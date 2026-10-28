@@ -36,6 +36,14 @@ struct alignas(8) PlainHero {
 };
 struct PlainRoot { xo::XVector<PlainHero> heroes; };
 } // namespace orec
+XOFFSET_RECORD_DERIVED(orec::Skill, (), id, level)
+XOFFSET_RECORD_DERIVED(orec::Buff, (), id, stacks, expire_ms)
+XOFFSET_RECORD_DERIVED(orec::Hero, (), id, level, star, name, skills, buffs)
+XOFFSET_RECORD_DERIVED(orec::Root, (), heroes)
+XOFFSET_RECORD_DERIVED(orec::PlainSkill, (), id, level)
+XOFFSET_RECORD_DERIVED(orec::PlainBuff, (), id, stacks, expire_ms)
+XOFFSET_RECORD_DERIVED(orec::PlainHero, (), id, level, star, name, skills, buffs)
+XOFFSET_RECORD_DERIVED(orec::PlainRoot, (), heroes)
 
 XOFFSET_ORDINARY_RECORDS(orec::Hero, orec::Skill, orec::Buff)
 XOFFSET_REGISTER_SCHEMA_NAME(orec::Root, "test.ordinary_records.root")
@@ -60,13 +68,19 @@ struct Base { std::int32_t a{}; };
 struct Derived : Base { std::int32_t b{}; };
 struct Bits { std::uint32_t a : 4; std::uint32_t b : 28; };
 } // namespace orec_checks
+XOFFSET_RECORD_DERIVED(orec_checks::Disjoint, (), e, x)
+XOFFSET_RECORD_DERIVED(orec_checks::Derived, (orec_checks::Base), b)
 static_assert(xo::detail::ordinary_record_members_disjoint<orec::Hero>());
 static_assert(xo::detail::ordinary_record_members_disjoint<orec_checks::Disjoint>());
+#if XOFFSET_SCHEMA_REFLECTION // overlapping ([[no_unique_address]]) members: no field list possible
 static_assert(!xo::detail::ordinary_record_members_disjoint<orec_checks::Overlap>());
+#endif
 static_assert(xo::detail::ordinary_record_has_no_bases<orec::Hero>());
 static_assert(!xo::detail::ordinary_record_has_no_bases<orec_checks::Derived>());
 static_assert(xo::detail::ordinary_record_has_no_bit_fields<orec::Hero>());
+#if XOFFSET_SCHEMA_REFLECTION // a bit-field cannot be listed in a field list
 static_assert(!xo::detail::ordinary_record_has_no_bit_fields<orec_checks::Bits>());
+#endif
 
 namespace {
 [[noreturn]] void fail(const std::string& message) {

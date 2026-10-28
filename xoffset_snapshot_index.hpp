@@ -24,18 +24,15 @@ namespace snapshot_index_detail {
             for (const auto& child : value) if (inline_heads(child, visit)) return true;
         } else if constexpr (fixed_detail::is_owning_head<U>::value) {
             return visit(value);
-        } else if constexpr (std::is_class_v<U> && boost::typelayout::is_byte_copy_safe_v<U>) {
+        } else if constexpr (std::is_class_v<U> && is_byte_copy_safe_v<U>) {
             bool stop = false;
             detail::for_each_reflected_subobject<U>([&](auto index) {
-                constexpr auto base = std::meta::bases_of(^^U,
-                    std::meta::access_context::unchecked())[decltype(index)::value];
-                using Base = [:std::meta::type_of(base):];
+                using Base = schema::base_t<U, decltype(index)::value>;
                 if (!stop) stop = inline_heads(static_cast<const Base&>(value), visit);
             }, [&](auto index) {
-                constexpr auto member = std::meta::nonstatic_data_members_of(^^U,
-                    std::meta::access_context::unchecked())[decltype(index)::value];
-                if constexpr (!std::meta::is_bit_field(member))
-                    if (!stop) stop = inline_heads(value.[:member:], visit);
+                using member = schema::member_t<U, decltype(index)::value>;
+                if constexpr (!member::is_bit_field)
+                    if (!stop) stop = inline_heads(member::get(value), visit);
             });
             return stop;
         }
@@ -57,18 +54,15 @@ namespace snapshot_index_detail {
                 if constexpr (!std::is_trivially_copyable_v<typename U::value_type>)
                     for (const auto& child : value) if (find_parent(child, parent)) return true;
             }
-        } else if constexpr (std::is_class_v<U> && boost::typelayout::is_byte_copy_safe_v<U>) {
+        } else if constexpr (std::is_class_v<U> && is_byte_copy_safe_v<U>) {
             bool found = false;
             detail::for_each_reflected_subobject<U>([&](auto index) {
-                constexpr auto base = std::meta::bases_of(^^U,
-                    std::meta::access_context::unchecked())[decltype(index)::value];
-                using Base = [:std::meta::type_of(base):];
+                using Base = schema::base_t<U, decltype(index)::value>;
                 if (!found) found = find_parent(static_cast<const Base&>(value), parent);
             }, [&](auto index) {
-                constexpr auto member = std::meta::nonstatic_data_members_of(^^U,
-                    std::meta::access_context::unchecked())[decltype(index)::value];
-                if constexpr (!std::meta::is_bit_field(member))
-                    if (!found) found = find_parent(value.[:member:], parent);
+                using member = schema::member_t<U, decltype(index)::value>;
+                if constexpr (!member::is_bit_field)
+                    if (!found) found = find_parent(member::get(value), parent);
             });
             return found;
         }
@@ -160,7 +154,7 @@ public:
         const auto key = result.owner_.segments()[0].data();
         void* block = nullptr;
         Control* constructed = nullptr;
-        try {
+        XOFFSET_TRY {
             if (!snapshot_index_detail::find_parent(result.owner_.root(), &parent)) return result;
             std::size_t count = 0;
             auto count_head = [&](const auto&) {
@@ -184,15 +178,15 @@ public:
                 const auto offset = reinterpret_cast<std::uintptr_t>(&head) - first;
                 if (offset > sizeof(Element) || sizeof(H) > sizeof(Element) - offset ||
                     offset > (std::numeric_limits<std::uint32_t>::max)())
-                    throw XException("snapshot index: invalid declared subobject offset");
+                    XOFFSET_THROW(XException(XErrc::invalid_state, "snapshot index: invalid declared subobject offset"));
                 std::construct_at(entries(c) + position++, Entry{
                     static_cast<std::uint32_t>(offset), &snapshot_index_detail::type_tag<H>});
                 return false;
             };
             snapshot_index_detail::inline_heads(parent[0], fill_head);
-            if (position != count) throw XException("snapshot index: changed declaration traversal");
+            if (position != count) XOFFSET_THROW(XException(XErrc::invalid_state, "snapshot index: changed declaration traversal"));
             result.control_ = c; // publish only a complete allocation
-        } catch (...) {
+        } XOFFSET_CATCH(...) {
             if (constructed) std::destroy_at(constructed);
             if (block) ::operator delete(block);
             if (reserved) snapshot_index_detail::release(key, charge);

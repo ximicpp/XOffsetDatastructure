@@ -38,11 +38,21 @@ inline int madvise(void* addr, std::size_t length, int advice) {
 
 namespace xo = XOffsetDatastructure;
 
+#if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
+#define XOFFSET_TEST_FRESH_OUTPUT 1
+#else
+// Without resize_and_overwrite (C++20) save_verified() sizes its output with
+// resize(), which zeroes it: the output is resident before the copy and is
+// never populated. The build-matrix report measures that cost.
+#define XOFFSET_TEST_FRESH_OUTPUT 0
+#endif
+
 namespace wp {
 struct Root {
     xo::XVector<std::uint64_t> data;
 };
 } // namespace wp
+XOFFSET_RECORD_DERIVED(wp::Root, (), data)
 
 XOFFSET_REGISTER_SCHEMA_NAME(wp::Root, "test.wire_populate.root")
 namespace XOffsetDatastructure {
@@ -81,12 +91,15 @@ int main() {
     // Every output of at least 1 MiB is a fresh mapping: glibc without its
     // dynamic threshold; sanitizer allocators map large blocks anyway (and
     // ignore mallopt).
+#if defined(M_MMAP_THRESHOLD) // glibc; bionic has no such knob
     (void)mallopt(M_MMAP_THRESHOLD, 1 << 20);
+#endif
     namespace h = populate_hook;
     const auto big_size = big.save_verified().size();
     h::calls = h::bytes = 0;
     const auto reference = resident_copy(big, big_size);
     need(h::calls == 0, "a resident output was populated");
+#if XOFFSET_TEST_FRESH_OUTPUT
     {   // Fresh output: populated chunk by chunk, same bytes.
         h::calls = h::bytes = 0;
         const auto wire = big.save_verified();
@@ -97,6 +110,15 @@ int main() {
         auto loaded = Buffer::load(wire);
         need(loaded.save_verified() == wire, "populated wire does not round-trip");
     }
+#else
+    {   // A zeroed (resident) output: not populated, same bytes.
+        h::calls = 0;
+        const auto wire = big.save_verified();
+        need(wire == reference && h::calls == 0, "zeroed output populated or different");
+        auto loaded = Buffer::load(wire);
+        need(loaded.save_verified() == wire, "wire does not round-trip");
+    }
+#endif
     {   // Reused output with enough capacity: resident, not populated.
         std::string out = reference;
         h::calls = 0;
@@ -108,6 +130,7 @@ int main() {
         const auto wire = small.save_verified();
         need(h::calls == 0 && wire == resident_copy(small, wire.size()), "small output populated or different");
     }
+#if XOFFSET_TEST_FRESH_OUTPUT
     {   // Kernel without MADV_POPULATE_WRITE: one EINVAL, then plain copies.
         h::einval = true;
         h::calls = 0;
@@ -122,7 +145,9 @@ int main() {
         h::einval = false;
         xo::detail::wire_populate_unsupported.store(false);
     }
-    std::cout << "test_wire_populate: 4 groups passed (" << big_size << " B wire)\n";
+#endif
+    std::cout << "test_wire_populate: " << (XOFFSET_TEST_FRESH_OUTPUT ? 4 : 3) << " groups passed (" << big_size << " B wire"
+              << (XOFFSET_TEST_FRESH_OUTPUT ? "" : ", zeroed outputs") << ")\n";
 #else
     const auto wire = big.save_verified();
     need(wire == resident_copy(big, wire.size()), "output differs");

@@ -28,16 +28,20 @@ struct GranuleRoot {
     xo::XMap<std::uint32_t, bool> sorted;
     xo::XVector<std::uint32_t> words;
 };
+XOFFSET_RECORD_DERIVED(GranuleScalar, (), a, b, table)
+XOFFSET_RECORD_DERIVED(GranuleRoot, (), no_checks, flags, name, plain, booleans, sorted, words)
 XOFFSET_REGISTER_SCHEMA_NAME(GranuleRoot, "tests.validation.granules")
 struct PairRoot {
     xo::XVector<std::uint8_t> left;
     xo::XVector<std::uint8_t> right;
 };
+XOFFSET_RECORD_DERIVED(PairRoot, (), left, right)
 XOFFSET_REGISTER_SCHEMA_NAME(PairRoot, "tests.validation.granules.pair")
 struct BigRoot {
     xo::XVector<std::uint64_t> values;
     xo::XString tail;
 };
+XOFFSET_RECORD_DERIVED(BigRoot, (), values, tail)
 XOFFSET_REGISTER_SCHEMA_NAME(BigRoot, "tests.validation.granules.big")
 
 namespace {

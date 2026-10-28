@@ -4,10 +4,19 @@ set(XOFFSET_FULL_OWN_HEADERS
     receive_raw.hpp
     receive_raw_fwd.hpp
     validation_scratch.hpp
+    xoffset_admission.hpp
     xoffset_core_lifetime.hpp
+    xoffset_fixed_string.hpp
+    xoffset_schema.hpp
+    xoffset_schema_describe.hpp
+    xoffset_schema_reflect.hpp
     xoffset_snapshot_index.hpp
     xoffset_snapshot_index_budget.hpp
     xoffset_validation_scratch.hpp
     xoffset_verified_paths.hpp
     xoffset_verified_receive.hpp
+    xoffset_schema_names.hpp
+    xoffset_handshake.hpp
+    xoffset_evolution.hpp
+    xoffset_schema_freeze.hpp
 )

@@ -2,6 +2,112 @@
 
 ## Unreleased
 
+## 3.2.0-rc.1: preview for device testing
+
+A preview of 3.2 for testing on real Android phones and iPhones; not a
+release, not announced. Against 3.1.0 it adds the client build path (C++20/C++23
+field lists, Android NDK, MSVC, clang-cl, MinGW, Apple clang), builds without
+exceptions, schema evolution with a handshake, and the end-to-end map demo
+(Linux servers with C++26 reflection, clients on Windows, Android, iOS, macOS).
+Wire format 2.1 is unchanged.
+
+Status at this tag: real devices are untested (the reason for this
+preview; `docs/DEVICE_TESTING.md` is the procedure). The Android emulator (API 35
+arm64, Mac M4) and the iOS Simulator (iOS 27.0, Xcode 27.1, 129/129) passed the
+full CTest, the wire corpus and the demo. No Mac checkpoint ran on this commit; the last Mac
+gate (GATE_D4, for #153) measured D÷FlatBuffers 0.908 (upper bound 0.918), and
+the mainline checkpoint against 3.1.0 is still due. The 7-night fuzz is no longer a 3.2 condition (susu
+2026-10-28); the nightly runs are paused. G9 stays at 17/19. The iOS device
+procedure (test host app, signing) follows in the next preview.
+
+- Client build path, field-list backend: with C++20 or C++23 (no reflection)
+  each record lists its fields once with `XOFFSET_RECORD`; the library walks
+  records through the schema interface (`xoffset_schema.hpp`) in both
+  backends, and the C++26 reflection build checks every field list against
+  the reflected type. Both builds write the same wire bytes. Toolchain files
+  and `tools/native_targets.sh` for Android arm64 (NDK r29/r30), Windows x64
+  MSVC 19.44, clang-cl 19 and MinGW GCC, and the iOS Simulator
+  (`docs/CLIENT_TARGETS.md`, user guide 2.1).
+- Schema evolution: `xoffset_handshake.hpp` (schema hello/ack with a
+  field-name digest, `peek_wire_fingerprint`), `xoffset_evolution.hpp`
+  (server side, C++26 reflection: per-peer receive and send of older schema
+  versions), the schema freeze tool and lineage (`docs/SCHEMA_EVOLUTION.md`).
+  Clients need only the handshake.
+- Verified reload of a dense small message is faster: `root<T>()` returns
+  the root admitted by the last make or verified load while its epoch is
+  current, and the reload skips checks of bytes it just wrote.
+- End-to-end map demo (`demo/mapstate`): Linux servers A/B (GCC 16, C++26
+  reflection) send dense, compact and zstd snapshots to clients built with
+  C++20 field lists, with and without exceptions; recorded runs for Windows
+  (MinGW, MSVC, clang-cl), Android emulator, iOS Simulator and macOS in
+  `demo/mapstate/RESULT.md`.
+- SC-8: builds without exceptions (`-fno-exceptions`, MSVC `/EHs-c-`) for
+  engine clients. Non-throwing receive entries `try_load_verified`,
+  `try_load_verified_with_resource`, `try_reload_verified`,
+  `try_reload_verified_with_resource`, `try_begin_verified_reload` and
+  `VerifiedReloadToken::try_finish` (and the `TypedXBuffer` forms) return
+  `XResult<T>` / `XStatus` with an `XErrc` code and the exact message the
+  throwing entry throws. `XException::code()` is new; `XException` and
+  `XBadAlloc` moved to the new header `xoffset_error.hpp` (installed with
+  the storage package). Without exceptions, failures that cannot be
+  returned call the handler set with `set_fatal_handler` and abort.
+  Validation is unchanged: the fuzz core compares every rejection of
+  `try_load_verified` with `load_verified`, and 24 test programs, the OS
+  layer test and the validator fuzz run without exceptions in CTest.
+  Raw validation and verified receive have no non-throwing entry yet.
+  `xoffset_handshake.hpp` loads handshake messages through
+  `try_load_verified` in builds without exceptions.
+- Nightly fuzz covers schema evolution: `tools/fuzz_libfuzzer.sh` runs
+  `fuzz_schema_evolution` by default (targets v2_wire, wire_schemas,
+  schema_evolution), and the GCC 16 replay in `tools/fuzz_nightly.sh` replays
+  `tests/fuzz/regressions/schema_evolution/` and its seed corpus through
+  `fuzz_schema_evolution_replay`.
+- MinGW GCC: a program with two translation units that include
+  `xoffset_error.hpp` failed to link (`multiple definition of TLS init
+  function for ...pending_error`), with or without exceptions. The pending
+  error is now a function-local `thread_local`; `test_vm_storage_noexc` is
+  built from two translation units.
+
+### Public API change: container iterators are a class, not `T*`
+
+`XVector`, `XSet`, `XMap`, `XFixedVector`, `XFixedFlatSet` and `XFixedFlatMap`
+now use `fixed_detail::contiguous_iterator<T>` for `iterator` and
+`fixed_detail::contiguous_iterator<const T>` for `const_iterator`. Before this
+change they were `T*` and `const T*`. The new iterator is a
+`std::contiguous_iterator` whose `operator*` returns `T&`. That tells the
+compiler every element can be read, so a `for (const auto& e : v)` loop with a
+conditional field read is if-converted and vectorized, as it is over
+`std::vector`. With a raw pointer the loop stayed scalar with a branch.
+
+On the Mac (GATE_D3, against `f0308ee7`) SLG D got faster: D.read went from
+82.2 to 67.0 µs, and D÷FlatBuffers from 1.125 to 0.898 (upper bound 0.912),
+so O4 is met. A/B/C did not regress (largest upper bound 1.0107), G9 stays
+at 17/19, and D on x86 is not slower.
+
+Still compiles:
+
+- range-for, `begin() + n`, `it - v.begin()`, `it[n]`, `&*it`, `it->x` and
+  comparisons;
+- `v.end() == nullptr`;
+- passing a `T*` where an iterator is expected, e.g. `v.erase(ptr)` or
+  `v.insert(ptr, x)`;
+- std algorithms, `std::span(v)` and `assign(v.begin(), v.end())`.
+
+`iterator` converts to `const_iterator`, not the reverse.
+
+No longer compiles. Use `v.data()` or `std::to_address(it)` instead:
+
+1. `T* p = v.begin();`
+2. passing `v.begin()` to a `T*` parameter;
+3. `std::memcpy(v.begin(), ...)` and other `void*` parameters;
+4. `std::is_pointer_v<XVector<T>::iterator>`;
+5. `T* q = it;` for an iterator `it`;
+6. `if (v.begin())` as an emptiness test (use `v.empty()`).
+
+`XString` is unchanged. At `-O0` a range-for over a container is about 2.4
+times slower per element than with `T*`, but it is still faster than the same
+loop over `std::vector`.
+
 ## 3.1.0: wire format 2.1
 
 Wire format 2.1 replaces 2.0 (breaking: senders and receivers upgrade

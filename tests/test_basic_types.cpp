@@ -5,13 +5,15 @@
 
 #include <iostream>
 #include <cassert>
-#include "../xoffsetdatastructure.hpp"
+#include "test_allocator_ctors.hpp"
 
 using namespace XOffsetDatastructure;
 
 struct BasicTypes {
+#if XOFFSET_TEST_ALLOCATOR_CTORS
     template <typename Allocator>
     BasicTypes(Allocator allocator) {}
+#endif
     
     int mInt;
     float mFloat;
@@ -19,6 +21,9 @@ struct BasicTypes {
     char mChar;
     bool mBool;
 };
+#if !XOFFSET_TEST_ALLOCATOR_CTORS
+XOFFSET_RECORD_DERIVED(BasicTypes, (), mInt, mFloat, mDouble, mChar, mBool)
+#endif
 
 // Type safety validation
 static_assert(is_byte_copy_safe_v<BasicTypes>,

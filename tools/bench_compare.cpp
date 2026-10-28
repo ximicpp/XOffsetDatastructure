@@ -79,6 +79,14 @@ struct BenchRow {
     std::size_t used_bytes;
     std::size_t wire_bytes;
 };
+} // namespace (unnamed)
+XOFFSET_RECORD_DERIVED(BenchItem, (), id, qty, name)
+XOFFSET_RECORD_DERIVED(VecIntRoot, (), values)
+XOFFSET_RECORD_DERIVED(VecItemRoot, (), values)
+XOFFSET_RECORD_DERIVED(MapRoot, (), values)
+XOFFSET_RECORD_DERIVED(StringRoot, (), scratch)
+XOFFSET_RECORD_DERIVED(SnapshotRoot, (), title, level, items, names)
+namespace {
 
 bool should_run(
     std::string_view name,

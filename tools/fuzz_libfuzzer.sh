@@ -15,7 +15,7 @@
 #
 #   tools/fuzz_report.py --repo ximicpp/XOffsetDatastructure report \
 #     --findings-dir OUT --needs-json OUT/needs.json \
-#     --expect gcc16-diff,gcc16-replay,libfuzzer-v2_wire,libfuzzer-wire_schemas ...
+#     --expect gcc16-diff,gcc16-replay,libfuzzer-v2_wire,libfuzzer-wire_schemas,libfuzzer-schema_evolution ...
 #
 # --inject is the drill: builds with XOFFSET_FUZZ_INJECT_CRASH=ON, runs an
 # XOFFSET-INJECT input on v2_wire (one finding expected) and keeps the corpus
@@ -31,7 +31,7 @@ P2996_TARBALL=${P2996_TARBALL:-/mnt/project-files/toolchains/p2996-d77eff1-linux
 FUZZ_FLAGS='-max_len=262144 -rss_limit_mb=2048 -timeout=30'
 MODE_FLAGS='-fork=4 -ignore_crashes=1 -ignore_ooms=1 -ignore_timeouts=1 -use_value_profile=1'
 
-OUT='' SECS=1200 INJECT=OFF TARGETS='v2_wire wire_schemas'
+OUT='' SECS=1200 INJECT=OFF TARGETS='v2_wire wire_schemas schema_evolution'
 CORPUS_STORE=/mnt/project-files/fuzz-nightly/corpus
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -47,7 +47,7 @@ if [ -z "$OUT" ] || ! [[ "$SECS" =~ ^[0-9]+$ ]] || [ "$SECS" -lt 10 ]; then
   echo "usage: $0 --out DIR [--seconds N>=10] [--corpus-dir DIR] [--targets a,b] [--inject]" >&2; exit 2
 fi
 for T in $TARGETS; do
-  case "$T" in v2_wire|wire_schemas) ;; *) echo "unknown target '$T'" >&2; exit 2 ;; esac
+  case "$T" in v2_wire|wire_schemas|schema_evolution) ;; *) echo "unknown target '$T'" >&2; exit 2 ;; esac
 done
 
 ROOT=$(git -C "$(dirname "$0")" rev-parse --show-toplevel) || exit 2
@@ -128,7 +128,7 @@ chmod +x build/xo-native
     -DCMAKE_BUILD_RPATH="$P2996_ROOT/lib/x86_64-unknown-linux-gnu" \
     -DXOFFSET_BUILD_FUZZERS=ON -DXOFFSET_BUILD_EXAMPLES=OFF -DXOFFSET_BUILD_TOOLS=OFF -DXOFFSET_FUZZ_INJECT_CRASH=$INJECT &&
   "$CMAKE" --build build/libfuzzer --parallel "$(nproc)" \
-    --target test_v2_fuzz fuzz_v2_wire fuzz_wire_schemas fuzz_wire_schemas_seeds; } > "$OUT/libfuzzer-build.log" 2>&1 ||
+    --target test_v2_fuzz fuzz_v2_wire fuzz_wire_schemas fuzz_wire_schemas_seeds fuzz_schema_evolution fuzz_schema_evolution_seeds; } > "$OUT/libfuzzer-build.log" 2>&1 ||
   { echo "libFuzzer build failed, see libfuzzer-build.log"; tail -n 20 "$OUT/libfuzzer-build.log"; exit 0; }
 BIN=build/libfuzzer/bin/Debug
 
@@ -140,6 +140,7 @@ for T in $TARGETS; do
   case "$T" in
     v2_wire) $BIN/test_v2_fuzz --write-corpus "$W/seeds" > "$R/seeds.log" 2>&1 ;;
     wire_schemas) $BIN/fuzz_wire_schemas_seeds "$W/seeds" > "$R/seeds.log" 2>&1 ;;
+    schema_evolution) $BIN/fuzz_schema_evolution_seeds "$W/seeds" > "$R/seeds.log" 2>&1 ;;
   esac
   SOURCE=none
   if [ -f "$CORPUS_STORE/$T.tar.gz" ] && tar -xzf "$CORPUS_STORE/$T.tar.gz" -C "$CORPUS" 2>> "$R/corpus-restore.log"; then

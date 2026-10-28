@@ -36,6 +36,8 @@
   enum 的底层类型。它就是 wire 头里 schema 指纹的输入（指纹另外包含注册的 schema
   名称）。
 - 宏可以放在命名空间作用域或函数体内。类型名里有逗号时，先用 `using` 起别名。
-- 交叉编译时由目标平台的编译器求值，所以 iOS、Android、Windows 的构建同样受约束。
+- 每个构建由它自己的编译器求值，交叉编译时就是目标平台的编译器，所以 Windows（MinGW）
+  客户端的构建同样受约束。Android、iOS 客户端用 C++20 字段表构建（3.2.0-rc.1 起），见
+  [CLIENT_TARGETS.md](CLIENT_TARGETS.md)。
 - 这是构建期检查，不替代运行时校验：`load_verified` 仍然完整校验每个 wire。
-- CI 用 `schema_pin_mismatch` 测试确认不一致时确实编译失败。
+- CTest 里的 `schema_pin_mismatch` 测试确认不一致时确实编译失败。

@@ -15,7 +15,10 @@ Verdicts per tier:
   * a_checks.csv and client_checks.csv exist, non-empty, every row "pass";
     a_checks.csv has the six fixed row names;
   * every snapshot request id logged by A was logged by the client and vice
-    versa, with equal tick, category, visible, wire_bytes and digest;
+    versa, with equal tick, category, visible, wire_bytes and digest, and
+    (rows carrying them) equal encoding, net_bytes and wire_digest: the
+    client verified the very bytes A wrote, in the encoding it asked for;
+  * a client run with --encoding cycle received every encoding;
   * normal, full and empty categories each sampled on both sides; every
     empty snapshot has visible == 0; every full-scene snapshot has
     visible == units; check_ok all 1 on both sides.
@@ -24,9 +27,13 @@ runs sent byte-identical step wires (equal digests at every tick).
 --compare OTHER_ROOT: every tier here sent the same step wires, tick by tick,
 as the tier of the same unit count in OTHER_ROOT (another compiler,
 platform or build), over at least --min-steps common ticks.
-Self-test: exit 0 and every selftest_checks.csv row "pass".
-Evil (each mode): a, b, client exited 0, A logged at least 4 "rejected:"
+Self-test: exit 0 and every selftest_checks.csv row "pass" (--no-selftest:
+not run for these binaries).
+Evil (each mode): a, b, client exited 0, A logged at least 6 "rejected:"
 lines and every row of the evil client's client_checks.csv passes.
+Client offline runs (run_e2e.sh), when present: selfcheck/ (client
+--self-check) and replay/ (client --replay of a corpus) exited 0 with every
+client_checks.csv row "pass".
 
 Per-category numbers are computed here from the per-request rows
 (nearest-rank percentiles); whole-run numbers come from the processes'
@@ -65,6 +72,8 @@ VIEW_METRICS = (
     ("a.snap_save_us", "A snapshot save"),
     ("a.snap_destroy_us", "A snapshot destroy"),
     ("a.snap_bytes", "snapshot wire (A)"),
+    ("a.snap_net_bytes", "snapshot frame payload (A; zstd: compressed)"),
+    ("a.snap_compress_us", "A snapshot zstd compress"),
     ("a.visible_count", "visible units (A)"),
     ("c.view_rtt_us", "client view round trip (ViewReq sent -> snapshot complete)"),
     ("c.load_us", "client verify snapshot (load / reload)"),
@@ -73,6 +82,8 @@ VIEW_METRICS = (
     ("c.present_us", "client present"),
     ("c.destroy_us", "client snapshot destroy"),
     ("c.snap_bytes", "snapshot wire (client)"),
+    ("c.snap_net_bytes", "snapshot frame payload (client)"),
+    ("c.decompress_us", "client snapshot zstd decompress"),
     ("c.visible_count", "visible units (client)"),
     ("c.catalog_load_us", "client catalog load_verified (once)"),
 )
@@ -84,9 +95,13 @@ A_CHECK_NAMES = ("batch_roundtrip", "reference_model", "modification_coverage",
 # INTERFACES.md section 6; the headless client has no draw / present, and
 # with --buffers reuse nothing is destroyed per message.
 HEADLESS_OPTIONAL = ("c.draw_us", "c.present_us")
+# Recorded only when a snapshot was zstd-compressed; checked per encoding.
+ENCODING_OPTIONAL = ("a.snap_compress_us", "c.decompress_us")
+ENCODINGS = ("dense", "compact", "zstd")
+EVENT_ENCODINGS = ("raw", "zstd", "zdict", "batch")
 DESTROY_METRICS = ("a.destroy_us", "b.destroy_us", "a.snap_destroy_us", "c.destroy_us")
 REQUIRED_METRICS = tuple(k for k, _ in BATCH_METRICS + VIEW_METRICS
-                         if k not in HEADLESS_OPTIONAL) + ("a.units_count", "a.ticks_per_s")
+                         if k not in HEADLESS_OPTIONAL + ENCODING_OPTIONAL) + ("a.units_count", "a.ticks_per_s")
 MODES = ("fresh", "reuse")
 
 
@@ -215,6 +230,81 @@ def exit_code_verdicts(v, scope, codes, names):
         v.add(scope, n + " exit 0", codes.get(n) == "0", "exit " + codes.get(n, "missing"))
 
 
+def client_events_mode(meta):
+    """The client's --events mode from meta.txt, or None when it did not subscribe."""
+    words = meta.get("client_args", "").split()
+    if "--evil" in words or "--events" not in words:
+        return None
+    i = words.index("--events")
+    mode = words[i + 1] if i + 1 < len(words) else ""
+    return None if mode == "off" else mode
+
+
+def summarize_events(v, scope, d, meta):
+    """Event stream (INTERFACES.md section 6): every Events frame A sent
+    arrived, decoded to the same wires (digest) and passed the client's
+    checks. None when the client did not subscribe."""
+    mode = client_events_mode(meta)
+    if mode is None:
+        return None
+    a_ev = read_csv(os.path.join(d, "a_events.csv"))
+    c_ev = read_csv(os.path.join(d, "client_events.csv"))
+    v.add(scope, "a_events.csv and client_events.csv present", a_ev is not None and c_ev is not None,
+          "A {} client {}".format("ok" if a_ev is not None else "missing",
+                                  "ok" if c_ev is not None else "missing"))
+    a_ev = a_ev or []
+    c_ev = c_ev or []
+
+    def key(r):
+        return (r.get("tick"), r.get("part"), r.get("encoding"))
+
+    a_by = {key(r): r for r in a_ev}
+    c_by = {key(r): r for r in c_ev}
+    matched = mismatched = 0
+    examples = []
+    for k, ar in a_by.items():
+        cr = c_by.get(k)
+        if cr is None:
+            continue
+        diffs = [f for f in ("count", "wire_bytes", "net_bytes", "digest") if ar.get(f) != cr.get(f)]
+        if diffs:
+            mismatched += 1
+            if len(examples) < 5:
+                examples.append("{}: {}".format("/".join(k), ", ".join(
+                    "{} A={} C={}".format(f, ar.get(f), cr.get(f)) for f in diffs)))
+        else:
+            matched += 1
+    a_only = len(set(a_by) - set(c_by))
+    c_only = len(set(c_by) - set(a_by))
+    dups = len(a_ev) - len(a_by) + len(c_ev) - len(c_by)
+    v.add(scope, "A and client event logs agree (count, sizes, digest per frame)",
+          matched > 0 and mismatched == 0 and a_only == 0 and c_only == 0 and dups == 0,
+          "matched {} mismatched {} A-only {} client-only {} duplicates {}{}".format(
+              matched, mismatched, a_only, c_only, dups, ("; " + "; ".join(examples)) if examples else ""))
+    bad = sum(1 for r in c_ev if r.get("check_ok") != "1")
+    v.add(scope, "client event check_ok all 1", c_ev and bad == 0,
+          "{} rows, {} with check_ok != 1".format(len(c_ev), bad))
+    wanted = EVENT_ENCODINGS if mode == "cycle" else (mode,)
+    per = {}
+    for enc in EVENT_ENCODINGS:
+        rows = [r for r in c_ev if r.get("encoding") == enc]
+        n = sum(num(r.get("count")) for r in rows)
+        wire = sum(num(r.get("wire_bytes")) for r in rows)
+        net = sum(num(r.get("net_bytes")) for r in rows)
+        per[enc] = {
+            "frames": len(rows), "events": int(n) if rows else 0,
+            "wire_per_event": wire / n if rows and n else float("nan"),
+            "net_per_event": net / n if rows and n else float("nan"),
+            "a.encode_us": stats([num(r.get("encode_us")) for r in a_ev if r.get("encoding") == enc]),
+            "c.decode_us": stats([num(r.get("decode_us")) for r in rows]),
+            "c.verify_us": stats([num(r.get("verify_us")) for r in rows]),
+        }
+    missing = [e for e in wanted if not per[e]["frames"]]
+    v.add(scope, "every event encoding sampled (--events {})".format(mode), not missing,
+          ", ".join("{} {}".format(e, per[e]["frames"]) for e in wanted))
+    return {"mode": mode, "per_encoding": per, "frames": len(c_ev)}
+
+
 def summarize_tier(root, name, min_steps):
     d = os.path.join(root, name)
     scope = name
@@ -269,8 +359,9 @@ def summarize_tier(root, name, min_steps):
         cr = c_by.get(rid)
         if cr is None:
             continue
-        diffs = [k for k in ("tick", "category", "visible", "wire_bytes", "digest")
-                 if ar.get(k) != cr.get(k)]
+        keys = ["tick", "category", "visible", "wire_bytes", "digest"]
+        keys += [k for k in ("encoding", "net_bytes", "wire_digest") if k in ar and k in cr]
+        diffs = [k for k in keys if ar.get(k) != cr.get(k)]
         if diffs:
             mismatched += 1
             if len(mismatch_examples) < 5:
@@ -293,6 +384,27 @@ def summarize_tier(root, name, min_steps):
         bad = sum(1 for r in rows if r.get("check_ok") != "1")
         v.add(scope, side + " snapshot check_ok all 1", rows and bad == 0,
               "{} rows, {} with check_ok != 1".format(len(rows), bad))
+
+    per_enc = {}
+    for enc in ENCODINGS:
+        ar = [r for r in a_snap if r.get("encoding") == enc]
+        cr = [r for r in c_snap if r.get("encoding") == enc]
+        per_enc[enc] = {
+            "a_count": len(ar), "client_count": len(cr),
+            "wire_bytes": stats([num(r.get("wire_bytes")) for r in cr]),
+            "net_bytes": stats([num(r.get("net_bytes")) for r in cr]),
+            "a.save_us": stats([num(r.get("save_us")) for r in ar]),
+            "a.compress_us": stats([num(r.get("compress_us")) for r in ar]),
+            "c.rtt_us": stats([num(r.get("rtt_us")) for r in cr]),
+            "c.decompress_us": stats([num(r.get("decompress_us")) for r in cr]),
+            "c.load_us": stats([num(r.get("load_us")) for r in cr]),
+        }
+    if "--encoding cycle" in meta.get("client_args", ""):
+        missing_enc = [e for e in ENCODINGS if not per_enc[e]["a_count"] or not per_enc[e]["client_count"]]
+        v.add(scope, "every encoding sampled (--encoding cycle)", not missing_enc,
+              ", ".join("{} {}/{}".format(e, per_enc[e]["a_count"], per_enc[e]["client_count"]) for e in ENCODINGS))
+
+    events = summarize_events(v, scope, d, meta)
 
     per_cat = {}
     for cat in CATEGORIES:
@@ -347,7 +459,7 @@ def summarize_tier(root, name, min_steps):
                          "destroy_us", "free_blocks", "free_bytes")},
         "metrics": metrics,
         "checks": {"a": a_checks or [], "client": c_checks or []},
-        "digest": digest, "per_category": per_cat, "verdicts": v,
+        "digest": digest, "per_category": per_cat, "per_encoding": per_enc, "events": events, "verdicts": v,
     }
 
 
@@ -425,6 +537,50 @@ def render_tier(lines, t):
     row("client read + present data, MERGED (us)", lambda c: mean_p95(c["c.read_present_us"]))
     row("client destroy (us)", lambda c: mean_p95(c["c.destroy_us"]))
     lines.append("")
+    pe = t["per_encoding"]
+    if any(pe[e]["client_count"] for e in ENCODINGS):
+        lines.append("### View snapshots by encoding (per-request rows; mean / p95)")
+        lines.append("")
+        lines.append("wire = the XOffset wire the client verified; net = the frame payload (zstd: compressed).")
+        lines.append("")
+        lines.append("| | " + " | ".join(ENCODINGS) + " |")
+        lines.append("| --- | " + " | ".join("---:" for _ in ENCODINGS) + " |")
+
+        def erow(label, f):
+            lines.append("| {} | {} |".format(label, " | ".join(f(pe[e]) for e in ENCODINGS)))
+
+        erow("requests (A / client)", lambda c: "{} / {}".format(c["a_count"], c["client_count"]))
+        erow("wire bytes", lambda c: mean_p95(c["wire_bytes"], "_bytes"))
+        erow("net bytes", lambda c: mean_p95(c["net_bytes"], "_bytes"))
+        erow("A save (us)", lambda c: mean_p95(c["a.save_us"]))
+        erow("A zstd compress (us)", lambda c: mean_p95(c["a.compress_us"]))
+        erow("client round trip (us)", lambda c: mean_p95(c["c.rtt_us"]))
+        erow("client zstd decompress (us)", lambda c: mean_p95(c["c.decompress_us"]))
+        erow("client verify snapshot (us)", lambda c: mean_p95(c["c.load_us"]))
+        lines.append("")
+    ev = t.get("events")
+    if ev:
+        lines.append("### Event stream (--events {}; per Events frame of up to 128 events)".format(ev["mode"]))
+        lines.append("")
+        lines.append("wire = the UnitEvent wires per event; net = the frame payload per event "
+                     "(raw: count + lengths + wires; zstd: one frame per wire; zdict: dictionary frame "
+                     "per wire; batch: one dictionary frame for the whole Events frame).")
+        lines.append("")
+        pv = ev["per_encoding"]
+        encs = [e for e in EVENT_ENCODINGS if pv[e]["frames"]]
+        lines.append("| | " + " | ".join(encs) + " |")
+        lines.append("| --- | " + " | ".join("---:" for _ in encs) + " |")
+
+        def vrow(label, f):
+            lines.append("| {} | {} |".format(label, " | ".join(f(pv[e]) for e in encs)))
+
+        vrow("frames / events", lambda c: "{} / {}".format(c["frames"], c["events"]))
+        vrow("wire bytes per event", lambda c: fmt(c["wire_per_event"]))
+        vrow("net bytes per event", lambda c: fmt(c["net_per_event"]))
+        vrow("A encode per frame (us)", lambda c: mean_p95(c["a.encode_us"]))
+        vrow("client decode per frame (us)", lambda c: mean_p95(c["c.decode_us"]))
+        vrow("client verify per frame (us)", lambda c: mean_p95(c["c.verify_us"]))
+        lines.append("")
     lines.append("### View path, whole run (process metrics)")
     lines.append("")
     metric_table(lines, m, VIEW_METRICS, t["mode"])
@@ -495,6 +651,7 @@ def main():
     ap.add_argument("root", help="OUT_ROOT of run_all_tiers.sh")
     ap.add_argument("--min-steps", type=int, default=500)
     ap.add_argument("--no-evil", action="store_true", help="evil run was skipped")
+    ap.add_argument("--no-selftest", action="store_true", help="server self-test was not run here")
     ap.add_argument("--label", default="", help="free text, e.g. machine and compiler")
     ap.add_argument("--out", help="Markdown report path (default: stdout)")
     ap.add_argument("--json", help="JSON summary path")
@@ -548,10 +705,19 @@ def main():
                             len(common), len(bad), (": first at tick " + bad[0]) if bad else "",
                             ref[1].get("host", "-")))
 
-    st_codes = read_kv(os.path.join(root, "selftest", "exit_codes.txt"))
-    exit_code_verdicts(overall, "selftest", st_codes, ("selftest",))
-    st_rows = read_csv(os.path.join(root, "selftest", "selftest_checks.csv"))
-    check_rows(overall, "selftest", "selftest_checks", st_rows)
+    st_rows = None
+    if not args.no_selftest:
+        st_codes = read_kv(os.path.join(root, "selftest", "exit_codes.txt"))
+        exit_code_verdicts(overall, "selftest", st_codes, ("selftest",))
+        st_rows = read_csv(os.path.join(root, "selftest", "selftest_checks.csv"))
+        check_rows(overall, "selftest", "selftest_checks", st_rows)
+
+    for offline in ("selfcheck", "replay"):
+        d = os.path.join(root, offline)
+        if not os.path.isdir(d):
+            continue
+        exit_code_verdicts(overall, offline, read_kv(os.path.join(d, "exit_codes.txt")), ("client",))
+        check_rows(overall, offline, "client_checks", read_csv(os.path.join(d, "client_checks.csv")))
 
     if not args.no_evil:
         evil_dirs = sorted(n for n in os.listdir(root)
@@ -562,7 +728,7 @@ def main():
             ev = read_kv(os.path.join(root, n, "exit_codes.txt"))
             exit_code_verdicts(overall, n, ev, ("a", "b", "client"))
             rej = int(num(ev.get("a_rejected_lines")) if not math.isnan(num(ev.get("a_rejected_lines"))) else 0)
-            overall.add(n, "A logged >= 4 rejected requests", rej >= 4, "{} line(s)".format(rej))
+            overall.add(n, "A logged >= 6 rejected requests", rej >= 6, "{} line(s)".format(rej))
             check_rows(overall, n, "evil client_checks",
                        read_csv(os.path.join(root, n, "client_checks.csv")))
 
@@ -576,6 +742,11 @@ def main():
     lines.append("- label: {}".format(args.label or "-"))
     lines.append("- host: {}; commit: {}; seed: {}; steps per tier: {}".format(
         meta0.get("host", "-"), meta0.get("commit", "-"), meta0.get("seed", "-"), meta0.get("steps", "-")))
+    if tiers:
+        build = os.path.join(root, tiers[0]["name"], "client_build.txt")
+        if os.path.isfile(build):
+            with open(build) as f:
+                lines.append("- client: `{}` built {}".format(meta0.get("client_cmd", "-"), f.read().strip()))
     lines.append("- overall: **{}** ({} verdicts, {} failed)".format(
         "PASS" if passed else "FAIL", len(all_items), sum(1 for i in all_items if not i[2])))
     lines.append("- percentiles: process metrics as the processes computed them; per-category rows here, nearest rank")

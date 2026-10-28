@@ -121,8 +121,8 @@ build/gcc-docker bash -euo pipefail -c "
     \"-DCMAKE_CXX_FLAGS=-O1 \$XOFFSET_GCC_SANITIZE\" \
     -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined \
     -DXOFFSET_BUILD_EXAMPLES=OFF -DXOFFSET_BUILD_TOOLS=OFF -DXOFFSET_FUZZ_INJECT_CRASH=$INJECT
-  cmake --build build/gcc16-asan --parallel \$(nproc) --target test_v2_fuzz fuzz_v2_wire_replay fuzz_wire_schemas_replay
-  for T in v2_wire wire_schemas; do
+  cmake --build build/gcc16-asan --parallel \$(nproc) --target test_v2_fuzz fuzz_v2_wire_replay fuzz_wire_schemas_replay fuzz_schema_evolution_replay
+  for T in v2_wire wire_schemas schema_evolution; do
     build/gcc16-asan/bin/Debug/fuzz_\${T}_replay --write-seeds $WORK/seeds/\$T
   done" > "$OUT/build.log" 2>&1 || { echo "build failed, see build.log"; tail -n 20 "$OUT/build.log"; exit 0; }
 
@@ -161,6 +161,7 @@ mkdir -p "$OUT/gcc16-replay"
 python3 tools/fuzz_gcc16.py replay --image "$IMAGE" --out "$OUT/gcc16-replay" \
   --spec "v2_wire:$BIN/fuzz_v2_wire_replay:tests/fuzz/regressions/v2_wire:$WORK/seeds/v2_wire$V2_EXTRA" \
   --spec "wire_schemas:$BIN/fuzz_wire_schemas_replay:tests/fuzz/regressions/wire_schemas:$WORK/seeds/wire_schemas" \
+  --spec "schema_evolution:$BIN/fuzz_schema_evolution_replay:tests/fuzz/regressions/schema_evolution:$WORK/seeds/schema_evolution" \
   > "$OUT/gcc16-replay/findings.log" 2>&1
 if [ -f "$OUT/gcc16-replay/findings.json" ]; then
   N=$(python3 -c 'import json, sys; print(len(json.load(open(sys.argv[1]))["findings"]))' "$OUT/gcc16-replay/findings.json")

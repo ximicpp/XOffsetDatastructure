@@ -1,4 +1,4 @@
-# 3.1.0 兼容与输入边界
+# 3.2.0-rc.1 兼容与输入边界
 
 （文件名沿用 alpha 时期。）此预发布版面向固定编译器、依赖、schema 并自行验收的试用者。核心实现可用，
 但预发布版之间不承诺源码 API 或 ABI 稳定（稳定承诺只有 K0–K7，见 `docs/STABILITY_TESTS.md`），也不承诺任意编译器、标准库、schema
@@ -7,13 +7,13 @@
 
 ## 版本和工具链
 
-源码根目录的 `XOFFSET_VERSION`（安装后为 `share/XOffsetDatastructure/VERSION`）是完整版本 `3.1.0` 的唯一文本来源；CMake project 数字版本是
-`3.1.0`。安装消费采用无版本查找，再检查完整字符串：
+源码根目录的 `XOFFSET_VERSION`（安装后为 `share/XOffsetDatastructure/VERSION`）是完整版本 `3.2.0-rc.1` 的唯一文本来源；CMake project 数字版本是
+`3.2.0`。安装消费采用无版本查找，再检查完整字符串：
 
 ```cmake
 find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
-if(NOT XOffsetDatastructure_VERSION STREQUAL "3.1.0")
-    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 3.1.0")
+if(NOT XOffsetDatastructure_VERSION STREQUAL "3.2.0-rc.1")
+    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 3.2.0-rc.1")
 endif()
 ```
 
@@ -43,7 +43,7 @@ root/schema/type/layout 身份及有效的对象图（活块与空洞表恰好�
 并不能让不同布局兼容。需要持久化跨版本读取时，应保留能够读取原格式的工具链、
 schema 与转换程序，并单独验证迁移结果。
 
-- 存储类型必须满足 `boost::typelayout::is_byte_copy_safe_v<T>`。
+- 存储类型必须满足 `XOffsetDatastructure::is_byte_copy_safe_v<T>`。
 - 固定 schema verified 路径还要求 `is_v1_wire_admitted_v<T>`（名称沿用旧版，规则适用于 V2）；
   这是额外的 wire 准入约束，不等于“所有可平凡复制的 C++ 类型均可用”。
 - 使用 library 的 XString/XVector 等 arena 容器。普通进程地址、原生指针/引用、

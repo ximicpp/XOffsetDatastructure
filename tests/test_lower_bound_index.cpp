@@ -28,6 +28,7 @@ struct Root {
     xo::XMap<xo::XString, std::int32_t> named;  // non-scalar key keeps the old loop
 };
 } // namespace lbi
+XOFFSET_RECORD_DERIVED(lbi::Root, (), wide, narrow, tiny, ids, small, kinds, reals, named)
 
 XOFFSET_REGISTER_SCHEMA_NAME(lbi::Root, "test.lower_bound_index.root")
 

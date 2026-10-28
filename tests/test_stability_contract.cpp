@@ -27,6 +27,8 @@ struct Root {
     xo::XMap<std::uint32_t, xo::XString> notes;
 };
 } // namespace sc
+XOFFSET_RECORD_DERIVED(sc::Item, (), id, label)
+XOFFSET_RECORD_DERIVED(sc::Root, (), epoch, items, notes)
 
 XOFFSET_REGISTER_SCHEMA_NAME(sc::Root, "test.stability_contract.root")
 

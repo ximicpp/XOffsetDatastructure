@@ -6,6 +6,7 @@
 using namespace XOffsetDatastructure;
 using allocator_model::require;
 struct AllocatorModelRoot { std::uint64_t marker{}; XVector<std::uint32_t> values; XString label; };
+XOFFSET_RECORD_DERIVED(AllocatorModelRoot, (), marker, values, label)
 XOFFSET_REGISTER_SCHEMA_NAME(AllocatorModelRoot,"test.AllocatorModelRoot")
 namespace {
 // V2 blocks carry no header: a block's extent is derived from its owner as

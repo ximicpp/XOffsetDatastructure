@@ -36,6 +36,10 @@ struct PlainRoot {
     xo::XString spacer;
 };
 } // namespace ag
+XOFFSET_RECORD_DERIVED(ag::Rec, (), id, name, values)
+XOFFSET_RECORD_DERIVED(ag::Root, (), recs, spacer)
+XOFFSET_RECORD_DERIVED(ag::PlainRec, (), id, name, values)
+XOFFSET_RECORD_DERIVED(ag::PlainRoot, (), recs, spacer)
 
 XOFFSET_REGISTER_SCHEMA_NAME(ag::Root, "test.append_grow.root")
 XOFFSET_REGISTER_SCHEMA_NAME(ag::PlainRoot, "test.append_grow.plain")

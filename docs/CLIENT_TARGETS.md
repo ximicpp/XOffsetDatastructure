@@ -1,29 +1,73 @@
-# 客户端目标可行性（K8，3.1.0）
+# 客户端目标可行性（K8）
 
-结论：服务端与客户端之间使用 XOffset，在 **Linux arm64** 和 **Windows x64（MinGW-w64 GCC 16）**
-上已验证（2026-10-21 GitHub CI；CI 停用后改为本地矩阵，3.1.0 RC 五列全过，见下一节）；**Android** 和 **iOS** 目前不可行，缺的是工具链前提，不是库本身的问题。
-服务端与客户端必须用同一 schema、同时发布（见产品定位）。
+最核心的场景是服务端之间、服务端到客户端：服务端 Linux，客户端 Windows / iOS / Android，
+都是 64 位小端，不依赖具体的客户端引擎。服务端与客户端必须用同一 schema、同时发布
+（见 [DEPLOYMENT.md](DEPLOYMENT.md) 第 2 节）。库有两条构建路径，wire 逐字节相同：
 
-## 已验证（`.github/workflows/client-targets.yml`）
+- **C++26**：P2996 反射描述每个记录，需要 clang-p2996 或带反射的 GCC。服务端走这条路。
+- **C++20 / C++23**：每个记录写一行 `XOFFSET_RECORD` 字段表（`-DXOFFSET_CXX_STANDARD=20|23`），
+  不需要反射，原生客户端编译器都能用。客户端走这条路；同一行字段表在服务端的 C++26 构建里
+  会和反射逐项核对。
 
-| 目标 | 编译器 | 验证内容 | 结果 |
-| --- | --- | --- | --- |
-| Linux x86-64（参照） | GCC 16（gcc 镜像按 digest 固定） | 写出参照 wire 语料 | 作为其他目标的比对基准 |
-| Linux arm64（GitHub `ubuntu-24.04-arm` 原生） | GCC 16（arm64 平台 manifest digest 固定） | Debug 全量 CTest；读入 x86-64 语料并全部接受；写出本机语料与 x86-64 语料 `diff -r` | 全量通过，wire 逐字节一致 |
-| Windows x64（`windows-latest` + MSYS2 UCRT64） | MinGW-w64 GCC 16.2（要求 ≥ 16） | Debug 全量 CTest 87/87（Ninja）；Release 构建读入 x86-64 语料并全部接受；写出本机语料与 x86-64 语料 `diff -r` | 全量通过；5 个语料（empty、small、medium_holes、reloaded_mutated、sparse）逐字节一致 |
+K8（客户端与服务端同一套库、同一 wire）是目标，尚未承诺，实现中：字段表后端已合入（#149，3.2.0-rc.1 起），
+下表 Android、Windows 和 iOS 模拟器各工具链已通过，iOS 真机待测。三个客户端目标都原生构建、CTest 通过（iOS 含
+地址空间实测并定下最低部署目标）、跨目标 wire 语料一致、签名与 `tools/sigs/` 基线一致之后，才升为
+核心承诺（[USER_GUIDE.md](USER_GUIDE.md) 第 8 节，测试对照见 [STABILITY_TESTS.md](STABILITY_TESTS.md)）。
 
-Windows 上需要注意的三点（都已在仓库里处理）：
+## C++20 / C++23 字段表构建
 
-- 依赖锁按子模块字节做哈希，checkout 前要 `core.autocrlf false`、`core.eol lf`，否则 Boost 的
-  `* text=auto` 会把文件转成 CRLF，锁校验失败。
-- 顶层构建在 MinGW 上静态链接运行时（`-static`）。动态 `libstdc++-6.dll` 里的 `std::pmr` 等
-  内部分配不经过测试替换的 `operator new`，分配失败注入类测试会测不到。这只影响本仓库自己的
-  测试和工具，不进入导出的接口。
-- 签名导出工具以二进制方式写文件，提交的签名基线在所有主机上都是 LF。
+运行入口：`tools/native_targets.sh TARGET --std 20|23 --ref <参照语料>`（工具链文件在
+`cmake/toolchains/`）。每个目标都跑 Release 全量 CTest，然后做 wire 语料检查：写出本机语料，
+读入参照 wire（必须全部接受），再与参照语料 `diff -r`。参照语料由 Linux x86-64 GCC 16 C++26
+（反射）写出，共 6 个：elided、empty、medium_holes、reloaded_mutated、small、sparse。
 
-## 本地平台矩阵（v1.1 起，代替 GitHub CI）
+防止回退：`tools/local_validate.sh` 带这些列（`msvc-c++20`、`msvc-c++23`、`clang-cl-c++20`、
+`mingw-c++20`、`ndk29-c++20`、`ndk30-c++20`），参照语料由同一提交的 GCC 16 C++26 构建现写。
+CTest 里包括关异常的 `*_noexc` 程序。默认运行里的 `client-c++20` 步骤保证每个 PR 至少跑一个
+C++20 客户端列：按 MSVC、clang-cl、NDK r29、NDK r30、MinGW 的顺序取本机能跑的第一个；一个都跑不了
+时这一步失败。`--clients` 和 `--release` 跑全部客户端列。云端新容器装 MSVC 用
+`tools/msvc-wine/fetch_msvc.py /opt/msvc`（再跑 `tools/msvc-wine/case_links.py /opt/msvc` 给 clang-cl 用）。
 
-`tools/platform_matrix.sh TARGET` 构建、跑全量 CTest，并拿 Linux x86-64 GCC 16 写出的参照语料做
+| 目标 | 编译器 | 标准 | 实际运行方式 | 结果 |
+| --- | --- | --- | --- | --- |
+| Android arm64-v8a | NDK r29 Clang 21.0.0，API 28，`c++_static` | C++20 | 全静态链接，云端 x86-64 上用 `qemu-aarch64-static` 跑 CTest | 129/129（含 21 个关异常测试）；语料全部接受，逐字节一致 |
+| Android arm64-v8a | NDK r30 Clang 21.0.0 | C++20 | 同上 | 129/129（含 21 个关异常测试）；语料全部接受，逐字节一致 |
+| Windows x64 | MSVC 19.44（VS 2022 17.14 工具集 14.44.35207，Windows SDK 10.0.26100），`/MT` | C++20、C++23 | 云端用 wine 9.0 运行 cl/link（`cmake/toolchains/msvc-wine-x86_64.cmake`）和 CTest | 两种标准都是 129/129（含 21 个关异常测试）；语料全部接受，逐字节一致 |
+| Windows x64 | clang-cl 19 + 同一套 MSVC STL 和 SDK，`/MT` | C++20 | `cmake/toolchains/clang-cl-x86_64.cmake`，CTest 经 wine | 129/129（含 21 个关异常测试）；语料全部接受，逐字节一致 |
+| Windows x64 | MinGW-w64 GCC 13.2（posix 线程），`-static` | C++20 | CTest 经 wine | 129/129（含 21 个关异常测试）；语料全部接受，逐字节一致 |
+| macOS arm64 | Apple clang 21.0.0（Command Line Tools 26.5，系统 libc++），macOS 26.3 | C++20、C++23 | M4 Mac 上原生运行（探索分支，wire 2.0） | 两种标准都是 101/101；语料逐字节一致 |
+| iOS 模拟器 | Apple clang 21.0.0（Xcode 27.1，iPhoneSimulator 27.1 SDK），部署目标 iOS 17.0 | C++20 | M4 Mac 上的 iOS 27.0 模拟器（iPhone 17），`ios-simulator.cmake`，CTest 经 `simctl spawn` | 129/129；语料全部接受，逐字节一致。模拟器进程用的是 Mac 的地址空间，真机上的地址空间实测仍待做 |
+| Linux x86-64 | GCC 13 / 16、Clang 18、P2996 Clang（各自 C++20，GCC 16 另有 C++23） | C++20、C++23 | `tools/local_validate.sh` 的矩阵列，含 ASan 列 | 都是 106/106；字段表构建与反射构建的校验结果逐条相同（差分 2×200000 例） |
+
+各目标需要注意的地方：
+
+- **Android**：测试里的分配失败注入用 `aligned_alloc`，bionic 从 API 28 起才有，所以测试构建
+  默认 API 28；库本身不依赖它。没有 KVM 时只能跑全静态的 bionic 程序，工具链文件在
+  `XOFFSET_ANDROID_QEMU=ON` 时加 `-static`。bionic 的 `__cxa_thread_atexit_impl` 用
+  `operator new` 分配线程析构节点（glibc 用 calloc），所以线程第一次使用 thread_local 缓存时，
+  替换了 `operator new` 的测试会多看到一次分配。
+- **Windows（MSVC、clang-cl）**：
+  - `XOFFSET_RECORD` 需要符合标准的预处理器 `/Zc:preprocessor`。CMake 接口目标会自动加上；
+    不用 CMake 时，传统预处理器会在编译期直接报错说明。
+  - 库在包含 `<windows.h>` 时临时定义 `WIN32_LEAN_AND_MEAN` 和 `NOMINMAX`（只在用户没定义时），
+    所以 `rpcndr.h` 的 `small` 宏不会进来。`near`、`far` 仍是宏，不要用作标识符。
+  - MSVC 的 ABI 把 `alignas` 限制在 8192 以内，单个类型不能超过 0x7fffffff 字节。
+  - `[[no_unique_address]]`：MSVC 忽略它。GCC/Clang 上它让成员重叠时 `XOFFSET_RECORD` 直接拒绝
+    （成员不能重叠）；只用反射的服务端会接受并打出 8 字节的 pin，MSVC 客户端照这个 pin 写的
+    `XOFFSET_PIN_SCHEMA` 会编译失败（MSVC 布局是 12 字节）。共享类型不要用它。
+  - `std::string::resize_and_overwrite` 在 MSVC 上只在 `/std:c++latest`（CMake 的 C++23）下可用，
+    C++20 下库走普通的 `resize` 路径。
+- **Windows（MinGW GCC）**：GCC 在 MinGW 上用模拟 TLS（emutls），库里的每线程缓存在线程退出时
+  会出错，所以 GCC + MinGW/Cygwin 下默认关闭这些缓存（`XOFFSET_THREAD_CACHES=0`）。
+- **macOS / iOS（std::pmr）**：库用系统 libc++ 的 `std::pmr`。系统 libc++ 从 macOS 14 / iOS 17 起
+  才有这些符号，而 libc++ 头文件没有给 pmr 加可用性标注，部署目标更低时照样能编译、链接，到旧
+  系统上加载时才失败。所以 C++20/23 构建的默认部署目标是 macOS 14，更低的部署目标在编译期报错。
+  NDK、MinGW 和 MSVC 都把标准库静态链进程序，没有这个系统版本门槛。
+
+## C++26 反射构建：本地平台矩阵（3.1.0 起的记录）
+
+GitHub CI 自 2026-10-23 停用，`.github/workflows/` 里的文件不再运行。现在的记录是
+`tools/platform_matrix.sh TARGET`：它构建、跑全量 CTest，并拿 Linux x86-64 GCC 16 写出的参照语料做
 `--read` 和 `diff -r`，结果写进构建目录的 `PLATFORM_RESULT.md`。
 
 | 目标 | 在哪跑 | 编译器 | 最近结果 |
@@ -36,22 +80,47 @@ Windows 上跳过的两项是 `test_canonical_cold_no_callback` 和 `test_canoni
 每线程 owner 缓存，而 GCC 在 MinGW 上用 emutls，线程退出时访问 `thread_local` 会拿到新块，所以这类
 缓存在 MinGW GCC 上整体关闭（`XOFFSET_THREAD_CACHES=0`），这两项以退出码 77 报跳过。
 
-## 目前不可行
+Windows 上需要注意的三点（都已在仓库里处理）：
 
-**Android（arm64-v8a）**：NDK 自带的 Clang 没有 P2996 反射，NDK 自 r18 起也不再提供 GCC，
-所以现在没有能编译 XOffset 的 Android 工具链。Linux arm64 的结果说明同一 ABI（LP64、小端、
-AArch64 对齐规则）下 wire 一致，但这只是旁证，不等于 Android 已验证。前提：P2996（或 C++26
-反射）进入 NDK Clang，或者自行构建一套面向 Android 的 P2996 Clang + libc++。
+- 依赖锁按子模块字节做哈希，checkout 前要 `core.autocrlf false`、`core.eol lf`，否则 Boost 的
+  `* text=auto` 会把文件转成 CRLF，锁校验失败。
+- 顶层构建在 MinGW 上静态链接运行时（`-static`）。动态 `libstdc++-6.dll` 里的 `std::pmr` 等
+  内部分配不经过测试替换的 `operator new`，分配失败注入类测试会测不到。这只影响本仓库自己的
+  测试和工具，不进入导出的接口。
+- 签名导出工具以二进制方式写文件，提交的签名基线在所有主机上都是 LF。
 
-**iOS / iOS 模拟器**：在 Apple M4 Mac 上用 clang-p2996 d77eff1 探测（2026-10-21），结果是：
+NDK Clang 没有 P2996 反射，NDK 自 r18 起也不再提供 GCC；P2996 工具链只有 macOS 版 libc++ 和
+`*_osx` compiler-rt，没有 iOS / iOS 模拟器版；MSVC 和 clang-cl 也没有反射。所以 Android、iOS 和
+MSVC 客户端都走上面的 C++20 / C++23 字段表构建。
 
-- 没有 Xcode，没有 iOS / iOS 模拟器 SDK（`xcrun --sdk iphoneos` 找不到 SDK）；
-- P2996 工具链只有 macOS 版 libc++（`LC_BUILD_VERSION` platform 1）和 `*_osx` compiler-rt，
-  没有 ios / iossim 版，也没有按 target 分开的 `__config_site`。
+## 历史记录：GitHub CI（2026-10-21，wire 格式 2.0）
 
-所以即使装上 Xcode 也只能走到编译，链接仍会失败。前提：Xcode + iOS SDK，并为 P2996 工具链
-单独构建 iOS 与 iOS 模拟器版的 libc++ 和 compiler-rt。
+CI 停用前 `.github/workflows/client-targets.yml` 的结果，格式是 2.0，测试数也比现在少；只作历史参考。
+
+| 目标 | 编译器 | 验证内容 | 结果 |
+| --- | --- | --- | --- |
+| Linux x86-64（参照） | GCC 16（gcc 镜像按 digest 固定） | 写出参照 wire 语料 | 作为其他目标的比对基准 |
+| Linux arm64（GitHub `ubuntu-24.04-arm` 原生） | GCC 16（arm64 平台 manifest digest 固定） | Debug 全量 CTest；读入 x86-64 语料并全部接受；写出本机语料与 x86-64 语料 `diff -r` | 全量通过，wire 逐字节一致 |
+| Windows x64（`windows-latest` + MSYS2 UCRT64） | MinGW-w64 GCC 16.2（要求 ≥ 16） | Debug 全量 CTest 87/87（Ninja）；Release 构建读入 x86-64 语料并全部接受；写出本机语料与 x86-64 语料 `diff -r` | 全量通过；5 个语料（empty、small、medium_holes、reloaded_mutated、sparse）逐字节一致 |
+
+## 握手（3.2.0-rc.1 起）
+
+客户端与服务端的 schema 版本不同时，3.2 的服务端负责转换（[SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)）。
+客户端只多一次握手，用 `xoffset_handshake.hpp`：连接建立后发
+`make_schema_hello<...>()`，收到服务端的 ack 后用 `read_schema_ack<...>()` 读出结果，
+被拒绝时提示更新。这两个函数不抛异常；关异常的构建里握手消息经 `try_load_verified` 装载
+（下一节）。客户端不包含 `xoffset_evolution.hpp`，没有转换代码。
+
+## 关异常构建（SC-8）
+
+不开异常的引擎（`-fno-exceptions`，MSVC `/EHs-c- /D_HAS_EXCEPTIONS=0`）可以直接包含 XOffset，
+接收时用 `try_load_verified` / `try_reload_verified` / `try_begin_verified_reload` 拿错误码和错误
+文字，其他不可返回的失败走 `set_fatal_handler`（`docs/USER_GUIDE.md` 第 6.2 节）。CTest 里
+`*_noexc` 的 24 个程序和 `test_vm_storage_noexc`（C++17 OS 层）都按关异常编译；
+`tools/no_exceptions_differential.sh` 比较开、关异常两种构建对同一批变异 wire 的结果。
+C++26 反射构建（P2996、GCC 16）和 C++20 字段表构建（GCC 16、P2996 Clang）都在云端 Linux x86-64
+上跑过这些测试；其他客户端目标的关异常构建随各自平台列验证。
 
 ## 范围
 
-只支持 64 位目标。32 位客户端、大端平台不在 3.1.0 范围内。
+只支持 64 位小端目标。32 位客户端、大端平台不在范围内。
