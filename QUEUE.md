@@ -1,10 +1,10 @@
 # Mac queue
 
-Updated 2026-10-28T06:41:03Z after 048-ckpt4: done 2 2026-10-28T06:41:00Z
+Updated 2026-10-28T06:59:13Z after 049-ckpt4: running 2026-10-28T06:59:10Z
 
 ```
 runner: pid 4651 (version 2)
-free: 48 GB on /Volumes/XOffsetCS, 48 GB on /Users/ximi
+free: 31 GB on /Volumes/XOffsetCS, 31 GB on /Users/ximi
 001-GATE_COMPOSED                        done 0 2026-10-26T09:59:24Z
 002-int1-r2                              done 0 2026-10-26T11:33:59Z
 003-d5-diag-pre                          done 21 2026-10-26T11:47:50Z
@@ -53,4 +53,5 @@ free: 48 GB on /Volumes/XOffsetCS, 48 GB on /Users/ximi
 046-gated3                               done 0 2026-10-27T19:06:20Z
 047-gated4                               done 0 2026-10-27T21:12:11Z
 048-ckpt4                                done 2 2026-10-28T06:41:00Z
+049-ckpt4                                running 2026-10-28T06:59:10Z
 ```
