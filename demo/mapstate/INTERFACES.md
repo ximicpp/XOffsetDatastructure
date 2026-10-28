@@ -127,6 +127,10 @@ mapdemo_selftest [--csv-dir DIR]
   03:19Z 10-22); a mismatch shows up as a `reference_model` check failure on A.
 - `--steps 0` and `--duration-s 0` mean unlimited. A stops after whichever limit
   is reached, sends `Bye` to B and the client, writes its CSV files, exits.
+  After the `Bye` A shuts down its sending side and reads each client
+  connection until the client closes (2 s at most) before closing it: a
+  request still unread at close would reset the connection, and a Windows
+  client then drops the snapshot and `Bye` it has not read yet (10-28).
 - `--check` defaults: on for A and the headless client, off for the window client.
 - Exit codes: 0 success, 1 a check failed, 2 usage / protocol / IO / capacity error.
   Every error prints one line starting with `error:` to stderr.

@@ -395,6 +395,28 @@ void Conn::close() noexcept {
     tx_.clear();
 }
 
+void Conn::shutdown_send() noexcept {
+    if (fd_ == kInvalidSocket) return;
+#if defined(_WIN32)
+    ::shutdown(NativeSocket(fd_), SD_SEND);
+#else
+    ::shutdown(NativeSocket(fd_), SHUT_WR);
+#endif
+}
+
+bool Conn::discard_input() noexcept {
+    if (fd_ == kInvalidSocket) return false;
+    char buf[4096];
+    for (;;) {
+        const long long got = recv_some(fd_, buf, sizeof buf);
+        if (got > 0) continue;
+        if (got == 0) return false;   // the peer closed
+        const int e = last_error();
+        if (interrupted(e)) continue;
+        return would_block(e);        // false on an error
+    }
+}
+
 // Frames already queued by enqueue() go out first so the stream stays ordered.
 Status Conn::drain_queue() {
     for (;;) {
