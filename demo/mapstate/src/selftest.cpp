@@ -830,6 +830,80 @@ void test_schema_versions() {
                    : ex.first);
 }
 
+// Write-back as the demo runs it (client --edits; A's Edit and Forward). A
+// snapshot loaded from a compact wire (no free space) is changed in place,
+// the client's save_verified wire is verified at the Edit limit with the
+// same content digest, and bytes the client hid in the units vector's
+// spare capacity pass that verification but not A's save_compact rebuild.
+// A buffer loaded without headroom refuses to grow (XBadAlloc); a client
+// built without exceptions would stop there instead (DEPLOYMENT.md 4.3).
+void test_writeback() {
+    Expect ex;
+    XB bb = XB::load_verified<UnitStateBatch>(batch_wire(2000), cap_batch());
+    const Rect view{{0.0f, 0.0f}, {kViewWidth, kViewHeight}};
+    XB dense = XB::load_verified<ViewSnapshot>(snapshot_wire(bb.root<UnitStateBatch>(), 21, view), cap_snapshot());
+    const std::string compact = dense.save_compact<ViewSnapshot>(XCompactOptions{0});
+    XB c = XB::load_verified<ViewSnapshot>(compact, cap_snapshot());
+    ViewSnapshot& s = c.root<ViewSnapshot>();
+    const std::size_t received = s.units.size();
+    ex(received >= 2, "fewer than 2 units in the view");
+    if (received < 2) {
+        record("writeback", false, ex.first);
+        return;
+    }
+    s.units[0].hp = s.units[0].hp >= 100 ? 50 : s.units[0].hp + 1;
+    const std::uint32_t erased = s.units[received / 2].id;
+    s.units.stable_erase_if([&](const VisibleUnit& u) { return u.id == erased; });
+    VisibleUnit& added = s.units.emplace_back();
+    added.id = 0x80000001u;
+    added.hp = 75;
+    added.pos = Point{512.0f, 384.0f};
+    added.name = std::string_view("client-edit-00000001");
+    const std::string longer = std::string(s.units[1].name.view()) + "-renamed-by-client";
+    s.units[1].name = std::string_view(longer);
+    const std::uint64_t digest = checks::snapshot_digest(s);
+    const checks::Result rules_ok = checks::edit_sanity_of(s);
+    ex(rules_ok.ok, "edit_sanity_of refused the edit: " + rules_ok.detail);
+    // Bytes the content does not reach: the vector's spare capacity.
+    s.units.reserve(s.units.size() + 4);
+    static constexpr char kHidden[] = "HIDDEN-BY-CLIENT";
+    std::memcpy(reinterpret_cast<char*>(s.units.data() + s.units.size()), kHidden, sizeof kHidden - 1);
+    const std::string up = c.save_verified<ViewSnapshot>();
+    ex(up.find(kHidden) != std::string::npos, "the hidden bytes are not in the client's wire");
+    ex(up.size() <= net::kEditLimit, "the client's wire exceeds the Edit limit");
+
+    XB in = XB::load_verified<ViewSnapshot>(up, XB::maximum_capacity(net::kEditLimit));
+    ex(checks::snapshot_digest(in.root<ViewSnapshot>()) == digest, "A's digest of the edit differs");
+    ex(in.root<ViewSnapshot>().units.size() == received, "the edit does not have one unit out and one in");
+    const std::string fwd = in.save_compact<ViewSnapshot>(XCompactOptions{0});
+    ex(fwd.find(kHidden) == std::string::npos, "save_compact forwarded the hidden bytes");
+    ex(fwd.size() < up.size(), "the rebuilt wire is not smaller than the client's");
+    XB out = XB::load_verified<ViewSnapshot>(fwd, XB::maximum_capacity(net::kEditLimit));
+    ex(checks::snapshot_digest(out.root<ViewSnapshot>()) == digest, "the forwarded content differs");
+
+    // No headroom: maximum_capacity just above the wire's own size (the
+    // payload can be a few bytes larger than the compact wire).
+    XB tight = XB::load_verified<ViewSnapshot>(
+        compact, XB::maximum_capacity(compact.size() + 256).with_growth(XGrowPolicy::Automatic));
+    bool refused = false;
+    try {
+        for (std::uint32_t i = 0; i < 64; ++i) {
+            VisibleUnit& u = tight.root<ViewSnapshot>().units.emplace_back();
+            u.id = 0x80000100u + i;
+            u.name = std::string_view("client-edit-no-headroom");
+        }
+    } catch (const XBadAlloc&) {
+        refused = true;
+    }
+    ex(refused, "growth past maximum_capacity was not refused");
+    record("writeback", ex.ok(),
+           ex.ok() ? fmt("%zu units from a %zu B compact wire: changed in place (hp, -1, +1, short name -> long), "
+                         "client wire %zu B, A's rebuild %zu B without the hidden bytes, same digest; "
+                         "no headroom -> XBadAlloc",
+                         received, compact.size(), up.size(), fwd.size())
+                   : ex.first);
+}
+
 void run_guarded(const char* name, void (*fn)()) {
     try {
         fn();
@@ -866,6 +940,7 @@ int main(int argc, char** argv) {
     run_guarded("checks_detect_faults", test_checks_detect_faults);
     run_guarded("net_two_process", test_net_two_process);
     run_guarded("schema_versions", test_schema_versions);
+    run_guarded("writeback", test_writeback);
 
     metrics::CsvFile csv;
     const std::string path = csv_dir + "/selftest_checks.csv";

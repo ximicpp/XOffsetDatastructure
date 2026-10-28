@@ -15,7 +15,8 @@
 # MAPDEMO_CLIENT / MAPDEMO_CLIENT_ARGS (see run_tier.sh; the evil run adds
 # --evil to MAPDEMO_CLIENT_ARGS), MAPDEMO_CLIENT2 / MAPDEMO_CLIENT2_ARGS (a
 # second client in every tier, at the same time; not in the evil run),
-# MAPDEMO_SKIP_SELFTEST=1 (the self-test and schema lock check of the
+# MAPDEMO_EDITS (run_tier.sh: write-back every Nth normal snapshot, default
+# 10; the evil run sends its own bad write-backs), MAPDEMO_SKIP_SELFTEST=1 (the self-test and schema lock check of the
 # servers already ran for these binaries).
 #
 # OUT_ROOT (default ./mapdemo-results) gets selftest/, schema_check/,
@@ -80,7 +81,7 @@ if [ "${MAPDEMO_SKIP_EVIL:-0}" != 1 ]; then
     for mode in $MODES; do
         echo "== evil (online failure inputs), --buffers $mode"
         MAPDEMO_PORT_A=$PORT MAPDEMO_PORT_B=$(( PORT + 1 )) MAPDEMO_BUFFERS=$mode \
-            MAPDEMO_CLIENT_ARGS="--evil ${MAPDEMO_CLIENT_ARGS:-}" MAPDEMO_A_ARGS= MAPDEMO_CLIENT2= \
+            MAPDEMO_CLIENT_ARGS="--evil ${MAPDEMO_CLIENT_ARGS:-}" MAPDEMO_A_ARGS= MAPDEMO_CLIENT2= MAPDEMO_EDITS=0 \
             "$HERE/run_tier.sh" "$BIN" 100 "$OUT_ROOT/evil_$mode" 200 || FAILED=1
         PORT=$(( PORT + 2 ))
         REJECTED=$(grep -c '^rejected:' "$OUT_ROOT/evil_$mode/a.log" 2>/dev/null || true)
