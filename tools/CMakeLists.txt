@@ -15,6 +15,8 @@ add_test(
 set_tests_properties(check_signature_matrix PROPERTIES LABELS "tooling")
 endif()
 
+xoffset_test_host_modules()
+
 # Signature export and its checks use reflection and TypeLayout: C++26 with the
 # reflection backend only.
 if(NOT XOFFSET_CXX_STANDARD STREQUAL "26" OR XOFFSET_SCHEMA_BACKEND STREQUAL "describe")
