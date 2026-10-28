@@ -18,7 +18,10 @@
 # headless client on the same A at the same time, e.g. the client of the
 # other schema version; its requests are numbered from 3000001 so A's log
 # keeps one row per request id; CSV files in OUT_DIR/client2/) with
-# MAPDEMO_CLIENT2_ARGS (its extra arguments, default MAPDEMO_CLIENT_ARGS).
+# MAPDEMO_CLIENT2_ARGS (its extra arguments, default MAPDEMO_CLIENT_ARGS),
+# MAPDEMO_EDITS (default 10: each client writes back every 10th normal
+# snapshot, --edits 10, and A forwards each edit to the other client of the
+# same schema version; 0 = no write-back).
 #
 # Writes OUT_DIR/{a,b,client}.log (and client2.log), the CSV files of
 # INTERFACES.md section 6, OUT_DIR/meta.txt and OUT_DIR/exit_codes.txt. Exit
@@ -44,6 +47,11 @@ A_ARGS=${MAPDEMO_A_ARGS:-}
 CLIENT=${MAPDEMO_CLIENT:-$BIN/mapdemo_client}
 CLIENT2=${MAPDEMO_CLIENT2:-}
 CLIENT2_ARGS=${MAPDEMO_CLIENT2_ARGS-$CLIENT_ARGS}
+EDITS=${MAPDEMO_EDITS:-10}
+if [ "$EDITS" != 0 ]; then
+    CLIENT_ARGS="$CLIENT_ARGS --edits $EDITS"
+    CLIENT2_ARGS="$CLIENT2_ARGS --edits $EDITS"
+fi
 
 for exe in mapdemo_a mapdemo_b; do
     if [ ! -x "$BIN/$exe" ]; then
@@ -94,9 +102,12 @@ wait_for() {
     echo "date_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "host=$(uname -srm)"
     echo "load_before=$(uptime | sed 's/.*load average[s]*: //')"
-    if command -v git >/dev/null 2>&1; then
-        echo "commit=$(git -C "$(dirname "$0")" rev-parse HEAD 2>/dev/null || echo unknown)"
-    fi
+    # An exported tree (tools/device/android_device.sh copies the source without
+    # .git) records its commit in .xo-commit at the root.
+    commit=$(git -C "$(dirname "$0")" rev-parse HEAD 2>/dev/null) \
+        || commit=$(tr -d ' \r\n' < "$(dirname "$0")/../../../.xo-commit" 2>/dev/null) \
+        || commit=unknown
+    echo "commit=${commit:-unknown}"
 } > "$OUT/meta.txt"
 
 "$BIN/mapdemo_b" --port "$PORT_B" --seed "$SEED" --buffers "$BUFFERS" --csv-dir "$OUT" > "$OUT/b.log" 2>&1 &

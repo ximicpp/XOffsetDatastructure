@@ -10,7 +10,8 @@
   会和反射逐项核对。
 
 K8（客户端与服务端同一套库、同一 wire）是目标，尚未承诺，实现中：字段表后端已合入（#149，3.2.0-rc.1 起），
-下表 Android、Windows 和 iOS 模拟器各工具链已通过，iOS 真机待测。三个客户端目标都原生构建、CTest 通过（iOS 含
+下表 Android、Windows 和 iOS 模拟器各工具链已通过；3.2.0-rc.1 在 Android 真机、Windows 和 macOS 实机上
+也已通过（下一节），iOS 真机待测。三个客户端目标都原生构建、CTest 通过（iOS 含
 地址空间实测并定下最低部署目标）、跨目标 wire 语料一致、签名与 `tools/sigs/` 基线一致之后，才升为
 核心承诺（[USER_GUIDE.md](USER_GUIDE.md) 第 8 节，测试对照见 [STABILITY_TESTS.md](STABILITY_TESTS.md)）。
 
@@ -63,6 +64,26 @@ C++20 客户端列：按 MSVC、clang-cl、NDK r29、NDK r30、MinGW 的顺序�
   才有这些符号，而 libc++ 头文件没有给 pmr 加可用性标注，部署目标更低时照样能编译、链接，到旧
   系统上加载时才失败。所以 C++20/23 构建的默认部署目标是 macOS 14，更低的部署目标在编译期报错。
   NDK、MinGW 和 MSVC 都把标准库静态链进程序，没有这个系统版本门槛。
+
+## 真机与实机：3.2.0-rc.1（39de636，2026-10-28）
+
+测试方在自己的机器上拉取 `v3.2.0-rc.1`，用 `tools/native_targets.sh`、`tools/platform_matrix.sh` 和
+`tools/device/android_device.sh` 跑出下表；参照语料是同一提交在 WSL2 Docker 里由 GCC 16.2 C++26 反射写出
+的 6 个 wire。结果只属于提交 39de636。核验、未通过的记录和证据索引见
+[validation/2026-10-28-rc1-platform/README.md](validation/2026-10-28-rc1-platform/README.md)。
+
+| 目标 | 编译器 | 标准 | 实际运行方式 | 结果 |
+| --- | --- | --- | --- | --- |
+| Android arm64-v8a 真机（Xiaomi M2102K1C，Android 11） | NDK r29 Clang 21，API 28 | C++20 | 手机上 adb 运行 CTest，编译失败测试在电脑上 | 114/114 + 15/15；语料全部接受，逐字节一致；demo 两个客户端 E2E PASSED |
+| Windows x64 实机（Windows 11） | MSVC 19.44.35229，`/MT`，`/utf-8` | C++20、C++23 | 原生 | 两种标准都是 129/129；语料全部接受，逐字节一致 |
+| macOS arm64 实机（SDK 26.4） | Apple clang 21.0.0 | C++20、C++23 | 原生 | 两种标准都是 129/129；语料全部接受，逐字节一致 |
+| macOS arm64 实机（同一台） | clang-p2996 9ffb96e3 | C++26 反射 | 原生 | 158/158；语料逐字节一致 |
+| Linux x86-64 远端虚拟机（KVM） | Zig 提供的 Clang 20.1.2 | C++20 | 原生 | 129/129；语料全部接受，逐字节一致 |
+| Linux x86-64，WSL2 Docker | GCC 16.2.0 | C++26 反射 | 写参照语料，也是 Android demo 的服务端 | 158/158 |
+
+129 和 158 是两种后端各自的全量清单，两者互不包含，不能相加。Windows 的第一次构建在代码页 936 下因测试源码
+里的非 ASCII 字符失败，加 `/utf-8` 后通过（之后项目对 MSVC 自动加 `/utf-8`）。本轮没有性能数据，没有
+iPhone，没有裸机 Linux；Windows 和 macOS 只跑了库和语料，没有跨设备 demo。
 
 ## C++26 反射构建：本地平台矩阵（3.1.0 起的记录）
 
@@ -143,6 +164,8 @@ iOS 不能运行命令行程序，Android 真机也不方便逐个推送测试�
 `xo_host_run.py` 可以当 CTest 的 `CMAKE_CROSSCOMPILING_EMULATOR`（`ios-simulator.cmake` 在
 `XOFFSET_TEST_HOST=ON` 时就这样设，`ios-device.cmake` 用 `XO_HOST_DEVICE`），也可以给
 `demo/mapstate/tools/run_e2e.sh` 当客户端包装命令。它把输入文件和输出目录在电脑和设备之间来回拷贝，
-程序看到的路径和在电脑上一样；退出码是程序自己的，被信号杀掉时是 128+信号。
+程序看到的路径和在电脑上一样；退出码是程序自己的，被信号杀掉时是 128+信号。程序替换的 `operator new` / `delete`
+（分配计数、失败注入）经宿主转发，C++ 运行库内部的分配也会走到它们，和普通可执行文件一样
+（`test_host_new_forwarding` 检查这一点）。
 云端 Linux 上用 `local` backend 检查过：129/129 个 CTest 通过，演示端到端（自检 23/23、语料回放 60/60、
 三档压力和恶意输入）全部通过。

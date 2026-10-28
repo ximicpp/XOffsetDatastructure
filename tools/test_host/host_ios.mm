@@ -52,7 +52,13 @@ std::vector<std::string> g_args;
     static std::vector<char*> argv;
     for (auto& a : g_args) argv.push_back(a.data());
     argv.push_back(nullptr);
-    xoffset_test_host::start_command_thread((int)g_args.size(), argv.data(), o);
+    // start once the launch has settled (the first frames, the system's own work on its
+    // queues): a program that counts allocations sees a quiet process
+    static xoffset_test_host::Options host_options;
+    host_options = o;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 300 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+        xoffset_test_host::start_command_thread((int)g_args.size(), argv.data(), host_options);
+    });
 }
 @end
 
@@ -70,6 +76,7 @@ std::vector<std::string> g_args;
 @end
 
 int main(int argc, char* argv[]) {
+    xoffset_test_host::keep_host_allocations_on_this_thread();  // UIKit's thread
     // devicectl and simctl pass the launch arguments after the program name; the
     // system may add its own (e.g. -NSDocumentRevisionsDebugMode YES) before them
     for (int i = 1; i < argc; ++i) {

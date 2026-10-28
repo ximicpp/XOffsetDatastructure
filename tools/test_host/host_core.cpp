@@ -386,7 +386,8 @@ void on_signal(int sig) {
     std::exit(code);
 }
 
-const xoffset_test_host_api g_api = {XOFFSET_TEST_HOST_API_VERSION, &program_exit};
+const xoffset_test_host_api g_api = {XOFFSET_TEST_HOST_API_VERSION, &program_exit, host_new_functions,
+                                     &set_new_functions};
 
 void install_signal_handlers() {
     static char alt[1 << 16];
