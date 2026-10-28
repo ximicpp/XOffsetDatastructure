@@ -47,6 +47,11 @@ this commit; the last one (CKPT4, 2026-10-28) measured D÷FlatBuffers 0.933.
   (`include/mapdemo/schema_v1.hpp`, `schema.lock`); version 2 adds a field.
   The demo uses the library handshake, and A converts snapshots for
   `mapdemo_client_v1` while serving version-2 clients on the same server.
+- Map demo: client write-back. With `--edits N` (on in every tier) a
+  client edits a received snapshot in place in its own verified buffer and
+  sends it with `save_verified`; A verifies it with a 1 MiB cap, checks the
+  digest and field rules, and forwards a compacted rebuild to the other
+  clients of the same schema version, which verify it again.
 - MSVC: no warning C5030 from `register_owned_bitmap` (it used
   `[[gnu::noinline]]`; now `XOFFSET_DETAIL_NOINLINE`).
 - Builds without exceptions verify as fast as builds with them. Without
