@@ -23,6 +23,13 @@
 // every event wire to DIR/events.bin ([u64 length][wire] records) to train
 // a dictionary with contrib/zstd_dict.
 //
+// Schema versions (handshake.hpp, schema_lineage.hpp): every client starts
+// with a Hello naming the version it works in of each root type. A answers
+// with a HelloAck; a client of version 1 gets its ViewSnapshots converted to
+// version 1 (evolve<>, then saved in the encoding it asked for); a client
+// whose version A does not know, or whose field names differ from that
+// version's, gets the rejection and the connection is closed.
+//
 // Each step: save(cur) -> StepReq to B -> StepRes -> verify into spare ->
 // (checks) -> spare becomes cur. At most one step is in flight; steps are
 // paced at 20 Hz and never bunched up when A falls behind. View requests are
@@ -54,10 +61,12 @@
 #include "mapdemo/build_info.hpp"
 #include "mapdemo/checks.hpp"
 #include "mapdemo/codec.hpp"
+#include "mapdemo/handshake.hpp"
 #include "mapdemo/metrics.hpp"
 #include "mapdemo/net.hpp"
 #include "mapdemo/rules.hpp"
 #include "mapdemo/schema.hpp"
+#include "mapdemo/schema_lineage.hpp"
 #include "mapdemo/std_model.hpp"
 
 namespace {
@@ -195,6 +204,8 @@ struct Client {
     net::Conn conn;
     bool hello_done = false;
     bool close_after_flush = false;
+    XPeerSchemas peer;        // the client's schema versions (its Hello)
+    bool v1_snapshots = false;   // ViewSnapshots go out converted to version 1
     XBuffer req_buf;          // reuse: reloaded for every ViewReq
     bool req_ready = false;
     bool subscribed = false;
@@ -225,6 +236,8 @@ private:
     void load_event_dictionary();
     void publish_events(std::uint64_t tick);
     void reject(Client& c, const std::string& why, bool close_conn);
+    void count_rejected(Client& c, const std::string& why);
+    void on_hello(Client& c, const net::Frame& frame);
     void write_corpus(std::uint64_t request_id, std::uint16_t flags, const char* category, codec::Encoding enc,
                       const std::string& payload, std::size_t wire_bytes, std::uint64_t wire_digest,
                       std::uint64_t digest, std::size_t visible);
@@ -245,8 +258,10 @@ private:
     XBuffer cur_;                       // last completed tick
     XBuffer spare_;                     // B's result is verified into this, then swapped with cur_
     bool spare_ready_ = false;          // reuse: spare_ holds an arena to reload into
-    XBuffer snap_buf_;                  // reuse: refilled for every snapshot
+    TypedXBuffer<ViewSnapshot> snap_buf_;   // reuse: refilled for every snapshot
     bool snap_ready_ = false;
+    TypedXBuffer<mapdemo_v1::ViewSnapshot> v1_buf_;   // reuse: version-1 conversions, refilled
+    bool v1_ready_ = false;
     std::string compact_;               // zstd: the compact wire before compression
     codec::Compressor zstd_;
     std::vector<std::uint32_t> hits_;   // filter output, capacity kept
@@ -282,6 +297,9 @@ private:
     std::uint64_t snaps_zero_ = 0;
     std::uint64_t category_mismatch_ = 0;
     std::uint64_t rejected_ = 0;
+    std::uint64_t clients_v2_ = 0;      // accepted Hellos per ViewSnapshot version
+    std::uint64_t clients_v1_ = 0;
+    std::uint64_t snaps_converted_ = 0;
 
     bool csv_ = false;
     metrics::CsvFile steps_csv_;
@@ -316,7 +334,8 @@ void ServerA::open_csv() {
         throw Fatal{2, "cannot open " + steps_path};
     if (!snaps_csv_.open(snaps_path,
             "request_id,tick,category,min_x,min_y,max_x,max_y,visible,wire_bytes,digest,"
-            "req_load_us,filter_us,build_us,save_us,destroy_us,check_ok,encoding,net_bytes,wire_digest,compress_us"))
+            "req_load_us,filter_us,build_us,save_us,destroy_us,check_ok,encoding,net_bytes,wire_digest,compress_us,"
+            "schema,convert_us"))
         throw Fatal{2, "cannot open " + snaps_path};
     const std::string events_path = opt_.csv_dir + "/a_events.csv";
     if (!events_csv_.open(events_path, "tick,part,encoding,count,wire_bytes,net_bytes,digest,encode_us"))
@@ -361,9 +380,11 @@ void ServerA::build_initial_batch() {
 
 void ServerA::connect_b() {
     b_ = net::Conn::connect(opt_.b_host, opt_.b_port);
-    b_.send(MsgType::Hello, 0, net::hello_payload());
-    net::Frame res = b_.recv({MsgType::HelloOk, MsgType::Error});
+    b_.send(MsgType::Hello, 0, make_server_schema_hello<UnitStateBatch>("mapdemo_a"));
+    net::Frame res = b_.recv({MsgType::HelloAck, MsgType::Error});
     if (res.type == MsgType::Error) throw Fatal{2, "hello: B rejected the handshake: " + res.payload};
+    const XSchemaAckResult ack = read_schema_ack<UnitStateBatch>(res.payload);
+    if (!ack) throw Fatal{2, "hello: B rejected the handshake: " + ack.message};
     b_.set_nonblocking(true);
 }
 
@@ -502,9 +523,13 @@ void ServerA::accept_clients() {
     }
 }
 
-void ServerA::reject(Client& c, const std::string& why, bool close_conn) {
+void ServerA::count_rejected(Client& c, const std::string& why) {
     ++rejected_;
     std::fprintf(stderr, "rejected: client %" PRIu64 ": %s\n", c.id, why.c_str());
+}
+
+void ServerA::reject(Client& c, const std::string& why, bool close_conn) {
+    count_rejected(c, why);
     if (close_conn) {
         c.conn.close();
         return;
@@ -556,18 +581,44 @@ void ServerA::on_client_readable(Client& c) {
     }
 }
 
+void ServerA::on_hello(Client& c, const net::Frame& frame) {
+    std::string ack;
+    try {
+        c.peer = XPeerSchemas::accept<MapCatalog, ViewRequest, ViewSnapshot, UnitEvent>(frame.payload, ack, "mapdemo_a");
+    } catch (const XException& e) {
+        // Not a schema hello at all: Error, then close.
+        reject(c, std::string("hello: ") + e.what(), false);
+        c.close_after_flush = true;
+        return;
+    }
+    c.conn.enqueue(MsgType::HelloAck, 0, std::move(ack));
+    if (!c.peer.accepted()) {
+        // The ack names the verdicts; the client asks for an update. Nothing
+        // else goes out on this connection.
+        std::string why = "hello from '" + c.peer.label() + "':";
+        for (const XSchemaPeerEntry& e : c.peer.entries())
+            if (!accepted(e.verdict))
+                why += std::string(" ") + handshake::client_root_name(e.root_type_id) + " " + to_string(e.verdict);
+        count_rejected(c, why);
+        c.close_after_flush = true;
+        c.conn.flush();
+        return;
+    }
+    // The lineage has two versions; the client works in the other one.
+    static_assert(XOffsetDatastructure::detail::evolve::version_count<ViewSnapshot> == 2);
+    c.v1_snapshots = !c.peer.sends_working_version<ViewSnapshot>();
+    ++(c.v1_snapshots ? clients_v1_ : clients_v2_);
+    std::fprintf(stderr, "a: client %" PRIu64 " '%s': ViewSnapshot version %d (%s)\n", c.id, c.peer.label().c_str(),
+                 c.v1_snapshots ? 1 : MAPDEMO_SCHEMA_VERSION, c.v1_snapshots ? "converted" : "same");
+    c.hello_done = true;
+    c.conn.enqueue(MsgType::Catalog, 0, catalog_wire_);
+    c.conn.flush();
+}
+
 void ServerA::on_client_frame(Client& c, net::Frame frame) {
     if (frame.type == MsgType::Hello) {
-        if (c.hello_done) { reject(c, "second Hello", true); return; }
-        if (!net::hello_matches(frame.payload)) {
-            reject(c, "hello: schema hash mismatch", false);
-            c.close_after_flush = true;
-            return;
-        }
-        c.hello_done = true;
-        c.conn.enqueue(MsgType::HelloOk, 0, std::string());
-        c.conn.enqueue(MsgType::Catalog, 0, catalog_wire_);
-        c.conn.flush();
+        if (c.hello_done || c.close_after_flush) { reject(c, "second Hello", true); return; }
+        on_hello(c, frame);
         return;
     }
     if (!c.hello_done) { reject(c, std::string(net::type_name(frame.type)) + " before Hello", true); return; }
@@ -632,19 +683,20 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
 
     // Build the snapshot in its own arena from the public fields only.
     sw.restart();
-    XBuffer& snap_buf = snap_buf_;
+    TypedXBuffer<ViewSnapshot>& snap_buf = snap_buf_;
     try {
         if (reuse() && snap_ready_) {
-            snap_buf.reset<ViewSnapshot>();
+            snap_buf.reset();
         } else {
-            snap_buf = XBuffer::create<ViewSnapshot>(4096 + hits.size() * 64, cap_snapshot());
+            snap_buf = TypedXBuffer<ViewSnapshot>::create(4096 + hits.size() * 64, cap_snapshot());
             snap_ready_ = true;
         }
-        auto& s = snap_buf.root<ViewSnapshot>();
+        auto& s = snap_buf.root();
         s.request_id = req.request_id;
         s.tick = cur_root().tick;
         s.scene_id = req.scene_id;
         s.rect = req.rect;
+        s.scene_units = n;   // one scene: a ViewReq for another one was refused above
         s.units.reserve(std::uint32_t(hits.size()));
         for (std::uint32_t i : hits) {
             const auto& u = units[i];
@@ -665,6 +717,41 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
     const double build_us = sw.us();
     rec_.add("a.snap_build_us", build_us);
 
+    // A version-1 client: the snapshot converted to version 1 (scene_units
+    // and reserved0 dropped, the rest matched by name), in a buffer of its
+    // own; that one is saved below. fresh: evolve<> makes a new buffer per
+    // snapshot; reuse: evolve_into refills the kept one.
+    double convert_us = -1;
+    std::optional<TypedXBuffer<mapdemo_v1::ViewSnapshot>> v1_fresh;
+    TypedXBuffer<mapdemo_v1::ViewSnapshot>* v1 = nullptr;
+    if (c.v1_snapshots) {
+        sw.restart();
+        try {
+            if (reuse()) {
+                if (v1_ready_) {
+                    v1_buf_.reset();
+                } else {
+                    v1_buf_ = TypedXBuffer<mapdemo_v1::ViewSnapshot>::create(4096 + hits.size() * 64, cap_snapshot());
+                    v1_ready_ = true;
+                }
+                evolve_into(snap_buf.root(), v1_buf_.root());
+                v1 = &v1_buf_;
+            } else {
+                v1 = &v1_fresh.emplace(evolve<mapdemo_v1::ViewSnapshot>(snap_buf));
+            }
+        } catch (const XBadAlloc& e) {
+            reject(c, std::string("capacity: version-1 ViewSnapshot cap ") + std::to_string(kCapSnapshot >> 20) +
+                      " MiB exceeded (" + e.what() + ")", false);
+            return;
+        } catch (const XException& e) {
+            reject(c, std::string("ViewSnapshot: conversion to version 1 failed: ") + e.what(), false);
+            return;
+        }
+        convert_us = sw.us();
+        rec_.add("a.snap_convert_us", convert_us);
+        ++snaps_converted_;
+    }
+
     // Save in the requested encoding. wire = the frame payload; xwire = the
     // XOffset wire the client will verify (the payload itself, or for zstd
     // the compact wire before compression).
@@ -672,12 +759,15 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
     std::string wire = reuse() ? c.conn.take_tx_buffer() : std::string();
     std::string& xwire = enc == codec::Encoding::Zstd ? compact_ : wire;
     const XCompactOptions canonical{0};   // capacity == size: the smallest wire
-    if (enc == codec::Encoding::Dense) {
-        if (reuse()) snap_buf.save_verified_into<ViewSnapshot>(xwire);
-        else xwire = snap_buf.save_verified<ViewSnapshot>();
+    if (v1) {
+        if (enc == codec::Encoding::Dense) v1->save_verified_into(xwire);
+        else v1->save_compact_into(xwire, canonical);
+    } else if (enc == codec::Encoding::Dense) {
+        if (reuse()) snap_buf.save_verified_into(xwire);
+        else xwire = snap_buf.save_verified();
     } else {
-        if (reuse()) snap_buf.save_compact_into<ViewSnapshot>(xwire, canonical);
-        else xwire = snap_buf.save_compact<ViewSnapshot>(canonical);
+        if (reuse()) snap_buf.save_compact_into(xwire, canonical);
+        else xwire = snap_buf.save_compact(canonical);
     }
     const double save_us = sw.us();
     double compress_us = -1;
@@ -698,18 +788,29 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
 
     if (!opt_.corpus_dir.empty() && corpus_written_ < opt_.corpus_max)
         write_corpus(req.request_id, frame.flags, cat, enc, wire, wire_bytes, xwire_digest,
-                     checks::snapshot_digest(snap_buf.root<ViewSnapshot>()), hits.size());
+                     checks::snapshot_digest(snap_buf.root()), hits.size());
 
+    // The payload moves into the connection; a converted wire is checked below.
+    std::string v1_wire;
+    if (opt_.check && v1) v1_wire = xwire;
     c.conn.enqueue(MsgType::ViewSnapshot, req.request_id, std::move(wire), frame.flags);
     c.conn.flush();
 
     // Checks and digest stay outside the timed regions.
-    const ViewSnapshot& snap = snap_buf.root<ViewSnapshot>();
+    const ViewSnapshot& snap = snap_buf.root();
     const std::uint64_t digest = checks::snapshot_digest(snap);
     bool check_ok = true;
     if (opt_.check) {
         metrics::Stopwatch cw;
         checks::Result r = checks::compare_snapshot(snap, req, *ref_);
+        // What a version-1 client gets: verified as version 1, with the
+        // content of the snapshot it was converted from.
+        if (r.ok && v1) {
+            XResult<XBuffer> back = XBuffer::try_load_verified<mapdemo_v1::ViewSnapshot>(v1_wire, cap_snapshot());
+            if (!back) r = checks::Result{false, "version-1 wire rejected: " + back.error().message};
+            else if (checks::snapshot_digest_of(back->root<mapdemo_v1::ViewSnapshot>()) != digest)
+                r = checks::Result{false, "version-1 snapshot content differs"};
+        }
         if (!r.ok) {
             check_ok = false;
             fail_check("view_snapshot", "request " + std::to_string(req.request_id) + ": " + r.detail);
@@ -740,7 +841,7 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
         c.conn.recycle_rx(std::move(frame.payload));
     } else {
         sw.restart();
-        snap_buf = XBuffer();
+        snap_buf = TypedXBuffer<ViewSnapshot>();
         snap_ready_ = false;
         c.req_buf = XBuffer();
         c.req_ready = false;
@@ -773,6 +874,10 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
         row += std::to_string(net_bytes); row += ',';
         row += hex16(xwire_digest); row += ',';
         if (compress_us >= 0) row += fmt_us(compress_us);
+        row += ',';
+        row += v1 ? '1' : char('0' + MAPDEMO_SCHEMA_VERSION);
+        row += ',';
+        if (convert_us >= 0) row += fmt_us(convert_us);
         snaps_csv_.row(row);
     }
     if (!check_ok) throw Fatal{1, "snapshot check failed for request " + std::to_string(request_id)};
@@ -1054,6 +1159,9 @@ void ServerA::write_results() {
             " category_mismatch=" + std::to_string(category_mismatch_)});
     }
     rows.push_back(CheckRow{"rejected_requests", true, "count=" + std::to_string(rejected_)});
+    rows.push_back(CheckRow{"schema_versions", true,
+        "clients_v" + std::to_string(MAPDEMO_SCHEMA_VERSION) + "=" + std::to_string(clients_v2_) +
+        " clients_v1=" + std::to_string(clients_v1_) + " converted_snapshots=" + std::to_string(snaps_converted_)});
     rows.push_back(CheckRow{"event_stream", true,
         "subscribers=" + std::to_string(subscribers_) + " dictionary=" + std::to_string(event_dict_id_) +
         " event_ticks=" + std::to_string(event_ticks_) + " events=" + std::to_string(events_built_) +
