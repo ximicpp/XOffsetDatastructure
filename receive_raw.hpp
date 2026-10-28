@@ -88,16 +88,16 @@ inline const char* raw_checked_relative(const char* field, std::int32_t delta,
         if(delta>=0) {
             const auto amount=std::uint32_t(delta);
             if(offset>bytes->used||amount>bytes->used-offset)
-                throw XException("wire validation: relative pointer out of bounds");
+                XOFFSET_THROW(XException(XErrc::invalid_payload, "wire validation: relative pointer out of bounds"));
             target=offset+amount;
         }else{
             const auto amount=std::uint64_t(-std::int64_t(delta));
-            if(amount>offset)throw XException("wire validation: relative pointer out of bounds");
+            if(amount>offset)XOFFSET_THROW(XException(XErrc::invalid_payload, "wire validation: relative pointer out of bounds"));
             target=offset-std::size_t(amount);
         }
-        if(target>=bytes->used)throw XException("wire validation: relative pointer out of bounds");
+        if(target>=bytes->used)XOFFSET_THROW(XException(XErrc::invalid_payload, "wire validation: relative pointer out of bounds"));
         auto* result=bytes->at(target);
-        validate_storage_range(result,1,1,ctx,"wire validation: relative pointer out of bounds");
+        XOFFSET_VREQUIRE(validate_storage_range(result,1,1,ctx,"wire validation: relative pointer out of bounds"));
         return result;
     }
     const auto origin = reinterpret_cast<std::uintptr_t>(field);
@@ -105,17 +105,17 @@ inline const char* raw_checked_relative(const char* field, std::int32_t delta,
     if (delta >= 0) {
         const auto amount = static_cast<std::uint32_t>(delta);
         if (amount > (std::numeric_limits<std::uintptr_t>::max)() - origin)
-            throw XException("wire validation: relative pointer out of bounds");
+            XOFFSET_THROW(XException(XErrc::invalid_payload, "wire validation: relative pointer out of bounds"));
         target = origin + amount;
     } else {
         const auto amount = static_cast<std::uint64_t>(-std::int64_t(delta));
         if (amount > origin)
-            throw XException("wire validation: relative pointer out of bounds");
+            XOFFSET_THROW(XException(XErrc::invalid_payload, "wire validation: relative pointer out of bounds"));
         target = origin - static_cast<std::uintptr_t>(amount);
     }
     const auto* result = reinterpret_cast<const char*>(target);
-    validate_storage_range(result, 1, 1, ctx,
-        "wire validation: relative pointer out of bounds");
+    XOFFSET_VREQUIRE(validate_storage_range(result, 1, 1, ctx,
+        "wire validation: relative pointer out of bounds"));
     return result;
 }
 
@@ -310,7 +310,7 @@ inline void raw_register_allocation(const void* pointer,std::size_t n,std::size_
     // V2: no block header; the extent is derived from the owner (8-aligned,
     // length rounded to 8). Canonical bytes are contiguous at ctx.base.
     (void)bytes;
-    register_allocation(pointer,n,alignment,ctx,free);
+    XOFFSET_VREQUIRE(register_allocation(pointer,n,alignment,ctx,free));
 }
 
 inline void raw_register_wire_holes(const void* holes,std::size_t count,WireValidationContext& ctx,
@@ -321,9 +321,9 @@ inline void raw_register_wire_holes(const void* holes,std::size_t count,WireVali
         std::memcpy(&hole,static_cast<const char*>(holes)+i*sizeof(hole),sizeof(hole));
         if(hole.bytes==0||(hole.bytes&7u)!=0||(hole.offset&7u)!=0||
            hole.offset<sizeof(XArena)||hole.offset>used||hole.bytes>used-hole.offset)
-            throw XException("wire validation failed: invalid hole table entry");
-        register_free_range(raw_advance(ctx.base,hole.offset,bytes),hole.bytes,ctx,
-                            "wire validation failed: invalid hole table entry");
+            XOFFSET_THROW(XException(XErrc::invalid_payload, "wire validation failed: invalid hole table entry"));
+        XOFFSET_VREQUIRE(register_free_range(raw_advance(ctx.base,hole.offset,bytes),hole.bytes,ctx,
+                            "wire validation failed: invalid hole table entry"));
     }
 }
 
@@ -505,15 +505,15 @@ template<class T> consteval bool raw_needs_activation() {
 
 inline RawPayloadHeader read_raw_arena_header(const char* base, std::size_t extent) {
     if (!base || extent < sizeof(XArena))
-        throw XException("XBufferCore: payload too small");
+        XOFFSET_THROW(XException(XErrc::invalid_payload_header, "XBufferCore: payload too small"));
     const auto header = raw_wire_pod<RawPayloadHeader>(base);
     constexpr char magic[8] = {'X','B','U','F','V','2','\0','\0'};
     if (std::memcmp(header.magic, magic, 8) != 0 ||
         header.header_size != sizeof(XArena))
-        throw XException("XBufferCore: payload header mismatch");
+        XOFFSET_THROW(XException(XErrc::invalid_payload_header, "XBufferCore: payload header mismatch"));
     constexpr auto minimum = sizeof(XArena);
     if (header.used_end < minimum || header.used_end > extent)
-        throw XException("XBufferCore: payload used_end out of range");
+        XOFFSET_THROW(XException(XErrc::invalid_payload_header, "XBufferCore: payload used_end out of range"));
     return header;
 }
 
@@ -523,7 +523,7 @@ std::size_t raw_root_offset(const char* base, std::size_t extent,
     if (!h.root_offset || h.root_offset > extent ||
         sizeof(T) > extent - h.root_offset ||
         (reinterpret_cast<std::uintptr_t>(base) + h.root_offset) % alignof(T))
-        throw XException("load_verified<T>(): root not found");
+        XOFFSET_THROW(XException(XErrc::root_mismatch, "load_verified<T>(): root not found"));
     return static_cast<std::size_t>(h.root_offset);
 }
 
@@ -533,23 +533,23 @@ template<class T> void validate_wire_value_raw(const char*,WireValidationContext
 inline void validate_string_raw(const char* address,WireValidationContext& ctx,const CanonicalRawBytes* bytes=nullptr) {
     const auto head = raw_wire_pod<RawOwningDescriptor>(address);
     if (raw_inline_string(head)) {
-        validate_inline_string_bytes(address);
+        XOFFSET_VREQUIRE(validate_inline_string_bytes(address));
         return;
     }
     if (head.size > head.capacity || head.capacity >= XBufferCore::MAX_PAYLOAD)
-        throw XException("wire validation failed: XFixedString size exceeds capacity");
+        XOFFSET_THROW(XException(XErrc::invalid_payload, "wire validation failed: XFixedString size exceeds capacity"));
     if (!head.capacity) {
         if (head.size != 0 || head.data_delta != 0)
-            throw XException("wire validation failed: empty XFixedString has invalid payload");
+            XOFFSET_THROW(XException(XErrc::invalid_payload, "wire validation failed: empty XFixedString has invalid payload"));
         return;
     }
     const auto* data=raw_checked_relative(address,head.data_delta,ctx,bytes);
-    validate_storage_range(data, std::size_t(head.capacity) + 1, alignof(char), ctx,
-        "wire validation failed: XFixedString payload out of bounds");
+    XOFFSET_VREQUIRE(validate_storage_range(data, std::size_t(head.capacity) + 1, alignof(char), ctx,
+        "wire validation failed: XFixedString payload out of bounds"));
     raw_register_allocation(data,
         fixed_detail::round_up_to_alignment(head.capacity+1,8),8,ctx,false,bytes);
     if(raw_wire_pod<char>(raw_advance(data,head.size,bytes))!='\0')
-        throw XException("wire validation failed: XFixedString missing terminator");
+        XOFFSET_THROW(XException(XErrc::invalid_payload, "wire validation failed: XFixedString missing terminator"));
 }
 
 template<class Element>
@@ -558,16 +558,16 @@ RawOwningDescriptor validate_vector_raw(const char* address,
     const auto head = raw_wire_pod<RawOwningDescriptor>(address);
     if (head.size > head.capacity ||
         head.capacity > (XBufferCore::MAX_PAYLOAD - 8u) / sizeof(Element))
-        throw XException("wire validation failed: XFixedVector size exceeds capacity");
+        XOFFSET_THROW(XException(XErrc::invalid_payload, "wire validation failed: XFixedVector size exceeds capacity"));
     if (!head.capacity) {
         if (head.size != 0 || head.data_delta != 0)
-            throw XException("wire validation failed: empty XFixedVector has invalid payload");
+            XOFFSET_THROW(XException(XErrc::invalid_payload, "wire validation failed: empty XFixedVector has invalid payload"));
         return head;
     }
     const auto* data=raw_checked_relative(address,head.data_delta,ctx,view);
     const auto bytes = std::size_t(head.capacity) * sizeof(Element);
-    validate_storage_range(data, bytes, alignof(Element), ctx,
-        "wire validation failed: XFixedVector payload out of bounds");
+    XOFFSET_VREQUIRE(validate_storage_range(data, bytes, alignof(Element), ctx,
+        "wire validation failed: XFixedVector payload out of bounds"));
     raw_register_allocation(data,(bytes+7u)&~std::size_t(7u),
         std::max<std::size_t>(alignof(Element),8),ctx,false,view);
     if constexpr (raw_needs_validation<Element>())
@@ -586,18 +586,18 @@ void validate_wire_value_raw(const char* address,WireValidationContext& ctx,cons
                 { wire_activation<T>::activate(write,stats,bytes) } noexcept -> std::same_as<void>;
             })
                 wire_activation<T>::validate_raw(address,ctx,bytes);
-            else throw XException("raw receive: custom canonical validation policy required");
+            else XOFFSET_THROW(XException(XErrc::invalid_state, "raw receive: custom canonical validation policy required"));
         } else wire_activation<T>::validate_raw(address,ctx);
     }
     else if constexpr (std::is_same_v<T, bool>) {
         const auto bits = raw_wire_pod<unsigned char>(address);
-        if (bits > 1) throw XException("wire validation: invalid bool representation");
+        if (bits > 1) XOFFSET_THROW(XException(XErrc::invalid_payload, "wire validation: invalid bool representation"));
     } else if constexpr (std::is_enum_v<T>) {
         // Read U first, never E, before the full standard value-range check.
         using U=std::underlying_type_t<T>;
         const U bits=raw_wire_pod<U>(address);
         if(!raw_enum_representation_valid<T>(bits))
-            throw XException("wire validation: invalid enum representation");
+            XOFFSET_THROW(XException(XErrc::invalid_payload, "wire validation: invalid enum representation"));
     } else if constexpr (std::is_array_v<T>) {
         using E = std::remove_extent_t<T>;
         if constexpr (raw_needs_validation<E>())
@@ -614,7 +614,7 @@ void validate_wire_value_raw(const char* address,WireValidationContext& ctx,cons
             for (std::uint32_t i = 1; i < head.size; ++i)
                 if(!raw_compare_keys<E>(raw_advance(data,std::size_t(i-1)*sizeof(E),bytes),
                     raw_advance(data,std::size_t(i)*sizeof(E),bytes),ctx,bytes))
-                    throw XException("wire validation: set keys not strictly ordered");
+                    XOFFSET_THROW(XException(XErrc::invalid_payload, "wire validation: set keys not strictly ordered"));
         }
     } else if constexpr (is_fixed_flat_map_v<T>) {
         using E = typename T::value_type;
@@ -627,7 +627,7 @@ void validate_wire_value_raw(const char* address,WireValidationContext& ctx,cons
                 if(!raw_compare_keys<K>(
                     raw_advance(data,std::size_t(i-1)*sizeof(E)+offsetof(E,first),bytes),
                     raw_advance(data,std::size_t(i)*sizeof(E)+offsetof(E,first),bytes),ctx,bytes))
-                    throw XException("wire validation: map keys not strictly ordered");
+                    XOFFSET_THROW(XException(XErrc::invalid_payload, "wire validation: map keys not strictly ordered"));
         }
     } else if constexpr (is_fixed_vector_v<T>)
         (void)validate_vector_raw<typename T::value_type>(address,ctx,bytes);
@@ -649,7 +649,7 @@ RawWireVerification verify_structural_wire_graph_raw_at(
         std::pmr::memory_resource* upstream,const CanonicalRawBytes* bytes=nullptr,
         const void* gaps=nullptr,std::size_t gap_count=0) {
     static_assert(receive_raw_supported<T>(), "unsupported raw wire activation domain");
-    if(!upstream)throw std::invalid_argument("validation scratch: null upstream");
+    if(!upstream)XOFFSET_THROW(std::invalid_argument("validation scratch: null upstream"));
     WireValidationContext ctx{
         .base = base,
         .end = raw_advance(base,extent,bytes),
@@ -657,12 +657,12 @@ RawWireVerification verify_structural_wire_graph_raw_at(
         .upstream = upstream
     };
     if (arena.flags != 0 || arena.reserved0 != 0 || arena.reserved1 != 0)
-        throw XException("wire validation: unsupported arena header flags");
-    register_owned_range(base, sizeof(XArena), ctx, "wire validation: invalid arena header");
+        XOFFSET_THROW(XException(XErrc::invalid_payload, "wire validation: unsupported arena header flags"));
+    XOFFSET_VREQUIRE(register_owned_range(base, sizeof(XArena), ctx, "wire validation: invalid arena header"));
     raw_register_wire_holes(holes,hole_count,ctx,bytes);
     raw_register_allocation(raw_advance(base,root,bytes),sizeof(T),alignof(T),ctx,false,bytes);
     validate_wire_value_raw<T>(raw_advance(base,root,bytes),ctx,bytes);
-    require_exact_coverage(ctx);
+    XOFFSET_VREQUIRE(require_exact_coverage(ctx));
     return {root, extent};
 }
 
@@ -674,12 +674,12 @@ RawWireVerification verify_structural_wire_graph_raw(
     const auto extent = owner.get_size();
     const auto arena = read_raw_arena_header(base, extent);
     if (arena.used_end != extent)
-        throw XException("load_verified<T>(): non-normalized payload extent");
+        XOFFSET_THROW(XException(XErrc::root_mismatch, "load_verified<T>(): non-normalized payload extent"));
     const auto root = raw_root_offset<T>(base, extent, arena);
     // A live owner's free table is its hole table.
     std::vector<XBufferCore::WireHole> holes;
     if (!owner.free_table_complete())
-        throw XException("wire validation: free table incomplete");
+        XOFFSET_THROW(XException(XErrc::invalid_payload, "wire validation: free table incomplete"));
     holes.reserve(owner.free_block_count());
     owner.for_each_free_block([&](XBufferCore::WireHole hole) { holes.push_back(hole); });
     return verify_structural_wire_graph_raw_at<T>(
@@ -846,10 +846,10 @@ Proof<T> validate(char* base, std::size_t used, std::uint64_t wire_root_offset,
                   const void* gaps, std::size_t gap_count) {
     const auto arena = read_raw_arena_header(base, used);
     if (arena.used_end != used)
-        throw XException("load_verified<T>(): non-normalized payload extent");
+        XOFFSET_THROW(XException(XErrc::root_mismatch, "load_verified<T>(): non-normalized payload extent"));
     const auto root = raw_root_offset<T>(base, used, arena);
     if (root != wire_root_offset)
-        throw XException("load_verified<T>(): root offset mismatch");
+        XOFFSET_THROW(XException(XErrc::root_mismatch, "load_verified<T>(): root offset mismatch"));
     (void)verify_structural_wire_graph_raw_at<T>(
         base, used, arena, root, holes, hole_count, upstream, nullptr, gaps, gap_count);
     // Local scratch and its upstream callbacks have finished before a proof is
@@ -862,12 +862,12 @@ template<class T> requires(supported_v<T>)
 Proof<T> validate(std::byte* origin,std::size_t maximum,std::size_t used,
         std::uint64_t wire_root_offset,const void* holes,std::size_t hole_count,
         std::pmr::memory_resource* upstream,const void* gaps,std::size_t gap_count) {
-    if(!origin||used>maximum)throw XException("XBufferCore: payload too small");
+    if(!origin||used>maximum)XOFFSET_THROW(XException(XErrc::invalid_payload_header, "XBufferCore: payload too small"));
     CanonicalRawBytes bytes{origin,maximum,used};
     const auto arena=read_raw_arena_header(bytes.at(0),used);
-    if(arena.used_end!=used)throw XException("load_verified<T>(): non-normalized payload extent");
+    if(arena.used_end!=used)XOFFSET_THROW(XException(XErrc::root_mismatch, "load_verified<T>(): non-normalized payload extent"));
     const auto root=raw_root_offset<T>(bytes.at(0),used,arena);
-    if(root!=wire_root_offset)throw XException("load_verified<T>(): root offset mismatch");
+    if(root!=wire_root_offset)XOFFSET_THROW(XException(XErrc::root_mismatch, "load_verified<T>(): root offset mismatch"));
     (void)verify_structural_wire_graph_raw_at<T>(bytes.at(0),used,arena,root,holes,hole_count,upstream,&bytes,gaps,gap_count);
     return Proof<T>(origin,maximum,used,root);
 }

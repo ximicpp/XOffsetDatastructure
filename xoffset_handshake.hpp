@@ -212,7 +212,15 @@ namespace XOffsetDatastructure {
                 error = "handshake message larger than XSCHEMA_HELLO_MAX_BYTES";
                 return false;
             }
-#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
+#if XOFFSET_NO_EXCEPTIONS
+            auto loaded = TypedXBuffer<Message>::try_load_verified(
+                std::span<const std::byte>(static_cast<const std::byte*>(data), size), receive_limit());
+            if (!loaded) {
+                error = std::move(loaded).error().message;
+                return false;
+            }
+            out = std::move(*loaded);
+#else
             try {
                 out = TypedXBuffer<Message>::load_verified(
                     std::span<const std::byte>(static_cast<const std::byte*>(data), size), receive_limit());
@@ -222,8 +230,6 @@ namespace XOffsetDatastructure {
             } catch (...) {
                 return false;
             }
-#else
-#error "xoffset_handshake.hpp without exceptions needs TypedXBuffer<T>::try_load_verified (SC-8)"
 #endif
             const Message& m = out.root();
             if (m.wire_format != XSCHEMA_HELLO_WIRE_FORMAT) {

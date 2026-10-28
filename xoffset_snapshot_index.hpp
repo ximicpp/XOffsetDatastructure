@@ -154,7 +154,7 @@ public:
         const auto key = result.owner_.segments()[0].data();
         void* block = nullptr;
         Control* constructed = nullptr;
-        try {
+        XOFFSET_TRY {
             if (!snapshot_index_detail::find_parent(result.owner_.root(), &parent)) return result;
             std::size_t count = 0;
             auto count_head = [&](const auto&) {
@@ -178,15 +178,15 @@ public:
                 const auto offset = reinterpret_cast<std::uintptr_t>(&head) - first;
                 if (offset > sizeof(Element) || sizeof(H) > sizeof(Element) - offset ||
                     offset > (std::numeric_limits<std::uint32_t>::max)())
-                    throw XException("snapshot index: invalid declared subobject offset");
+                    XOFFSET_THROW(XException(XErrc::invalid_state, "snapshot index: invalid declared subobject offset"));
                 std::construct_at(entries(c) + position++, Entry{
                     static_cast<std::uint32_t>(offset), &snapshot_index_detail::type_tag<H>});
                 return false;
             };
             snapshot_index_detail::inline_heads(parent[0], fill_head);
-            if (position != count) throw XException("snapshot index: changed declaration traversal");
+            if (position != count) XOFFSET_THROW(XException(XErrc::invalid_state, "snapshot index: changed declaration traversal"));
             result.control_ = c; // publish only a complete allocation
-        } catch (...) {
+        } XOFFSET_CATCH(...) {
             if (constructed) std::destroy_at(constructed);
             if (block) ::operator delete(block);
             if (reserved) snapshot_index_detail::release(key, charge);
