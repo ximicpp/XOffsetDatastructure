@@ -48,11 +48,30 @@ class RuntimeMatrixTests(unittest.TestCase):
         targets = {}
         for index, name in enumerate(runtime_matrix.verify.TARGETS):
             targets[name] = {"binary": self.fake("all-"+str(index), name, self.fingerprint)}
+            if name.startswith("windows-"): targets[name]["runtime_kind"]="windows"
         q, r = self.run_matrix("all-fake", targets)
         self.assertEqual(q.returncode, 0, q.stderr)
         self.assertEqual(r["status"], "PASS")
         self.assertEqual(r["targets"]["macos-arm64"]["status"], "PASS_REFERENCE")
         self.assertTrue(all(v["status"] == "PASS_WIRE" for k, v in r["targets"].items() if k != "macos-arm64"))
+
+    def test_wine_is_not_a_native_windows_gate_pass(self):
+        targets = {}
+        for index, name in enumerate(runtime_matrix.verify.TARGETS):
+            targets[name] = {"binary": self.fake("compat-"+str(index), name, self.fingerprint)}
+            if name.startswith("windows-"): targets[name]["runtime_kind"]="windows"
+        targets["windows-arm64"]["runtime_kind"]="wine"
+        q,r=self.run_matrix("wine-compat", targets)
+        self.assertEqual(q.returncode,2)
+        self.assertEqual(r["targets"]["windows-arm64"]["status"],"PASS_WIRE_WINE")
+        self.assertEqual(r["status"],"FAIL")
+
+    def test_windows_requires_runtime_kind(self):
+        ref=self.fake("ref-kind","macos-arm64",self.fingerprint)
+        target=self.fake("missing-kind","windows-x64",self.fingerprint)
+        q,r=self.run_matrix("missing-kind-test",{"macos-arm64":{"binary":ref},"windows-x64":{"binary":target}})
+        self.assertEqual(q.returncode,2)
+        self.assertEqual(r["targets"]["windows-x64"]["status"],"BLOCKED_CONFIG")
 
     def test_stale_source_fingerprint_is_rejected(self):
         ref=self.fake("ref-stale","macos-arm64","stale")

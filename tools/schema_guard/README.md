@@ -315,3 +315,35 @@ performs fresh identity, write and read operations. Its shared-directory
 transport has been exercised locally on Windows x64, but has not yet been
 tested against a Windows ARM64 VM or a network-mounted share. The target stays
 blocked until the complete live matrix actually passes on a suitable guest.
+
+## Declaring Windows execution environments
+
+Every Windows runtime profile must explicitly set "runtime_kind": "windows"
+for an actual Windows host or guest, or "runtime_kind": "wine" for Wine.
+A missing or invalid declaration is BLOCKED_CONFIG. This is a trusted profile
+declaration, not automatic proof of the host OS; reviewers must check the
+runner environment. Wine can report PASS_WIRE_WINE after both reads and byte
+comparison, but that status never satisfies the native Windows gate.
+
+For Wine on Linux ARM64, wine_wire_runner.py accepts an immutable local Docker
+image ID, uses a network-disabled container and translates the corpus path to
+the Wine Z: drive. Configure a target with runtime_kind wine, the Windows ARM64
+fixture binary and a runner prefix such as:
+
+    ["python3", "/path/to/wine_wire_runner.py", "--image", "sha256:...", "--"]
+
+The image must contain a working /usr/lib/wine/wine64. A fixture build, a
+container image or a successful Wine run does not establish native Windows.
+The tested Debian Wine 10 image failed during initialization on this ARM64
+host; see the Wine compatibility follow-up for diagnostic evidence.
+
+## GitHub Windows ARM64 one-shot probe
+
+The schema-arm64-probe workflow fetches checksum-pinned synthetic Mac reference
+corpus and ARM64 fixture Git blobs and runs them on a GitHub Windows ARM64 VM.
+It verifies current source hashes, dependency lock evidence and gitlinks. The
+blob IDs are one-shot inputs and can expire; reruns must regenerate them for the
+current source. A passing Windows job means Windows read the Mac corpus and
+produced matching bytes; Mac must freshly read the returned artifact before
+claiming bidirectional verification. This diagnostic workflow does not bypass
+run_checked.py or satisfy its live native Windows runtime profile.
