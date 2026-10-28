@@ -244,3 +244,36 @@ A stopped worker, missing device, wrong binary hash, failed transfer, or
 timeout fails the matrix. The worker does not make the remaining unavailable
 targets pass. The October 2026 live run used the Android x64 emulator with
 arm64 translation; it is not evidence of physical Android hardware.
+
+## Building Windows runtime fixtures
+
+Prepare the checksum-pinned MSYS2 MinGW runtime packages in a new Mac directory
+with Python 3.11 or later and zstd:
+
+    python3 tools/schema_guard/prepare_windows_runtime.py --zstd /path/to/zstd \
+        --out /path/to/new/runtime
+    python3 tools/schema_guard/build_wire_windows.py --profiles /path/to/compile-profiles.json \
+        --out /path/to/new/windows-objects
+
+The runtime helper verifies every package SHA-256 before extracting it. Existing
+archives may be reused with repeated --archive-dir and --offline; deleted upstream
+package versions require an independently reviewed version and checksum update.
+Transfer both resulting object files, the runtime trees and link_wire_windows.py
+to an isolated directory on Windows with checksum-verifying nodecli copy. Link
+using a local clang++ with LLD and both target backends:
+
+    python link_wire_windows.py --clang C:\path\clang++.exe --objects C:\path\objects `
+        --sysroot-x64 C:\path\runtime\clang64 --sysroot-arm64 C:\path\runtime\clangarm64 `
+        --out C:\path\new-output
+
+The Mac P2996 compiler emits target LLVM IR and Apple Clang emits COFF objects;
+the Windows LLVM linker combines them with the static MinGW libc++ and runtime.
+These mixed toolchains are fixture verification configurations, not evidence of
+MSVC STL ABI or of a production toolchain. Copy the resulting binaries back to
+the Mac, add matching native-fixture allowlists to the Windows nodecli worker
+and add runtime profile entries for the gate. The worker must run on an OS
+capable of executing each binary. A successful link is not an execution result.
+Windows ARM64 needs a real matching Windows runtime; an unverified compatibility
+layer must not be reported as a native Windows pass.
+
+See VALIDATION_WINDOWS_20261028.md for the latest run and limitations.
