@@ -34,4 +34,9 @@ struct Options {
 // 512 KiB by default; test programs expect a process main thread).
 void start_command_thread(int argc, char** argv, const Options& options);
 
+// host_new.cpp: the host's operator new and delete, which forward to a hosted
+// program's replacements (xoffset_test_host.h).
+extern const void* const host_new_functions[];
+void set_new_functions(const void* const* program_functions);
+
 }  // namespace xoffset_test_host
