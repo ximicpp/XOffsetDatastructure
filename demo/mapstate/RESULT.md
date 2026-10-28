@@ -30,7 +30,8 @@ it. Both run the same validator and send the same bytes.
 | Window client, cloud (10-27) | Xvfb, GCC 13 C++20 client with raylib 5.5, 10000 units, `--auto-drag --check --encoding cycle` | screenshots at frames 60 / 180 / 420 (`e2e-20261027/shots-cloud-xvfb/`), `direct_read` 69 / 69, all three encodings |
 | End to end, Android emulator (10-28) | Mac M4: Android 15 emulator (API 35, google_apis arm64-v8a, 16 KB pages), NDK r29 C++20 client; A/B GCC 16 C++26 in a Linux arm64 VM (colima) on the same Mac; next_cpp26 00b5d35 | PASS: self-check 23 / 23, replay 60 / 60, 74 / 74 verdicts; step wires equal to the cloud x86-64 run at 500 / 500 ticks in every tier; library CTest 91 / 91 on the emulator. Emulator numbers, not device numbers |
 | End to end, clients without exceptions (10-28) | cloud, next_cpp26 c928334 with #155: A/B GCC 16 C++26; the six client builds of `full3`, each also built without exceptions (`mapdemo_client_noexc`), 12 targets against the corpus and step wires of `full1` (`noexc3`); ASan+UBSan run of both C++26 clients in both buffer modes; window client under Xvfb | PASS: self-check 23 / 23, replay 60 / 60, tiers + evil on all 12 targets, with the same self-check and evil outcomes and refusal texts on all of them; step wires equal to `full1` at 500 / 500 ticks; sanitizers 151 / 151 and 149 / 149 verdicts, no report. Verification is 1.08x to 1.29x slower without exceptions (section 5) |
-| End to end, iOS Simulator | Mac M4, A/B in colima | pending (Mac, waiting for Xcode) |
+| Window client, macOS (10-28) | Mac M4, macOS 27.2: Apple clang 21 C++20 client with raylib 5.5, 10000 units, `--auto-drag --check`; A/B GCC 16 C++26 in a Linux arm64 VM (colima); next_cpp26 00b5d35 | client exit 0, screenshots at frames 60 / 180 / 420, `direct_read` 71 / 71, 59 fps |
+| End to end, iOS Simulator | Mac M4, A/B in colima | pending: Xcode 27.1 installed 10-28; the run of next_cpp26 bb7714c (clients with and without exceptions) is queued |
 
 Sections 1 to 4 were recorded before 10-27. The 10-27 schema change (V2.1
 wire, filler fields removed) changes the step and snapshot bytes, so their
@@ -300,9 +301,15 @@ files, with sha256 in `SHA256SUMS`.
 
 The macOS window run first crashed in raylib 5.5's InitWindow (no monitor:
 the Mac's screen was asleep); the client now exits 2 with "cannot open a
-window" instead (checked without a display and under Xvfb). Still open for
-this section: the iOS Simulator run (waiting for Xcode on the Mac) and the
-macOS window screenshots.
+window" instead (checked without a display and under Xvfb). With the screen
+awake (10-28, next_cpp26 00b5d35) the window client ran on the Mac M4 against
+A and B in colima: exit 0, three screenshots, `direct_read` 71 / 71. The frame
+420 status bar reads tick 270, 474 units visible, a 15,376 B snapshot sent as
+6,666 B of zstd, view round trip 17 ms (frame-paced), `reload_verified` 8.0
+us, 59 fps. Output: `mobile_sim_macos_window_out.tar.gz` in the project folder
+(sha256 `0f71e100757c95f10ed2b62e04cb956763c75ec3cf208ce0a2e4e9af7dc87043`),
+screenshots under `out-macos-window/macos/shots/`. Still open for this
+section: the iOS Simulator run.
 
 ## 6. Scope
 
