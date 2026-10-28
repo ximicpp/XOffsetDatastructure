@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Wire schemas that mean different things on different 64-bit
+  little-endian platforms fail to compile: a set or map key that orders by
+  plain `char` (directly, in an array or record member, or an enum whose
+  underlying type is `char`), which Linux and Android arm64 sort unsigned
+  and x86-64, Apple and Windows signed, so each side rejected the other's
+  wire; and an enum without a fixed underlying type (`int` on MSVC,
+  `unsigned int` on GCC and Clang). Use `std::int8_t`/`std::uint8_t` or
+  `XString` keys and `enum class` or `enum E : std::uint32_t`. Signatures
+  of other types are unchanged. USER_GUIDE 2.2 lists the portable scalars.
+- The cross-compiler corpus adds two `save_compact` wires (slack 0 and 8)
+  and, for every case, the reference wire edited by fixed steps and saved
+  with `save_verified` and `save_compact`: a client that edits a wire
+  written elsewhere must write the writer's bytes
+  (`test_cross_compiler_wire --read`, `--mutate-ref`).
 - Device and platform results for 3.2.0-rc.1 (commit 39de636 only): an
   Android 11 phone, Windows and macOS machines, a remote Linux VM and WSL2
   (`docs/validation/2026-10-28-rc1-platform/README.md`). Functional only; no
