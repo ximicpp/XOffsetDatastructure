@@ -1,0 +1,10 @@
+# Device mesh demo: the Mac site's devices, fixed at planning time
+# (run_mailbox.sh plan, run_mesh_mac.sh). "ID NAME SITE"; ids from 101.
+101 macos-arm64-clang mac
+102 macos-arm64-clang-noexc mac
+103 ios-sim-arm64 mac
+104 ios-sim-arm64-noexc mac
+105 android-emu-arm64 mac
+106 android-emu-arm64-noexc mac
+107 colima-linux-arm64-gcc mac
+108 colima-linux-arm64-gcc-noexc mac

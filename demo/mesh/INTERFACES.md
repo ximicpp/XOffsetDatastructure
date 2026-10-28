@@ -165,15 +165,55 @@ link: `http://HOST:47802/join?hub=HOST:47801&run=LABEL`.
 
 ```
 xo_peer (--hub HOST:PORT | --join URL) [--name NAME] [--evil] [--out DIR] [--timeout-s 600]
-xo_peer --mailbox IN_DIR OUT_DIR --name NAME --id N
+xo_peer --mailbox IN_DIR OUT_DIR --id N [--name NAME] [--list] [--out DIR]
 ```
 
 `--name` defaults to `<os>-<arch>-<compiler>[-noexc]` from the build line.
 `--evil` sets `kPeerEvil`. `--out DIR` writes `peer.log` and the build
 line. Exit 0 after Bye; 1 on a handshake or protocol failure; 2 on usage.
-Mailbox mode (phase 4, cross-site): reads `.xmhop` files addressed to
-`--id`, runs `handle_hop`, writes the next hop and the report as files.
-Output on stdout: one line per hop handled: job, type, verdict, summary.
+Mailbox mode (phase 4, cross-site, no live link between the sites): the
+same `start_job` / `handle_hop` on files. A mailbox is a directory; the file
+name says what a file is and whom it is for (`src/peer/mailbox.hpp`):
+
+| file | content |
+| --- | --- |
+| `j000123_to101.xmjob` | Job payload (HopMeta, hop 0) for route[0] = device 101 |
+| `j000123_h00_to7.xmhop` | Hop payload (`pack_hop`) that route[0] sent to route[1] = device 7 |
+| `j000123_p01_from7.xmrep` | HopReport wire of route position 1 (device 7) |
+| `j000123_p01_from7.xmerr` | text: position 1 could not read the meta, so no report |
+| `build_7.txt` | device 7's build line |
+
+Position 0 answers the Job and sends hop 0; position k >= 1 answers hop
+k - 1 and sends hop k. `xo_peer --mailbox` answers every Job and Hop file in
+IN_DIR addressed to `--id` that has no report (or `.xmerr`) in IN_DIR or
+OUT_DIR, writes the next hop and then the report into OUT_DIR (as
+`<name>.tmp`, renamed), and repeats until nothing is left; `--list` prints
+those files instead. One line per file on stdout: job, position, verdict,
+summary. Exit 0 unless a file could not be read or written.
+
+`xo_hub` plans and scores mailbox runs offline (`src/hub/mailbox.cpp`):
+
+```
+xo_hub --mailbox-plan DIR --devices FILE [--plan cross,chain,evil] [--types ...]
+       [--scales ...] [--save-modes ...] [--seed 1] [--run LABEL]
+xo_hub --mailbox-score DIR --out OUT [--run LABEL]
+```
+
+`FILE` has lines `ID NAME SITE` (two sites; the first one named is site 1;
+ids are fixed here, the Mac's from 101). The plan writes `DIR/plan.csv`
+(`job,kind,seed,type,scale,save_mode,evil,route` with route
+`id:name>id:name...`), `DIR/devices.txt` and one Job file per job into
+`DIR/box/`: kind `cross` [site 1, site 2, another site-1 device] and
+[site 2, site 1, another site-1 device] for every pair, every type, one
+(scale, save mode) per pair (rotating); one `chain` per type [site 1, every
+site-2 device, another site-1 device]; two `evil` cases per pair in each
+direction. The score reads the reports and hop files in `DIR/box/`, judges
+each job as the live hub does, also checks that every hop file's data part
+is the replay's (length and wire digest) and that no hop went further than
+the route, and writes the live hub's `devices.csv`, `jobs.csv`, `hops.csv`,
+`matrix.csv` and `summary.txt` into OUT (matrix: pair and cross jobs,
+route[0] x route[1]). `tools/run_mailbox.sh` drives the cloud side,
+`tools/run_mesh_mac.sh` the Mac side.
 
 `xmesh_selftest` (types thread): in memory, no network. For every type,
 scale and save mode: make, save, receive, digest, check, a five-device
