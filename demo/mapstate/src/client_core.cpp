@@ -1,6 +1,10 @@
 // Map state demo: client network, SnapshotHolder, sampling script. OWNER: client thread.
 #include "client_core.hpp"
 
+#include "mapdemo/build_info.hpp"
+#include "mapdemo/handshake.hpp"
+#include "mapdemo/schema_probes.hpp"
+
 #include <algorithm>
 #include <cerrno>
 #include <chrono>
@@ -23,6 +27,7 @@ const char* usage_text() {
            "                      [--buffers reuse|fresh] [--encoding zstd|compact|dense|cycle]\n"
            "                      [--events off|raw|zstd|zdict|batch|cycle] [--events-dict FILE]\n"
            "                      [--csv-dir DIR] [--auto-drag] [--screenshot-at F1,F2,...] [--evil]\n"
+           "                      [--first-request-id N]\n"
            "       mapdemo_client --self-check [--csv-dir DIR]\n"
            "       mapdemo_client --replay CORPUS_DIR [--buffers reuse|fresh] [--csv-dir DIR]\n";
 }
@@ -42,7 +47,7 @@ static std::optional<long> parse_long(const char* text, long lo, long hi) {
 Result<Options> parse_options(int argc, char** argv) {
     static constexpr std::string_view kWithValue[] = {"--host",     "--port",   "--csv-dir",       "--replay",
                                                       "--encoding", "--buffers", "--screenshot-at", "--events",
-                                                      "--events-dict"};
+                                                      "--events-dict", "--first-request-id"};
     Options o;
     for (int i = 1; i < argc; ++i) {
         std::string_view a = argv[i];
@@ -85,6 +90,11 @@ Result<Options> parse_options(int argc, char** argv) {
             }
         }
         else if (a == "--events-dict") o.events_dict = v;
+        else if (a == "--first-request-id") {
+            const auto id = parse_long(v, 1, 1000000000);
+            if (!id) return bad_value(a, v);
+            o.first_request_id = static_cast<std::uint64_t>(*id);
+        }
         else if (a == "--buffers") {
             const auto m = parse_buffer_mode(v);
             if (!m) return bad_value(a, v);
@@ -257,33 +267,49 @@ std::string join_path(const std::string& dir, const char* file) {
     return dir.back() == '/' ? dir + file : dir + "/" + file;
 }
 
-// Connects to A and sends Hello; returns A's answer (HelloOk or Error). A port
-// forwarder (docker -p, a VM's or an emulator's) can accept the connection
-// before A listens and then close it, so a close before any answer is retried
-// like a refused connect, for up to 5 s.
-static Result<net::Frame> connect_hello(net::Conn& c, const Options& opt) {
+// The Hello label: program and build (schema version included), for A's log.
+static std::string hello_label() { return "mapdemo_client " + build_info(); }
+
+// Connects to A and sends `hello`; returns A's answer (HelloAck or Error). A
+// port forwarder (docker -p, a VM's or an emulator's) can accept the
+// connection before A listens and then close it, so a close before any
+// answer is retried like a refused connect, for up to 5 s.
+static Result<net::Frame> connect_hello(net::Conn& c, const Options& opt, const std::string& hello) {
     const std::uint64_t give_up = net::now_ns() + 5000000000ull;
     for (;;) {
         Result<net::Conn> opened = net::Conn::try_connect(opt.host, opt.port);
         if (!opened) return std::move(opened).error();
         c = std::move(*opened);
-        MAPDEMO_TRY(c.try_send(net::MsgType::Hello, 0, net::hello_payload()));
-        Result<net::Frame> answer = c.try_recv({net::MsgType::HelloOk, net::MsgType::Error});
+        MAPDEMO_TRY(c.try_send(net::MsgType::Hello, 0, hello));
+        Result<net::Frame> answer = c.try_recv({net::MsgType::HelloAck, net::MsgType::Error});
         if (answer || !answer.error().peer_closed || net::now_ns() >= give_up) return answer;
         c.close();
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 }
 
-Session::Session(const Options& options) : opt_(options) {}
+// A's HelloAck to this build's Hello: ok, or the Error a player would see
+// (this build is too old or too new for A, or names its fields differently).
+static Status check_ack(const net::Frame& answer) {
+    if (answer.type == net::MsgType::Error) return Error{"A refused the handshake: " + answer.payload};
+    const XSchemaAckResult r = handshake::read_client_ack(answer.payload);
+    if (r) return {};
+    if (r.status == XSchemaAckResult::Status::rejected)
+        return Error{std::string("A does not serve this client's schema (") + handshake::client_root_name(r.root_type_id) +
+                     ": " + to_string(r.verdict) + "); this client needs an update"};
+    return Error{"bad HelloAck from A: " + r.message};
+}
+
+Session::Session(const Options& options) : opt_(options), next_request_id_(options.first_request_id) {}
 
 Session::~Session() = default;
 
 Status Session::connect() {
-    Result<net::Frame> ok = connect_hello(conn_, opt_);
+    Result<net::Frame> ok = connect_hello(conn_, opt_, handshake::client_hello(hello_label()));
     if (!ok) return std::move(ok).error();
-    if (ok->type == net::MsgType::Error) return Error{"A refused the handshake: " + ok->payload};
+    MAPDEMO_TRY(check_ack(*ok));
     checks_.pass("handshake");
+    checks_.note("handshake", "schema v" + std::to_string(MAPDEMO_SCHEMA_VERSION) + " accepted");
 
     Result<net::Frame> cat = conn_.try_recv({net::MsgType::Catalog, net::MsgType::Error});
     if (!cat) return std::move(cat).error();
@@ -791,7 +817,7 @@ Awaited await_frame(net::Conn& c, int timeout_ms) {
         for (;;) {
             if (c.want_write()) MAPDEMO_TRY(c.try_flush());
             Result<std::optional<net::Frame>> f = c.try_recv_nowait(
-                {net::MsgType::ViewSnapshot, net::MsgType::Error, net::MsgType::Bye, net::MsgType::Catalog, net::MsgType::HelloOk,
+                {net::MsgType::ViewSnapshot, net::MsgType::Error, net::MsgType::Bye, net::MsgType::Catalog, net::MsgType::HelloAck,
                  net::MsgType::SubscribeOk, net::MsgType::Events});
             if (!f) return std::move(f).error();
             if (*f) {
@@ -815,9 +841,9 @@ Awaited await_frame(net::Conn& c, int timeout_ms) {
 }
 
 Status handshake(net::Conn& c, const Options& opt) {
-    Result<net::Frame> ok = connect_hello(c, opt);
+    Result<net::Frame> ok = connect_hello(c, opt, handshake::client_hello(hello_label()));
     if (!ok) return std::move(ok).error();
-    if (ok->type != net::MsgType::HelloOk) return Error{"handshake refused: " + ok->payload};
+    MAPDEMO_TRY(check_ack(*ok));
     MAPDEMO_TRY(c.try_recv({net::MsgType::Catalog}));
     return {};
 }
@@ -855,6 +881,54 @@ bool expect_rejected(CheckLog& log, const char* name, const char* what, net::Con
         log.fail(name, result);
     }
     return ok;
+}
+
+void log_outcome(CheckLog& log, const char* name, const char* what, bool ok, const std::string& result) {
+    std::fprintf(stdout, "evil: %-40s -> %s %s\n", what, ok ? "rejected," : "NOT rejected,", result.c_str());
+    if (ok) {
+        log.pass(name);
+        log.note(name, result);
+    } else {
+        log.fail(name, result);
+    }
+}
+
+// A Hello whose ViewSnapshot is `Snapshot` (the other root types as in this
+// build): A's HelloAck must refuse ViewSnapshot with `want`, and A must then
+// close the connection without sending anything else.
+template <typename Snapshot>
+void expect_hello_refused(CheckLog& log, const char* name, const char* what, const Options& opt, XSchemaVerdict want) {
+    net::Conn c;
+    const std::string hello = make_schema_hello<MapCatalog, ViewRequest, Snapshot, UnitEvent>("mapdemo_client --evil");
+    Result<net::Frame> answer = connect_hello(c, opt, hello);
+    std::string result;
+    bool ok = false;
+    if (!answer) {
+        result = "no HelloAck: " + answer.error().message;
+    } else if (answer->type != net::MsgType::HelloAck) {
+        result = std::string("got ") + net::type_name(answer->type) + " " + answer->payload;
+    } else {
+        const XSchemaAckResult r = read_schema_ack<MapCatalog, ViewRequest, Snapshot, UnitEvent>(answer->payload);
+        if (r) {
+            result = "accepted";
+        } else if (r.status != XSchemaAckResult::Status::rejected) {
+            result = "bad HelloAck: " + r.message;
+        } else if (r.root_type_id != wire_root_type_id_v<Snapshot>() || r.verdict != want) {
+            result = std::string("HelloAck refused ") + handshake::client_root_name(r.root_type_id) + " with " +
+                     to_string(r.verdict);
+        } else {
+            Awaited a = await_frame(c, 5000);
+            result = std::string("HelloAck ViewSnapshot ") + to_string(r.verdict);
+            if (a.outcome == Outcome::Closed) {
+                ok = true;
+                result += ", connection closed";
+            } else {
+                result += a.outcome == Outcome::Timeout ? ", but the connection stayed open"
+                                                        : std::string(", then ") + net::type_name(a.frame.type);
+            }
+        }
+    }
+    log_outcome(log, name, what, ok, result);
 }
 
 } // namespace
@@ -932,6 +1006,22 @@ Result<int> run_evil(const Options& opt) {
         MAPDEMO_TRY(handshake(c9, opt));
         MAPDEMO_TRY(c9.try_send(net::MsgType::Subscribe, 0, codec::subscribe_payload(0), 7));
         expect_rejected(log, "evil_subscribe_encoding", "Subscribe asking for event encoding 7", c9);
+    }
+    // (10) to (12): the handshake. A build whose field names differ from the
+    // version they lay out, a version A does not know, and a Hello that is
+    // not a schema hello at all.
+    expect_hello_refused<probe::RenamedViewSnapshot>(log, "evil_hello_renamed",
+                                                     "Hello: version-1 layout, renamed field (hp -> health)", opt,
+                                                     XSchemaVerdict::reject_names);
+    expect_hello_refused<probe::FutureViewSnapshot>(log, "evil_hello_unknown", "Hello: a ViewSnapshot A does not know",
+                                                    opt, XSchemaVerdict::reject_unknown);
+    {
+        net::Conn c;
+        Result<net::Frame> answer = connect_hello(c, opt, "not a schema hello");
+        const bool ok = answer && answer->type == net::MsgType::Error;
+        log_outcome(log, "evil_hello_junk", "Hello: not a schema hello", ok,
+                    !answer ? "no answer: " + answer.error().message
+                            : std::string(net::type_name(answer->type)) + ": " + answer->payload);
     }
     {   // (4) one connection: valid request, truncated wire, valid request.
         // With --buffers reuse, A's per-client request buffer is left empty

@@ -152,6 +152,17 @@ def target_summary(out_root, name, corpus_rows):
     t["verdicts"] = len(verdicts)
     t["verdicts_failed"] = sum(1 for v in verdicts if not v.get("ok"))
     t["tier_names"] = [x.get("name") for x in (s or {}).get("tiers", [])]
+    # A second client in the tiers (MAPDEMO_CLIENT2_OF), e.g. the other
+    # schema version: its build and the schema versions A sent.
+    t["schema_versions"] = "-"
+    tiers0 = (s or {}).get("tiers", [])
+    if tiers0:
+        sc = tiers0[0].get("schema_clients") or []
+        c2 = read_text(os.path.join(root, tiers0[0].get("name", ""), "client2", "client_build.txt"))
+        t["schema_versions"] = " + ".join("v" + c.get("schema_version", "?") for c in sc) or "-"
+        if c2:
+            t["schema_versions"] += " (second client `{}`)".format(
+                tiers0[0].get("meta", {}).get("client2_cmd", "-").split("/")[-1])
     evil = [v for v in verdicts if v.get("scope", "").startswith("evil")]
     t["evil_ok"] = bool(evil) and all(v.get("ok") for v in evil)
     cmp = [v for v in verdicts if v.get("scope") == "compare"]
@@ -240,17 +251,18 @@ def main():
     lines.append("")
     lines.append("## Targets")
     lines.append("")
-    lines.append("| target | runs under | client build | self-check | replay | tiers | evil | step wires | result |")
-    lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
+    lines.append("| target | runs under | client build | self-check | replay | tiers | schema versions in the tiers "
+                 "| evil | step wires | result |")
+    lines.append("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
     for t in targets:
-        lines.append("| {} | {} | `{}` | {}/{} | {}/{} same digests ({}) | {} ({} verdicts{}) | {} | {} | {} |".format(
+        lines.append("| {} | {} | `{}` | {}/{} | {}/{} same digests ({}) | {} ({} verdicts{}) | {} | {} | {} | {} |".format(
             t["name"], t["runner"], t["build"],
             t["selfcheck"]["passed"], t["selfcheck"]["checks"],
             t["replay_same"], len(corpus_rows),
             ", ".join("{} {}".format(e, t["replay_by_encoding"][e]) for e in ENCODINGS),
             ", ".join(t["tier_names"]) or "-", t["verdicts"],
             ", {} failed".format(t["verdicts_failed"]) if t["verdicts_failed"] else "",
-            "pass" if t["evil_ok"] else "**FAIL**", t["compare"],
+            t["schema_versions"], "pass" if t["evil_ok"] else "**FAIL**", t["compare"],
             "PASS" if t["ok"] else "**FAIL**"))
     lines.append("")
     problems = [(t["name"], p) for t in targets for p in t["problems"]]
