@@ -101,8 +101,18 @@ CI 停用前 `.github/workflows/client-targets.yml` 的结果，格式是 2.0，
 客户端与服务端的 schema 版本不同时，3.2 的服务端负责转换（[SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)）。
 客户端只多一次握手，用 `xoffset_handshake.hpp`：连接建立后发
 `make_schema_hello<...>()`，收到服务端的 ack 后用 `read_schema_ack<...>()` 读出结果，
-被拒绝时提示更新。这两个函数不抛异常；关异常的客户端构建要等 SC-8 的
-`try_load_verified` 合入。客户端不包含 `xoffset_evolution.hpp`，没有转换代码。
+被拒绝时提示更新。这两个函数不抛异常；关异常的构建里握手消息经 `try_load_verified` 装载
+（下一节）。客户端不包含 `xoffset_evolution.hpp`，没有转换代码。
+
+## 关异常构建（SC-8）
+
+不开异常的引擎（`-fno-exceptions`，MSVC `/EHs-c- /D_HAS_EXCEPTIONS=0`）可以直接包含 XOffset，
+接收时用 `try_load_verified` / `try_reload_verified` / `try_begin_verified_reload` 拿错误码和错误
+文字，其他不可返回的失败走 `set_fatal_handler`（`docs/USER_GUIDE.md` 第 6.2 节）。CTest 里
+`*_noexc` 的 24 个程序和 `test_vm_storage_noexc`（C++17 OS 层）都按关异常编译；
+`tools/no_exceptions_differential.sh` 比较开、关异常两种构建对同一批变异 wire 的结果。
+C++26 反射构建（P2996、GCC 16）和 C++20 字段表构建（GCC 16、P2996 Clang）都在云端 Linux x86-64
+上跑过这些测试；其他客户端目标的关异常构建随各自平台列验证。
 
 ## 范围
 
