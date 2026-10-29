@@ -290,7 +290,7 @@ EMULATOR AND SIMULATOR NUMBERS, not phone numbers.
    2,902 files (1,544 reports, no errors). Scored alone: 1,536/2,054, every
    failure a job through 107 or 108 (`no report from colima-...`).
 2. `XO_MAILBOX_PRIOR=<batch 1's outbox> run_mesh_mac.sh mailbox` (after
-   #186), 10-29 ~03:0xZ: all 8 devices built, self-tests 8/8, and from
+   #186), 10-29 03:00-03:05Z: all 8 devices built, self-tests 8/8, and from
    batch 1's answers they answered the rest in 6 rounds (the chains go
    through all 8 Mac devices): 1,042 new files (552 reports); batch 1's
    2,902 files were not sent again. Exit 0.
