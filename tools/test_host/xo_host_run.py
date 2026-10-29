@@ -25,14 +25,13 @@ Backends (the app's data directory is <container>/Documents/xo):
   local   the command-line host (tools/test_host/host_cli.cpp) on this computer, with
           the data directory under --state: checks the same flow without a phone
 
-Serving (--serve 1 or XO_HOST_SERVE=1; not yet the default: on an iPhone every program
-library loaded into one process keeps its 64 MiB table, and about 50 of them fill the
-process's address space): the app is started once ("xoserve") and
-stays up; each run sends inbox/<id>.tar and then inbox/<id>.ready, and the app runs the
-programs one after another in its process (it shows the totals meanwhile). A state stamp
-keeps the serving process id; when it is gone (a crash, a reinstall, a timeout, or the app
-ended itself after a run because less than XO_HOST_HEADROOM_MIB (1024) of address space was
-left in one piece) the next run starts the app again. --fresh (XO_HOST_FRESH=1) starts it again before this run (timed
+Serving (--serve 1 or XO_HOST_SERVE=1; not yet the default on an iPhone): the app is started
+once ("xoserve") and stays up; each run sends inbox/<id>.tar and then inbox/<id>.ready, the app
+marks it inbox/<id>.taken and runs the programs one after another in its process (it shows
+the totals meanwhile). A state stamp keeps the serving process id; when it is gone (a crash,
+a reinstall, a timeout, or the app ended itself after a run because less than
+XO_HOST_HEADROOM_MIB (2048) of address space was left in one piece) the next run starts the
+app again. --fresh (XO_HOST_FRESH=1) starts it again before this run (timed
 runs and memory probes: a process that ran nothing else). --serve 0 starts the app for each
 run ("xorun").
 
@@ -105,6 +104,13 @@ class LocalBackend(Backend):
         dst = os.path.join(self.root, rel)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         shutil.copyfile(local, dst)
+        # XO_HOST_LOCAL_RECHECK_MS: look at the copy again after a while, as devicectl does
+        # (it fails when the app has already removed the file: iPhone runs 6 and 8)
+        recheck = int(os.environ.get("XO_HOST_LOCAL_RECHECK_MS", "0") or 0)
+        if recheck:
+            time.sleep(recheck / 1000.0)
+            if not os.path.exists(dst):
+                raise RuntimeError("copy to %s failed: the file is gone" % rel)
 
     def pull(self, rel, local):
         src = os.path.join(self.root, rel)
@@ -162,6 +168,13 @@ class SimBackend(Backend):
         dst = os.path.join(self.container, rel)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         shutil.copyfile(local, dst)
+        # XO_HOST_LOCAL_RECHECK_MS: look at the copy again after a while, as devicectl does
+        # (it fails when the app has already removed the file: iPhone runs 6 and 8)
+        recheck = int(os.environ.get("XO_HOST_LOCAL_RECHECK_MS", "0") or 0)
+        if recheck:
+            time.sleep(recheck / 1000.0)
+            if not os.path.exists(dst):
+                raise RuntimeError("copy to %s failed: the file is gone" % rel)
 
     def pull(self, rel, local):
         src = os.path.join(self.container, rel)
@@ -418,7 +431,15 @@ def run(a):
             ready = os.path.join(work, "ready")
             with open(ready, "wb") as f:
                 f.write(b"1\n")   # devicectl failed on some empty files (iPhone run 6, CoreDeviceError 7000)
-            backend.push(ready, "%sinbox/%s.ready" % (prefix, run_id))
+            try:
+                backend.push(ready, "%sinbox/%s.ready" % (prefix, run_id))
+            except RuntimeError as e:
+                # devicectl can report a failure for a copy that arrived (CoreDeviceError 7000):
+                # the app took the request when either file is there; otherwise send it once more
+                if not any(backend.pull("%sinbox/%s.%s" % (prefix, run_id, k), os.path.join(work, k))
+                           for k in ("taken", "ready")):
+                    log("%s; sending it again" % e)
+                    backend.push(ready, "%sinbox/%s.ready" % (prefix, run_id))
         elif not backend.launch(["xorun", run_id]):
             return 124
         deadline = time.time() + a.timeout
@@ -434,9 +455,11 @@ def run(a):
             got = backend.pull(rel_out, result)
             if not got and not backend.alive():
                 # The serving app ended before it took the request (it ends by itself when
-                # little address space is left after a run): start it again, once.
-                if a.serve and not relaunched and backend.pull("%sinbox/%s.ready" % (prefix, run_id),
-                                                               os.path.join(work, "pending")):
+                # little address space is left after a run): start it again, once. A request it
+                # took (<id>.taken) and did not answer ended with the app: pack what it left.
+                if a.serve and not relaunched \
+                        and backend.pull("%sinbox/%s.ready" % (prefix, run_id), os.path.join(work, "pending")) \
+                        and not backend.pull("%sinbox/%s.taken" % (prefix, run_id), os.path.join(work, "taken")):
                     relaunched = True
                     forget_serving(a)
                     if not ensure_serving(a, backend):
@@ -523,6 +546,7 @@ def main():
     p.add_argument("program")
     p.add_argument("args", nargs=argparse.REMAINDER)
     a = p.parse_args()
+    a.state = os.path.abspath(a.state)   # the local host changes its directory during runs
     a.sent_stamps = []
     if a.poll <= 0:
         a.poll = 1.0 if a.backend == "device" else 0.1
