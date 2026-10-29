@@ -32,9 +32,9 @@
       "sha256": "f1f7f98c21afb92057a18d0917892d568ff5b4ede2586bbcac0bdfc97d523ba6"
     },
     "CHANGELOG.md": {
-      "bytes": 49705,
+      "bytes": 50274,
       "mode": 420,
-      "sha256": "9d3eacd2ee0afc0e1b5c59ca71d189ea811ac8a47ccc7019af4da43e3202652b"
+      "sha256": "b6f5721a517f9c9049fdb74af5ba91a642d6ffdf32135df4f69cc5045d557907"
     },
     "CMakeLists.txt": {
       "bytes": 7058,
@@ -147,9 +147,9 @@
       "sha256": "b447ba42711985a815d1ad58bdc78521749d3a13e2cdacdbfa422cdf91195445"
     },
     "cmake/XOffsetTestHost.cmake": {
-      "bytes": 3490,
+      "bytes": 3713,
       "mode": 420,
-      "sha256": "48fc4bc605f1763c9aedbade13e7f7bc550901415dff847dffae62c922bda2a6"
+      "sha256": "b6f269b4fc3949e52e9bd98161d366f4f426fada3a9ded8560ef641ff805653f"
     },
     "cmake/XOffsetTestInventory.cmake": {
       "bytes": 3243,
@@ -5492,9 +5492,9 @@
       "sha256": "40d0456ab92f0a4750e809cade538fc8ac00bd0f48bcb30ee9afe346dbb0c7a8"
     },
     "xoffset_slot_storage.hpp": {
-      "bytes": 23635,
+      "bytes": 24884,
       "mode": 420,
-      "sha256": "92cdfa52182d7f7d4970ea1bd565d922dac7b7db3bd87d75dad229a9d26cd60b"
+      "sha256": "435431c35329dcbbce46775b6bf2a23dc41afba56dfc80932d399e469ee8e0a1"
     },
     "xoffset_snapshot_index.hpp": {
       "bytes": 11421,
