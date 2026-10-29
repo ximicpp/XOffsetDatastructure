@@ -1,4 +1,4 @@
-# XOffsetDatastructure 用户指南（3.2.0-rc.2，wire 格式 2.1）
+# XOffsetDatastructure 用户指南（3.2.0，wire 格式 2.1）
 
 本文面向使用者，说明怎么定义类型、构建、修改、保存、加载，以及必须遵守的约束。
 部署要求见 [DEPLOYMENT.md](DEPLOYMENT.md)，格式细节见 [V2_FORMAT.md](V2_FORMAT.md)，输入与兼容边界见
@@ -485,7 +485,7 @@ XStatus done = token ? token->try_finish() : XStatus(token.error());
   任何改了 schema 的服务端更新都必须和客户端同时发版。
 - 需要长期保存或跨版本读取的数据，应保留能读取原版本的程序，自行导出再导入。
 
-3.2.0-rc.1 起加入 schema 演进：服务端保存一条版本链，收到旧版本
+3.2.0 起加入 schema 演进：服务端保存一条版本链，收到旧版本
 的 wire 先按旧版本完整校验再按字段名升级，发给旧客户端时降级后写出；客户端只多一次
 握手。用法、发版规则和代价见 [SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)。wire 格式不变。
 - 不同编译器、不同平台之间的 wire 兼容只在已验证的工具链上成立（见第 8 节 K7）。
@@ -519,18 +519,19 @@ K7 的现状：
   固定文件的构建都由它自己的编译器求值，不一致就编译失败（[SCHEMA_PINS.md](SCHEMA_PINS.md)，
   CTest `schema_pin_mismatch` 确认确实会失败）。服务端的 GCC 16、P2996 Clang 如此；客户端的
   字段表构建不需要反射，同一份 pin 也由原生编译器求值，NDK r29/r30 Clang、MSVC 19.44、
-  clang-cl 19 和 MinGW GCC 13 的全量 CTest 都包含这项检查。Apple clang 上要等 iOS 构建跑通。
+  clang-cl 19、MinGW GCC 13 和 Apple clang（iOS、macOS）的全量 CTest 都包含这项检查。
 - **库自带类型**：x86-64 Linux、x86-64 Windows、arm64 iOS、arm64 Android 四个目标的签名
   基线在 `tools/sigs/`，在 CTest 里核对（`check_compat`、
   `check_signature_regeneration`）。
 - **跨编译器 wire**：3.1.0 RC 的本地平台矩阵里，Linux x86-64（GCC 16、P2996）、
   Linux arm64（GCC 16、P2996）和 Windows x64（MinGW-w64 GCC 16）写出的 2.1 语料逐字节
-  一致，互相接受。字段表构建合入后（3.2.0-rc.1 起），Android arm64（NDK r29/r30）和
-  Windows x64（MSVC 19.44 的 C++20 与 C++23、clang-cl 19、MinGW GCC 13）都读入服务端
-  C++26 反射构建写出的参照语料并全部接受，写出的语料与它逐字节一致
-  （[CLIENT_TARGETS.md](CLIENT_TARGETS.md)）。
-- **边界**：只覆盖跑过上面检查的工具链。iOS 只在模拟器上跑过（Xcode 27.1，iOS 27.0，
-  语料逐字节一致），真机尚未覆盖。库自带类型的签名基线目前只在 CTest 里核对，不会让用户构建失败；目标是为用户
+  一致，互相接受。字段表构建合入后（3.2.0 起），Android arm64（NDK r29/r30）和
+  Windows x64（MSVC 19.44 的 C++20 与 C++23、clang-cl 19、MinGW GCC 13）、macOS arm64 和
+  iOS 模拟器（Apple clang）都读入服务端 C++26 反射构建写出的参照语料并全部接受，写出的语料
+  与它逐字节一致（[CLIENT_TARGETS.md](CLIENT_TARGETS.md)）。3.2.0 起，在不同平台上含义不同的
+  schema（按普通 `char` 排序的键、没有固定底层类型的 enum）编译期就被拒绝（第 2.2 节）。
+- **边界**：只覆盖跑过上面检查的工具链。真机：3.2.0-rc.1 在一台 Android 11 手机上通过；
+  一台 iPhone 15 Pro Max（iOS 26.6.2）上 CTest 和 24 个参照 wire 都通过（[DEVICE_TESTING.md](DEVICE_TESTING.md) 第 9 节）。库自带类型的签名基线目前只在 CTest 里核对，不会让用户构建失败；目标是为用户
   schema 导出签名、不一致时构建失败，并把 GCC 16 并入同一门禁（实现中）。
 
 K4 的前提：接收方必须设置 `maximum_capacity`。否则发送方可以发接近 payload 上限
@@ -543,10 +544,12 @@ K4 的前提：接收方必须设置 `maximum_capacity`。否则发送方可以�
 **目标（尚未承诺，实现中）K8**：客户端（Windows、Android、iOS，都是 64 位小端）与服务端用同一套
 库、同一份 schema 和同一 wire，客户端能接收、读写、校验、再发。客户端用字段表后端
 （第 2.1 节），按 C++20 用各平台原生编译器构建（Apple clang、Android NDK Clang、Windows
-编译器），服务端照旧用 C++26 反射。现状（3.2.0-rc.2）：字段表后端已合入；Android
-（NDK r29/r30）和 Windows（MSVC 19.44、clang-cl 19、MinGW）全量 CTest 都是 106/106，语料与
-服务端逐字节一致；iOS 模拟器（Xcode 27.1，部署目标 iOS 17.0）全量 CTest 129/129，
-语料同样逐字节一致，真机待测。升为核心承诺的条件：三个客户端目标都原生构建、CTest 通过
+编译器），服务端照旧用 C++26 反射。现状（3.2.0）：Android（NDK r29/r30）、Windows（MSVC 19.44、
+clang-cl 19、MinGW）、macOS 和 iOS 模拟器（Apple clang，部署目标 macOS 14.0 / iOS 17.0）的全量
+CTest 都通过，语料与服务端逐字节一致（逐目标的数字见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)）；
+真机：iPhone 15 Pro Max（iOS 26.6.2）CTest 138/138、语料逐字节一致、demo 通过，同机 SLG M 对 FlatBuffers
+A 0.305、D 0.858；3.2.0-rc.1 在一台 Android 11 手机上功能全部通过，没有计时。Android 手机上的速度测到之前，
+客户端用法不对外宣传。升为核心承诺的条件：三个客户端目标都原生构建、CTest 通过
 （iOS 含地址空间实测，并定下最低部署目标：系统 libc++ 的 `std::pmr` 在 macOS 14 / iOS 17
 以下加载失败），跨目标 wire 语料一致，签名与 `tools/sigs/` 基线一致。详见
 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)。3.1.0 没有这条构建路径：Android、iOS 和 MSVC 编不了。

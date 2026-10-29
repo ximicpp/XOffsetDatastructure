@@ -1,4 +1,4 @@
-# XOffsetDatastructure 部署指南（3.2.0-rc.2）
+# XOffsetDatastructure 部署指南（3.2.0）
 
 本文写给把 XOffset 接入服务端、客户端的工程师，说明发布、安全和网络上的前提。
 API 用法见 [USER_GUIDE.md](USER_GUIDE.md)，输入边界见
@@ -10,7 +10,7 @@ XOffset 用于**同一份 schema 的 C++ 程序之间**搬运可变状态：服�
 与客户端之间。编译器和平台可以不同，schema 必须相同。它不是跨语言协议，也不是
 长期存储格式。
 
-服务端与客户端之间的用法目前是目标，对外不宣传。3.2.0-rc.2 的现状（详见
+服务端与客户端之间的用法目前是目标，对外不宣传。3.2.0 的现状（详见
 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)）：
 
 - 客户端用 C++20/C++23 字段表构建（`XOFFSET_RECORD`，各平台原生编译器），服务端用 C++26
@@ -36,7 +36,7 @@ XOffset 用于**同一份 schema 的 C++ 程序之间**搬运可变状态：服�
   报错。可以把 `wire_schema_hash_v<T>()` 作为握手的一部分，在建立会话时比较。
 - 服务端之间滚动升级时，新旧版本不能混用同一类数据。可以分批切换（同一时间只让
   同版本的服务端互相通信），或在切换期间用旧版本程序导出、新版本程序导入。
-- schema 演进（新旧版本互通）从 3.2.0-rc.1 起提供，见下面 2.1 节。
+- schema 演进（新旧版本互通）从 3.2.0 起提供，见下面 2.1 节。
 
 ### 2.1 3.2 起：版本链与三条发版规则
 
@@ -61,7 +61,7 @@ XOffset 用于**同一份 schema 的 C++ 程序之间**搬运可变状态：服�
 | --- | --- | --- |
 | 服务端 | Linux x86-64、Linux arm64 | GCC 16.2（libstdc++），或 clang-p2996 `d77eff1`（配套 libc++）。两者 wire 逐字节一致，可以混用 |
 | 客户端 | Windows x64 | MinGW-w64 GCC 16.2（`tools/build_mingw_toolchain.sh`、`cmake/toolchains/mingw-w64-x86_64.cmake`）。GCC 的 MinGW TLS 是模拟的，每线程缓存在这个目标上关闭（`XOFFSET_THREAD_CACHES=0`） |
-| 客户端 | Android、iOS、macOS、Windows（MSVC、clang-cl） | 3.1.0 无可用工具链；3.2.0-rc.1 起用 C++20 字段表构建：Android NDK r29/r30、MSVC 19.44、clang-cl 19，iOS 用 Apple clang（Xcode 27.1，模拟器 129/129），macOS 用 Apple clang（Xcode 27.1，C++20、C++23 各 137/137），见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md) |
+| 客户端 | Android、iOS、macOS、Windows（MSVC、clang-cl） | 3.1.0 无可用工具链；3.2.0 起用 C++20 字段表构建：Android NDK r29/r30、MSVC 19.44、clang-cl 19，iOS 用 Apple clang（Xcode 27.1，模拟器 129/129），macOS 用 Apple clang（Xcode 27.1，C++20、C++23 各 137/137），见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md) |
 
 - 固定的编译器来源：clang-p2996 见 `toolchains/README.md`，GCC 16 镜像 digest 见
   `tools/local_validate.sh`，MinGW 工具链的构建配方是 `tools/build_mingw_toolchain.sh`。
