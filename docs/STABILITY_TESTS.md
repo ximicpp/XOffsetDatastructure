@@ -44,9 +44,9 @@ K0–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 客户端（iOS、Android、Windows，64 位小端）用字段表后端、各平台原生编译器构建，与服务端用同一套库、
 同一 wire。它不是 CTest 里的一项，而是每个客户端目标各跑一遍 `tools/native_targets.sh`：
 
-| 检查 | 测的是什么 | 现状（3.2.0-rc.2） |
+| 检查 | 测的是什么 | 现状（3.2.0） |
 |---|---|---|
-| 目标上的全量 CTest（Release） | 上面 K0–K7 中两种构建都跑的测试，在该目标的编译器和标准库上通过 | Android arm64（NDK r29/r30）、Windows x64（MSVC 19.44 C++20/C++23、clang-cl 19、MinGW GCC 13）都是 106/106；iOS 模拟器（Xcode 27.1，iOS 27.0）129/129；iOS 真机待测 |
+| 目标上的全量 CTest（Release） | 上面 K0–K7 中两种构建都跑的测试，在该目标的编译器和标准库上通过 | Android arm64（NDK r29/r30）、Windows x64（MSVC 19.44 C++20/C++23、clang-cl 19、MinGW GCC 13）、macOS arm64 和 iOS 模拟器（Apple clang）都通过（数字见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)）；真机：iPhone 15 Pro Max 138/138、Android 11 手机（3.2.0-rc.1）通过（[DEVICE_TESTING.md](DEVICE_TESTING.md) 第 9 节） |
 | 读参照语料 | 服务端 C++26 反射构建写出的 6 个语料，目标全部 `load_verified` 接受 | 上述目标全部接受 |
 | 写语料 `diff -r` | 目标写出的语料与参照逐字节一致 | 上述目标逐字节一致 |
 

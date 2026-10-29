@@ -2,6 +2,64 @@
 
 ## Unreleased
 
+## 3.2.0: clients on native compilers
+
+Against 3.1.0 this release adds the client build path. Clients describe each
+record with one `XOFFSET_RECORD` field list (C++20 or C++23, no reflection)
+and build with their platform's own compiler: Android NDK Clang, MSVC,
+clang-cl, MinGW GCC, and Apple clang for iOS and macOS. Servers keep C++26
+reflection, and both builds write the same bytes. It also adds builds
+without exceptions, schema evolution with a handshake, compile-time
+rejection of schemas whose meaning differs between platforms, the iOS test
+host and the end-to-end map demo (Linux servers; Windows, Android, iOS and
+macOS clients, an old-version client and client write-back). Wire format
+2.1 is unchanged. The entries are in the 3.2.0-rc.1 and 3.2.0-rc.2 sections
+below and in the list here.
+
+Status at this tag: the client path is still a target, not a core
+guarantee (K8, `docs/CLIENT_TARGETS.md`), and server-to-client use is not
+announced. Every client toolchain in `docs/CLIENT_TARGETS.md` passes the
+full CTest and writes the reference corpus byte for byte. Real devices: an
+iPhone 15 Pro Max (iOS 26.6.2, through the test host app) passed CTest
+138/138, the 24 reference wires and both demo clients, and measured SLG M
+against FlatBuffers 25.12.19 on the same phone at A 0.305, B 0.179, C 0.252,
+D 0.858 (`docs/DEVICE_TESTING.md` section 9); an Android 11 phone (Xiaomi
+M2102K1C) passed the functional checks with 3.2.0-rc.1, without timing.
+Android timing is the remaining condition for announcing the client path.
+
+Mac M4 checkpoint against `v3.1.0` (CKPT5, `docs/PERFORMANCE.md` section 4):
+D÷FlatBuffers 0.933 (upper bound 0.947; 3.1.0 was 1.117), SLG A/B/C
+0.994/1.003/1.004 and the formal harness within 1.013, G8 met, G9 17/19 as
+in 3.1.0. The four-format SLG step failed in CKPT5 and CKPT5b on intervals
+widened by single outlier processes (once on each side). A third run
+(CKPT5c) was pooled with both under a rule written before it ran: with all
+18+18 processes, A/B/C are 0.999/1.001/1.005 and C's upper bound is 1.0216,
+just over the 1.02 limit, so the rule stopped the release for susu's
+decision; susu chose to release (2026-10-29). No single run shows C above 1
+(1.014, 0.995, 1.007). `map.erase.fresh` runs two more instructions
+because container iterators are now a class (rc.1 public API change), at
+most 0.5% by the CKPT4 machine-code reading. The 7-night fuzz run is no longer a release
+condition (susu 2026-10-28).
+
+- `demo/mesh`: a cross-device data demo (off by default,
+  `XOFFSET_BUILD_MESH_DEMO`). Devices register at a hub that relays every
+  message; an object of one of six everyday types travels device to device
+  as its wire, and each device verifies it, compares it with a reference
+  model, edits it in place and sends it on. No library change.
+- iOS test host: `XO_HOST_SERVE=1` keeps the app up and runs the programs
+  one after another in its process (the default stays one launch per
+  program); iOS skips the tests' fork sections; `sign_ios_app.sh` finds the
+  stub app in its build directory. `bench/slg` takes `SLG_XOFFSET_CAP_MIB`
+  to reserve less address space for the player, battle and report buffers
+  (unset: 256 MiB, as before); the iPhone run uses 2 MiB.
+- Opt-in `XOFFSET_OWNER_MAP_SHARED`: the owner map becomes a runtime table,
+  taken from `xoffset_owner_map_shared(bytes)` when the process exports it
+  and otherwise mmapped, so many shared libraries in one process share one
+  table instead of 64 MiB of BSS each. The test host's program libraries
+  use it, and the serving host restarts when address-space headroom runs
+  out, so serving mode fits an iPhone's address space; serving mode stays
+  off by default until a phone run confirms it. Without the macro the
+  library and its machine code are unchanged (#183).
 - Wire schemas that mean different things on different 64-bit
   little-endian platforms fail to compile: a set or map key that orders by
   plain `char` (directly, in an array or record member, or an enum whose
