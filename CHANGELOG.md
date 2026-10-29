@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+## 3.2.1: iPhone test host serves by default
+
+A patch release on top of 3.2.0. The library headers and sources are byte
+for byte those of 3.2.0, so wire format 2.1, the API and every 3.2.0
+performance number are unchanged; only the iOS test host, the device mesh
+demo and the documentation change. The client path is still a target, not
+a core guarantee (K8), and server-to-client use is still not announced.
+
+- iOS test host: serving mode (one app process runs the programs one after
+  another) is now the default on a device and with the local backend; the
+  simulator keeps one launch per program until a simulator run checks
+  serving. iPhone 15 Pro Max run 9 passed in one serving app: CTest
+  138/138, the 24 reference wires byte-identical, slg verify, the memory
+  probe and both demo clients; CTest took 1 min 57 s against 3 min 49 s
+  with one launch per program (`docs/DEVICE_TESTING.md` section 9) (#188).
+- iOS test host: the serving app marks a request `<id>.taken` and removes
+  `.ready` ten seconds later instead of at once, because devicectl failed
+  a copy (CoreDeviceError 7000) when the file it had just written was gone
+  (run 8 lost 25 of 138 CTest runs this way); the driver checks delivery
+  before resending, and `XO_HOST_LOCAL_RECHECK_MS` makes the local backend
+  recheck its copies the way devicectl does (#185).
+- `demo/mesh`: the Mac batch no longer hangs after the hub exits (it had
+  waited for the background Android emulator); the hub and devices are
+  time-bounded, clean-up runs from exit and signal traps, and
+  `XO_MAILBOX_PRIOR` lets a later mailbox run answer only what an earlier
+  one left. `demo/mesh/RESULT.md` records the Mac live mesh (8 devices,
+  1,748/1,748) and the cross-site mailbox with all 8 Mac devices
+  (2,054/2,054); merged with the cloud mesh, 24 devices and 11,254 jobs,
+  all passed (#186, #187).
+
 ## 3.2.0: clients on native compilers
 
 Against 3.1.0 this release adds the client build path. Clients describe each
