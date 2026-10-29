@@ -129,8 +129,8 @@ B 15119 → 12964（0.857），D 824 → 712（0.864）。两个口径下 D 每�
 
 ## 4. 3.2.0
 
-CKPT5 检查点：`next_cpp26` `70a07a05` 对 `v3.1.0`（`9ef5ce75`），2026-10-28。发布头在它之后只多了 0 类
-PR（demo、工具、文档），库代码相同。VERDICT：`perf-gate/mac/2026-10-28-ckpt5-70a07a0/VERDICT.md`；
+CKPT5 检查点：`next_cpp26` `70a07a05` 对 `v3.1.0`（`9ef5ce75`），2026-10-28。发布头在它之后多了 0 类
+PR（demo、工具、文档）和 S 类的 #183（库头只在新的可选宏 `XOFFSET_OWNER_MAP_SHARED` 下改变，默认构建的 Ir 和机器码相同）。VERDICT：`perf-gate/mac/2026-10-28-ckpt5-70a07a0/VERDICT.md`；
 CKPT5 的 L2 SLG 因两个离群进程区间过宽、按规则判 fail，同样的二进制重跑 L2（CKPT5b，`perf-gate/mac/2026-10-28-ckpt5b-70a07a0/VERDICT.md`）点估计都 ≤1.003，
 这次离群在 anchor 一侧，C 的区间仍宽于 1.03。两次的离群方向不随二进制走，这一次 SLG 按 GATED 口径和两次合并的数据判通过（对冻结规则的一次例外，由「性能优化」确认）。
 

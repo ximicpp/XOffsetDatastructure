@@ -46,6 +46,14 @@ longer a release condition (susu 2026-10-28).
   stub app in its build directory. `bench/slg` takes `SLG_XOFFSET_CAP_MIB`
   to reserve less address space for the player, battle and report buffers
   (unset: 256 MiB, as before); the iPhone run uses 2 MiB.
+- Opt-in `XOFFSET_OWNER_MAP_SHARED`: the owner map becomes a runtime table,
+  taken from `xoffset_owner_map_shared(bytes)` when the process exports it
+  and otherwise mmapped, so many shared libraries in one process share one
+  table instead of 64 MiB of BSS each. The test host's program libraries
+  use it, and the serving host restarts when address-space headroom runs
+  out, so serving mode fits an iPhone's address space; serving mode stays
+  off by default until a phone run confirms it. Without the macro the
+  library and its machine code are unchanged (#183).
 - Wire schemas that mean different things on different 64-bit
   little-endian platforms fail to compile: a set or map key that orders by
   plain `char` (directly, in an array or record member, or an enum whose
