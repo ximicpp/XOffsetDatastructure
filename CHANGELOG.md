@@ -30,10 +30,14 @@ Android timing is the remaining condition for announcing the client path.
 Mac M4 checkpoint against `v3.1.0` (CKPT5, `docs/PERFORMANCE.md` section 4):
 D÷FlatBuffers 0.933 (upper bound 0.947; 3.1.0 was 1.117), SLG A/B/C
 0.994/1.003/1.004 and the formal harness within 1.013, G8 met, G9 17/19 as
-in 3.1.0. The four-format SLG step failed twice only on intervals widened by
-one outlier process (once on each side) and passes on the two runs pooled;
-it was accepted as an exception to the gate rule. The 7-night fuzz run is no
-longer a release condition (susu 2026-10-28).
+in 3.1.0. The four-format SLG step failed in CKPT5 and CKPT5b on intervals
+widened by single outlier processes (once on each side). A third run
+(CKPT5c) was pooled with both under a rule written before it ran: with all
+18+18 processes, A/B/C are 0.999/1.001/1.005 and C's upper bound is 1.0216,
+just over the 1.02 limit, so the rule stopped the release for susu's
+decision; susu chose to release (2026-10-29). No single run shows C above 1
+(1.014, 0.995, 1.007). The 7-night fuzz run is no longer a release
+condition (susu 2026-10-28).
 
 - `demo/mesh`: a cross-device data demo (off by default,
   `XOFFSET_BUILD_MESH_DEMO`). Devices register at a hub that relays every
