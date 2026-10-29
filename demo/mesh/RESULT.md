@@ -279,35 +279,39 @@ SIGTERM during the mesh each end with RESULT.md and nothing left running).
 ## 5. Cross-site mailbox: cloud and Mac (phase 4, network thread)
 
 The plan of section 3 (2,054 jobs, label `cross-331f5e9`, plan sha256
-`9ded5022...`) with the Mac's real devices: `run_mesh_mac.sh mailbox`
-10-29 01:06-01:23Z, then `run_mailbox.sh post` in the cloud 10-29 02:2xZ.
+`9ded5022...`) with the Mac's real devices, in two Mac batches, then
+`run_mailbox.sh post` in the cloud on both outputs (10-29 03:1xZ).
+EMULATOR AND SIMULATOR NUMBERS, not phone numbers.
 
-In that Mac batch colima did not start (a stopped `xo-mesh-hub` container
-was left over from the batch interrupted at 18:57Z), so the two colima
-devices (107, 108) and their self-tests did not run. The other six answered
-2,054 files in 4 rounds and returned 2,902 files (1,544 reports, no
-errors); the cloud devices finished in 2 rounds.
+1. `run_mesh_mac.sh mailbox`, 10-29 01:06-01:23Z: colima did not start (a
+   stopped `xo-mesh-hub` container was left over from the batch
+   interrupted at 18:57Z), so the two colima devices (107, 108) did not
+   run. The other six answered the 2,054 files in 4 rounds and returned
+   2,902 files (1,544 reports, no errors). Scored alone: 1,536/2,054, every
+   failure a job through 107 or 108 (`no report from colima-...`).
+2. `XO_MAILBOX_PRIOR=<batch 1's outbox> run_mesh_mac.sh mailbox` (after
+   #186), 10-29 ~03:0xZ: all 8 devices built, self-tests 8/8, and from
+   batch 1's answers they answered the rest in 6 rounds (the chains go
+   through all 8 Mac devices): 1,042 new files (552 reports); batch 1's
+   2,902 files were not sent again. Exit 0.
 
-**Result: FAIL, only from the two devices that never ran.** 1,536 of 2,054
-jobs passed: cross 1,152/1,536, evil 384/512, chain 0/6. All 518 failures
-are `no report from colima-linux-arm64-gcc[-noexc]`: every job whose route
-has a colima device (each chain passes all 8 Mac devices). Every job
-without one passed, with every hop file's data part matching the replay.
-In the 24 x 24 matrix (cloud mesh of section 2, this score and the Mac
-mesh of section 4 merged, 11,254 jobs) every cell between the 16 cloud
-devices and macOS, the iOS Simulator and the Android emulator has 6/6 in
-both directions, cloud-cloud and Mac-Mac cells pass, and the 64 cells
-between the cloud and colima are 0/6 (`CROSS_RESULT.md`).
+The cloud took both outboxes (3,944 files, none differing from the box),
+the cloud devices finished in 2 rounds, and `xo_hub --mailbox-score`
+judged every job from the reports and checked every hop file's data part
+against the replay (length and wire digest).
 
-To close it the Mac answers what is left: `XO_MAILBOX_PRIOR=<that run's
-mailbox/outbox.tar.gz> run_mesh_mac.sh mailbox` starts from the earlier
-answers, all 8 devices answer only the rest, and its outbox holds only the
-new files; `run_mailbox.sh post DIR OUT1 OUT2` takes both. Rehearsed in the
-cloud on the real Mac outbox with linux-x64 programs standing in for the
-Mac devices (stub Mac tools): 1,048 new files, then 2,054/2,054 passed and
-the merged report 11,254/11,254. That rehearsal is not a Mac result.
+**Result: PASS.** 2,054 jobs, 2,054 passed: cross 1,536 (every (cloud,
+Mac) pair and type both ways), chain 6 (cloud, all 8 Mac devices, cloud),
+evil 512 (each of the 7 cases refused as expected). Each Mac device passed
+its 262 mailbox jobs. Merged with the cloud mesh of section 2 and the Mac
+mesh of section 4 (`mesh_report.py --also`): **24 devices, 11,254 jobs, all
+passed** (pairs 7,104, cross 1,536, chains 30, evil 2,584); every cell of
+the 24 x 24 matrix passes, each cloud-Mac cell 6/6 in each direction
+(`CROSS_RESULT_full.md`).
 
 (`/mnt/project-files/cross-device-demo-20261028/mac-20261029/`:
-`CROSS_RESULT.md` sha256 `9b21bf83...`, `MESH_RESULT_mac_live.md`,
-`cross_score_331f5e9.tar.gz` with the hub's score CSVs, `mac_live_hub.tar.gz`;
-the Mac's output `mesh_mac_out.tar.gz` sha256 `569e3b2f...`.)
+`CROSS_RESULT_full.md` sha256 `80455785...`, `cross_score_full_331f5e9.tar.gz`
+with the score CSVs, `MESH_RESULT_mac_live.md`, `mac_live_hub.tar.gz`;
+batch 1's score alone in `CROSS_RESULT.md`. Mac outputs in `../mac-out/`:
+`mesh_mac_out.tar.gz` sha256 `569e3b2f...`, `mesh_mac_mailbox2_331f5e9.tar.gz`
+sha256 `9f3c30e9...`.)
