@@ -36,7 +36,9 @@ widened by single outlier processes (once on each side). A third run
 18+18 processes, A/B/C are 0.999/1.001/1.005 and C's upper bound is 1.0216,
 just over the 1.02 limit, so the rule stopped the release for susu's
 decision; susu chose to release (2026-10-29). No single run shows C above 1
-(1.014, 0.995, 1.007). The 7-night fuzz run is no longer a release
+(1.014, 0.995, 1.007). `map.erase.fresh` runs two more instructions
+because container iterators are now a class (rc.1 public API change), at
+most 0.5% by the CKPT4 machine-code reading. The 7-night fuzz run is no longer a release
 condition (susu 2026-10-28).
 
 - `demo/mesh`: a cross-device data demo (off by default,
