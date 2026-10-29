@@ -40,6 +40,14 @@
 #   exit 2  inputs or environment missing (nothing ran)
 #   exit 3  something ran and failed (see RESULT.md)
 #   exit 0  everything that ran passed
+#
+# RESULT.md and the clean-up (emulator, simulator, container, colima, builds) also happen when
+# a step fails or the batch is interrupted (INT, TERM, HUP); the live mesh is bounded by
+# XO_HUB_LIMIT_S (default 5400 s for the hub, then 120 s for the devices). Run it under nohup.
+#
+# XO_MAILBOX_PRIOR=<an earlier run's mailbox/outbox.tar.gz>: the mailbox starts from that
+# run's answers, the devices answer only what is left (e.g. the devices that did not run then)
+# and outbox.tar.gz holds only the new files; run_mailbox.sh post takes both outputs.
 set -u -o pipefail
 # xcode-select may still point at the Command Line Tools; xcrun simctl and the iOS SDK need Xcode
 if [ -z "${DEVELOPER_DIR:-}" ] && [ -d /Applications/Xcode.app/Contents/Developer ] \
@@ -78,11 +86,19 @@ row() { ROWS="$ROWS| $1 | $2 | $3 |
 "; }
 RC=0
 fail() { RC=3; }
-EMU_PID=""; IOS_UDID=""; VM_UP=0; W=""
+EMU_PID=""; IOS_UDID=""; VM_UP=0; RT_UP=0; W=""
+BG_PIDS=""       # live mesh background jobs (hub, poller, watchdog, devices), stopped by finish
+FINISHED=0
 
+# kill_tree PID: PID and its children (a device's subshell runs xo_peer, adb or python3)
+kill_tree() { pkill -TERM -P "$1" 2>/dev/null; kill -TERM "$1" 2>/dev/null; }
 finish() {
-    local rc=$1
+    local rc=$1 p
+    [ $FINISHED = 0 ] || return 0
+    FINISHED=1
+    trap - INT TERM HUP
     log "finish rc=$rc"
+    for p in $BG_PIDS; do kill_tree "$p"; done
     {
         echo "# Device mesh on the Mac: live mesh and cross-site mailbox (EMULATOR/SIMULATOR numbers)"
         echo
@@ -99,7 +115,8 @@ finish() {
     cat "$XOQ_OUT/RESULT.md"
     [ -n "$EMU_PID" ] && { "$ADB" emu kill > /dev/null 2>&1; sleep 5; kill "$EMU_PID" 2>/dev/null; }
     [ -n "$IOS_UDID" ] && { xcrun simctl shutdown "$IOS_UDID" > /dev/null 2>&1; xcrun simctl delete "$IOS_UDID" > /dev/null 2>&1; }
-    if [ $VM_UP = 1 ]; then docker rm -f "$RT" > /dev/null 2>&1; colima stop --profile $PROF > /dev/null 2>&1; fi
+    [ $RT_UP = 1 ] && docker rm -f "$RT" > /dev/null 2>&1
+    [ $VM_UP = 1 ] && colima stop --profile $PROF > /dev/null 2>&1
     # everything worth keeping is in $XOQ_OUT; the Android SDK in $ANDROID_HOME stays for later runs
     rm -rf "${ANDROID_AVD_HOME:?}"
     [ -n "$W" ] && [ -d "$W" ] && [ "${XO_KEEP_W:-0}" != 1 ] && rm -rf "${W:?}"
@@ -107,6 +124,19 @@ finish() {
     exit "$rc"
 }
 stop() { STOPMSG=$1; echo "STOP: $1"; finish "${2:-2}"; }
+# an interrupted or failing batch still writes RESULT.md and cleans up (finish runs once)
+on_signal() { STOPMSG="interrupted by SIG$1"; echo "STOP: $STOPMSG"; finish 3; }
+trap 'on_signal INT' INT
+trap 'on_signal TERM' TERM
+trap 'on_signal HUP' HUP
+on_exit() {  # an exit that did not go through finish (a plain `exit`, an error): keep its code
+    local rc=$1
+    [ $FINISHED = 1 ] && return
+    [ "$rc" = 0 ] && rc=3
+    STOPMSG=${STOPMSG:-"the batch exited (rc $1) before it finished"}
+    finish "$rc"
+}
+trap 'on_exit $?' EXIT
 
 # ---------------------------------------------------------------- 0. inputs
 log "0. inputs ($WHAT)"
@@ -338,9 +368,17 @@ colima_up() {
         || { row colima "**not run**" "colima start failed (build/colima-start.log)"; fail; return; }
     VM_UP=1
     docker pull -q "$G" > /dev/null || { row colima "**not run**" "docker pull $G failed"; fail; return; }
-    docker inspect "$RT" > /dev/null 2>&1 && { row colima "**not run**" "container $RT exists (left over: look before removing it)"; VM_UP=0; fail; return; }
+    # $RT is this batch's container (it runs `sleep infinity`; everything it writes is under $W):
+    # a stopped one is left over from an earlier batch that did not finish and is removed
+    if docker inspect "$RT" > /dev/null 2>&1; then
+        [ "$(docker inspect -f '{{.State.Running}}' "$RT" 2>/dev/null)" = false ] \
+            || { row colima "**not run**" "container $RT is running (another batch uses it?)"; fail; return; }
+        docker rm "$RT" > /dev/null || { row colima "**not run**" "could not remove the stopped container $RT"; fail; return; }
+        echo "removed the stopped container $RT left over from an earlier batch" >> "$XOQ_OUT/build/colima-start.log"
+    fi
     docker run -d --name "$RT" -p 127.0.0.1:$PORT:$PORT -p 127.0.0.1:$HTTP_PORT:$HTTP_PORT -v "$W:$W" "$G" sleep infinity > /dev/null \
         || { row colima "**not run**" "$RT start failed"; fail; return; }
+    RT_UP=1
     vm "cd $SRC && python3 tools/prepare_vm_cmake.py --platform linux-\$(uname -m) --out /opt/cmake-tool" > "$XOQ_OUT/build/colima-cmake-tool.log" 2>&1 \
         || { row colima "**not run**" "prepare_vm_cmake failed (build/colima-cmake-tool.log)"; fail; return; }
     vm "export PATH=/opt/cmake-tool/root/bin:\$PATH; cmake -S $SRC -B $VB -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ -DXOFFSET_BUILD_MESH_DEMO=ON \
@@ -382,13 +420,24 @@ LIVE=$W/live
 live_run() {
     log "2. live mesh: xo_hub in colima + 8 devices"
     [ $OK_VM = 1 ] || { row "live mesh" "**not run**" "no hub (colima)"; fail; return; }
-    local n=0 hex t pids="" name dir hub_pid poll_pid e p
+    local n=0 hex t pids="" name dir hub_pid poll_pid e p left
     for v in $OK_MAC $OK_MAC $OK_IOS $OK_IOS $OK_AND $OK_AND $OK_VM $OK_VM; do n=$((n + v)); done
     mkdir -p "$LIVE/devices"
     docker exec "$RT" "$VMBIN/xo_hub" --run "mac-$(date -u +%Y%m%d-%H%M)" --out "$LIVE/hub" --port $PORT --http-port $HTTP_PORT \
         --expect "$n" --wait-s 900 --job-timeout-s 600 --max-inflight 16 --advertise 127.0.0.1 --no-archive \
         > "$XOQ_OUT/mesh/hub.log" 2>&1 &
     hub_pid=$!
+    BG_PIDS="$BG_PIDS $hub_pid"
+    # the hub ends by itself (--wait-s, --job-timeout-s); this bounds it if it does not
+    ( t=0; while kill -0 $hub_pid 2>/dev/null; do
+          sleep 5; t=$((t + 5))
+          [ $t -lt "${XO_HUB_LIMIT_S:-5400}" ] && continue
+          echo "the hub still ran after $t s: stopped" >> "$XOQ_OUT/mesh/hub.log"
+          # (no procps in the gcc image)
+          docker exec "$RT" sh -c 'for p in /proc/[0-9]*; do [ "$(cat $p/comm 2>/dev/null)" = xo_hub ] && kill ${p#/proc/}; done'
+          sleep 5; kill $hub_pid; break
+      done ) > /dev/null 2>&1 &
+    BG_PIDS="$BG_PIDS $!"
     # The published port accepts (docker-proxy) before the hub listens and then resets the
     # connection: wait until the hub listens inside the container.
     hex=$(printf '%04X' $PORT); t=0
@@ -399,16 +448,18 @@ live_run() {
           curl -s -m 3 "http://127.0.0.1:$HTTP_PORT/status.json" -o "$LIVE/status.tmp" && mv "$LIVE/status.tmp" "$LIVE/status.json"
           curl -s -m 3 "http://127.0.0.1:$HTTP_PORT/" -o "$LIVE/dash.tmp" && mv "$LIVE/dash.tmp" "$LIVE/dashboard.html"
           sleep 5
-      done ) &
+      done ) > /dev/null 2>&1 &
     poll_pid=$!
+    BG_PIDS="$BG_PIDS $poll_pid"
     # name ok command...: one device in the background, exit code in devices/NAME/exit
     start() {
         local name=$1 ok=$2; shift 2
         local dir=$LIVE/devices/$name
         mkdir -p "$dir"
         [ "$ok" = 1 ] || { echo 127 > "$dir/exit"; return; }
-        ( "$@" > "$dir/stdout.txt" 2>&1; echo $? > "$dir/exit" ) &
+        ( "$@" > "$dir/stdout.txt" 2>&1; echo $? > "$dir/exit" ) < /dev/null &
         pids="$pids $!"
+        BG_PIDS="$BG_PIDS $!"
     }
     local args="--evil --timeout-s 3600 --connect-s 120"
     # shellcheck disable=SC2086
@@ -426,12 +477,20 @@ live_run() {
     }
     wait $hub_pid; e=$?
     log "hub exit $e"
-    for p in $pids; do
-        t=0; while kill -0 "$p" 2>/dev/null && [ $t -lt 120 ]; do sleep 1; t=$((t + 1)); done
-        kill "$p" 2>/dev/null
+    # The devices leave when the hub ends: 120 s for all of them, then they are stopped. Only
+    # these jobs are waited for; a bare `wait` also waits for the Android emulator (forever).
+    t=0
+    while [ $t -lt 120 ]; do
+        left=0
+        for p in $pids; do kill -0 "$p" 2>/dev/null && left=1; done
+        [ $left = 1 ] || break
+        sleep 1; t=$((t + 1))
     done
-    kill $poll_pid 2>/dev/null
-    wait 2> /dev/null
+    for p in $pids; do kill -0 "$p" 2>/dev/null && { kill_tree "$p"; log "device job $p still ran 120 s after the hub: stopped"; }; done
+    kill_tree $poll_pid
+    # shellcheck disable=SC2086
+    wait $pids $poll_pid 2> /dev/null
+    BG_PIDS=""
     for name in android-emu-arm64 android-emu-arm64-noexc; do
         [ $OK_AND = 1 ] && "$ADB" exec-out "tar -cf - -C $DEV/run/$name ." 2>/dev/null | tar -xf - -C "$LIVE/devices/$name"
     done
@@ -486,7 +545,7 @@ mb_device() {
 mailbox_run() {
     log "3. mailbox: the Mac devices answer the cloud's files"
     [ $OK_MAC = 1 ] || { row mailbox "**not run**" "the macOS build failed (it lists the Android files)"; fail; return; }
-    local devs="" r=0 before after name bad="" n_in n_out
+    local devs="" r=0 before after name bad="" n_in n_out f b
     [ $OK_MAC = 1 ] && devs="$devs macos-arm64-clang macos-arm64-clang-noexc"
     [ $OK_IOS = 1 ] && devs="$devs ios-sim-arm64 ios-sim-arm64-noexc"
     [ $OK_AND = 1 ] && devs="$devs android-emu-arm64 android-emu-arm64-noexc"
@@ -494,6 +553,16 @@ mailbox_run() {
     rm -rf "$MBOX"; mkdir -p "$MBOX"
     cp -R "$W/mac_inbox/inbox" "$MBOX/box"
     n_in=$(ls "$MBOX/box" | wc -l | tr -d ' ')
+    local prior_note=""
+    if [ -n "${XO_MAILBOX_PRIOR:-}" ]; then
+        # an earlier run's answers stay answered (xo_peer --mailbox skips what has a report)
+        mkdir -p "$MBOX/prior"
+        tar -xzf "$XO_MAILBOX_PRIOR" -C "$MBOX/prior" 2>> "$XOQ_OUT/mailbox/logs/prior.log" && [ -d "$MBOX/prior/outbox" ] \
+            || { row mailbox "**not run**" "XO_MAILBOX_PRIOR $XO_MAILBOX_PRIOR: no outbox/ in it"; fail; return; }
+        cp "$MBOX/prior/outbox/"* "$MBOX/box/"
+        sha "$XO_MAILBOX_PRIOR" > "$XOQ_OUT/mailbox/PRIOR_SHA256.txt"
+        prior_note="; the $(ls "$MBOX/prior/outbox" | wc -l | tr -d ' ') files of the earlier outbox $(basename "$XO_MAILBOX_PRIOR") (sha256 $(cut -c1-12 "$XOQ_OUT/mailbox/PRIOR_SHA256.txt")) are not sent again"
+    fi
     while :; do
         r=$((r + 1))
         before=$(ls "$MBOX/box" | wc -l)
@@ -507,7 +576,10 @@ mailbox_run() {
     done
     mkdir -p "$MBOX/outbox"
     for f in "$MBOX/box"/*; do
-        [ -e "$W/mac_inbox/inbox/$(basename "$f")" ] || cp "$f" "$MBOX/outbox/"
+        b=$(basename "$f")
+        [ -e "$W/mac_inbox/inbox/$b" ] && continue
+        [ -e "$MBOX/prior/outbox/$b" ] && cmp -s "$f" "$MBOX/prior/outbox/$b" && continue
+        cp "$f" "$MBOX/outbox/"
     done
     n_out=$(ls "$MBOX/outbox" | wc -l | tr -d ' ')
     tar -czf "$XOQ_OUT/mailbox/outbox.tar.gz" -C "$MBOX" outbox
@@ -518,8 +590,8 @@ mailbox_run() {
       # shellcheck disable=SC2010
       echo "hop_files_for_cloud=$(ls "$MBOX/outbox" | grep -c '_to[0-9]\{1,2\}\.xmhop$')"; } > "$XOQ_OUT/mailbox/OUTBOX_INFO.txt"
     local missing=""
-    for name in $devs; do [ -f "$MBOX/outbox/build_$(id_of "$name").txt" ] || missing="$missing $name"; done
-    if [ -z "$bad$missing" ]; then row "mailbox" "answered" "$n_in files in, $n_out out in $r rounds, $(grep reports= "$XOQ_OUT/mailbox/OUTBOX_INFO.txt"); the cloud scores it (run_mailbox.sh post)"
+    for name in $devs; do [ -f "$MBOX/box/build_$(id_of "$name").txt" ] || missing="$missing $name"; done
+    if [ -z "$bad$missing" ]; then row "mailbox" "answered" "$n_in files in, $n_out out in $r rounds, $(grep reports= "$XOQ_OUT/mailbox/OUTBOX_INFO.txt")$prior_note; the cloud scores it (run_mailbox.sh post)"
     else row "mailbox" "**failed**" "devices with errors:$bad${missing:+; never ran:$missing} (mailbox/logs/)"; fail; fi
 }
 

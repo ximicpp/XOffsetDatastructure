@@ -13,13 +13,15 @@
 #       the cloud devices answer every file they can (rounds until none is
 #       left), then DIR/mac_inbox.tar.gz gets the files for the Mac devices
 #       (inbox/, devices.txt, INBOX_INFO.txt) for run_mesh_mac.sh.
-#   run_mailbox.sh post [--out DIR] MAC_OUT
-#       MAC_OUT: run_mesh_mac.sh's output directory (or a .tar.gz of it) with
-#       mailbox/outbox.tar.gz. Its files go into the box (an existing file
-#       must be byte-identical), the cloud devices answer the rest, then
-#       xo_hub --mailbox-score (DIR/score/hub) and DIR/CROSS_RESULT.md
-#       (mesh_report.py over the cloud mesh XMESH_CLOUD_RUN, the Mac mesh
-#       MAC_OUT/mesh and the mailbox score).
+#   run_mailbox.sh post [--out DIR] MAC_OUT [MAC_OUT ...]
+#       MAC_OUT: run_mesh_mac.sh's output directory, or a .tar.gz of one or
+#       more of them; every mailbox/outbox.tar.gz in them (a later run with
+#       XO_MAILBOX_PRIOR adds the files its first run lacked) goes into the
+#       box (an existing file must be byte-identical), the cloud devices
+#       answer the rest, then xo_hub --mailbox-score (DIR/score/hub) and
+#       DIR/CROSS_RESULT.md (mesh_report.py over the cloud mesh
+#       XMESH_CLOUD_RUN, the mailbox score and every Mac live mesh, a
+#       mesh/ with hub/summary.txt, in the MAC_OUTs).
 #   run_mailbox.sh fake-mac [--out DIR]
 #       cloud dry run of the Mac side: the linux-x64-gcc programs play the
 #       Mac devices on mac_inbox.tar.gz and write DIR/fake-mac/ as
@@ -48,7 +50,7 @@ while [ $# -gt 0 ]; do
         --out) OUT=$2; shift 2 ;;
         -h|--help) sed -n '2,36p' "$0"; exit 0 ;;
         -*) echo "unknown option $1" >&2; exit 2 ;;
-        *) if [ "$STEP" = post ] && [ -z "$MAC_OUT" ]; then MAC_OUT=$1; else COLUMNS="$COLUMNS $1"; fi; shift ;;
+        *) if [ "$STEP" = post ]; then MAC_OUT="$MAC_OUT $1"; else COLUMNS="$COLUMNS $1"; fi; shift ;;
     esac
 done
 case "$STEP" in plan|pre|post|fake-mac) ;; *) sed -n '2,36p' "$0"; exit 2 ;; esac
@@ -160,28 +162,39 @@ fake-mac)
 post)
     [ -n "$MAC_OUT" ] || { echo "post needs MAC_OUT (run_mesh_mac.sh output dir or .tar.gz)" >&2; exit 2; }
     [ -f "$PLAN/plan.csv" ] || { echo "no plan in $PLAN" >&2; exit 2; }
-    M=$MAC_OUT
-    if [ -f "$MAC_OUT" ]; then
-        rm -rf "$OUT/mac-out"
-        mkdir -p "$OUT/mac-out"
-        tar -xzf "$MAC_OUT" -C "$OUT/mac-out" || exit 1
-        M=$(dirname "$(find "$OUT/mac-out" -path '*/mailbox/outbox.tar.gz' | head -1)")/..
-    fi
-    [ -f "$M/mailbox/outbox.tar.gz" ] || { echo "no mailbox/outbox.tar.gz in $MAC_OUT" >&2; exit 2; }
-    M=$(cd "$M" && pwd)
-    rm -rf "$OUT/mac-outbox"
-    mkdir -p "$OUT/mac-outbox"
-    tar -xzf "$M/mailbox/outbox.tar.gz" -C "$OUT/mac-outbox" || exit 1
-    n=0; same=0
-    for f in "$OUT/mac-outbox/outbox"/*; do
-        [ -f "$f" ] || continue
-        b=$(basename "$f")
-        if [ -e "$BOX/$b" ]; then
-            cmp -s "$f" "$BOX/$b" || { echo "conflict: the Mac's $b differs from the cloud's" >&2; exit 1; }
-            same=$((same + 1))
-        else
-            cp "$f" "$BOX/$b"; n=$((n + 1))
-        fi
+    rm -rf "$OUT/mac-out" "$OUT/mac-outbox"
+    ROOTS=""; k=0
+    for a in $MAC_OUT; do
+        if [ -f "$a" ]; then
+            k=$((k + 1)); mkdir -p "$OUT/mac-out/$k"
+            tar -xzf "$a" -C "$OUT/mac-out/$k" || exit 1
+            ROOTS="$ROOTS $OUT/mac-out/$k"
+        elif [ -d "$a" ]; then ROOTS="$ROOTS $(cd "$a" && pwd)"
+        else echo "no $a" >&2; exit 2; fi
+    done
+    # shellcheck disable=SC2086
+    OUTBOXES=$(find $ROOTS -path '*/mailbox/outbox.tar.gz' | sort)
+    # shellcheck disable=SC2086
+    MESHES=$(find $ROOTS -path '*/mesh/hub/summary.txt' | sort)
+    [ -n "$OUTBOXES" ] || { echo "no mailbox/outbox.tar.gz in$MAC_OUT" >&2; exit 2; }
+    n=0; same=0; k=0
+    for o in $OUTBOXES; do
+        k=$((k + 1)); mkdir -p "$OUT/mac-outbox/$k"
+        tar -xzf "$o" -C "$OUT/mac-outbox/$k" || exit 1
+        echo "Mac outbox $o: $(ls "$OUT/mac-outbox/$k/outbox" | wc -l) files"
+        for f in "$OUT/mac-outbox/$k/outbox"/*; do
+            [ -f "$f" ] || continue
+            b=$(basename "$f")
+            if [ -e "$BOX/$b" ]; then
+                if cmp -s "$f" "$BOX/$b"; then same=$((same + 1))
+                # a later run's build line (same device, rebuilt) does not replace the first one's
+                elif case $b in build_*.txt) true ;; *) false ;; esac; then
+                    echo "note: $b differs in $o (kept the first): $(head -1 "$f")"
+                else echo "conflict: the Mac's $b ($o) differs from the box's" >&2; exit 1; fi
+            else
+                cp "$f" "$BOX/$b"; n=$((n + 1))
+            fi
+        done
     done
     echo "Mac outbox: $n new files ($same already here)"
     echo "== cloud devices, after the Mac"
@@ -195,7 +208,7 @@ post)
     # devices are listed under the id of the first run that has them: cloud mesh, mailbox, Mac mesh
     ALSO=""
     if [ -f "$MAIN/hub/summary.txt" ]; then ALSO="--also $OUT/score"; else MAIN=$OUT/score; fi
-    [ -f "$M/mesh/hub/summary.txt" ] && ALSO="$ALSO --also $M/mesh"
+    for m in $MESHES; do ALSO="$ALSO --also $(dirname "$(dirname "$m")")"; done
     # shellcheck disable=SC2086
     python3 "$HERE/mesh_report.py" "$MAIN" $ALSO > "$OUT/CROSS_RESULT.md" || RC=1
     head -3 "$OUT/CROSS_RESULT.md"
