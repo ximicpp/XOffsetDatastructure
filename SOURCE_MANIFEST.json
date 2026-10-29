@@ -1,5 +1,5 @@
 {
-  "archive_root": "xoffsetdatastructure-3.2.0",
+  "archive_root": "xoffsetdatastructure-3.2.1",
   "dependency_lock": {
     "include_trees": {
       "external/boost/libs/config/include": "1840c63a8e130b742d6f8148acaf9706a566ccf1791d2afd6eb9462465c2aaf8",
@@ -32,9 +32,9 @@
       "sha256": "f1f7f98c21afb92057a18d0917892d568ff5b4ede2586bbcac0bdfc97d523ba6"
     },
     "CHANGELOG.md": {
-      "bytes": 50698,
+      "bytes": 52556,
       "mode": 420,
-      "sha256": "3587b88a35258eea9d6d0b10ed295a27e9bb35b3686638716f2bee78c3118aed"
+      "sha256": "ec8a0fe8d32ba5246a4ca8ab84598d98d85772fcfb37dd67f3a7e373f9ce7c7d"
     },
     "CMakeLists.txt": {
       "bytes": 7058,
@@ -54,12 +54,12 @@
     "README.md": {
       "bytes": 14585,
       "mode": 420,
-      "sha256": "9afecce438de36dcc73afefd00e81f325e71c11b5ddfc076338cdd7583076027"
+      "sha256": "9b60b44aafcf48fced56f6613f9e201fbc334d12f2cacf23372105dd4118b0f7"
     },
     "XOFFSET_VERSION": {
       "bytes": 6,
       "mode": 420,
-      "sha256": "33bdaf9e2d6bcbde2e4e613e865e403f8fe21fc621078d34c30b0bdc7f68d903"
+      "sha256": "3822728783049fc2f22a56d1ee74d62352c49fbf81c6b54b50830d6f61c3af22"
     },
     "bench/slg/include/slg/cista_free.hpp": {
       "bytes": 1520,
@@ -219,7 +219,7 @@
     "docs/ALPHA_COMPATIBILITY.md": {
       "bytes": 8275,
       "mode": 420,
-      "sha256": "fdf53cffb9f22e8b18a94e93b1deb26d15bae048d6f6e97183a0ece343770747"
+      "sha256": "0a00f2027ead222c9c204015da3ac65c22923b1c26dc500de389ea88ac351297"
     },
     "docs/PACKAGING.md": {
       "bytes": 18425,
@@ -5543,5 +5543,5 @@
     "offline_build": "full/storage CMake and package validation use bundled dependency bytes; caller provides compatible compiler, SDK, CMake and standard library",
     "validation_limits": "validate_vm.py native full/storage are supported entry points; historical wire bundles and full developer-test discovery are outside this distribution"
   },
-  "version": "3.2.0"
+  "version": "3.2.1"
 }

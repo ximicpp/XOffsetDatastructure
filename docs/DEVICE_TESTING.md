@@ -1,6 +1,6 @@
-# 真机测试（3.2.0）
+# 真机测试（3.2.1）
 
-本页给 3.2.0 的真机测试：在一台干净的电脑上拉取这个版本，把手机接上 USB，
+本页给 3.2.1 的真机测试：在一台干净的电脑上拉取这个版本，把手机接上 USB，
 一条命令跑完，再把结果文件传回来。
 
 第 1–6 节是 **Android 手机 + Linux 服务端**：功能检查、SLG 计时和内存上限；第 7 节是 **iPhone**：
@@ -63,9 +63,9 @@ NDK 设 `ANDROID_NDK=`。
 ## 4. 拉取这个版本
 
 ```sh
-git clone --branch v3.2.0 --depth 1 https://github.com/ximicpp/XOffsetDatastructure.git xoffset-3.2.0
-cd xoffset-3.2.0
-cat XOFFSET_VERSION          # 3.2.0
+git clone --branch v3.2.1 --depth 1 https://github.com/ximicpp/XOffsetDatastructure.git xoffset-3.2.1
+cd xoffset-3.2.1
+cat XOFFSET_VERSION          # 3.2.1
 git rev-parse HEAD           # 与发版记录里的提交一致
 ```
 
@@ -97,7 +97,7 @@ bash tools/device/android_device.sh run      # 每台手机跑一次
 结束时脚本打印结果包的位置，形如：
 
 ```
-result: ~/xo-device/3.2.0-<提交前 7 位>/out-<UTC 时间>/RESULT.md; send back ~/xo-device/3.2.0-<提交前 7 位>/out-<UTC 时间>.tar.gz
+result: ~/xo-device/3.2.1-<提交前 7 位>/out-<UTC 时间>/RESULT.md; send back ~/xo-device/3.2.1-<提交前 7 位>/out-<UTC 时间>.tar.gz
 ```
 
 把 **`out-<UTC 时间>.tar.gz`** 拖进项目对话里，并说一下手机型号。包里有：
@@ -139,7 +139,7 @@ bash tools/device/ios_device.sh device out-iphone --steps build,info,ctest,slg,m
 
 - 接了多台 iPhone 时，用 `xcrun devicectl list devices` 查 UDID，加 `--udid <UDID>`。
 - wire 语料检查：步骤加 `,corpus` 和 `--ref <参照目录>`。参照目录就是第 5 节 Android 脚本生成的
-  `~/xo-device/3.2.0-<提交前 7 位>/ref-corpus`（Linux GCC 16 C++26 写出）。
+  `~/xo-device/3.2.1-<提交前 7 位>/ref-corpus`（Linux GCC 16 C++26 写出）。
 - `slg` 要和 FlatBuffers 对照时，加 `--fb-include <flatbuffers 25.12.19 的 include 目录>` 和
   `--fb-generated <slg_generated.h 所在目录>`；不加只测 XOffset。
 - 只有 `net`、`clients` 两步用 `--server-host`（同一 Wi-Fi 下 Mac 的地址：`ipconfig getifaddr en0`）；
