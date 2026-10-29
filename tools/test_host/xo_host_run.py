@@ -30,8 +30,9 @@ library loaded into one process keeps its 64 MiB table, and about 50 of them fil
 process's address space): the app is started once ("xoserve") and
 stays up; each run sends inbox/<id>.tar and then inbox/<id>.ready, and the app runs the
 programs one after another in its process (it shows the totals meanwhile). A state stamp
-keeps the serving process id; when it is gone (a crash, a reinstall, a timeout) the next
-run starts the app again. --fresh (XO_HOST_FRESH=1) starts it again before this run (timed
+keeps the serving process id; when it is gone (a crash, a reinstall, a timeout, or the app
+ended itself after a run because less than XO_HOST_HEADROOM_MIB (1024) of address space was
+left in one piece) the next run starts the app again. --fresh (XO_HOST_FRESH=1) starts it again before this run (timed
 runs and memory probes: a process that ran nothing else). --serve 0 starts the app for each
 run ("xorun").
 
@@ -424,6 +425,7 @@ def run(a):
         got = backend.pull(rel_out, result)
         why = reason = None
         dead_checks = 0
+        relaunched = False
         while not got:
             if time.time() > deadline:
                 why, reason = "timeout after %d s" % a.timeout, "timeout"
@@ -431,6 +433,16 @@ def run(a):
             time.sleep(a.poll)
             got = backend.pull(rel_out, result)
             if not got and not backend.alive():
+                # The serving app ended before it took the request (it ends by itself when
+                # little address space is left after a run): start it again, once.
+                if a.serve and not relaunched and backend.pull("%sinbox/%s.ready" % (prefix, run_id),
+                                                               os.path.join(work, "pending")):
+                    relaunched = True
+                    forget_serving(a)
+                    if not ensure_serving(a, backend):
+                        return 124
+                    dead_checks = 0
+                    continue
                 # gone without a result: give the file system a moment, then pack what it left
                 dead_checks += 1
                 if dead_checks >= 3:
