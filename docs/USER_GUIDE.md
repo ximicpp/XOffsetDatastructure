@@ -1,4 +1,4 @@
-# XOffsetDatastructure 用户指南（3.2.0，wire 格式 2.1）
+# XOffsetDatastructure 用户指南（3.2.1，wire 格式 2.1）
 
 本文面向使用者，说明怎么定义类型、构建、修改、保存、加载，以及必须遵守的约束。
 部署要求见 [DEPLOYMENT.md](DEPLOYMENT.md)，格式细节见 [V2_FORMAT.md](V2_FORMAT.md)，输入与兼容边界见
@@ -544,7 +544,7 @@ K4 的前提：接收方必须设置 `maximum_capacity`。否则发送方可以�
 **目标（尚未承诺，实现中）K8**：客户端（Windows、Android、iOS，都是 64 位小端）与服务端用同一套
 库、同一份 schema 和同一 wire，客户端能接收、读写、校验、再发。客户端用字段表后端
 （第 2.1 节），按 C++20 用各平台原生编译器构建（Apple clang、Android NDK Clang、Windows
-编译器），服务端照旧用 C++26 反射。现状（3.2.0）：Android（NDK r29/r30）、Windows（MSVC 19.44、
+编译器），服务端照旧用 C++26 反射。现状（3.2.1）：Android（NDK r29/r30）、Windows（MSVC 19.44、
 clang-cl 19、MinGW）、macOS 和 iOS 模拟器（Apple clang，部署目标 macOS 14.0 / iOS 17.0）的全量
 CTest 都通过，语料与服务端逐字节一致（逐目标的数字见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)）；
 真机：iPhone 15 Pro Max（iOS 26.6.2）CTest 138/138、语料逐字节一致、demo 通过，同机 SLG M 对 FlatBuffers
