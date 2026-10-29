@@ -1039,15 +1039,42 @@ void serve_one(const std::string& id, const Options& o, ProcessState& saved) {
         std::lock_guard<std::mutex> lock(g_dash_mu);
         g_dash.serving = true;
     }
-    for (;;) {
-        std::vector<std::string> ready;
+    // devicectl fails a copy (CoreDeviceError 7000) when the file it just wrote is gone before it
+    // looks at it again (iPhone runs 6 and 8): a request is marked taken with <id>.taken, and its
+    // .ready is removed some seconds later, or by the next serving process.
+    const std::string inbox = o.root + "/inbox/";
+    auto ids_with = [&](const char* suffix) {
+        const std::size_t k = std::strlen(suffix);
+        std::vector<std::string> ids;
         for (const auto& n : list_dir(o.root + "/inbox"))
-            if (n.size() > 6 && n.compare(n.size() - 6, 6, ".ready") == 0) ready.push_back(n.substr(0, n.size() - 6));
-        std::sort(ready.begin(), ready.end());
-        for (const auto& id : ready) {
-            ::unlink((o.root + "/inbox/" + id + ".ready").c_str());
+            if (n.size() > k && n.compare(n.size() - k, k, suffix) == 0) ids.push_back(n.substr(0, n.size() - k));
+        std::sort(ids.begin(), ids.end());
+        return ids;
+    };
+    auto forget = [&](const std::string& id) {
+        ::unlink((inbox + id + ".ready").c_str());
+        ::unlink((inbox + id + ".taken").c_str());
+    };
+    for (const auto& id : ids_with(".taken")) {   // an earlier process took these
+        forget(id);
+        ::unlink((inbox + id + ".tar").c_str());
+    }
+    std::vector<std::pair<std::string, std::chrono::steady_clock::time_point>> taken;
+    for (;;) {
+        for (const auto& id : ids_with(".ready")) {
+            if (std::any_of(taken.begin(), taken.end(), [&](const auto& t) { return t.first == id; })) continue;
+            write_file(inbox + id + ".taken", "1\n");
+            taken.emplace_back(id, std::chrono::steady_clock::now());
             serve_one(id, o, saved);
         }
+        const auto now = std::chrono::steady_clock::now();
+        taken.erase(std::remove_if(taken.begin(), taken.end(),
+                                   [&](const auto& t) {
+                                       if (now - t.second < std::chrono::seconds(10)) return false;
+                                       forget(t.first);
+                                       return true;
+                                   }),
+                    taken.end());
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 }
@@ -1067,6 +1094,7 @@ void serve_one(const std::string& id, const Options& o, ProcessState& saved) {
     if (!exists(run + "/out.txt")) write_file(run + "/out.txt", "");
     // a request that never ran must not run in the next serving process
     ::unlink((o.root + "/inbox/" + id + ".ready").c_str());
+    ::unlink((o.root + "/inbox/" + id + ".taken").c_str());
     ::unlink((o.root + "/inbox/" + id + ".tar").c_str());
     finalize(status.substr(0, status.find('\n')).c_str(), true);
     std::_Exit(0);
