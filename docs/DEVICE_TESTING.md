@@ -172,6 +172,7 @@ bash tools/device/ios_device.sh device out-iphone --steps build,info,ctest,slg,m
 | --- | --- | --- | --- | --- |
 | 3.2.0-rc.1（39de636），2026-10-28 | Xiaomi M2102K1C，Android 11（API 30），arm64-v8a | Windows 11 + WSL2，服务端在 WSL2 Docker | 编译失败测试 15/15、手机 CTest 114/114、6 个参照 wire 逐字节一致、两个 demo 客户端 E2E PASSED（前两次分别因端口和 adb 路径未通过，记录保留） | [validation/2026-10-28-rc1-platform/README.md](validation/2026-10-28-rc1-platform/README.md) |
 | a473fb27（3.2.0-rc.2 之后，含 #178、#181），2026-10-28 | iPhone 15 Pro Max（iPhone16,2），iOS 26.6.2，8 GB，免费 Apple ID 签名，USB | Mac mini M4，服务端在 colima（GCC 16，arm64） | 测试宿主 App 104 个库；CTest 138/138；24 个参照 wire 全部接受、写出字节一致；slg（SC-6）verify 通过，3 次 × M 规模 × 41 周期，热状态 0；内存探测（SC-12）见 [DEPLOYMENT.md](DEPLOYMENT.md) 第 5 节；demo 两个客户端 E2E PASSED。第 5 次因 fork 和 slg 地址空间未全过，第 6 次常驻模式退步，记录在第 7 节下面 | 下表 |
+| 8cf9e16c（= #185 合入的 ea7edd3a 的内容，含 #183），2026-10-29 | 同上 | 同上 | 常驻模式（一个 App 依次运行全部程序，slg 计时和内存探测各用新启动的 App）：CTest 138/138；24 个参照 wire 字节一致；slg verify 通过，3 次 × M × 41 周期，热状态 0；内存探测通过；demo 两个客户端 E2E PASSED；没有 CoreDeviceError 7000。第 8 次（084d4859）因 `.ready` 拷贝报错未全过（#185 修复） | [CLIENT_TARGETS.md](CLIENT_TARGETS.md) 测试宿主一节 |
 
 iPhone 15 Pro Max 上的 SC-6（slg M 规模，3 次运行合并，xoffset 与 FlatBuffers 25.12.19 同机对比，几何均值 / 单侧 95% 上界，
 <1 表示 xoffset 更快；玩家、战斗、报告 buffer 各预留 2 MiB，`SLG_REUSE=1`）：

@@ -36,11 +36,10 @@
 #   --mem-limit MIB    --commit probe limit (default 16384 device, 2048 simulator)
 #   -j N               build jobs
 #
-# One app launch per program. XO_HOST_SERVE=1: the app is started once and runs the programs
-# one after another, showing the totals; the timed slg runs and the memory probes each get a
-# newly started app (on an iPhone not yet usable for the whole suite: every loaded program
-# library keeps a 64 MiB table and about 50 fill the process's address space). The totals start from zero for each call of this
-# script (@reset).
+# On a device (and locally) the app is started once and runs the programs one after another,
+# showing the totals; the timed slg runs and the memory probes each get a newly started app.
+# XO_HOST_SERVE=0 starts the app for each program (the simulator's default until a simulator
+# run checks serving). The totals start from zero for each call of this script (@reset).
 #
 # OUT gets RESULT.md (one row per step), the logs, slg/ (raw jsonl, analyze.py tables) and
 # mem/. Phone timings: Auto-Lock "Never", charger on, nothing else running; thermal state
