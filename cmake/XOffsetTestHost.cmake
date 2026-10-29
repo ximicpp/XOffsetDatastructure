@@ -38,6 +38,9 @@ function(xoffset_test_host_module target)
         endif()
     endforeach()
     target_include_directories(${module} PRIVATE "${XOFFSET_TEST_HOST_DIR}")
+    # one owner map for all loaded libraries, the host's (xoffset_slot_storage.hpp)
+    target_compile_definitions(${module} PRIVATE XOFFSET_OWNER_MAP_SHARED=1)
+    target_link_libraries(${module} PRIVATE ${CMAKE_DL_LIBS})
     if(NOT APPLE)
         # ELF: the program's calls to exit and _Exit bind to the shim's definitions
         # (GCC drops the hidden attribute on these builtins). Mach-O binds them
