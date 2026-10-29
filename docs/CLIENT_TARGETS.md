@@ -155,7 +155,7 @@ C++26 反射构建（P2996、GCC 16）和 C++20 字段表构建（GCC 16、P2996
 iOS 不能运行命令行程序，Android 真机也不方便逐个推送测试。`-DXOFFSET_TEST_HOST=ON` 把每个测试、演示客户端和
 测量程序（`xo_slg_bench` SC-6、`xo_mem_probe` SC-12）各编成一个共享库（`cmake/XOffsetTestHost.cmake`），
 由一个宿主程序加载运行：iOS 是 App（`tools/test_host/host_ios.mm`，库在 App 的
-`Frameworks/` 里），其他平台是命令行宿主。默认每次启动只运行一个程序。`XO_HOST_SERVE=1` 时宿主常驻（`xoserve`）：只启动一次，电脑把程序一个个送进去，
+`Frameworks/` 里），其他平台是命令行宿主。真机和本机默认宿主常驻（`xoserve`，`XO_HOST_SERVE=0` 改回每次启动只运行一个程序；模拟器还没验证，默认仍是每次启动一个）：只启动一次，电脑把程序一个个送进去，
 在同一个进程里依次运行；App 界面显示累计数据（收到的任务包和 demo 快照字节数、运行和通过个数、最近几个程序），
 slg 计时和内存探测期间界面不刷新，这两类程序各在一个新启动的 App 里运行。iPhone 一个进程约有 3.4 GiB 地址空间，
 第 6 次真机运行（2026-10-28）里每个加载过的程序库各留一个 64 MiB 的所有者表，约 50 个库就占满了。现在程序库以
@@ -165,7 +165,8 @@ slg 计时和内存探测期间界面不刷新，这两类程序各在一个新�
 CoreDeviceError 7000：宿主一看到 `<id>.ready` 就删掉，devicectl 拷完回头再找这个文件时已经不在了。现在宿主写
 `<id>.taken` 表示已取，`.ready` 过 10 秒（或由下一个常驻进程）再删；`xo_host_run.py` 拷 `.ready` 报错时先看 App
 是否已收到，没收到才重发。`XO_HOST_LOCAL_RECHECK_MS` 让本机后端像 devicectl 一样回头检查拷贝，用来在云端复现。
-云端在 `ulimit -v 3500000` 下以常驻模式、开着这个检查跑完 CTest、参照 wire、slg、内存探测和 demo；真机上还没重测，所以默认仍是每次启动一个程序。程序的 `exit`/`_Exit`、信号和输出都由宿主接住，结果写进宿主的
+云端在 `ulimit -v 3500000` 下以常驻模式、开着这个检查跑完 CTest、参照 wire、slg、内存探测和 demo；第 9 次真机运行（2026-10-29）以常驻模式全部通过，
+没有一次拷贝报错，CTest 用时 1 分 57 秒（第 7 次每个程序启动一次是 3 分 49 秒）。程序的 `exit`/`_Exit`、信号和输出都由宿主接住，结果写进宿主的
 数据目录（iOS 是 App 的 `Documents/xo`），电脑上的 `tools/test_host/xo_host_run.py` 负责安装、启动、
 传文件和取回结果：
 

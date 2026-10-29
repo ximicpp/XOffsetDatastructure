@@ -25,7 +25,8 @@ Backends (the app's data directory is <container>/Documents/xo):
   local   the command-line host (tools/test_host/host_cli.cpp) on this computer, with
           the data directory under --state: checks the same flow without a phone
 
-Serving (--serve 1 or XO_HOST_SERVE=1; not yet the default on an iPhone): the app is started
+Serving (--serve 1 or XO_HOST_SERVE=1; the default for device and local, checked on an iPhone
+in run 9; --serve 0 for sim until a simulator run checks it): the app is started
 once ("xoserve") and stays up; each run sends inbox/<id>.tar and then inbox/<id>.ready, the app
 marks it inbox/<id>.taken and runs the programs one after another in its process (it shows
 the totals meanwhile). A state stamp keeps the serving process id; when it is gone (a crash,
@@ -536,8 +537,10 @@ def main():
                    help="seconds between two looks for the result (default 1 on a phone, 0.1 otherwise)")
     p.add_argument("--state", default=os.environ.get("XO_HOST_STATE", os.path.join(tempfile.gettempdir(), "xo-host-state")))
     p.add_argument("--status-file", help="also write the run's status lines here")
-    p.add_argument("--serve", type=int, choices=(0, 1), default=int(os.environ.get("XO_HOST_SERVE", "0")),
-                   help="1: run in the app that stays up (started when needed); 0 (default): start the app for each run")
+    p.add_argument("--serve", type=int, choices=(0, 1),
+                   default=int(os.environ["XO_HOST_SERVE"]) if os.environ.get("XO_HOST_SERVE") else None,
+                   help="1: run in the app that stays up (started when needed; default for device and local); "
+                        "0: start the app for each run (default for sim)")
     p.add_argument("--output-flags", default=os.environ.get("XO_HOST_OUTPUT_FLAGS", "--csv-dir,--write,--out"),
                    help="options whose path argument is an output even when it exists (a directory there gets "
                         "the run's files added)")
@@ -547,6 +550,8 @@ def main():
     p.add_argument("args", nargs=argparse.REMAINDER)
     a = p.parse_args()
     a.state = os.path.abspath(a.state)   # the local host changes its directory during runs
+    if a.serve is None:
+        a.serve = 0 if a.backend == "sim" else 1   # serving was checked on an iPhone (run 9) and locally
     a.sent_stamps = []
     if a.poll <= 0:
         a.poll = 1.0 if a.backend == "device" else 0.1
