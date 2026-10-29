@@ -203,9 +203,9 @@ output; the 424 MB hop archive is not kept).
 
 ## 3. Cross-site mailbox: cloud dry run (network thread)
 
-The Mac run (phases 3 and 4, `tools/run_mesh_mac.sh`) is still to come;
-this is the whole flow in the cloud with the Mac's eight devices played by
-the linux-x64-gcc programs (`run_mailbox.sh fake-mac`), 10-28 16:4xZ.
+The whole flow in the cloud, with the Mac's eight devices played by the
+linux-x64-gcc programs (`run_mailbox.sh fake-mac`), 10-28 16:4xZ. The Mac
+itself is in sections 4 and 5.
 
 `xo_hub --mailbox-plan` for the 16 cloud devices (ids 1-16) and the 8 Mac
 devices of `tools/mac_devices.txt` (ids 101-108): 2,054 jobs. 1,536 `cross`
@@ -230,3 +230,84 @@ all passed; each cloud-Mac cell of the matrix has 6/6 jobs in each
 direction. A changed byte in a hop file's data part after the receiver
 reported fails the job (`data part ... wire ...; replay ...`), and a
 missing report fails it as `no report from <device>`.
+
+## 4. Mac live mesh (phase 3, network thread)
+
+Run `mac-20261029-0129`, 10-29 01:24-01:29Z: `tools/run_mesh_mac.sh live`
+on the Mac (Apple M4, 16 GB, macOS 27.2, Xcode 27.1), pack
+`mesh_mac_pack_331f5e9.tar.gz` (sha256 `ab72685a...`, source 331f5e9).
+EMULATOR AND SIMULATOR NUMBERS, not phone numbers. One hub (GCC 16.2,
+Linux arm64 in colima 0.10.2, C++20 field lists) and 8 devices, each with
+exceptions and without: macOS arm64 Apple clang 21 (native), iOS Simulator
+27.0 on an iPhone 17 (Apple clang 21; `xo_peer` inside the test host app,
+`xo_peer_noexc` through `simctl spawn`), the Android emulator (android-35
+google_apis arm64-v8a; the pack's NDK r29 programs, android-28, reaching
+the hub at 10.0.2.2) and colima Linux arm64 (GCC 16.2, next to the hub).
+
+**Result: PASS.** 1,748 jobs, 1,748 passed, in 17 s: 1,344 pair jobs (every
+ordered pair of the 8 devices x 6 types x small, medium x save_verified,
+save_compact), 12 chains, 392 evil jobs (every ordered pair x 7 cases).
+Each device passed 446/446 jobs and exited 0 after Bye; every received
+content digest, sent wire digest and length matched the hub's replay. All
+8 self-tests passed (60 checks each, the cloud's corpus included).
+
+| device | median us verify / check / mutate / save |
+| --- | --- |
+| macos-arm64-clang | 2.2 / 20.7 / 5.7 / 1.6 |
+| macos-arm64-clang-noexc | 2.4 / 19.2 / 4.9 / 1.4 |
+| ios-sim-arm64 | 2.8 / 24.1 / 5.8 / 1.8 |
+| ios-sim-arm64-noexc | 3.2 / 32.5 / 6.2 / 2.2 |
+| android-emu-arm64 | 1.8 / 15.3 / 4.5 / 1.1 |
+| android-emu-arm64-noexc | 2.6 / 17.5 / 5.4 / 1.2 |
+| colima-linux-arm64-gcc | 2.8 / 18.1 / 5.7 / 1.9 |
+| colima-linux-arm64-gcc-noexc | 3.0 / 17.8 / 6.0 / 2.2 |
+
+The batch then hung after the hub exited (01:29:26Z) and was stopped by
+hand at 02:13Z, so the hub's files were copied by hand
+(`out-live/leftover-live`) and the report was made in the cloud
+(`MESH_RESULT_mac_live.md`). Cause: after the devices, `live_run` ran a
+bare `wait`, which also waits for the Android emulator started in the
+background, i.e. forever; the clean-up only ran at the very end. Since
+then (`run_mesh_mac.sh`): only the hub, poller and device jobs are waited
+for, the hub at most `XO_HUB_LIMIT_S` (5,400 s) and the devices 120 s after
+it; RESULT.md and the clean-up run from a trap on failure, exit, INT, TERM
+and HUP; a stopped left-over `xo-mesh-hub` container is removed. Checked in
+the cloud with stub Mac tools (the old script hangs after `hub exit 0`, the
+new one ends; a hub held past the limit, devices held past the hub and a
+SIGTERM during the mesh each end with RESULT.md and nothing left running).
+
+## 5. Cross-site mailbox: cloud and Mac (phase 4, network thread)
+
+The plan of section 3 (2,054 jobs, label `cross-331f5e9`, plan sha256
+`9ded5022...`) with the Mac's real devices: `run_mesh_mac.sh mailbox`
+10-29 01:06-01:23Z, then `run_mailbox.sh post` in the cloud 10-29 02:2xZ.
+
+In that Mac batch colima did not start (a stopped `xo-mesh-hub` container
+was left over from the batch interrupted at 18:57Z), so the two colima
+devices (107, 108) and their self-tests did not run. The other six answered
+2,054 files in 4 rounds and returned 2,902 files (1,544 reports, no
+errors); the cloud devices finished in 2 rounds.
+
+**Result: FAIL, only from the two devices that never ran.** 1,536 of 2,054
+jobs passed: cross 1,152/1,536, evil 384/512, chain 0/6. All 518 failures
+are `no report from colima-linux-arm64-gcc[-noexc]`: every job whose route
+has a colima device (each chain passes all 8 Mac devices). Every job
+without one passed, with every hop file's data part matching the replay.
+In the 24 x 24 matrix (cloud mesh of section 2, this score and the Mac
+mesh of section 4 merged, 11,254 jobs) every cell between the 16 cloud
+devices and macOS, the iOS Simulator and the Android emulator has 6/6 in
+both directions, cloud-cloud and Mac-Mac cells pass, and the 64 cells
+between the cloud and colima are 0/6 (`CROSS_RESULT.md`).
+
+To close it the Mac answers what is left: `XO_MAILBOX_PRIOR=<that run's
+mailbox/outbox.tar.gz> run_mesh_mac.sh mailbox` starts from the earlier
+answers, all 8 devices answer only the rest, and its outbox holds only the
+new files; `run_mailbox.sh post DIR OUT1 OUT2` takes both. Rehearsed in the
+cloud on the real Mac outbox with linux-x64 programs standing in for the
+Mac devices (stub Mac tools): 1,048 new files, then 2,054/2,054 passed and
+the merged report 11,254/11,254. That rehearsal is not a Mac result.
+
+(`/mnt/project-files/cross-device-demo-20261028/mac-20261029/`:
+`CROSS_RESULT.md` sha256 `9b21bf83...`, `MESH_RESULT_mac_live.md`,
+`cross_score_331f5e9.tar.gz` with the hub's score CSVs, `mac_live_hub.tar.gz`;
+the Mac's output `mesh_mac_out.tar.gz` sha256 `569e3b2f...`.)
