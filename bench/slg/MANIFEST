@@ -55,6 +55,9 @@
 #                        Unset: A/B/C/D and their stage keys unchanged (same digests and report
 #                        sums as before at S, both protocols). New message types ViewUnit /
 #                        ViewSnapshot / ViewDelta in every model, adapter and schema; Slot kView.
+#   bench/xoffset_runner.hpp  2026-11-02: demo B.install and S.load_install call XBuffer::swap
+#                        (std::swap did three moves); thread 优化服务端进程间迁移性能. Default
+#                        A/B/C/D unchanged.
 # Contents: slg-reuse adapters (FlatBuffers verified_root runs the Verifier),
 # reuse protocol (c) (SLG_REUSE=1), ordinary-record declarations for every xm
 # record type in include/slg/model_xoffset.hpp, T4 adapter v2 (whole-container
@@ -76,7 +79,7 @@ eac6391a496578276cfe33afe8b2bb3866d3f1bc03127ac9a0bbb7bb7434583d  bench/runner.h
 c332435d838943330aeffa243d50dc958347177d376ae3ce78e183825e1170c9  bench/slg_bench.cpp
 730a66f677d9d20077175f629cf0b13919e66ccedaf880e4eb414c6bc94c0610  bench/small_msg_probe.cpp
 b8ea1fcd3368b9acfb65760dd52a9d4bc05750bdc2ea56a221b0dd338a7f7925  bench/std_runner.hpp
-f30b3281083eda53c1efc8848ca7845b9d6282950982d3ce762173f51f9222cc  bench/xoffset_runner.hpp
+25f883b7b83571887b467e1d898f5bd93df3919125bc0fae3ad5fbfe6b7edb1b  bench/xoffset_runner.hpp
 12cab27be9331a4a09ae66f444cf5852dd81e363df562748a4ea854932e35e44  include/slg/cista_free.hpp
 d383da79e1f656838311c9fc339c977cba69a53277adeb72910ed6cd3c1d92ed  include/slg/generic.hpp
 d64ef2095a2be911ac33fdf651b384f4403fd8731562b8fb53373130fc692f2d  include/slg/model_cista.hpp
