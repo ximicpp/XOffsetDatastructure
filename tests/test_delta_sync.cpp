@@ -56,6 +56,7 @@ constexpr xo::XCompactOptions kTight{.slack_div = 0};
 struct Totals {
     std::size_t deltas = 0, keys = 0, empties = 0, digests = 0, shrinks = 0;
     std::size_t corrupt_rejected = 0, corrupt_accepted = 0, late_joins = 0;
+    std::size_t checks[4] = {};  // by XDeltaCheck: key, none, in_place, full
     std::uint64_t delta_bytes = 0, full_bytes = 0;
 } totals;
 
@@ -102,7 +103,11 @@ void same_state(fz::Root& src_root, Buffer& src, Buffer& rep, const std::string&
     need(rep.save_compact(kTight) == src.save_compact(kTight), where + ": replica compact wire differs");
 }
 
-// Corrupted copies of `d` applied to a copy of the replica.
+// Corrupted copies of `d` applied to the replica with a copy of its cursor,
+// so that they take the same check path as `d` would (the throwing entry of
+// apply_entry runs on a clone, which is verified in full: both must agree).
+// An accepted one must verify; the replica is then restored from a clone,
+// which the cursor no longer matches (its next delta is verified in full).
 void corrupt_trials(Buffer& rep, const xo::XDeltaCursor& cur, const std::string& d, bool digest,
                     const std::string& expected_payload, std::mt19937_64& rng, const std::string& where) {
     const auto before = payload_of(rep);
@@ -116,26 +121,27 @@ void corrupt_trials(Buffer& rep, const xo::XDeltaCursor& cur, const std::string&
         case 2: bad.push_back(char(rng())); break;
         case 3: bad[rng() % std::min<std::size_t>(bad.size(), 56)] ^= char(1u << (rng() % 8)); break;
         case 4: bad[bad.size() - 1 - rng() % std::max<std::size_t>(1, bad.size() / 4)] ^= char(1 + rng() % 255); break;
-        case 5: { // a byte inside the run section
-            const std::size_t from = std::min<std::size_t>(bad.size() - 1, 32 + (digest ? 8 : 0));
+        case 5: { // a byte inside the block section
+            const std::size_t from = std::min<std::size_t>(bad.size() - 1, 14 + (digest ? 8 : 0));
             bad[from + rng() % (bad.size() - from)] ^= char(1 + rng() % 255);
         } break;
         }
         if (bad == d) continue;
-        auto trial = rep.clone();
+        auto saved = rep.clone();
         auto tc = cur;
-        auto r = apply_entry(trial, bad, tc);
+        auto r = apply_entry(rep, bad, tc);
         if (!r) {
-            need(payload_of(trial) == before && holes_of(trial) == before_holes,
+            need(payload_of(rep) == before && holes_of(rep) == before_holes,
                  where + ": a rejected delta changed the replica (" + r.error().message + ")");
             need(tc.version() == cur.version() && tc.stream() == cur.stream(), where + ": a rejected delta moved the cursor");
-            need(dump(trial.root()) == before_dump, where + ": a rejected delta changed the contents");
+            need(dump(rep.root()) == before_dump, where + ": a rejected delta changed the contents");
             ++totals.corrupt_rejected;
         } else {
-            auto again = typed_load(trial.save_verified());
+            auto again = typed_load(rep.save_verified());
             need(bool(again), where + ": an accepted corrupted delta left a payload that does not verify");
-            if (digest) need(payload_of(trial) == expected_payload, where + ": a digest delta accepted another result");
+            if (digest) need(payload_of(rep) == expected_payload, where + ": a digest delta accepted another result");
             ++totals.corrupt_accepted;
+            rep = std::move(saved);
         }
     }
 }
@@ -152,6 +158,32 @@ void fill(fz::Root& r, std::mt19937_64& rng) {
     }
     for (int i = int(rng() % 5); i > 0; --i) r.tags.emplace_back(random_text(rng, 20), r.tags.get_stored_allocator());
     for (int i = int(rng() % 6); i > 0; --i) r.keys.insert(std::uint32_t(rng() % 1000));
+}
+
+// Changes that keep the structure (scalars, bools, vector elements, map
+// values, inline strings that stay inline): deltas the receiver applies
+// unchecked or with in-place checks.
+void mutate_light(fz::Root& r, std::mt19937_64& rng) {
+    for (int n = 1 + int(rng() % 4); n > 0; --n) {
+        switch (rng() % 6) {
+        case 0: r.epoch = rng(); break;
+        case 1: if (!r.items.empty()) r.items[rng() % r.items.size()].id = std::uint32_t(rng()); break;
+        case 2: if (!r.items.empty()) { auto& it = r.items[rng() % r.items.size()]; it.flag = !it.flag; } break;
+        case 3:
+            if (!r.items.empty()) {
+                auto& it = r.items[rng() % r.items.size()];
+                if (!it.vals.empty()) it.vals[rng() % it.vals.size()] = std::uint16_t(rng());
+            }
+            break;
+        case 4:
+            if (!r.items.empty()) {
+                auto& it = r.items[rng() % r.items.size()];
+                if (it.name.size() <= 10) it.name = random_text(rng, 10);
+            }
+            break;
+        case 5: if (!r.attrs.empty()) r.attrs.begin()->second = rng(); break;
+        }
+    }
 }
 
 void random_stream(std::uint64_t seed, int steps) {
@@ -175,13 +207,14 @@ void random_stream(std::uint64_t seed, int steps) {
             src.reset(); // the payload shrinks
             fill(src.root(), rng);
             ++totals.shrinks;
+        } else if (op < 9 && op > 2) {
+            mutate_light(src.root(), rng);
         } else if (op != 2) { // op 2: nothing changes
             mutate_valid(src.root(), rng);
             if (rng() % 4 == 0) src.root().epoch ^= std::uint64_t(1) << (rng() % 64); // one bit
         }
         xo::XDeltaOptions options;
         options.digest = rng() % 2;
-        options.merge_gap = std::uint32_t(rng() % 5);
         std::string d = "stale bytes from an earlier delta";
         const auto stats = src.save_delta_into(d, base, options);
         need(stats.delta_bytes == d.size(), where + ": stats disagree with the delta size");
@@ -197,9 +230,11 @@ void random_stream(std::uint64_t seed, int steps) {
         totals.digests += options.digest;
         totals.delta_bytes += d.size();
         totals.full_bytes += src.save_verified().size();
-        if (!stats.key && rng() % 3 == 0) corrupt_trials(rep, cur, d, options.digest, payload_of(src), rng, where);
+        if (!stats.key && rng() % 2 == 0) corrupt_trials(rep, cur, d, options.digest, payload_of(src), rng, where);
         auto r = apply_entry(rep, d, cur);
         need(bool(r), where + ": delta rejected: " + (r ? std::string() : r.error().message));
+        need((cur.last_check() == xo::XDeltaCheck::key) == stats.key, where + ": key delta not reported as key");
+        ++totals.checks[std::size_t(cur.last_check())];
         same_state(src.root(), src, rep, where);
         need(cur.version() == base.version() && cur.stream() == base.stream(), where + ": cursor does not follow");
         if (joined) {
@@ -232,6 +267,19 @@ void random_stream(std::uint64_t seed, int steps) {
             }
         }
     }
+}
+
+std::string varint(std::uint32_t v) {
+    std::string out;
+    for (; v >= 0x80; v >>= 7) out += char(0x80 | (v & 0x7F));
+    return out + char(v);
+}
+
+// A delta header (format 1.0) without EXTENT: used_end and root unchanged.
+std::string delta_header(std::uint64_t stream, std::uint32_t version, std::uint32_t blocks, std::uint32_t flags = 0) {
+    std::string h = {'X', 'D', char(0x10), char(flags)};
+    h.append(reinterpret_cast<const char*>(&stream), 8);
+    return h + varint(version) + varint(blocks);
 }
 
 std::string delta_of(Buffer& src, xo::XDeltaBaseline& base, xo::XDeltaOptions options = {}) {
@@ -272,7 +320,7 @@ void fixed_cases() {
         need(stats.empty && d.empty() && base.version() == 1, "unchanged buffer gave a delta");
         src.root().epoch += 1;
         const auto small = delta_of(src, base);
-        need(small.size() <= sizeof(xo::XDeltaHeader) + 3 + 8, "one changed scalar gave a large delta: " +
+        need(small.size() <= 20, "one changed scalar gave a large delta: " +
              std::to_string(small.size()));
         need(bool(apply_entry(rep, small, cur)), "scalar delta rejected");
         same_state(src.root(), src, rep, "scalar");
@@ -365,13 +413,19 @@ void fixed_cases() {
         base.reset();
         src.root().epoch += 3;
         key = delta_of(src, base);
-        // The root offset (offset 24) one word further: the header checks
-        // pass, verification of the patched payload rejects.
+        // The root offset (the third header varint) one word further: the
+        // header checks pass, verification of the patched payload rejects.
+        std::size_t at = 12;
+        const auto skip_varint = [&] { while (std::uint8_t(key[at]) & 0x80) ++at; ++at; };
+        skip_varint();  // version
+        skip_varint();  // used_end
+        const std::size_t root_at = at;
         std::uint32_t root = 0;
-        std::memcpy(&root, key.data() + 24, 4);
-        std::string bad = key;
-        const std::uint32_t moved = root + 8;
-        std::memcpy(bad.data() + 24, &moved, 4);
+        for (int shift = 0;; shift += 7) {
+            root |= std::uint32_t(std::uint8_t(key[at]) & 0x7F) << shift;
+            if (!(std::uint8_t(key[at++]) & 0x80)) break;
+        }
+        const std::string bad = key.substr(0, root_at) + varint(root + 8) + key.substr(at);
         auto r = apply_entry(rep, bad, cur);
         need(!r && cur.empty() && !rep.has_root(), "rejected key delta did not leave the buffer empty");
         need(bool(apply_entry(rep, key, cur)), "good key delta after a rejected one");
@@ -408,7 +462,7 @@ void view_sizes() {
     (void)server.save_delta_into(d, base);
     need(bool(client.try_apply_delta_verified(d, cur)), "view key delta rejected");
     const std::size_t key_bytes = d.size();
-    std::uint64_t delta_sum = 0, full_sum = 0, compact_sum = 0, runs = 0;
+    std::uint64_t delta_sum = 0, full_sum = 0, compact_sum = 0, blocks = 0;
     const int ticks = 200;
     for (int t = 0; t < ticks; ++t) {
         ++v.tick;
@@ -427,61 +481,73 @@ void view_sizes() {
         }
         const auto stats = server.save_delta_into(d, base);
         delta_sum += d.size();
-        runs += stats.runs;
+        blocks += stats.blocks;
         full_sum += server.save_verified().size();
         compact_sum += server.save_compact(kTight).size();
         need(bool(client.try_apply_delta_verified(d, cur)), "view delta rejected at tick " + std::to_string(t));
         need(payload_of(client) == payload_of(server), "view replica differs at tick " + std::to_string(t));
     }
     std::cout << "view (120 units, 30% move, 5% hp, 2 leave + 2 enter per tick): key delta " << key_bytes
-              << " B; per tick: delta " << delta_sum / ticks << " B in " << runs / ticks << " runs, save_verified "
+              << " B; per tick: delta " << delta_sum / ticks << " B in " << blocks / ticks << " blocks, save_verified "
               << full_sum / ticks << " B, save_compact " << compact_sum / ticks << " B\n";
     need(delta_sum * 4 < compact_sum, "view deltas are not much smaller than compact wires");
 }
 
-// The wrong-type case uses the typed entry of the right type for the sender.
-// The comparison against a byte-by-byte reference: runs (with merge_gap
-// joining) and the updated copy, for both block-mask versions.
+// The block scan against a byte-by-byte reference: the blocks (offset, mask,
+// whole) of [from, n) and the updated copy, and both block-mask versions.
 void diff_reference_case() {
     std::mt19937_64 rng(20261102);
-    std::vector<xo::detail::DeltaRun> runs, want;
+    xo::detail::DeltaBlockBuffer blocks;
+    struct Want { std::size_t offset; std::uint64_t mask; bool whole; };
+    std::vector<Want> want;
     for (int trial = 0; trial < 3000; ++trial) {
-        const std::size_t n = 48 + std::size_t(rng() % 700);
-        const std::size_t from = std::min<std::size_t>(n, rng() % 2 ? 48 : rng() % 80);
+        const std::size_t n = 48 + 8 * std::size_t(rng() % 90);
+        const std::size_t from = std::min<std::size_t>(n, rng() % 2 ? 48 : 8 * (rng() % 10));
         std::vector<char> cur(n), base(n);
         for (auto& c : cur) c = char(rng());
         base = cur;
         // Changes in clusters, often next to 64-byte block edges.
         const int clusters = int(rng() % 12);
         for (int c = 0; c < clusters; ++c) {
-            std::size_t at = rng() % 2 ? (rng() % 12) * 64 + (rng() % 7) - 3 : rng() % n;
+            std::size_t at = rng() % 2 ? from + (rng() % 12) * 64 + (rng() % 7) - 3 : rng() % n;
             const std::size_t len = 1 + rng() % 9;
             for (std::size_t k = 0; k < len; ++k, at += 1 + (rng() % 4 == 0 ? rng() % 5 : 0))
                 if (at < n) base[at] = char(base[at] ^ char(1 + rng() % 255));
         }
         if (trial % 50 == 0) for (auto& c : base) c = char(rng());   // everything differs
-        const std::uint32_t gap = std::uint32_t(rng() % 11);
+        if (trial % 50 == 1) for (std::size_t i = from; i + 1 < n; i += 2) base[i] = char(~cur[i]); // every other byte
         want.clear();
-        for (std::size_t i = from; i < n;) {
-            if (cur[i] == base[i]) { ++i; continue; }
-            std::size_t e = i;
-            while (e < n && cur[e] != base[e]) ++e;
-            if (!want.empty() && i - (std::size_t(want.back().offset) + want.back().bytes) <= gap)
-                want.back().bytes = std::uint32_t(e - want.back().offset);
-            else
-                want.push_back({std::uint32_t(i), std::uint32_t(e - i)});
-            i = e;
+        for (std::size_t start = from; start < n; start += 64) {
+            std::uint64_t mask = 0;
+            for (std::size_t k = 0; k < 64 && start + k < n; ++k)
+                if (cur[start + k] != base[start + k]) mask |= std::uint64_t(1) << k;
+            if (mask == 0) continue;
+            int mask_bytes = 0;
+            for (int k = 0; k < 8; ++k) mask_bytes += ((mask >> (8 * k)) & 0xFF) != 0;
+            const bool whole = start + 64 <= n && mask_bytes + std::popcount(mask) >= 64;
+            want.push_back({start, mask, whole});
         }
         std::vector<char> copy = base;
-        runs.clear();
-        xo::detail::delta_diff_update(cur.data(), copy.data(), from, n, gap, runs);
-        need(runs.size() == want.size(), "diff: run count differs from the reference");
-        for (std::size_t r = 0; r < runs.size(); ++r)
-            need(runs[r].offset == want[r].offset && runs[r].bytes == want[r].bytes, "diff: run differs from the reference");
+        (void)xo::detail::delta_diff_update(cur.data(), copy.data(), from, n, blocks);
+        need(blocks.size() == want.size(), "diff: block count differs from the reference");
+        for (std::size_t r = 0; r < blocks.size(); ++r)
+            need(blocks[r].offset == want[r].offset && blocks[r].mask == want[r].mask &&
+                     bool(blocks[r].whole) == want[r].whole,
+                 "diff: block differs from the reference");
         need(std::equal(copy.begin() + std::ptrdiff_t(from), copy.end(), cur.begin() + std::ptrdiff_t(from)) &&
                  std::equal(copy.begin(), copy.begin() + std::ptrdiff_t(from), base.begin()),
              "diff: the recorded copy was not brought up to date");
-        // Both block-mask versions against each other, at every offset.
+        // Masked writes and reads round-trip.
+        for (const auto& blk : blocks) {
+            if (blk.whole || blk.offset + 64 > n) continue;
+            char packed[64], out[64] = {};
+            const char* end = xo::detail::delta_put_masked(packed, cur.data() + blk.offset, blk.mask);
+            need(end == packed + std::popcount(blk.mask), "diff: masked write has the wrong length");
+            need(xo::detail::delta_get_masked(out, packed, blk.mask) == end, "diff: masked read has the wrong length");
+            for (std::size_t k = 0; k < 64; ++k)
+                need(out[k] == (blk.mask >> k & 1 ? cur[blk.offset + k] : char(0)), "diff: masked round trip differs");
+        }
+        // Both block-mask versions against the reference, at every offset.
         for (std::size_t i = 0; i + 64 <= n; i += 1 + rng() % 9) {
             std::uint64_t ref = 0;
             for (std::size_t k = 0; k < 64; ++k) if (cur[i + k] != base[i + k]) ref |= std::uint64_t(1) << k;
@@ -489,6 +555,177 @@ void diff_reference_case() {
                      xo::detail::delta_block_mask_words(cur.data() + i, base.data() + i) == ref,
                  "diff: block mask differs from the reference");
         }
+    }
+}
+
+// Hand-made block sections that the parser must reject, before a byte of the
+// replica changes.
+void block_section_case() {
+    std::mt19937_64 rng(11);
+    const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
+    auto src = Buffer::create(4096, cap);
+    fill(src.root(), rng);
+    xo::XDeltaBaseline base;
+    Buffer rep(4096, xo::XBuffer::maximum_capacity(kLimit));
+    xo::XDeltaCursor cur;
+    need(bool(apply_entry(rep, delta_of(src, base), cur)), "block section: key delta rejected");
+    src.root().epoch += 1;
+    const std::string good = delta_of(src, base);
+    const std::size_t used = std::size_t(rep.arena()->used_end);
+    const std::size_t last = (used - 48 - 1) / 64; // index of the last block
+    const auto make = [&](std::uint32_t count, std::string section) {
+        return delta_header(cur.stream(), cur.version() + 1, count) + section;
+    };
+    const std::size_t header_size = make(1, "").size();
+    need(good.compare(0, header_size, make(1, "")) == 0, "block section: the scalar delta is not one plain block");
+    struct Case { const char* what; std::string delta; xo::XErrc code; };
+    std::vector<Case> cases = {
+        {"a zero mask byte", make(1, std::string("\0\x03\x01\0", 4) + "a"), xo::XErrc::invalid_extent_table},
+        {"a block at used", make(1, varint(std::uint32_t((used - 48 + 63) / 64)) + "\x01\x01" + "a"),
+         xo::XErrc::invalid_extent_table},
+        {"a block far past used", make(1, varint(0x0FFFFFFF) + "\x01\x01" + "a"), xo::XErrc::invalid_extent_table},
+        {"a second block past used", make(2, std::string("\0\x01\x01", 3) + "a" + varint(std::uint32_t(last)) +
+                                                 "\x01\x01" + "b"),
+         xo::XErrc::invalid_extent_table},
+        {"a truncated entry", make(1, std::string("\0\x01", 2)), xo::XErrc::size_mismatch},
+        {"missing changed bytes", make(1, std::string("\0\x01\x03", 3) + "a"), xo::XErrc::size_mismatch},
+        {"a missing mask byte", make(1, std::string("\0\x03\x01", 3)), xo::XErrc::size_mismatch},
+        {"a block count past the section", make(100, std::string("\0\x01\x01", 3) + "a"), xo::XErrc::size_mismatch},
+        {"trailing bytes", make(1, std::string("\0\x01\x01", 3) + "ab"), xo::XErrc::size_mismatch},
+    };
+    // Header cases.
+    const std::string body = good.substr(header_size);
+    cases.push_back({"a bad magic", "XE" + good.substr(2), xo::XErrc::bad_magic});
+    cases.push_back({"format 2.0", good.substr(0, 2) + char(0x20) + good.substr(3), xo::XErrc::unsupported_version});
+    cases.push_back({"format 1.1", good.substr(0, 2) + char(0x11) + good.substr(3), xo::XErrc::unsupported_version});
+    cases.push_back({"an unknown flag", delta_header(cur.stream(), cur.version() + 1, 1, 0x10) + body,
+                     xo::XErrc::unsupported_flags});
+    cases.push_back({"a header cut before its varints", good.substr(0, 12), xo::XErrc::truncated});
+    cases.push_back({"a header cut in a varint", good.substr(0, 12) + char(0x81), xo::XErrc::truncated});
+    cases.push_back({"a key delta without extent",
+                     delta_header(cur.stream(), cur.version() + 1, 1, xo::XDELTA_FLAG_KEY | xo::XDELTA_FLAG_HOLES) +
+                         std::string(16, '\0') + body,
+                     xo::XErrc::unsupported_flags});
+    cases.push_back({"a stream of 0", delta_header(0, cur.version() + 1, 1) + body, xo::XErrc::delta_base_mismatch});
+    cases.push_back({"another stream", delta_header(cur.stream() ^ 1, cur.version() + 1, 1) + body,
+                     xo::XErrc::delta_base_mismatch});
+    if ((used - 48) % 64 != 0) {
+        const std::size_t tail = (used - 48) % 64; // bytes of the last, shorter block
+        cases.push_back({"a whole block past used", make(1, varint(std::uint32_t(last)) + std::string(1, '\0') +
+                                                                std::string(64, 'w')),
+                         xo::XErrc::invalid_extent_table});
+        std::string mask(8, '\0');
+        mask[tail / 8] = char(1u << (tail % 8));  // the first byte at used
+        std::string sel(1, char(1u << (tail / 8)));
+        cases.push_back({"a mask bit at used", make(1, varint(std::uint32_t(last)) + sel + mask.substr(tail / 8, 1) + "a"),
+                         xo::XErrc::invalid_extent_table});
+    }
+    // The good delta, rebuilt from parts, applies (the cases differ from it
+    // only where they say).
+    need(make(1, good.substr(header_size)) == good, "block section: rebuilt delta differs");
+    const auto before = payload_of(rep);
+    for (const auto& c : cases) {
+        auto trial = rep.clone();
+        auto tc = cur;
+        auto r = apply_entry(trial, c.delta, tc);
+        need(!r, std::string("block section: accepted ") + c.what);
+        need(r.code() == c.code, std::string("block section: wrong code for ") + c.what + ": " + r.error().message);
+        need(payload_of(trial) == before && tc.version() == cur.version(),
+             std::string("block section: rejecting ") + c.what + " changed the replica");
+    }
+    need(bool(apply_entry(rep, good, cur)), "block section: the good delta was rejected");
+    same_state(src.root(), src, rep, "block section");
+}
+
+// A delta with one block that writes `bytes` at payload offset `at`, as the
+// next delta of the cursor's stream onto the replica's current extent.
+std::string poke_delta(const xo::XBuffer& rep, const xo::XDeltaCursor& cur, std::size_t at, const std::string& bytes) {
+    const std::size_t i = at - 48;
+    need(i % 64 + bytes.size() <= 64, "poke: bytes cross a block");
+    std::uint64_t mask = 0;
+    for (std::size_t k = 0; k < bytes.size(); ++k) mask |= std::uint64_t(1) << (i % 64 + k);
+    std::string section = varint(std::uint32_t(i / 64));
+    unsigned sel = 0;
+    for (int w = 0; w < 8; ++w) if ((mask >> (8 * w)) & 0xFF) sel |= 1u << w;
+    section += char(sel);
+    for (int w = 0; w < 8; ++w) if ((mask >> (8 * w)) & 0xFF) section += char(mask >> (8 * w));
+    section += bytes;
+    (void)rep;
+    return delta_header(cur.stream(), cur.version() + 1, 1) + section;
+}
+
+// Which check each kind of change takes, and the in-place checks rejecting
+// what verification rejects.
+void check_path_case() {
+    std::mt19937_64 rng(5);
+    const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
+    auto src = Buffer::create(4096, cap);
+    auto& r = src.root();
+    r.title = "short";
+    for (int i = 0; i < 3; ++i) {
+        auto& it = r.items.emplace_back();
+        it.id = std::uint32_t(i + 1);
+        it.name = "n" + std::to_string(i);
+        for (int j = 0; j < 4; ++j) it.vals.push_back(std::uint16_t(j));
+    }
+    r.items.reserve(8);
+    r.keys.insert(5);
+    r.attrs.emplace(xo::XString("hp", r.attrs.get_stored_allocator()), 10);
+    xo::XDeltaBaseline base;
+    Buffer rep(4096, xo::XBuffer::maximum_capacity(kLimit));
+    xo::XDeltaCursor cur;
+    need(bool(apply_entry(rep, delta_of(src, base), cur)) && cur.last_check() == xo::XDeltaCheck::key,
+         "check path: key delta");
+    const auto step = [&](const char* what, xo::XDeltaCheck want, auto&& change) {
+        change();
+        const auto d = delta_of(src, base);
+        need(!d.empty(), std::string("check path: no delta for ") + what);
+        auto res = apply_entry(rep, d, cur);
+        need(bool(res), std::string("check path: rejected ") + what + (res ? "" : ": " + res.error().message));
+        need(cur.last_check() == want, std::string("check path: unexpected check for ") + what + ": " +
+                                           std::to_string(int(cur.last_check())));
+        same_state(src.root(), src, rep, std::string("check path: ") + what);
+    };
+    using C = xo::XDeltaCheck;
+    step("a scalar", C::none, [&] { r.epoch = 77; });
+    step("vector elements", C::none, [&] { r.items[1].vals[2] = 9; r.items[2].id = 30; });
+    step("a map value", C::none, [&] { r.attrs.begin()->second = 11; });
+    step("inline characters", C::none, [&] { r.items[0].name = "m0"; });
+    step("a bool", C::in_place, [&] { r.items[1].flag = true; });
+    step("an inline length", C::in_place, [&] { r.items[0].name = "longer"; });
+    step("an inline string emptied", C::in_place, [&] { r.items[2].name = ""; });
+    step("a scalar after in-place checks", C::none, [&] { r.epoch = 78; });
+    step("a heap string", C::full, [&] { r.items[2].name = "a name too long to be inline"; });
+    step("a set insert", C::full, [&] { r.keys.insert(7); });
+    step("a vector size within capacity", C::full, [&] { r.items.emplace_back().id = 9; });
+    step("a scalar after a full check", C::none, [&] { r.epoch = 79; });
+
+    // Hand-made deltas through the in-place checks and the unchecked path.
+    const char* rbase = static_cast<const char*>(rep.get_address());
+    const auto off = [&](const void* p) { return std::size_t(static_cast<const char*>(p) - rbase); };
+    const auto rejects = [&](const char* what, const std::string& d, const char* text) {
+        const auto before = payload_of(rep);
+        auto tc = cur;
+        auto res = apply_entry(rep, d, tc);
+        need(!res, std::string("check path: accepted ") + what);
+        need(res.error().message.find(text) != std::string::npos,
+             std::string("check path: wrong error for ") + what + ": " + res.error().message);
+        need(payload_of(rep) == before && tc.version() == cur.version(),
+             std::string("check path: rejecting ") + what + " changed the replica");
+    };
+    rejects("a bool of 2", poke_delta(rep, cur, off(&rep.root().items[0].flag), std::string(1, '\x02')),
+            "invalid bool representation");
+    rejects("inline padding", poke_delta(rep, cur, off(&rep.root().items[0].name) + 9, std::string(1, 'z')),
+            "nonzero padding");
+    rejects("an inline length of 11", poke_delta(rep, cur, off(&rep.root().items[0].name) + 11, std::string(1, char(0x8B))),
+            "exceeds 10");
+    {
+        // Free bytes take any value without a check.
+        auto tc = cur;
+        const auto d = poke_delta(rep, cur, off(&rep.root().epoch), std::string("\x01\x02\x03\x04", 4));
+        auto res = apply_entry(rep, d, tc);
+        need(bool(res) && tc.last_check() == C::none, "check path: free bytes were not applied unchecked");
+        need(bool(typed_load(rep.save_verified())), "check path: unchecked result does not verify");
     }
 }
 
@@ -511,15 +748,21 @@ int main(int argc, char** argv) {
     const int steps = argc > 2 ? std::atoi(argv[2]) : 60;
     fixed_cases();
     diff_reference_case();
+    block_section_case();
+    check_path_case();
     wrong_type_case();
     view_sizes();
     for (int s = 0; s < streams; ++s) random_stream(20261102u + std::uint64_t(s), steps);
     need(totals.keys >= std::size_t(streams), "too few key deltas");
     need(totals.shrinks > 0 && totals.digests > 0 && totals.corrupt_rejected > 0 && totals.late_joins > 0,
          "a path was never taken");
+    need(streams < 10 || (totals.checks[1] > 0 && totals.checks[2] > 0 && totals.checks[3] > 0),
+         "a receiver check path was never taken");
     std::cout << "test_delta_sync: " << streams << " streams x " << steps << " steps, " << totals.deltas
               << " deltas (" << totals.keys << " key, " << totals.digests << " with digest), " << totals.empties
-              << " empty, " << totals.shrinks << " shrinks, " << totals.late_joins << " late joins; corrupted: " << totals.corrupt_rejected << " rejected, "
+              << " empty, " << totals.shrinks << " shrinks, " << totals.late_joins << " late joins; receiver checks: "
+              << totals.checks[1] << " none, " << totals.checks[2] << " in place, " << totals.checks[3]
+              << " full; corrupted: " << totals.corrupt_rejected << " rejected, "
               << totals.corrupt_accepted << " accepted as valid payloads; delta bytes " << totals.delta_bytes
               << " vs full wires " << totals.full_bytes << "\n";
     return 0;

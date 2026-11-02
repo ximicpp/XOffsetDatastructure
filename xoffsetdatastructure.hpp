@@ -6204,9 +6204,6 @@ namespace XOffsetDatastructure {
     class XDeltaCursor;
     // Options of save_delta / save_delta_into.
     struct XDeltaOptions {
-        // Two changed runs separated by at most this many unchanged bytes are
-        // sent as one run (a run costs about 2 bytes of framing).
-        std::uint32_t merge_gap = 2;
         // Carry the digest of the whole resulting payload; the receiver
         // rejects (and rolls back) a delta whose result differs, which also
         // catches a replica changed locally since the last delta. Costs one
@@ -6218,8 +6215,8 @@ namespace XOffsetDatastructure {
         bool key = false;                 // a key delta: the receiver starts from an empty payload
         bool holes = false;               // the hole table changed and was sent
         bool empty = false;               // nothing changed: no delta written, version not advanced
-        std::uint32_t runs = 0;           // changed byte runs sent
-        std::uint64_t run_bytes = 0;      // payload bytes inside those runs
+        std::uint32_t blocks = 0;         // 64-byte payload blocks sent (those with a changed byte)
+        std::uint64_t changed_bytes = 0;  // payload bytes carried in them
         std::uint64_t compared_bytes = 0; // payload bytes compared against the baseline
         std::size_t delta_bytes = 0;      // size of the delta written (0 when empty)
     };
