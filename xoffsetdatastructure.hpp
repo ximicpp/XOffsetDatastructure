@@ -801,6 +801,9 @@ namespace XOffsetDatastructure {
         }
 
         bool free_table_complete() const noexcept { return !free_table_lost_; }
+        // Holes of one exact size a free table records without host storage
+        // (see FreeBin); the next one of that size allocates bin storage.
+        static constexpr std::uint32_t free_bin_inline_entries = 4;
         // Releases this thread's cached empty free tables, so the next table
         // is a fresh host allocation (allocation-failure tests use this).
         static void trim_free_table_cache() noexcept {
@@ -878,21 +881,39 @@ namespace XOffsetDatastructure {
             FreeTablePtr table; // no holes: an absent table is an exact, empty one
             XOFFSET_TRY {
                 if (count != 0) table = make_free_table();
-                for (std::size_t i = 0; i < count; ++i) {
+                const auto* in = static_cast<const char*>(holes);
+                for (std::size_t i = 0; i < count;) {
                     WireHole hole;
-                    std::memcpy(&hole, static_cast<const char*>(holes) + i * sizeof(hole), sizeof(hole));
+                    std::memcpy(&hole, in + i * sizeof(hole), sizeof(hole));
                     if (hole.bytes <= FreeTable::small_max) {
+                        // The canonical order groups holes by size: a run of
+                        // one size fills its bin in one step, in wire order.
+                        std::size_t run = 1;
+                        for (std::uint32_t next = 0; i + run < count; ++run) {
+                            std::memcpy(&next, in + (i + run) * sizeof(hole) + offsetof(WireHole, bytes), sizeof(next));
+                            if (next != hole.bytes) break;
+                        }
                         const auto bin = hole.bytes / 8u - 1u;
                         auto& slot = table->bins[bin];
-                        if (slot.size() == slot.capacity()) [[unlikely]] table->grown = true;
-                        slot.push_back(hole.offset);
+                        bool grew = false;
+                        std::uint32_t* out = slot.reserve_back(static_cast<std::uint32_t>(run), grew);
+                        if (grew) [[unlikely]] {
+                            table->grown = true;
+                            table->touched[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
+                        }
+                        for (std::size_t k = 0; k < run; ++k)
+                            std::memcpy(out + k, in + (i + k) * sizeof(hole) + offsetof(WireHole, offset), sizeof(*out));
+                        slot.append(static_cast<std::uint32_t>(run));
                         table->mark_nonempty(bin);
-                        table->touched[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
+                        table->bytes += std::uint64_t(hole.bytes) * run;
+                        table->count += run;
+                        i += run;
                     } else {
                         table->large.emplace(hole.bytes, hole.offset);
+                        table->bytes += hole.bytes;
+                        ++table->count;
+                        ++i;
                     }
-                    table->bytes += hole.bytes;
-                    ++table->count;
                 }
             } XOFFSET_CATCH(const std::bad_alloc&) {
                 XOFFSET_THROW(XBadAlloc());
@@ -911,16 +932,102 @@ namespace XOffsetDatastructure {
         }
 
     private:
+        // The offsets of one exact-size bin, newest last. Up to
+        // inline_capacity of them live in the bin header itself, so a bin
+        // with few holes (the usual case in a resident buffer) is a single
+        // cache line with no separate storage to load: taking or recording a
+        // block in a cold table costs one dependent miss fewer. More entries
+        // move to host storage, which only grow() allocates.
+        class FreeBin {
+        public:
+            static constexpr std::uint32_t inline_capacity = free_bin_inline_entries;
+
+            FreeBin() noexcept {}
+            FreeBin(const FreeBin&) = delete;
+            FreeBin& operator=(const FreeBin&) = delete;
+            ~FreeBin() { release(); }
+
+            bool empty() const noexcept { return size_ == 0; }
+            std::uint32_t size() const noexcept { return size_; }
+            std::uint32_t capacity() const noexcept { return capacity_; }
+            // Host storage this bin owns, in entries (0 while inline).
+            std::uint32_t host_capacity() const noexcept { return on_host() ? capacity_ : 0u; }
+            const std::uint32_t* begin() const noexcept { return data(); }
+            const std::uint32_t* end() const noexcept { return data() + size_; }
+            std::uint32_t back() const noexcept { return data()[size_ - 1u]; }
+            void pop_back() noexcept { --size_; }
+            // Requires size() < capacity().
+            void push_back(std::uint32_t offset) noexcept { data()[size_++] = offset; }
+            void clear() noexcept { size_ = 0; }
+
+            // Moves the entries into `storage` (`entries` > capacity()) and
+            // returns the previous host storage (null while inline), which
+            // the caller releases once the new state is published.
+            std::uint32_t* adopt(std::uint32_t* storage, std::uint32_t entries) noexcept {
+                if (size_ != 0) std::memcpy(storage, data(), size_ * sizeof(std::uint32_t));
+                std::uint32_t* old = on_host() ? host_ : nullptr;
+                host_ = storage;
+                capacity_ = entries;
+                return old;
+            }
+            // Room for `entries` more entries, growing host storage (may
+            // throw std::bad_alloc); returns where they go. append() then
+            // publishes them. `grew` is set when host storage grew.
+            std::uint32_t* reserve_back(std::uint32_t entries, bool& grew) {
+                if (entries > capacity_ - size_) {
+                    grow(std::max({2u * inline_capacity, capacity_ * 2u, size_ + entries}));
+                    grew = true;
+                }
+                return data() + size_;
+            }
+            void append(std::uint32_t entries) noexcept { size_ += entries; }
+            // Replaces the entries with src's (may throw std::bad_alloc).
+            // Returns true when host storage grew.
+            bool assign(const FreeBin& src) {
+                bool grew = false;
+                if (src.size_ > capacity_) {
+                    size_ = 0;
+                    grow(src.size_);
+                    grew = true;
+                }
+                if (src.size_ != 0) std::memcpy(data(), src.data(), src.size_ * sizeof(std::uint32_t));
+                size_ = src.size_;
+                return grew;
+            }
+            // Drops the entries and any host storage.
+            void release() noexcept {
+                if (on_host()) delete[] host_;
+                capacity_ = inline_capacity;
+                size_ = 0;
+            }
+
+        private:
+            bool on_host() const noexcept { return capacity_ > inline_capacity; }
+            std::uint32_t* data() noexcept { return on_host() ? host_ : inline_; }
+            const std::uint32_t* data() const noexcept { return on_host() ? host_ : inline_; }
+            void grow(std::uint32_t entries) {
+                delete[] adopt(new std::uint32_t[entries], entries);
+            }
+
+            std::uint32_t size_ = 0;
+            std::uint32_t capacity_ = inline_capacity;
+            union {
+                std::uint32_t inline_[inline_capacity];
+                std::uint32_t* host_;
+            };
+        };
+
         struct FreeTable {
             static constexpr std::uint32_t small_max = 4096;
             static constexpr std::uint32_t small_bins = small_max / 8;
-            std::vector<std::uint32_t> bins[small_bins];
+            FreeBin bins[small_bins];
             std::uint64_t nonempty[small_bins / 64] = {};
             // Bit w is set exactly when nonempty[w] != 0, so a search for a
             // larger bin skips empty words without loading them.
             std::uint32_t nonempty_words = 0;
-            // Bins that may own storage (set whenever a bin gets storage,
-            // never cleared by removal), so recycling visits only those bins.
+            // Bins that may own host storage (set whenever a bin gets host
+            // storage, never cleared by removal), so recycling visits only
+            // those bins (inline entries need no release).
             std::uint64_t touched[small_bins / 64] = {};
             std::multimap<std::uint32_t, std::uint32_t> large;
             std::uint64_t bytes = 0;
@@ -1005,15 +1112,18 @@ namespace XOffsetDatastructure {
                     std::uint64_t still_touched = 0;
                     for (auto bits = table->touched[word]; bits != 0; bits &= bits - 1u) {
                         auto& bin = table->bins[word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits))];
-                        const auto bytes = bin.capacity() * sizeof(std::uint32_t);
-                        if (keep_bins && bin.capacity() <= keep_bin_entries && bytes <= keep_bytes - kept) {
+                        const auto bytes = bin.host_capacity() * sizeof(std::uint32_t);
+                        if (keep_bins && bin.host_capacity() <= keep_bin_entries && bytes <= keep_bytes - kept) {
                             bin.clear(); // storage stays, so the bin stays touched
                             kept += bytes;
                             still_touched |= bits & (~bits + 1u);
                         } else {
-                            std::vector<std::uint32_t>().swap(bin);
+                            bin.release();
                         }
                     }
+                    // Bins holding only inline entries own no storage.
+                    for (auto bits = table->nonempty[word] & ~table->touched[word]; bits != 0; bits &= bits - 1u)
+                        table->bins[word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits))].clear();
                     table->nonempty[word] = 0;
                     table->touched[word] = still_touched;
                 }
@@ -1061,10 +1171,10 @@ namespace XOffsetDatastructure {
             for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
                 for (auto bits = src.nonempty[word]; bits != 0; bits &= bits - 1u) {
                     const auto bin = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
-                    table->bins[bin] = src.bins[bin];
+                    if (table->bins[bin].assign(src.bins[bin]))
+                        table->touched[word] |= std::uint64_t(1) << (bin % 64u);
                 }
                 table->nonempty[word] = src.nonempty[word];
-                table->touched[word] |= src.nonempty[word];
             }
             table->nonempty_words = src.nonempty_words;
             table->large = src.large;
@@ -1155,7 +1265,10 @@ namespace XOffsetDatastructure {
         XOFFSET_DETAIL_NOINLINE bool insert_free_block_general(std::uint32_t offset, std::uint32_t bytes) noexcept {
             const auto identity = owner_record_;
             FreeTablePtr spare_table;
-            std::vector<std::uint32_t> spare_bin;
+            // Host storage for a full bin, allocated before the owner is
+            // re-resolved; after publication it holds the bin's old storage.
+            std::unique_ptr<std::uint32_t[]> spare_bin;
+            std::uint32_t spare_entries = 0;
             // Constructed inside the try: the MSVC STL's map allocates its head
             // node in the default constructor.
             std::optional<std::multimap<std::uint32_t, std::uint32_t>> spare_large;
@@ -1178,15 +1291,17 @@ namespace XOffsetDatastructure {
                         const auto bin = bytes / 8u - 1u;
                         auto& slot = table.bins[bin];
                         if (slot.size() == slot.capacity()) {
-                            const auto want = std::max<std::size_t>(8u, slot.capacity() * 2u);
-                            if (spare_bin.capacity() < want) {
-                                spare_bin.clear();
-                                spare_bin.reserve(want);
+                            const auto want = std::max<std::uint32_t>(2u * FreeBin::inline_capacity, slot.capacity() * 2u);
+                            if (spare_entries < want) {
+                                spare_bin.reset();
+                                spare_entries = 0;
+                                spare_bin.reset(new std::uint32_t[want]);
+                                spare_entries = want;
                                 continue; // re-resolve after the allocation
                             }
-                            spare_bin.assign(slot.begin(), slot.end()); // fits: no allocation
                             table.grown = true;
-                            slot.swap(spare_bin); // old storage released at scope exit
+                            // Old host storage (if any) is released at scope exit.
+                            spare_bin.reset(slot.adopt(spare_bin.release(), spare_entries));
                             // Storage only arrives here, so only growth marks the bin.
                             table.touched[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
                         }
