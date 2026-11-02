@@ -138,6 +138,9 @@ struct OwnerMap {
     // be allocated (only on Windows, where it is allocated at run time).
     static bool ready() noexcept;
     static std::uint8_t entry(std::uintptr_t address) noexcept;
+    // Where entry(address) is read from, or null while no table exists; for
+    // a prefetch hint only (it is not an atomic access).
+    static const std::uint8_t* entry_address(std::uintptr_t address) noexcept;
     // Relaxed atomic byte access; this header is C++17, without std::atomic_ref.
     XOFFSET_DETAIL_OWNER_INLINE static std::uint8_t load(const std::uint8_t& e) noexcept {
 #if defined(__GNUC__) || defined(__clang__)
@@ -213,6 +216,11 @@ XOFFSET_DETAIL_OWNER_INLINE std::uint8_t OwnerMap::entry(std::uintptr_t address)
     const std::uint8_t* table = owner_map_table.load(std::memory_order_relaxed);
     return table ? load(table[index(address)]) : std::uint8_t(0);
 }
+
+XOFFSET_DETAIL_OWNER_INLINE const std::uint8_t* OwnerMap::entry_address(std::uintptr_t address) noexcept {
+    const std::uint8_t* table = owner_map_table.load(std::memory_order_relaxed);
+    return table ? table + index(address) : nullptr;
+}
 #else
 // Zero-initialized (BSS): pages the program never touches cost no memory.
 // Mach-O compilers put a weak (inline) zero-initialized variable in
@@ -227,6 +235,10 @@ inline bool OwnerMap::ready() noexcept { return true; }
 
 XOFFSET_DETAIL_OWNER_INLINE std::uint8_t OwnerMap::entry(std::uintptr_t address) noexcept {
     return load(owner_map_table[index(address)]);
+}
+
+XOFFSET_DETAIL_OWNER_INLINE const std::uint8_t* OwnerMap::entry_address(std::uintptr_t address) noexcept {
+    return owner_map_table + index(address);
 }
 #endif
 

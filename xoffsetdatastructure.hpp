@@ -272,6 +272,13 @@ namespace XOffsetDatastructure {
 #else
 #define XOFFSET_DETAIL_NOINLINE
 #endif
+// A cache prefetch hint for reading (rw 0) or writing (rw 1); nothing where
+// the compiler has no builtin.
+#if defined(__clang__) || defined(__GNUC__)
+#define XOFFSET_DETAIL_PREFETCH(p, rw) __builtin_prefetch((p), (rw))
+#else
+#define XOFFSET_DETAIL_PREFETCH(p, rw) ((void)(p))
+#endif
 // [[indeterminate]] (C++26) where the compiler has it: an automatic variable
 // whose bytes are written before they are read does not get the erroneous-
 // behaviour fill (GCC 16 zeroes it; Clang without the attribute does not).
@@ -814,6 +821,36 @@ namespace XOffsetDatastructure {
         }
         std::size_t free_block_count() const noexcept { return free_table_ ? free_table_->count : 0; }
         std::uint64_t free_block_bytes() const noexcept { return free_table_ ? free_table_->bytes : 0; }
+
+        // A hint: starts loading, without waiting, the host-side lines the
+        // next allocation or release in this buffer reads first: the owner
+        // map entry and owner word of the payload, the arena header, and the
+        // free table's counters, bin bitmap and first small bins. It changes
+        // no contents, no placement and no state, and it is a no-op where the
+        // compiler has no prefetch builtin. When a buffer that has gone cold
+        // is about to be updated from data that is still arriving (a reply
+        // being received or decoded), calling this first overlaps those cache
+        // misses with that work instead of paying them one after another in
+        // the update.
+        void prefetch_for_update() const noexcept {
+            const char* const base = buffer_.data();
+            if (!base) return;
+            XOFFSET_DETAIL_PREFETCH(
+                detail::OwnerMap::entry_address(reinterpret_cast<std::uintptr_t>(base)), 0);
+            XOFFSET_DETAIL_PREFETCH(base - sizeof(void*), 0);
+            XOFFSET_DETAIL_PREFETCH(base, 1);
+            const FreeTable* const table = free_table_.get();
+            if (!table) return;
+            XOFFSET_DETAIL_PREFETCH(&table->count, 1);
+            XOFFSET_DETAIL_PREFETCH(&table->nonempty[0], 1);
+            // The first 8 lines of bins (sizes up to 168 bytes) are the ones
+            // game records churn most; 4 to 12 lines measured the same on
+            // bench/slg A.apply, none was clearly slower.
+            constexpr std::size_t bin_lines = 8;
+            const char* const bins = reinterpret_cast<const char*>(&table->bins[0]);
+            for (std::size_t line = 0; line < bin_lines; ++line)
+                XOFFSET_DETAIL_PREFETCH(bins + 64 * line, 1);
+        }
 
         // Free blocks in canonical emission order: ascending bin size, LIFO
         // vector order within a bin, then large blocks in (size, insertion)
@@ -7600,6 +7637,8 @@ namespace XOffsetDatastructure {
     // The non-throwing receive entries (try_load_verified, try_reload_verified,
     // try_begin_verified_reload, VerifiedReloadToken::try_finish) are available.
 #define XOFFSET_TRY_ENTRIES_API 1
+    // XBufferCore::prefetch_for_update() (a cache hint) is available.
+#define XOFFSET_PREFETCH_FOR_UPDATE_API 1
     template <typename T> class VerifiedReloadToken;
 
     class XBuffer : public XBufferCore {
