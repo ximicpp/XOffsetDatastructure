@@ -71,6 +71,12 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   U's (checked every message). `tools/analyze.py` compares N with each other
   format's U.
 
+XOffset's A adapter (both case sets) calls `prefetch_for_update()` on the two
+players' buffers when the battle result starts arriving, inside the timed
+A.res_decode: a public cache hint that changes nothing, so A.apply does not
+pay the cold allocator lines one after another. The other formats have no
+equivalent; libraries without `XOFFSET_PREFETCH_FOR_UPDATE_API` skip it.
+
 There is no C or D in this set, and `MANIFEST` lists the change. With
 `SLG_CASES` unset nothing changes: same stage keys, digests and report sums.
 

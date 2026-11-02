@@ -58,6 +58,12 @@
 #   bench/xoffset_runner.hpp  2026-11-02: demo B.install and S.load_install call XBuffer::swap
 #                        (std::swap did three moves); thread 优化服务端进程间迁移性能. Default
 #                        A/B/C/D unchanged.
+#   bench/xoffset_runner.hpp  2026-11-02: XOffset A adapter, when the library defines
+#                        XOFFSET_PREFETCH_FOR_UPDATE_API the scene side calls the public cache
+#                        hint prefetch_for_update() on both players' buffers as the battle
+#                        result starts arriving, timed in A.res_decode (both protocols, both
+#                        case sets). Changes no bytes, digests or report sums; older libraries
+#                        build the previous code (origin 25f883b7b83571887b467e1d898f5bd93df3919125bc0fae3ad5fbfe6b7edb1b)
 # Contents: slg-reuse adapters (FlatBuffers verified_root runs the Verifier),
 # reuse protocol (c) (SLG_REUSE=1), ordinary-record declarations for every xm
 # record type in include/slg/model_xoffset.hpp, T4 adapter v2 (whole-container
@@ -68,7 +74,7 @@
 #   them (guarded; older trees keep the previous declarations). Same machine code under GCC 16
 #   and P2996 (asm_equal), the lines are tools/describe_dump output (describe_dump_slg).
 4bd68ec1a9dcb93c4cf4cced05cd5a5ce098e4612183badbdc4f001ed32ab4e5  CMakeLists.txt
-e60d56cfb3cef28a6242f2b8ad67d6a433b5a30652cb64f104008e9fd1f94bf8  README.md
+a81ec38c14511e6c1e08732e3d492465e0054fa6aeddae58032015baf4a2788d  README.md
 26793b8192760da887a3db1b7afa9ee673a8257b8b01f14d6e7a38ca7d5a37a1  adapters/cereal_format.hpp
 67888cfee1aecdbc14d15dbdf919f1c39edfade985fc2385cf430947743a3bc0  adapters/flatbuffers_format.hpp
 70bfdee054800b8ea0a291ec8b4ff0c868036824c3d1198eeef44ff67f07ed5a  adapters/protobuf_format.hpp
@@ -79,7 +85,7 @@ eac6391a496578276cfe33afe8b2bb3866d3f1bc03127ac9a0bbb7bb7434583d  bench/runner.h
 c332435d838943330aeffa243d50dc958347177d376ae3ce78e183825e1170c9  bench/slg_bench.cpp
 730a66f677d9d20077175f629cf0b13919e66ccedaf880e4eb414c6bc94c0610  bench/small_msg_probe.cpp
 b8ea1fcd3368b9acfb65760dd52a9d4bc05750bdc2ea56a221b0dd338a7f7925  bench/std_runner.hpp
-25f883b7b83571887b467e1d898f5bd93df3919125bc0fae3ad5fbfe6b7edb1b  bench/xoffset_runner.hpp
+c815ef4fe0e932d11207e937dcf7576ffae1354f92cec905f25c5da8dc6db5a8  bench/xoffset_runner.hpp
 12cab27be9331a4a09ae66f444cf5852dd81e363df562748a4ea854932e35e44  include/slg/cista_free.hpp
 d383da79e1f656838311c9fc339c977cba69a53277adeb72910ed6cd3c1d92ed  include/slg/generic.hpp
 d64ef2095a2be911ac33fdf651b384f4403fd8731562b8fb53373130fc692f2d  include/slg/model_cista.hpp
