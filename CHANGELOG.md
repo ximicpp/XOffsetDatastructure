@@ -28,8 +28,9 @@
   for a cheaper apply.
 - Block bytes are gathered and scattered with one byte shuffle per 8-byte
   word: SSSE3 (checked at run time) on x86-64, NEON on AArch64, plain code
-  elsewhere. The receiver's apply scratch is shared by the cursors of a
-  thread (one copy, warm in cache, for any number of replicas).
+  elsewhere. The scratch of applying a delta is shared by the cursors of
+  a thread, and that of writing one by its baselines (one copy, warm in
+  cache, for any number of replicas).
 
 ## 3.2.1: iPhone test host serves by default
 

@@ -986,6 +986,20 @@ namespace XOffsetDatastructure {
             }
         }
 
+        // What writing one delta needs only while it runs: the buffer's hole
+        // table, the blocks that changed and, for touched_only, the blocks to
+        // compare. A thread writes one delta at a time, so its baselines
+        // share one (see DeltaReceiveScratch).
+        struct DeltaSendScratch {
+            std::vector<XBufferCore::WireHole> holes;
+            DeltaBlockBuffer blocks;
+            std::vector<std::uint8_t> want;
+            void release() noexcept {
+                std::vector<XBufferCore::WireHole>().swap(holes);
+                blocks.release();
+                std::vector<std::uint8_t>().swap(want);
+            }
+        };
         // What applying one delta needs only while it runs: the delta copied
         // with room past its end, the old bytes it overwrites, its blocks and
         // the replica's holes. A thread applies one delta at a time, so its
@@ -1008,12 +1022,15 @@ namespace XOffsetDatastructure {
             static thread_local bool available = true;  // trivial: outlives the scratch
             return available;
         }
-        struct DeltaThreadScratch : DeltaReceiveScratch {
+        struct DeltaThreadScratch {
+            DeltaSendScratch send;
+            DeltaReceiveScratch receive;
             ~DeltaThreadScratch() { delta_thread_scratch_available() = false; }
         };
-        // Null once the thread's scratch is destroyed (a delta applied from a
-        // later thread_local destructor uses its cursor's own).
-        inline DeltaReceiveScratch* delta_thread_scratch() noexcept {
+        // Null once the thread's scratch is destroyed (a delta written or
+        // applied from a later thread_local destructor uses its baseline's or
+        // cursor's own).
+        inline DeltaThreadScratch* delta_thread_scratch() noexcept {
             if (!delta_thread_scratch_available()) return nullptr;
             static thread_local DeltaThreadScratch scratch;
             return &scratch;
@@ -1057,14 +1074,16 @@ namespace XOffsetDatastructure {
             key_delta_into(out, options);
             return out;
         }
-        /// reset() and return the copy's memory.
+        /// reset() and return the copy's memory, and the scratch the calling
+        /// thread's baselines share.
         void release() noexcept {
             reset();
             std::vector<char>().swap(payload_);
             std::vector<XBufferCore::WireHole>().swap(holes_);
-            std::vector<XBufferCore::WireHole>().swap(scratch_holes_);
-            std::vector<std::uint8_t>().swap(want_);
-            blocks_.release();
+            own_scratch_.release();
+#if XOFFSET_THREAD_CACHES
+            if (detail::DeltaThreadScratch* s = detail::delta_thread_scratch()) s->send.release();
+#endif
         }
 
     private:
@@ -1076,13 +1095,13 @@ namespace XOffsetDatastructure {
         std::uint64_t root_type_id_ = 0;
         std::vector<char> payload_;                       // [0, used_end) as the receiver holds it ([0, 48) unused)
         std::vector<XBufferCore::WireHole> holes_;        // its hole table, by offset
-        std::vector<XBufferCore::WireHole> scratch_holes_;
-        detail::DeltaBlockBuffer blocks_;
         // touched_only: the touch log of the buffer the last delta came from
         // (0: none) and the stamp it had then (touches since have a later one).
         std::uint64_t touch_log_ = 0;
         std::uint32_t touch_stamp_ = 0;
-        std::vector<std::uint8_t> want_;  // scratch: the blocks to compare
+        // Used instead of the thread's shared scratch where there is none
+        // (XOFFSET_THREAD_CACHES 0, or after the thread's is destroyed).
+        detail::DeltaSendScratch own_scratch_;
     };
 
     /// Receiver side of one delta stream: which state the buffer next to it
@@ -1113,7 +1132,7 @@ namespace XOffsetDatastructure {
         void release_scratch() noexcept {
             own_scratch_.release();
 #if XOFFSET_THREAD_CACHES
-            if (detail::DeltaReceiveScratch* s = detail::delta_thread_scratch()) s->release();
+            if (detail::DeltaThreadScratch* s = detail::delta_thread_scratch()) s->receive.release();
 #endif
             std::vector<detail::DeltaCheckBits>().swap(checks_);
             std::vector<detail::DeltaCheckNode>().swap(nodes_);
@@ -1157,9 +1176,15 @@ namespace XOffsetDatastructure {
     namespace detail {
         struct DeltaAccess {
             static constexpr std::size_t payload_begin = XWIRE_PAYLOAD_BEGIN;
+            static DeltaSendScratch& send_scratch(XDeltaBaseline& b) noexcept {
+#if XOFFSET_THREAD_CACHES
+                if (DeltaThreadScratch* s = delta_thread_scratch()) return s->send;
+#endif
+                return b.own_scratch_;
+            }
             static DeltaReceiveScratch& receive_scratch(XDeltaCursor& c) noexcept {
 #if XOFFSET_THREAD_CACHES
-                if (DeltaReceiveScratch* s = delta_thread_scratch()) return *s;
+                if (DeltaThreadScratch* s = delta_thread_scratch()) return s->receive;
 #endif
                 return c.own_scratch_;
             }
@@ -1198,7 +1223,8 @@ namespace XOffsetDatastructure {
                 const bool key = b.payload_.empty();
 
                 // The hole table, by offset.
-                auto& holes = b.scratch_holes_;
+                DeltaSendScratch& scratch = send_scratch(b);
+                auto& holes = scratch.holes;
                 holes.clear();
                 holes.reserve(core.free_block_count());
                 core.for_each_free_block([&](XBufferCore::WireHole h) { holes.push_back(h); });
@@ -1229,15 +1255,15 @@ namespace XOffsetDatastructure {
                         if (b) b->reset();
                     }
                 } drop{&b};
-                auto& blocks = b.blocks_;
+                auto& blocks = scratch.blocks;
                 const DeltaTouchLog* const log = xbuf.touch_log_.get();
                 DeltaBlockTotals totals;
                 if (options.touched_only && !key && log && !log->lost && log->epoch == core.epoch() &&
                     b.touch_log_ == log->id) {
                     const std::size_t count = (used - payload_begin + delta_block - 1) / delta_block;
                     if (holes_changed) {
-                        select_touched(b, *log, holes, base_used, used);
-                        const std::uint8_t* want = b.want_.data();
+                        select_touched(b, scratch.want, *log, holes, base_used, used);
+                        const std::uint8_t* want = scratch.want.data();
                         totals = delta_scan<true>(
                             cur, base.data(), payload_begin, used, blocks,
                             [=](std::size_t i) {
@@ -1459,7 +1485,7 @@ namespace XOffsetDatastructure {
                 else ++log->now;
             }
             // The blocks a touched_only delta compares when the holes changed
-            // (b.want_, per block from payload_begin): those touched since the
+            // (want, per block from payload_begin): those touched since the
             // baseline's stamp, those past its used size, those of holes that
             // came or went.
             // Blocks below both used sizes that the log has stamps for.
@@ -1468,11 +1494,10 @@ namespace XOffsetDatastructure {
                 return std::min(common > payload_begin ? (common - payload_begin + delta_block - 1) / delta_block : 0u,
                                 log.stamps.size());
             }
-            static void select_touched(XDeltaBaseline& b, const DeltaTouchLog& log,
-                                       const std::vector<XBufferCore::WireHole>& holes, std::size_t base_used,
-                                       std::size_t used) {
+            static void select_touched(const XDeltaBaseline& b, std::vector<std::uint8_t>& want,
+                                       const DeltaTouchLog& log, const std::vector<XBufferCore::WireHole>& holes,
+                                       std::size_t base_used, std::size_t used) {
                 const std::size_t count = (used - payload_begin + delta_block - 1) / delta_block;
-                auto& want = b.want_;
                 want.assign(count, 0);
                 const auto mark = [&](std::size_t from, std::size_t to) {
                     from = std::max(from, payload_begin);
