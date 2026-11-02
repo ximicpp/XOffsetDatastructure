@@ -292,9 +292,11 @@ touch log 4 bytes per block. The scratch a delta needs while it is applied
 (a copy of a small delta, the old bytes it overwrites, its block list and
 the hole table) is shared by the cursors of one thread, so a receiver that
 holds many replicas keeps one copy, warm in cache, instead of one per
-replica (`XDeltaCursor::release_scratch()` frees it). Where
-`XOFFSET_THREAD_CACHES` is 0 (GCC on MinGW and Cygwin) each cursor keeps
-its own.
+replica (`XDeltaCursor::release_scratch()` frees it); likewise the scratch
+of writing one (the hole table, the changed blocks, the blocks to compare)
+is shared by a thread's baselines (`XDeltaBaseline::release()`). Where
+`XOFFSET_THREAD_CACHES` is 0 (GCC on MinGW and Cygwin) each cursor and
+baseline keeps its own.
 
 Viewport-like model in `tests/test_delta_sync.cpp` (120 units in 128 stable
 slots, each tick 30% move a few cells, 5% lose hp, 2 leave and 2 enter):
