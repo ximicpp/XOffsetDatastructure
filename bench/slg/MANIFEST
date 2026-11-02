@@ -60,6 +60,12 @@
 #                        Unset: A/B/C/D and their stage keys unchanged (same digests and report
 #                        sums as before at S, both protocols). New message types ViewUnit /
 #                        ViewSnapshot / ViewDelta in every model, adapter and schema; Slot kView.
+#   2026-11-02 viewport sync (thread 优化客户端视口同步性能): K*.recv times the key
+#                        delta receive and the read of every unit and march, as E*.recv does
+#                        (the read was untimed before); K*.window_zstd added. XOffset native
+#                        block buffers: capacity reserved once (1.5x average + 32, was a fixed
+#                        2x + 64 slots), vectors as long as the most records held, free slots
+#                        reused lowest first. Application-level E/U and other formats unchanged.
 # Contents: slg-reuse adapters (FlatBuffers verified_root runs the Verifier),
 # reuse protocol (c) (SLG_REUSE=1), ordinary-record declarations for every xm
 # record type in include/slg/model_xoffset.hpp, T4 adapter v2 (whole-container
@@ -70,7 +76,7 @@
 #   them (guarded; older trees keep the previous declarations). Same machine code under GCC 16
 #   and P2996 (asm_equal), the lines are tools/describe_dump output (describe_dump_slg).
 4bd68ec1a9dcb93c4cf4cced05cd5a5ce098e4612183badbdc4f001ed32ab4e5  CMakeLists.txt
-4775c77743ca8af361e4f1d0bc308f8b86bfcfec8c4ed77afea4dc61f7b8fbc3  README.md
+571d3bba42030be388aa5701242af4fb905020416ce62487088582f1056ea5f4  README.md
 17df29f77131fdc3996d6606180a88b548007d5f16fc2c71a3ac45878fce26fd  adapters/cereal_format.hpp
 6bb4c5619efe2bf89de0e784266ab4c414a934495e83cffbee96ab37dd5209ee  adapters/flatbuffers_format.hpp
 93dde0e701e2bfa23f2e63653e8f214e1410912906237af57d04a8c8eacad49c  adapters/protobuf_format.hpp
@@ -81,7 +87,7 @@ eac6391a496578276cfe33afe8b2bb3866d3f1bc03127ac9a0bbb7bb7434583d  bench/runner.h
 65d0f3e276ecd4b4824113e09343ec30c3084ca055ed5eaa162d40d3133f87d7  bench/slg_bench.cpp
 730a66f677d9d20077175f629cf0b13919e66ccedaf880e4eb414c6bc94c0610  bench/small_msg_probe.cpp
 a92b5d7928f7263adb55a07dbb2e134213394a2fbaff4aaa4e7b5db1930c17b6  bench/std_runner.hpp
-b83770594569e97a415655b28ef0f837aaa3799a1defb1455875c4f4f9fd903b  bench/xoffset_runner.hpp
+1447a5ed627b76f40b2be013ef8e4f2ac581e4c6e309a668119fa949179375e7  bench/xoffset_runner.hpp
 12cab27be9331a4a09ae66f444cf5852dd81e363df562748a4ea854932e35e44  include/slg/cista_free.hpp
 d383da79e1f656838311c9fc339c977cba69a53277adeb72910ed6cd3c1d92ed  include/slg/generic.hpp
 577bbe4a8c90c2f8efcb547e3061e5350f41f76daf73a5cd4a25960d52be5720  include/slg/login.hpp
@@ -90,7 +96,7 @@ a7ac4b83dce89750e858a3226ca7d62a269aa051acc5fb474d084f26d028753e  include/slg/mo
 ad969a2935b7c7becdd8c566cea52c6e1b445b42ddc94aa4eabb0973b3e62883  include/slg/model_xoffset.hpp
 3259eef215f98da7328da68bb5e7dd1f33141cdeb894511a039af075114c3391  include/slg/model_xoffset_optin.hpp
 36d5761eb46998e5040f7a19fb99f5ac1df5e31ee129a864e3872ba734e4a5db  include/slg/trace.hpp
-a0241a6666072d1145a5313d8d593cae69259c3d1d94c114307e74a09c58ae8b  include/slg/view.hpp
+8aa040a4aeb93dc2edadd86de6c5b1958e7a0efed0c8c9ac9ea58bf2e7d7cc1f  include/slg/view.hpp
 74667dd9fa7ac0c31e37252e5934ec95ff8d63337ff7e9d85428ae9d445bb862  schema/slg.fbs
 2d7fc7c3743978f7d7460333ffc989427333d2213b9345efb55e828ee4a2b19b  schema/slg.proto
 a6f4067932355c6781a25a370633706f7d998cabccf571a282b913e6e5240772  tools/analyze.py
