@@ -383,6 +383,18 @@ public:
             if (!r) throw std::runtime_error("native login rejected: " + std::string(r.error().message));
         }
         std::size_t n_diff(int p) { srv[std::size_t(p)].template save_delta_into<PlayerState>(nd, nb[std::size_t(p)]); return nd.size(); }
+        // The edit's dirty marks as touches; the delta compares only what was touched
+        // (SLG_NO_TOUCH=1: compare everything, as before).
+        static bool touch_on() { static const bool on = std::getenv("SLG_NO_TOUCH") == nullptr; return on; }
+        template <class T> void n_touch(int p, const T& obj) { if (touch_on()) srv[std::size_t(p)].touch(obj); }
+        template <class D> std::size_t n_diff_dirty(int p, const D&) {
+            if (!touch_on()) return n_diff(p);
+            auto& b = srv[std::size_t(p)];
+            XOffsetDatastructure::XDeltaOptions o;
+            o.touched_only = true;
+            b.template save_delta_into<PlayerState>(nd, nb[std::size_t(p)], o);
+            return nd.size();
+        }
         void n_recv(int p) {
             if (nd.empty()) return;
             const XOffsetDatastructure::XStatus r = nh[std::size_t(p)]->template try_apply_delta_verified<PlayerState>(nd, nc[std::size_t(p)]);
