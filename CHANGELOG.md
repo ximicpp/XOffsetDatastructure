@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Delta sync (`xoffset_delta.hpp`, `docs/DELTA_SYNC.md`): a sender keeps an
+  `XDeltaBaseline` per receiver and `save_delta_into<T>` writes only the
+  payload byte runs that changed since (plus the hole table when it
+  changed); the receiver's `apply_delta_verified<T>` /
+  `try_apply_delta_verified<T>` patches its copy in place, verifies it
+  exactly as `load_verified<T>` verifies a wire and rolls the bytes back on
+  rejection, keeping an `XDeltaCursor` (stream and version). The first delta
+  is a key delta (the full state). Delta format 1.0 is new; wire format 2.1
+  is unchanged. New error codes `delta_base_mismatch` and `digest_mismatch`.
+
 ## 3.2.1: iPhone test host serves by default
 
 A patch release on top of 3.2.0. The library headers and sources are byte

@@ -158,6 +158,7 @@ set(REFLECTION_TESTS
     test_reload_reset
     test_reset_used_range
     test_clone
+    test_delta_sync
 )
 
 foreach(test_name ${REFLECTION_TESTS})
@@ -249,6 +250,7 @@ set(NO_EXCEPTIONS_TESTS
     test_xhandle
     test_xstring_direct_assign
     test_schema_handshake
+    test_delta_sync
 )
 foreach(test_name ${NO_EXCEPTIONS_TESTS})
     if(NOT XOFFSET_TESTS_REFLECTION AND test_name IN_LIST XOFFSET_CXX26_ONLY_TESTS)
