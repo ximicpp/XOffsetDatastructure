@@ -349,14 +349,16 @@ namespace XOffsetDatastructure {
 
         // The 64-byte blocks of [from, n) (the last may be shorter) where cur
         // differs from base (Update) or from zero (!Update, base unused), with
-        // their masks, among the blocks next_selected picks (next_selected(i):
-        // the first picked block index at or after i, counted from `from`). With
-        // Update, each block that differs is copied into base on the way, so
-        // base equals cur on the selected blocks afterwards. whole_blocks:
-        // every block that differs and lies inside [from, n) goes whole.
-        template <bool Update, typename Next>
+        // their masks, among the blocks next_run picks (next_run(i): the next
+        // run of picked block indexes, counted from `from`, as a pair
+        // [first, last) with first >= i and last > first, or first past the
+        // blocks when none is left; last may run past them). With Update,
+        // each block that differs is copied into base on the way, so base
+        // equals cur on the selected blocks afterwards. whole_blocks: every
+        // block that differs and lies inside [from, n) goes whole.
+        template <bool Update, typename NextRun>
         DeltaBlockTotals delta_scan(const char* cur, char* base, std::size_t from, std::size_t n,
-                                    DeltaBlockBuffer& blocks, Next&& next_selected, bool whole_blocks = false) {
+                                    DeltaBlockBuffer& blocks, NextRun&& next_run, bool whole_blocks = false) {
             alignas(64) static constexpr char zeros[64] = {};
             DeltaBlockTotals totals;
             DeltaBlock* w = blocks.reset_for((n - from + delta_block - 1) / delta_block);
@@ -372,18 +374,21 @@ namespace XOffsetDatastructure {
                 next = index + 1;
             };
             const std::size_t count = (n - from + delta_block - 1) / delta_block;
-            for (std::size_t index = next_selected(std::size_t(0)); index < count;
-                 index = next_selected(index + 1)) {
-                const std::size_t i = from + index * delta_block;
-                if (n - i >= delta_block) {
-                    totals.compared += delta_block;
+            const std::size_t full = (n - from) / delta_block;  // blocks of 64 bytes (all but a shorter last)
+            for (std::pair<std::size_t, std::size_t> run = next_run(std::size_t(0)); run.first < count;
+                 run = next_run(std::min(run.second, count))) {
+                const std::size_t last = std::min(run.second, full);
+                for (std::size_t index = run.first; index < last; ++index) {
+                    const std::size_t i = from + index * delta_block;
                     const std::uint64_t m = delta_block_mask(cur + i, Update ? base + i : zeros);
-                    if (m == 0) continue;
+                    if (m == 0) [[likely]] continue;
                     if constexpr (Update) std::memcpy(base + i, cur + i, delta_block);
                     record(i, m);
-                    continue;
                 }
+                if (last > run.first) totals.compared += (last - run.first) * delta_block;
+                if (full == count || run.second <= full) continue;
                 // The last, shorter block.
+                const std::size_t i = from + full * delta_block;
                 totals.compared += n - i;
                 std::uint64_t m = 0;
                 std::size_t k = 0;
@@ -406,7 +411,9 @@ namespace XOffsetDatastructure {
             return totals;
         }
         struct DeltaEveryBlock {
-            constexpr std::size_t operator()(std::size_t index) const noexcept { return index; }
+            constexpr std::pair<std::size_t, std::size_t> operator()(std::size_t index) const noexcept {
+                return {index, SIZE_MAX};
+            }
         };
 
         inline DeltaBlockTotals delta_diff_update(const char* cur, char* base, std::size_t from, std::size_t n,
@@ -1193,7 +1200,9 @@ namespace XOffsetDatastructure {
                             cur, base.data(), payload_begin, used, blocks,
                             [=](std::size_t i) {
                                 while (i < count && want[i] == 0) ++i;
-                                return i;
+                                std::size_t j = i;
+                                while (j < count && want[j] != 0) ++j;
+                                return std::pair<std::size_t, std::size_t>(i, j);
                             },
                             options.whole_blocks);
                     } else {
@@ -1206,19 +1215,25 @@ namespace XOffsetDatastructure {
                         const std::uint32_t since = b.touch_stamp_;
                         const std::size_t grown =
                             used > base_used ? (std::max(base_used, payload_begin) - payload_begin) / delta_block : count;
+                        const std::size_t below = std::min(stamped, grown);  // blocks the stamps decide
                         totals = delta_scan<true>(
                             cur, base.data(), payload_begin, used, blocks,
                             [=](std::size_t i) {
-                                while (i < grown) {
-                                    if (i >= stamped) return grown;
+                                if (i >= grown) return std::pair<std::size_t, std::size_t>(i, SIZE_MAX);
+                                while (i < below) {
                                     if (i % delta_touch_group == 0 && groups[i / delta_touch_group] <= since) {
                                         i += delta_touch_group;
                                         continue;
                                     }
-                                    if (stamps[i] > since) return i;
+                                    if (stamps[i] > since) {
+                                        std::size_t j = i + 1;
+                                        while (j < below && stamps[j] > since) ++j;
+                                        return std::pair<std::size_t, std::size_t>(i, j);
+                                    }
                                     ++i;
                                 }
-                                return i;
+                                // From grown on (a skipped group may reach past it), every block.
+                                return std::pair<std::size_t, std::size_t>(grown, SIZE_MAX);
                             },
                             options.whole_blocks);
                     }

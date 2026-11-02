@@ -983,6 +983,38 @@ void touched_fixed_case() {
     same_state(src.root(), src, rep, "touched: moved container");
 }
 
+// The bytes past the baseline's used size are compared even where the
+// touches skip a whole group of untouched blocks: here a string head is
+// touched and the block it now points to came with growth, untouched. The
+// old used end moves through a group of 16 blocks as `count` grows.
+void touched_growth_case() {
+    const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
+    xo::XDeltaOptions touched;
+    touched.touched_only = true;
+    for (std::uint32_t count = 8; count < 80; ++count) {
+        const std::string where = "touched growth, " + std::to_string(count) + " slots";
+        auto src = xo::TypedXBuffer<dz::View>::create(4096, cap);
+        src.root().slots.reserve(count);  // one block, no holes
+        for (std::uint32_t i = 0; i < count; ++i) src.root().slots.emplace_back().id = i + 1;
+        need(holes_of(src).empty(), where + ": holes before the change");
+        xo::XDeltaBaseline base;
+        xo::TypedXBuffer<dz::View> rep(4096, xo::XBuffer::maximum_capacity(kLimit));
+        xo::XDeltaCursor cur;
+        std::string d;
+        (void)src.save_delta_into(d, base, touched);
+        need(bool(rep.try_apply_delta_verified(d, cur)), where + ": key delta");
+        auto& name = src.root().slots[0].name;
+        name = "a name too long to stay inline";  // a new block at the end
+        need(holes_of(src).empty(), where + ": holes after the change");
+        src.touch(&name, sizeof(name));  // the head only
+        const auto st = src.save_delta_into(d, base, touched);
+        need(!st.empty, where + ": no delta");
+        auto r = rep.try_apply_delta_verified(d, cur);
+        need(bool(r), where + ": delta rejected: " + (r ? std::string() : r.error().message));
+        need(payload_of(src) == payload_of(rep), where + ": the grown bytes were not sent");
+    }
+}
+
 void wrong_type_case() {
     const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
     auto view = xo::TypedXBuffer<dz::View>::create(4096, cap);
@@ -1007,6 +1039,7 @@ int main(int argc, char** argv) {
     wrong_type_case();
     view_sizes();
     touched_fixed_case();
+    touched_growth_case();
     for (int s = 0; s < streams; ++s) random_stream(20261102u + std::uint64_t(s), steps);
     for (int s = 0; s < streams; ++s) touched_stream(20261103u + std::uint64_t(s), steps);
     need(touch_totals.compared_touched * 4 < touch_totals.compared_whole * 3 && touch_totals.relayed > 0 &&
