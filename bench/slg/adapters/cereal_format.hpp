@@ -33,8 +33,9 @@ template <CerealArchive A> void serialize(A& ar, Tile& v) { ar(v.x, v.y, v.terra
 template <CerealArchive A> void serialize(A& ar, March& v) { ar(v.march_id, v.owner, v.from_x, v.from_y, v.to_x, v.to_y, v.eta, v.troops); }
 template <CerealArchive A> void serialize(A& ar, ShardState& v) { ar(v.shard_id, v.tick, v.width, v.tiles, v.cities, v.marches); }
 template <CerealArchive A> void serialize(A& ar, ViewUnit& v) { ar(v.id, v.owner, v.x, v.y, v.hp, v.state, v.name); }
-template <CerealArchive A> void serialize(A& ar, ViewSnapshot& v) { ar(v.request_id, v.tick, v.x0, v.y0, v.x1, v.y1, v.units); }
-template <CerealArchive A> void serialize(A& ar, ViewDelta& v) { ar(v.request_id, v.tick, v.x0, v.y0, v.x1, v.y1, v.upserts, v.removed); }
+template <CerealArchive A> void serialize(A& ar, ViewMarch& v) { ar(v.id, v.owner, v.x0, v.y0, v.x1, v.y1, v.t0, v.t1); }
+template <CerealArchive A> void serialize(A& ar, ViewSnapshot& v) { ar(v.request_id, v.tick, v.x0, v.y0, v.x1, v.y1, v.units, v.marches); }
+template <CerealArchive A> void serialize(A& ar, ViewDelta& v) { ar(v.request_id, v.tick, v.x0, v.y0, v.x1, v.y1, v.upserts, v.removed, v.marches, v.removed_marches); }
 } // namespace slg::stdm
 
 namespace slg {

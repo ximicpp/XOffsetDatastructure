@@ -78,10 +78,14 @@ struct ShardState {
 // Demo case set, scenario E (view.hpp): units inside one client's viewport.
 struct ViewUnit { int32_t id{}; int32_t owner{}; int32_t x{}; int32_t y{}; int32_t hp{}; int32_t state{}; std::string name; };
 
+// A march as the client sees it: a line from (x0,y0) to (x1,y1), start and arrival tick.
+struct ViewMarch { int32_t id{}; int32_t owner{}; int32_t x0{}; int32_t y0{}; int32_t x1{}; int32_t y1{}; int64_t t0{}; int64_t t1{}; };
+
 struct ViewSnapshot {
     int64_t request_id{}; int64_t tick{};
     int32_t x0{}; int32_t y0{}; int32_t x1{}; int32_t y1{};
     std::vector<ViewUnit> units;
+    std::vector<ViewMarch> marches;
 };
 
 // Scenario U (view.hpp): changes since the client's last sync.
@@ -90,6 +94,8 @@ struct ViewDelta {
     int32_t x0{}; int32_t y0{}; int32_t x1{}; int32_t y1{};
     std::vector<ViewUnit> upserts;
     std::vector<int32_t> removed;
+    std::vector<ViewMarch> marches;
+    std::vector<int32_t> removed_marches;
 };
 
 } // namespace slg::stdm

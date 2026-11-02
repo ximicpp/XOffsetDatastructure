@@ -84,11 +84,10 @@ public:
         shard_.receive(save(tmp, s));
         if (demo_cases()) {
             const ViewScale& vs = *find_view_scale(sc.name);
-            world_.setup(seed, vs);
-            wu_.setup(mix_seed(seed, 0xde17), vs);
-            dt_.setup(vs.clients);
-            held_ = std::vector<cm::ViewSnapshot>(std::size_t(vs.clients));
-            at_.assign(std::size_t(vs.clients), {});
+            for (int i = 0; i < 3; ++i) {
+                bs_[i].setup(BlockRates::seed(seed, i), vs, BlockRates::rates[i]);
+                ops_[i].setup(vs.clients);
+            }
         }
     }
 
@@ -250,46 +249,42 @@ public:
         }
     }
 
-    // Demo case set, E: viewport sync (view.hpp). The server fills its reused
-    // message object from the world and serializes it; the client copies the wire
-    // into its receive buffer, deserializes with the runner's checks and reads
-    // every unit in place.
+    // Demo case set, server -> client map data (view.hpp, run_blocks): the server
+    // fills its reused message object and serializes it into the block's send
+    // buffer; a client copies the wire into its held view's buffer, deserializes
+    // it there with the runner's checks, reads it in place and keeps it, changing
+    // it in place when deltas arrive.
     void run_view(int cycle, CycleStats& st, SampleWires* keep) {
-        const ViewScale& vs = world_.scale();
-        for (int r = 0; r < vs.rounds; ++r) {
-            world_.tick();
-            for (int c = 0; c < vs.clients; ++c) {
-                const auto& sel = world_.request(c);
-                const int64_t id = (int64_t(cycle) * vs.rounds + r) * vs.clients + c;
-                timed(st, "E.send", [&] { fill_view(e_s_, world_, sel, id); save(view_, e_s_); });
-                timed(st, "E.recv", [&] {
-                    e_r_.receive({view_.data(), view_.size()});
-                    st.report_sum += query_view(*e_r_);
-                });
-                st.bytes["E.view"] += view_.size();
-                if (keep) keep->view = to_string_bytes(view_);
-            }
-        }
-        // U: delta sync on a second world (view.hpp); the client's view is a cista
-        // object it keeps and changes in place.
-        const ViewScale& us = wu_.scale();
-        for (int r = 0; r < us.rounds; ++r) {
-            wu_.tick();
-            for (int c = 0; c < us.clients; ++c) {
-                const auto& sel = wu_.request(c);
-                dt_.plan(wu_, c, sel, plan_);
-                const int64_t id = (int64_t(cycle) * us.rounds + r) * us.clients + c;
-                timed(st, "U.send", [&] { fill_delta(u_s_, wu_, plan_, id); save(delta_, u_s_); });
-                timed(st, "U.recv", [&] { u_r_.receive({delta_.data(), delta_.size()}); });
-                timed(st, "U.apply", [&] { apply_delta(held_[std::size_t(c)], at_[std::size_t(c)], *u_r_); });
-                st.report_sum += query_held(held_[std::size_t(c)]);
-                st.bytes["U.delta"] += delta_.size();
-                if (keep) keep->delta = to_string_bytes(delta_);
-                st.bytes["U.units"] += plan_.upserts.size();
-                st.bytes["U.removed"] += plan_.removed.size();
-            }
-        }
+        for (int i = 0; i < 3; ++i)
+            run_blocks(bs_[i], ops_[i], BlockRates::keys(i), cycle, st, keep ? &keep->view : nullptr, keep ? &keep->delta : nullptr);
     }
+
+    struct BlockOps {
+        std::vector<Bytes> snaps;
+        std::vector<Held<cm::ViewSnapshot>> held_views;
+        cm::ViewSnapshot ev;
+        cm::ViewDelta ds;
+        Held<cm::ViewDelta> dd;
+        Bytes dw;
+        void setup(int clients) {
+            snaps.assign(std::size_t(kBlocks), {});
+            held_views = std::vector<Held<cm::ViewSnapshot>>(std::size_t(clients) * 9);
+        }
+        template <class Fill> std::size_t snap_encode(int b, Fill&& fill) { fill(ev); return save(snaps[std::size_t(b)], ev).size(); }
+        std::string_view snap_wire(int b) const {
+            const auto& v = snaps[std::size_t(b)];
+            return {reinterpret_cast<const char*>(v.data()), v.size()};
+        }
+        void snap_recv(int c, int k, int b) {
+            const auto& v = snaps[std::size_t(b)];
+            held_views[std::size_t(c) * 9 + std::size_t(k)].receive({v.data(), v.size()});
+        }
+        cm::ViewSnapshot& held(int c, int k) { return *held_views[std::size_t(c) * 9 + std::size_t(k)]; }
+        template <class Fill> std::size_t delta_encode(Fill&& fill) { fill(ds); return save(dw, ds).size(); }
+        std::string_view delta_wire() const { return {reinterpret_cast<const char*>(dw.data()), dw.size()}; }
+        void delta_recv() { dd.receive({dw.data(), dw.size()}); }
+        const cm::ViewDelta& delta() const { return *dd; }
+    };
 
     uint64_t world_digest() override {
         Digest g;
@@ -333,17 +328,9 @@ private:
     Held<cm::ShardState> c_r_;
     Held<cm::Report> d_;
     Bytes req_, res_, out_, back_, snap_, snap2_;
-    ViewWorld world_;
-    cm::ViewSnapshot e_s_;
-    Held<cm::ViewSnapshot> e_r_;
-    Bytes view_, store_, delta_;
-    ViewWorld wu_;
-    DeltaTracker dt_;
-    DeltaPlan plan_;
-    cm::ViewDelta u_s_;
-    Held<cm::ViewDelta> u_r_;
-    std::vector<cm::ViewSnapshot> held_;
-    std::vector<std::unordered_map<int32_t, int32_t>> at_;
+    Bytes store_;
+    BlockSession bs_[3];
+    BlockOps ops_[3];
 };
 
 } // namespace slg
