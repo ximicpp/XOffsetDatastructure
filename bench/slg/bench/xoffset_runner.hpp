@@ -253,7 +253,7 @@ public:
             timed(st, "B.scene_edits", [&] {
                 season_edits(b_m_->root<PlayerState>(), mix_seed(seed_, uint64_t(cycle) * 1000003u + k), sc.season_ops);
             });
-            timed(st, "B.install", [&] { std::swap(slot, *b_m_); });
+            timed(st, "B.install", [&] { slot.swap(*b_m_); });
             st.bytes["B.out"] += out_.size();
             if (keep) keep->player = out_;
         }
@@ -280,7 +280,7 @@ public:
             recv<PlayerState>(st, "S.store_recv", back_, b_r_);
             store_ = back_;
             recv<PlayerState>(st, "S.load_recv", store_, b_m_);
-            timed(st, "S.load_install", [&] { std::swap(slot, *b_m_); });
+            timed(st, "S.load_install", [&] { slot.swap(*b_m_); });
             st.bytes["S.player"] += back_.size();
         }
 

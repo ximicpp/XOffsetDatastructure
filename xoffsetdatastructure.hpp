@@ -1869,6 +1869,7 @@ namespace XOffsetDatastructure {
         }
 
         static constexpr std::size_t regrow_step = 4096;
+        static constexpr std::uint32_t first_dirty_step = 256;
 
         bool ensure_allocation_extent(size_type required, bool allow_growth = true) {
             if (required <= buffer_.size()) return true;
@@ -1881,11 +1882,18 @@ namespace XOffsetDatastructure {
             // D6: below zero_from() (bytes exposed before an in-place reload
             // shrank the logical length) grow_to must memset every newly exposed byte, so a
             // doubling there clears far more than the tail will use. Grow in
-            // 4 KiB steps inside that range; past it fresh OS pages are
-            // already zero and growth is geometric again. used_end, and
-            // therefore the wire, does not depend on the logical length.
-            if (required < buffer_.zero_from())
-                target = std::max<std::size_t>(required, std::min<std::size_t>(geometric, std::size_t(current) + regrow_step));
+            // steps inside that range; past it fresh OS pages are already
+            // zero and growth is geometric again. The step starts at 256 B
+            // after each reload or reset and doubles up to 4 KiB with every
+            // step: an owner that grows once (one vector regrow in a resident
+            // player) clears a few cache lines, not a cold 4 KiB page, while
+            // one that keeps growing reaches the 4 KiB step after five calls.
+            // used_end, and therefore the wire, does not depend on the
+            // logical length.
+            if (required < buffer_.zero_from()) {
+                target = std::max<std::size_t>(required, std::min<std::size_t>(geometric, std::size_t(current) + dirty_step_));
+                if (dirty_step_ < regrow_step) dirty_step_ *= 2;
+            }
             // Throw on an OS/preparation failure. In particular, a container's
             // failed tail expansion must not silently retry via a new allocation.
             if (!buffer_.grow_to(target)) XOFFSET_THROW(XBadAlloc());
@@ -1918,6 +1926,7 @@ namespace XOffsetDatastructure {
                 if (auto* table = free_table_.release()) FreeTableRecycler::recycle(table, true);
             }
             free_table_lost_ = false;
+            dirty_step_ = first_dirty_step;
             typed_root_access_allowed_ = false;
             schema_bound_ = false;
             bound_root_type_id_ = 0;
@@ -1930,9 +1939,32 @@ namespace XOffsetDatastructure {
         // as it did before begin_verified_reload shared them.
         template <typename Assign>
         detail::vstatus reinit_from_storage(const char* data, size_type size, Assign&& assign) {
+            const ZeroTail tail = settled_zero_tail();
             XOFFSET_VTRY(admit_reinit(size, data != nullptr));
             XOFFSET_VTRY(as_arena_failure(assign));
+            note_reinit_zero_tail(tail, size);
             return check_reinit_payload();
+        }
+
+        // In-place loads and the zero watermark. On a settled owner (exact
+        // free table, nothing dirty past the logical length) N2 makes every
+        // byte in [used_end, logical) zero, so after an in-place load of `size`
+        // bytes into the same storage only [size, old used_end) can be dirty.
+        // Without this, the watermark stays at the old logical length and
+        // later growth clears bytes that are already zero (the 4 KiB regrow
+        // steps and the geometric slack of the previous content).
+        struct ZeroTail {
+            const char* base = nullptr;
+            size_type used_end = 0;
+        };
+        ZeroTail settled_zero_tail() const noexcept {
+            if (free_table_lost_ || buffer_.size() < min_payload_size() ||
+                buffer_.zero_from() != buffer_.size()) return {};
+            return {buffer_.data(), used_end_clamped()};
+        }
+        void note_reinit_zero_tail(const ZeroTail& tail, size_type size) noexcept {
+            if (tail.base && tail.base == buffer_.data())
+                buffer_.note_zero_from(std::max<std::size_t>(size, tail.used_end));
         }
 
         XOFFSET_DETAIL_MOVE_INLINE detail::vstatus admit_reinit(size_type size, bool has_source = true) {
@@ -1991,10 +2023,12 @@ namespace XOffsetDatastructure {
             if (size < sizeof(arena_header) || !buffer_.can_assign_in_place(size)) [[unlikely]] {
                 return reinit_from_wire({root_offset, stored, nullptr, 0}, size);
             }
+            const ZeroTail tail = settled_zero_tail();
             begin_reinit();
             free_table_lost_ = true;
             if (!buffer_.assign_in_place(stored, size, sizeof(arena_header)))
                 XOFFSET_VFAIL(XBadAlloc, XErrc::out_of_storage, detail::arena_failure_message);
+            note_reinit_zero_tail(tail, size);
             // check_reinit_payload() holds by construction: the header was
             // just written with used_end == size == the logical size, so its
             // checks pass and nothing lies past used_end to zero.
@@ -2145,6 +2179,8 @@ namespace XOffsetDatastructure {
         friend struct fixed_detail::StableEraseOwnerWitness;
         OwnerRecordPtr owner_record_;
         detail::VirtualMemoryStorage buffer_;
+        // Next D6 growth step below zero_from() (ensure_allocation_extent).
+        std::uint32_t dirty_step_ = first_dirty_step;
         XGrowPolicy growth_policy_ = XGrowPolicy::Explicit;
         FreeTablePtr free_table_;
         bool free_table_lost_ = false;
