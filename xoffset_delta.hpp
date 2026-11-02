@@ -318,17 +318,33 @@ namespace XOffsetDatastructure {
             std::size_t size_ = 0, cap_ = 0;
         };
 
+        // Bits set in x. Without a population count instruction (baseline
+        // x86-64 builds) std::popcount is a library routine or a long
+        // sequence; this is one multiply.
+        inline unsigned delta_popcount(std::uint64_t x) noexcept {
+#if defined(__POPCNT__) || defined(__aarch64__) || defined(_M_ARM64)
+            return static_cast<unsigned>(std::popcount(x));
+#else
+            x = x - ((x >> 1) & 0x5555555555555555ull);
+            x = (x & 0x3333333333333333ull) + ((x >> 2) & 0x3333333333333333ull);
+            x = (x + (x >> 4)) & 0x0F0F0F0F0F0F0F0Full;
+            return static_cast<unsigned>((x * 0x0101010101010101ull) >> 56);
+#endif
+        }
         // A block inside the payload goes whole (no mask) when the mask form
         // would not be shorter: mask bytes plus changed bytes of at least 64.
-        inline bool delta_block_whole(std::uint64_t mask, std::size_t start, std::size_t used) noexcept {
-            return start + delta_block <= used &&
-                   std::popcount(delta_byte_flags(mask)) + std::popcount(mask) >= int(delta_block);
-        }
-        // Encoded size of one block after its skip varint: the selector byte,
-        // the nonzero mask bytes, the changed bytes (or 64 bytes whole).
-        inline std::size_t delta_block_size(std::uint64_t mask, bool whole) noexcept {
-            return 1u + (whole ? delta_block
-                               : std::size_t(std::popcount(delta_byte_flags(mask)) + std::popcount(mask)));
+        // Its encoded size after its skip varint: the selector byte, the
+        // nonzero mask bytes, the changed bytes (or 64 bytes whole).
+        struct DeltaBlockForm {
+            bool whole;
+            std::size_t size;     // encoded, after the skip varint
+            std::size_t changed;  // bytes carried
+        };
+        inline DeltaBlockForm delta_block_form(std::uint64_t mask, std::size_t start, std::size_t used) noexcept {
+            const std::size_t changed = delta_popcount(mask);
+            const std::size_t masked = delta_popcount(delta_byte_flags(mask)) + changed;
+            if (start + delta_block <= used && masked >= delta_block) return {true, 1u + delta_block, delta_block};
+            return {false, 1u + masked, changed};
         }
 
         // The 64-byte blocks of [from, n) (the last may be shorter) where cur
@@ -336,21 +352,23 @@ namespace XOffsetDatastructure {
         // their masks, among the blocks next_selected picks (next_selected(i):
         // the first picked block index at or after i, counted from `from`). With
         // Update, each block that differs is copied into base on the way, so
-        // base equals cur on the selected blocks afterwards.
+        // base equals cur on the selected blocks afterwards. whole_blocks:
+        // every block that differs and lies inside [from, n) goes whole.
         template <bool Update, typename Next>
         DeltaBlockTotals delta_scan(const char* cur, char* base, std::size_t from, std::size_t n,
-                                    DeltaBlockBuffer& blocks, Next&& next_selected) {
+                                    DeltaBlockBuffer& blocks, Next&& next_selected, bool whole_blocks = false) {
             alignas(64) static constexpr char zeros[64] = {};
             DeltaBlockTotals totals;
             DeltaBlock* w = blocks.reset_for((n - from + delta_block - 1) / delta_block);
             std::size_t next = 0;  // index of the block after the last one recorded
             const auto record = [&](std::size_t start, std::uint64_t mask) {
                 const std::size_t index = (start - from) / delta_block;
-                const bool whole = delta_block_whole(mask, start, n);
-                totals.encoded += delta_varint_size(static_cast<std::uint32_t>(index - next)) +
-                                  delta_block_size(mask, whole);
-                totals.changed += whole ? delta_block : std::size_t(std::popcount(mask));
-                *w++ = {static_cast<std::uint32_t>(start), whole ? 1u : 0u, mask};
+                const DeltaBlockForm form = whole_blocks && start + delta_block <= n
+                                                ? DeltaBlockForm{true, 1u + delta_block, delta_block}
+                                                : delta_block_form(mask, start, n);
+                totals.encoded += delta_varint_size(static_cast<std::uint32_t>(index - next)) + form.size;
+                totals.changed += form.changed;
+                *w++ = {static_cast<std::uint32_t>(start), form.whole ? 1u : 0u, mask};
                 next = index + 1;
             };
             const std::size_t count = (n - from + delta_block - 1) / delta_block;
@@ -392,14 +410,14 @@ namespace XOffsetDatastructure {
         };
 
         inline DeltaBlockTotals delta_diff_update(const char* cur, char* base, std::size_t from, std::size_t n,
-                                                  DeltaBlockBuffer& blocks) {
-            return delta_scan<true>(cur, base, from, n, blocks, DeltaEveryBlock{});
+                                                  DeltaBlockBuffer& blocks, bool whole_blocks = false) {
+            return delta_scan<true>(cur, base, from, n, blocks, DeltaEveryBlock{}, whole_blocks);
         }
 
         // The blocks of [from, n) where p is nonzero (those of a key delta of p).
         inline DeltaBlockTotals delta_nonzero_blocks(const char* p, std::size_t from, std::size_t n,
-                                                     DeltaBlockBuffer& blocks) {
-            return delta_scan<false>(p, nullptr, from, n, blocks, DeltaEveryBlock{});
+                                                     DeltaBlockBuffer& blocks, bool whole_blocks = false) {
+            return delta_scan<false>(p, nullptr, from, n, blocks, DeltaEveryBlock{}, whole_blocks);
         }
 
         // Byte shuffles per mask byte m (bit j: byte j of a word): `gather`
@@ -530,13 +548,22 @@ namespace XOffsetDatastructure {
             return src;
         }
         // The mask of a block from its selector and the popcount(sel) mask
-        // bytes at q (8 readable); false when one of them is zero.
+        // bytes at q (8 readable), and its bit count; false when one of the
+        // mask bytes is zero.
         XOFFSET_DELTA_SSSE3 inline bool delta_expand_mask_shuffle(const unsigned char* q, unsigned sel,
-                                                                  std::uint64_t& mask) noexcept {
+                                                                  std::uint64_t& mask, std::size_t& bits) noexcept {
+            const __m128i zeros = _mm_setzero_si128();
             const __m128i idx = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(&delta_shuffle.scatter[sel]));
+            // Index bytes 8 + j (no mask byte) pick zeros from the upper half.
             const __m128i v = _mm_shuffle_epi8(_mm_loadl_epi64(reinterpret_cast<const __m128i*>(q)), idx);
-            const unsigned zero = static_cast<unsigned>(_mm_movemask_epi8(_mm_cmpeq_epi8(v, _mm_setzero_si128())));
+            const unsigned zero = static_cast<unsigned>(_mm_movemask_epi8(_mm_cmpeq_epi8(v, zeros)));
             mask = static_cast<std::uint64_t>(_mm_cvtsi128_si64(v));
+            const __m128i nibbles = _mm_set1_epi8(0x0F);
+            const __m128i counts = _mm_setr_epi8(0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4);
+            const __m128i per_byte =
+                _mm_add_epi8(_mm_shuffle_epi8(counts, _mm_and_si128(v, nibbles)),
+                             _mm_shuffle_epi8(counts, _mm_and_si128(_mm_srli_epi16(v, 4), nibbles)));
+            bits = static_cast<std::size_t>(_mm_cvtsi128_si32(_mm_sad_epu8(per_byte, zeros)) & 0xFFFF);
             return (zero & sel) == 0;
         }
 #elif defined(XOFFSET_DELTA_SHUFFLE_NEON)
@@ -574,10 +601,12 @@ namespace XOffsetDatastructure {
             }
             return src;
         }
-        inline bool delta_expand_mask_shuffle(const unsigned char* q, unsigned sel, std::uint64_t& mask) noexcept {
+        inline bool delta_expand_mask_shuffle(const unsigned char* q, unsigned sel, std::uint64_t& mask,
+                                              std::size_t& bits) noexcept {
             const uint8x16_t pair = vcombine_u8(vld1_u8(q), vdup_n_u8(0));
             const uint8x8_t v = vqtbl1_u8(pair, vcreate_u8(delta_shuffle.scatter[sel]));
             mask = vget_lane_u64(vreinterpret_u64_u8(v), 0);
+            bits = vaddv_u8(vcnt_u8(v));
             // Bit k: byte k of v is zero.
             const std::uint64_t zero = vget_lane_u64(vreinterpret_u64_u8(vceq_u8(v, vdup_n_u8(0))), 0);
             return (delta_byte_flags(zero) & sel) == 0;
@@ -595,7 +624,9 @@ namespace XOffsetDatastructure {
             std::memset(blk, 0, 8 * words);
             return delta_get_masked_plain(blk, src, mask);
         }
-        inline bool delta_expand_mask_shuffle(const unsigned char*, unsigned, std::uint64_t&) noexcept { return false; }
+        inline bool delta_expand_mask_shuffle(const unsigned char*, unsigned, std::uint64_t&, std::size_t&) noexcept {
+            return false;
+        }
 #endif
 
         // Writes block bytes of `mask` from blk; returns the end. The output
@@ -612,7 +643,7 @@ namespace XOffsetDatastructure {
                 std::memcpy(blk, src, delta_block);
                 return src + delta_block;
             }
-            if (std::size_t(src_end - src) >= std::size_t(std::popcount(mask)) + 8u && delta_shuffle_supported())
+            if (src_end - src >= std::ptrdiff_t(delta_block + 8) && delta_shuffle_supported())
                 return delta_get_masked_shuffle(blk, src, mask);
             return delta_get_masked_plain(blk, src, mask);
         }
@@ -624,7 +655,7 @@ namespace XOffsetDatastructure {
                 std::memcpy(blk, src, delta_block);
                 return src + delta_block;
             }
-            if (std::size_t(src_end - src) >= std::size_t(std::popcount(mask)) + 8u && delta_shuffle_supported())
+            if (src_end - src >= std::ptrdiff_t(delta_block + 8) && delta_shuffle_supported())
                 return delta_set_masked_shuffle(blk, src, mask, words);
             std::memset(blk, 0, 8 * words);
             return delta_get_masked_plain(blk, src, mask);
@@ -1070,7 +1101,8 @@ namespace XOffsetDatastructure {
         std::uint64_t checks_root_ = 0;
         std::size_t checks_free_ = 0;
         bool checks_free_complete_ = false;
-        bool checks_valid_ = false;
+        bool checks_valid_ = false;  // the recorded state is a verified one
+        bool checks_built_ = false;  // checks_, nodes_ and ranges_ describe it (built when first needed)
         XDeltaCheck last_check_ = XDeltaCheck::key;
     };
 
@@ -1152,10 +1184,13 @@ namespace XOffsetDatastructure {
                     if (holes_changed) {
                         select_touched(b, *log, holes, base_used, used);
                         const std::uint8_t* want = b.want_.data();
-                        totals = delta_scan<true>(cur, base.data(), payload_begin, used, blocks, [=](std::size_t i) {
-                            while (i < count && want[i] == 0) ++i;
-                            return i;
-                        });
+                        totals = delta_scan<true>(
+                            cur, base.data(), payload_begin, used, blocks,
+                            [=](std::size_t i) {
+                                while (i < count && want[i] == 0) ++i;
+                                return i;
+                            },
+                            options.whole_blocks);
                     } else {
                         // Touched since the baseline's stamp (groups of 16
                         // blocks untouched since are skipped whole), or past
@@ -1166,21 +1201,24 @@ namespace XOffsetDatastructure {
                         const std::uint32_t since = b.touch_stamp_;
                         const std::size_t grown =
                             used > base_used ? (std::max(base_used, payload_begin) - payload_begin) / delta_block : count;
-                        totals = delta_scan<true>(cur, base.data(), payload_begin, used, blocks, [=](std::size_t i) {
-                            while (i < grown) {
-                                if (i >= stamped) return grown;
-                                if (i % delta_touch_group == 0 && groups[i / delta_touch_group] <= since) {
-                                    i += delta_touch_group;
-                                    continue;
+                        totals = delta_scan<true>(
+                            cur, base.data(), payload_begin, used, blocks,
+                            [=](std::size_t i) {
+                                while (i < grown) {
+                                    if (i >= stamped) return grown;
+                                    if (i % delta_touch_group == 0 && groups[i / delta_touch_group] <= since) {
+                                        i += delta_touch_group;
+                                        continue;
+                                    }
+                                    if (stamps[i] > since) return i;
+                                    ++i;
                                 }
-                                if (stamps[i] > since) return i;
-                                ++i;
-                            }
-                            return i;
-                        });
+                                return i;
+                            },
+                            options.whole_blocks);
                     }
                 } else {
-                    totals = delta_diff_update(cur, base.data(), payload_begin, used, blocks);
+                    totals = delta_diff_update(cur, base.data(), payload_begin, used, blocks, options.whole_blocks);
                 }
 
                 XDeltaStats stats;
@@ -1519,7 +1557,8 @@ namespace XOffsetDatastructure {
                     XOFFSET_THROW(XException(XErrc::invalid_state, "XDeltaBaseline::key_delta_into(): no recorded state"));
                 const std::size_t used = b.payload_.size();
                 DeltaBlockBuffer blocks;
-                const DeltaBlockTotals totals = delta_nonzero_blocks(b.payload_.data(), payload_begin, used, blocks);
+                const DeltaBlockTotals totals =
+                    delta_nonzero_blocks(b.payload_.data(), payload_begin, used, blocks, options.whole_blocks);
                 DeltaHeader header{};
                 header.flags = XDELTA_FLAG_KEY | XDELTA_FLAG_HOLES | XDELTA_FLAG_EXTENT |
                                (options.digest ? XDELTA_FLAG_DIGEST : 0u);
@@ -1675,13 +1714,15 @@ namespace XOffsetDatastructure {
                             XOFFSET_VFAIL(XException, XErrc::size_mismatch, msg(who, "delta block table truncated"));
                         bool nonzero = true;
                         if (shuffle && readable - q >= 8) {
-                            nonzero = delta_expand_mask_shuffle(q, sel, mask);
+                            nonzero = delta_expand_mask_shuffle(q, sel, mask, bytes);
                             q += present;
                         } else {
                             mask = 0;
+                            bytes = 0;
                             for (unsigned s = sel; s != 0; s &= s - 1) {
                                 const unsigned byte = *q++;
                                 nonzero &= byte != 0;
+                                bytes += delta_shuffle.count[byte];
                                 mask |= std::uint64_t(byte) << (8 * std::countr_zero(s));
                             }
                         }
@@ -1689,7 +1730,6 @@ namespace XOffsetDatastructure {
                             XOFFSET_VFAIL(XException, XErrc::invalid_extent_table, msg(who, "delta block mask byte is zero"));
                         if (start + 63u - unsigned(std::countl_zero(mask)) >= used)
                             XOFFSET_VFAIL(XException, XErrc::invalid_extent_table, msg(who, "delta block out of bounds"));
-                        bytes = std::size_t(std::popcount(mask));
                     }
                     if (std::size_t(end - q) < bytes)
                         XOFFSET_VFAIL(XException, XErrc::size_mismatch, msg(who, "delta block table truncated"));
@@ -1782,24 +1822,40 @@ namespace XOffsetDatastructure {
                 }
                 return vok();
             }
-            // After a commit: a map that cannot be built is left invalid (the
-            // next delta is then verified in full).
+            // After a whole verification of an incremental delta: the state is
+            // recorded; the map is built when a delta first needs it (a
+            // replica whose deltas keep needing the whole verification, like
+            // a store that receives saves, does not build it each time).
+            static void defer_checks(XDeltaCursor& c, const XBufferCore& core) noexcept {
+                c.checks_built_ = false;
+                note_checks(c, core);
+            }
+            // The map of the recorded state (which the buffer still holds);
+            // false when it cannot be built (the delta is then verified in
+            // full).
             template <typename T>
-            static void rebuild_checks(XDeltaCursor& c, XBufferCore& core, const T& root) {
-                c.checks_valid_ = false;
+            static bool ensure_checks(XDeltaCursor& c, XBufferCore& core, std::uint64_t root_offset) {
+                if (c.checks_built_) return true;
+                const T* root = find_root_at<T>(core, root_offset);
+                if (!root) {
+                    c.checks_valid_ = false;
+                    return false;
+                }
                 std::fill(c.checks_.begin(), c.checks_.end(), DeltaCheckBits{});
                 c.nodes_.clear();
                 c.ranges_.clear();
                 XOFFSET_TRY {
                     DeltaCheckMarker m(static_cast<const char*>(core.get_address()), c.checks_.data(), &c.nodes_,
                                        &c.ranges_);
-                    delta_mark_value(root, m);
+                    delta_mark_value(*root, m);
                     c.ranges_sorted_ = false;  // sorted when first needed (collect_nodes)
                     c.touched_.reserve(c.nodes_.size());
                 } XOFFSET_CATCH(const std::bad_alloc&) {
-                    return;
+                    c.checks_valid_ = false;
+                    return false;
                 }
-                note_checks(c, core);
+                c.checks_built_ = true;
+                return true;
             }
             // The node whose range holds `offset`, or none.
             static const DeltaNodeRange* node_range_of(const XDeltaCursor& c, std::size_t offset) noexcept {
@@ -1884,9 +1940,17 @@ namespace XOffsetDatastructure {
             template <std::uint64_t DeltaCheckBits::*Which>
             static std::size_t head_before(const DeltaCheckBits* bits, std::size_t offset, std::size_t reach) noexcept {
                 const std::size_t i = offset - payload_begin;
-                const std::size_t low = i >= reach ? i - reach : 0;
-                for (std::size_t j = i + 1; j-- > low;)
-                    if (((bits[j / delta_block].*Which) >> (j % delta_block)) & 1u) return payload_begin + j;
+                const std::size_t block = i / delta_block, bit = i % delta_block;  // reach < 64
+                std::uint64_t in = (bits[block].*Which) & (bit == delta_block - 1 ? ~std::uint64_t(0)
+                                                                                 : (std::uint64_t(2) << bit) - 1u);
+                if (bit >= reach) in &= ~((std::uint64_t(1) << (bit - reach)) - 1u);
+                if (in != 0) return payload_begin + block * delta_block + 63u - unsigned(std::countl_zero(in));
+                if (bit < reach && block > 0) {  // the end of the block before
+                    const unsigned from = unsigned(delta_block - (reach - bit));
+                    const std::uint64_t before = (bits[block - 1].*Which) >> from;
+                    if (before != 0)
+                        return payload_begin + (block - 1) * delta_block + from + 63u - unsigned(std::countl_zero(before));
+                }
                 return 0;
             }
             // Calls on_vector(offset of the head) once for each vector head
@@ -1900,22 +1964,23 @@ namespace XOffsetDatastructure {
                 for (std::size_t k = 0; k < parsed.block_count; ++k) {
                     const DeltaBlockRef& r = parsed.blocks[k];
                     const std::uint64_t written = r.mask & bits[(r.offset - payload_begin) / delta_block].local;
-                    for (std::uint64_t hit = written; hit != 0; hit &= hit - 1) {
+                    for (std::uint64_t hit = written; hit != 0;) {
                         const std::size_t offset = r.offset + static_cast<std::size_t>(std::countr_zero(hit));
-                        if (const std::size_t v = head_before<&DeltaCheckBits::vheads>(bits, offset, 7)) {
-                            if (v != last_head) {
-                                last_head = v;
-                                if (!on_vector(v)) return false;
-                            }
-                        } else if (const std::size_t h =
-                                       head_before<&DeltaCheckBits::heads>(bits, offset, sizeof(XFixedString) - 1)) {
-                            if (h != last_head) {
-                                last_head = h;
-                                if (!on_head(h)) return false;
-                            }
-                        } else if (!on_bool(offset)) {
-                            return false;
+                        std::size_t head = head_before<&DeltaCheckBits::vheads>(bits, offset, 7);
+                        if (head != 0) {
+                            if (head != last_head && !on_vector(head)) return false;
+                        } else if ((head = head_before<&DeltaCheckBits::heads>(bits, offset,
+                                                                               sizeof(XFixedString) - 1)) != 0) {
+                            if (head != last_head && !on_head(head)) return false;
+                        } else {
+                            if (!on_bool(offset)) return false;
+                            hit &= hit - 1;
+                            continue;
                         }
+                        // The rest of the head in this block is done.
+                        last_head = head;
+                        const std::size_t past = head + sizeof(XFixedString) - r.offset;
+                        hit = past >= delta_block ? 0 : hit & ~((std::uint64_t(1) << past) - 1u);
                     }
                 }
                 return true;
@@ -2024,7 +2089,9 @@ namespace XOffsetDatastructure {
                 cursor.version_ = parsed.header.version;
                 cursor.schema_hash_ = wire_schema_hash<T>();
                 cursor.root_type_id_ = wire_root_type_id<T>();
-                rebuild_checks(cursor, core, *find_root_at<T>(core, parsed.header.root_offset));
+                // Deltas follow a key delta: its map is built now.
+                defer_checks(cursor, core);
+                (void)ensure_checks<T>(cursor, core, parsed.header.root_offset);
                 cursor.last_check_ = XDeltaCheck::key;
                 return vok();
             }
@@ -2067,7 +2134,8 @@ namespace XOffsetDatastructure {
                 // root and the holes; the in-place checks when it writes bools
                 // and inline string heads besides; else the whole verification.
                 XDeltaCheck check = XDeltaCheck::full;
-                if (!parsed.holes && used == old_used && root == old_root && checks_match(cursor, core)) {
+                if (!parsed.holes && used == old_used && root == old_root && checks_match(cursor, core) &&
+                    ensure_checks<T>(cursor, core, old_root)) {
                     check = XDeltaCheck::none;
                     const DeltaCheckBits* bits = cursor.checks_.data();
                     for (std::size_t k = 0; k < parsed.block_count; ++k) {
@@ -2163,7 +2231,7 @@ namespace XOffsetDatastructure {
                 core.cache_root(root_ptr);
                 cursor.version_ = parsed.header.version;
                 if (check == XDeltaCheck::full) {
-                    rebuild_checks(cursor, core, *root_ptr);
+                    defer_checks(cursor, core);
                 } else {
                     if (check == XDeltaCheck::in_place) remark_in_place(cursor, base, parsed);
                     note_checks(cursor, core);

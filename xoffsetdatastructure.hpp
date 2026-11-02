@@ -6218,6 +6218,11 @@ namespace XOffsetDatastructure {
         // the buffer's content was replaced (reload, reset, swap, a move of
         // its storage), compares everything.
         bool touched_only = false;
+        // Send each changed 64-byte block whole instead of its changed bytes
+        // (a block that ends past used_end still goes by its mask): a larger
+        // delta that the receiver applies with one copy per block. For key
+        // deltas to receivers where apply time counts more than bytes.
+        bool whole_blocks = false;
     };
     namespace detail {
         // A delta sender's touch marks (XBuffer::touch): per 64-byte block of

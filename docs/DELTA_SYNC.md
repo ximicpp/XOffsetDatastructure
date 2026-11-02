@@ -103,6 +103,11 @@ forwards them (a relay) gets the blocks each applied delta wrote as touches.
   catches a replica that was changed locally and a change the sender did not
   touch (section 4). One hash pass over the payload on each side.
 - `touched_only` (default false): see above.
+- `whole_blocks` (default false): each changed block goes whole (64 bytes,
+  selector 0) instead of by its mask; a block that ends past `used_end` still
+  goes by its mask. The delta is larger and the receiver applies each block
+  with one copy. Also taken by `XDeltaBaseline::key_delta_into`, for key
+  deltas to receivers where apply time counts more than bytes.
 
 The receiver's `XDeltaCursor::last_check()` says what it checked for the last
 delta (`key`, `none`, `in_place`, `full`; section 3).
@@ -205,7 +210,10 @@ without changing what verification visits or decides. So:
 
 The map holds for the buffer state it was built with; a buffer that was
 moved, reloaded, reset, swapped, grown into new storage, or that allocated or
-freed since, gets its next delta verified in full (which rebuilds the map).
+freed since, gets its next delta verified in full. The map is built after a
+key delta, and after a whole verification of another delta only when a later
+delta first needs it (a replica whose deltas keep needing the whole
+verification, like a store receiving saves, does not rebuild it each time).
 
 ## 4. Guarantees
 
@@ -273,8 +281,9 @@ SSSE3 when the CPU has it, NEON on AArch64, byte by byte elsewhere); with
 `digest`, one hash pass. Receiver, per delta: the header and section checks,
 the bytes scattered by their masks, then the check of section 3: for `none`
 nothing more, for `in_place` an undo copy and the checks of the bytes written,
-for `full` the whole verification and a rebuild of the map (proportional to
-the payload); with `digest`, one hash pass. The receiver's map takes 32 bytes
+for `full` the whole verification (proportional to the payload; the map is
+rebuilt, also proportional, when a later delta needs it); with `digest`, one
+hash pass. The receiver's map takes 32 bytes
 per 64-byte block of payload, plus about 64 bytes per heap string, set or map
 of plain elements; the sender's touch log 4 bytes per block.
 

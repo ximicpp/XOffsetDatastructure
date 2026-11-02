@@ -226,9 +226,13 @@ void random_stream(std::uint64_t seed, int steps) {
         }
         xo::XDeltaOptions options;
         options.digest = rng() % 2;
+        options.whole_blocks = rng() % 4 == 0;
         std::string d = "stale bytes from an earlier delta";
         const auto stats = src.save_delta_into(d, base, options);
         need(stats.delta_bytes == d.size(), where + ": stats disagree with the delta size");
+        // Whole blocks: every block but one ending past used_end carries 64 bytes.
+        need(!options.whole_blocks || stats.blocks == 0 || stats.changed_bytes > (stats.blocks - 1u) * 64u,
+             where + ": whole_blocks sent masked blocks");
         if (stats.empty) {
             need(d.empty() && !stats.key, where + ": an empty delta wrote bytes");
             need(payload_of(src) == payload_of(rep), where + ": empty delta although the payload changed");
