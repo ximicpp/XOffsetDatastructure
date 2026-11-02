@@ -76,6 +76,11 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   baseline's key delta (K*.send / K*.recv). Clients apply with
   `try_apply_delta_verified` (N*.recv, patch + full verification) and read in
   place; every delivery's view is checked equal to the application-level one.
+  K*.recv is timed like E*.recv: the key delta receive plus the read of every
+  unit and march. The server reserves each block's capacity once (1.5x the
+  average plus 32); its vectors are as long as the most records the block has
+  held, a record that leaves zeroes its slot and the lowest free slot is reused,
+  so a new subscriber checks and reads only that many slots.
   `tools/analyze.py` compares N* with the other formats' U* and K* with E*.
 - the player's own data (`include/slg/login.hpp`): L, a client logs in and
   gets its whole player once (256 online players at M, a quarter log in again

@@ -469,6 +469,7 @@ template <class V, class D> void apply_delta(V& v, HeldIndex& at, const D& d) {
 //   void n_update(int b, const BlockWorld&, const DeltaPlan&, int64_t id)   mutate the server's block buffer
 //   std::size_t n_diff(int b)                  save_delta_into against the block's shared baseline
 //   std::size_t n_key(int b)                   key delta of the block for a new subscriber
+//   std::string_view n_key_wire(int b)         that key delta (bytes only)
 //   void n_apply(int c, int k)                 subscriber applies the block's delta (patch + verify)
 //   void n_key_recv(int c, int k, int b)       new subscriber applies the key delta
 //   auto& n_held(int c, int k)                 its view; must read the same as held(c, k)
@@ -476,11 +477,11 @@ template <class V, class D> void apply_delta(V& v, HeldIndex& at, const D& d) {
 struct BlockKeys {
     std::string esend, erecv, eindex, usend, urecv, uapply;
     std::string ewin, ereq, eenc, ezstd, ecomp, ecompz, udelta, umsg, uenc, uzstd, uunits, umarch;
-    std::string nsend, ndiff, nrecv, ndelta, kenc, krecv, kbytes;
+    std::string nsend, ndiff, nrecv, ndelta, kenc, krecv, kbytes, kzstd;
     BlockKeys(const char* e, const char* u, const char* n, const char* kk) {
         const std::string E(e), U(u), N(n), K(kk);
         nsend = N + ".send"; ndiff = N + ".diff"; nrecv = N + ".recv"; ndelta = N + ".delta";
-        kenc = K + ".send"; krecv = K + ".recv"; kbytes = K + ".window";
+        kenc = K + ".send"; krecv = K + ".recv"; kbytes = K + ".window"; kzstd = K + ".window_zstd";
         esend = E + ".send"; erecv = E + ".recv"; eindex = E + ".index";
         usend = U + ".send"; urecv = U + ".recv"; uapply = U + ".apply";
         ewin = E + ".window"; ereq = E + ".requests"; eenc = E + ".encoded"; ezstd = E + ".window_zstd";
@@ -510,7 +511,7 @@ struct BlockSession {
     std::vector<int64_t> snap_tick;                                // block -> tick its snapshot was encoded
     std::vector<std::size_t> snap_z, snap_c, snap_cz;              // zstd / compact sizes of that snapshot
     std::vector<int64_t> last_id, last_tick;                       // block -> id and tick of its last delta
-    std::vector<std::size_t> nkey;                                 // native: key delta size, this tick
+    std::vector<std::size_t> nkey, nkey_z;                         // native: key delta size (raw / zstd), this tick
     void setup(uint64_t seed, const ViewScale& vs, Rate rate) {
         world.setup(seed, vs, rate);
         tracker.setup();
@@ -519,7 +520,7 @@ struct BlockSession {
         snap_tick.assign(std::size_t(kBlocks), -1);
         snap_z.assign(std::size_t(kBlocks), 0); snap_c.assign(std::size_t(kBlocks), 0); snap_cz.assign(std::size_t(kBlocks), 0);
         last_id.assign(std::size_t(kBlocks), 0); last_tick.assign(std::size_t(kBlocks), 0);
-        nkey.assign(std::size_t(kBlocks), 0);
+        nkey.assign(std::size_t(kBlocks), 0); nkey_z.assign(std::size_t(kBlocks), 0);
     }
 };
 
@@ -587,7 +588,10 @@ template <class Ops> void run_blocks(BlockSession& s, Ops& ops, const BlockKeys&
                     timed(st, k.esend.c_str(), [&] {
                         ops.snap_encode(b, [&](auto& v) { fill_view(v, w, b, s.last_id[std::size_t(b)], s.last_tick[std::size_t(b)]); });
                     });
-                    if constexpr (native) timed(st, k.kenc.c_str(), [&] { s.nkey[std::size_t(b)] = ops.n_key(b); });
+                    if constexpr (native) {
+                        timed(st, k.kenc.c_str(), [&] { s.nkey[std::size_t(b)] = ops.n_key(b); });
+                        s.nkey_z[std::size_t(b)] = zstd_size(ops.n_key_wire(b));
+                    }
                     s.snap_tick[std::size_t(b)] = w.tick_no();
                     s.snap_z[std::size_t(b)] = zstd_size(ops.snap_wire(b));
                     if constexpr (requires { ops.snap_compact(b); }) {
@@ -605,9 +609,15 @@ template <class Ops> void run_blocks(BlockSession& s, Ops& ops, const BlockKeys&
                 });
                 st.report_sum += q;
                 if constexpr (native) {
-                    timed(st, k.krecv.c_str(), [&] { ops.n_key_recv(c, slot, b); });
-                    if (query_view(ops.n_held(c, slot)) != q) throw std::runtime_error("native key delta: view differs from the snapshot");
+                    // Timed like E.recv: receive, then read every unit and march.
+                    uint64_t nq = 0;
+                    timed(st, k.krecv.c_str(), [&] {
+                        ops.n_key_recv(c, slot, b);
+                        nq = query_view(ops.n_held(c, slot));
+                    });
+                    if (nq != q) throw std::runtime_error("native key delta: view differs from the snapshot");
                     st.bytes[k.kbytes] += s.nkey[std::size_t(b)];
+                    st.bytes[k.kzstd] += s.nkey_z[std::size_t(b)];
                 }
                 HeldIndex& at = s.index[std::size_t(c) * 9 + std::size_t(slot)];
                 timed(st, k.eindex.c_str(), [&] { build_index(ops.held(c, slot), at); });
