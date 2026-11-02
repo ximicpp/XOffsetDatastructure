@@ -17,7 +17,7 @@ namespace slg::pbconv {
 #define SLG_PB_DECL(T) inline void to(pb::T&, const stdm::T&); inline void from(stdm::T&, const pb::T&);
 SLG_PB_DECL(Buff) SLG_PB_DECL(Skill) SLG_PB_DECL(Troop) SLG_PB_DECL(Event) SLG_PB_DECL(Tile)
 SLG_PB_DECL(Hero) SLG_PB_DECL(Army) SLG_PB_DECL(City) SLG_PB_DECL(PlayerState) SLG_PB_DECL(Report)
-SLG_PB_DECL(BattleMsg) SLG_PB_DECL(March) SLG_PB_DECL(ShardState) SLG_PB_DECL(ViewUnit) SLG_PB_DECL(ViewSnapshot) SLG_PB_DECL(ViewDelta)
+SLG_PB_DECL(BattleMsg) SLG_PB_DECL(March) SLG_PB_DECL(ShardState) SLG_PB_DECL(ViewUnit) SLG_PB_DECL(ViewMarch) SLG_PB_DECL(ViewSnapshot) SLG_PB_DECL(ViewDelta)
 #undef SLG_PB_DECL
 
 inline void to(pb::Buff& d, const stdm::Buff& s) { d.set_id(s.id); d.set_stacks(s.stacks); d.set_expire_ms(s.expire_ms); }
@@ -101,9 +101,16 @@ inline void from(stdm::ShardState& d, const pb::ShardState& s) {
 inline void to(pb::ViewUnit& d, const stdm::ViewUnit& s) {
     d.set_id(s.id); d.set_owner(s.owner); d.set_x(s.x); d.set_y(s.y); d.set_hp(s.hp); d.set_state(s.state); d.set_name(s.name);
 }
+inline void to(pb::ViewMarch& d, const stdm::ViewMarch& s) {
+    d.set_id(s.id); d.set_owner(s.owner); d.set_x0(s.x0); d.set_y0(s.y0); d.set_x1(s.x1); d.set_y1(s.y1); d.set_t0(s.t0); d.set_t1(s.t1);
+}
+inline void from(stdm::ViewMarch& d, const pb::ViewMarch& s) {
+    d.id = s.id(); d.owner = s.owner(); d.x0 = s.x0(); d.y0 = s.y0(); d.x1 = s.x1(); d.y1 = s.y1(); d.t0 = s.t0(); d.t1 = s.t1();
+}
 inline void to(pb::ViewSnapshot& d, const stdm::ViewSnapshot& s) {
     d.set_request_id(s.request_id); d.set_tick(s.tick); d.set_x0(s.x0); d.set_y0(s.y0); d.set_x1(s.x1); d.set_y1(s.y1);
     to_rep(d.mutable_units(), s.units);
+    to_rep(d.mutable_marches(), s.marches);
 }
 inline void from(stdm::ViewUnit& d, const pb::ViewUnit& s) {
     d.id = s.id(); d.owner = s.owner(); d.x = s.x(); d.y = s.y(); d.hp = s.hp(); d.state = s.state(); d.name = s.name();
@@ -111,6 +118,7 @@ inline void from(stdm::ViewUnit& d, const pb::ViewUnit& s) {
 inline void from(stdm::ViewSnapshot& d, const pb::ViewSnapshot& s) {
     d.request_id = s.request_id(); d.tick = s.tick(); d.x0 = s.x0(); d.y0 = s.y0(); d.x1 = s.x1(); d.y1 = s.y1();
     from_rep(d.units, s.units());
+    from_rep(d.marches, s.marches());
 }
 
 inline void to(pb::ViewDelta& d, const stdm::ViewDelta& s) {
@@ -118,11 +126,16 @@ inline void to(pb::ViewDelta& d, const stdm::ViewDelta& s) {
     to_rep(d.mutable_upserts(), s.upserts);
     d.mutable_removed()->Reserve(int(s.removed.size()));
     for (int32_t id : s.removed) d.add_removed(id);
+    to_rep(d.mutable_marches(), s.marches);
+    d.mutable_removed_marches()->Reserve(int(s.removed_marches.size()));
+    for (int32_t id : s.removed_marches) d.add_removed_marches(id);
 }
 inline void from(stdm::ViewDelta& d, const pb::ViewDelta& s) {
     d.request_id = s.request_id(); d.tick = s.tick(); d.x0 = s.x0(); d.y0 = s.y0(); d.x1 = s.x1(); d.y1 = s.y1();
     from_rep(d.upserts, s.upserts());
     d.removed.assign(s.removed().begin(), s.removed().end());
+    from_rep(d.marches, s.marches());
+    d.removed_marches.assign(s.removed_marches().begin(), s.removed_marches().end());
 }
 
 template <class T> struct msg_of;
