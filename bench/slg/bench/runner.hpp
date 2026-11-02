@@ -22,7 +22,7 @@ struct CycleStats {
 };
 
 // Wires kept from the last cycle in verify mode, for size and compression statistics.
-struct SampleWires { std::string req, res, player, shard, report; };
+struct SampleWires { std::string req, res, player, shard, report, view, delta; };
 
 #if SLG_IR_COUNT
 // Instruction-count build (-DSLG_IR_COUNT=1) for the CI performance gate
@@ -84,7 +84,7 @@ struct Runner {
 inline bool reuse_mode() { static const bool on = std::getenv("SLG_REUSE") != nullptr; return on; }
 
 // Message slots for the reuse protocol.
-enum Slot : int { kReq, kRes, kOut, kBack, kSnap, kSnap2, kSlots };
+enum Slot : int { kReq, kRes, kOut, kBack, kSnap, kSnap2, kView, kDelta, kSlots };
 
 inline std::string to_string_bytes(std::span<const uint8_t> b) { return {reinterpret_cast<const char*>(b.data()), b.size()}; }
 
