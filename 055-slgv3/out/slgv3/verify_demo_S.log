@@ -1,0 +1,55 @@
+cycle 0 xoffset      state=97ab6136398cacdc reports=186627332314722309
+cycle 0 cereal       state=97ab6136398cacdc reports=186627332314722309
+cycle 0 protobuf     state=97ab6136398cacdc reports=186627332314722309
+cycle 0 flatbuffers  state=97ab6136398cacdc reports=186627332314722309
+cycle 0 zpp_bits     state=97ab6136398cacdc reports=186627332314722309
+cycle 0 cista        state=97ab6136398cacdc reports=186627332314722309
+cycle 1 xoffset      state=ccaa5bdabaf46b01 reports=188950020732197517
+cycle 1 cereal       state=ccaa5bdabaf46b01 reports=188950020732197517
+cycle 1 protobuf     state=ccaa5bdabaf46b01 reports=188950020732197517
+cycle 1 flatbuffers  state=ccaa5bdabaf46b01 reports=188950020732197517
+cycle 1 zpp_bits     state=ccaa5bdabaf46b01 reports=188950020732197517
+cycle 1 cista        state=ccaa5bdabaf46b01 reports=188950020732197517
+cycle 2 xoffset      state=fd09ad3f36e147a8 reports=201970961949445646
+cycle 2 cereal       state=fd09ad3f36e147a8 reports=201970961949445646
+cycle 2 protobuf     state=fd09ad3f36e147a8 reports=201970961949445646
+cycle 2 flatbuffers  state=fd09ad3f36e147a8 reports=201970961949445646
+cycle 2 zpp_bits     state=fd09ad3f36e147a8 reports=201970961949445646
+cycle 2 cista        state=fd09ad3f36e147a8 reports=201970961949445646
+
+wire bytes per message, demo case set (average over the last cycle)
+format            A.req      A.res   B.player   S.player
+xoffset            1150       2058      11416      11625
+cereal              984       1400       7071       7259
+protobuf            549        834       4306       4422
+flatbuffers        1184       1606       8200       8416
+zpp_bits            857       1273       6341       6500
+cista              1393       1809       9633       9903
+
+server -> client, bytes: E = one 3x3 window pull (raw / zstd-3), U = one block delta per subscriber (raw / zstd-3)
+format       rate   E.window     E.zstd    U.delta     U.zstd      pulls deliveries
+xoffset      P         10613       5505        152         99         45       1152
+                       12041       5602   (save_compact window / zstd-3)
+                        6262                    49              (native: key window / delta)
+xoffset      C         10130       5226        238        145         38       1525
+                       11535       5312   (save_compact window / zstd-3)
+                        5808                    64              (native: key window / delta)
+xoffset      S         10026       5144        479        285         38       1980
+                       11349       5224   (save_compact window / zstd-3)
+                        5698                    92              (native: key window / delta)
+cereal       P          9851       5074         95         64         45       1152
+cereal       C          9401       4815        176        108         38       1525
+cereal       S          9302       4736        404        238         38       1980
+protobuf     P          6774       5545         36         45         45       1152
+protobuf     C          6227       5193         91         94         38       1525
+protobuf     S          6063       5100        241        239         38       1980
+flatbuffers  P         13105       6821        148         92         45       1152
+flatbuffers  C         12516       6492        257        150         38       1525
+flatbuffers  S         12382       6406        550        323         38       1980
+zpp_bits     P          9050       4969         78         63         45       1152
+zpp_bits     C          8641       4719        152        106         38       1525
+zpp_bits     S          8547       4637        356        229         38       1980
+cista        P         10486       5183        159         80         45       1152
+cista        C         10008       4927        244        123         38       1525
+cista        S          9903       4839        485        253         38       1980
+verify: all formats agree
