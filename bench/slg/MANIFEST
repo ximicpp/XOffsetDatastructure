@@ -42,6 +42,19 @@
 #                        Unset: same machine code under GCC 16 and P2996 (asm_equal). An iPhone
 #                        process gets ~3.4 GiB of address space, less than scale S needs at 256 MiB
 #                        (origin 278a2c98ab068aae8b167fcf29146196b6509cf6fae2a1900d5e45156c9ed84b)
+#   2026-11-02 demo case set (susu, thread 整理与竞品的性能对比): SLG_CASES=demo with
+#                        SLG_REUSE=1 runs A (scene <-> battle, unchanged), B (scene <-> scene:
+#                        one hop, the receiver plays on the received state and sends it on),
+#                        S (scene <-> storage: save, checked receive at storage, load back) and
+#                        E (server -> client viewport sync, include/slg/view.hpp: 10k units,
+#                        512x384 viewports that pan and sometimes jump) and U (delta sync: the
+#                        client holds its view, the server sends changed/entered units and the
+#                        ids that left; app-level for every format). No C or D in that set.
+#                        N (xoffset only, with XOFFSET_DELTA_SYNC_API): the same U plan through
+#                        XOffset's own save_delta_into / try_apply_delta_verified.
+#                        Unset: A/B/C/D and their stage keys unchanged (same digests and report
+#                        sums as before at S, both protocols). New message types ViewUnit /
+#                        ViewSnapshot / ViewDelta in every model, adapter and schema; Slot kView.
 # Contents: slg-reuse adapters (FlatBuffers verified_root runs the Verifier),
 # reuse protocol (c) (SLG_REUSE=1), ordinary-record declarations for every xm
 # record type in include/slg/model_xoffset.hpp, T4 adapter v2 (whole-container
@@ -52,25 +65,26 @@
 #   them (guarded; older trees keep the previous declarations). Same machine code under GCC 16
 #   and P2996 (asm_equal), the lines are tools/describe_dump output (describe_dump_slg).
 4bd68ec1a9dcb93c4cf4cced05cd5a5ce098e4612183badbdc4f001ed32ab4e5  CMakeLists.txt
-fffeb26223e5b10a3f0d11e19766d15f2fcc8cce09152cba08bcee1978eb1d77  README.md
-0f306ee47ffe88ae9094f1b4babf9c8dd63776a65edaf7bfc440d31d1215d6fb  adapters/cereal_format.hpp
-ac03936eed1724d80efc668aea4cac38c14a6da9648a76fac154bdc27eeea7cc  adapters/flatbuffers_format.hpp
-bc2571e0ad90ff1e864735696aa039d3b7ab307c527b3d031e491a1c5acb1b91  adapters/protobuf_format.hpp
+e60d56cfb3cef28a6242f2b8ad67d6a433b5a30652cb64f104008e9fd1f94bf8  README.md
+26793b8192760da887a3db1b7afa9ee673a8257b8b01f14d6e7a38ca7d5a37a1  adapters/cereal_format.hpp
+67888cfee1aecdbc14d15dbdf919f1c39edfade985fc2385cf430947743a3bc0  adapters/flatbuffers_format.hpp
+70bfdee054800b8ea0a291ec8b4ff0c868036824c3d1198eeef44ff67f07ed5a  adapters/protobuf_format.hpp
 61fce58cd26e87f1c003b9cf55b690a9e553a7bde47b7e0e287e85c813ede0c9  adapters/zpp_bits_format.hpp
-20383b348767343e9e68eb0a2633cab669712a869f7a61bf388f47c912fca228  bench/cista_runner.hpp
+f271236b82f29eef6bb345a42d18bb52e7859d4baca0b20193ab19c6030b94ed  bench/cista_runner.hpp
 f5e58fceecd0c7b22503a4b0652b4164aea055ee31fc24b859efa48496cd245f  bench/erase_probe.cpp
-ca78dc903b3c6665bc3c56515456cc917a3447117aba40483742b7a1cc44f3bc  bench/runner.hpp
-63505e708ed84a8ffa1d6136fef17af72f6d807b00f009b206f145e7c9497a74  bench/slg_bench.cpp
+eac6391a496578276cfe33afe8b2bb3866d3f1bc03127ac9a0bbb7bb7434583d  bench/runner.hpp
+c332435d838943330aeffa243d50dc958347177d376ae3ce78e183825e1170c9  bench/slg_bench.cpp
 730a66f677d9d20077175f629cf0b13919e66ccedaf880e4eb414c6bc94c0610  bench/small_msg_probe.cpp
-371cd935d934ed2fb94781381ab86332d05fee833bd19857f20fb11e77faeb07  bench/std_runner.hpp
-444d3baa1459ac6855dbfb39392f8bc7d71c33cabe48804c4aad7fcfc5c7d519  bench/xoffset_runner.hpp
+b8ea1fcd3368b9acfb65760dd52a9d4bc05750bdc2ea56a221b0dd338a7f7925  bench/std_runner.hpp
+f30b3281083eda53c1efc8848ca7845b9d6282950982d3ce762173f51f9222cc  bench/xoffset_runner.hpp
 12cab27be9331a4a09ae66f444cf5852dd81e363df562748a4ea854932e35e44  include/slg/cista_free.hpp
 d383da79e1f656838311c9fc339c977cba69a53277adeb72910ed6cd3c1d92ed  include/slg/generic.hpp
-320a42e2ed061cf97deeb04cbbde733194c499b5670be2c2c3f6f2e9447bd7c7  include/slg/model_cista.hpp
-d51467c9c67b8861345ebc5f53593f03b71622dd0a3d4cea7a672f1ad794dc9f  include/slg/model_std.hpp
-1fb6e9b1cbe96d8bc8542ba127627d3633653763aa029af302165f26e01a8c86  include/slg/model_xoffset.hpp
+d64ef2095a2be911ac33fdf651b384f4403fd8731562b8fb53373130fc692f2d  include/slg/model_cista.hpp
+2d6ef7b1a9e74956716e59a165b4c53cf8112d796ec87b142a4dda177e7bc926  include/slg/model_std.hpp
+030429a294fc752555f4519886deb01fa410651a9380d17ba2efca6ac825b56d  include/slg/model_xoffset.hpp
 3259eef215f98da7328da68bb5e7dd1f33141cdeb894511a039af075114c3391  include/slg/model_xoffset_optin.hpp
 36d5761eb46998e5040f7a19fb99f5ac1df5e31ee129a864e3872ba734e4a5db  include/slg/trace.hpp
-234159b81efcb07c0ab826a5f0a56b7f72a86a4ecb597ca7900f089cbb798723  schema/slg.fbs
-12bcdc8273ae57e4485346e679f9e51cf06266c168527198f8abd0e277a1836d  schema/slg.proto
-e9ac06bbe56ecd0ed3b237e095ad0d0c56b81036e8dca45806d7bf3c23a1df0c  tools/analyze.py
+5bbbf22111c27aba91fdcaef94fa235aeb607c4ae557646b543651224b896955  include/slg/view.hpp
+53054f1836f60b966f86242d891d4a5c10666e6b2c500d51a4242f775c7d05dc  schema/slg.fbs
+58d7b40bfd2d46e9ad29a8efc23e0916a1399f066826c29650fa67ec147894b8  schema/slg.proto
+764ed029e4e30c5cce0bdc302399a7d77517a06a43b7a339e7be8576c12809d5  tools/analyze.py
