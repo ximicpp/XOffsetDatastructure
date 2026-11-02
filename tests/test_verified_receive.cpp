@@ -328,6 +328,9 @@ void rollback_and_rejection(){
         unsigned failures=0;bool finished=false;
         for(unsigned point=0;point<256&&!finished;++point){
             auto token=receive(wire,xo::XBuffer::maximum_capacity(n+4096));const auto before=body_image(token);const auto*base=token.payload_address();
+            // CF: the compact table needs no bin storage, so its only host
+            // allocation is the table itself, made only without a cached one.
+            xo::XBufferCore::trim_free_table_cache();
             host::remaining=point;bool failed=false;
             try{
                 auto out=xo::finish_verified(token);host::remaining=-1;finished=true;
