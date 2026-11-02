@@ -183,6 +183,17 @@ void mutate_light(fz::Root& r, std::mt19937_64& rng) {
             break;
         case 5: if (!r.attrs.empty()) r.attrs.begin()->second = rng(); break;
         }
+        // Sizes within capacity: containers checked on their own (a set
+        // insert or a vector push that grows the block is verified in full).
+        if (rng() % 3 == 0) {
+            if (rng() % 2) r.keys.insert(std::uint32_t(rng() % 1000));
+            else if (!r.keys.empty()) r.keys.erase(*(r.keys.begin() + std::ptrdiff_t(rng() % r.keys.size())));
+        }
+        if (rng() % 3 == 0 && !r.items.empty()) {
+            auto& it = r.items[rng() % r.items.size()];
+            if (rng() % 2 || it.vals.empty()) it.vals.push_back(std::uint16_t(rng()));
+            else it.vals.pop_back();
+        }
     }
 }
 
@@ -669,7 +680,10 @@ void check_path_case() {
         for (int j = 0; j < 4; ++j) it.vals.push_back(std::uint16_t(j));
     }
     r.items.reserve(8);
+    r.items[0].vals.reserve(16);
+    r.keys.reserve(8);
     r.keys.insert(5);
+    r.title = "a title that is long enough for a heap block";
     r.attrs.emplace(xo::XString("hp", r.attrs.get_stored_allocator()), 10);
     xo::XDeltaBaseline base;
     Buffer rep(4096, xo::XBuffer::maximum_capacity(kLimit));
@@ -696,8 +710,13 @@ void check_path_case() {
     step("an inline string emptied", C::in_place, [&] { r.items[2].name = ""; });
     step("a scalar after in-place checks", C::none, [&] { r.epoch = 78; });
     step("a heap string", C::full, [&] { r.items[2].name = "a name too long to be inline"; });
-    step("a set insert", C::full, [&] { r.keys.insert(7); });
-    step("a vector size within capacity", C::full, [&] { r.items.emplace_back().id = 9; });
+    step("a heap string within its block", C::in_place, [&] { r.title = "a shorter title, still on the heap"; });
+    step("a set insert within capacity", C::in_place, [&] { r.keys.insert(7); r.keys.insert(1); });
+    step("a set erase", C::in_place, [&] { r.keys.erase(*r.keys.begin()); });
+    step("scalar vector sizes within capacity", C::in_place, [&] { r.items[0].vals.push_back(4); r.items[0].vals.push_back(5); });
+    step("a scalar vector shrinks", C::in_place, [&] { r.items[0].vals.pop_back(); });
+    step("a set insert past capacity", C::full, [&] { for (std::uint32_t k = 100; k < 120; ++k) r.keys.insert(k); });
+    step("a vector of records grows within capacity", C::full, [&] { r.items.emplace_back().id = 9; });
     step("a scalar after a full check", C::none, [&] { r.epoch = 79; });
 
     // Hand-made deltas through the in-place checks and the unchecked path.
@@ -719,6 +738,13 @@ void check_path_case() {
             "nonzero padding");
     rejects("an inline length of 11", poke_delta(rep, cur, off(&rep.root().items[0].name) + 11, std::string(1, char(0x8B))),
             "exceeds 10");
+    rejects("unordered set keys", poke_delta(rep, cur, off(&*rep.root().keys.begin()), std::string(4, '\xFF')),
+            "set keys not strictly ordered");
+    rejects("a vector size past capacity", poke_delta(rep, cur, off(&rep.root().items[0].vals) + 4, std::string(1, '\x7F')),
+            "size exceeds capacity");
+    rejects("a missing terminator",
+            poke_delta(rep, cur, off(rep.root().title.data() + rep.root().title.size()), std::string(1, 'x')),
+            "missing terminator");
     {
         // Free bytes take any value without a check.
         auto tc = cur;

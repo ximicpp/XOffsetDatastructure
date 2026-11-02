@@ -20,6 +20,7 @@
 // Included at the end of xoffsetdatastructure.hpp.
 
 #include <algorithm>
+#include <cstddef>
 #include <atomic>
 #include <bit>
 #include <chrono>
@@ -431,13 +432,73 @@ namespace XOffsetDatastructure {
         };
         static_assert(sizeof(XFixedString) == 12, "inline string head layout");
 
+        // A container whose change is checked on its own: a heap string, or a
+        // vector, set or map whose elements hold nothing verification reads
+        // but set and map keys. Its checked bytes are its head and, for a
+        // heap string, set or map, bytes of its block (the terminator, the
+        // keys); a change of them is checked against the container alone, as
+        // long as capacity and block stay (the payload's coverage is then
+        // unchanged).
+        enum DeltaNodeKind : std::uint32_t { delta_node_string, delta_node_vector, delta_node_set, delta_node_map };
+        struct DeltaCheckNode {
+            std::uint32_t head = 0;      // offset of the head
+            DeltaNodeKind kind = delta_node_vector;
+            std::uint32_t capacity = 0;  // capacity_ and data_delta when checked
+            std::int32_t data_delta = 0;
+            std::uint32_t size = 0;      // size_ when checked
+            std::uint32_t element = 0;   // vector, set, map: element size
+            std::uint32_t key_size = 0;  // set, map: the key, at the start of an element
+            std::uint32_t stamp = 0;     // scratch: last delta that touched it
+            bool (*keys_ordered)(const char* data, std::uint32_t size) = nullptr;  // set, map
+        };
+        // A range of checked bytes that belongs to one node; ranges do not overlap.
+        struct DeltaNodeRange {
+            std::uint32_t begin = 0, end = 0, node = 0;
+        };
+
+        // Keys strictly ordered, as verification checks them.
+        template <typename Elem, bool Map>
+        bool delta_keys_ordered(const char* raw, std::uint32_t size) {
+            const Elem* data = reinterpret_cast<const Elem*>(raw);
+            bool unordered = false;
+            for (std::uint32_t i = 1; i < size; ++i) {
+                if constexpr (Map) unordered |= !fixed_detail::ordered_less(data[i - 1].first, data[i].first);
+                else unordered |= !fixed_detail::ordered_less(data[i - 1], data[i]);
+            }
+            return !unordered;
+        }
+
         class DeltaCheckMarker {
         public:
-            DeltaCheckMarker(const char* base, DeltaCheckBits* bits) noexcept : base_(base), bits_(bits) {}
+            DeltaCheckMarker(const char* base, DeltaCheckBits* bits, std::vector<DeltaCheckNode>* nodes = nullptr,
+                             std::vector<DeltaNodeRange>* ranges = nullptr) noexcept
+                : base_(base), bits_(bits), nodes_(nodes), ranges_(ranges) {}
+            const char* base() const noexcept { return base_; }
+            // Records a node (when nodes are collected) with its head and block ranges.
+            void node(const DeltaCheckNode& n, std::size_t block_begin, std::size_t block_bytes) {
+                if (!nodes_) return;
+                const auto index = static_cast<std::uint32_t>(nodes_->size());
+                nodes_->push_back(n);
+                ranges_->push_back({n.head, n.head + static_cast<std::uint32_t>(sizeof(XFixedString)), index});
+                if (block_bytes != 0)
+                    ranges_->push_back({static_cast<std::uint32_t>(block_begin),
+                                        static_cast<std::uint32_t>(block_begin + block_bytes), index});
+            }
             std::size_t offset_of(const void* p) const noexcept {
                 return static_cast<std::size_t>(static_cast<const char*>(p) - base_);
             }
             void mark(const void* p, std::size_t n, bool local) noexcept { mark_at(offset_of(p), n, local); }
+            // Checked as a whole: never checked in place.
+            void pin(const void* p, std::size_t n) noexcept {
+                const std::size_t offset = offset_of(p);
+                mark_at(offset, n, false);
+                std::size_t i = offset - XWIRE_PAYLOAD_BEGIN;
+                for (const std::size_t e = i + n; i < e; ++i) {
+                    const std::uint64_t keep = ~(std::uint64_t(1) << (i % delta_block));
+                    bits_[i / delta_block].local &= keep;
+                    bits_[i / delta_block].heads &= keep;
+                }
+            }
             // Everything marked lies in the verified payload, past the arena header.
             void mark_at(std::size_t offset, std::size_t n, bool local) noexcept {
                 std::size_t i = offset - XWIRE_PAYLOAD_BEGIN;
@@ -454,10 +515,17 @@ namespace XOffsetDatastructure {
                 }
             }
             void clear_at(std::size_t offset, std::size_t n) noexcept {
-                for (std::size_t i = offset - XWIRE_PAYLOAD_BEGIN, e = i + n; i < e; ++i) {
-                    const std::uint64_t m = ~(std::uint64_t(1) << (i % delta_block));
-                    bits_[i / delta_block].checked &= m;
-                    bits_[i / delta_block].local &= m;
+                std::size_t i = offset - XWIRE_PAYLOAD_BEGIN;
+                const std::size_t e = i + n;
+                while (i < e) {
+                    const std::size_t bit = i % delta_block;
+                    const std::size_t take = std::min(delta_block - bit, e - i);
+                    const std::uint64_t m =
+                        (take == delta_block ? ~std::uint64_t(0) : (std::uint64_t(1) << take) - 1u) << bit;
+                    DeltaCheckBits& b = bits_[i / delta_block];
+                    b.checked &= ~m;
+                    b.local &= ~m;
+                    i += take;
                 }
             }
             void head_at(std::size_t offset) noexcept {
@@ -475,6 +543,8 @@ namespace XOffsetDatastructure {
         private:
             const char* base_;
             DeltaCheckBits* bits_;
+            std::vector<DeltaCheckNode>* nodes_;
+            std::vector<DeltaNodeRange>* ranges_;
         };
 
         template <typename T>
@@ -504,19 +574,59 @@ namespace XOffsetDatastructure {
                 } else {
                     m.mark(&s, sizeof(XFixedString), false);
                     if (s.capacity_ != 0) m.mark(delta_heap_data<char>(s.data_delta) + s.size_, 1, false);
+                    DeltaCheckNode n;
+                    n.head = static_cast<std::uint32_t>(m.offset_of(&s));
+                    n.kind = delta_node_string;
+                    n.capacity = s.capacity_;
+                    n.data_delta = s.data_delta;
+                    n.size = s.size_;
+                    m.node(n, s.capacity_ != 0 ? m.offset_of(delta_heap_data<char>(s.data_delta)) : 0,
+                           s.capacity_ != 0 ? std::size_t(s.capacity_) + 1u : 0u);
                 }
             } else if constexpr (is_fixed_flat_set_v<CleanT> || is_fixed_flat_map_v<CleanT> ||
                                  is_fixed_vector_v<CleanT>) {
                 using Elem = typename CleanT::value_type;
                 const auto& v = static_cast<const XFixedVector<Elem>&>(value);
                 m.mark(&v, sizeof(v), false);
+                if constexpr (!wire_value_needs_validation_v<Elem>) {
+                    DeltaCheckNode n;
+                    n.head = static_cast<std::uint32_t>(m.offset_of(&v));
+                    n.capacity = v.capacity_;
+                    n.data_delta = v.data_delta;
+                    n.size = v.size_;
+                    n.element = sizeof(Elem);
+                    std::size_t keys_bytes = 0;  // the block range holds checked bytes only for keys
+                    if constexpr (is_fixed_flat_set_v<CleanT>) {
+                        n.kind = delta_node_set;
+                        n.key_size = sizeof(Elem);
+                        n.keys_ordered = &delta_keys_ordered<Elem, false>;
+                        keys_bytes = std::size_t(v.capacity_) * sizeof(Elem);
+                    } else if constexpr (is_fixed_flat_map_v<CleanT>) {
+                        static_assert(offsetof(Elem, first) == 0, "map element layout");
+                        n.kind = delta_node_map;
+                        n.key_size = sizeof(typename CleanT::key_type);
+                        n.keys_ordered = &delta_keys_ordered<Elem, true>;
+                        keys_bytes = std::size_t(v.capacity_) * sizeof(Elem);
+                    } else {
+                        n.kind = delta_node_vector;
+                    }
+                    m.node(n, keys_bytes != 0 ? m.offset_of(delta_heap_data<Elem>(v.data_delta)) : 0, keys_bytes);
+                }
                 if (v.capacity_ == 0) return;
                 const Elem* data = delta_heap_data<Elem>(v.data_delta);
                 for (std::uint32_t i = 0; i < v.size_; ++i) {
-                    if constexpr (wire_value_needs_validation_v<Elem>) delta_mark_value(data[i], m);
-                    // Keys are compared with each other.
-                    if constexpr (is_fixed_flat_set_v<CleanT>) delta_mark_pinned(data[i], m);
-                    else if constexpr (is_fixed_flat_map_v<CleanT>) delta_mark_pinned(data[i].first, m);
+                    // Keys are compared with each other: everything they reach
+                    // is checked as a whole (which covers what verifying them
+                    // reads), with no part checked in place or on its own.
+                    if constexpr (is_fixed_flat_set_v<CleanT>) {
+                        delta_mark_pinned(data[i], m);
+                    } else if constexpr (is_fixed_flat_map_v<CleanT>) {
+                        delta_mark_pinned(data[i].first, m);
+                        if constexpr (wire_value_needs_validation_v<typename CleanT::mapped_type>)
+                            delta_mark_value(data[i].second, m);
+                    } else if constexpr (wire_value_needs_validation_v<Elem>) {
+                        delta_mark_value(data[i], m);
+                    }
                 }
             } else if constexpr (std::is_class_v<CleanT>) {
                 (void)for_each_reflected_subobject_v<CleanT>(
@@ -537,14 +647,14 @@ namespace XOffsetDatastructure {
         template <typename T>
         void delta_mark_pinned(const T& value, DeltaCheckMarker& m) {
             using CleanT = std::remove_cv_t<T>;
-            m.mark(&value, sizeof(CleanT), false);
+            m.pin(&value, sizeof(CleanT));
             if constexpr (std::is_array_v<CleanT>) {
                 if constexpr (wire_value_needs_validation_v<std::remove_extent_t<CleanT>>)
                     for (const auto& elem : value) delta_mark_pinned(elem, m);
             } else if constexpr (is_fixed_string_v<CleanT>) {
                 const auto& s = static_cast<const XFixedString&>(value);
                 if (!s.is_inline() && s.capacity_ != 0)
-                    m.mark(delta_heap_data<char>(s.data_delta), std::size_t(s.size_) + 1u, false);
+                    m.pin(delta_heap_data<char>(s.data_delta), std::size_t(s.size_) + 1u);
             } else if constexpr (is_fixed_flat_set_v<CleanT> || is_fixed_flat_map_v<CleanT> ||
                                  is_fixed_vector_v<CleanT>) {
                 using Elem = typename CleanT::value_type;
@@ -651,6 +761,9 @@ namespace XOffsetDatastructure {
             std::vector<char>().swap(undo_);
             std::vector<detail::DeltaBlockRef>().swap(blocks_);
             std::vector<detail::DeltaCheckBits>().swap(checks_);
+            std::vector<detail::DeltaCheckNode>().swap(nodes_);
+            std::vector<detail::DeltaNodeRange>().swap(ranges_);
+            std::vector<std::uint32_t>().swap(touched_);
             checks_valid_ = false;
         }
 
@@ -666,6 +779,10 @@ namespace XOffsetDatastructure {
         // The bytes the last verification read, valid for the buffer state
         // recorded with it (see DeltaAccess::checks_match).
         std::vector<detail::DeltaCheckBits> checks_;
+        std::vector<detail::DeltaCheckNode> nodes_;
+        std::vector<detail::DeltaNodeRange> ranges_;  // by begin
+        std::vector<std::uint32_t> touched_;          // nodes the current delta re-checks
+        std::uint32_t stamp_ = 0;
         const void* checks_core_ = nullptr;
         const void* checks_base_ = nullptr;
         std::uint64_t checks_epoch_ = 0;
@@ -1132,12 +1249,93 @@ namespace XOffsetDatastructure {
                 }
                 return vok();
             }
+            // After a commit: a map that cannot be built is left invalid (the
+            // next delta is then verified in full).
             template <typename T>
             static void rebuild_checks(XDeltaCursor& c, XBufferCore& core, const T& root) {
+                c.checks_valid_ = false;
                 std::fill(c.checks_.begin(), c.checks_.end(), DeltaCheckBits{});
-                DeltaCheckMarker m(static_cast<const char*>(core.get_address()), c.checks_.data());
-                delta_mark_value(root, m);
+                c.nodes_.clear();
+                c.ranges_.clear();
+                XOFFSET_TRY {
+                    DeltaCheckMarker m(static_cast<const char*>(core.get_address()), c.checks_.data(), &c.nodes_,
+                                       &c.ranges_);
+                    delta_mark_value(root, m);
+                    std::sort(c.ranges_.begin(), c.ranges_.end(),
+                              [](const DeltaNodeRange& a, const DeltaNodeRange& b) { return a.begin < b.begin; });
+                    c.touched_.reserve(c.nodes_.size());
+                } XOFFSET_CATCH(const std::bad_alloc&) {
+                    return;
+                }
                 note_checks(c, core);
+            }
+            // The node whose range holds `offset`, or none.
+            static const DeltaNodeRange* node_range_of(const XDeltaCursor& c, std::size_t offset) noexcept {
+                auto it = std::upper_bound(c.ranges_.begin(), c.ranges_.end(), offset,
+                                           [](std::size_t o, const DeltaNodeRange& r) { return o < r.begin; });
+                if (it == c.ranges_.begin()) return nullptr;
+                --it;
+                return offset < it->end ? &*it : nullptr;
+            }
+            // Before the patch: the nodes owning the checked bytes outside
+            // bools and inline string heads that the delta writes; false when
+            // some byte belongs to none (the whole verification is needed).
+            static bool collect_nodes(XDeltaCursor& c, const Parsed& parsed) noexcept {
+                c.touched_.clear();
+                if (++c.stamp_ == 0) {
+                    for (auto& n : c.nodes_) n.stamp = 0;
+                    c.stamp_ = 1;
+                }
+                std::size_t lo = 0, hi = 0;
+                for (std::size_t k = 0; k < parsed.block_count; ++k) {
+                    const DeltaBlockRef& r = parsed.blocks[k];
+                    const DeltaCheckBits& b = c.checks_[(r.offset - payload_begin) / delta_block];
+                    for (std::uint64_t hit = r.mask & b.checked & ~b.local; hit != 0; hit &= hit - 1) {
+                        const std::size_t offset = r.offset + static_cast<std::size_t>(std::countr_zero(hit));
+                        if (offset >= lo && offset < hi) continue;
+                        const DeltaNodeRange* range = node_range_of(c, offset);
+                        if (!range) return false;
+                        lo = range->begin;
+                        hi = range->end;
+                        DeltaCheckNode& n = c.nodes_[range->node];
+                        if (n.stamp != c.stamp_) {
+                            n.stamp = c.stamp_;
+                            c.touched_.push_back(range->node);  // reserved for every node
+                        }
+                    }
+                }
+                return true;
+            }
+            // A touched node passes what verification checks of it, with the
+            // same capacity and block (false: the whole verification decides).
+            static bool node_holds(const char* base, const DeltaCheckNode& n) noexcept {
+                const char* head = base + n.head;
+                std::int32_t data_delta;
+                std::uint32_t size, capacity;
+                std::memcpy(&data_delta, head, 4);
+                std::memcpy(&size, head + 4, 4);
+                std::memcpy(&capacity, head + 8, 4);
+                if (capacity != n.capacity || data_delta != n.data_delta || size > capacity) return false;
+                if (capacity == 0) return size == 0;
+                if (n.kind == delta_node_string) return head[data_delta + std::int64_t(size)] == '\0';
+                return !n.keys_ordered || n.keys_ordered(head + data_delta, size);
+            }
+            // After the commit: a touched node's checked bytes for its new size.
+            static void remark_node(DeltaCheckMarker& m, DeltaCheckNode& n) noexcept {
+                const char* head = m.base() + n.head;
+                std::uint32_t size;
+                std::memcpy(&size, head + 4, 4);
+                if (n.capacity != 0 && n.kind != delta_node_vector) {
+                    const std::size_t data = n.head + static_cast<std::size_t>(std::int64_t(n.data_delta));
+                    if (n.kind == delta_node_string) {
+                        m.clear_at(data + n.size, 1);
+                        m.mark_at(data + size, 1, false);
+                    } else {
+                        m.clear_at(data, std::size_t(n.capacity) * n.element);
+                        for (std::uint32_t i = 0; i < size; ++i) m.mark_at(data + std::size_t(i) * n.element, n.key_size, false);
+                    }
+                }
+                n.size = size;
             }
             // The start of the inline string head that holds checked byte
             // `offset`, or 0 when the byte is a bool. Heads do not overlap, so
@@ -1149,61 +1347,66 @@ namespace XOffsetDatastructure {
                     if ((bits[j / delta_block].heads >> (j % delta_block)) & 1u) return payload_begin + j;
                 return 0;
             }
-            // Calls fn(offset of the head) once for each inline string head the
-            // delta wrote checked bytes of, and fn_bool(offset) for each bool.
+            // Calls on_head(offset of the head) once for each inline string head
+            // the delta wrote checked bytes of, and on_bool(offset) for each
+            // bool it wrote; stops at the first false.
             template <typename HeadFn, typename BoolFn>
-            static vstatus for_each_checked_write(const Parsed& parsed, const DeltaCheckBits* bits, HeadFn&& on_head,
-                                                  BoolFn&& on_bool) {
+            static bool for_each_checked_write(const Parsed& parsed, const DeltaCheckBits* bits, HeadFn&& on_head,
+                                               BoolFn&& on_bool) noexcept {
                 std::size_t last_head = 0;
                 for (std::size_t k = 0; k < parsed.block_count; ++k) {
                     const DeltaBlockRef& r = parsed.blocks[k];
-                    const std::uint64_t written = r.mask & bits[(r.offset - payload_begin) / delta_block].checked;
+                    const std::uint64_t written = r.mask & bits[(r.offset - payload_begin) / delta_block].local;
                     for (std::uint64_t hit = written; hit != 0; hit &= hit - 1) {
                         const std::size_t offset = r.offset + static_cast<std::size_t>(std::countr_zero(hit));
                         const std::size_t head = inline_head_of(bits, offset);
                         if (head == 0) {
-                            XOFFSET_VTRY(on_bool(offset));
+                            if (!on_bool(offset)) return false;
                         } else if (head != last_head) {
                             last_head = head;
-                            XOFFSET_VTRY(on_head(head));
+                            if (!on_head(head)) return false;
                         }
                     }
                 }
-                return vok();
+                return true;
             }
-            // The in-place checks: the bools and inline string heads the delta
-            // wrote, as verification checks them. `full` when a head left the
-            // inline form (its new block needs the whole verification).
-            static vstatus check_in_place(const char* base, const Parsed& parsed, const DeltaCheckBits* bits,
-                                          bool& full) {
+            // The in-place checks: the containers, bools and inline string heads
+            // the delta wrote pass what verification checks of them. False when
+            // one does not, or a container's capacity or block changed, or a
+            // head left the inline form: the whole verification then decides
+            // (so a delta is accepted or rejected, with the same error, as the
+            // whole verification would).
+            static bool holds_in_place(const char* base, const Parsed& parsed, const XDeltaCursor& c) noexcept {
+                for (const std::uint32_t index : c.touched_)
+                    if (!node_holds(base, c.nodes_[index])) return false;
                 return for_each_checked_write(
-                    parsed, bits,
-                    [&](std::size_t head) -> vstatus {
-                        if ((static_cast<unsigned char>(base[head + 11]) & 0x80u) == 0) {
-                            full = true;
-                            return vok();
-                        }
-                        return validate_inline_string_bytes(base + head);
+                    parsed, c.checks_.data(),
+                    [&](std::size_t head) {
+                        std::uint64_t low;
+                        std::uint32_t high;
+                        std::memcpy(&low, base + head, 8);
+                        std::memcpy(&high, base + head + 8, 4);
+                        const unsigned length = (high >> 24) & 0x7Fu;
+                        return (high & XFixedString::inline_flag) != 0 && length <= XFixedString::inline_max &&
+                               ((low & inline_pad_masks.low[length]) | (high & inline_pad_masks.high[length])) == 0;
                     },
-                    [&](std::size_t offset) -> vstatus {
-                        if (static_cast<unsigned char>(base[offset]) > 1u)
-                            return wire_reject("wire validation: invalid bool representation");
-                        return vok();
-                    });
+                    [&](std::size_t offset) { return static_cast<unsigned char>(base[offset]) <= 1u; });
             }
-            // After check_in_place: the heads it checked, marked for their new
-            // lengths. (Iterating while marking is safe: a head is re-marked
-            // from its own bytes, and marking it twice gives the same bits.)
+            // After check_in_place: the containers and heads it checked, marked
+            // for their new sizes. (Iterating while marking is safe: a head is
+            // re-marked from its own bytes, and marking it twice gives the same
+            // bits.)
             static void remark_in_place(XDeltaCursor& c, const char* base, const Parsed& parsed) noexcept {
                 DeltaCheckMarker m(base, c.checks_.data());
+                for (const std::uint32_t index : c.touched_) remark_node(m, c.nodes_[index]);
                 (void)for_each_checked_write(
                     parsed, c.checks_.data(),
                     [&](std::size_t head) {
                         m.clear_at(head, sizeof(XFixedString));
                         m.inline_head_at(head);
-                        return vok();
+                        return true;
                     },
-                    [](std::size_t) { return vok(); });
+                    [](std::size_t) { return true; });
             }
             // The scratch the whole verification needs: the replica's holes,
             // unless the delta carries them, and room for the new map.
@@ -1302,14 +1505,12 @@ namespace XOffsetDatastructure {
                     for (std::size_t k = 0; k < parsed.block_count; ++k) {
                         const DeltaBlockRef& r = parsed.blocks[k];
                         const DeltaCheckBits& b = bits[(r.offset - payload_begin) / delta_block];
-                        const std::uint64_t written = r.mask & b.checked;
-                        if (written == 0) continue;
-                        if ((written & ~b.local) != 0) {
-                            check = XDeltaCheck::full;
+                        if ((r.mask & b.checked) != 0) {
+                            check = XDeltaCheck::in_place;
                             break;
                         }
-                        check = XDeltaCheck::in_place;
                     }
+                    if (check == XDeltaCheck::in_place && !collect_nodes(cursor, parsed)) check = XDeltaCheck::full;
                 }
 
                 // Everything that can fail without verification fails first,
@@ -1357,13 +1558,9 @@ namespace XOffsetDatastructure {
 
                 XOFFSET_ROLLBACK_BEGIN
                     XOFFSET_VTRY(check_digest<T>(core, parsed, who));
-                    if (check == XDeltaCheck::in_place) {
-                        bool full = false;
-                        XOFFSET_VTRY(check_in_place(base, parsed, cursor.checks_.data(), full));
-                        if (full) {
-                            check = XDeltaCheck::full;
-                            XOFFSET_VTRY(prepare_full(core, parsed, cursor, who));
-                        }
+                    if (check == XDeltaCheck::in_place && !holds_in_place(base, parsed, cursor)) {
+                        check = XDeltaCheck::full;
+                        XOFFSET_VTRY(prepare_full(core, parsed, cursor, who));
                     }
                     if (check == XDeltaCheck::full) {
                         auto* root_ptr = find_root_at<T>(core, root);
