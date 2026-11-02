@@ -138,6 +138,7 @@ namespace XOffsetDatastructure {
 #endif
         struct VerifiedPathsAccess;
         struct VerifiedReceiveAccess;
+        struct DeltaAccess;
         // Registration is the only registry operation allowed to allocate.
         // One-shot thread-local injection leaves existing owners untouched.
         inline thread_local bool pending_registry_failure = false;
@@ -2142,6 +2143,7 @@ namespace XOffsetDatastructure {
     private:
         friend struct detail::VerifiedPathsAccess;
         friend struct detail::VerifiedReceiveAccess;
+        friend struct detail::DeltaAccess;
         friend struct fixed_detail::StableEraseOwnerWitness;
         OwnerRecordPtr owner_record_;
         detail::VirtualMemoryStorage buffer_;
@@ -6193,6 +6195,35 @@ namespace XOffsetDatastructure {
         std::uint32_t slack_div = 8;
     };
 
+    // Delta sync (xoffset_delta.hpp, docs/DELTA_SYNC.md): a sender keeps an
+    // XDeltaBaseline per receiver (the state that receiver holds) and sends
+    // only the payload bytes that changed since; the receiver patches its
+    // copy in place, verifies it as load_verified would and keeps an
+    // XDeltaCursor (which state it holds).
+    class XDeltaBaseline;
+    class XDeltaCursor;
+    // Options of save_delta / save_delta_into.
+    struct XDeltaOptions {
+        // Two changed runs separated by at most this many unchanged bytes are
+        // sent as one run (a run costs about 2 bytes of framing).
+        std::uint32_t merge_gap = 2;
+        // Carry the digest of the whole resulting payload; the receiver
+        // rejects (and rolls back) a delta whose result differs, which also
+        // catches a replica changed locally since the last delta. Costs one
+        // hash pass over the payload on each side.
+        bool digest = false;
+    };
+    // What one save_delta_into wrote.
+    struct XDeltaStats {
+        bool key = false;                 // a key delta: the receiver starts from an empty payload
+        bool holes = false;               // the hole table changed and was sent
+        bool empty = false;               // nothing changed: no delta written, version not advanced
+        std::uint32_t runs = 0;           // changed byte runs sent
+        std::uint64_t run_bytes = 0;      // payload bytes inside those runs
+        std::uint64_t compared_bytes = 0; // payload bytes compared against the baseline
+        std::size_t delta_bytes = 0;      // size of the delta written (0 when empty)
+    };
+
     // One assignment of save_compact_into(out, options, xassign(target,
     // source)...): the wire is written as if `*target = *source` had been
     // done first, without doing it. target: a member subobject (any depth,
@@ -7912,6 +7943,47 @@ namespace XOffsetDatastructure {
         std::unique_ptr<detail::WireValidationScratch> reload_scratch_;
         bool direct_reload_open_ = false;
         template <typename> friend class VerifiedReloadToken;
+        friend struct detail::DeltaAccess;
+
+    public:
+        // ---- Delta sync (xoffset_delta.hpp, docs/DELTA_SYNC.md) ----------
+        /// Writes into `out` a delta that turns the state `baseline` records
+        /// (what one receiver holds) into this buffer's current state, and
+        /// advances `baseline` to it. Only payload bytes that differ are sent
+        /// (plus the hole table when it changed); an empty baseline gives a
+        /// key delta, which a receiver applies to any buffer. When nothing
+        /// changed, `out` is left empty and the version does not advance
+        /// (send nothing). The buffer is not changed (beyond an incomplete
+        /// free table being recomputed, as save_verified does).
+        template <typename T>
+        XDeltaStats save_delta_into(std::string& out, XDeltaBaseline& baseline, XDeltaOptions options = {});
+        template <typename T>
+        std::string save_delta(XDeltaBaseline& baseline, XDeltaOptions options = {});
+
+        /// Applies a delta of save_delta_into to this buffer, which holds the
+        /// state `cursor` records (any buffer for a key delta). The patched
+        /// payload is verified exactly as load_verified<T> verifies a wire;
+        /// on success this buffer holds the sender's payload byte for byte
+        /// and `cursor` advances. A rejected non-key delta leaves the buffer
+        /// and `cursor` exactly as they were; a key delta rejected after its
+        /// header checks leaves the buffer empty (as a failed
+        /// reload_verified) and `cursor` cleared.
+        /// Either way the receiver asks the sender for a key delta
+        /// (XDeltaBaseline::reset). Element pointers into the previous
+        /// content are invalidated (the root keeps its address while the
+        /// root offset and the storage stay; XHandles re-resolve).
+        template <typename T>
+        void apply_delta_verified(std::span<const std::byte> delta, XDeltaCursor& cursor);
+        template <typename T>
+        void apply_delta_verified(const std::string& delta, XDeltaCursor& cursor);
+        /// apply_delta_verified without exceptions: ok, or the code and
+        /// message it would have thrown (same buffer and cursor state).
+        template <typename T>
+        XStatus try_apply_delta_verified(std::span<const std::byte> delta, XDeltaCursor& cursor);
+        template <typename T>
+        XStatus try_apply_delta_verified(const std::string& delta, XDeltaCursor& cursor);
+
+    private:
 
     public:
         /// Direct receive into this buffer: reload_verified<T>() without the
@@ -8401,6 +8473,26 @@ namespace XOffsetDatastructure {
         XStatus try_reload_verified(std::span<const std::byte> data) { return XBuffer::try_reload_verified<T>(data); }
         XStatus try_reload_verified(const std::string& data) { return XBuffer::try_reload_verified<T>(data); }
 
+        /// Delta sync (see XBuffer::save_delta_into / apply_delta_verified).
+        XDeltaStats save_delta_into(std::string& out, XDeltaBaseline& baseline, XDeltaOptions options = {}) {
+            return XBuffer::save_delta_into<T>(out, baseline, options);
+        }
+        std::string save_delta(XDeltaBaseline& baseline, XDeltaOptions options = {}) {
+            return XBuffer::save_delta<T>(baseline, options);
+        }
+        void apply_delta_verified(std::span<const std::byte> delta, XDeltaCursor& cursor) {
+            XBuffer::apply_delta_verified<T>(delta, cursor);
+        }
+        void apply_delta_verified(const std::string& delta, XDeltaCursor& cursor) {
+            XBuffer::apply_delta_verified<T>(delta, cursor);
+        }
+        XStatus try_apply_delta_verified(std::span<const std::byte> delta, XDeltaCursor& cursor) {
+            return XBuffer::try_apply_delta_verified<T>(delta, cursor);
+        }
+        XStatus try_apply_delta_verified(const std::string& delta, XDeltaCursor& cursor) {
+            return XBuffer::try_apply_delta_verified<T>(delta, cursor);
+        }
+
         /// Construct from an existing XBuffer (e.g., after compaction).
         TypedXBuffer(XBuffer&& other) noexcept
             : XBuffer(std::move(other)) {}
@@ -8762,5 +8854,6 @@ XOFFSET_REGISTER_MIGRATION_MAP(XFixedFlatMap, Container)
 #include "xoffset_verified_paths.hpp"
 #include "xoffset_verified_receive.hpp"
 #include "xoffset_core_lifetime.hpp"
+#include "xoffset_delta.hpp"
 
 #endif

@@ -44,10 +44,12 @@ enum class XErrc : std::uint16_t {
     root_offset_out_of_bounds = 8,
     invalid_extent_table = 9,
     incomplete_input = 10,         // a direct receive did not deliver what it announced
+    delta_base_mismatch = 11,      // a delta for another state than the replica holds (ask for a key delta)
     // Payload verification.
     invalid_payload = 32,          // the structural graph check rejected the payload
     root_mismatch = 33,            // no root at the declared offset, or a non-normalized extent
     invalid_payload_header = 34,   // the 48-byte payload header is malformed
+    digest_mismatch = 35,          // a delta's result differs from the sender's digest
     // Limits and resources.
     capacity_exceeded = 64,        // more than the maximum capacity (or the format limit)
     out_of_storage = 65,           // the arena or its OS storage could not provide memory
@@ -73,9 +75,11 @@ inline const char* to_string(XErrc code) noexcept {
         case XErrc::root_offset_out_of_bounds: return "root_offset_out_of_bounds";
         case XErrc::invalid_extent_table: return "invalid_extent_table";
         case XErrc::incomplete_input: return "incomplete_input";
+        case XErrc::delta_base_mismatch: return "delta_base_mismatch";
         case XErrc::invalid_payload: return "invalid_payload";
         case XErrc::root_mismatch: return "root_mismatch";
         case XErrc::invalid_payload_header: return "invalid_payload_header";
+        case XErrc::digest_mismatch: return "digest_mismatch";
         case XErrc::capacity_exceeded: return "capacity_exceeded";
         case XErrc::out_of_storage: return "out_of_storage";
         case XErrc::host_allocation_failed: return "host_allocation_failed";
