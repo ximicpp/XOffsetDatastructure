@@ -6209,7 +6209,28 @@ namespace XOffsetDatastructure {
         // catches a replica changed locally since the last delta. Costs one
         // hash pass over the payload on each side.
         bool digest = false;
+        // Compare only what changed by this buffer's touch() marks: the
+        // 64-byte blocks touched since the baseline's last delta from this
+        // buffer, plus the bytes past the baseline's used size and the
+        // holes that came or went, instead of the whole payload. The sender
+        // touches everything it changes (a change it does not touch is not
+        // sent). A baseline's first such delta from a buffer, and any after
+        // the buffer's content was replaced (reload, reset, swap, a move of
+        // its storage), compares everything.
+        bool touched_only = false;
     };
+    namespace detail {
+        // A delta sender's touch marks (XBuffer::touch): per 64-byte block of
+        // the payload, the stamp of its last touch.
+        struct DeltaTouchLog {
+            std::vector<std::uint32_t> stamps;
+            std::vector<std::uint32_t> groups;  // per 16 blocks: the latest of their stamps
+            std::uint64_t id = 0;     // changes when the stamps start over
+            std::uint64_t epoch = 0;  // the buffer content (epoch) they describe
+            std::uint32_t now = 1;    // stamp of touches from now on
+            bool lost = false;        // a touch could not be recorded
+        };
+    } // namespace detail
     // What one save_delta_into wrote.
     struct XDeltaStats {
         bool key = false;                 // a key delta: the receiver starts from an empty payload
@@ -7459,6 +7480,7 @@ namespace XOffsetDatastructure {
             if (this == &other) return;
             XBufferCore::swap(other);
             reload_scratch_.swap(other.reload_scratch_);
+            touch_log_.swap(other.touch_log_);
             std::swap(direct_reload_open_, other.direct_reload_open_);
         }
 
@@ -7938,6 +7960,7 @@ namespace XOffsetDatastructure {
         }
 
         std::unique_ptr<detail::WireValidationScratch> reload_scratch_;
+        std::unique_ptr<detail::DeltaTouchLog> touch_log_;  // touch() marks (delta senders)
         bool direct_reload_open_ = false;
         template <typename> friend class VerifiedReloadToken;
         friend struct detail::DeltaAccess;
@@ -7956,6 +7979,16 @@ namespace XOffsetDatastructure {
         XDeltaStats save_delta_into(std::string& out, XDeltaBaseline& baseline, XDeltaOptions options = {});
         template <typename T>
         std::string save_delta(XDeltaBaseline& baseline, XDeltaOptions options = {});
+        /// For deltas with XDeltaOptions::touched_only: records that `value`
+        /// (an object in this buffer's payload) may have changed, with
+        /// everything it reaches (the blocks of its strings and containers,
+        /// nested). Call it after the change: a container that moved to a new
+        /// block is marked where it is now (the block it left becomes a
+        /// hole, which the delta finds by itself).
+        template <typename T>
+        void touch(const T& value) noexcept;
+        /// The same for the payload bytes [p, p + bytes) alone.
+        void touch(const void* p, std::size_t bytes) noexcept;
 
         /// Applies a delta of save_delta_into to this buffer, which holds the
         /// state `cursor` records (any buffer for a key delta). The patched

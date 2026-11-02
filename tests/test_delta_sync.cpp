@@ -548,15 +548,39 @@ void diff_reference_case() {
         need(std::equal(copy.begin() + std::ptrdiff_t(from), copy.end(), cur.begin() + std::ptrdiff_t(from)) &&
                  std::equal(copy.begin(), copy.begin() + std::ptrdiff_t(from), base.begin()),
              "diff: the recorded copy was not brought up to date");
-        // Masked writes and reads round-trip.
+        // Masked writes and reads round-trip, in every version (plain,
+        // shuffle, the dispatching one; with and without room to read past
+        // the bytes), and leave the other bytes as they were.
         for (const auto& blk : blocks) {
             if (blk.whole || blk.offset + 64 > n) continue;
-            char packed[64], out[64] = {};
-            const char* end = xo::detail::delta_put_masked(packed, cur.data() + blk.offset, blk.mask);
-            need(end == packed + std::popcount(blk.mask), "diff: masked write has the wrong length");
-            need(xo::detail::delta_get_masked(out, packed, blk.mask) == end, "diff: masked read has the wrong length");
-            for (std::size_t k = 0; k < 64; ++k)
-                need(out[k] == (blk.mask >> k & 1 ? cur[blk.offset + k] : char(0)), "diff: masked round trip differs");
+            const char* src = cur.data() + blk.offset;
+            const auto count = std::size_t(std::popcount(blk.mask));
+            char packed[3][64 + 8];
+            const char* ends[3] = {
+                xo::detail::delta_put_masked_plain(packed[0], src, blk.mask),
+                xo::detail::delta_put_masked(packed[1], src, blk.mask),
+                xo::detail::delta_shuffle_supported() ? xo::detail::delta_put_masked_shuffle(packed[2], src, blk.mask)
+                                                      : xo::detail::delta_put_masked_plain(packed[2], src, blk.mask)};
+            for (int v = 0; v < 3; ++v) {
+                need(ends[v] == packed[v] + count, "diff: masked write has the wrong length");
+                need(std::equal(packed[v], packed[v] + count, packed[0]), "diff: masked write versions differ");
+            }
+            for (int v = 0; v < 4; ++v) {
+                char out[64];
+                for (auto& c : out) c = static_cast<char>(rng());
+                char before[64];
+                std::memcpy(before, out, 64);
+                const char* got = nullptr;
+                if (v == 0) got = xo::detail::delta_get_masked_plain(out, packed[0], blk.mask);
+                else if (v == 1) got = xo::detail::delta_get_masked(out, packed[0], blk.mask, packed[0] + count);
+                else if (v == 2) got = xo::detail::delta_get_masked(out, packed[0], blk.mask, packed[0] + sizeof packed[0]);
+                else got = xo::detail::delta_shuffle_supported()
+                               ? xo::detail::delta_get_masked_shuffle(out, packed[0], blk.mask)
+                               : xo::detail::delta_get_masked_plain(out, packed[0], blk.mask);
+                need(got == packed[0] + count, "diff: masked read has the wrong length");
+                for (std::size_t k = 0; k < 64; ++k)
+                    need(out[k] == (blk.mask >> k & 1 ? src[k] : before[k]), "diff: masked round trip differs");
+            }
         }
         // Both block-mask versions against the reference, at every offset.
         for (std::size_t i = 0; i + 64 <= n; i += 1 + rng() % 9) {
@@ -755,6 +779,206 @@ void check_path_case() {
     }
 }
 
+// Changes with their touch() marks: exactly the objects and containers
+// changed (containers after the change, wherever their block is now).
+void mutate_touched(Buffer& src, std::mt19937_64& rng) {
+    auto& r = src.root();
+    for (int n = 1 + int(rng() % 4); n > 0; --n) {
+        switch (rng() % 14) {
+        case 0: r.epoch = rng(); src.touch(r.epoch); break;
+        case 1: if (!r.items.empty()) { auto& it = r.items[rng() % r.items.size()]; it.id = std::uint32_t(rng()); src.touch(it.id); } break;
+        case 2: if (!r.items.empty()) { auto& it = r.items[rng() % r.items.size()]; it.flag = !it.flag; src.touch(it.flag); } break;
+        case 3:
+            if (!r.items.empty()) {
+                auto& it = r.items[rng() % r.items.size()];
+                if (!it.vals.empty()) { auto& v = it.vals[rng() % it.vals.size()]; v = std::uint16_t(rng()); src.touch(v); }
+            }
+            break;
+        case 4:
+            if (!r.items.empty()) {
+                auto& it = r.items[rng() % r.items.size()];
+                it.name = random_text(rng, 40);  // inline or heap, may move to a new block
+                src.touch(it.name);
+            }
+            break;
+        case 5: if (!r.attrs.empty()) { auto& v = r.attrs.begin()->second; v = rng(); src.touch(v); } break;
+        case 6:
+            if (rng() % 2) r.keys.insert(std::uint32_t(rng() % 1000));
+            else if (!r.keys.empty()) r.keys.erase(*(r.keys.begin() + std::ptrdiff_t(rng() % r.keys.size())));
+            src.touch(r.keys);
+            break;
+        case 7:
+            if (!r.items.empty()) {
+                auto& it = r.items[rng() % r.items.size()];
+                for (int i = int(rng() % 9); i > 0; --i) it.vals.push_back(std::uint16_t(rng()));
+                if (rng() % 3 == 0 && !it.vals.empty()) it.vals.pop_back();
+                src.touch(it.vals);
+            }
+            break;
+        case 8: r.title = random_text(rng, 40); src.touch(r.title); break;
+        case 9:
+            if (!r.items.empty()) {
+                r.items.erase(r.items.begin() + std::ptrdiff_t(rng() % r.items.size()));
+                src.touch(r.items);
+            }
+            break;
+        case 10: {
+            auto& it = r.items.emplace_back();
+            it.id = std::uint32_t(rng());
+            it.flag = rng() & 1;
+            it.name = random_text(rng, 30);
+            src.touch(r.items);  // with every item's name and values (the block may have moved)
+        } break;
+        case 11: r.tags.emplace_back(random_text(rng, 24), r.tags.get_stored_allocator()); src.touch(r.tags); break;
+        case 12: r.attrs.insert_or_assign(std::string_view(random_text(rng, 16)), std::uint64_t(rng())); src.touch(r.attrs); break;
+        case 13: {  // raw bytes of an object
+            r.epoch ^= std::uint64_t(1) << (rng() % 64);
+            src.touch(&r.epoch, sizeof r.epoch);
+        } break;
+        }
+    }
+}
+
+// touched_only: when the sender touches what it changed, every delta is the
+// one a whole comparison writes (same stream, same recorded state), and it
+// compares less. A relay forwards what it applies (the blocks a delta wrote
+// count as touches) and its deltas match a whole comparison too.
+struct TouchTotals {
+    std::size_t deltas = 0, relayed = 0, replaced = 0;
+    std::uint64_t compared_touched = 0, compared_whole = 0;
+} touch_totals;
+
+void touched_stream(std::uint64_t seed, int steps) {
+    std::mt19937_64 rng(seed);
+    const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
+    auto src = Buffer::create(4096, cap);
+    fill(src.root(), rng);
+    xo::XDeltaBaseline tb(seed * 2 + 1), wb(seed * 2 + 1);
+    Buffer rep(4096, cap);
+    xo::XDeltaCursor cur;
+    xo::XDeltaBaseline rtb(seed * 4 + 3), rwb(seed * 4 + 3);
+    Buffer down(4096, xo::XBuffer::maximum_capacity(kLimit));
+    xo::XDeltaCursor down_cur;
+    for (int step = 0; step < steps; ++step) {
+        const std::string where = "touched seed " + std::to_string(seed) + " step " + std::to_string(step);
+        const auto op = rng() % 16;
+        bool replaced = false;
+        if (op == 0) {
+            src.reset();  // content replaced: the next touched delta compares everything
+            fill(src.root(), rng);
+            replaced = true;
+            ++touch_totals.replaced;
+        } else if (op == 1) {
+            mutate_valid(src.root(), rng);
+            src.touch(src.root());  // everything
+        } else if (op == 2) {
+            tb.reset();  // the receiver asked for a key delta
+            wb.reset();
+        } else if (op != 3) {  // op 3: nothing changes
+            mutate_touched(src, rng);
+        }
+        xo::XDeltaOptions whole;
+        whole.digest = rng() % 2;
+        xo::XDeltaOptions touched = whole;
+        touched.touched_only = true;
+        std::string dt = "stale", dw = "stale";
+        const auto st = src.save_delta_into(dt, tb, touched);
+        const auto sw = src.save_delta_into(dw, wb, whole);
+        need(dt == dw && st.empty == sw.empty && st.key == sw.key && st.blocks == sw.blocks,
+             where + ": a touched_only delta differs from the whole comparison");
+        need(st.compared_bytes <= sw.compared_bytes, where + ": touched_only compared more");
+        if (replaced || st.key) need(st.compared_bytes == sw.compared_bytes, where + ": replaced content not compared whole");
+        touch_totals.compared_touched += st.compared_bytes;
+        touch_totals.compared_whole += sw.compared_bytes;
+        if (st.empty) continue;
+        ++touch_totals.deltas;
+        auto r = apply_entry(rep, dt, cur);
+        need(bool(r), where + ": delta rejected: " + (r ? std::string() : r.error().message));
+        same_state(src.root(), src, rep, where);
+        // The relay forwards.
+        std::string rt = "stale", rw = "stale";
+        const auto rst = rep.save_delta_into(rt, rtb, touched);
+        const auto rsw = rep.save_delta_into(rw, rwb, whole);
+        need(rt == rw && rst.empty == rsw.empty, where + ": a relayed touched_only delta differs from the whole comparison");
+        need(rst.compared_bytes <= rsw.compared_bytes, where + ": the relay compared more");
+        if (rst.empty) continue;
+        ++touch_totals.relayed;
+        auto dr = apply_entry(down, rt, down_cur);
+        need(bool(dr), where + ": relayed delta rejected: " + (dr ? std::string() : dr.error().message));
+        same_state(src.root(), src, down, where + " (downstream)");
+    }
+}
+
+void touched_fixed_case() {
+    std::mt19937_64 rng(17);
+    const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
+    auto src = Buffer::create(4096, cap);
+    fill(src.root(), rng);
+    while (src.root().items.size() < 2) src.root().items.emplace_back().id = 1;
+    xo::XDeltaOptions touched;
+    touched.touched_only = true;
+    xo::XDeltaBaseline base;
+    Buffer rep(4096, xo::XBuffer::maximum_capacity(kLimit));
+    xo::XDeltaCursor cur;
+    need(bool(apply_entry(rep, delta_of(src, base, touched), cur)), "touched: key delta");
+    const std::size_t whole = payload_of(src).size() - xo::XWIRE_PAYLOAD_BEGIN;
+    std::string d;
+    // The first touched delta of a baseline compares everything (the key
+    // delta paired it); a touched change then compares its block only.
+    src.root().epoch += 1;
+    src.touch(src.root().epoch);
+    auto st = src.save_delta_into(d, base, touched);
+    need(!st.empty && st.compared_bytes == 64, "touched: one touched scalar did not compare one block");
+    need(bool(apply_entry(rep, d, cur)), "touched: scalar delta");
+    same_state(src.root(), src, rep, "touched: scalar");
+    // Nothing touched: nothing compared, nothing sent.
+    st = src.save_delta_into(d, base, touched);
+    need(st.empty && st.compared_bytes == 0, "touched: an untouched buffer compared bytes");
+    // A change not touched is not sent; with a digest the receiver finds out.
+    src.root().epoch += 1;
+    st = src.save_delta_into(d, base, touched);
+    need(st.empty, "touched: an untouched change was sent");
+    src.root().items[0].id += 1;
+    src.touch(src.root().items[0].id);
+    xo::XDeltaOptions digest = touched;
+    digest.digest = true;
+    st = src.save_delta_into(d, base, digest);
+    need(!st.empty, "touched: no delta for a touched change");
+    auto res = apply_entry(rep, d, cur);
+    need(!res && res.code() == xo::XErrc::digest_mismatch, "touched: the digest did not catch an untouched change");
+    base.reset();  // the receiver asks for a key delta
+    need(bool(apply_entry(rep, delta_of(src, base, touched), cur)), "touched: resync key delta");
+    same_state(src.root(), src, rep, "touched: resync");
+    // A touch outside the payload: everything is compared next time.
+    std::uint64_t elsewhere = 0;
+    src.touch(elsewhere);
+    src.root().epoch += 1;
+    st = src.save_delta_into(d, base, touched);
+    need(!st.empty && st.compared_bytes == whole, "touched: a foreign touch did not compare everything");
+    need(bool(apply_entry(rep, d, cur)), "touched: delta after a foreign touch");
+    same_state(src.root(), src, rep, "touched: foreign touch");
+    // Content replaced in place (reload): everything is compared.
+    auto copy = src.save_verified();
+    src.reload_verified(copy);
+    src.root().epoch += 1;
+    src.touch(src.root().epoch);
+    st = src.save_delta_into(d, base, touched);
+    need(!st.empty && st.compared_bytes == payload_of(src).size() - xo::XWIRE_PAYLOAD_BEGIN,
+         "touched: a reloaded buffer did not compare everything");
+    need(bool(apply_entry(rep, d, cur)), "touched: delta after reload");
+    same_state(src.root(), src, rep, "touched: reload");
+    // A container that moves to a new block: touching it where it is now
+    // suffices (the block it left is a hole, found by the hole tables).
+    auto& vals = src.root().items[1].vals;
+    for (int i = 0; i < 40; ++i) vals.push_back(std::uint16_t(i));
+    src.touch(vals);
+    st = src.save_delta_into(d, base, touched);
+    need(!st.empty && st.compared_bytes < payload_of(src).size() - xo::XWIRE_PAYLOAD_BEGIN,
+         "touched: a moved container compared everything");
+    need(bool(apply_entry(rep, d, cur)), "touched: moved container");
+    same_state(src.root(), src, rep, "touched: moved container");
+}
+
 void wrong_type_case() {
     const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
     auto view = xo::TypedXBuffer<dz::View>::create(4096, cap);
@@ -778,7 +1002,12 @@ int main(int argc, char** argv) {
     check_path_case();
     wrong_type_case();
     view_sizes();
+    touched_fixed_case();
     for (int s = 0; s < streams; ++s) random_stream(20261102u + std::uint64_t(s), steps);
+    for (int s = 0; s < streams; ++s) touched_stream(20261103u + std::uint64_t(s), steps);
+    need(touch_totals.compared_touched * 4 < touch_totals.compared_whole * 3 && touch_totals.relayed > 0 &&
+             touch_totals.replaced > 0,
+         "touched_only: compared too much, or a path was never taken");
     need(totals.keys >= std::size_t(streams), "too few key deltas");
     need(totals.shrinks > 0 && totals.digests > 0 && totals.corrupt_rejected > 0 && totals.late_joins > 0,
          "a path was never taken");
@@ -790,6 +1019,8 @@ int main(int argc, char** argv) {
               << totals.checks[1] << " none, " << totals.checks[2] << " in place, " << totals.checks[3]
               << " full; corrupted: " << totals.corrupt_rejected << " rejected, "
               << totals.corrupt_accepted << " accepted as valid payloads; delta bytes " << totals.delta_bytes
-              << " vs full wires " << totals.full_bytes << "\n";
+              << " vs full wires " << totals.full_bytes << "; touched_only: " << touch_totals.deltas << " deltas, "
+              << touch_totals.relayed << " relayed, compared " << touch_totals.compared_touched << " of "
+              << touch_totals.compared_whole << " bytes\n";
     return 0;
 }
