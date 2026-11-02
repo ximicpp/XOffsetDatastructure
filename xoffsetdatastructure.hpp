@@ -1961,15 +1961,24 @@ namespace XOffsetDatastructure {
         // lower the watermark by enough to matter; small reloads (messages of
         // similar size) leave after one comparison.
         static constexpr std::size_t zero_tail_min_gain = 4096;
-        ZeroTail settled_zero_tail(size_type size) const noexcept {
+        // The common case (a reload of similar size) is one comparison and one
+        // branch; the rest stays out of line so the compiler does not if-convert
+        // it into every reload.
+        XOFFSET_DETAIL_MOVE_INLINE ZeroTail settled_zero_tail(size_type size) const noexcept {
+            if (std::size_t(size) + zero_tail_min_gain > buffer_.size()) [[likely]] return {};
+            return settled_zero_tail_shrinking();
+        }
+        XOFFSET_DETAIL_NOINLINE ZeroTail settled_zero_tail_shrinking() const noexcept {
             const auto logical = buffer_.size();
-            if (std::size_t(size) + zero_tail_min_gain > logical || buffer_.zero_from() != logical || free_table_lost_ ||
-                logical < min_payload_size()) [[likely]] return {};
+            if (buffer_.zero_from() != logical || free_table_lost_ || logical < min_payload_size()) return {};
             const auto used = static_cast<size_type>(arena()->used_end);
             return {buffer_.data(), used < logical ? used : logical};
         }
-        void note_reinit_zero_tail(const ZeroTail& tail, size_type size) noexcept {
-            if (tail.base && tail.base == buffer_.data())
+        XOFFSET_DETAIL_MOVE_INLINE void note_reinit_zero_tail(const ZeroTail& tail, size_type size) noexcept {
+            if (tail.base) [[unlikely]] note_reinit_zero_tail_slow(tail, size);
+        }
+        XOFFSET_DETAIL_NOINLINE void note_reinit_zero_tail_slow(const ZeroTail& tail, size_type size) noexcept {
+            if (tail.base == buffer_.data())
                 buffer_.note_zero_from(std::max<std::size_t>(size, tail.used_end));
         }
 
