@@ -10,11 +10,15 @@
 // as the sender's exact result). Fixed cases: empty deltas, base mismatch,
 // out-of-order and repeated deltas, wrong root type, a replica changed
 // locally (caught by the digest), capacity limits, rejected key deltas, the
-// xxHash64 digest against reference values, and a viewport-like model whose
+// xxHash64 digest against reference values, replicas fed on several threads
+// at once (and one at thread exit), and a viewport-like model whose
 // delta sizes are reported. With exceptions on, the throwing entry must
 // report exactly what the try_ entry reports. No try/catch of its own: also
 // built as test_delta_sync_noexc.
 #include "fuzz/v2_fuzz_core.hpp"
+
+#include <functional>
+#include <thread>
 
 namespace dz {
 struct Unit {
@@ -1015,6 +1019,79 @@ void touched_growth_case() {
     }
 }
 
+// The cursors of a thread share its apply scratch: several threads at once
+// feed their replicas in turn, and a delta applied from a thread_local
+// destructor that runs after the thread's scratch is destroyed uses the
+// cursor's own.
+struct AtThreadExit {
+    std::function<void()> run;
+    ~AtThreadExit() {
+        if (run) run();
+    }
+};
+
+struct LateApply {
+    std::unique_ptr<xo::TypedXBuffer<dz::View>> rep;
+    xo::XDeltaCursor cur;
+    std::string key, expect;
+    bool applied = false;
+};
+
+void thread_scratch_case() {
+    constexpr int threads = 4, replicas = 3, steps = 80;
+    std::vector<LateApply> late(threads);
+    std::vector<std::string> errors(threads);
+    std::vector<std::thread> pool;
+    for (int t = 0; t < threads; ++t)
+        pool.emplace_back([&late, &errors, t] {
+            static thread_local AtThreadExit at_exit;  // before any delta: destroyed after the scratch
+            const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
+            std::mt19937_64 rng(20261104u + std::uint64_t(t));
+            auto src = xo::TypedXBuffer<dz::View>::create(4096, cap);
+            src.root().slots.reserve(64);
+            std::vector<xo::XDeltaBaseline> bases(replicas);
+            std::vector<xo::XDeltaCursor> curs(replicas);
+            std::vector<std::unique_ptr<xo::TypedXBuffer<dz::View>>> reps;
+            for (int r = 0; r < replicas; ++r)
+                reps.push_back(std::make_unique<xo::TypedXBuffer<dz::View>>(4096, xo::XBuffer::maximum_capacity(kLimit)));
+            std::string d;
+            for (int step = 0; step < steps && errors[t].empty(); ++step) {
+                auto& v = src.root();
+                v.tick = std::uint32_t(step + 1);
+                if (v.slots.size() < 48 || rng() % 4 == 0) v.slots.emplace_back().id = std::uint32_t(rng());
+                for (auto& u : v.slots) {
+                    if (rng() % 3 == 0) u.hp -= 1;
+                    if (rng() % 16 == 0) u.name = rng() % 2 ? "short" : "a name that does not fit inline";
+                }
+                for (int r = 0; r < replicas; ++r) {
+                    (void)src.save_delta_into(d, bases[std::size_t(r)]);
+                    if (d.empty()) continue;
+                    auto res = reps[std::size_t(r)]->try_apply_delta_verified(d, curs[std::size_t(r)]);
+                    if (!res) {
+                        errors[t] = "thread delta rejected: " + res.error().message;
+                        break;
+                    }
+                    if (payload_of(*reps[std::size_t(r)]) != payload_of(src)) {
+                        errors[t] = "thread replica differs";
+                        break;
+                    }
+                }
+            }
+            LateApply& l = late[std::size_t(t)];
+            xo::XDeltaBaseline fresh;
+            (void)src.save_delta_into(l.key, fresh);
+            l.expect = payload_of(src);
+            l.rep = std::make_unique<xo::TypedXBuffer<dz::View>>(4096, xo::XBuffer::maximum_capacity(kLimit));
+            at_exit.run = [&l] { l.applied = bool(l.rep->try_apply_delta_verified(l.key, l.cur)); };
+        });
+    for (auto& th : pool) th.join();
+    for (int t = 0; t < threads; ++t) {
+        need(errors[std::size_t(t)].empty(), errors[std::size_t(t)]);
+        const LateApply& l = late[std::size_t(t)];
+        need(l.applied && payload_of(*l.rep) == l.expect, "key delta applied at thread exit");
+    }
+}
+
 void wrong_type_case() {
     const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
     auto view = xo::TypedXBuffer<dz::View>::create(4096, cap);
@@ -1040,6 +1117,7 @@ int main(int argc, char** argv) {
     view_sizes();
     touched_fixed_case();
     touched_growth_case();
+    thread_scratch_case();
     for (int s = 0; s < streams; ++s) random_stream(20261102u + std::uint64_t(s), steps);
     for (int s = 0; s < streams; ++s) touched_stream(20261103u + std::uint64_t(s), steps);
     need(touch_totals.compared_touched * 4 < touch_totals.compared_whole * 3 && touch_totals.relayed > 0 &&
