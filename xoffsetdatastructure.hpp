@@ -1880,17 +1880,22 @@ namespace XOffsetDatastructure {
             const auto geometric = current > maximum / 2 ? maximum : current * 2;
             auto target = std::max<std::size_t>(required, geometric);
             // D6: below zero_from() (bytes exposed before an in-place reload
-            // shrank the logical length) grow_to must memset every newly exposed byte, so a
-            // doubling there clears far more than the tail will use. Grow in
-            // steps inside that range; past it fresh OS pages are already
-            // zero and growth is geometric again. The step starts at 256 B
-            // after each reload or reset and doubles up to 4 KiB with every
-            // step: an owner that grows once (one vector regrow in a resident
-            // player) clears a few cache lines, not a cold 4 KiB page, while
-            // one that keeps growing reaches the 4 KiB step after five calls.
-            // used_end, and therefore the wire, does not depend on the
-            // logical length.
+            // shrank the logical length) grow_to must memset every newly
+            // exposed byte, so a doubling there clears far more than the tail
+            // will use. Grow in steps inside that range; past it fresh OS
+            // pages are already zero and growth is geometric again. The step
+            // starts at 256 B in each epoch (after each reload or reset) and
+            // doubles up to 4 KiB with every step: an owner that grows once
+            // (one vector regrow in a resident player) clears a few cache
+            // lines, not a cold 4 KiB page, while one that keeps growing
+            // reaches the 4 KiB step after five calls. The reset is keyed on
+            // the epoch here so the reload path does not pay for it. used_end,
+            // and therefore the wire, does not depend on the logical length.
             if (required < buffer_.zero_from()) {
+                if (dirty_epoch_ != m_epoch) [[unlikely]] {
+                    dirty_epoch_ = m_epoch;
+                    dirty_step_ = first_dirty_step;
+                }
                 target = std::max<std::size_t>(required, std::min<std::size_t>(geometric, std::size_t(current) + dirty_step_));
                 if (dirty_step_ < regrow_step) dirty_step_ *= 2;
             }
@@ -1926,7 +1931,6 @@ namespace XOffsetDatastructure {
                 if (auto* table = free_table_.release()) FreeTableRecycler::recycle(table, true);
             }
             free_table_lost_ = false;
-            dirty_step_ = first_dirty_step;
             typed_root_access_allowed_ = false;
             schema_bound_ = false;
             bound_root_type_id_ = 0;
@@ -1939,7 +1943,15 @@ namespace XOffsetDatastructure {
         // as it did before begin_verified_reload shared them.
         template <typename Assign>
         detail::vstatus reinit_from_storage(const char* data, size_type size, Assign&& assign) {
-            const ZeroTail tail = settled_zero_tail(size);
+            if (shrinks_by_page(size)) [[unlikely]] return reinit_from_storage_shrinking(data, size, assign);
+            XOFFSET_VTRY(admit_reinit(size, data != nullptr));
+            XOFFSET_VTRY(as_arena_failure(assign));
+            return check_reinit_payload();
+        }
+        template <typename Assign>
+        XOFFSET_DETAIL_NOINLINE detail::vstatus reinit_from_storage_shrinking(const char* data, size_type size,
+                                                                             Assign& assign) {
+            const ZeroTail tail = settled_zero_tail();
             XOFFSET_VTRY(admit_reinit(size, data != nullptr));
             XOFFSET_VTRY(as_arena_failure(assign));
             note_reinit_zero_tail(tail, size);
@@ -1961,24 +1973,21 @@ namespace XOffsetDatastructure {
         // lower the watermark by enough to matter; small reloads (messages of
         // similar size) leave after one comparison.
         static constexpr std::size_t zero_tail_min_gain = 4096;
-        // The common case (a reload of similar size) is one comparison and one
-        // branch; the rest stays out of line so the compiler does not if-convert
-        // it into every reload.
-        XOFFSET_DETAIL_MOVE_INLINE ZeroTail settled_zero_tail(size_type size) const noexcept {
-            if (std::size_t(size) + zero_tail_min_gain > buffer_.size()) [[likely]] return {};
-            return settled_zero_tail_shrinking();
+        // The common case (a reload of similar size) costs this one comparison;
+        // a shrinking load takes an out-of-line copy of the reinit that also
+        // lowers the watermark, so nothing of it is if-converted into every
+        // reload.
+        XOFFSET_DETAIL_MOVE_INLINE bool shrinks_by_page(size_type size) const noexcept {
+            return std::size_t(size) + zero_tail_min_gain <= buffer_.size();
         }
-        XOFFSET_DETAIL_NOINLINE ZeroTail settled_zero_tail_shrinking() const noexcept {
+        ZeroTail settled_zero_tail() const noexcept {
             const auto logical = buffer_.size();
             if (buffer_.zero_from() != logical || free_table_lost_ || logical < min_payload_size()) return {};
             const auto used = static_cast<size_type>(arena()->used_end);
             return {buffer_.data(), used < logical ? used : logical};
         }
-        XOFFSET_DETAIL_MOVE_INLINE void note_reinit_zero_tail(const ZeroTail& tail, size_type size) noexcept {
-            if (tail.base) [[unlikely]] note_reinit_zero_tail_slow(tail, size);
-        }
-        XOFFSET_DETAIL_NOINLINE void note_reinit_zero_tail_slow(const ZeroTail& tail, size_type size) noexcept {
-            if (tail.base == buffer_.data())
+        void note_reinit_zero_tail(const ZeroTail& tail, size_type size) noexcept {
+            if (tail.base && tail.base == buffer_.data())
                 buffer_.note_zero_from(std::max<std::size_t>(size, tail.used_end));
         }
 
@@ -2038,15 +2047,27 @@ namespace XOffsetDatastructure {
             if (size < sizeof(arena_header) || !buffer_.can_assign_in_place(size)) [[unlikely]] {
                 return reinit_from_wire({root_offset, stored, nullptr, 0}, size);
             }
-            const ZeroTail tail = settled_zero_tail(size);
+            if (shrinks_by_page(size)) [[unlikely]] return reinit_dense_shrinking_in_place(stored, root_offset, size);
+            begin_reinit();
+            free_table_lost_ = true;
+            if (!buffer_.assign_in_place(stored, size, sizeof(arena_header)))
+                XOFFSET_VFAIL(XBadAlloc, XErrc::out_of_storage, detail::arena_failure_message);
+            // check_reinit_payload() holds by construction: the header was
+            // just written with used_end == size == the logical size, so its
+            // checks pass and nothing lies past used_end to zero.
+            write_payload_header(buffer_.data(), root_offset, size);
+            return detail::vok();
+        }
+
+        XOFFSET_DETAIL_NOINLINE detail::vstatus reinit_dense_shrinking_in_place(const char* stored,
+                                                                               std::uint64_t root_offset,
+                                                                               size_type size) {
+            const ZeroTail tail = settled_zero_tail();
             begin_reinit();
             free_table_lost_ = true;
             if (!buffer_.assign_in_place(stored, size, sizeof(arena_header)))
                 XOFFSET_VFAIL(XBadAlloc, XErrc::out_of_storage, detail::arena_failure_message);
             note_reinit_zero_tail(tail, size);
-            // check_reinit_payload() holds by construction: the header was
-            // just written with used_end == size == the logical size, so its
-            // checks pass and nothing lies past used_end to zero.
             write_payload_header(buffer_.data(), root_offset, size);
             return detail::vok();
         }
@@ -2196,6 +2217,7 @@ namespace XOffsetDatastructure {
         detail::VirtualMemoryStorage buffer_;
         // Next D6 growth step below zero_from() (ensure_allocation_extent).
         std::uint32_t dirty_step_ = first_dirty_step;
+        uint64_t dirty_epoch_ = 0;  // m_epoch when dirty_step_ was last reset
         XGrowPolicy growth_policy_ = XGrowPolicy::Explicit;
         FreeTablePtr free_table_;
         bool free_table_lost_ = false;
