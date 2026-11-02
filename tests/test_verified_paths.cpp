@@ -8,6 +8,7 @@
 #include <new>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace host {
 inline thread_local long remaining = -1;
@@ -252,9 +253,17 @@ void hole_table_paths() {
     need(from_dense.root<PathsRoot>().blob.size()==8192,"dense snapshot reload differs");
     // A lost retirement (host OOM in the free table) is recomputed before emission.
     auto lost=make();
-    // A size class with no bin yet: retiring it needs a host allocation.
     lost.root().name=std::string(300,'q');
     lost.root().blob.reserve(lost.root().blob.capacity()+64); // name block leaves the tail
+    // A size class with no bin yet: retiring it needs a host allocation. CF:
+    // a compact table has room for any size, so more 8-byte holes than the
+    // compact form holds make the table binned first.
+    {
+        std::vector<void*> small(xo::XBufferCore::free_table_compact_max+1);
+        for(auto& p:small)p=lost.arena()->allocate_aligned(8,8);
+        for(auto p:small)lost.arena()->deallocate(p,8);
+        need(lost.free_block_count()>xo::XBufferCore::free_table_compact_max,"binned fixture differs");
+    }
     {Arm arm;lost.root().name.reserve(1000);need(host::remaining==-1,"free-table host failure not reached");}
     need(!lost.free_table_complete(),"lost retirement not recorded");
     std::string recomputed;lost.save_verified_into(recomputed);

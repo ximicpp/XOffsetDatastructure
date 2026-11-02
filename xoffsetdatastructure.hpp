@@ -730,16 +730,27 @@ namespace XOffsetDatastructure {
                 alignment - 1u < 8u && (alignment & (alignment - 1u)) == 0) [[likely]] {
                 FreeTable* table = free_table_.get();
                 if (table && table->count != 0) {
-                    const auto bin = bytes / 8u - 1u;
-                    auto& exact = table->bins[bin];
-                    if (!exact.empty()) [[likely]] {
-                        check_owner_resolves();
-                        const auto offset = exact.back();
-                        exact.pop_back();
-                        if (exact.empty()) table->clear_nonempty(bin);
-                        table->bytes -= bytes;
-                        --table->count;
-                        return payload_byte_address(offset);
+                    if (!table->binned) [[likely]] {
+                        const auto at = table->compact_exact(bytes);
+                        if (at != table->used) [[likely]] {
+                            check_owner_resolves();
+                            const auto offset = table->entries[at].offset;
+                            table->compact_erase(at);
+                            return payload_byte_address(offset);
+                        }
+                    } else {
+                        auto& bins = *table->bins;
+                        const auto bin = bytes / 8u - 1u;
+                        auto& exact = bins.bins[bin];
+                        if (!exact.empty()) [[likely]] {
+                            check_owner_resolves();
+                            const auto offset = exact.back();
+                            exact.pop_back();
+                            if (exact.empty()) bins.clear_nonempty(bin);
+                            table->bytes -= bytes;
+                            --table->count;
+                            return payload_byte_address(offset);
+                        }
                     }
                 } else if (auto* sm = arena()) {
                     // No free block: bump_block, whose start is the current
@@ -774,9 +785,10 @@ namespace XOffsetDatastructure {
         // ptr/bytes must name exactly one live block of this arena, or a run
         // of adjacent live blocks released together (T4 subtree retirement):
         // blocks have no headers and the table records only holes.
-        // D3: a small block entering a bin that already has spare capacity
-        // needs no host allocation and runs no host callback; it is published
-        // inline. Everything else takes retire_block_general unchanged.
+        // D3: a small block entering a compact table with room, or a bin that
+        // already has spare capacity, needs no host allocation and runs no
+        // host callback; it is published inline. Everything else takes
+        // retire_block_general unchanged.
         XOFFSET_DETAIL_MOVE_INLINE void retire_block(void* ptr, std::uint32_t bytes) noexcept {
             const auto base = reinterpret_cast<std::uintptr_t>(buffer_.data());
             const auto address = reinterpret_cast<std::uintptr_t>(ptr);
@@ -784,23 +796,38 @@ namespace XOffsetDatastructure {
             if (table && ptr && bytes != 0 && (bytes & 7u) == 0 && bytes <= FreeTable::small_max &&
                 address >= base && address - base < buffer_.size() &&
                 bytes <= buffer_.size() - (address - base)) [[likely]] {
-                const auto bin = bytes / 8u - 1u;
-                auto& slot = table->bins[bin];
-                if (slot.size() < slot.capacity()) [[likely]] {
-                    check_owner_resolves();
-                    // M3, as in retire_block_general.
-                    zero_retired(ptr, bytes);
-                    slot.push_back(static_cast<std::uint32_t>(address - base));
-                    table->mark_nonempty(bin);
-                    table->bytes += bytes;
-                    ++table->count;
-                    return;
+                if (!table->binned) [[likely]] {
+                    if (table->used < FreeTable::compact_max) [[likely]] {
+                        check_owner_resolves();
+                        // M3, as in retire_block_general.
+                        zero_retired(ptr, bytes);
+                        table->compact_insert(static_cast<std::uint32_t>(address - base), bytes);
+                        return;
+                    }
+                } else {
+                    auto& bins = *table->bins;
+                    const auto bin = bytes / 8u - 1u;
+                    auto& slot = bins.bins[bin];
+                    if (slot.size() < slot.capacity()) [[likely]] {
+                        check_owner_resolves();
+                        // M3, as in retire_block_general.
+                        zero_retired(ptr, bytes);
+                        slot.push_back(static_cast<std::uint32_t>(address - base));
+                        bins.mark_nonempty(bin);
+                        table->bytes += bytes;
+                        ++table->count;
+                        return;
+                    }
                 }
             }
             retire_block_general(ptr, bytes);
         }
 
         bool free_table_complete() const noexcept { return !free_table_lost_; }
+        // Hole sizes up to this have exact-size bins in the binned table.
+        static constexpr std::uint32_t free_table_small_max = 4096;
+        // CF: a hole table holds up to this many holes in its compact form.
+        static constexpr std::uint32_t free_table_compact_max = 32;
         // Releases this thread's cached empty free tables, so the next table
         // is a fresh host allocation (allocation-failure tests use this).
         static void trim_free_table_cache() noexcept {
@@ -811,24 +838,32 @@ namespace XOffsetDatastructure {
         std::size_t free_block_count() const noexcept { return free_table_ ? free_table_->count : 0; }
         std::uint64_t free_block_bytes() const noexcept { return free_table_ ? free_table_->bytes : 0; }
 
-        // Free blocks in canonical emission order: ascending bin size, LIFO
-        // vector order within a bin, then large blocks in (size, insertion)
-        // order. load_holes() re-inserts in this order, so write-read-write
-        // reproduces identical bytes.
+        // Free blocks in canonical emission order: ascending size; within a
+        // size, insertion order (a small size hands out its newest block, a
+        // large one its oldest, so what remains keeps that order). A compact
+        // table stores exactly this order; a binned one is its bins in
+        // ascending order, then the large map. load_holes() re-inserts in
+        // this order, so write-read-write reproduces identical bytes.
         template <typename Fn>
         void for_each_free_block(Fn&& fn) const {
             if (!free_table_) return;
             const auto& table = *free_table_;
+            if (!table.binned) {
+                for (std::uint32_t i = 0; i < table.used; ++i)
+                    fn(WireHole{table.entries[i].offset, table.entries[i].bytes});
+                return;
+            }
+            const auto& bins = *table.bins;
             // Empty bins emit nothing, so visiting only nonempty bins in
             // ascending order keeps the canonical order.
             for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
-                for (auto bits = table.nonempty[word]; bits != 0; bits &= bits - 1u) {
+                for (auto bits = bins.nonempty[word]; bits != 0; bits &= bits - 1u) {
                     const auto bin = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
                     const auto bytes = (bin + 1u) * 8u;
-                    for (auto offset : table.bins[bin]) fn(WireHole{offset, bytes});
+                    for (auto offset : bins.bins[bin]) fn(WireHole{offset, bytes});
                 }
             }
-            for (const auto& [bytes, offset] : table.large) fn(WireHole{offset, bytes});
+            for (const auto& [bytes, offset] : bins.large) fn(WireHole{offset, bytes});
         }
 
         // Visits only free blocks of at least min_bytes (bins from min_bytes
@@ -837,17 +872,28 @@ namespace XOffsetDatastructure {
         void for_each_free_block_at_least(std::uint32_t min_bytes, Fn&& fn) const {
             if (!free_table_) return;
             const auto& table = *free_table_;
+            if (!table.binned) {
+                // As the binned form: sizes from min_bytes (rounded up to a
+                // multiple of 8) upward, and every large block.
+                const std::uint64_t least = (std::uint64_t(min_bytes) + 7u) & ~std::uint64_t(7);
+                for (std::uint32_t i = 0; i < table.used; ++i) {
+                    const auto hole = table.entries[i];
+                    if (hole.bytes >= least || hole.bytes > FreeTable::small_max) fn(WireHole{hole.offset, hole.bytes});
+                }
+                return;
+            }
+            const auto& bins = *table.bins;
             const std::uint32_t first = min_bytes <= 8u ? 0u : (min_bytes + 7u) / 8u - 1u;
             for (std::uint32_t word = first / 64u; word < FreeTable::small_bins / 64u; ++word) {
-                auto bits = table.nonempty[word];
+                auto bits = bins.nonempty[word];
                 if (word == first / 64u) bits &= ~std::uint64_t(0) << (first % 64u);
                 for (; bits != 0; bits &= bits - 1u) {
                     const auto bin = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
                     const auto bytes = (bin + 1u) * 8u;
-                    for (auto offset : table.bins[bin]) fn(WireHole{offset, bytes});
+                    for (auto offset : bins.bins[bin]) fn(WireHole{offset, bytes});
                 }
             }
-            for (const auto& [bytes, offset] : table.large) fn(WireHole{offset, bytes});
+            for (const auto& [bytes, offset] : bins.large) fn(WireHole{offset, bytes});
         }
 
         // Writes free_block_count() little-endian entries.
@@ -878,18 +924,24 @@ namespace XOffsetDatastructure {
             FreeTablePtr table; // no holes: an absent table is an exact, empty one
             XOFFSET_TRY {
                 if (count != 0) table = make_free_table();
+                if (count > FreeTable::compact_max) table->activate_bins();
                 for (std::size_t i = 0; i < count; ++i) {
                     WireHole hole;
                     std::memcpy(&hole, static_cast<const char*>(holes) + i * sizeof(hole), sizeof(hole));
+                    if (!table->binned) {
+                        table->compact_insert(hole.offset, hole.bytes);
+                        continue;
+                    }
+                    auto& bins = *table->bins;
                     if (hole.bytes <= FreeTable::small_max) {
                         const auto bin = hole.bytes / 8u - 1u;
-                        auto& slot = table->bins[bin];
-                        if (slot.size() == slot.capacity()) [[unlikely]] table->grown = true;
+                        auto& slot = bins.bins[bin];
+                        if (slot.size() == slot.capacity()) [[unlikely]] bins.grown = true;
                         slot.push_back(hole.offset);
-                        table->mark_nonempty(bin);
-                        table->touched[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
+                        bins.mark_nonempty(bin);
+                        bins.touched[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
                     } else {
-                        table->large.emplace(hole.bytes, hole.offset);
+                        bins.large.emplace(hole.bytes, hole.offset);
                     }
                     table->bytes += hole.bytes;
                     ++table->count;
@@ -911,9 +963,10 @@ namespace XOffsetDatastructure {
         }
 
     private:
-        struct FreeTable {
-            static constexpr std::uint32_t small_max = 4096;
-            static constexpr std::uint32_t small_bins = small_max / 8;
+        // The binned form of a hole table (~12 KiB of bin headers): exact-size
+        // bins up to small_max, then a size-ordered map.
+        struct FreeBins {
+            static constexpr std::uint32_t small_bins = free_table_small_max / 8;
             std::vector<std::uint32_t> bins[small_bins];
             std::uint64_t nonempty[small_bins / 64] = {};
             // Bit w is set exactly when nonempty[w] != 0, so a search for a
@@ -923,13 +976,11 @@ namespace XOffsetDatastructure {
             // never cleared by removal), so recycling visits only those bins.
             std::uint64_t touched[small_bins / 64] = {};
             std::multimap<std::uint32_t, std::uint32_t> large;
-            std::uint64_t bytes = 0;
-            std::size_t count = 0;
             // RL: false means no bin storage has grown since the last full
             // recycle (or construction), so what is kept is still within the
             // keep limits and a keep-recycle only empties the nonempty bins.
             // Every bin growth (load_free_blocks, insert_free_block,
-            // copy_free_table) sets it.
+            // copy_free_table, promotion) sets it.
             bool grown = false;
 
             void mark_nonempty(std::uint32_t bin) noexcept {
@@ -940,6 +991,101 @@ namespace XOffsetDatastructure {
                 auto& word = nonempty[bin / 64u];
                 word &= ~(std::uint64_t(1) << (bin % 64u));
                 if (word == 0) nonempty_words &= ~(1u << (bin / 64u));
+            }
+        };
+
+        // A buffer's hole table. CF: most buffers hold a handful of holes
+        // (a mutated player or view holds 1 to 8 when it allocates), so a
+        // table starts compact: up to compact_max holes in `entries`, kept in
+        // canonical order (ascending size, then insertion order), about 280
+        // bytes instead of the 12 KiB binned form. Both forms make the same
+        // decisions (exact size first, newest of that size; else the smallest
+        // larger small size, newest; else the oldest of the smallest large
+        // size; split at the front) and emit the same order, so the form never
+        // shows in a layout, a hole table or a wire byte. One hole more than
+        // compact_max promotes the table to its binned form, which it keeps
+        // (with its storage, under the recycle limits) until it is recycled.
+        struct FreeTable {
+            static constexpr std::uint32_t small_max = free_table_small_max;
+            static constexpr std::uint32_t small_bins = FreeBins::small_bins;
+            static constexpr std::uint32_t compact_max = free_table_compact_max;
+            struct Entry {
+                std::uint32_t bytes;
+                std::uint32_t offset;
+            };
+            std::uint64_t bytes = 0;
+            std::size_t count = 0;
+            FreeBins* bins = nullptr; // owned; the live form while `binned`, else spare storage
+            bool binned = false;
+            std::uint32_t used = 0;   // compact entries while !binned
+            Entry entries[compact_max];
+
+            FreeTable() noexcept = default;
+            FreeTable(const FreeTable&) = delete;
+            FreeTable& operator=(const FreeTable&) = delete;
+            ~FreeTable() { delete bins; }
+
+            // Throws std::bad_alloc; the table is unchanged then.
+            void activate_bins() {
+                if (!bins) bins = new FreeBins();
+                binned = true;
+            }
+            // The first compact entry larger than `size` (where an insertion goes).
+            std::uint32_t compact_upper(std::uint32_t size) const noexcept {
+                std::uint32_t i = 0;
+                while (i < used && entries[i].bytes <= size) ++i;
+                return i;
+            }
+            // The newest entry of exactly `size`, or `used`.
+            std::uint32_t compact_exact(std::uint32_t size) const noexcept {
+                const auto i = compact_upper(size);
+                return i != 0 && entries[i - 1u].bytes == size ? i - 1u : used;
+            }
+            // The entry the binned form hands out for `size`, or `used`.
+            std::uint32_t compact_pick(std::uint32_t size) const noexcept {
+                std::uint32_t i = 0;
+                while (i < used && entries[i].bytes < size) ++i;
+                if (i == used || entries[i].bytes > small_max) return i;
+                const auto found = entries[i].bytes;
+                while (i + 1u < used && entries[i + 1u].bytes == found) ++i;
+                return i;
+            }
+            // Requires used < compact_max.
+            void compact_insert(std::uint32_t offset, std::uint32_t size) noexcept {
+                const auto at = compact_upper(size);
+                std::memmove(entries + at + 1, entries + at, (used - at) * sizeof(Entry));
+                entries[at] = Entry{size, offset};
+                ++used;
+                bytes += size;
+                ++count;
+            }
+            void compact_erase(std::uint32_t at) noexcept {
+                bytes -= entries[at].bytes;
+                --count;
+                --used;
+                std::memmove(entries + at, entries + at + 1, (used - at) * sizeof(Entry));
+            }
+            // Moves the compact entries into `bins` in canonical order. Every
+            // small entry's bin already has the capacity and `nodes` holds a
+            // spare node per large entry (reserve_promotion), so nothing is
+            // allocated.
+            void promote(std::multimap<std::uint32_t, std::uint32_t>* nodes) noexcept {
+                auto& b = *bins;
+                for (std::uint32_t i = 0; i < used; ++i) {
+                    const auto hole = entries[i];
+                    if (hole.bytes <= small_max) {
+                        const auto bin = hole.bytes / 8u - 1u;
+                        b.bins[bin].push_back(hole.offset);
+                        b.mark_nonempty(bin);
+                    } else {
+                        auto node = nodes->extract(nodes->begin());
+                        node.key() = hole.bytes;
+                        node.mapped() = hole.offset;
+                        b.large.insert(std::move(node)); // after equal keys, as an emplace
+                    }
+                }
+                used = 0;
+                binned = true;
             }
         };
 
@@ -995,46 +1141,57 @@ namespace XOffsetDatastructure {
                 if (!free_table_cache_available()) { delete table; return; }
                 auto& cache = free_table_cache();
                 if (cache.count == FreeTableCache::capacity) { delete table; return; }
-                std::size_t kept = 0;
-                if (keep_bins && !table->grown) {
-                    clear_entries(*table); // also clears the word summary
-                    cache.tables[cache.count++] = table;
-                    return;
-                }
-                for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
-                    std::uint64_t still_touched = 0;
-                    for (auto bits = table->touched[word]; bits != 0; bits &= bits - 1u) {
-                        auto& bin = table->bins[word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits))];
-                        const auto bytes = bin.capacity() * sizeof(std::uint32_t);
-                        if (keep_bins && bin.capacity() <= keep_bin_entries && bytes <= keep_bytes - kept) {
-                            bin.clear(); // storage stays, so the bin stays touched
-                            kept += bytes;
-                            still_touched |= bits & (~bits + 1u);
-                        } else {
-                            std::vector<std::uint32_t>().swap(bin);
+                if (FreeBins* bins = table->bins) {
+                    if (keep_bins && !bins->grown) {
+                        clear_bins(*bins); // also clears the word summary
+                    } else {
+                        std::size_t kept = 0;
+                        for (std::uint32_t word = 0; word < FreeBins::small_bins / 64u; ++word) {
+                            std::uint64_t still_touched = 0;
+                            for (auto bits = bins->touched[word]; bits != 0; bits &= bits - 1u) {
+                                auto& bin = bins->bins[word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits))];
+                                const auto bytes = bin.capacity() * sizeof(std::uint32_t);
+                                if (keep_bins && bin.capacity() <= keep_bin_entries && bytes <= keep_bytes - kept) {
+                                    bin.clear(); // storage stays, so the bin stays touched
+                                    kept += bytes;
+                                    still_touched |= bits & (~bits + 1u);
+                                } else {
+                                    std::vector<std::uint32_t>().swap(bin);
+                                }
+                            }
+                            bins->nonempty[word] = 0;
+                            bins->touched[word] = still_touched;
                         }
+                        bins->nonempty_words = 0;
+                        bins->large.clear();
+                        bins->grown = false;
                     }
-                    table->nonempty[word] = 0;
-                    table->touched[word] = still_touched;
                 }
-                table->nonempty_words = 0;
-                table->large.clear();
+                table->binned = false;
+                table->used = 0;
                 table->bytes = 0;
                 table->count = 0;
-                table->grown = false;
                 cache.tables[cache.count++] = table;
             }
 
-            // Removes every entry but keeps the bins' storage (touched stays
-            // set), so refilling the table needs no host allocation.
-            static void clear_entries(FreeTable& table) noexcept {
-                for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
-                    for (auto bits = table.nonempty[word]; bits != 0; bits &= bits - 1u)
-                        table.bins[word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits))].clear();
-                    table.nonempty[word] = 0;
+            // Removes every entry of the binned form but keeps the bins'
+            // storage (touched stays set).
+            static void clear_bins(FreeBins& bins) noexcept {
+                for (std::uint32_t word = 0; word < FreeBins::small_bins / 64u; ++word) {
+                    for (auto bits = bins.nonempty[word]; bits != 0; bits &= bits - 1u)
+                        bins.bins[word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits))].clear();
+                    bins.nonempty[word] = 0;
                 }
-                table.nonempty_words = 0;
-                table.large.clear();
+                bins.nonempty_words = 0;
+                bins.large.clear();
+            }
+
+            // Removes every entry; the table is compact again and keeps any
+            // bin storage as spare, so refilling it needs no host allocation.
+            static void clear_entries(FreeTable& table) noexcept {
+                if (table.bins) clear_bins(*table.bins);
+                table.binned = false;
+                table.used = 0;
                 table.bytes = 0;
                 table.count = 0;
             }
@@ -1058,19 +1215,29 @@ namespace XOffsetDatastructure {
         // large map are kept, so both buffers allocate identically afterwards.
         static FreeTablePtr copy_free_table(const FreeTable& src) {
             auto table = make_free_table();
-            for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
-                for (auto bits = src.nonempty[word]; bits != 0; bits &= bits - 1u) {
-                    const auto bin = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
-                    table->bins[bin] = src.bins[bin];
-                }
-                table->nonempty[word] = src.nonempty[word];
-                table->touched[word] |= src.nonempty[word];
+            if (!src.binned) {
+                std::memcpy(table->entries, src.entries, src.used * sizeof(FreeTable::Entry));
+                table->used = src.used;
+                table->bytes = src.bytes;
+                table->count = src.count;
+                return table;
             }
-            table->nonempty_words = src.nonempty_words;
-            table->large = src.large;
+            table->activate_bins();
+            auto& bins = *table->bins;
+            const auto& from = *src.bins;
+            for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
+                for (auto bits = from.nonempty[word]; bits != 0; bits &= bits - 1u) {
+                    const auto bin = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
+                    bins.bins[bin] = from.bins[bin];
+                }
+                bins.nonempty[word] = from.nonempty[word];
+                bins.touched[word] |= from.nonempty[word];
+            }
+            bins.nonempty_words = from.nonempty_words;
+            bins.large = from.large;
             table->bytes = src.bytes;
             table->count = src.count;
-            table->grown = true; // bins were assigned: the next keep-recycle re-applies the limits
+            bins.grown = true; // bins were assigned: the next keep-recycle re-applies the limits
             return table;
         }
 
@@ -1135,30 +1302,77 @@ namespace XOffsetDatastructure {
             return insert_free_block_inline(offset, bytes) || insert_free_block_general(offset, bytes);
         }
 
-        // A small block entering a bin that already has spare capacity needs
-        // no host allocation and runs no host callback (as D3's retire_block),
-        // so it is published without copying the owner record.
+        // A block entering a compact table with room, or a small block
+        // entering a bin that already has spare capacity, needs no host
+        // allocation and runs no host callback (as D3's retire_block), so it
+        // is published without copying the owner record.
         bool insert_free_block_inline(std::uint32_t offset, std::uint32_t bytes) noexcept {
             FreeTable* table = free_table_.get();
-            if (!table || bytes > FreeTable::small_max) return false;
+            if (!table) return false;
+            if (!table->binned) {
+                if (table->used == FreeTable::compact_max) return false;
+                check_owner_resolves();
+                table->compact_insert(offset, bytes);
+                return true;
+            }
+            if (bytes > FreeTable::small_max) return false;
+            auto& bins = *table->bins;
             const auto bin = bytes / 8u - 1u;
-            auto& slot = table->bins[bin];
+            auto& slot = bins.bins[bin];
             if (slot.size() == slot.capacity()) return false;
             check_owner_resolves();
             slot.push_back(offset);
-            table->mark_nonempty(bin);
+            bins.mark_nonempty(bin);
             table->bytes += bytes;
             ++table->count;
+            return true;
+        }
+
+        // Promotion of a full compact table into `bins`: allocates at most one
+        // thing (one bin's storage, or the spare map nodes for the large
+        // holes) and returns true, so the caller re-resolves the owner before
+        // anything else; false once FreeTable::promote needs no allocation.
+        // `table` is not read after an allocation.
+        static bool reserve_promotion(FreeBins& bins, const FreeTable& table,
+                                      std::optional<std::multimap<std::uint32_t, std::uint32_t>>& nodes) {
+            std::size_t large = 0;
+            for (std::uint32_t i = 0; i < table.used;) {
+                const auto size = table.entries[i].bytes;
+                std::uint32_t run = 0;
+                while (i < table.used && table.entries[i].bytes == size) { ++i; ++run; }
+                if (size > FreeTable::small_max) { large += run; continue; }
+                const auto bin = size / 8u - 1u;
+                auto& slot = bins.bins[bin];
+                // Room for one more of this size, as the binned form's
+                // doubling would have left it (the bin is empty: nothing is
+                // copied), so the block being inserted needs no regrowth.
+                const auto want = std::bit_ceil(std::max<std::size_t>(8u, std::size_t(run) + 1u));
+                if (slot.capacity() < want) {
+                    slot.reserve(want);
+                    bins.grown = true;
+                    bins.touched[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
+                    return true;
+                }
+            }
+            if (large == 0) return false;
+            if (!nodes) {
+                nodes.emplace();
+                return true;
+            }
+            if (nodes->size() >= large) return false;
+            while (nodes->size() < large) nodes->emplace(0u, 0u);
             return true;
         }
 
         XOFFSET_DETAIL_NOINLINE bool insert_free_block_general(std::uint32_t offset, std::uint32_t bytes) noexcept {
             const auto identity = owner_record_;
             FreeTablePtr spare_table;
+            std::unique_ptr<FreeBins> spare_bins;
             std::vector<std::uint32_t> spare_bin;
             // Constructed inside the try: the MSVC STL's map allocates its head
             // node in the default constructor.
             std::optional<std::multimap<std::uint32_t, std::uint32_t>> spare_large;
+            std::optional<std::multimap<std::uint32_t, std::uint32_t>> spare_nodes;
             XOFFSET_TRY {
                 if (bytes > FreeTable::small_max) spare_large.emplace().emplace(bytes, offset);
                 for (;;) {
@@ -1172,11 +1386,29 @@ namespace XOffsetDatastructure {
                         owner->free_table_.swap(spare_table);
                     }
                     auto& table = *owner->free_table_;
+                    if (!table.binned) {
+                        if (table.used < FreeTable::compact_max) {
+                            table.compact_insert(offset, bytes);
+                            return true;
+                        }
+                        // CF promotion: the bins (the table's spare ones, if
+                        // any) and everything the compact holes need in them
+                        // are allocated first, one allocation per pass.
+                        if (!table.bins && !spare_bins) {
+                            spare_bins.reset(new FreeBins());
+                            continue; // re-resolve after the allocation
+                        }
+                        if (reserve_promotion(table.bins ? *table.bins : *spare_bins, table, spare_nodes))
+                            continue; // re-resolve after the allocation
+                        if (!table.bins) table.bins = spare_bins.release();
+                        table.promote(spare_nodes ? &*spare_nodes : nullptr);
+                    }
+                    auto& bins = *table.bins;
                     if (bytes > FreeTable::small_max) {
-                        table.large.insert(spare_large->extract(spare_large->begin()));
+                        bins.large.insert(spare_large->extract(spare_large->begin()));
                     } else {
                         const auto bin = bytes / 8u - 1u;
-                        auto& slot = table.bins[bin];
+                        auto& slot = bins.bins[bin];
                         if (slot.size() == slot.capacity()) {
                             const auto want = std::max<std::size_t>(8u, slot.capacity() * 2u);
                             if (spare_bin.capacity() < want) {
@@ -1185,13 +1417,13 @@ namespace XOffsetDatastructure {
                                 continue; // re-resolve after the allocation
                             }
                             spare_bin.assign(slot.begin(), slot.end()); // fits: no allocation
-                            table.grown = true;
+                            bins.grown = true;
                             slot.swap(spare_bin); // old storage released at scope exit
                             // Storage only arrives here, so only growth marks the bin.
-                            table.touched[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
+                            bins.touched[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
                         }
                         slot.push_back(offset);
-                        table.mark_nonempty(bin);
+                        bins.mark_nonempty(bin);
                     }
                     table.bytes += bytes;
                     ++table.count;
@@ -1222,10 +1454,10 @@ namespace XOffsetDatastructure {
             if (split.node) {
                 if (split.bytes > FreeTable::small_max) {
                     check_owner_resolves();
-                    auto& table = *free_table_;
+                    auto& table = *free_table_; // binned: only its large map gives a node
                     split.node.key() = split.bytes;
                     split.node.mapped() = split.offset;
-                    table.large.insert(std::move(split.node));
+                    table.bins->large.insert(std::move(split.node));
                     table.bytes += split.bytes;
                     ++table.count;
                     return;
@@ -1240,14 +1472,28 @@ namespace XOffsetDatastructure {
         }
 
         void* take_free_block(FreeTable& table, std::uint32_t bytes, FreeSplit& split) noexcept {
+            if (!table.binned) {
+                const auto at = table.compact_pick(bytes);
+                if (at == table.used) return nullptr;
+                const auto found = table.entries[at];
+                table.compact_erase(at);
+                // Split: the remainder stays free (a multiple of 8, at least 8);
+                // finish_free_split re-inserts it into the room just made.
+                if (found.bytes > bytes) {
+                    split.offset = found.offset + bytes;
+                    split.bytes = found.bytes - bytes;
+                }
+                return payload_byte_address(found.offset);
+            }
+            auto& bins = *table.bins;
             std::uint32_t found_offset = 0, found_bytes = 0;
             if (bytes <= FreeTable::small_max) {
                 auto bin = bytes / 8u - 1u;
-                auto& exact = table.bins[bin];
+                auto& exact = bins.bins[bin];
                 if (!exact.empty()) {
                     found_offset = exact.back();
                     exact.pop_back();
-                    if (exact.empty()) table.clear_nonempty(bin);
+                    if (exact.empty()) bins.clear_nonempty(bin);
                     table.bytes -= bytes;
                     --table.count;
                     return payload_byte_address(found_offset);
@@ -1258,29 +1504,29 @@ namespace XOffsetDatastructure {
                 std::uint64_t bits = 0;
                 std::uint32_t word = first;
                 if (first < FreeTable::small_bins / 64u)
-                    bits = table.nonempty[first] & (~std::uint64_t(0) << ((bin + 1u) % 64u));
+                    bits = bins.nonempty[first] & (~std::uint64_t(0) << ((bin + 1u) % 64u));
                 if (bits == 0) {
-                    const auto later = table.nonempty_words & (~0u << first << 1u);
+                    const auto later = bins.nonempty_words & (~0u << first << 1u);
                     if (later != 0) {
                         word = static_cast<std::uint32_t>(std::countr_zero(later));
-                        bits = table.nonempty[word];
+                        bits = bins.nonempty[word];
                     }
                 }
                 if (bits != 0) {
                     const auto larger = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
-                    auto& source = table.bins[larger];
+                    auto& source = bins.bins[larger];
                     found_offset = source.back();
                     found_bytes = (larger + 1u) * 8u;
                     source.pop_back();
-                    if (source.empty()) table.clear_nonempty(larger);
+                    if (source.empty()) bins.clear_nonempty(larger);
                 }
             }
             if (found_bytes == 0) {
-                auto it = table.large.lower_bound(bytes);
-                if (it == table.large.end()) return nullptr;
+                auto it = bins.large.lower_bound(bytes);
+                if (it == bins.large.end()) return nullptr;
                 found_bytes = it->first;
                 found_offset = it->second;
-                split.node = table.large.extract(it); // released after publication
+                split.node = bins.large.extract(it); // released after publication
             }
             table.bytes -= found_bytes;
             --table.count;
