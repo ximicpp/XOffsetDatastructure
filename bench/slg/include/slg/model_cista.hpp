@@ -121,4 +121,11 @@ struct ViewSnapshot {
     data::vector<ViewUnit> units;
 };
 
+struct ViewDelta {
+    int64_t request_id{}; int64_t tick{};
+    int32_t x0{}; int32_t y0{}; int32_t x1{}; int32_t y1{};
+    data::vector<ViewUnit> upserts;
+    data::vector<int32_t> removed;
+};
+
 } // namespace slg::cm

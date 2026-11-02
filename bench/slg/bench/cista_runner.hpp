@@ -82,7 +82,14 @@ public:
         cm::ShardState s;
         copy_shard(s, make_shard(seed, sc));
         shard_.receive(save(tmp, s));
-        if (demo_cases()) world_.setup(seed, *find_view_scale(sc.name));
+        if (demo_cases()) {
+            const ViewScale& vs = *find_view_scale(sc.name);
+            world_.setup(seed, vs);
+            wu_.setup(mix_seed(seed, 0xde17), vs);
+            dt_.setup(vs.clients);
+            held_ = std::vector<cm::ViewSnapshot>(std::size_t(vs.clients));
+            at_.assign(std::size_t(vs.clients), {});
+        }
     }
 
     void run_cycle(int cycle, CycleStats& st, SampleWires* keep) override {
@@ -263,6 +270,25 @@ public:
                 if (keep) keep->view = to_string_bytes(view_);
             }
         }
+        // U: delta sync on a second world (view.hpp); the client's view is a cista
+        // object it keeps and changes in place.
+        const ViewScale& us = wu_.scale();
+        for (int r = 0; r < us.rounds; ++r) {
+            wu_.tick();
+            for (int c = 0; c < us.clients; ++c) {
+                const auto& sel = wu_.request(c);
+                dt_.plan(wu_, c, sel, plan_);
+                const int64_t id = (int64_t(cycle) * us.rounds + r) * us.clients + c;
+                timed(st, "U.send", [&] { fill_delta(u_s_, wu_, plan_, id); save(delta_, u_s_); });
+                timed(st, "U.recv", [&] { u_r_.receive({delta_.data(), delta_.size()}); });
+                timed(st, "U.apply", [&] { apply_delta(held_[std::size_t(c)], at_[std::size_t(c)], *u_r_); });
+                st.report_sum += query_held(held_[std::size_t(c)]);
+                st.bytes["U.delta"] += delta_.size();
+                if (keep) keep->delta = to_string_bytes(delta_);
+                st.bytes["U.units"] += plan_.upserts.size();
+                st.bytes["U.removed"] += plan_.removed.size();
+            }
+        }
     }
 
     uint64_t world_digest() override {
@@ -310,7 +336,14 @@ private:
     ViewWorld world_;
     cm::ViewSnapshot e_s_;
     Held<cm::ViewSnapshot> e_r_;
-    Bytes view_, store_;
+    Bytes view_, store_, delta_;
+    ViewWorld wu_;
+    DeltaTracker dt_;
+    DeltaPlan plan_;
+    cm::ViewDelta u_s_;
+    Held<cm::ViewDelta> u_r_;
+    std::vector<cm::ViewSnapshot> held_;
+    std::vector<std::unordered_map<int32_t, int32_t>> at_;
 };
 
 } // namespace slg

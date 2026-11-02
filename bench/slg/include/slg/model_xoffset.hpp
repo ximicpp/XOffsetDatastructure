@@ -81,6 +81,14 @@ struct alignas(8) ViewSnapshot {
     XVector<ViewUnit> units;
 };
 
+// Scenario U (view.hpp).
+struct alignas(8) ViewDelta {
+    int64_t request_id{}; int64_t tick{};
+    int32_t x0{}; int32_t y0{}; int32_t x1{}; int32_t y1{};
+    XVector<ViewUnit> upserts;
+    XVector<int32_t> removed;
+};
+
 } // namespace slg::xm
 
 // Audited: every record above has only ordinary members (no bases, bit-fields,
@@ -110,11 +118,12 @@ XOFFSET_RECORD(slg::xm::March, march_id, owner, from_x, from_y, to_x, to_y, eta,
 XOFFSET_RECORD(slg::xm::ShardState, shard_id, tick, width, tiles, cities, marches)
 XOFFSET_RECORD(slg::xm::ViewUnit, id, owner, x, y, hp, state, name)
 XOFFSET_RECORD(slg::xm::ViewSnapshot, request_id, tick, x0, y0, x1, y1, units)
+XOFFSET_RECORD(slg::xm::ViewDelta, request_id, tick, x0, y0, x1, y1, upserts, removed)
 #elif defined(XOFFSET_ORDINARY_RECORDS)
 XOFFSET_ORDINARY_RECORDS(slg::xm::Buff, slg::xm::Skill, slg::xm::Troop, slg::xm::Hero, slg::xm::Army,
                          slg::xm::City, slg::xm::PlayerState, slg::xm::Event, slg::xm::Report,
                          slg::xm::BattleMsg, slg::xm::Tile, slg::xm::March, slg::xm::ShardState,
-                         slg::xm::ViewUnit, slg::xm::ViewSnapshot)
+                         slg::xm::ViewUnit, slg::xm::ViewSnapshot, slg::xm::ViewDelta)
 #else
 // Libraries without the macro: its two specializations, written out.
 #define SLG_XM_ORDINARY_RECORD(T)                                                      \
@@ -137,6 +146,7 @@ SLG_XM_ORDINARY_RECORD(slg::xm::March)
 SLG_XM_ORDINARY_RECORD(slg::xm::ShardState)
 SLG_XM_ORDINARY_RECORD(slg::xm::ViewUnit)
 SLG_XM_ORDINARY_RECORD(slg::xm::ViewSnapshot)
+SLG_XM_ORDINARY_RECORD(slg::xm::ViewDelta)
 #undef SLG_XM_ORDINARY_RECORD
 #endif
 
@@ -145,3 +155,4 @@ XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::BattleMsg, "slg.BattleMsg.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::ShardState, "slg.ShardState.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::Report, "slg.Report.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::ViewSnapshot, "slg.ViewSnapshot.v1")
+XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::ViewDelta, "slg.ViewDelta.v1")

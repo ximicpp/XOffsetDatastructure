@@ -16,6 +16,7 @@
 #include <cstdlib>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 #include "generic.hpp"
 
@@ -77,16 +78,18 @@ public:
         rebuild_grid();
     }
 
-    // One server tick: every unit moves; some lose or regain hp or change state.
+    // One server tick: marching units (state 0, about a quarter) move; 1 in 16 units
+// loses or regains hp, 1 in 16 changes state.
     void tick() {
         ++tick_;
         for (auto& u : units_) {
-            u.x += u.vx; u.y += u.vy;
-            if (u.x < 0 || u.x >= kMapSize) { u.vx = -u.vx; u.x = u.x < 0 ? -u.x : 2 * kMapSize - 1 - u.x; }
-            if (u.y < 0 || u.y >= kMapSize) { u.vy = -u.vy; u.y = u.y < 0 ? -u.y : 2 * kMapSize - 1 - u.y; }
             const int32_t r = tick_rng_.below(16);
             if (r == 0) u.hp = u.hp > 10 ? u.hp - tick_rng_.range(1, 10) : u.hp + 500;
             else if (r == 1) u.state = tick_rng_.below(4);
+            if (u.state != 0) continue;  // state 0 = marching: about a quarter of the units move
+            u.x += u.vx; u.y += u.vy;
+            if (u.x < 0 || u.x >= kMapSize) { u.vx = -u.vx; u.x = u.x < 0 ? -u.x : 2 * kMapSize - 1 - u.x; }
+            if (u.y < 0 || u.y >= kMapSize) { u.vy = -u.vy; u.y = u.y < 0 ? -u.y : 2 * kMapSize - 1 - u.y; }
         }
         rebuild_grid();
     }
@@ -159,6 +162,109 @@ template <class V> uint64_t query_view(const V& v) {
         h += uint64_t(u.hp) * 3u + uint64_t(u.x ^ u.y) + uint64_t(u.state) + uint64_t(u.id) * 1315423911u;
         h += uint64_t(u.owner) + sv(u.name).size();
     }
+    return h;
+}
+
+// ---- scenario U: delta sync ------------------------------------------------
+//
+// Each client already holds the units of its viewport. After every server tick
+// the server sends that client only what changed since its last sync: units
+// that entered the viewport or changed (whole record), and the ids of units that
+// left. The client applies the delta to the view it holds. This is the usual
+// application-level delta: none of the formats has a built-in one.
+// Server bookkeeping (what each client was last sent) is the same plain code in
+// every runner and is not timed. Timed: U.send (fill the delta message, encode),
+// U.recv (receive with the format's checks) and U.apply (apply to the held view;
+// the same template code for every format, on that format's own view object).
+
+struct DeltaPlan { std::vector<int32_t> upserts; std::vector<int32_t> removed; };
+
+class DeltaTracker {
+public:
+    void setup(int clients) { sent_.assign(std::size_t(clients), {}); }
+    // sel: world indices in client c's viewport now. Fills plan (world indices to send,
+    // ids that left) and records what the client will hold.
+    void plan(const ViewWorld& w, int c, const std::vector<int32_t>& sel, DeltaPlan& p) {
+        auto& last = sent_[std::size_t(c)];
+        p.upserts.clear(); p.removed.clear();
+        ++gen_;
+        for (int32_t i : sel) {
+            const WorldUnit& u = w.unit(i);
+            auto [it, fresh] = last.try_emplace(u.id);
+            Sent& s = it->second;
+            if (fresh || s.x != u.x || s.y != u.y || s.hp != u.hp || s.state != u.state) {
+                s.x = u.x; s.y = u.y; s.hp = u.hp; s.state = u.state;
+                p.upserts.push_back(i);
+            }
+            s.gen = gen_;
+        }
+        for (auto it = last.begin(); it != last.end();) {
+            if (it->second.gen != gen_) { p.removed.push_back(it->first); it = last.erase(it); }
+            else ++it;
+        }
+    }
+private:
+    struct Sent { int32_t x{}, y{}, hp{}, state{}; uint64_t gen{}; };
+    std::vector<std::unordered_map<int32_t, Sent>> sent_;
+    uint64_t gen_ = 0;
+};
+
+template <class D> void fill_delta(D& d, const ViewWorld& w, const DeltaPlan& p, int64_t request_id) {
+    const Viewport& r = w.current();
+    d.request_id = request_id; d.tick = w.tick_no();
+    d.x0 = r.x0; d.y0 = r.y0; d.x1 = r.x0 + kViewW; d.y1 = r.y0 + kViewH;
+    d.upserts.clear();
+    d.upserts.reserve(p.upserts.size());
+    for (int32_t i : p.upserts) {
+        const WorldUnit& s = w.unit(i);
+        auto& u = d.upserts.emplace_back();
+        u.id = s.id; u.owner = s.owner; u.x = s.x; u.y = s.y; u.hp = s.hp; u.state = s.state;
+        u.name = std::string_view(s.name);
+    }
+    d.removed.clear();
+    d.removed.reserve(p.removed.size());
+    for (int32_t id : p.removed) d.removed.emplace_back(id);
+}
+
+// Client side: apply a received delta to the view it holds (any model's
+// ViewSnapshot) through an id -> position index. A unit that left is replaced by
+// the last unit (order is not kept); a changed unit is updated in place.
+template <class V, class D> void apply_delta(V& v, std::unordered_map<int32_t, int32_t>& at, const D& d) {
+    v.request_id = d.request_id; v.tick = d.tick; v.x0 = d.x0; v.y0 = d.y0; v.x1 = d.x1; v.y1 = d.y1;
+    for (const auto& id : d.removed) {
+        const auto it = at.find(id);
+        if (it == at.end()) continue;
+        const int32_t pos = it->second, last = int32_t(v.units.size()) - 1;
+        if (pos != last) {
+            auto& dst = v.units[std::size_t(pos)];
+            const auto& src = v.units[std::size_t(last)];
+            dst.id = src.id; dst.owner = src.owner; dst.x = src.x; dst.y = src.y; dst.hp = src.hp; dst.state = src.state;
+            if (sv(dst.name) != sv(src.name)) dst.name = std::string(sv(src.name));
+            at[dst.id] = pos;
+        }
+        v.units.pop_back();
+        at.erase(it);
+    }
+    for (const auto& u : d.upserts) {
+        const auto it = at.find(u.id);
+        if (it != at.end()) {
+            auto& dst = v.units[std::size_t(it->second)];
+            dst.owner = u.owner; dst.x = u.x; dst.y = u.y; dst.hp = u.hp; dst.state = u.state;
+            if (sv(dst.name) != sv(u.name)) dst.name = sv(u.name);
+        } else {
+            at.emplace(u.id, int32_t(v.units.size()));
+            auto& dst = v.units.emplace_back();
+            dst.id = u.id; dst.owner = u.owner; dst.x = u.x; dst.y = u.y; dst.hp = u.hp; dst.state = u.state;
+            dst.name = sv(u.name);
+        }
+    }
+}
+
+// Order-independent read of a held view (must match across formats).
+template <class V> uint64_t query_held(const V& v) {
+    uint64_t h = uint64_t(v.request_id) * 31u + uint64_t(v.tick);
+    for (const auto& u : v.units)
+        h += uint64_t(u.hp) * 3u + uint64_t(u.x ^ u.y) + uint64_t(u.state) + uint64_t(u.id) * 1315423911u + uint64_t(u.owner) + sv(u.name).size();
     return h;
 }
 

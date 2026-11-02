@@ -68,6 +68,14 @@ public:
                 world_.setup(seed, *find_view_scale(sc.name));
                 e_s_.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, cap()));
                 e_r_.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, cap()));
+                const ViewScale& vs = *find_view_scale(sc.name);
+                wu_.setup(mix_seed(seed, 0xde17), vs);
+                dt_.setup(vs.clients);
+                u_s_.emplace(XBuffer::create<xm::ViewDelta>(kViewInitial, cap()));
+                u_r_.emplace(XBuffer::create<xm::ViewDelta>(kViewInitial, cap()));
+                held_.clear();
+                for (int c = 0; c < vs.clients; ++c) held_.push_back(XBuffer::create<xm::ViewSnapshot>(kViewInitial, cap()));
+                at_.assign(std::size_t(vs.clients), {});
             }
         }
     }
@@ -330,6 +338,30 @@ public:
                 if (keep) keep->view = view_;
             }
         }
+        // U: delta sync on a second world (view.hpp). The client applies the delta to
+        // the view it holds in its own XBuffer, in place.
+        const ViewScale& us = wu_.scale();
+        for (int r = 0; r < us.rounds; ++r) {
+            wu_.tick();
+            for (int c = 0; c < us.clients; ++c) {
+                const auto& sel = wu_.request(c);
+                dt_.plan(wu_, c, sel, plan_);
+                const int64_t id = (int64_t(cycle) * us.rounds + r) * us.clients + c;
+                timed(st, "U.send", [&] {
+                    fill_delta(u_s_->reset<xm::ViewDelta>(), wu_, plan_, id);
+                    u_s_->save_verified_into<xm::ViewDelta>(delta_);
+                });
+                timed(st, "U.recv", [&] { u_r_->reload_verified<xm::ViewDelta>(delta_); });
+                timed(st, "U.apply", [&] {
+                    apply_delta(held_[std::size_t(c)].root<xm::ViewSnapshot>(), at_[std::size_t(c)], u_r_->root<xm::ViewDelta>());
+                });
+                st.report_sum += query_held(held_[std::size_t(c)].root<xm::ViewSnapshot>());
+                st.bytes["U.delta"] += delta_.size();
+                if (keep) keep->delta = delta_;
+                st.bytes["U.units"] += plan_.upserts.size();
+                st.bytes["U.removed"] += plan_.removed.size();
+            }
+        }
     }
 
     uint64_t world_digest() override {
@@ -432,7 +464,13 @@ private:
     std::string req_, res_, out_, back_, snap_, snap2_;
     ViewWorld world_;
     std::optional<XOffsetDatastructure::XBuffer> e_s_, e_r_;
-    std::string view_, store_;
+    std::string view_, store_, delta_;
+    ViewWorld wu_;
+    DeltaTracker dt_;
+    DeltaPlan plan_;
+    std::optional<XOffsetDatastructure::XBuffer> u_s_, u_r_;
+    std::vector<XOffsetDatastructure::XBuffer> held_;
+    std::vector<std::unordered_map<int32_t, int32_t>> at_;
 };
 
 using XOffsetRunner = XOffsetRunnerT<XoModel, false>;

@@ -108,18 +108,19 @@ void print_sizes(const std::vector<std::unique_ptr<Runner>>& rs, const std::vect
         const ViewScale& vs = *find_view_scale(sc.name);
         const int views = vs.clients * vs.rounds;
         std::printf("\nwire bytes per message, demo case set (average over the last cycle)\n");
-        std::printf("%-12s %12s %12s %12s %12s %12s\n", "format", "A.req", "A.res", "B.player", "S.player", "E.view");
+        std::printf("%-12s %12s %12s %12s %12s %12s %12s\n", "format", "A.req", "A.res", "B.player", "S.player", "E.view", "U.delta");
         for (std::size_t i = 0; i < rs.size(); ++i) {
             auto avg = [&](const char* k, int n) { return n ? double(st[i].bytes.at(k)) / n : 0.0; };
-            std::printf("%-12s %12.0f %12.0f %12.0f %12.0f %12.0f\n", rs[i]->name().c_str(), avg("A.req", sc.battles),
-                        avg("A.res", sc.battles), avg("B.out", sc.migrants), avg("S.player", sc.migrants), avg("E.view", views));
+            std::printf("%-12s %12.0f %12.0f %12.0f %12.0f %12.0f %12.0f\n", rs[i]->name().c_str(), avg("A.req", sc.battles),
+                        avg("A.res", sc.battles), avg("B.out", sc.migrants), avg("S.player", sc.migrants), avg("E.view", views),
+                        avg("U.delta", views));
         }
 #if SLG_WITH_COMPRESSION
         std::printf("\ncompressed size of one sample message (zstd -3 / lz4), bytes\n");
-        std::printf("%-12s %21s %21s %21s\n", "format", "A.res", "B.player", "E.view");
+        std::printf("%-12s %21s %21s %21s %21s\n", "format", "A.res", "B.player", "E.view", "U.delta");
         for (std::size_t i = 0; i < rs.size(); ++i) {
             std::printf("%-12s", rs[i]->name().c_str());
-            for (const std::string* w : {&keep[i].res, &keep[i].player, &keep[i].view}) {
+            for (const std::string* w : {&keep[i].res, &keep[i].player, &keep[i].view, &keep[i].delta}) {
                 const auto c = compress(*w);
                 std::printf(" %10zu/%10zu", c.zstd, c.lz4);
             }

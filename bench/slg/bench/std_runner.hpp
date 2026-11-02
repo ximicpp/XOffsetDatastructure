@@ -23,7 +23,14 @@ public:
         armies_.clear();
         for (const auto& p : players_) armies_.push_back(int(p.armies.size()));
         shard_ = make_shard(seed, sc);
-        if (demo_cases()) world_.setup(seed, *find_view_scale(sc.name));
+        if (demo_cases()) {
+            const ViewScale& vs = *find_view_scale(sc.name);
+            world_.setup(seed, vs);
+            wu_.setup(mix_seed(seed, 0xde17), vs);
+            dt_.setup(vs.clients);
+            held_.assign(std::size_t(vs.clients), {});
+            at_.assign(std::size_t(vs.clients), {});
+        }
     }
 
     void run_cycle(int cycle, CycleStats& st, SampleWires* keep) override {
@@ -220,6 +227,25 @@ public:
                 if (keep) keep->view = to_string_bytes(w);
             }
         }
+        // U: delta sync on a second world (view.hpp).
+        const ViewScale& us = wu_.scale();
+        for (int r = 0; r < us.rounds; ++r) {
+            wu_.tick();
+            for (int c = 0; c < us.clients; ++c) {
+                const auto& sel = wu_.request(c);
+                dt_.plan(wu_, c, sel, plan_);
+                const int64_t id = (int64_t(cycle) * us.rounds + r) * us.clients + c;
+                std::span<const uint8_t> w;
+                timed(st, "U.send", [&] { fill_delta(ds_, wu_, plan_, id); w = rz_.encode(kDelta, ds_); });
+                timed(st, "U.recv", [&] { rz_.decode(w, dd_); });
+                timed(st, "U.apply", [&] { apply_delta(held_[std::size_t(c)], at_[std::size_t(c)], dd_); });
+                st.report_sum += query_held(held_[std::size_t(c)]);
+                st.bytes["U.delta"] += w.size();
+                if (keep) keep->delta = to_string_bytes(w);
+                st.bytes["U.units"] += plan_.upserts.size();
+                st.bytes["U.removed"] += plan_.removed.size();
+            }
+        }
     }
 
     uint64_t world_digest() override {
@@ -244,6 +270,12 @@ private:
     ViewWorld world_;
     stdm::ViewSnapshot ev_, er_;
     std::vector<uint8_t> store_;
+    ViewWorld wu_;
+    DeltaTracker dt_;
+    DeltaPlan plan_;
+    stdm::ViewDelta ds_, dd_;
+    std::vector<stdm::ViewSnapshot> held_;
+    std::vector<std::unordered_map<int32_t, int32_t>> at_;
 };
 
 } // namespace slg

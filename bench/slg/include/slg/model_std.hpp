@@ -84,4 +84,12 @@ struct ViewSnapshot {
     std::vector<ViewUnit> units;
 };
 
+// Scenario U (view.hpp): changes since the client's last sync.
+struct ViewDelta {
+    int64_t request_id{}; int64_t tick{};
+    int32_t x0{}; int32_t y0{}; int32_t x1{}; int32_t y1{};
+    std::vector<ViewUnit> upserts;
+    std::vector<int32_t> removed;
+};
+
 } // namespace slg::stdm

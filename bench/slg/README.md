@@ -57,6 +57,11 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   move every tick, 256 clients, 512x384 viewports on a 4096 map that pan and
   now and then jump; every request sends all units in the viewport, the client
   receives and reads every unit.
+- delta sync: U, on a second world of the same kind. Each client holds its
+  view; after every tick the server sends only the units that entered or
+  changed (whole records) and the ids that left, and the client applies them
+  to the view it holds (same template code for every format). The usual
+  application-level delta; none of the formats has a built-in one.
 
 There is no C or D in this set, and `MANIFEST` lists the change. With
 `SLG_CASES` unset nothing changes: same stage keys, digests and report sums.
