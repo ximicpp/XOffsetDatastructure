@@ -985,6 +985,40 @@ namespace XOffsetDatastructure {
                     });
             }
         }
+
+        // What applying one delta needs only while it runs: the delta copied
+        // with room past its end, the old bytes it overwrites, its blocks and
+        // the replica's holes. A thread applies one delta at a time, so its
+        // cursors share one: a replica's next delta finds it in cache, and a
+        // thousand replicas do not keep a thousand copies.
+        struct DeltaReceiveScratch {
+            std::vector<XBufferCore::WireHole> holes;
+            std::vector<char> undo;
+            std::vector<char> input;  // a small delta, copied with room past its end
+            std::vector<DeltaBlockRef> blocks;
+            void release() noexcept {
+                std::vector<XBufferCore::WireHole>().swap(holes);
+                std::vector<char>().swap(undo);
+                std::vector<char>().swap(input);
+                std::vector<DeltaBlockRef>().swap(blocks);
+            }
+        };
+#if XOFFSET_THREAD_CACHES
+        inline bool& delta_thread_scratch_available() noexcept {
+            static thread_local bool available = true;  // trivial: outlives the scratch
+            return available;
+        }
+        struct DeltaThreadScratch : DeltaReceiveScratch {
+            ~DeltaThreadScratch() { delta_thread_scratch_available() = false; }
+        };
+        // Null once the thread's scratch is destroyed (a delta applied from a
+        // later thread_local destructor uses its cursor's own).
+        inline DeltaReceiveScratch* delta_thread_scratch() noexcept {
+            if (!delta_thread_scratch_available()) return nullptr;
+            static thread_local DeltaThreadScratch scratch;
+            return &scratch;
+        }
+#endif
     } // namespace detail
 
     /// Sender side of one delta stream: the state one receiver (or a group of
@@ -1052,8 +1086,10 @@ namespace XOffsetDatastructure {
     };
 
     /// Receiver side of one delta stream: which state the buffer next to it
-    /// holds (stream, version, root type), plus retained scratch so that
-    /// applying deltas does not allocate per message once it has grown.
+    /// holds (stream, version, root type) and the map of bytes its checks
+    /// read. The scratch a delta needs while it is applied is shared by the
+    /// thread's cursors and kept, so applying deltas does not allocate per
+    /// message once it has grown.
     class XDeltaCursor {
     public:
         /// No key delta applied yet (or the last one was rejected): only a key
@@ -1071,13 +1107,14 @@ namespace XOffsetDatastructure {
             root_type_id_ = 0;
             checks_valid_ = false;
         }
-        /// Frees the scratch and the map of checked bytes (the next delta is
-        /// then verified in full, which rebuilds the map).
+        /// Frees the map of checked bytes (the next delta is then verified in
+        /// full, which rebuilds the map) and the scratch, including the one
+        /// the calling thread's cursors share.
         void release_scratch() noexcept {
-            std::vector<XBufferCore::WireHole>().swap(holes_);
-            std::vector<char>().swap(undo_);
-            std::vector<detail::DeltaBlockRef>().swap(blocks_);
-            std::vector<char>().swap(input_);
+            own_scratch_.release();
+#if XOFFSET_THREAD_CACHES
+            if (detail::DeltaReceiveScratch* s = detail::delta_thread_scratch()) s->release();
+#endif
             std::vector<detail::DeltaCheckBits>().swap(checks_);
             std::vector<detail::DeltaCheckNode>().swap(nodes_);
             std::vector<detail::DeltaNodeRange>().swap(ranges_);
@@ -1093,10 +1130,6 @@ namespace XOffsetDatastructure {
         std::uint32_t version_ = 0;
         std::uint64_t schema_hash_ = 0;
         std::uint64_t root_type_id_ = 0;
-        std::vector<XBufferCore::WireHole> holes_;
-        std::vector<char> undo_;
-        std::vector<char> input_;                     // a small delta, copied with room past its end
-        std::vector<detail::DeltaBlockRef> blocks_;
         // The bytes the last verification read, valid for the buffer state
         // recorded with it (see DeltaAccess::checks_match).
         std::vector<detail::DeltaCheckBits> checks_;
@@ -1116,11 +1149,20 @@ namespace XOffsetDatastructure {
         bool checks_valid_ = false;  // the recorded state is a verified one
         bool checks_built_ = false;  // checks_, nodes_ and ranges_ describe it (built when first needed)
         XDeltaCheck last_check_ = XDeltaCheck::key;
+        // Used instead of the thread's shared scratch where there is none
+        // (XOFFSET_THREAD_CACHES 0, or after the thread's is destroyed).
+        detail::DeltaReceiveScratch own_scratch_;
     };
 
     namespace detail {
         struct DeltaAccess {
             static constexpr std::size_t payload_begin = XWIRE_PAYLOAD_BEGIN;
+            static DeltaReceiveScratch& receive_scratch(XDeltaCursor& c) noexcept {
+#if XOFFSET_THREAD_CACHES
+                if (DeltaReceiveScratch* s = delta_thread_scratch()) return *s;
+#endif
+                return c.own_scratch_;
+            }
             // Deltas up to delta_padded_max bytes are read from a copy with
             // delta_padding bytes of room (a whole block plus a word).
             static constexpr std::size_t delta_padded_max = 4096;
@@ -2080,13 +2122,13 @@ namespace XOffsetDatastructure {
             // The scratch the whole verification needs: the replica's holes,
             // unless the delta carries them, and room for the new map.
             static vstatus prepare_full(XBufferCore& core, const Parsed& parsed, XDeltaCursor& cursor,
-                                        const char* who) {
+                                        std::vector<XBufferCore::WireHole>& holes, const char* who) {
                 XOFFSET_VTRY(size_checks(cursor, parsed.header.used_bytes));
                 if (parsed.holes) return vok();
                 XOFFSET_TRY {
-                    cursor.holes_.clear();
-                    cursor.holes_.reserve(core.free_block_count());
-                    core.for_each_free_block([&](XBufferCore::WireHole h) { cursor.holes_.push_back(h); });
+                    holes.clear();
+                    holes.reserve(core.free_block_count());
+                    core.for_each_free_block([&](XBufferCore::WireHole h) { holes.push_back(h); });
                 } XOFFSET_CATCH(const std::bad_alloc&) {
                     XOFFSET_VFAIL_BAD_ALLOC();
                 }
@@ -2097,7 +2139,8 @@ namespace XOffsetDatastructure {
             }
 
             template <typename T>
-            static vstatus apply_key(XBuffer& xbuf, const Parsed& parsed, XDeltaCursor& cursor, const char* who) {
+            static vstatus apply_key(XBuffer& xbuf, const Parsed& parsed, XDeltaCursor& cursor,
+                                     DeltaReceiveScratch& scratch, const char* who) {
                 XBufferCore& core = xbuf;
                 const std::size_t used = parsed.header.used_bytes;
                 cursor.clear();
@@ -2126,9 +2169,9 @@ namespace XOffsetDatastructure {
                     XWireHeaderV2 header{};
                     header.used_bytes = parsed.header.used_bytes;
                     header.root_offset = parsed.header.root_offset;
-                    header.hole_count = static_cast<std::uint32_t>(cursor.holes_.size());
+                    header.hole_count = static_cast<std::uint32_t>(scratch.holes.size());
                     XOFFSET_VTRY(xbuf.template finish_verified_load<T>(
-                        header, reinterpret_cast<const char*>(cursor.holes_.data()), cursor.holes_.size(),
+                        header, reinterpret_cast<const char*>(scratch.holes.data()), scratch.holes.size(),
                         default_wire_upstream(), who, &xbuf.retained_reload_scratch()));
                 XOFFSET_ROLLBACK_END(core.reset_arena(0))
                 cursor.stream_ = parsed.header.stream;
@@ -2167,7 +2210,7 @@ namespace XOffsetDatastructure {
 
             template <typename T>
             static vstatus apply_incremental(XBuffer& xbuf, const Parsed& parsed, XDeltaCursor& cursor,
-                                             const char* who) {
+                                             DeltaReceiveScratch& scratch, const char* who) {
                 XBufferCore& core = xbuf;
                 const std::size_t used = parsed.header.used_bytes;
                 const auto root = static_cast<std::uint64_t>(parsed.header.root_offset);
@@ -2198,7 +2241,7 @@ namespace XOffsetDatastructure {
                 // Everything that can fail without verification fails first,
                 // before a byte changes. Nothing can fail after an unchecked
                 // delta without a digest, so it keeps no undo copy.
-                auto& undo = cursor.undo_;
+                auto& undo = scratch.undo;
                 const bool keep_undo = check != XDeltaCheck::none || parsed.digest_present;
                 if (keep_undo) {
                     const std::size_t undo_bytes = parsed.undo_bytes + (used < old_used ? old_used - used : 0u);
@@ -2208,7 +2251,7 @@ namespace XOffsetDatastructure {
                         XOFFSET_VFAIL_BAD_ALLOC();
                     }
                 }
-                if (check == XDeltaCheck::full) XOFFSET_VTRY(prepare_full(core, parsed, cursor, who));
+                if (check == XDeltaCheck::full) XOFFSET_VTRY(prepare_full(core, parsed, cursor, scratch.holes, who));
                 if (used > core.segment_size() && !core.grow(used - core.segment_size()))
                     XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, arena_failure_message);
 
@@ -2243,7 +2286,7 @@ namespace XOffsetDatastructure {
                     XOFFSET_VTRY(check_digest<T>(core, parsed, who));
                     if (check == XDeltaCheck::in_place && !holds_in_place(base, parsed, cursor)) {
                         check = XDeltaCheck::full;
-                        XOFFSET_VTRY(prepare_full(core, parsed, cursor, who));
+                        XOFFSET_VTRY(prepare_full(core, parsed, cursor, scratch.holes, who));
                     }
                     if (check == XDeltaCheck::full) {
                         auto* root_ptr = find_root_at<T>(core, root);
@@ -2254,10 +2297,10 @@ namespace XOffsetDatastructure {
                         if (actual != root)
                             XOFFSET_VFAIL(XException, XErrc::root_mismatch, msg(who, "root offset mismatch"));
                         XOFFSET_VTRY(verify_structural_wire_graph(*root_ptr, core, default_wire_upstream(),
-                                                                  cursor.holes_.data(), cursor.holes_.size(), true,
+                                                                  scratch.holes.data(), scratch.holes.size(), true,
                                                                   nullptr, &xbuf.retained_reload_scratch()));
                         if (parsed.holes)
-                            XOFFSET_VTRY(core.load_free_blocks(cursor.holes_.data(), cursor.holes_.size()));
+                            XOFFSET_VTRY(core.load_free_blocks(scratch.holes.data(), scratch.holes.size()));
                     }
                 XOFFSET_ROLLBACK_END(roll_back(core, parsed, undo.data(), old_used, old_root))
 
@@ -2300,13 +2343,14 @@ namespace XOffsetDatastructure {
                 const std::uint64_t old_root = has_state ? core.arena()->root_offset : 0u;
                 // A small delta is read from a copy with room past its end, so
                 // that every block's bytes are scattered a word at a time.
+                DeltaReceiveScratch& scratch = receive_scratch(cursor);
                 std::size_t room = 0;
                 if (data.size() <= delta_padded_max) {
                     XOFFSET_TRY {
-                        if (cursor.input_.size() < data.size() + delta_padding)
-                            cursor.input_.resize(delta_padded_max + delta_padding);
-                        if (!data.empty()) std::memcpy(cursor.input_.data(), data.data(), data.size());
-                        data = std::span<const std::byte>(reinterpret_cast<const std::byte*>(cursor.input_.data()),
+                        auto& input = scratch.input;
+                        if (input.size() < data.size() + delta_padding) input.resize(delta_padded_max + delta_padding);
+                        if (!data.empty()) std::memcpy(input.data(), data.data(), data.size());
+                        data = std::span<const std::byte>(reinterpret_cast<const std::byte*>(input.data()),
                                                           data.size());
                         room = delta_padding;
                     } XOFFSET_CATCH(const std::bad_alloc&) {
@@ -2314,12 +2358,12 @@ namespace XOffsetDatastructure {
                     }
                 }
                 Parsed parsed{};
-                XOFFSET_VTRY(parse<T>(data, room, cursor, old_used, old_root, cursor.holes_, cursor.blocks_, parsed, who));
-                if (parsed.key) return apply_key<T>(xbuf, parsed, cursor, who);
+                XOFFSET_VTRY(parse<T>(data, room, cursor, old_used, old_root, scratch.holes, scratch.blocks, parsed, who));
+                if (parsed.key) return apply_key<T>(xbuf, parsed, cursor, scratch, who);
                 if (!has_state)
                     XOFFSET_VFAIL(XException, XErrc::delta_base_mismatch,
                                   msg(who, "buffer holds no verified root of this type (ask for a key delta)"));
-                return apply_incremental<T>(xbuf, parsed, cursor, who);
+                return apply_incremental<T>(xbuf, parsed, cursor, scratch, who);
             }
         };
     } // namespace detail

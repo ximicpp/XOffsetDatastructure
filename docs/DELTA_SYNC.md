@@ -288,7 +288,13 @@ rebuilt, also proportional, when a later delta needs it); with `digest`, one
 hash pass. The receiver's map takes 28 bytes
 per 64-byte block of payload (24 for the bits, 4 for the node index), plus
 about 64 bytes per heap string, set or map of plain elements; the sender's
-touch log 4 bytes per block.
+touch log 4 bytes per block. The scratch a delta needs while it is applied
+(a copy of a small delta, the old bytes it overwrites, its block list and
+the hole table) is shared by the cursors of one thread, so a receiver that
+holds many replicas keeps one copy, warm in cache, instead of one per
+replica (`XDeltaCursor::release_scratch()` frees it). Where
+`XOFFSET_THREAD_CACHES` is 0 (GCC on MinGW and Cygwin) each cursor keeps
+its own.
 
 Viewport-like model in `tests/test_delta_sync.cpp` (120 units in 128 stable
 slots, each tick 30% move a few cells, 5% lose hp, 2 leave and 2 enter):
