@@ -1957,10 +1957,13 @@ namespace XOffsetDatastructure {
             const char* base = nullptr;
             size_type used_end = 0;
         };
-        // Only a load that shrinks the logical length can lower the watermark.
+        // Only a load that shrinks the logical length by at least a page can
+        // lower the watermark by enough to matter; small reloads (messages of
+        // similar size) leave after one comparison.
+        static constexpr std::size_t zero_tail_min_gain = 4096;
         ZeroTail settled_zero_tail(size_type size) const noexcept {
             const auto logical = buffer_.size();
-            if (size >= logical || buffer_.zero_from() != logical || free_table_lost_ ||
+            if (std::size_t(size) + zero_tail_min_gain > logical || buffer_.zero_from() != logical || free_table_lost_ ||
                 logical < min_payload_size()) [[likely]] return {};
             const auto used = static_cast<size_type>(arena()->used_end);
             return {buffer_.data(), used < logical ? used : logical};
