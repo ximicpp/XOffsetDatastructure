@@ -55,7 +55,7 @@ constexpr xo::XCompactOptions kTight{.slack_div = 0};
 
 struct Totals {
     std::size_t deltas = 0, keys = 0, empties = 0, digests = 0, shrinks = 0;
-    std::size_t corrupt_rejected = 0, corrupt_accepted = 0;
+    std::size_t corrupt_rejected = 0, corrupt_accepted = 0, late_joins = 0;
     std::uint64_t delta_bytes = 0, full_bytes = 0;
 } totals;
 
@@ -161,6 +161,11 @@ void random_stream(std::uint64_t seed, int steps) {
     xo::XDeltaBaseline base(seed * 2 + 1);
     Buffer rep(4096, xo::XBuffer::maximum_capacity(kLimit)); // an empty arena: only a key delta applies
     xo::XDeltaCursor cur;
+    // A second receiver of the same deltas that joins late: it starts from
+    // the baseline's key_delta (the recorded state, same stream and version).
+    Buffer late(4096, xo::XBuffer::maximum_capacity(kLimit));
+    xo::XDeltaCursor late_cur;
+    bool joined = false;
     for (int step = 0; step < steps; ++step) {
         const std::string where = "seed " + std::to_string(seed) + " step " + std::to_string(step);
         const auto op = rng() % 20;
@@ -197,6 +202,24 @@ void random_stream(std::uint64_t seed, int steps) {
         need(bool(r), where + ": delta rejected: " + (r ? std::string() : r.error().message));
         same_state(src.root(), src, rep, where);
         need(cur.version() == base.version() && cur.stream() == base.stream(), where + ": cursor does not follow");
+        if (joined) {
+            auto lr = apply_entry(late, d, late_cur);
+            need(bool(lr), where + ": late receiver rejected a shared delta: " + (lr ? std::string() : lr.error().message));
+            same_state(src.root(), src, late, where + " (late receiver)");
+        } else if (rng() % 5 == 0) {
+            const auto version = base.version();
+            std::string k = "stale";
+            base.key_delta_into(k, options);
+            need(base.version() == version && !base.empty(), where + ": key_delta_into advanced the baseline");
+            need(k == base.key_delta(options), where + ": key_delta and key_delta_into differ");
+            auto lr = apply_entry(late, k, late_cur);
+            need(bool(lr), where + ": late key delta rejected: " + (lr ? std::string() : lr.error().message));
+            same_state(src.root(), src, late, where + " (late join)");
+            need(late_cur.version() == base.version() && late_cur.stream() == base.stream(),
+                 where + ": late cursor does not follow the baseline");
+            ++totals.late_joins;
+            joined = true;
+        }
         // The same delta again no longer applies, and changes nothing.
         if (rng() % 8 == 0) {
             const auto held = payload_of(rep);
@@ -417,6 +440,58 @@ void view_sizes() {
 }
 
 // The wrong-type case uses the typed entry of the right type for the sender.
+// The comparison against a byte-by-byte reference: runs (with merge_gap
+// joining) and the updated copy, for both block-mask versions.
+void diff_reference_case() {
+    std::mt19937_64 rng(20261102);
+    std::vector<xo::detail::DeltaRun> runs, want;
+    for (int trial = 0; trial < 3000; ++trial) {
+        const std::size_t n = 48 + std::size_t(rng() % 700);
+        const std::size_t from = std::min<std::size_t>(n, rng() % 2 ? 48 : rng() % 80);
+        std::vector<char> cur(n), base(n);
+        for (auto& c : cur) c = char(rng());
+        base = cur;
+        // Changes in clusters, often next to 64-byte block edges.
+        const int clusters = int(rng() % 12);
+        for (int c = 0; c < clusters; ++c) {
+            std::size_t at = rng() % 2 ? (rng() % 12) * 64 + (rng() % 7) - 3 : rng() % n;
+            const std::size_t len = 1 + rng() % 9;
+            for (std::size_t k = 0; k < len; ++k, at += 1 + (rng() % 4 == 0 ? rng() % 5 : 0))
+                if (at < n) base[at] = char(base[at] ^ char(1 + rng() % 255));
+        }
+        if (trial % 50 == 0) for (auto& c : base) c = char(rng());   // everything differs
+        const std::uint32_t gap = std::uint32_t(rng() % 11);
+        want.clear();
+        for (std::size_t i = from; i < n;) {
+            if (cur[i] == base[i]) { ++i; continue; }
+            std::size_t e = i;
+            while (e < n && cur[e] != base[e]) ++e;
+            if (!want.empty() && i - (std::size_t(want.back().offset) + want.back().bytes) <= gap)
+                want.back().bytes = std::uint32_t(e - want.back().offset);
+            else
+                want.push_back({std::uint32_t(i), std::uint32_t(e - i)});
+            i = e;
+        }
+        std::vector<char> copy = base;
+        runs.clear();
+        xo::detail::delta_diff_update(cur.data(), copy.data(), from, n, gap, runs);
+        need(runs.size() == want.size(), "diff: run count differs from the reference");
+        for (std::size_t r = 0; r < runs.size(); ++r)
+            need(runs[r].offset == want[r].offset && runs[r].bytes == want[r].bytes, "diff: run differs from the reference");
+        need(std::equal(copy.begin() + std::ptrdiff_t(from), copy.end(), cur.begin() + std::ptrdiff_t(from)) &&
+                 std::equal(copy.begin(), copy.begin() + std::ptrdiff_t(from), base.begin()),
+             "diff: the recorded copy was not brought up to date");
+        // Both block-mask versions against each other, at every offset.
+        for (std::size_t i = 0; i + 64 <= n; i += 1 + rng() % 9) {
+            std::uint64_t ref = 0;
+            for (std::size_t k = 0; k < 64; ++k) if (cur[i + k] != base[i + k]) ref |= std::uint64_t(1) << k;
+            need(xo::detail::delta_block_mask(cur.data() + i, base.data() + i) == ref &&
+                     xo::detail::delta_block_mask_words(cur.data() + i, base.data() + i) == ref,
+                 "diff: block mask differs from the reference");
+        }
+    }
+}
+
 void wrong_type_case() {
     const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
     auto view = xo::TypedXBuffer<dz::View>::create(4096, cap);
@@ -435,14 +510,16 @@ int main(int argc, char** argv) {
     const int streams = argc > 1 ? std::atoi(argv[1]) : 40;
     const int steps = argc > 2 ? std::atoi(argv[2]) : 60;
     fixed_cases();
+    diff_reference_case();
     wrong_type_case();
     view_sizes();
     for (int s = 0; s < streams; ++s) random_stream(20261102u + std::uint64_t(s), steps);
     need(totals.keys >= std::size_t(streams), "too few key deltas");
-    need(totals.shrinks > 0 && totals.digests > 0 && totals.corrupt_rejected > 0, "a path was never taken");
+    need(totals.shrinks > 0 && totals.digests > 0 && totals.corrupt_rejected > 0 && totals.late_joins > 0,
+         "a path was never taken");
     std::cout << "test_delta_sync: " << streams << " streams x " << steps << " steps, " << totals.deltas
               << " deltas (" << totals.keys << " key, " << totals.digests << " with digest), " << totals.empties
-              << " empty, " << totals.shrinks << " shrinks; corrupted: " << totals.corrupt_rejected << " rejected, "
+              << " empty, " << totals.shrinks << " shrinks, " << totals.late_joins << " late joins; corrupted: " << totals.corrupt_rejected << " rejected, "
               << totals.corrupt_accepted << " accepted as valid payloads; delta bytes " << totals.delta_bytes
               << " vs full wires " << totals.full_bytes << "\n";
     return 0;

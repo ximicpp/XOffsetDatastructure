@@ -27,6 +27,9 @@
 #include <span>
 #include <string>
 #include <vector>
+#if defined(__SSE2__) || defined(_M_X64) || defined(_M_AMD64)
+#include <emmintrin.h>
+#endif
 
 #define XOFFSET_DELTA_SYNC_API 1
 
@@ -169,62 +172,176 @@ namespace XOffsetDatastructure {
             return v;
         }
 
-        // First i in [from, n) with a[i] != b[i], or n.
-        inline std::size_t delta_first_diff(const char* a, const char* b, std::size_t from, std::size_t n) noexcept {
+        // Copies n bytes exactly; runs are mostly a few bytes long, so the
+        // short cases avoid a library call.
+        inline void delta_copy(char* dst, const char* src, std::size_t n) noexcept {
+            if (n <= 16) {
+                if (n >= 8) {
+                    std::uint64_t head, tail;
+                    std::memcpy(&head, src, 8);
+                    std::memcpy(&tail, src + n - 8, 8);
+                    std::memcpy(dst, &head, 8);
+                    std::memcpy(dst + n - 8, &tail, 8);
+                } else if (n >= 4) {
+                    std::uint32_t head, tail;
+                    std::memcpy(&head, src, 4);
+                    std::memcpy(&tail, src + n - 4, 4);
+                    std::memcpy(dst, &head, 4);
+                    std::memcpy(dst + n - 4, &tail, 4);
+                } else if (n != 0) {
+                    const char first = src[0], middle = src[n / 2], last = src[n - 1];
+                    dst[0] = first;
+                    dst[n / 2] = middle;
+                    dst[n - 1] = last;
+                }
+                return;
+            }
+            std::memcpy(dst, src, n);
+        }
+
+        // Bit k is set when byte k of x (in memory order) is nonzero.
+        inline std::uint64_t delta_byte_flags(std::uint64_t x) noexcept {
+            constexpr std::uint64_t lows = 0x7F7F7F7F7F7F7F7Full;
+            const std::uint64_t high = (((x & lows) + lows) | x) & ~lows;  // 0x80 in each nonzero byte
+            return ((high >> 7) * 0x0102040810204080ull) >> 56;
+        }
+
+        // Collects runs in ascending order, joining a run to the previous one
+        // when at most merge_gap equal bytes lie between them.
+        class DeltaRunSink {
+        public:
+            DeltaRunSink(std::vector<DeltaRun>& runs, std::uint32_t merge_gap) noexcept
+                : runs_(runs), gap_(merge_gap) {}
+            void add(std::size_t start, std::size_t end) {
+                if (open_ && start - end_ <= gap_) {
+                    end_ = end;
+                    return;
+                }
+                flush();
+                start_ = start;
+                end_ = end;
+                open_ = true;
+            }
+            void flush() {
+                if (open_)
+                    runs_.push_back({static_cast<std::uint32_t>(start_), static_cast<std::uint32_t>(end_ - start_)});
+                open_ = false;
+            }
+
+        private:
+            std::vector<DeltaRun>& runs_;
+            std::size_t gap_;
+            std::size_t start_ = 0, end_ = 0;
+            bool open_ = false;
+        };
+
+        // The runs of set bits of m (bit k = byte at + k differs).
+        inline void delta_mask_runs(std::uint64_t m, std::size_t at, DeltaRunSink& sink) {
+            while (m != 0) {
+                const unsigned start = static_cast<unsigned>(std::countr_zero(m));
+                const std::uint64_t rest = ~(m >> start);
+                const unsigned length = rest == 0 ? 64u - start : static_cast<unsigned>(std::countr_zero(rest));
+                sink.add(at + start, at + start + length);
+                if (start + length >= 64u) break;
+                m &= ~std::uint64_t(0) << (start + length);
+            }
+        }
+
+        // Fills every run of at most `gap` zero bits that lies between two set
+        // bits of m (gaps of up to 7; DeltaRunSink joins the longer ones).
+        inline std::uint64_t delta_fill_gaps(std::uint64_t m, std::uint32_t gap) noexcept {
+            const std::uint32_t widest = gap < 7u ? gap : 7u;
+            std::uint64_t filled = m;
+            for (std::uint32_t d = 2; d <= widest + 1u; ++d) {
+                const std::uint64_t pairs = m & (m >> d);  // bit k: set bits at k and k + d
+                for (std::uint32_t j = 1; j < d; ++j) filled |= pairs << j;
+            }
+            return filled;
+        }
+
+        // Bit k is set when a[k] != b[k], k in [0, 64). Portable version.
+        inline std::uint64_t delta_block_mask_words(const char* a, const char* b) noexcept {
+            std::uint64_t x[8];
+            std::uint64_t any = 0;
+            for (std::size_t k = 0; k < 8; ++k) {
+                x[k] = delta_load64(a + 8 * k) ^ delta_load64(b + 8 * k);
+                any |= x[k];
+            }
+            if (any == 0) return 0;
+            std::uint64_t m = 0;
+            for (std::size_t k = 0; k < 8; ++k) m |= delta_byte_flags(x[k]) << (8 * k);
+            return m;
+        }
+
+        // Bit k is set when a[k] != b[k], k in [0, 64).
+        inline std::uint64_t delta_block_mask(const char* a, const char* b) noexcept {
+#if defined(__SSE2__) || defined(_M_X64) || defined(_M_AMD64)
+            const auto load = [](const char* p) { return _mm_loadu_si128(reinterpret_cast<const __m128i*>(p)); };
+            const __m128i e0 = _mm_cmpeq_epi8(load(a), load(b));
+            const __m128i e1 = _mm_cmpeq_epi8(load(a + 16), load(b + 16));
+            const __m128i e2 = _mm_cmpeq_epi8(load(a + 32), load(b + 32));
+            const __m128i e3 = _mm_cmpeq_epi8(load(a + 48), load(b + 48));
+            if (_mm_movemask_epi8(_mm_and_si128(_mm_and_si128(e0, e1), _mm_and_si128(e2, e3))) == 0xFFFF) return 0;
+            const std::uint64_t equal = std::uint64_t(std::uint32_t(_mm_movemask_epi8(e0))) |
+                                        (std::uint64_t(std::uint32_t(_mm_movemask_epi8(e1))) << 16) |
+                                        (std::uint64_t(std::uint32_t(_mm_movemask_epi8(e2))) << 32) |
+                                        (std::uint64_t(std::uint32_t(_mm_movemask_epi8(e3))) << 48);
+            return ~equal;
+#else
+            return delta_block_mask_words(a, b);
+#endif
+        }
+
+        // Runs of [from, n) where cur and base differ (runs separated by at
+        // most merge_gap equal bytes are joined). Each 64-byte block that
+        // differs is copied into base on the way, so base equals cur on
+        // [from, n) afterwards.
+        inline void delta_diff_update(const char* cur, char* base, std::size_t from, std::size_t n,
+                                      std::uint32_t merge_gap, std::vector<DeltaRun>& runs) {
+            DeltaRunSink sink(runs, merge_gap);
             std::size_t i = from;
-            // 64-byte blocks without an early exit inside (vectorizes on every
-            // target), then words, then bytes.
             while (n - i >= 64) {
-                std::uint64_t acc = 0;
-                for (std::size_t k = 0; k < 64; k += 8) acc |= delta_load64(a + i + k) ^ delta_load64(b + i + k);
-                if (acc != 0) break;
+                const std::uint64_t m = delta_block_mask(cur + i, base + i);
+                if (m != 0) {
+                    std::memcpy(base + i, cur + i, 64);
+                    delta_mask_runs(delta_fill_gaps(m, merge_gap), i, sink);
+                }
                 i += 64;
             }
             while (n - i >= 8) {
-                const std::uint64_t x = delta_load64(a + i) ^ delta_load64(b + i);
-                if (x != 0) return i + (static_cast<std::size_t>(std::countr_zero(x)) >> 3);
-                i += 8;
-            }
-            while (i < n && a[i] == b[i]) ++i;
-            return i;
-        }
-
-        // First i in [from, n) with a[i] == b[i], or n.
-        inline std::size_t delta_first_equal(const char* a, const char* b, std::size_t from, std::size_t n) noexcept {
-            constexpr std::uint64_t ones = 0x0101010101010101ull;
-            constexpr std::uint64_t highs = 0x8080808080808080ull;
-            std::size_t i = from;
-            while (n - i >= 8) {
-                const std::uint64_t x = delta_load64(a + i) ^ delta_load64(b + i);
-                // The lowest flagged byte is the first zero byte of x (higher
-                // flags may be false positives; only the lowest is used).
-                const std::uint64_t zero = (x - ones) & ~x & highs;
-                if (zero != 0) return i + (static_cast<std::size_t>(std::countr_zero(zero)) >> 3);
-                i += 8;
-            }
-            while (i < n && a[i] != b[i]) ++i;
-            return i;
-        }
-
-        // Runs of [from, n) where cur and base differ; runs separated by at
-        // most merge_gap equal bytes are joined.
-        inline void delta_diff(const char* cur, const char* base, std::size_t from, std::size_t n,
-                               std::uint32_t merge_gap, std::vector<DeltaRun>& runs) {
-            std::size_t i = delta_first_diff(cur, base, from, n);
-            while (i < n) {
-                const std::size_t start = i;
-                std::size_t end;
-                for (;;) {
-                    end = delta_first_equal(cur, base, i, n);
-                    if (end == n) break;
-                    const std::size_t limit = std::min<std::size_t>(n, end + std::size_t(merge_gap) + 1u);
-                    const std::size_t next = delta_first_diff(cur, base, end, limit);
-                    if (next >= limit) break;
-                    i = next;
+                const std::uint64_t x = delta_load64(cur + i) ^ delta_load64(base + i);
+                if (x != 0) {
+                    std::memcpy(base + i, cur + i, 8);
+                    delta_mask_runs(delta_fill_gaps(delta_byte_flags(x), merge_gap), i, sink);
                 }
-                runs.push_back({static_cast<std::uint32_t>(start), static_cast<std::uint32_t>(end - start)});
-                i = delta_first_diff(cur, base, end, n);
+                i += 8;
             }
+            for (; i < n; ++i) {
+                if (cur[i] != base[i]) {
+                    base[i] = cur[i];
+                    sink.add(i, i + 1);
+                }
+            }
+            sink.flush();
+        }
+
+        // Runs of [from, n) where p is nonzero (the runs of a key delta of p).
+        inline void delta_nonzero_runs(const char* p, std::size_t from, std::size_t n, std::uint32_t merge_gap,
+                                       std::vector<DeltaRun>& runs) {
+            alignas(64) static constexpr char zeros[64] = {};
+            DeltaRunSink sink(runs, merge_gap);
+            std::size_t i = from;
+            for (; n - i >= 64; i += 64) {
+                const std::uint64_t m = delta_block_mask(p + i, zeros);
+                if (m != 0) delta_mask_runs(delta_fill_gaps(m, merge_gap), i, sink);
+            }
+            for (; n - i >= 8; i += 8) {
+                const std::uint64_t x = delta_load64(p + i);
+                if (x != 0) delta_mask_runs(delta_fill_gaps(delta_byte_flags(x), merge_gap), i, sink);
+            }
+            for (; i < n; ++i)
+                if (p[i] != 0) sink.add(i, i + 1);
+            sink.flush();
         }
 
         inline std::uint64_t new_delta_stream() noexcept {
@@ -265,6 +382,17 @@ namespace XOffsetDatastructure {
             payload_.clear();
             holes_.clear();
         }
+        /// A key delta of the recorded state, at this stream and version, for a
+        /// receiver that joins late (one baseline shared by several
+        /// receivers): applied to any buffer, it makes the receiver hold what
+        /// the others hold, so it accepts this baseline's next delta. The
+        /// baseline is not advanced. Requires !empty().
+        void key_delta_into(std::string& out, XDeltaOptions options = {}) const;
+        std::string key_delta(XDeltaOptions options = {}) const {
+            std::string out;
+            key_delta_into(out, options);
+            return out;
+        }
         /// reset() and return the copy's memory.
         void release() noexcept {
             reset();
@@ -279,6 +407,8 @@ namespace XOffsetDatastructure {
         std::uint64_t stream_ = 0;
         std::uint32_t version_ = 0;
         std::uint32_t root_offset_ = 0;
+        std::uint64_t schema_hash_ = 0;                   // fingerprint of the recorded root type
+        std::uint64_t root_type_id_ = 0;
         std::vector<char> payload_;                       // [0, used_end) as the receiver holds it ([0, 48) unused)
         std::vector<XBufferCore::WireHole> holes_;        // its hole table, by offset
         std::vector<XBufferCore::WireHole> scratch_holes_;
@@ -339,6 +469,14 @@ namespace XOffsetDatastructure {
                     b.version_ = 0;
                     b.reset();
                 }
+                // A baseline records one root type; another type starts over.
+                constexpr std::uint64_t schema_hash = wire_schema_hash<T>();
+                constexpr std::uint64_t root_type_id = wire_root_type_id<T>();
+                if (b.schema_hash_ != schema_hash || b.root_type_id_ != root_type_id) {
+                    b.reset();
+                    b.schema_hash_ = schema_hash;
+                    b.root_type_id_ = root_type_id;
+                }
                 const bool key = b.payload_.empty();
 
                 // The hole table, by offset.
@@ -352,6 +490,10 @@ namespace XOffsetDatastructure {
                     (!holes.empty() &&
                      std::memcmp(holes.data(), b.holes_.data(), holes.size() * sizeof(XBufferCore::WireHole)) != 0);
 
+                // The hole section is checked and sized before the baseline
+                // changes.
+                const std::size_t hole_section = holes_changed ? hole_section_size(holes, used) : 0u;
+
                 // The receiver's bytes past its used_end read as zero, so the
                 // recorded copy grows with zeros (a key delta compares against
                 // an all-zero payload).
@@ -360,50 +502,29 @@ namespace XOffsetDatastructure {
                 if (key) base.assign(used, '\0');
                 else if (used > base.size()) base.resize(used, '\0');
 
+                // The comparison brings the recorded copy up to date as it goes.
+                // If anything fails before the delta is complete, the baseline
+                // is dropped, so the next delta is a key delta.
+                struct DropOnFailure {
+                    XDeltaBaseline* b;
+                    ~DropOnFailure() {
+                        if (b) b->reset();
+                    }
+                } drop{&b};
                 auto& runs = b.runs_;
                 runs.clear();
-                delta_diff(cur, base.data(), payload_begin, used, options.merge_gap, runs);
+                delta_diff_update(cur, base.data(), payload_begin, used, options.merge_gap, runs);
 
                 XDeltaStats stats;
                 stats.key = key;
                 stats.compared_bytes = used - payload_begin;
                 if (!key && runs.empty() && !holes_changed && used == base_used && root == b.root_offset_) {
+                    drop.b = nullptr;
                     out.clear();
                     stats.empty = true;
                     return stats;
                 }
 
-                // Size, then one write.
-                std::size_t size = sizeof(XDeltaHeader) + (key ? 16u : 0u) + (options.digest ? 8u : 0u);
-                std::uint64_t run_bytes = 0;
-                std::size_t prev = payload_begin;
-                for (const auto& r : runs) {
-                    size += delta_varint_size(static_cast<std::uint32_t>(r.offset - prev)) +
-                            delta_varint_size(r.bytes) + r.bytes;
-                    run_bytes += r.bytes;
-                    prev = std::size_t(r.offset) + r.bytes;
-                }
-                if (holes_changed) {
-                    if (holes.size() > UINT32_MAX)
-                        XOFFSET_THROW(XException(XErrc::invalid_state, "save_delta<T>(): hole table too large"));
-                    size += delta_varint_size(static_cast<std::uint32_t>(holes.size()));
-                    std::size_t prev_hole = payload_begin;
-                    for (const auto& h : holes) {
-                        if (h.offset < prev_hole || (h.offset & 7u) != 0 || (h.bytes & 7u) != 0 || h.bytes == 0 ||
-                            std::size_t(h.offset) + h.bytes > used)
-                            XOFFSET_THROW(XException(XErrc::invalid_state, "save_delta<T>(): inconsistent free table"));
-                        size += delta_varint_size(static_cast<std::uint32_t>((h.offset - prev_hole) / 8u)) +
-                                delta_varint_size(h.bytes / 8u);
-                        prev_hole = std::size_t(h.offset) + h.bytes;
-                    }
-                }
-                if (size > out.max_size())
-                    XOFFSET_THROW(std::length_error("save_delta<T>(): output size exceeds string limit"));
-                out.resize(size);
-
-                // Nothing below allocates: the baseline is updated as the runs
-                // are written.
-                char* p = out.data();
                 XDeltaHeader header{};
                 header.magic = XDELTA_MAGIC;
                 header.flags = (key ? XDELTA_FLAG_KEY : 0u) | (holes_changed ? XDELTA_FLAG_HOLES : 0u) |
@@ -413,28 +534,86 @@ namespace XOffsetDatastructure {
                 header.used_bytes = static_cast<std::uint32_t>(used);
                 header.root_offset = root;
                 header.run_count = static_cast<std::uint32_t>(runs.size());
+                const std::uint64_t run_bytes =
+                    write_delta(out, header, b.schema_hash_, b.root_type_id_, cur, runs, holes, hole_section);
+                if (holes_changed) b.holes_.swap(holes);
+                if (used < base.size()) base.resize(used); // shrinking never allocates
+                b.version_ = header.version;
+                b.root_offset_ = root;
+                drop.b = nullptr;
+
+                stats.holes = holes_changed;
+                stats.runs = header.run_count;
+                stats.run_bytes = run_bytes;
+                stats.delta_bytes = out.size();
+                return stats;
+            }
+
+            // Size of the hole section for a table by offset; an inconsistent
+            // table (overlap, misalignment, past used) is a library error.
+            static std::size_t hole_section_size(const std::vector<XBufferCore::WireHole>& holes, std::size_t used) {
+                if (holes.size() > UINT32_MAX)
+                    XOFFSET_THROW(XException(XErrc::invalid_state, "save_delta<T>(): hole table too large"));
+                std::size_t size = delta_varint_size(static_cast<std::uint32_t>(holes.size()));
+                std::size_t prev = payload_begin;
+                for (const auto& h : holes) {
+                    if (h.offset < prev || (h.offset & 7u) != 0 || (h.bytes & 7u) != 0 || h.bytes == 0 ||
+                        std::size_t(h.offset) + h.bytes > used)
+                        XOFFSET_THROW(XException(XErrc::invalid_state, "save_delta<T>(): inconsistent free table"));
+                    size += delta_varint_size(static_cast<std::uint32_t>((h.offset - prev) / 8u)) +
+                            delta_varint_size(h.bytes / 8u);
+                    prev = std::size_t(h.offset) + h.bytes;
+                }
+                return size;
+            }
+
+            // Writes the delta `header` announces: the fingerprint (KEY), the
+            // digest of src (DIGEST), the runs' bytes from src, the holes
+            // (HOLES, hole_section bytes). Returns the run bytes.
+            static std::uint64_t write_delta(std::string& out, const XDeltaHeader& header, std::uint64_t schema_hash,
+                                             std::uint64_t root_type_id, const char* src,
+                                             const std::vector<DeltaRun>& runs,
+                                             const std::vector<XBufferCore::WireHole>& holes,
+                                             std::size_t hole_section) {
+                const bool key = (header.flags & XDELTA_FLAG_KEY) != 0;
+                const bool digest = (header.flags & XDELTA_FLAG_DIGEST) != 0;
+                const bool with_holes = (header.flags & XDELTA_FLAG_HOLES) != 0;
+                std::size_t size = sizeof(XDeltaHeader) + (key ? 16u : 0u) + (digest ? 8u : 0u) +
+                                   (with_holes ? hole_section : 0u);
+                std::uint64_t run_bytes = 0;
+                std::size_t prev = payload_begin;
+                for (const auto& r : runs) {
+                    size += delta_varint_size(static_cast<std::uint32_t>(r.offset - prev)) +
+                            delta_varint_size(r.bytes) + r.bytes;
+                    run_bytes += r.bytes;
+                    prev = std::size_t(r.offset) + r.bytes;
+                }
+                if (size > out.max_size())
+                    XOFFSET_THROW(std::length_error("save_delta<T>(): output size exceeds string limit"));
+                out.resize(size);
+
+                char* p = out.data();
                 std::memcpy(p, &header, sizeof(header));
                 p += sizeof(header);
                 if (key) {
-                    const std::uint64_t fingerprint[2] = {wire_schema_hash<T>(), wire_root_type_id<T>()};
+                    const std::uint64_t fingerprint[2] = {schema_hash, root_type_id};
                     std::memcpy(p, fingerprint, 16);
                     p += 16;
                 }
-                if (options.digest) {
-                    const std::uint64_t digest = xxh64(cur + payload_begin, used - payload_begin);
-                    std::memcpy(p, &digest, 8);
+                if (digest) {
+                    const std::uint64_t d = xxh64(src + payload_begin, header.used_bytes - payload_begin);
+                    std::memcpy(p, &d, 8);
                     p += 8;
                 }
                 prev = payload_begin;
                 for (const auto& r : runs) {
                     p = delta_put_varint(p, static_cast<std::uint32_t>(r.offset - prev));
                     p = delta_put_varint(p, r.bytes);
-                    std::memcpy(p, cur + r.offset, r.bytes);
-                    std::memcpy(base.data() + r.offset, cur + r.offset, r.bytes);
+                    delta_copy(p, src + r.offset, r.bytes);
                     p += r.bytes;
                     prev = std::size_t(r.offset) + r.bytes;
                 }
-                if (holes_changed) {
+                if (with_holes) {
                     p = delta_put_varint(p, static_cast<std::uint32_t>(holes.size()));
                     std::size_t prev_hole = payload_begin;
                     for (const auto& h : holes) {
@@ -442,17 +621,26 @@ namespace XOffsetDatastructure {
                         p = delta_put_varint(p, h.bytes / 8u);
                         prev_hole = std::size_t(h.offset) + h.bytes;
                     }
-                    b.holes_.swap(holes);
                 }
-                if (used < base.size()) base.resize(used); // shrinking never allocates
-                b.version_ = header.version;
-                b.root_offset_ = root;
+                return run_bytes;
+            }
 
-                stats.holes = holes_changed;
-                stats.runs = header.run_count;
-                stats.run_bytes = run_bytes;
-                stats.delta_bytes = size;
-                return stats;
+            static void key_delta_into(const XDeltaBaseline& b, std::string& out, XDeltaOptions options) {
+                if (b.payload_.empty() || b.version_ == 0)
+                    XOFFSET_THROW(XException(XErrc::invalid_state, "XDeltaBaseline::key_delta_into(): no recorded state"));
+                const std::size_t used = b.payload_.size();
+                std::vector<DeltaRun> runs;
+                delta_nonzero_runs(b.payload_.data(), payload_begin, used, options.merge_gap, runs);
+                XDeltaHeader header{};
+                header.magic = XDELTA_MAGIC;
+                header.flags = XDELTA_FLAG_KEY | XDELTA_FLAG_HOLES | (options.digest ? XDELTA_FLAG_DIGEST : 0u);
+                header.stream = b.stream_;
+                header.version = b.version_;
+                header.used_bytes = static_cast<std::uint32_t>(used);
+                header.root_offset = b.root_offset_;
+                header.run_count = static_cast<std::uint32_t>(runs.size());
+                write_delta(out, header, b.schema_hash_, b.root_type_id_, b.payload_.data(), runs, b.holes_,
+                            hole_section_size(b.holes_, used));
             }
 
             // ---- receiver -------------------------------------------------
@@ -619,7 +807,7 @@ namespace XOffsetDatastructure {
                     if (clean_from > payload_begin)
                         std::memset(base + payload_begin, 0, std::min(clean_from, used) - payload_begin);
                     for_each_run(parsed, [&](std::size_t offset, const char* bytes, std::size_t n) {
-                        std::memcpy(base + offset, bytes, n);
+                        delta_copy(base + offset, bytes, n);
                     });
                     XBufferCore::write_payload_header(base, parsed.header.root_offset, used);
                     XOFFSET_VTRY(check_digest<T>(core, parsed, who));
@@ -647,7 +835,7 @@ namespace XOffsetDatastructure {
                     const std::size_t end = offset + n;
                     if (offset < old_used) {
                         const std::size_t kept = std::min(end, old_used) - offset;
-                        std::memcpy(base + offset, undo, kept);
+                        delta_copy(base + offset, undo, kept);
                         undo += kept;
                         if (end > old_used) std::memset(base + old_used, 0, end - old_used);
                     } else {
@@ -695,10 +883,10 @@ namespace XOffsetDatastructure {
                 for_each_run(parsed, [&](std::size_t offset, const char* bytes, std::size_t n) {
                     if (offset < old_used) {
                         const std::size_t kept = std::min(offset + n, old_used) - offset;
-                        std::memcpy(u, base + offset, kept);
+                        delta_copy(u, base + offset, kept);
                         u += kept;
                     }
-                    std::memcpy(base + offset, bytes, n);
+                    delta_copy(base + offset, bytes, n);
                 });
                 if (used < old_used) {
                     std::memcpy(u, base + used, old_used - used);
@@ -750,6 +938,10 @@ namespace XOffsetDatastructure {
             }
         };
     } // namespace detail
+
+    inline void XDeltaBaseline::key_delta_into(std::string& out, XDeltaOptions options) const {
+        detail::DeltaAccess::key_delta_into(*this, out, options);
+    }
 
     template <typename T>
     XDeltaStats XBuffer::save_delta_into(std::string& out, XDeltaBaseline& baseline, XDeltaOptions options) {

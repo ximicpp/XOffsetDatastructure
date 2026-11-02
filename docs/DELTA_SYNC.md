@@ -43,6 +43,20 @@ const View& v = view.root<View>();       // read in place
 `TypedXBuffer<T>` has the same members without `<T>`. `apply_delta_verified`
 throws what `try_apply_delta_verified` returns.
 
+Several receivers of the same deltas (every subscriber of one map block) can
+share one baseline: the sender writes each delta once and sends it to all of
+them. A receiver that joins later starts from the recorded state:
+
+```cpp
+std::string k;
+block_base.key_delta_into(k);            // key delta at the baseline's stream and version
+send_to_new_subscriber(k);               // then the same deltas as everyone else
+```
+
+`key_delta_into` does not advance the baseline; the joiner's cursor then holds
+the baseline's version and accepts its next delta. It needs a baseline that has
+written at least one delta (`!empty()`).
+
 `save_delta_into` returns `XDeltaStats` (key, holes, empty, runs, run_bytes,
 compared_bytes, delta_bytes). `XDeltaOptions`:
 
@@ -167,9 +181,10 @@ messages start with `apply_delta_verified<T>()`.
 
 ## 5. Cost
 
-Sender, per delta: one comparison of the payload against the baseline
-(64-byte blocks, then words), one copy of the changed runs into the baseline,
-the free table sorted by offset; with `digest`, one hash pass. Receiver, per
+Sender, per delta: one comparison of the payload against the baseline in
+64-byte blocks (SSE2 on x86-64, 64-bit words elsewhere), where each block that
+differs is copied into the baseline and its changed bytes become runs through
+a bit mask; the free table sorted by offset; with `digest`, one hash pass. Receiver, per
 delta: the header and section checks, one undo copy and one copy of the
 changed runs, then the full verification of `load_verified<T>` (proportional
 to the payload, not to the delta); with `digest`, one hash pass.
