@@ -61,7 +61,15 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   view; after every tick the server sends only the units that entered or
   changed (whole records) and the ids that left, and the client applies them
   to the view it holds (same template code for every format). The usual
-  application-level delta; none of the formats has a built-in one.
+  application-level delta; none of the other formats has a built-in one.
+- native delta: N, XOffset only, built when the library has
+  `XOFFSET_DELTA_SYNC_API` (`xoffset_delta.hpp`). Same plan as U, but the
+  server keeps each client's view in an XBuffer in stable slots, mutates it in
+  place (N.send), writes `save_delta_into` against that client's baseline
+  (N.diff) and the client applies it with `try_apply_delta_verified` (N.recv:
+  patch + full verification) and reads in place. The client's read must equal
+  U's (checked every message). `tools/analyze.py` compares N with each other
+  format's U.
 
 There is no C or D in this set, and `MANIFEST` lists the change. With
 `SLG_CASES` unset nothing changes: same stage keys, digests and report sums.
