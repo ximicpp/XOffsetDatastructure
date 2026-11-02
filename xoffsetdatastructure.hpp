@@ -781,9 +781,10 @@ namespace XOffsetDatastructure {
             const auto base = reinterpret_cast<std::uintptr_t>(buffer_.data());
             const auto address = reinterpret_cast<std::uintptr_t>(ptr);
             FreeTable* table = free_table_.get();
-            if (table && ptr && bytes != 0 && (bytes & 7u) == 0 && bytes <= FreeTable::small_max &&
+            if (ptr && bytes != 0 && (bytes & 7u) == 0 && bytes <= FreeTable::small_max &&
                 address >= base && address - base < buffer_.size() &&
-                bytes <= buffer_.size() - (address - base)) [[likely]] {
+                bytes <= buffer_.size() - (address - base) &&
+                (table || (table = adopt_cached_free_table()))) [[likely]] {
                 const auto bin = bytes / 8u - 1u;
                 auto& slot = table->bins[bin];
                 if (slot.size() < slot.capacity()) [[likely]] {
@@ -1151,6 +1152,18 @@ namespace XOffsetDatastructure {
         };
         using FreeTablePtr = std::unique_ptr<FreeTable, FreeTableRecycler>;
 
+        // The first hole after a reload or reset (which released the table)
+        // takes a table from this thread's cache: no host allocation and no
+        // host callback, so the inline paths publish it directly, as they do
+        // a hole in a bin with room. Null when the cache is empty.
+        XOFFSET_DETAIL_MOVE_INLINE FreeTable* adopt_cached_free_table() noexcept {
+            if (!free_table_cache_available()) return nullptr;
+            auto& cache = free_table_cache();
+            if (cache.count == 0) return nullptr;
+            free_table_.reset(cache.tables[--cache.count]);
+            return free_table_.get();
+        }
+
         // Throws std::bad_alloc only when the cache is empty and allocation fails.
 #if defined(__clang__) || defined(__GNUC__)
         [[gnu::noinline, gnu::cold]]
@@ -1249,8 +1262,9 @@ namespace XOffsetDatastructure {
         // no host allocation and runs no host callback (as D3's retire_block),
         // so it is published without copying the owner record.
         bool insert_free_block_inline(std::uint32_t offset, std::uint32_t bytes) noexcept {
+            if (bytes > FreeTable::small_max) return false;
             FreeTable* table = free_table_.get();
-            if (!table || bytes > FreeTable::small_max) return false;
+            if (!table && !(table = adopt_cached_free_table())) return false;
             const auto bin = bytes / 8u - 1u;
             auto& slot = table->bins[bin];
             if (slot.size() == slot.capacity()) return false;
@@ -3715,21 +3729,33 @@ namespace XOffsetDatastructure {
             return fixed_detail::resolve_rel32_const<T>(&data_delta, data_delta);
         }
 
+    private:
+        T* live_data() noexcept {
+            return fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta);
+        }
+        const T* live_data() const noexcept {
+            return fixed_detail::resolve_rel32_live<const T>(&data_delta, data_delta);
+        }
+
+    public:
+
         size_type size() const noexcept { return size_; }
         size_type capacity() const noexcept { return capacity_; }
         bool empty() const noexcept { return size_ == 0; }
 
-        T& operator[](size_type index) noexcept { return data()[index]; }
-        const T& operator[](size_type index) const noexcept { return data()[index]; }
+        // Element access requires a nonempty vector, whose head names a live
+        // block: the address needs no empty-head (null) test.
+        T& operator[](size_type index) noexcept { return live_data()[index]; }
+        const T& operator[](size_type index) const noexcept { return live_data()[index]; }
 
         iterator begin() noexcept { return data(); }
         iterator end() noexcept { return data() ? data() + size_ : nullptr; }
         const_iterator begin() const noexcept { return data(); }
         const_iterator end() const noexcept { return data() ? data() + size_ : nullptr; }
-        T& front() noexcept { return data()[0]; }
-        const T& front() const noexcept { return data()[0]; }
-        T& back() noexcept { return data()[size_ - 1]; }
-        const T& back() const noexcept { return data()[size_ - 1]; }
+        T& front() noexcept { return live_data()[0]; }
+        const T& front() const noexcept { return live_data()[0]; }
+        T& back() noexcept { return live_data()[size_ - 1]; }
+        const T& back() const noexcept { return live_data()[size_ - 1]; }
 
         void clear() noexcept { truncate(0); }
 
