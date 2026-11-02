@@ -194,6 +194,10 @@ template <class Ops> void run_dirty_save(Ops& ops, const std::vector<int>& who, 
             std::size_t k = 0;
             timed(st, "SN.diff", [&] { k = ops.n_store_diff(p); });
             timed(st, "SN.store_recv", [&] { ops.n_store_recv(p); });
+            if constexpr (requires { ops.n_store_check(p); }) {
+                static const char* const names[5] = {"SN.check_key", "SN.check_none", "SN.check_in_place", "SN.check_full", "SN.check_empty"};
+                st.bytes[names[ops.n_store_check(p)]] += 1;
+            }
             Digest a, b;
             dig_player(a, ops.player(p)); dig_player(b, ops.n_store_held(p));
             if (a.h != b.h) throw std::runtime_error("native storage delta: player differs");
