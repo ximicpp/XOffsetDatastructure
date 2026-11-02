@@ -3,14 +3,32 @@
 ## Unreleased
 
 - Delta sync (`xoffset_delta.hpp`, `docs/DELTA_SYNC.md`): a sender keeps an
-  `XDeltaBaseline` per receiver and `save_delta_into<T>` writes only the
-  payload byte runs that changed since (plus the hole table when it
-  changed); the receiver's `apply_delta_verified<T>` /
-  `try_apply_delta_verified<T>` patches its copy in place, verifies it
-  exactly as `load_verified<T>` verifies a wire and rolls the bytes back on
-  rejection, keeping an `XDeltaCursor` (stream and version). The first delta
-  is a key delta (the full state). Delta format 1.0 is new; wire format 2.1
-  is unchanged. New error codes `delta_base_mismatch` and `digest_mismatch`.
+  `XDeltaBaseline` per receiver and `save_delta_into<T>` writes the 64-byte
+  payload blocks that changed since, each by its byte mask (plus the hole
+  table when it changed); the receiver's `apply_delta_verified<T>` /
+  `try_apply_delta_verified<T>` patches its copy in place, keeps an
+  `XDeltaCursor` (stream and version) and rolls the bytes back on
+  rejection. The first delta is a key delta (the full state);
+  `XDeltaBaseline::key_delta_into` serves a receiver that joins late.
+  Delta format 1.0 is new (14-byte header for a small delta); wire format
+  2.1 is unchanged. New error codes `delta_base_mismatch` and
+  `digest_mismatch`.
+- The result passes exactly what `load_verified<T>` checks, but only what a
+  delta can affect is checked: the receiver keeps a map of the bytes
+  verification reads; a delta that writes none of them is not checked, one
+  that writes bools, string heads, vector sizes or the keys of a set or map
+  is checked in place, anything else is verified in full
+  (`XDeltaCursor::last_check()`). Errors are those of the whole
+  verification.
+- `XBuffer::touch(value)` / `touch(p, n)` with
+  `XDeltaOptions::touched_only`: the sender compares only the blocks it
+  touched since the baseline's last delta instead of the whole payload
+  (`XDeltaStats::compared_bytes`). `XDeltaOptions::digest` carries a hash
+  of the result; `XDeltaOptions::whole_blocks` sends changed blocks whole
+  for a cheaper apply.
+- Block bytes are gathered and scattered with one byte shuffle per 8-byte
+  word: SSSE3 (checked at run time) on x86-64, NEON on AArch64, plain code
+  elsewhere.
 
 ## 3.2.1: iPhone test host serves by default
 

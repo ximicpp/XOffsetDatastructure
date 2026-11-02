@@ -1524,8 +1524,8 @@ namespace XOffsetDatastructure {
                         }
                         const std::uint64_t sel = delta_byte_flags(blk.mask);
                         *p++ = static_cast<char>(sel);
-                        for (std::uint64_t s = sel; s != 0; s &= s - 1)
-                            *p++ = static_cast<char>(blk.mask >> (8 * std::countr_zero(s)));
+                        // The nonzero mask bytes: the mask is a word whose bytes sel selects.
+                        p = delta_put_masked(p, reinterpret_cast<const char*>(&blk.mask), sel);
                         p = delta_put_masked(p, src + blk.offset, blk.mask);
                     }
                     if (with_holes) {
