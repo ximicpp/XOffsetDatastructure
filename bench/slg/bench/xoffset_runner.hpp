@@ -76,6 +76,18 @@ public:
                 held_.clear();
                 for (int c = 0; c < vs.clients; ++c) held_.push_back(XBuffer::create<xm::ViewSnapshot>(kViewInitial, cap()));
                 at_.assign(std::size_t(vs.clients), {});
+#ifdef XOFFSET_DELTA_SYNC_API
+                // N: XOffset's own delta sync (same plan as U; see run_view).
+                ns_.clear(); nr_.clear();
+                for (int c = 0; c < vs.clients; ++c) {
+                    ns_.push_back(XBuffer::create<xm::ViewSnapshot>(kViewInitial, cap()));
+                    nr_.emplace_back(kViewInitial, cap());
+                }
+                nb_.assign(std::size_t(vs.clients), {});
+                nc_.assign(std::size_t(vs.clients), {});
+                nslot_.assign(std::size_t(vs.clients), {});
+                nfree_.assign(std::size_t(vs.clients), {});
+#endif
             }
         }
     }
@@ -360,9 +372,82 @@ public:
                 if (keep) keep->delta = delta_;
                 st.bytes["U.units"] += plan_.upserts.size();
                 st.bytes["U.removed"] += plan_.removed.size();
+#ifdef XOFFSET_DELTA_SYNC_API
+                run_native_delta(st, c, id, query_held(held_[std::size_t(c)].root<xm::ViewSnapshot>()));
+#endif
             }
         }
     }
+
+#ifdef XOFFSET_DELTA_SYNC_API
+    // N: the same delta sync with XOffset's own delta (xoffset_delta.hpp). The
+    // server keeps, per client, an XBuffer holding the client's view in stable
+    // slots (a unit that leaves zeroes its slot, a unit that enters takes a free
+    // slot), mutates it in place from the same plan as U, and sends
+    // save_delta_into against that client's baseline: the changed payload bytes.
+    // The client applies it with try_apply_delta_verified (patch + full
+    // verification) and reads in place: no decode and no apply step. Zeroed
+    // slots add nothing to query_held, so the client's read must equal U's.
+    // Timed: N.send (mutate the server's copy), N.diff (save_delta_into),
+    // N.recv (apply + verify).
+    void run_native_delta(CycleStats& st, int c, int64_t id, uint64_t want) {
+        using namespace XOffsetDatastructure;
+        const std::size_t k = std::size_t(c);
+        auto& sb = ns_[k];
+        auto& slot = nslot_[k];
+        auto& fr = nfree_[k];
+        // Untimed bookkeeping, like U's plan: which slot each removed / upserted unit
+        // uses (a leaving unit frees its slot first, an entering one takes a free slot
+        // or appends).
+        nrm_.clear(); nup_.clear();
+        for (int32_t gone : plan_.removed) {
+            const auto it = slot.find(gone);
+            if (it == slot.end()) continue;
+            nrm_.push_back(it->second);
+            fr.push_back(it->second);
+            slot.erase(it);
+        }
+        int32_t size = int32_t(sb.root<xm::ViewSnapshot>().units.size());
+        for (int32_t i : plan_.upserts) {
+            const int32_t uid = wu_.unit(i).id;
+            auto it = slot.find(uid);
+            int32_t pos;
+            if (it != slot.end()) pos = it->second;
+            else {
+                if (fr.empty()) pos = size++;
+                else { pos = fr.back(); fr.pop_back(); }
+                slot.emplace(uid, pos);
+            }
+            nup_.emplace_back(i, pos);
+        }
+        timed(st, "N.send", [&] {
+            const Viewport& r = wu_.current();
+            auto& v = sb.root<xm::ViewSnapshot>();
+            v.request_id = id; v.tick = wu_.tick_no();
+            v.x0 = r.x0; v.y0 = r.y0; v.x1 = r.x0 + kViewW; v.y1 = r.y0 + kViewH;
+            if (v.units.size() < std::size_t(size)) v.units.resize(std::size_t(size));
+            for (int32_t pos : nrm_) {
+                auto& u = v.units[std::size_t(pos)];
+                u.id = 0; u.owner = 0; u.x = 0; u.y = 0; u.hp = 0; u.state = 0;
+                u.name = std::string_view{};
+            }
+            for (const auto& [i, pos] : nup_) {
+                const WorldUnit& s = wu_.unit(i);
+                auto& u = v.units[std::size_t(pos)];
+                u.id = s.id; u.owner = s.owner; u.x = s.x; u.y = s.y; u.hp = s.hp; u.state = s.state;
+                if (sv(u.name) != std::string_view(s.name)) u.name = std::string_view(s.name);
+            }
+        });
+        timed(st, "N.diff", [&] { sb.save_delta_into<xm::ViewSnapshot>(ndelta_, nb_[k]); });
+        if (ndelta_.empty()) throw std::runtime_error("native delta: empty delta");
+        timed(st, "N.recv", [&] {
+            const XStatus r = nr_[k].try_apply_delta_verified<xm::ViewSnapshot>(ndelta_, nc_[k]);
+            if (!r) throw std::runtime_error("native delta rejected: " + std::string(r.error().message));
+        });
+        if (query_held(nr_[k].root<xm::ViewSnapshot>()) != want) throw std::runtime_error("native delta: client view differs from U");
+        st.bytes["N.delta"] += ndelta_.size();
+    }
+#endif
 
     uint64_t world_digest() override {
         Digest g;
@@ -471,6 +556,16 @@ private:
     std::optional<XOffsetDatastructure::XBuffer> u_s_, u_r_;
     std::vector<XOffsetDatastructure::XBuffer> held_;
     std::vector<std::unordered_map<int32_t, int32_t>> at_;
+#ifdef XOFFSET_DELTA_SYNC_API
+    std::vector<XOffsetDatastructure::XBuffer> ns_, nr_;
+    std::vector<XOffsetDatastructure::XDeltaBaseline> nb_;
+    std::vector<XOffsetDatastructure::XDeltaCursor> nc_;
+    std::vector<std::unordered_map<int32_t, int32_t>> nslot_;
+    std::vector<std::vector<int32_t>> nfree_;
+    std::vector<int32_t> nrm_;
+    std::vector<std::pair<int32_t, int32_t>> nup_;
+    std::string ndelta_;
+#endif
 };
 
 using XOffsetRunner = XOffsetRunnerT<XoModel, false>;

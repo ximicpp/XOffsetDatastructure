@@ -50,6 +50,8 @@
 #                        512x384 viewports that pan and sometimes jump) and U (delta sync: the
 #                        client holds its view, the server sends changed/entered units and the
 #                        ids that left; app-level for every format). No C or D in that set.
+#                        N (xoffset only, with XOFFSET_DELTA_SYNC_API): the same U plan through
+#                        XOffset's own save_delta_into / try_apply_delta_verified.
 #                        Unset: A/B/C/D and their stage keys unchanged (same digests and report
 #                        sums as before at S, both protocols). New message types ViewUnit /
 #                        ViewSnapshot / ViewDelta in every model, adapter and schema; Slot kView.
@@ -63,7 +65,7 @@
 #   them (guarded; older trees keep the previous declarations). Same machine code under GCC 16
 #   and P2996 (asm_equal), the lines are tools/describe_dump output (describe_dump_slg).
 4bd68ec1a9dcb93c4cf4cced05cd5a5ce098e4612183badbdc4f001ed32ab4e5  CMakeLists.txt
-ca40c2b98d5190092acbf9b57c6b300f8b7d338bf4b310b2c3ae4262240b6321  README.md
+e60d56cfb3cef28a6242f2b8ad67d6a433b5a30652cb64f104008e9fd1f94bf8  README.md
 26793b8192760da887a3db1b7afa9ee673a8257b8b01f14d6e7a38ca7d5a37a1  adapters/cereal_format.hpp
 67888cfee1aecdbc14d15dbdf919f1c39edfade985fc2385cf430947743a3bc0  adapters/flatbuffers_format.hpp
 70bfdee054800b8ea0a291ec8b4ff0c868036824c3d1198eeef44ff67f07ed5a  adapters/protobuf_format.hpp
@@ -74,7 +76,7 @@ eac6391a496578276cfe33afe8b2bb3866d3f1bc03127ac9a0bbb7bb7434583d  bench/runner.h
 c332435d838943330aeffa243d50dc958347177d376ae3ce78e183825e1170c9  bench/slg_bench.cpp
 730a66f677d9d20077175f629cf0b13919e66ccedaf880e4eb414c6bc94c0610  bench/small_msg_probe.cpp
 b8ea1fcd3368b9acfb65760dd52a9d4bc05750bdc2ea56a221b0dd338a7f7925  bench/std_runner.hpp
-a1d96f61366388e8b84115751d342946305230481885d2c9a705718e159481cd  bench/xoffset_runner.hpp
+f30b3281083eda53c1efc8848ca7845b9d6282950982d3ce762173f51f9222cc  bench/xoffset_runner.hpp
 12cab27be9331a4a09ae66f444cf5852dd81e363df562748a4ea854932e35e44  include/slg/cista_free.hpp
 d383da79e1f656838311c9fc339c977cba69a53277adeb72910ed6cd3c1d92ed  include/slg/generic.hpp
 d64ef2095a2be911ac33fdf651b384f4403fd8731562b8fb53373130fc692f2d  include/slg/model_cista.hpp
@@ -85,4 +87,4 @@ d64ef2095a2be911ac33fdf651b384f4403fd8731562b8fb53373130fc692f2d  include/slg/mo
 5bbbf22111c27aba91fdcaef94fa235aeb607c4ae557646b543651224b896955  include/slg/view.hpp
 53054f1836f60b966f86242d891d4a5c10666e6b2c500d51a4242f775c7d05dc  schema/slg.fbs
 58d7b40bfd2d46e9ad29a8efc23e0916a1399f066826c29650fa67ec147894b8  schema/slg.proto
-0139ccaccfa959679d039ed20e04d9e15c31dd3f78b7c390548af8bdbd62324f  tools/analyze.py
+764ed029e4e30c5cce0bdc302399a7d77517a06a43b7a339e7be8576c12809d5  tools/analyze.py

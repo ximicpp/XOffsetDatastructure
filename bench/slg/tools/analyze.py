@@ -85,6 +85,10 @@ def main():
     scen = {"A": "战斗服往返", "B": "跨服迁移", "C": "分区快照", "D": "战报只读"}
     if meta.get("cases") == "demo":  # SLG_CASES=demo (include/slg/view.hpp)
         scen = {"A": "场景↔战斗", "B": "场景↔场景", "S": "场景↔存储", "E": "服务端→客户端", "U": "增量同步"}
+        # N: XOffset's own delta sync (xoffset_delta.hpp), same plan as U; only the
+        # xoffset runners have it, and it is compared with each baseline's U.
+        if any(m.startswith("N.") for f in formats for m in ns[f]):
+            scen["N"] = "增量同步（XOffset 原生增量 ÷ 对手 U）"
     # Scenario totals per cycle.
     for fmt in formats:
         for s in scen:
@@ -121,7 +125,8 @@ def main():
         for s, label in scen.items():
             cells = []
             for b in base:
-                x = ns[a.subject].get(s + ".total", {}); y = ns[b].get(s + ".total", {})
+                x = ns[a.subject].get(s + ".total", {})
+                y = ns[b].get(("U" if s == "N" and "N.total" not in ns[b] else s) + ".total", {})
                 cs = sorted(set(x) & set(y))
                 lr = [math.log(x[c] / y[c]) for c in cs if x[c] > 0 and y[c] > 0]
                 if len(lr) < 3: cells.append(""); continue
