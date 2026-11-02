@@ -420,6 +420,9 @@ public:
             if (!st) throw std::runtime_error("native storage delta rejected: " + std::string(st.error().message));
         }
         PlayerState& n_store_held(int p) { return nh.at(p).template root<PlayerState>(); }
+        void n_store_prime_all() {
+            for (int p = 0; p < int(r->players_.size()); ++p) { n_store_diff(p); n_store_recv(p); }
+        }
 #endif
     };
 

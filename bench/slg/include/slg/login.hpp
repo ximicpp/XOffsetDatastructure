@@ -159,9 +159,13 @@ template <class Ops> void run_login(Ops& ops, uint64_t seed, int cycle, int roun
 //   auto& player(int p)                    the scene's resident player
 //   std::size_t modules_encode(auto fill)  fill(PlayerPatch&) then encode
 //   void modules_recv()                    storage receives it (checked) and keeps the bytes
-// Optional native: n_store_diff(p) -> size, n_store_recv(p), n_store_held(p).
+// Optional native: n_store_diff(p) -> size, n_store_recv(p), n_store_held(p),
+// n_store_prime_all(): storage already holds every player (from earlier saves), so in
+// cycle 0 (not pooled) each player's baseline is primed once, untimed; the timed
+// deltas are then the steady state, not first saves.
 template <class Ops> void run_dirty_save(Ops& ops, const std::vector<int>& who, int cycle, CycleStats& st) {
     constexpr bool native = requires { ops.n_store_diff(0); };
+    if constexpr (requires { ops.n_store_prime_all(); }) if (cycle == 0) ops.n_store_prime_all();
     for (int p : who) {
         std::size_t n = 0;
         timed(st, "SD.save_encode", [&] { n = ops.modules_encode([&](auto& m) { fill_modules(m, ops.player(p), cycle); }); });
