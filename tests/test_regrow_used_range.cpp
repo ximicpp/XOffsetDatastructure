@@ -1,8 +1,10 @@
 // D6: after an in-place reload the arena regrows inside its previously used
-// range in 4 KiB steps (each step memsets only what it exposes) instead of
-// doubling, and grows geometrically again once it passes that range. The
-// logical length never reaches the wire: every save equals the save of the
-// same operations on a freshly loaded buffer.
+// range in steps (each step memsets only what it exposes; 256 B after the
+// reload, doubling up to 4 KiB) instead of doubling, and grows geometrically
+// again once it passes that range. The previously used range ends at the old
+// used_end, not at the old logical length: by N2 the bytes between them were
+// already zero. The logical length never reaches the wire: every save equals
+// the save of the same operations on a freshly loaded buffer.
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -44,7 +46,8 @@ int main() {
     auto a = Buffer::create(4096, growable());
     for (std::uint64_t i = 0; i < (std::uint64_t(2) << 20) / 8; ++i) a.root().values.push_back(~i);
     const std::size_t high = a.get_size();
-    assert(high >= (std::size_t(2) << 20));
+    const std::size_t old_used = used_end(a);
+    assert(high >= (std::size_t(2) << 20) && old_used <= high);
 
     std::string small;
     {
@@ -57,10 +60,11 @@ int main() {
     assert(a.get_size() < high);
     assert(a.save_verified() == b.save_verified());
 
-    // Inside the used range: logical length stays within 4 KiB of the tail.
+    // Inside the used range: logical length stays within 4 KiB of the tail,
+    // and the first step after the reload exposes at most 256 B past it.
     std::size_t growths = 0, last = a.get_size();
     std::uint64_t pushed = 0;
-    while (used_end(a) + 64 * 1024 < high) {
+    while (used_end(a) + 64 * 1024 < old_used) {
         a.root().other.push_back(pushed);
         b.root().other.push_back(pushed);
         ++pushed;
@@ -69,6 +73,7 @@ int main() {
             last = a.get_size();
             const std::size_t needed = used_end(a);
             assert(last >= needed && last - needed <= 4096);
+            if (growths == 1) assert(last - needed <= 256);
             assert(tail_zero(a));
         }
     }
@@ -85,12 +90,31 @@ int main() {
         ++pushed;
         if (a.get_size() != before) {
             assert(tail_zero(a));
-            if (before >= high && a.get_size() >= 2 * before) doubled = true;
+            if (before >= old_used && a.get_size() >= 2 * before) doubled = true;
         }
     }
     assert(doubled);
     assert(a.save_verified() == b.save_verified());
     assert(a.root().other.size() == pushed && a.root().values.size() == 1);
+
+    // Two reloads in a row: after the first the old content's bytes past the
+    // new length are still dirty, so the second may not treat its own
+    // [used_end, logical) as the only dirty range. Every growth must still
+    // expose zero bytes only.
+    {
+        auto c = Buffer::create(4096, growable());
+        for (std::uint64_t i = 0; i < (std::uint64_t(1) << 20) / 8; ++i) c.root().values.push_back(~i);
+        c.reload_verified(small);
+        c.reload_verified(small);
+        auto d = Buffer::load_verified(small, growable());
+        for (std::uint64_t i = 0; i < (std::uint64_t(2) << 20) / 8; ++i) {
+            const std::size_t before = c.get_size();
+            c.root().other.push_back(i);
+            d.root().other.push_back(i);
+            if (c.get_size() != before) assert(tail_zero(c));
+        }
+        assert(c.save_verified() == d.save_verified());
+    }
 
     std::cout << "test_regrow_used_range: growths_in_used_range=" << growths
               << " high=" << high << " final_size=" << a.get_size() << " passed\n";
