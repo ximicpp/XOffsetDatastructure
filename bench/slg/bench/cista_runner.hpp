@@ -26,6 +26,7 @@
 #include "slg/model_cista.hpp"
 #include "slg/model_std.hpp"
 #include "slg/trace.hpp"
+#include "slg/login.hpp"
 #include "slg/view.hpp"
 
 namespace slg {
@@ -88,6 +89,14 @@ public:
                 bs_[i].setup(BlockRates::seed(seed, i), vs, BlockRates::rates[i]);
                 ops_[i].setup(vs.clients);
             }
+            lops_.srv.clear();
+            for (int i = 0; i < sc.migrants; ++i) {
+                cm::PlayerState h;
+                copy_player(h, make_player(mix_seed(seed, 0x1061), i + 1));
+                lops_.srv.emplace_back().receive(save(tmp, h));
+            }
+            lops_.hold = std::vector<Held<cm::PlayerState>>(lops_.srv.size());
+            sops_.r = this;
         }
     }
 
@@ -180,6 +189,7 @@ public:
             timed(st, "S.load_install", [&] { swap(slot, b_m_); });
             st.bytes["S.player"] += back_.size();
         }
+        if (demo_cases()) run_dirty_save(sops_, pick_storage(seed_, cycle, sc.players, sc.migrants), cycle, st);
 
         // C: map shard snapshot, restore, ticks, snapshot again (not in the demo case set).
         if (!demo_cases()) {
@@ -257,7 +267,35 @@ public:
     void run_view(int cycle, CycleStats& st, SampleWires* keep) {
         for (int i = 0; i < 3; ++i)
             run_blocks(bs_[i], ops_[i], BlockRates::keys(i), cycle, st, keep ? &keep->view : nullptr, keep ? &keep->delta : nullptr);
+        run_login(lops_, mix_seed(seed_, 0x1062), cycle, 4, st, lseq_);
     }
+
+    // L / LD (login.hpp): players live in cista buffers; a client copies the wire
+    // into its held player's buffer, deserializes it there with the runner's checks
+    // and changes it in place.
+    struct LoginOps {
+        std::vector<Held<cm::PlayerState>> srv, hold;
+        cm::PlayerPatch pm;
+        Held<cm::PlayerPatch> pr;
+        Bytes lw, pw;
+        int online() const { return int(srv.size()); }
+        cm::PlayerState& server(int p) { return *srv[std::size_t(p)]; }
+        std::size_t login_encode(int p) { return save(lw, *srv[std::size_t(p)]).size(); }
+        void login_recv(int p) { hold[std::size_t(p)].receive({lw.data(), lw.size()}); }
+        cm::PlayerState& held(int p) { return *hold[std::size_t(p)]; }
+        template <class Fill> std::size_t patch_encode(Fill&& fill) { fill(pm); return save(pw, pm).size(); }
+        void patch_recv() { pr.receive({pw.data(), pw.size()}); }
+        const cm::PlayerPatch& patch() const { return *pr; }
+    };
+    struct StoreOps {
+        CistaRunner* r = nullptr;
+        cm::PlayerPatch pm;
+        Held<cm::PlayerPatch> pr;
+        Bytes w;
+        cm::PlayerState& player(int p) { return *r->players_[std::size_t(p)]; }
+        template <class Fill> std::size_t modules_encode(Fill&& fill) { fill(pm); return save(w, pm).size(); }
+        void modules_recv() { pr.receive({w.data(), w.size()}); }
+    };
 
     struct BlockOps {
         std::vector<Bytes> snaps;
@@ -331,6 +369,9 @@ private:
     Bytes store_;
     BlockSession bs_[3];
     BlockOps ops_[3];
+    LoginOps lops_;
+    StoreOps sops_;
+    std::vector<int64_t> lseq_;
 };
 
 } // namespace slg

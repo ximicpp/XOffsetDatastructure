@@ -61,6 +61,14 @@ inline Offset<fb::City> build(FlatBufferBuilder& b, const stdm::City& c) {
     auto rs = kv64(b, c.resources);
     return fb::CreateCity(b, c.city_id, c.level, bl, rs);
 }
+inline Offset<fb::PlayerPatch> build(FlatBufferBuilder& b, const stdm::PlayerPatch& p) {
+    auto ix = b.CreateVector(p.army_index);
+    auto ar = tables(b, p.armies);
+    auto it = kv64(b, p.items);
+    auto city = build(b, p.city);
+    return fb::CreatePlayerPatch(b, p.player_id, p.seq, ix, ar, it, p.city_changed, city);
+}
+
 inline Offset<fb::PlayerState> build(FlatBufferBuilder& b, const stdm::PlayerState& p) {
     auto name = b.CreateString(p.name);
     auto city = build(b, p.city);
@@ -162,6 +170,15 @@ inline void unpack(stdm::City& d, const fb::City* s) {
     d.city_id = s->city_id(); d.level = s->level();
     unpack_map(d.buildings, s->buildings()); unpack_map(d.resources, s->resources());
 }
+inline void unpack(stdm::PlayerPatch& d, const fb::PlayerPatch* s) {
+    d.player_id = s->player_id(); d.seq = s->seq();
+    d.army_index.clear();
+    if (const auto* x = s->army_index()) d.army_index.assign(x->begin(), x->end());
+    unpack_vec(d.armies, s->armies(), [](stdm::Army& x, const fb::Army* y) { unpack(x, y); });
+    unpack_map(d.items, s->items());
+    d.city_changed = s->city_changed();
+    if (s->city()) unpack(d.city, s->city());
+}
 inline void unpack(stdm::PlayerState& d, const fb::PlayerState* s) {
     d.player_id = s->player_id(); d.name = s->name() ? s->name()->str() : std::string();
     if (s->city()) unpack(d.city, s->city());
@@ -222,6 +239,7 @@ inline void unpack(stdm::ViewDelta& d, const fb::ViewDelta* s) {
 
 template <class T> struct table_of;
 template <> struct table_of<stdm::PlayerState> { using type = fb::PlayerState; };
+template <> struct table_of<stdm::PlayerPatch> { using type = fb::PlayerPatch; };
 template <> struct table_of<stdm::BattleMsg> { using type = fb::BattleMsg; };
 template <> struct table_of<stdm::ShardState> { using type = fb::ShardState; };
 template <> struct table_of<stdm::Report> { using type = fb::Report; };

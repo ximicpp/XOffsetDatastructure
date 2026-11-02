@@ -16,7 +16,7 @@ namespace slg::pbconv {
 // Forward declarations so the container helpers below find every overload.
 #define SLG_PB_DECL(T) inline void to(pb::T&, const stdm::T&); inline void from(stdm::T&, const pb::T&);
 SLG_PB_DECL(Buff) SLG_PB_DECL(Skill) SLG_PB_DECL(Troop) SLG_PB_DECL(Event) SLG_PB_DECL(Tile)
-SLG_PB_DECL(Hero) SLG_PB_DECL(Army) SLG_PB_DECL(City) SLG_PB_DECL(PlayerState) SLG_PB_DECL(Report)
+SLG_PB_DECL(Hero) SLG_PB_DECL(Army) SLG_PB_DECL(City) SLG_PB_DECL(PlayerState) SLG_PB_DECL(PlayerPatch) SLG_PB_DECL(Report)
 SLG_PB_DECL(BattleMsg) SLG_PB_DECL(March) SLG_PB_DECL(ShardState) SLG_PB_DECL(ViewUnit) SLG_PB_DECL(ViewMarch) SLG_PB_DECL(ViewSnapshot) SLG_PB_DECL(ViewDelta)
 #undef SLG_PB_DECL
 
@@ -44,6 +44,13 @@ inline void to(pb::PlayerState& d, const stdm::PlayerState& s) {
     d.set_player_id(s.player_id); d.set_name(s.name); to(*d.mutable_city(), s.city);
     to_rep(d.mutable_armies(), s.armies); to_rep(d.mutable_heroes(), s.heroes);
     to_map(d.mutable_research(), s.research); to_map(d.mutable_items(), s.items);
+}
+inline void to(pb::PlayerPatch& d, const stdm::PlayerPatch& s) {
+    d.set_player_id(s.player_id); d.set_seq(s.seq);
+    d.mutable_army_index()->Reserve(int(s.army_index.size()));
+    for (int32_t i : s.army_index) d.add_army_index(i);
+    to_rep(d.mutable_armies(), s.armies); to_map(d.mutable_items(), s.items);
+    d.set_city_changed(s.city_changed); to(*d.mutable_city(), s.city);
 }
 inline void to(pb::Report& d, const stdm::Report& s) { d.set_battle_id(s.battle_id); d.set_summary(s.summary); to_rep(d.mutable_events(), s.events); }
 inline void to(pb::BattleMsg& d, const stdm::BattleMsg& s) {
@@ -83,6 +90,12 @@ inline void from(stdm::PlayerState& d, const pb::PlayerState& s) {
     d.player_id = s.player_id(); d.name = s.name(); from(d.city, s.city());
     from_rep(d.armies, s.armies()); from_rep(d.heroes, s.heroes());
     from_map(d.research, s.research()); from_map(d.items, s.items());
+}
+inline void from(stdm::PlayerPatch& d, const pb::PlayerPatch& s) {
+    d.player_id = s.player_id(); d.seq = s.seq();
+    d.army_index.assign(s.army_index().begin(), s.army_index().end());
+    from_rep(d.armies, s.armies()); from_map(d.items, s.items());
+    d.city_changed = s.city_changed(); from(d.city, s.city());
 }
 inline void from(stdm::Report& d, const pb::Report& s) { d.battle_id = s.battle_id(); d.summary = s.summary(); from_rep(d.events, s.events()); }
 inline void from(stdm::BattleMsg& d, const pb::BattleMsg& s) {
@@ -140,6 +153,7 @@ inline void from(stdm::ViewDelta& d, const pb::ViewDelta& s) {
 
 template <class T> struct msg_of;
 template <> struct msg_of<stdm::PlayerState> { using type = pb::PlayerState; };
+template <> struct msg_of<stdm::PlayerPatch> { using type = pb::PlayerPatch; };
 template <> struct msg_of<stdm::BattleMsg> { using type = pb::BattleMsg; };
 template <> struct msg_of<stdm::ShardState> { using type = pb::ShardState; };
 template <> struct msg_of<stdm::Report> { using type = pb::Report; };
@@ -177,6 +191,7 @@ struct ProtobufFormat {
         Pair<pb::Report> report;
         Pair<pb::ViewSnapshot> view;
         Pair<pb::ViewDelta> delta;
+        Pair<pb::PlayerPatch> patch;
         std::string slot[kSlots];
         template <class T> auto& pair() {
             if constexpr (std::is_same_v<T, stdm::BattleMsg>) return battle;
@@ -184,6 +199,7 @@ struct ProtobufFormat {
             else if constexpr (std::is_same_v<T, stdm::ShardState>) return shard;
             else if constexpr (std::is_same_v<T, stdm::ViewSnapshot>) return view;
             else if constexpr (std::is_same_v<T, stdm::ViewDelta>) return delta;
+            else if constexpr (std::is_same_v<T, stdm::PlayerPatch>) return patch;
             else return report;
         }
         template <class T> std::span<const uint8_t> encode(int s, const T& v) {

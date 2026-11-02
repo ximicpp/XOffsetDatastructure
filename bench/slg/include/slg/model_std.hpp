@@ -43,6 +43,17 @@ struct PlayerState {
     std::map<int32_t, int64_t> items;
 };
 
+// Login self deltas and dirty-module saves (login.hpp): changed armies (whole,
+// by index), changed item counts, the city when it changed.
+struct PlayerPatch {
+    int64_t player_id{}; int64_t seq{};
+    std::vector<int32_t> army_index;
+    std::vector<Army> armies;
+    std::map<int32_t, int64_t> items;
+    int32_t city_changed{};
+    City city;
+};
+
 struct Event { int32_t round{}; int32_t hero_id{}; int32_t skill_id{}; int32_t target{}; int32_t damage{}; };
 
 struct Report {

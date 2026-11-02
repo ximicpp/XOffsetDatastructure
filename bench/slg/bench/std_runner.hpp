@@ -8,6 +8,7 @@
 #include "slg/generic.hpp"
 #include "slg/model_std.hpp"
 #include "slg/trace.hpp"
+#include "slg/login.hpp"
 #include "slg/view.hpp"
 
 namespace slg {
@@ -29,6 +30,11 @@ public:
                 bs_[i].setup(BlockRates::seed(seed, i), vs, BlockRates::rates[i]);
                 ops_[i].setup(&rz_, vs.clients);
             }
+            lops_.rz = &rz_;
+            lops_.srv.clear();
+            for (int i = 0; i < sc.migrants; ++i) lops_.srv.push_back(make_player(mix_seed(seed, 0x1061), i + 1));
+            lops_.hold.assign(lops_.srv.size(), {});
+            sops_.r = this;
         }
     }
 
@@ -176,6 +182,7 @@ public:
             timed(st, "S.load_install", [&] { std::swap(slot, bm_); });
             st.bytes["S.player"] += w.size();
         }
+        if (demo_cases()) run_dirty_save(sops_, pick_storage(seed_, cycle, sc.players, sc.migrants), cycle, st);
 
         if (!demo_cases()) {  // the demo case set has no shard snapshot (susu 2026-11-02)
             std::span<const uint8_t> snap, snap2;
@@ -216,7 +223,34 @@ public:
     void run_view(int cycle, CycleStats& st, SampleWires* keep) {
         for (int i = 0; i < 3; ++i)
             run_blocks(bs_[i], ops_[i], BlockRates::keys(i), cycle, st, keep ? &keep->view : nullptr, keep ? &keep->delta : nullptr);
+        run_login(lops_, mix_seed(seed_, 0x1062), cycle, 4, st, lseq_);
     }
+
+    // L / LD (login.hpp): the server's players and the clients' held players are
+    // plain objects; the client decodes into the one it holds.
+    struct LoginOps {
+        typename F::Reuse* rz = nullptr;
+        std::vector<stdm::PlayerState> srv, hold;
+        stdm::PlayerPatch pm, pr;
+        std::span<const uint8_t> lw, pw;
+        int online() const { return int(srv.size()); }
+        stdm::PlayerState& server(int p) { return srv[std::size_t(p)]; }
+        std::size_t login_encode(int p) { lw = rz->encode(kOut, srv[std::size_t(p)]); return lw.size(); }
+        void login_recv(int p) { rz->decode(lw, hold[std::size_t(p)]); }
+        stdm::PlayerState& held(int p) { return hold[std::size_t(p)]; }
+        template <class Fill> std::size_t patch_encode(Fill&& fill) { fill(pm); pw = rz->encode(kDelta, pm); return pw.size(); }
+        void patch_recv() { rz->decode(pw, pr); }
+        const stdm::PlayerPatch& patch() const { return pr; }
+    };
+    // SD: the scene's resident players; storage decodes with the format's checks.
+    struct StoreOps {
+        StdRunner* r = nullptr;
+        stdm::PlayerPatch pm, pr;
+        std::span<const uint8_t> w;
+        stdm::PlayerState& player(int p) { return r->players_[std::size_t(p)]; }
+        template <class Fill> std::size_t modules_encode(Fill&& fill) { fill(pm); w = r->rz_.encode(kBack, pm); return w.size(); }
+        void modules_recv() { r->rz_.decode(w, pr); }
+    };
 
     struct BlockOps {
         typename F::Reuse* rz = nullptr;
@@ -273,6 +307,9 @@ private:
     std::vector<uint8_t> store_;
     BlockSession bs_[3];
     BlockOps ops_[3];
+    LoginOps lops_;
+    StoreOps sops_;
+    std::vector<int64_t> lseq_;
 };
 
 } // namespace slg

@@ -73,6 +73,15 @@ struct City {
     FlatMap<int32_t, int64_t> resources;
 };
 
+struct PlayerPatch {
+    int64_t player_id{}; int64_t seq{};
+    data::vector<int32_t> army_index;
+    data::vector<Army> armies;
+    FlatMap<int32_t, int64_t> items;
+    int32_t city_changed{};
+    City city;
+};
+
 struct PlayerState {
     int64_t player_id{};
     data::string name;
