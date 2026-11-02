@@ -32,20 +32,31 @@ struct SelfDirty {
 };
 
 // One player's own actions in one tick; records what it touched.
-template <class P> void self_edits(P& p, Rng& rng, int ops, SelfDirty& d) {
+// touch(object) records a changed object or container for native XOffset
+// deltas (a no-op for the others).
+struct NoTouch { template <class T> void operator()(const T&) const {} };
+template <class M, class K, class V, class Touch> void bump(M& m, K k, V by, Touch& touch) {
+    if (m.find(k) != m.end()) { auto& v = m[k]; v += by; touch(v); }
+    else { m[k] += by; touch(m); }   // an insert moves entries
+}
+template <class P, class Touch = NoTouch> void self_edits(P& p, Rng& rng, int ops, SelfDirty& d, Touch touch = {}) {
     for (int i = 0; i < ops; ++i) {
         switch (rng.below(4)) {
-        case 0: { const int32_t k = rng.below(200); p.items[k] += rng.range(1, 100); d.items.push_back(k); break; }
+        case 0: { const int32_t k = rng.below(200); bump(p.items, k, rng.range(1, 100), touch); d.items.push_back(k); break; }
         case 1:
             if (p.armies.size() > 0) {
                 const int32_t a = rng.below(int32_t(p.armies.size()));
                 auto& ar = p.armies[std::size_t(a)];
-                if (ar.troops.size() > 0) ar.troops[std::size_t(rng.below(int32_t(ar.troops.size())))].count += rng.range(1, 50);
+                if (ar.troops.size() > 0) {
+                    auto& t = ar.troops[std::size_t(rng.below(int32_t(ar.troops.size())))];
+                    t.count += rng.range(1, 50);
+                    touch(t);
+                }
                 d.armies.push_back(a);
             }
             break;
-        case 2: p.city.buildings[rng.below(30)] += 1; d.city = true; break;
-        default: p.city.resources[rng.below(8)] += rng.range(10, 1000); d.city = true; break;
+        case 2: bump(p.city.buildings, rng.below(30), 1, touch); d.city = true; break;
+        default: bump(p.city.resources, rng.below(8), rng.range(10, 1000), touch); d.city = true; break;
         }
     }
     std::sort(d.armies.begin(), d.armies.end()); d.armies.erase(std::unique(d.armies.begin(), d.armies.end()), d.armies.end());
@@ -135,7 +146,10 @@ template <class Ops> void run_login(Ops& ops, uint64_t seed, int cycle, int roun
         for (int p = 0; p < online; ++p) {
             Rng rng(mix_seed(seed, (uint64_t(cycle) * 64 + uint64_t(r)) * 100003 + uint64_t(p)));
             dirty.clear();
-            self_edits(ops.server(p), rng, 2, dirty);
+            if constexpr (requires { ops.n_touch(0, 0); })
+                self_edits(ops.server(p), rng, 2, dirty, [&](const auto& o) { ops.n_touch(p, o); });
+            else
+                self_edits(ops.server(p), rng, 2, dirty);
             const int64_t sq = ++seq[std::size_t(p)];
             std::size_t n = 0;
             timed(st, "LD.send", [&] { n = ops.patch_encode([&](auto& m) { fill_patch(m, ops.server(p), dirty, sq); }); });
@@ -147,7 +161,10 @@ template <class Ops> void run_login(Ops& ops, uint64_t seed, int cycle, int roun
             st.bytes["LD.patches"] += 1;
             if constexpr (native) {
                 std::size_t k = 0;
-                timed(st, "LN.diff", [&] { k = ops.n_diff(p); });
+                if constexpr (requires { ops.n_diff_dirty(0, dirty); })
+                    timed(st, "LN.diff", [&] { k = ops.n_diff_dirty(p, dirty); });
+                else
+                    timed(st, "LN.diff", [&] { k = ops.n_diff(p); });
                 timed(st, "LN.recv", [&] { ops.n_recv(p); });
                 if (query_self(ops.n_held(p)) != q) throw std::runtime_error("native self delta: player differs");
                 st.bytes["LN.delta"] += k;
