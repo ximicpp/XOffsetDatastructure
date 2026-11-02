@@ -2,9 +2,11 @@
 // XBuffer; messages are built in, saved from and loaded into arenas, and the game logic
 // runs in place on the received arena. Requires P2996 Clang.
 #pragma once
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -486,10 +488,11 @@ public:
 
 #ifdef XOFFSET_DELTA_SYNC_API
         // Native delta (N*, K*): the server keeps each block in an XBuffer with
-        // stable slots (a record that leaves zeroes its slot, a new one takes a
-        // free slot or is appended), mutates it in place, and writes one delta per
-        // block against a baseline shared by all its subscribers; a new subscriber
-        // gets the baseline's key delta. Clients patch + verify and read in place.
+        // stable slots (a record that leaves zeroes its slot, a new one takes the
+        // lowest free slot or is appended), mutates it in place, and writes one
+        // delta per block against a baseline shared by all its subscribers; a new
+        // subscriber gets the baseline's key delta. Clients patch + verify and
+        // read in place.
         struct NBlock {
             std::optional<XBuffer> buf;
             XOffsetDatastructure::XDeltaBaseline base;
@@ -504,22 +507,24 @@ public:
         std::vector<std::optional<XBuffer>> nheld;
         std::vector<XOffsetDatastructure::XDeltaCursor> ncur;
         int32_t napply_b = -1;
-        // Fixed slot capacity per block (about twice the average plus margin), so
-        // the layout does not change from tick to tick; grows only on overflow.
+        // Capacity per block is reserved once (about 1.5x the average plus
+        // margin), so the layout does not move from tick to tick; the vectors
+        // are as long as the most records the block has held (free slots are
+        // reused lowest first) and grow past the reservation only on overflow.
+        // A new subscriber checks and reads every slot up to that length, so
+        // slots past it cost nothing (a fixed 2x + 64 slots cost 25% more key
+        // receive time).
         void n_setup(int clients, int units, int marches) {
             nb.clear();
             nb.resize(std::size_t(kBlocks));
-            const int32_t ucap = 2 * units / kBlocks + 64, mcap = 6 * marches / kBlocks + 32;
+            const int32_t ucap = 3 * units / (2 * kBlocks) + 32, mcap = 3 * marches / kBlocks + 32;
             for (int32_t b = 0; b < kBlocks; ++b) {
                 auto& n = nb[std::size_t(b)];
                 n.buf.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, cap()));
                 auto& v = n.buf->template root<xm::ViewSnapshot>();
                 block_rect(b, v.x0, v.y0, v.x1, v.y1);
-                v.units.resize(std::size_t(ucap));
-                v.marches.resize(std::size_t(mcap));
-                n.usize = ucap; n.msize = mcap;
-                for (int32_t i = ucap - 1; i >= 0; --i) n.ufree.push_back(i);
-                for (int32_t i = mcap - 1; i >= 0; --i) n.mfree.push_back(i);
+                v.units.reserve(std::size_t(ucap));
+                v.marches.reserve(std::size_t(mcap));
             }
             nheld.clear();
             nheld.resize(std::size_t(clients) * 9);
@@ -534,7 +539,7 @@ public:
                 if (it != at.end()) return it->second;
                 int32_t pos;
                 if (fr.empty()) pos = size++;
-                else { pos = fr.back(); fr.pop_back(); }
+                else { std::pop_heap(fr.begin(), fr.end(), std::greater<>{}); pos = fr.back(); fr.pop_back(); }
                 at.emplace(id, pos);
                 return pos;
             };
@@ -542,11 +547,13 @@ public:
                 const auto it = n.uslot.find(id);
                 if (it == n.uslot.end()) continue;
                 n.urm.push_back(it->second); n.ufree.push_back(it->second); n.uslot.erase(it);
+                std::push_heap(n.ufree.begin(), n.ufree.end(), std::greater<>{});
             }
             for (int32_t id : p.removed_marches) {
                 const auto it = n.mslot.find(id);
                 if (it == n.mslot.end()) continue;
                 n.mrm.push_back(it->second); n.mfree.push_back(it->second); n.mslot.erase(it);
+                std::push_heap(n.mfree.begin(), n.mfree.end(), std::greater<>{});
             }
             for (int32_t i : p.units) n.uup.emplace_back(i, take(n.uslot, n.ufree, n.usize, w.unit(i).id));
             for (int32_t i : p.marches) n.mup.emplace_back(i, take(n.mslot, n.mfree, n.msize, w.march(i).id));
@@ -576,6 +583,7 @@ public:
             n.buf->template save_delta_into<xm::ViewSnapshot>(n.delta, n.base);
             return n.delta.size();
         }
+        std::string_view n_key_wire(int b) const { return nb[std::size_t(b)].key; }
         std::size_t n_key(int b) {
             auto& n = nb[std::size_t(b)];
             if (n.base.empty()) n_diff(b);   // a block that never changed
