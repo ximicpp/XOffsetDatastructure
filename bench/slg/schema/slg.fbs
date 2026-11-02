@@ -14,6 +14,7 @@ table Hero { id:int; level:int; star:int; name:string; skills:[Skill]; buffs:[Bu
 table Army { army_id:long; owner_id:long; x:int; y:int; heroes:[Hero]; troops:[Troop]; buffs:[Buff]; }
 table City { city_id:long; level:int; buildings:[KV32]; resources:[KV64]; }
 table PlayerState { player_id:long; name:string; city:City; armies:[Army]; heroes:[Hero]; research:[KV32]; items:[KV64]; }
+table PlayerPatch { player_id:long; seq:long; army_index:[int]; armies:[Army]; items:[KV64]; city_changed:int; city:City; }
 table Report { battle_id:long; summary:string; events:[Event]; }
 table BattleMsg { battle_id:long; seed:long; winner:int; attacker:Army; defender:Army; report:Report; }
 table March { march_id:long; owner:long; from_x:int; from_y:int; to_x:int; to_y:int; eta:int; troops:[Troop]; }

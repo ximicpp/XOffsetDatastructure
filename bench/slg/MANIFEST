@@ -55,6 +55,8 @@
 #   2026-11-02 E/U revised (research doc 67f2Y3BpccPrANT5vjBdkH, adopted by susu): block
 #                        windows pulled on block crossing, per-block deltas fanned out, march
 #                        lines, three change rates (keys E*/U*/N*/K*, P/C/S); ViewMarch added.
+#   2026-11-02 L/LD login full + self deltas, SD dirty-module save (login.hpp, PlayerPatch);
+#                        XOffset native LK/LN/SN. Unit names shortened to u_N / sq_N.
 #                        Unset: A/B/C/D and their stage keys unchanged (same digests and report
 #                        sums as before at S, both protocols). New message types ViewUnit /
 #                        ViewSnapshot / ViewDelta in every model, adapter and schema; Slot kView.
@@ -68,26 +70,27 @@
 #   them (guarded; older trees keep the previous declarations). Same machine code under GCC 16
 #   and P2996 (asm_equal), the lines are tools/describe_dump output (describe_dump_slg).
 4bd68ec1a9dcb93c4cf4cced05cd5a5ce098e4612183badbdc4f001ed32ab4e5  CMakeLists.txt
-617aa175def79d47c9230dc1614c4ec5f51910083fc1ef3c97be306c47dd627d  README.md
-5b7d159d62c16a16ed3384d47024a670623a6ef845bc70a9283cb84c9ed5a78e  adapters/cereal_format.hpp
-e51112784fefbee5a132edf5b9b16b06018970b0e6209cd94c20795fd2322f3d  adapters/flatbuffers_format.hpp
-ad371b91847fefa07547c984cfc46a23a99a2167740803d81e68d97741438c4e  adapters/protobuf_format.hpp
+4775c77743ca8af361e4f1d0bc308f8b86bfcfec8c4ed77afea4dc61f7b8fbc3  README.md
+17df29f77131fdc3996d6606180a88b548007d5f16fc2c71a3ac45878fce26fd  adapters/cereal_format.hpp
+6bb4c5619efe2bf89de0e784266ab4c414a934495e83cffbee96ab37dd5209ee  adapters/flatbuffers_format.hpp
+93dde0e701e2bfa23f2e63653e8f214e1410912906237af57d04a8c8eacad49c  adapters/protobuf_format.hpp
 61fce58cd26e87f1c003b9cf55b690a9e553a7bde47b7e0e287e85c813ede0c9  adapters/zpp_bits_format.hpp
-a06cdd6cbfb68c5e4661ffd282716006eb9bb8214ef8402776894a7e7506f202  bench/cista_runner.hpp
+fab6ef1b22e54146703115dc9f54e223aa73a63930e2cfe5db6c19e5b987c0a6  bench/cista_runner.hpp
 f5e58fceecd0c7b22503a4b0652b4164aea055ee31fc24b859efa48496cd245f  bench/erase_probe.cpp
 eac6391a496578276cfe33afe8b2bb3866d3f1bc03127ac9a0bbb7bb7434583d  bench/runner.hpp
 65d0f3e276ecd4b4824113e09343ec30c3084ca055ed5eaa162d40d3133f87d7  bench/slg_bench.cpp
 730a66f677d9d20077175f629cf0b13919e66ccedaf880e4eb414c6bc94c0610  bench/small_msg_probe.cpp
-7248dec1646847abf244c193f2a030186f40727fd14ad1ffbb14817dab60b521  bench/std_runner.hpp
-347196dd85bf008ad65674ded2f7d8d5f1fcd437db529142537b5b06b46f9846  bench/xoffset_runner.hpp
+a92b5d7928f7263adb55a07dbb2e134213394a2fbaff4aaa4e7b5db1930c17b6  bench/std_runner.hpp
+a9697a8b6d5852396c01fd43bd7366c87583895ac73d2e0c03117c8e72826cc3  bench/xoffset_runner.hpp
 12cab27be9331a4a09ae66f444cf5852dd81e363df562748a4ea854932e35e44  include/slg/cista_free.hpp
 d383da79e1f656838311c9fc339c977cba69a53277adeb72910ed6cd3c1d92ed  include/slg/generic.hpp
-e127f105d696c8745e91ca565fbd293532f78eeea8fc491ed539418d360a006b  include/slg/model_cista.hpp
-00bb20c5a6b2a0edbb60df1996260d7d751cf7a528417941f91abbfd91ec759a  include/slg/model_std.hpp
-4fbbcdd9b6e366a5c2fb90eee572e11bb5795f2e28e2eedebac8e3e4e75544cc  include/slg/model_xoffset.hpp
+ddc5383c8b6da0f48bc162c363677ce5104ca47044fc94f798bee62d4fc54464  include/slg/login.hpp
+a7ac4b83dce89750e858a3226ca7d62a269aa051acc5fb474d084f26d028753e  include/slg/model_cista.hpp
+5f5b98780705a520d92a8ee0ec27a07db8d833d84bfbd7c2112b8a69ada89069  include/slg/model_std.hpp
+ad969a2935b7c7becdd8c566cea52c6e1b445b42ddc94aa4eabb0973b3e62883  include/slg/model_xoffset.hpp
 3259eef215f98da7328da68bb5e7dd1f33141cdeb894511a039af075114c3391  include/slg/model_xoffset_optin.hpp
 36d5761eb46998e5040f7a19fb99f5ac1df5e31ee129a864e3872ba734e4a5db  include/slg/trace.hpp
-4ac7ebfde252433076c7c648854b762861a0457199868bcb6e2efae21137d101  include/slg/view.hpp
-a8494dd33d3177b496da3788c4c346d9ac0ae844d0c9a2ce3b79f5cfbbc22a8e  schema/slg.fbs
-3da297abbb1640eb297d185af319c00325c4d9f4d4f80d8f4860438c4d2e499c  schema/slg.proto
-17153874f50d19319add6277c4d9d3751b59f3e9f42d4dd591846ad2990bfad9  tools/analyze.py
+a0241a6666072d1145a5313d8d593cae69259c3d1d94c114307e74a09c58ae8b  include/slg/view.hpp
+74667dd9fa7ac0c31e37252e5934ec95ff8d63337ff7e9d85428ae9d445bb862  schema/slg.fbs
+2d7fc7c3743978f7d7460333ffc989427333d2213b9345efb55e828ee4a2b19b  schema/slg.proto
+a6f4067932355c6781a25a370633706f7d998cabccf571a282b913e6e5240772  tools/analyze.py

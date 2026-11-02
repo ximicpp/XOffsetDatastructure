@@ -42,6 +42,16 @@ struct alignas(8) PlayerState {
     XMap<int32_t, int64_t> items;
 };
 
+// Login self deltas and dirty-module saves (login.hpp).
+struct alignas(8) PlayerPatch {
+    int64_t player_id{}; int64_t seq{};
+    XVector<int32_t> army_index;
+    XVector<Army> armies;
+    XMap<int32_t, int64_t> items;
+    int32_t city_changed{};
+    City city;
+};
+
 struct alignas(8) Event { int32_t round{}; int32_t hero_id{}; int32_t skill_id{}; int32_t target{}; int32_t damage{}; };
 
 struct alignas(8) Report {
@@ -115,6 +125,7 @@ XOFFSET_RECORD(slg::xm::Hero, id, level, star, name, skills, buffs)
 XOFFSET_RECORD(slg::xm::Troop, type, count, wounded)
 XOFFSET_RECORD(slg::xm::Army, army_id, owner_id, x, y, heroes, troops, buffs)
 XOFFSET_RECORD(slg::xm::PlayerState, player_id, name, city, armies, heroes, research, items)
+XOFFSET_RECORD(slg::xm::PlayerPatch, player_id, seq, army_index, armies, items, city_changed, city)
 XOFFSET_RECORD(slg::xm::Event, round, hero_id, skill_id, target, damage)
 XOFFSET_RECORD(slg::xm::Report, battle_id, summary, events)
 XOFFSET_RECORD(slg::xm::BattleMsg, battle_id, seed, winner, attacker, defender, report)
@@ -127,7 +138,7 @@ XOFFSET_RECORD(slg::xm::ViewSnapshot, request_id, tick, x0, y0, x1, y1, units, m
 XOFFSET_RECORD(slg::xm::ViewDelta, request_id, tick, x0, y0, x1, y1, upserts, removed, marches, removed_marches)
 #elif defined(XOFFSET_ORDINARY_RECORDS)
 XOFFSET_ORDINARY_RECORDS(slg::xm::Buff, slg::xm::Skill, slg::xm::Troop, slg::xm::Hero, slg::xm::Army,
-                         slg::xm::City, slg::xm::PlayerState, slg::xm::Event, slg::xm::Report,
+                         slg::xm::City, slg::xm::PlayerState, slg::xm::PlayerPatch, slg::xm::Event, slg::xm::Report,
                          slg::xm::BattleMsg, slg::xm::Tile, slg::xm::March, slg::xm::ShardState,
                          slg::xm::ViewUnit, slg::xm::ViewMarch, slg::xm::ViewSnapshot, slg::xm::ViewDelta)
 #else
@@ -144,6 +155,7 @@ SLG_XM_ORDINARY_RECORD(slg::xm::Hero)
 SLG_XM_ORDINARY_RECORD(slg::xm::Army)
 SLG_XM_ORDINARY_RECORD(slg::xm::City)
 SLG_XM_ORDINARY_RECORD(slg::xm::PlayerState)
+SLG_XM_ORDINARY_RECORD(slg::xm::PlayerPatch)
 SLG_XM_ORDINARY_RECORD(slg::xm::Event)
 SLG_XM_ORDINARY_RECORD(slg::xm::Report)
 SLG_XM_ORDINARY_RECORD(slg::xm::BattleMsg)
@@ -158,6 +170,7 @@ SLG_XM_ORDINARY_RECORD(slg::xm::ViewDelta)
 #endif
 
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::PlayerState, "slg.PlayerState.v1")
+XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::PlayerPatch, "slg.PlayerPatch.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::BattleMsg, "slg.BattleMsg.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::ShardState, "slg.ShardState.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::Report, "slg.Report.v1")

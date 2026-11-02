@@ -25,6 +25,7 @@ template <CerealArchive A> void serialize(A& ar, Troop& v) { ar(v.type, v.count,
 template <CerealArchive A> void serialize(A& ar, Hero& v) { ar(v.id, v.level, v.star, v.name, v.skills, v.buffs); }
 template <CerealArchive A> void serialize(A& ar, Army& v) { ar(v.army_id, v.owner_id, v.x, v.y, v.heroes, v.troops, v.buffs); }
 template <CerealArchive A> void serialize(A& ar, City& v) { ar(v.city_id, v.level, v.buildings, v.resources); }
+template <CerealArchive A> void serialize(A& ar, PlayerPatch& v) { ar(v.player_id, v.seq, v.army_index, v.armies, v.items, v.city_changed, v.city); }
 template <CerealArchive A> void serialize(A& ar, PlayerState& v) { ar(v.player_id, v.name, v.city, v.armies, v.heroes, v.research, v.items); }
 template <CerealArchive A> void serialize(A& ar, Event& v) { ar(v.round, v.hero_id, v.skill_id, v.target, v.damage); }
 template <CerealArchive A> void serialize(A& ar, Report& v) { ar(v.battle_id, v.summary, v.events); }

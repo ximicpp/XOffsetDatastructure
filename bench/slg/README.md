@@ -77,6 +77,14 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   `try_apply_delta_verified` (N*.recv, patch + full verification) and read in
   place; every delivery's view is checked equal to the application-level one.
   `tools/analyze.py` compares N* with the other formats' U* and K* with E*.
+- the player's own data (`include/slg/login.hpp`): L, a client logs in and
+  gets its whole player once (256 online players at M, a quarter log in again
+  each cycle); LD, the server then changes the player every tick (troops,
+  items, buildings, resources) and sends a PlayerPatch with only the changed
+  parts (dirty marks recorded by the edit); the client applies it in place.
+  SD, the dirty-module save to storage (all armies and items as a PlayerPatch).
+  XOffset native: LK login key delta, LN self deltas, SN delta to what storage
+  holds; every native receiver is checked equal to the application-level one.
 
 There is no C or D in this set, and `MANIFEST` lists the change. With
 `SLG_CASES` unset nothing changes: same stage keys, digests and report sums.

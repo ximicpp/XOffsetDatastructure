@@ -15,6 +15,7 @@
 #include "slg/model_xoffset.hpp"
 #include "slg/model_xoffset_optin.hpp"
 #include "slg/trace.hpp"
+#include "slg/login.hpp"
 #include "slg/view.hpp"
 
 namespace slg {
@@ -68,8 +69,16 @@ public:
                 const ViewScale& vs = *find_view_scale(sc.name);
                 for (int k = 0; k < 3; ++k) {
                     bs_[k].setup(BlockRates::seed(seed, k), vs, BlockRates::rates[k]);
-                    ops_[k].setup(vs.clients);
+                    ops_[k].setup(vs.clients, vs.units, vs.marches);
                 }
+                lops_.srv.clear();
+                for (int i = 0; i < sc.migrants; ++i) {
+                    XBuffer b = XBuffer::create<PlayerState>(kPlayerInitial, cap());
+                    copy_player(b.root<PlayerState>(), make_player(mix_seed(seed, 0x1061), i + 1));
+                    lops_.srv.push_back(std::move(b));
+                }
+                lops_.setup();
+                sops_.r = this;
             }
         }
     }
@@ -265,6 +274,7 @@ public:
             timed(st, "S.load_install", [&] { std::swap(slot, *b_m_); });
             st.bytes["S.player"] += back_.size();
         }
+        if (demo_cases()) run_dirty_save(sops_, pick_storage(seed_, cycle, sc.players, sc.migrants), cycle, st);
 
         if (!demo_cases()) {  // the demo case set has no shard snapshot (susu 2026-11-02)
             timed(st, "C.snapshot", [&] { shard_->save_verified_into<ShardState>(snap_); });
@@ -318,7 +328,100 @@ public:
     void run_view(int cycle, CycleStats& st, SampleWires* keep) {
         for (int k = 0; k < 3; ++k)
             run_blocks(bs_[k], ops_[k], BlockRates::keys(k), cycle, st, keep ? &keep->view : nullptr, keep ? &keep->delta : nullptr);
+        run_login(lops_, mix_seed(seed_, 0x1062), cycle, 4, st, lseq_);
     }
+
+    // L / LD (login.hpp): the server's players are resident XBuffers; a client
+    // reloads the login wire into the XBuffer it keeps and changes it in place.
+    // Native (LK / LN): one baseline per online client over the server's player.
+    struct LoginOps {
+        using XBuffer = XOffsetDatastructure::XBuffer;
+        std::vector<XBuffer> srv;
+        std::vector<std::optional<XBuffer>> hold;
+        std::optional<XBuffer> pm, pr;
+        std::string lw, pw;
+        void setup() {
+            hold.clear(); hold.resize(srv.size());
+            pm.emplace(XBuffer::create<xm::PlayerPatch>(kViewInitial, cap()));
+            pr.emplace(XBuffer::create<xm::PlayerPatch>(kViewInitial, cap()));
+#ifdef XOFFSET_DELTA_SYNC_API
+            nb.assign(srv.size(), {});
+            nc.assign(srv.size(), {});
+            nh.clear(); nh.resize(srv.size());
+#endif
+        }
+        int online() const { return int(srv.size()); }
+        PlayerState& server(int p) { return srv[std::size_t(p)].template root<PlayerState>(); }
+        std::size_t login_encode(int p) { srv[std::size_t(p)].template save_verified_into<PlayerState>(lw); return lw.size(); }
+        void login_recv(int p) {
+            auto& h = hold[std::size_t(p)];
+            if (!h) h.emplace(XBuffer::create<PlayerState>(kPlayerInitial, cap()));
+            h->template reload_verified<PlayerState>(lw);
+        }
+        PlayerState& held(int p) { return hold[std::size_t(p)]->template root<PlayerState>(); }
+        template <class Fill> std::size_t patch_encode(Fill&& fill) {
+            fill(pm->template reset<xm::PlayerPatch>());
+            pm->template save_verified_into<xm::PlayerPatch>(pw);
+            return pw.size();
+        }
+        void patch_recv() { pr->template reload_verified<xm::PlayerPatch>(pw); }
+        const xm::PlayerPatch& patch() { return pr->template root<xm::PlayerPatch>(); }
+#ifdef XOFFSET_DELTA_SYNC_API
+        std::vector<XOffsetDatastructure::XDeltaBaseline> nb;
+        std::vector<XOffsetDatastructure::XDeltaCursor> nc;
+        std::vector<std::optional<XBuffer>> nh;
+        std::string nd;
+        std::size_t n_login_key(int p) {
+            nb[std::size_t(p)].reset();
+            srv[std::size_t(p)].template save_delta_into<PlayerState>(nd, nb[std::size_t(p)]);
+            return nd.size();
+        }
+        void n_login_recv(int p) {
+            auto& h = nh[std::size_t(p)];
+            if (!h) h.emplace(XBuffer::create<PlayerState>(kPlayerInitial, cap()));
+            const XOffsetDatastructure::XStatus r = h->template try_apply_delta_verified<PlayerState>(nd, nc[std::size_t(p)]);
+            if (!r) throw std::runtime_error("native login rejected: " + std::string(r.error().message));
+        }
+        std::size_t n_diff(int p) { srv[std::size_t(p)].template save_delta_into<PlayerState>(nd, nb[std::size_t(p)]); return nd.size(); }
+        void n_recv(int p) {
+            if (nd.empty()) return;
+            const XOffsetDatastructure::XStatus r = nh[std::size_t(p)]->template try_apply_delta_verified<PlayerState>(nd, nc[std::size_t(p)]);
+            if (!r) throw std::runtime_error("native self delta rejected: " + std::string(r.error().message));
+        }
+        PlayerState& n_held(int p) { return nh[std::size_t(p)]->template root<PlayerState>(); }
+#endif
+    };
+    // SD (login.hpp): dirty modules to storage. Native SN: a delta against what
+    // storage holds of that player (one baseline per player, kept across cycles).
+    struct StoreOps {
+        using XBuffer = XOffsetDatastructure::XBuffer;
+        XOffsetRunnerT* r = nullptr;
+        std::optional<XBuffer> pm, pr;
+        std::string w;
+        PlayerState& player(int p) { return r->players_[std::size_t(p)].template root<PlayerState>(); }
+        template <class Fill> std::size_t modules_encode(Fill&& fill) {
+            if (!pm) { pm.emplace(XBuffer::create<xm::PlayerPatch>(kPlayerInitial, cap())); pr.emplace(XBuffer::create<xm::PlayerPatch>(kPlayerInitial, cap())); }
+            fill(pm->template reset<xm::PlayerPatch>());
+            pm->template save_verified_into<xm::PlayerPatch>(w);
+            return w.size();
+        }
+        void modules_recv() { pr->template reload_verified<xm::PlayerPatch>(w); }
+#ifdef XOFFSET_DELTA_SYNC_API
+        std::unordered_map<int, XOffsetDatastructure::XDeltaBaseline> nb;
+        std::unordered_map<int, XOffsetDatastructure::XDeltaCursor> nc;
+        std::unordered_map<int, XBuffer> nh;
+        std::string nd;
+        std::size_t n_store_diff(int p) { r->players_[std::size_t(p)].template save_delta_into<PlayerState>(nd, nb[p]); return nd.size(); }
+        void n_store_recv(int p) {
+            if (nd.empty()) return;
+            auto it = nh.find(p);
+            if (it == nh.end()) it = nh.emplace(p, XBuffer::create<PlayerState>(kPlayerInitial, cap())).first;
+            const XOffsetDatastructure::XStatus st = it->second.template try_apply_delta_verified<PlayerState>(nd, nc[p]);
+            if (!st) throw std::runtime_error("native storage delta rejected: " + std::string(st.error().message));
+        }
+        PlayerState& n_store_held(int p) { return nh.at(p).template root<PlayerState>(); }
+#endif
+    };
 
     // Held views are small: slot storage (no VM reservation each), 32 KiB at most.
     static XOffsetDatastructure::XBuffer::MaximumCapacity held_cap() {
@@ -332,7 +435,7 @@ public:
         std::vector<std::string> snaps;
         std::string dw, comp;
         std::vector<std::optional<XBuffer>> held_views;
-        void setup(int clients) {
+        void setup(int clients, int units, int marches) {
             es.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, cap()));
             ds.emplace(XBuffer::create<xm::ViewDelta>(kViewInitial, cap()));
             dr.emplace(XBuffer::create<xm::ViewDelta>(kViewInitial, cap()));
@@ -340,7 +443,7 @@ public:
             held_views.clear();
             held_views.resize(std::size_t(clients) * 9);
 #ifdef XOFFSET_DELTA_SYNC_API
-            n_setup(clients);
+            n_setup(clients, units, marches);
 #endif
         }
         template <class Fill> std::size_t snap_encode(int b, Fill&& fill) {
@@ -386,14 +489,22 @@ public:
         std::vector<std::optional<XBuffer>> nheld;
         std::vector<XOffsetDatastructure::XDeltaCursor> ncur;
         int32_t napply_b = -1;
-        void n_setup(int clients) {
+        // Fixed slot capacity per block (about twice the average plus margin), so
+        // the layout does not change from tick to tick; grows only on overflow.
+        void n_setup(int clients, int units, int marches) {
             nb.clear();
             nb.resize(std::size_t(kBlocks));
+            const int32_t ucap = 2 * units / kBlocks + 64, mcap = 6 * marches / kBlocks + 32;
             for (int32_t b = 0; b < kBlocks; ++b) {
                 auto& n = nb[std::size_t(b)];
                 n.buf.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, cap()));
                 auto& v = n.buf->template root<xm::ViewSnapshot>();
                 block_rect(b, v.x0, v.y0, v.x1, v.y1);
+                v.units.resize(std::size_t(ucap));
+                v.marches.resize(std::size_t(mcap));
+                n.usize = ucap; n.msize = mcap;
+                for (int32_t i = ucap - 1; i >= 0; --i) n.ufree.push_back(i);
+                for (int32_t i = mcap - 1; i >= 0; --i) n.mfree.push_back(i);
             }
             nheld.clear();
             nheld.resize(std::size_t(clients) * 9);
@@ -580,6 +691,9 @@ private:
     std::string store_;
     BlockSession bs_[3];
     BlockOps ops_[3];
+    LoginOps lops_;
+    StoreOps sops_;
+    std::vector<int64_t> lseq_;
 };
 
 using XOffsetRunner = XOffsetRunnerT<XoModel, false>;

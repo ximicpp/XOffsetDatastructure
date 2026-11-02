@@ -107,7 +107,7 @@ public:
             u.x = rng.below(kMapSize); u.y = rng.below(kMapSize);
             u.vx = rng.range(-8, 8); u.vy = rng.range(-8, 8);
             u.hp = rng.range(100, 1000); u.state = rng.below(4);
-            u.name = std::string(rng.below(2) ? "unit_" : "squad_") + std::to_string(u.id);
+            u.name = std::string(rng.below(2) ? "u_" : "sq_") + std::to_string(u.id);   // at most 8 bytes
             units_.push_back(std::move(u));
         }
         for (auto& z : zones_) { z[0] = rng.range(kZoneR, kMapSize - kZoneR); z[1] = rng.range(kZoneR, kMapSize - kZoneR); }

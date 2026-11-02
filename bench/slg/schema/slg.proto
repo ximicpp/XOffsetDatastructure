@@ -21,6 +21,7 @@ message PlayerState {
 }
 message Event { int32 round = 1; int32 hero_id = 2; int32 skill_id = 3; int32 target = 4; int32 damage = 5; }
 message Report { int64 battle_id = 1; string summary = 2; repeated Event events = 3; }
+message PlayerPatch { int64 player_id = 1; int64 seq = 2; repeated int32 army_index = 3; repeated Army armies = 4; map<int32, int64> items = 5; int32 city_changed = 6; City city = 7; }
 message BattleMsg { int64 battle_id = 1; int64 seed = 2; int32 winner = 3; Army attacker = 4; Army defender = 5; Report report = 6; }
 message Tile { int32 x = 1; int32 y = 2; int32 terrain = 3; int32 level = 4; int64 owner = 5; }
 message March {
