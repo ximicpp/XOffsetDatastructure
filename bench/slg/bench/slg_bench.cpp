@@ -17,6 +17,7 @@
 #include <vector>
 #include "runner.hpp"
 #include "std_runner.hpp"
+#include "slg/view.hpp"
 #if SLG_WITH_CEREAL
 #include "cereal_format.hpp"
 #endif
@@ -103,6 +104,30 @@ Compressed compress(const std::string& w) {
 
 void print_sizes(const std::vector<std::unique_ptr<Runner>>& rs, const std::vector<CycleStats>& st,
                  const std::vector<SampleWires>& keep, const Scale& sc) {
+    if (demo_cases()) {
+        const ViewScale& vs = *find_view_scale(sc.name);
+        const int views = vs.clients * vs.rounds;
+        std::printf("\nwire bytes per message, demo case set (average over the last cycle)\n");
+        std::printf("%-12s %12s %12s %12s %12s %12s\n", "format", "A.req", "A.res", "B.player", "S.player", "E.view");
+        for (std::size_t i = 0; i < rs.size(); ++i) {
+            auto avg = [&](const char* k, int n) { return n ? double(st[i].bytes.at(k)) / n : 0.0; };
+            std::printf("%-12s %12.0f %12.0f %12.0f %12.0f %12.0f\n", rs[i]->name().c_str(), avg("A.req", sc.battles),
+                        avg("A.res", sc.battles), avg("B.out", sc.migrants), avg("S.player", sc.migrants), avg("E.view", views));
+        }
+#if SLG_WITH_COMPRESSION
+        std::printf("\ncompressed size of one sample message (zstd -3 / lz4), bytes\n");
+        std::printf("%-12s %21s %21s %21s\n", "format", "A.res", "B.player", "E.view");
+        for (std::size_t i = 0; i < rs.size(); ++i) {
+            std::printf("%-12s", rs[i]->name().c_str());
+            for (const std::string* w : {&keep[i].res, &keep[i].player, &keep[i].view}) {
+                const auto c = compress(*w);
+                std::printf(" %10zu/%10zu", c.zstd, c.lz4);
+            }
+            std::printf("\n");
+        }
+#endif
+        return;
+    }
     std::printf("\nwire bytes per message (average over the last cycle)\n");
     std::printf("%-12s %12s %12s %12s %12s %12s\n", "format", "A.req", "A.res", "B.player", "C.shard", "D.report");
     for (std::size_t i = 0; i < rs.size(); ++i) {
@@ -145,6 +170,7 @@ int main(int argc, char** argv) {
     }
     const Scale* sc = find_scale(scale);
     if (!sc) { std::cerr << "unknown scale " << scale << "\n"; return 2; }
+    if (demo_cases() && !reuse_mode()) { std::cerr << "SLG_CASES=demo needs SLG_REUSE=1\n"; return 2; }
     if (formats.empty()) formats = all_formats();
     if (cycles < 0) cycles = mode == "verify" ? 2 : 41;
 
@@ -162,7 +188,8 @@ int main(int argc, char** argv) {
         if (out.empty()) { std::cerr << "--out is required in bench mode\n"; return 2; }
         jsonl.open(out);
         jsonl << "{\"meta\":{\"scale\":\"" << sc->name << "\",\"seed\":" << seed << ",\"cycles\":" << cycles
-              << ",\"formats\":\"" << formats << "\",\"protocol\":\"" << (reuse_mode() ? "reuse" : "per_message")
+              << ",\"formats\":\"" << formats << "\",\"cases\":\"" << (demo_cases() ? "demo" : "abcd")
+              << "\",\"protocol\":\"" << (reuse_mode() ? "reuse" : "per_message")
               << "\",\"xoffset_pool\":" << (std::getenv("SLG_XOFFSET_POOL") || reuse_mode() ? "true" : "false") << "}}\n";
     } else if (mode != "verify") {
         std::cerr << "unknown mode " << mode << "\n"; return 2;

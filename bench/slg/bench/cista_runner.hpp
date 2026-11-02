@@ -26,6 +26,7 @@
 #include "slg/model_cista.hpp"
 #include "slg/model_std.hpp"
 #include "slg/trace.hpp"
+#include "slg/view.hpp"
 
 namespace slg {
 
@@ -81,6 +82,7 @@ public:
         cm::ShardState s;
         copy_shard(s, make_shard(seed, sc));
         shard_.receive(save(tmp, s));
+        if (demo_cases()) world_.setup(seed, *find_view_scale(sc.name));
     }
 
     void run_cycle(int cycle, CycleStats& st, SampleWires* keep) override {
@@ -129,7 +131,19 @@ public:
 
         // B: cross-server season migration and write-back.
         const auto migrants = pick_migrants(seed_, cycle, sc);
-        for (std::size_t k = 0; k < migrants.size(); ++k) {
+        // Demo case set, B: one hop between two scene servers; the received buffer
+        // becomes the receiver's resident player and is played on in place.
+        if (demo_cases()) for (std::size_t k = 0; k < migrants.size(); ++k) {
+            if (!reuse) throw std::runtime_error("SLG_CASES=demo needs SLG_REUSE=1");
+            auto& slot = players_[std::size_t(migrants[k])];
+            timed(st, "B.out_encode", [&] { save(out_, *slot); });
+            recv(st, "B.in_decode", b_m_, out_);
+            timed(st, "B.scene_edits", [&] { season_edits(*b_m_, mix_seed(seed_, uint64_t(cycle) * 1000003u + k), sc.season_ops); });
+            timed(st, "B.install", [&] { swap(slot, b_m_); });
+            st.bytes["B.out"] += out_.size();
+            if (keep) keep->player = to_string_bytes(out_);
+        }
+        else for (std::size_t k = 0; k < migrants.size(); ++k) {
             auto& slot = players_[std::size_t(migrants[k])];
             Bytes out_local, back_local;
             Held<cm::PlayerState> m_local, r_local;
@@ -150,8 +164,19 @@ public:
             else timed(st, "B.cleanup", [&] { m.drop(); r.drop(); Bytes().swap(m.buf); Bytes().swap(r.buf); Bytes().swap(out); Bytes().swap(back); });
         }
 
-        // C: map shard snapshot, restore, ticks, snapshot again.
-        {
+        // Demo case set, S: scene <-> storage for players (see std_runner.hpp).
+        if (demo_cases()) for (int p : pick_storage(seed_, cycle, sc.players, sc.migrants)) {
+            auto& slot = players_[std::size_t(p)];
+            timed(st, "S.save_encode", [&] { save(back_, *slot); });
+            recv(st, "S.store_recv", b_r_, back_);
+            store_ = back_;
+            recv(st, "S.load_recv", b_m_, store_);
+            timed(st, "S.load_install", [&] { swap(slot, b_m_); });
+            st.bytes["S.player"] += back_.size();
+        }
+
+        // C: map shard snapshot, restore, ticks, snapshot again (not in the demo case set).
+        if (!demo_cases()) {
             Bytes snap_local, snap2_local;
             Held<cm::ShardState> r_local;
             Bytes& snap = reuse ? snap_ : snap_local;
@@ -180,6 +205,7 @@ public:
         // message (copy into an owned buffer + checked deserialize); D.read_direct
         // deserializes the wire itself as const (same checks, no copy), like
         // FlatBuffers' Verifier + in-place read.
+        if (demo_cases()) { run_view(cycle, st, keep); return; }
         std::vector<Bytes> wires;
         wires.reserve(reports.size());
         for (const auto& rep : reports) {
@@ -214,6 +240,28 @@ public:
                 const cm::Report* r = cista::deserialize<cm::Report, Mode>(w.data(), w.data() + w.size());
                 st.report_direct_sum += query_report(*r);
             });
+        }
+    }
+
+    // Demo case set, E: viewport sync (view.hpp). The server fills its reused
+    // message object from the world and serializes it; the client copies the wire
+    // into its receive buffer, deserializes with the runner's checks and reads
+    // every unit in place.
+    void run_view(int cycle, CycleStats& st, SampleWires* keep) {
+        const ViewScale& vs = world_.scale();
+        for (int r = 0; r < vs.rounds; ++r) {
+            world_.tick();
+            for (int c = 0; c < vs.clients; ++c) {
+                const auto& sel = world_.request(c);
+                const int64_t id = (int64_t(cycle) * vs.rounds + r) * vs.clients + c;
+                timed(st, "E.send", [&] { fill_view(e_s_, world_, sel, id); save(view_, e_s_); });
+                timed(st, "E.recv", [&] {
+                    e_r_.receive({view_.data(), view_.size()});
+                    st.report_sum += query_view(*e_r_);
+                });
+                st.bytes["E.view"] += view_.size();
+                if (keep) keep->view = to_string_bytes(view_);
+            }
         }
     }
 
@@ -259,6 +307,10 @@ private:
     Held<cm::ShardState> c_r_;
     Held<cm::Report> d_;
     Bytes req_, res_, out_, back_, snap_, snap2_;
+    ViewWorld world_;
+    cm::ViewSnapshot e_s_;
+    Held<cm::ViewSnapshot> e_r_;
+    Bytes view_, store_;
 };
 
 } // namespace slg

@@ -32,6 +32,8 @@ template <CerealArchive A> void serialize(A& ar, BattleMsg& v) { ar(v.battle_id,
 template <CerealArchive A> void serialize(A& ar, Tile& v) { ar(v.x, v.y, v.terrain, v.level, v.owner); }
 template <CerealArchive A> void serialize(A& ar, March& v) { ar(v.march_id, v.owner, v.from_x, v.from_y, v.to_x, v.to_y, v.eta, v.troops); }
 template <CerealArchive A> void serialize(A& ar, ShardState& v) { ar(v.shard_id, v.tick, v.width, v.tiles, v.cities, v.marches); }
+template <CerealArchive A> void serialize(A& ar, ViewUnit& v) { ar(v.id, v.owner, v.x, v.y, v.hp, v.state, v.name); }
+template <CerealArchive A> void serialize(A& ar, ViewSnapshot& v) { ar(v.request_id, v.tick, v.x0, v.y0, v.x1, v.y1, v.units); }
 } // namespace slg::stdm
 
 namespace slg {

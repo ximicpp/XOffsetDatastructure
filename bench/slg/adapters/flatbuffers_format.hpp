@@ -96,6 +96,17 @@ inline Offset<fb::ShardState> build(FlatBufferBuilder& b, const stdm::ShardState
     return fb::CreateShardState(b, s.shard_id, s.tick, s.width, tl, ci, ma);
 }
 
+inline Offset<fb::ViewSnapshot> build(FlatBufferBuilder& b, const stdm::ViewSnapshot& v) {
+    std::vector<Offset<fb::ViewUnit>> tmp;
+    tmp.reserve(v.units.size());
+    for (const auto& u : v.units) {
+        auto n = b.CreateString(u.name);
+        tmp.push_back(fb::CreateViewUnit(b, u.id, u.owner, u.x, u.y, u.hp, u.state, n));
+    }
+    auto us = b.CreateVector(tmp);
+    return fb::CreateViewSnapshot(b, v.request_id, v.tick, v.x0, v.y0, v.x1, v.y1, us);
+}
+
 template <class V, class FV, class Conv> void unpack_vec(V& out, const FV* in, Conv&& c) {
     out.clear();
     if (!in) return;
@@ -161,11 +172,20 @@ inline void unpack(stdm::ShardState& d, const fb::ShardState* s) {
     unpack_vec(d.marches, s->marches(), [](stdm::March& x, const fb::March* y) { unpack(x, y); });
 }
 
+inline void unpack(stdm::ViewSnapshot& d, const fb::ViewSnapshot* s) {
+    d.request_id = s->request_id(); d.tick = s->tick(); d.x0 = s->x0(); d.y0 = s->y0(); d.x1 = s->x1(); d.y1 = s->y1();
+    unpack_vec(d.units, s->units(), [](stdm::ViewUnit& x, const fb::ViewUnit* y) {
+        x.id = y->id(); x.owner = y->owner(); x.x = y->x(); x.y = y->y(); x.hp = y->hp(); x.state = y->state();
+        x.name = y->name() ? y->name()->str() : std::string();
+    });
+}
+
 template <class T> struct table_of;
 template <> struct table_of<stdm::PlayerState> { using type = fb::PlayerState; };
 template <> struct table_of<stdm::BattleMsg> { using type = fb::BattleMsg; };
 template <> struct table_of<stdm::ShardState> { using type = fb::ShardState; };
 template <> struct table_of<stdm::Report> { using type = fb::Report; };
+template <> struct table_of<stdm::ViewSnapshot> { using type = fb::ViewSnapshot; };
 
 } // namespace slg::fbconv
 

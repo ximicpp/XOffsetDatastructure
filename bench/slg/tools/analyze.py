@@ -83,6 +83,8 @@ def main():
 
     formats = sorted(ns)
     scen = {"A": "战斗服往返", "B": "跨服迁移", "C": "分区快照", "D": "战报只读"}
+    if meta.get("cases") == "demo":  # SLG_CASES=demo (include/slg/view.hpp)
+        scen = {"A": "场景↔战斗", "B": "场景↔场景", "S": "场景↔存储", "E": "服务端→客户端"}
     # Scenario totals per cycle.
     for fmt in formats:
         for s in scen:

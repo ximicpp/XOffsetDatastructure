@@ -39,6 +39,28 @@ python3 bench/slg/tools/analyze.py raw.jsonl
 encoder/decoder state per message slot for every format. FlatBuffers decodes
 through `verified_root` (the Verifier runs); XOffset uses `reload_verified`.
 
+## Demo case set (`SLG_CASES=demo`)
+
+```
+SLG_REUSE=1 SLG_CASES=demo slg_bench --mode bench --scale M --cycles 41 --out raw.jsonl
+```
+
+The game cases as susu grouped them on 2026-11-02, for the comparison with
+other formats (the PERF_GOAL gates keep the default A/B/C/D set):
+
+- server processes: A scene <-> battle (unchanged); B scene <-> scene, one hop,
+  the receiver keeps the received player as its resident state, plays on it in
+  place and sends it on at the next hop; S scene <-> storage, the storage
+  process receives the player with the format's checks and keeps the bytes,
+  then sends them back on log-in.
+- server -> client: E viewport sync (`include/slg/view.hpp`): 10,000 units that
+  move every tick, 256 clients, 512x384 viewports on a 4096 map that pan and
+  now and then jump; every request sends all units in the viewport, the client
+  receives and reads every unit.
+
+There is no C or D in this set, and `MANIFEST` lists the change. With
+`SLG_CASES` unset nothing changes: same stage keys, digests and report sums.
+
 ## Instruction counts (CI performance gate)
 
 `-DSLG_IR_COUNT=ON` (or `-DSLG_IR_COUNT=1` on a direct compile) builds a

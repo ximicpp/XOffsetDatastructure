@@ -8,6 +8,7 @@
 #include "slg/generic.hpp"
 #include "slg/model_std.hpp"
 #include "slg/trace.hpp"
+#include "slg/view.hpp"
 
 namespace slg {
 
@@ -22,6 +23,7 @@ public:
         armies_.clear();
         for (const auto& p : players_) armies_.push_back(int(p.armies.size()));
         shard_ = make_shard(seed, sc);
+        if (demo_cases()) world_.setup(seed, *find_view_scale(sc.name));
     }
 
     void run_cycle(int cycle, CycleStats& st, SampleWires* keep) override {
@@ -126,7 +128,20 @@ public:
         }
 
         const auto migrants = pick_migrants(seed_, cycle, sc);
-        for (std::size_t k = 0; k < migrants.size(); ++k) {
+        // Demo case set, B: one hop between two scene servers. The receiver keeps the
+        // decoded player as its resident state and plays on it; the next hop sends
+        // that state again (no return trip).
+        if (demo_cases()) for (std::size_t k = 0; k < migrants.size(); ++k) {
+            auto& slot = players_[std::size_t(migrants[k])];
+            std::span<const uint8_t> out;
+            timed(st, "B.out_encode", [&] { out = rz_.encode(kOut, slot); });
+            timed(st, "B.in_decode", [&] { rz_.decode(out, bm_); });
+            timed(st, "B.scene_edits", [&] { season_edits(bm_, mix_seed(seed_, uint64_t(cycle) * 1000003u + k), sc.season_ops); });
+            timed(st, "B.install", [&] { std::swap(slot, bm_); });
+            st.bytes["B.out"] += out.size();
+            if (keep) keep->player = to_string_bytes(out);
+        }
+        else for (std::size_t k = 0; k < migrants.size(); ++k) {
             auto& slot = players_[std::size_t(migrants[k])];
             std::span<const uint8_t> out, back;
             timed(st, "B.out_encode", [&] { out = rz_.encode(kOut, slot); });
@@ -141,7 +156,22 @@ public:
             timed(st, "B.cleanup", [] {});
         }
 
-        {
+        // Demo case set, S: scene <-> storage for players. The scene encodes
+        // the player; the storage process receives it with the format's checks and
+        // keeps the bytes (copy untimed); on log-in it sends the stored bytes back and
+        // the scene receives them as its resident player.
+        if (demo_cases()) for (int p : pick_storage(seed_, cycle, sc.players, sc.migrants)) {
+            auto& slot = players_[std::size_t(p)];
+            std::span<const uint8_t> w;
+            timed(st, "S.save_encode", [&] { w = rz_.encode(kBack, slot); });
+            timed(st, "S.store_recv", [&] { rz_.decode(w, br_); });
+            store_.assign(w.begin(), w.end());
+            timed(st, "S.load_recv", [&] { rz_.decode(std::span<const uint8_t>(store_), bm_); });
+            timed(st, "S.load_install", [&] { std::swap(slot, bm_); });
+            st.bytes["S.player"] += w.size();
+        }
+
+        if (!demo_cases()) {  // the demo case set has no shard snapshot (susu 2026-11-02)
             std::span<const uint8_t> snap, snap2;
             timed(st, "C.snapshot", [&] { snap = rz_.encode(kSnap, shard_); });
             timed(st, "C.restore", [&] { rz_.decode(snap, cr_); });
@@ -158,6 +188,7 @@ public:
             }
         }
 
+        if (demo_cases()) { run_view(cycle, st, keep); return; }
         using W = typename F::Wire;
         std::vector<W> wires;
         wires.reserve(reports.size());
@@ -169,6 +200,25 @@ public:
             timed(st, "D.read", [&] { rz_.decode(F::bytes(w), dr_); st.report_sum += query_report(dr_); });
             if constexpr (requires { F::read_report_direct(F::bytes(w)); })
                 timed(st, "D.read_direct", [&] { st.report_direct_sum += F::read_report_direct(F::bytes(w)); });
+        }
+    }
+
+    // Demo case set, E: viewport sync (view.hpp). The server fills its reused
+    // ViewSnapshot from the world and encodes it; the client decodes into its
+    // reused ViewSnapshot and reads every unit.
+    void run_view(int cycle, CycleStats& st, SampleWires* keep) {
+        const ViewScale& vs = world_.scale();
+        for (int r = 0; r < vs.rounds; ++r) {
+            world_.tick();
+            for (int c = 0; c < vs.clients; ++c) {
+                const auto& sel = world_.request(c);
+                const int64_t id = (int64_t(cycle) * vs.rounds + r) * vs.clients + c;
+                std::span<const uint8_t> w;
+                timed(st, "E.send", [&] { fill_view(ev_, world_, sel, id); w = rz_.encode(kView, ev_); });
+                timed(st, "E.recv", [&] { rz_.decode(w, er_); st.report_sum += query_view(er_); });
+                st.bytes["E.view"] += w.size();
+                if (keep) keep->view = to_string_bytes(w);
+            }
         }
     }
 
@@ -191,6 +241,9 @@ private:
     stdm::PlayerState bm_, br_;
     stdm::ShardState cr_;
     stdm::Report dr_;
+    ViewWorld world_;
+    stdm::ViewSnapshot ev_, er_;
+    std::vector<uint8_t> store_;
 };
 
 } // namespace slg
