@@ -1939,7 +1939,7 @@ namespace XOffsetDatastructure {
         // as it did before begin_verified_reload shared them.
         template <typename Assign>
         detail::vstatus reinit_from_storage(const char* data, size_type size, Assign&& assign) {
-            const ZeroTail tail = settled_zero_tail();
+            const ZeroTail tail = settled_zero_tail(size);
             XOFFSET_VTRY(admit_reinit(size, data != nullptr));
             XOFFSET_VTRY(as_arena_failure(assign));
             note_reinit_zero_tail(tail, size);
@@ -1957,10 +1957,13 @@ namespace XOffsetDatastructure {
             const char* base = nullptr;
             size_type used_end = 0;
         };
-        ZeroTail settled_zero_tail() const noexcept {
-            if (free_table_lost_ || buffer_.size() < min_payload_size() ||
-                buffer_.zero_from() != buffer_.size()) return {};
-            return {buffer_.data(), used_end_clamped()};
+        // Only a load that shrinks the logical length can lower the watermark.
+        ZeroTail settled_zero_tail(size_type size) const noexcept {
+            const auto logical = buffer_.size();
+            if (size >= logical || buffer_.zero_from() != logical || free_table_lost_ ||
+                logical < min_payload_size()) [[likely]] return {};
+            const auto used = static_cast<size_type>(arena()->used_end);
+            return {buffer_.data(), used < logical ? used : logical};
         }
         void note_reinit_zero_tail(const ZeroTail& tail, size_type size) noexcept {
             if (tail.base && tail.base == buffer_.data())
@@ -2023,7 +2026,7 @@ namespace XOffsetDatastructure {
             if (size < sizeof(arena_header) || !buffer_.can_assign_in_place(size)) [[unlikely]] {
                 return reinit_from_wire({root_offset, stored, nullptr, 0}, size);
             }
-            const ZeroTail tail = settled_zero_tail();
+            const ZeroTail tail = settled_zero_tail(size);
             begin_reinit();
             free_table_lost_ = true;
             if (!buffer_.assign_in_place(stored, size, sizeof(arena_header)))
