@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <stdexcept>
+#include <type_traits>
 #include <vector>
 #include "generic.hpp"
 
@@ -36,7 +37,8 @@ struct SelfDirty {
 // deltas (a no-op for the others).
 struct NoTouch { template <class T> void operator()(const T&) const {} };
 template <class M, class K, class V, class Touch> void bump(M& m, K k, V by, Touch& touch) {
-    if (m.find(k) != m.end()) { auto& v = m[k]; v += by; touch(v); }
+    if constexpr (std::is_same_v<Touch, NoTouch>) m[k] += by;   // the same edit, no lookup first
+    else if (m.find(k) != m.end()) { auto& v = m[k]; v += by; touch(v); }
     else { m[k] += by; touch(m); }   // an insert moves entries
 }
 template <class P, class Touch = NoTouch> void self_edits(P& p, Rng& rng, int ops, SelfDirty& d, Touch touch = {}) {
