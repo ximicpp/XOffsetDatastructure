@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- New `XBufferCore::prefetch_for_update()` (and so `XBuffer`), with feature
+  macro `XOFFSET_PREFETCH_FOR_UPDATE_API`: a cache hint that starts loading the
+  host-side lines the next allocation or release in a cold buffer reads first
+  (owner map entry, owner word, arena header, free table counters and first
+  small bins). It changes nothing. Calling it when an update's data starts
+  arriving overlaps those misses with the receive; bench/slg A calls it for
+  both players while the battle result is received.
+- Free table: small bins keep their first four holes inline, and reloads
+  reuse a cached table on the inline paths; `XVector` element access resolves
+  the data pointer directly.
+
 ## 3.2.1: iPhone test host serves by default
 
 A patch release on top of 3.2.0. The library headers and sources are byte
