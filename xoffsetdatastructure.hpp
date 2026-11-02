@@ -6214,9 +6214,10 @@ namespace XOffsetDatastructure {
         // buffer, plus the bytes past the baseline's used size and the
         // holes that came or went, instead of the whole payload. The sender
         // touches everything it changes (a change it does not touch is not
-        // sent). A baseline's first such delta from a buffer, and any after
-        // the buffer's content was replaced (reload, reset, swap, a move of
-        // its storage), compares everything.
+        // sent). A baseline's first such delta from a buffer (unless a key
+        // delta from a buffer already keeping touches came before), and any
+        // after the buffer's content was replaced (reload, reset, swap, a
+        // move of its storage), compares everything.
         bool touched_only = false;
         // Send each changed 64-byte block whole instead of its changed bytes
         // (a block that ends past used_end still goes by its mask): a larger

@@ -686,12 +686,12 @@ namespace XOffsetDatastructure {
         // string heads; the size of the heads of vectors whose elements hold
         // nothing verification reads, whose block and capacity stay while
         // their other head bytes stay). `heads`: the first byte of each
-        // inline or empty string head; `vheads`: of each such vector head.
+        // inline or empty string head and of each such vector head; the last
+        // byte of a string head is local, that of a vector head is not.
         struct DeltaCheckBits {
             std::uint64_t checked = 0;
             std::uint64_t local = 0;
             std::uint64_t heads = 0;
-            std::uint64_t vheads = 0;
         };
         static_assert(sizeof(XFixedString) == 12, "inline string head layout");
         static_assert(sizeof(XFixedVector<std::uint32_t>) == 12, "vector head layout");
@@ -757,7 +757,6 @@ namespace XOffsetDatastructure {
                     b.checked |= m;
                     b.local &= ~m;
                     b.heads &= ~m;
-                    b.vheads &= ~m;
                 });
             }
             // Everything marked lies in the verified payload, past the arena header.
@@ -773,18 +772,21 @@ namespace XOffsetDatastructure {
                     b.local &= ~m;
                 });
             }
-            void head_at(std::size_t offset) noexcept {
-                const std::size_t i = offset - XWIRE_PAYLOAD_BEGIN;
-                bits_[i / delta_block].heads |= std::uint64_t(1) << (i % delta_block);
-            }
             // The head of a vector whose elements hold nothing verification
             // reads: its size is checked in place (against its capacity); its
             // block and capacity are checked by the whole verification.
             void vector_head_at(std::size_t offset) noexcept {
+                const std::size_t i = offset - XWIRE_PAYLOAD_BEGIN;
+                const std::size_t bit = i % delta_block;
+                DeltaCheckBits& b = bits_[i / delta_block];
+                b.heads |= std::uint64_t(1) << bit;
+                if (bit + sizeof(XFixedString) <= delta_block) {  // within one block (most heads)
+                    b.checked |= std::uint64_t(0xFFF) << bit;
+                    b.local |= std::uint64_t(0xF) << (bit + 4);
+                    return;
+                }
                 mark_at(offset, sizeof(XFixedString), false);
                 mark_at(offset + 4, 4, true);
-                const std::size_t i = offset - XWIRE_PAYLOAD_BEGIN;
-                bits_[i / delta_block].vheads |= std::uint64_t(1) << (i % delta_block);
             }
             // An inline string head: its length and padding are checked in
             // place, its characters are free. An empty head (no block, all
@@ -1072,6 +1074,8 @@ namespace XOffsetDatastructure {
             std::vector<detail::DeltaCheckBits>().swap(checks_);
             std::vector<detail::DeltaCheckNode>().swap(nodes_);
             std::vector<detail::DeltaNodeRange>().swap(ranges_);
+            std::vector<detail::DeltaNodeRange>().swap(range_scratch_);
+            std::vector<std::uint32_t>().swap(range_index_);
             std::vector<std::uint32_t>().swap(touched_);
             checks_valid_ = false;
         }
@@ -1090,8 +1094,9 @@ namespace XOffsetDatastructure {
         // recorded with it (see DeltaAccess::checks_match).
         std::vector<detail::DeltaCheckBits> checks_;
         std::vector<detail::DeltaCheckNode> nodes_;
-        std::vector<detail::DeltaNodeRange> ranges_;  // by begin once ranges_sorted_
-        bool ranges_sorted_ = false;
+        std::vector<detail::DeltaNodeRange> ranges_;  // by begin
+        std::vector<detail::DeltaNodeRange> range_scratch_;
+        std::vector<std::uint32_t> range_index_;      // per block of checks_: the ranges that begin before it
         std::vector<std::uint32_t> touched_;          // nodes the current delta re-checks
         std::uint32_t stamp_ = 0;
         const void* checks_core_ = nullptr;
@@ -1246,7 +1251,10 @@ namespace XOffsetDatastructure {
                 if (used < base.size()) base.resize(used); // shrinking never allocates
                 b.version_ = header.version;
                 b.root_offset_ = root;
-                if (options.touched_only) pair_touch_log(xbuf, b);
+                // A key delta also pairs with a touch log the buffer already
+                // keeps, so the baseline's next touched_only delta compares
+                // only what was touched since.
+                if (options.touched_only || (key && xbuf.touch_log_)) pair_touch_log(xbuf, b);
                 drop.b = nullptr;
 
                 stats.holes = holes_changed;
@@ -1848,7 +1856,7 @@ namespace XOffsetDatastructure {
                     DeltaCheckMarker m(static_cast<const char*>(core.get_address()), c.checks_.data(), &c.nodes_,
                                        &c.ranges_);
                     delta_mark_value(*root, m);
-                    c.ranges_sorted_ = false;  // sorted when first needed (collect_nodes)
+                    index_ranges(c);
                     c.touched_.reserve(c.nodes_.size());
                 } XOFFSET_CATCH(const std::bad_alloc&) {
                     c.checks_valid_ = false;
@@ -1857,23 +1865,45 @@ namespace XOffsetDatastructure {
                 c.checks_built_ = true;
                 return true;
             }
-            // The node whose range holds `offset`, or none.
+            // Sorts the node ranges by begin (they do not overlap), by block
+            // first (a counting sort; then the few in one block), and indexes
+            // them: range_index_[b] = the number of ranges that begin before
+            // block b of the map.
+            static void index_ranges(XDeltaCursor& c) {
+                const std::size_t blocks = c.checks_.size();
+                auto& index = c.range_index_;
+                index.assign(blocks + 1, 0u);
+                for (const DeltaNodeRange& r : c.ranges_) ++index[(r.begin - payload_begin) / delta_block + 1];
+                for (std::size_t b = 1; b <= blocks; ++b) index[b] += index[b - 1];
+                auto& sorted = c.range_scratch_;
+                sorted.resize(c.ranges_.size());
+                for (const DeltaNodeRange& r : c.ranges_) sorted[index[(r.begin - payload_begin) / delta_block]++] = r;
+                for (std::size_t b = blocks; b > 0; --b) index[b] = index[b - 1];  // back to bucket starts
+                index[0] = 0;
+                for (std::size_t i = 1; i < sorted.size(); ++i) {  // moves stay within a block
+                    const DeltaNodeRange r = sorted[i];
+                    std::size_t j = i;
+                    for (; j > 0 && sorted[j - 1].begin > r.begin; --j) sorted[j] = sorted[j - 1];
+                    sorted[j] = r;
+                }
+                c.ranges_.swap(sorted);
+            }
+            // The node whose range holds `offset`, or none: the last range
+            // that begins at or before it, from its block or before.
             static const DeltaNodeRange* node_range_of(const XDeltaCursor& c, std::size_t offset) noexcept {
-                auto it = std::upper_bound(c.ranges_.begin(), c.ranges_.end(), offset,
-                                           [](std::size_t o, const DeltaNodeRange& r) { return o < r.begin; });
-                if (it == c.ranges_.begin()) return nullptr;
-                --it;
-                return offset < it->end ? &*it : nullptr;
+                const std::size_t b = (offset - payload_begin) / delta_block;
+                if (b + 1 >= c.range_index_.size()) return nullptr;
+                const DeltaNodeRange* r = c.ranges_.data();
+                std::size_t k = c.range_index_[b];
+                const std::size_t e = c.range_index_[b + 1];
+                const DeltaNodeRange* hit = k > 0 ? &r[k - 1] : nullptr;
+                for (; k < e && r[k].begin <= offset; ++k) hit = &r[k];
+                return hit && offset < hit->end ? hit : nullptr;
             }
             // Before the patch: the nodes owning the checked bytes outside
             // bools and inline string heads that the delta writes; false when
             // some byte belongs to none (the whole verification is needed).
             static bool collect_nodes(XDeltaCursor& c, const Parsed& parsed) noexcept {
-                if (!c.ranges_sorted_) {
-                    std::sort(c.ranges_.begin(), c.ranges_.end(),
-                              [](const DeltaNodeRange& a, const DeltaNodeRange& b) { return a.begin < b.begin; });
-                    c.ranges_sorted_ = true;
-                }
                 c.touched_.clear();
                 if (++c.stamp_ == 0) {
                     for (auto& n : c.nodes_) n.stamp = 0;
@@ -1966,12 +1996,13 @@ namespace XOffsetDatastructure {
                     const std::uint64_t written = r.mask & bits[(r.offset - payload_begin) / delta_block].local;
                     for (std::uint64_t hit = written; hit != 0;) {
                         const std::size_t offset = r.offset + static_cast<std::size_t>(std::countr_zero(hit));
-                        std::size_t head = head_before<&DeltaCheckBits::vheads>(bits, offset, 7);
+                        const std::size_t head =
+                            head_before<&DeltaCheckBits::heads>(bits, offset, sizeof(XFixedString) - 1);
                         if (head != 0) {
-                            if (head != last_head && !on_vector(head)) return false;
-                        } else if ((head = head_before<&DeltaCheckBits::heads>(bits, offset,
-                                                                               sizeof(XFixedString) - 1)) != 0) {
-                            if (head != last_head && !on_head(head)) return false;
+                            // A vector head's last byte is not local, a string head's is.
+                            const std::size_t e = head + sizeof(XFixedString) - 1 - payload_begin;
+                            const bool vector = ((bits[e / delta_block].local >> (e % delta_block)) & 1u) == 0;
+                            if (head != last_head && !(vector ? on_vector(head) : on_head(head))) return false;
                         } else {
                             if (!on_bool(offset)) return false;
                             hit &= hit - 1;

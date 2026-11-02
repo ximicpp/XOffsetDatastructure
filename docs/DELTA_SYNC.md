@@ -87,7 +87,9 @@ The rule: **touch everything you change, after you change it** (a container
 that moved is marked where it is now). A change that is not touched is not
 sent; send with `digest = true` while developing to have the receiver catch
 that (`digest_mismatch`). Everything is compared, as without the option, for a
-baseline's first delta from a buffer, after the buffer's content was replaced
+baseline's first delta from a buffer (a key delta from a buffer that already
+keeps touches counts as that first one: the next delta compares only what was
+touched since it), after the buffer's content was replaced
 (`reload_verified`, `reset`, `swap`, a key delta applied, storage that moved),
 and after a touch outside the payload. A buffer that receives deltas and
 forwards them (a relay) gets the blocks each applied delta wrote as touches.
@@ -283,9 +285,10 @@ the bytes scattered by their masks, then the check of section 3: for `none`
 nothing more, for `in_place` an undo copy and the checks of the bytes written,
 for `full` the whole verification (proportional to the payload; the map is
 rebuilt, also proportional, when a later delta needs it); with `digest`, one
-hash pass. The receiver's map takes 32 bytes
-per 64-byte block of payload, plus about 64 bytes per heap string, set or map
-of plain elements; the sender's touch log 4 bytes per block.
+hash pass. The receiver's map takes 28 bytes
+per 64-byte block of payload (24 for the bits, 4 for the node index), plus
+about 64 bytes per heap string, set or map of plain elements; the sender's
+touch log 4 bytes per block.
 
 Viewport-like model in `tests/test_delta_sync.cpp` (120 units in 128 stable
 slots, each tick 30% move a few cells, 5% lose hp, 2 leave and 2 enter):
