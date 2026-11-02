@@ -15,6 +15,7 @@
 #include "slg/model_xoffset.hpp"
 #include "slg/model_xoffset_optin.hpp"
 #include "slg/trace.hpp"
+#include "slg/view.hpp"
 
 namespace slg {
 
@@ -63,6 +64,11 @@ public:
             b_r_.emplace(XBuffer::create<PlayerState>(kPlayerInitial, cap()));
             c_r_.emplace(XBuffer::create<ShardState>(kShardInitial, cap(true)));
             d_.emplace(XBuffer::create<Report>(kReportInitial, cap()));
+            if (demo_cases()) {
+                world_.setup(seed, *find_view_scale(sc.name));
+                e_s_.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, cap()));
+                e_r_.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, cap()));
+            }
         }
     }
 
@@ -217,7 +223,21 @@ public:
         }
 
         const auto migrants = pick_migrants(seed_, cycle, sc);
-        for (std::size_t k = 0; k < migrants.size(); ++k) {
+        // Demo case set, B: one hop between two scene servers. The received buffer
+        // becomes the receiver's resident player and is played on in place; the next
+        // hop sends it again as it is (no return trip).
+        if (demo_cases()) for (std::size_t k = 0; k < migrants.size(); ++k) {
+            XBuffer& slot = players_[std::size_t(migrants[k])];
+            timed(st, "B.out_encode", [&] { slot.save_verified_into<PlayerState>(out_); });
+            recv<PlayerState>(st, "B.in_decode", out_, b_m_);
+            timed(st, "B.scene_edits", [&] {
+                season_edits(b_m_->root<PlayerState>(), mix_seed(seed_, uint64_t(cycle) * 1000003u + k), sc.season_ops);
+            });
+            timed(st, "B.install", [&] { std::swap(slot, *b_m_); });
+            st.bytes["B.out"] += out_.size();
+            if (keep) keep->player = out_;
+        }
+        else for (std::size_t k = 0; k < migrants.size(); ++k) {
             XBuffer& slot = players_[std::size_t(migrants[k])];
             timed(st, "B.out_encode", [&] { slot.save_verified_into<PlayerState>(out_); });
             recv<PlayerState>(st, "B.in_decode", out_, b_m_);
@@ -233,7 +253,18 @@ public:
             timed(st, "B.cleanup", [] {});
         }
 
-        {
+        // Demo case set, S: scene <-> storage for players (see std_runner.hpp).
+        if (demo_cases()) for (int p : pick_storage(seed_, cycle, sc.players, sc.migrants)) {
+            XBuffer& slot = players_[std::size_t(p)];
+            timed(st, "S.save_encode", [&] { slot.save_verified_into<PlayerState>(back_); });
+            recv<PlayerState>(st, "S.store_recv", back_, b_r_);
+            store_ = back_;
+            recv<PlayerState>(st, "S.load_recv", store_, b_m_);
+            timed(st, "S.load_install", [&] { std::swap(slot, *b_m_); });
+            st.bytes["S.player"] += back_.size();
+        }
+
+        if (!demo_cases()) {  // the demo case set has no shard snapshot (susu 2026-11-02)
             timed(st, "C.snapshot", [&] { shard_->save_verified_into<ShardState>(snap_); });
             recv<ShardState>(st, "C.restore", snap_, c_r_);
             timed(st, "C.ticks", [&] { shard_ticks(c_r_->root<ShardState>(), mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
@@ -250,6 +281,7 @@ public:
             }
         }
 
+        if (demo_cases()) { run_view(cycle, st, keep); return; }
         std::vector<std::string> wires;
         wires.reserve(reports.size());
         for (const auto& rep : reports) {
@@ -276,6 +308,30 @@ public:
         }
     }
 
+    // Demo case set, E: viewport sync (view.hpp). The server resets its reused
+    // message buffer, fills it from the world and saves it; the client reloads
+    // (full verification) into its reused buffer and reads every unit in place.
+    void run_view(int cycle, CycleStats& st, SampleWires* keep) {
+        const ViewScale& vs = world_.scale();
+        for (int r = 0; r < vs.rounds; ++r) {
+            world_.tick();
+            for (int c = 0; c < vs.clients; ++c) {
+                const auto& sel = world_.request(c);
+                const int64_t id = (int64_t(cycle) * vs.rounds + r) * vs.clients + c;
+                timed(st, "E.send", [&] {
+                    fill_view(e_s_->reset<xm::ViewSnapshot>(), world_, sel, id);
+                    e_s_->save_verified_into<xm::ViewSnapshot>(view_);
+                });
+                timed(st, "E.recv", [&] {
+                    e_r_->reload_verified<xm::ViewSnapshot>(view_);
+                    st.report_sum += query_view(e_r_->root<xm::ViewSnapshot>());
+                });
+                st.bytes["E.view"] += view_.size();
+                if (keep) keep->view = view_;
+            }
+        }
+    }
+
     uint64_t world_digest() override {
         Digest g;
         for (auto& b : players_) dig_player(g, b.template root<PlayerState>());
@@ -288,6 +344,7 @@ private:
     static constexpr std::size_t kBattleInitial = 16 * 1024;
     static constexpr std::size_t kShardInitial = 4 * 1024 * 1024;
     static constexpr std::size_t kReportInitial = 4 * 1024;
+    static constexpr std::size_t kViewInitial = 16 * 1024;
 
     // Every buffer reserves 256 MiB of address space. SLG_XOFFSET_CAP_MIB=N reserves N MiB
     // for each player, battle and report buffer instead (the shard keeps 256 MiB): an
@@ -373,6 +430,9 @@ private:
     // Reuse protocol state.
     std::optional<XOffsetDatastructure::XBuffer> a_req_, a_m_, a_r_, b_m_, b_r_, c_r_, d_;
     std::string req_, res_, out_, back_, snap_, snap2_;
+    ViewWorld world_;
+    std::optional<XOffsetDatastructure::XBuffer> e_s_, e_r_;
+    std::string view_, store_;
 };
 
 using XOffsetRunner = XOffsetRunnerT<XoModel, false>;

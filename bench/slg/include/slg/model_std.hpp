@@ -75,4 +75,13 @@ struct ShardState {
     std::vector<March> marches;
 };
 
+// Demo case set, scenario E (view.hpp): units inside one client's viewport.
+struct ViewUnit { int32_t id{}; int32_t owner{}; int32_t x{}; int32_t y{}; int32_t hp{}; int32_t state{}; std::string name; };
+
+struct ViewSnapshot {
+    int64_t request_id{}; int64_t tick{};
+    int32_t x0{}; int32_t y0{}; int32_t x1{}; int32_t y1{};
+    std::vector<ViewUnit> units;
+};
+
 } // namespace slg::stdm

@@ -17,7 +17,7 @@ namespace slg::pbconv {
 #define SLG_PB_DECL(T) inline void to(pb::T&, const stdm::T&); inline void from(stdm::T&, const pb::T&);
 SLG_PB_DECL(Buff) SLG_PB_DECL(Skill) SLG_PB_DECL(Troop) SLG_PB_DECL(Event) SLG_PB_DECL(Tile)
 SLG_PB_DECL(Hero) SLG_PB_DECL(Army) SLG_PB_DECL(City) SLG_PB_DECL(PlayerState) SLG_PB_DECL(Report)
-SLG_PB_DECL(BattleMsg) SLG_PB_DECL(March) SLG_PB_DECL(ShardState)
+SLG_PB_DECL(BattleMsg) SLG_PB_DECL(March) SLG_PB_DECL(ShardState) SLG_PB_DECL(ViewUnit) SLG_PB_DECL(ViewSnapshot)
 #undef SLG_PB_DECL
 
 inline void to(pb::Buff& d, const stdm::Buff& s) { d.set_id(s.id); d.set_stacks(s.stacks); d.set_expire_ms(s.expire_ms); }
@@ -98,11 +98,27 @@ inline void from(stdm::ShardState& d, const pb::ShardState& s) {
     from_rep(d.tiles, s.tiles()); from_rep(d.cities, s.cities()); from_rep(d.marches, s.marches());
 }
 
+inline void to(pb::ViewUnit& d, const stdm::ViewUnit& s) {
+    d.set_id(s.id); d.set_owner(s.owner); d.set_x(s.x); d.set_y(s.y); d.set_hp(s.hp); d.set_state(s.state); d.set_name(s.name);
+}
+inline void to(pb::ViewSnapshot& d, const stdm::ViewSnapshot& s) {
+    d.set_request_id(s.request_id); d.set_tick(s.tick); d.set_x0(s.x0); d.set_y0(s.y0); d.set_x1(s.x1); d.set_y1(s.y1);
+    to_rep(d.mutable_units(), s.units);
+}
+inline void from(stdm::ViewUnit& d, const pb::ViewUnit& s) {
+    d.id = s.id(); d.owner = s.owner(); d.x = s.x(); d.y = s.y(); d.hp = s.hp(); d.state = s.state(); d.name = s.name();
+}
+inline void from(stdm::ViewSnapshot& d, const pb::ViewSnapshot& s) {
+    d.request_id = s.request_id(); d.tick = s.tick(); d.x0 = s.x0(); d.y0 = s.y0(); d.x1 = s.x1(); d.y1 = s.y1();
+    from_rep(d.units, s.units());
+}
+
 template <class T> struct msg_of;
 template <> struct msg_of<stdm::PlayerState> { using type = pb::PlayerState; };
 template <> struct msg_of<stdm::BattleMsg> { using type = pb::BattleMsg; };
 template <> struct msg_of<stdm::ShardState> { using type = pb::ShardState; };
 template <> struct msg_of<stdm::Report> { using type = pb::Report; };
+template <> struct msg_of<stdm::ViewSnapshot> { using type = pb::ViewSnapshot; };
 
 } // namespace slg::pbconv
 
@@ -133,11 +149,13 @@ struct ProtobufFormat {
         Pair<pb::PlayerState> player;
         Pair<pb::ShardState> shard;
         Pair<pb::Report> report;
+        Pair<pb::ViewSnapshot> view;
         std::string slot[kSlots];
         template <class T> auto& pair() {
             if constexpr (std::is_same_v<T, stdm::BattleMsg>) return battle;
             else if constexpr (std::is_same_v<T, stdm::PlayerState>) return player;
             else if constexpr (std::is_same_v<T, stdm::ShardState>) return shard;
+            else if constexpr (std::is_same_v<T, stdm::ViewSnapshot>) return view;
             else return report;
         }
         template <class T> std::span<const uint8_t> encode(int s, const T& v) {

@@ -72,6 +72,15 @@ struct alignas(8) ShardState {
     XVector<March> marches;
 };
 
+// Demo case set, scenario E (view.hpp).
+struct alignas(8) ViewUnit { int32_t id{}; int32_t owner{}; int32_t x{}; int32_t y{}; int32_t hp{}; int32_t state{}; XString name; };
+
+struct alignas(8) ViewSnapshot {
+    int64_t request_id{}; int64_t tick{};
+    int32_t x0{}; int32_t y0{}; int32_t x1{}; int32_t y1{};
+    XVector<ViewUnit> units;
+};
+
 } // namespace slg::xm
 
 // Audited: every record above has only ordinary members (no bases, bit-fields,
@@ -99,10 +108,13 @@ XOFFSET_RECORD(slg::xm::BattleMsg, battle_id, seed, winner, attacker, defender, 
 XOFFSET_RECORD(slg::xm::Tile, x, y, terrain, level, owner)
 XOFFSET_RECORD(slg::xm::March, march_id, owner, from_x, from_y, to_x, to_y, eta, troops)
 XOFFSET_RECORD(slg::xm::ShardState, shard_id, tick, width, tiles, cities, marches)
+XOFFSET_RECORD(slg::xm::ViewUnit, id, owner, x, y, hp, state, name)
+XOFFSET_RECORD(slg::xm::ViewSnapshot, request_id, tick, x0, y0, x1, y1, units)
 #elif defined(XOFFSET_ORDINARY_RECORDS)
 XOFFSET_ORDINARY_RECORDS(slg::xm::Buff, slg::xm::Skill, slg::xm::Troop, slg::xm::Hero, slg::xm::Army,
                          slg::xm::City, slg::xm::PlayerState, slg::xm::Event, slg::xm::Report,
-                         slg::xm::BattleMsg, slg::xm::Tile, slg::xm::March, slg::xm::ShardState)
+                         slg::xm::BattleMsg, slg::xm::Tile, slg::xm::March, slg::xm::ShardState,
+                         slg::xm::ViewUnit, slg::xm::ViewSnapshot)
 #else
 // Libraries without the macro: its two specializations, written out.
 #define SLG_XM_ORDINARY_RECORD(T)                                                      \
@@ -123,6 +135,8 @@ SLG_XM_ORDINARY_RECORD(slg::xm::BattleMsg)
 SLG_XM_ORDINARY_RECORD(slg::xm::Tile)
 SLG_XM_ORDINARY_RECORD(slg::xm::March)
 SLG_XM_ORDINARY_RECORD(slg::xm::ShardState)
+SLG_XM_ORDINARY_RECORD(slg::xm::ViewUnit)
+SLG_XM_ORDINARY_RECORD(slg::xm::ViewSnapshot)
 #undef SLG_XM_ORDINARY_RECORD
 #endif
 
@@ -130,3 +144,4 @@ XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::PlayerState, "slg.PlayerState.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::BattleMsg, "slg.BattleMsg.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::ShardState, "slg.ShardState.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::Report, "slg.Report.v1")
+XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::ViewSnapshot, "slg.ViewSnapshot.v1")
