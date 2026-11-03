@@ -133,6 +133,17 @@ the player edits before LD were already untimed. Byte sizes that compress
 (EB.window_zstd, the compact sizes, U*.delta_zstd) are computed after each
 round's timed loop, so zstd never runs between two timed deliveries.
 
+Native and application-level XOffset rows come from separate processes
+(2026-11-03): the native stages run interleaved with the application-level
+ones, per delivery, so whichever runs second finds the world and the player
+warm. `SLG_NATIVE_OFF=1` skips N*, LK, LN and SN; the formal runs take every
+application-level row from such processes and the native rows from a
+`--formats xoffset` process with them on. The native view update writes a
+unit whole only when it is new to the view; otherwise it writes the fields
+the world marked dirty this tick (`touch(u, bits)`, `MapWorld::dirty`), as a
+game server's dirty flags, and every client's native delta goes into one
+shared buffer (thread 设计并实现增量同步).
+
 ## Instruction counts (CI performance gate)
 
 `-DSLG_IR_COUNT=ON` (or `-DSLG_IR_COUNT=1` on a direct compile) builds a

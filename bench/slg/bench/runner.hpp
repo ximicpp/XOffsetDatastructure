@@ -80,6 +80,13 @@ template <class F> void untimed(CycleStats& st, const char* key, F&& f) {
     else timed(st, key, std::forward<F>(f));
 }
 
+// XOffset native delta stages (N*, LK, LN, SN) run in the same process as the
+// application-level ones, interleaved per delivery, so whichever runs second
+// finds the world and the player warm. SLG_NATIVE_OFF=1 skips the native
+// stages: the formal runs take XOffset's application-level rows from such
+// processes and the native rows from processes with them on.
+inline bool native_on() { static const bool on = std::getenv("SLG_NATIVE_OFF") == nullptr; return on; }
+
 struct Runner {
     virtual ~Runner() = default;
     virtual std::string name() const = 0;

@@ -128,6 +128,17 @@ template <class V> std::size_t tile_pos(const V& v, int32_t tx, int32_t ty) {
     X(rank) X(slots) X(power) X(state_end) X(shield_end) X(cooldown_end) X(last_update) X(kills) \
     X(in_battle) X(shielded) X(hidden)
 
+// Dirty flag bit of each ViewUnit field: SLG_VUNIT_SCALARS order, then the rest.
+namespace dbit {
+enum : int {
+#define SLG_X(f) f,
+    SLG_VUNIT_SCALARS(SLG_X)
+#undef SLG_X
+    name, alliance_tag, owner_name, commander, heroes, troops, buffs
+};
+}
+#define SLG_D(f) (uint64_t(1) << dbit::f)
+
 struct WorldHero { int32_t id{}; int32_t level{}; int32_t star{}; int32_t skin{}; };
 struct WorldTroop { int32_t type{}; int32_t count{}; int32_t wounded{}; };
 struct WorldBuff { int32_t id{}; int32_t stacks{}; int64_t expire_ms{}; };
@@ -145,6 +156,8 @@ struct WorldUnit {
     std::vector<WorldBuff> buffs;
     int32_t vx{}; int32_t vy{};     // world only: velocity (stress)
     uint32_t ver = 0;               // world only: bumped on every change (server bookkeeping)
+    uint64_t dirty = 0;             // world only: SLG_D bits of the fields changed in tick dirty_tick
+    int64_t dirty_tick = -1;
 };
 
 // Copies of a unit between any two models (std, cista, XOffset, the world).
@@ -250,10 +263,10 @@ public:
         if (rate_ == Rate::Stress) {
             for (auto& u : units_) {
                 const int32_t k = r.below(16);
-                if (k == 0) { u.hp = u.hp > 10 ? u.hp - r.range(1, 10) : u.hp + 500; hit_troop(r, u); touch(u); }
-                else if (k == 1) { set_state(r, u); touch(u); }
+                if (k == 0) { u.hp = u.hp > 10 ? u.hp - r.range(1, 10) : u.hp + 500; hit_troop(r, u); touch(u, SLG_D(hp) | SLG_D(troops) | SLG_D(power)); }
+                else if (k == 1) { set_state(r, u); touch(u, SLG_D(state) | SLG_D(state_end)); }
                 if (u.state != 0) continue;   // state 0 = moving: about a quarter of the units
-                u.x += u.vx; u.y += u.vy; touch(u);
+                u.x += u.vx; u.y += u.vy; touch(u, SLG_D(x) | SLG_D(y));
                 if (u.x < 0 || u.x >= kMapSize) { u.vx = -u.vx; u.x = u.x < 0 ? -u.x : 2 * kMapSize - 1 - u.x; }
                 if (u.y < 0 || u.y >= kMapSize) { u.vy = -u.vy; u.y = u.y < 0 ? -u.y : 2 * kMapSize - 1 - u.y; }
             }
@@ -263,19 +276,25 @@ public:
             const int events = std::max(1, int(units_.size()) / 500);
             for (int e = 0; e < events; ++e) {
                 auto& u = units_[std::size_t(r.below(int32_t(units_.size())))];
+                uint64_t d = 0;
                 switch (r.below(5)) {
-                case 0: set_owner(r, u); break;                         // captured
-                case 1: set_state(r, u); break;                         // starts gathering, garrisons, ...
+                case 0:                                                 // captured
+                    set_owner(r, u);
+                    d = SLG_D(owner) | SLG_D(owner_name) | SLG_D(alliance) | SLG_D(alliance_tag);
+                    break;
+                case 1: set_state(r, u); d = SLG_D(state) | SLG_D(state_end); break;   // starts gathering, garrisons, ...
                 case 2:                                                 // skirmish
                     u.hp = u.hp > 50 ? u.hp - r.range(1, 50) : u.hp + 500;
                     hit_troop(r, u);
+                    d = SLG_D(hp) | SLG_D(troops) | SLG_D(power);
                     break;
-                case 3: change_buff(r, u); break;                       // buff gained, lost or refreshed
+                case 3: change_buff(r, u); d = SLG_D(buffs); break;    // buff gained, lost or refreshed
                 default:                                                // levels up
                     ++u.level; u.power += r.range(100, 5000); u.commander.level = std::min(u.commander.level + 1, 60);
+                    d = SLG_D(level) | SLG_D(power) | SLG_D(commander);
                     break;
                 }
-                touch(u);
+                touch(u, d);
             }
             // 1 tile in 1024 changes owner (occupied, abandoned).
             for (int e = 0; e < int(tiles_.size()) / 1024; ++e) take_tile(r.below(int32_t(tiles_.size())), r);
@@ -288,9 +307,10 @@ public:
                     hit_troop(r, u);
                     u.morale = std::max(0, u.morale - r.below(3));
                     u.kills += r.below(20);
-                    if (r.below(8) == 0) set_state(r, u);
-                    if (r.below(16) == 0) change_buff(r, u);
-                    touch(u);
+                    uint64_t d = SLG_D(hp) | SLG_D(in_battle) | SLG_D(troops) | SLG_D(power) | SLG_D(morale) | SLG_D(kills);
+                    if (r.below(8) == 0) { set_state(r, u); d |= SLG_D(state) | SLG_D(state_end); }
+                    if (r.below(16) == 0) { change_buff(r, u); d |= SLG_D(buffs); }
+                    touch(u, d);
                 }
                 for (int32_t t : zone_tiles_) if (r.below(16) == 0) take_tile(t, r);
             }
@@ -345,13 +365,22 @@ public:
     }
 
     const WorldUnit& unit(int32_t i) const { return units_[std::size_t(i)]; }
+    // Fields of unit i changed in the current tick (SLG_D bits): server
+    // bookkeeping, as a game server's dirty flags, set where the world
+    // changes the unit.
+    uint64_t dirty(int32_t i) const { const WorldUnit& u = units_[std::size_t(i)]; return u.dirty_tick == tick_ ? u.dirty : 0; }
     const WorldMarch& march(int32_t i) const { return marches_[std::size_t(i)]; }
     const WorldTile& tile(int32_t tx, int32_t ty) const { return tiles_[std::size_t(ty * kTiles + tx)]; }
     int64_t tick_no() const { return tick_; }
     const ViewScale& scale() const { return *vs_; }
 
 private:
-    void touch(WorldUnit& u) const { ++u.ver; u.last_update = tick_; }
+    // A change to u in this tick (the fields `bits`; last_update always).
+    void touch(WorldUnit& u, uint64_t bits) const {
+        ++u.ver; u.last_update = tick_;
+        if (u.dirty_tick != tick_) { u.dirty = 0; u.dirty_tick = tick_; }
+        u.dirty |= bits | SLG_D(last_update);
+    }
     static std::string owner_name_of(int32_t owner) {
         std::string d = std::to_string(owner);
         return "lord_" + std::string(7 - std::min<std::size_t>(7, d.size()), '0') + d;   // 12 bytes
@@ -818,7 +847,7 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
             h.units.reserve(h.units.size() * 3 / 2 + 16);
             h.marches.reserve(h.marches.size() * 3 / 2 + 16);
             build_index(h, s.index[std::size_t(c)]);
-            if constexpr (native) {
+            if constexpr (native) if (native_on()) {
                 ops.n_view(c, w, rect);
                 ops.n_plan(c, w, s.plan);
                 ops.n_update(c, w, s.plan, 0);
@@ -839,7 +868,7 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
             s.tracker.plan(w, c, rect, s.plan);
             if (s.plan.empty()) continue;   // nothing changed in this view: nothing sent
             std::size_t nd = 0;
-            if constexpr (native) {
+            if constexpr (native) if (native_on()) {
                 ops.n_plan(c, w, s.plan);   // slot bookkeeping, untimed like the tracker
                 timed(st, k.nsend.c_str(), [&] { ops.n_update(c, w, s.plan, base + c); });
                 timed(st, k.ndiff.c_str(), [&] { nd = ops.n_diff(c); });
@@ -852,7 +881,7 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
             timed(st, k.uapply.c_str(), [&] { apply_delta(ops.held(c, 0), at, ops.delta()); });
             const uint64_t q = query_view(ops.held(c, 0));
             st.report_sum += q;
-            if constexpr (native) {
+            if constexpr (native) if (native_on()) {
                 timed(st, k.nrecv.c_str(), [&] { ops.n_apply(c, 0); });
                 if (query_view(ops.n_held(c, 0)) != q) throw std::runtime_error("native delta: view differs from the application-level one");
                 st.bytes[k.ndelta] += nd;
