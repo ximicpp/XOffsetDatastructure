@@ -131,6 +131,7 @@ struct ViewSnapshot {
     int32_t x0{}; int32_t y0{}; int32_t x1{}; int32_t y1{};
     data::vector<ViewUnit> units;
     data::vector<ViewMarch> marches;
+    data::vector<Tile> tiles;
 };
 
 struct ViewDelta {
@@ -140,6 +141,7 @@ struct ViewDelta {
     data::vector<int32_t> removed;
     data::vector<ViewMarch> marches;
     data::vector<int32_t> removed_marches;
+    data::vector<Tile> tiles;
 };
 
 } // namespace slg::cm

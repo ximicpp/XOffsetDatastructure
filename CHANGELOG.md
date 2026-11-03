@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Allocation: a small block is bumped inline when the free table records
+  no hole of its size or larger, not only when the table is empty, so
+  appends after the first retirement skip the general path. Placement and
+  wire bytes are unchanged.
+- `XVector` of a trivially copyable type: an append that grows the vector
+  no longer calls `memmove` with length 0, and `end()` adds `size()` to
+  `data()` without testing for null. Instructions, GCC 16 (P2996):
+  slg.A.simulate -3.0% (-2.4%), formal.mutate -2.7% (-4.6%), push_back
+  growth of heroes -3.9% (-3.2%).
+
 ## 3.2.1: iPhone test host serves by default
 
 A patch release on top of 3.2.0. The library headers and sources are byte
