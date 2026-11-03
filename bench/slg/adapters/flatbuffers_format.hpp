@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <span>
 #include <stdexcept>
+#include <deque>
 #include <vector>
 #include <flatbuffers/flatbuffers.h>
 #include "slg_generated.h"
@@ -16,22 +17,44 @@ namespace slg::fbconv {
 using flatbuffers::FlatBufferBuilder;
 using flatbuffers::Offset;
 
+// Struct vectors go through a reused scratch vector (no allocation per list
+// once warm; the conversion never nests). CreateUninitializedVectorOfStructs
+// aligns to the struct size, not its alignment, so it cannot be used for
+// 12-byte structs.
 template <class F, class V, class Conv> auto structs(FlatBufferBuilder& b, const V& v, Conv&& c) {
-    std::vector<F> tmp;
-    tmp.reserve(v.size());
+    static thread_local std::vector<F> tmp;
+    tmp.clear();
     for (const auto& e : v) tmp.push_back(c(e));
     return b.CreateVectorOfStructs(tmp.data(), tmp.size());
 }
+// Table offsets are collected in reused per-nesting-depth scratch vectors, as a
+// tuned FlatBuffers sender does (no allocation per list once warm).
+template <class O> struct OffScratch {
+    static std::deque<std::vector<O>>& pool() { static thread_local std::deque<std::vector<O>> p; return p; }
+    static std::size_t& depth() { static thread_local std::size_t d = 0; return d; }
+    std::vector<O>& v;
+    OffScratch() : v(take()) {}
+    ~OffScratch() { --depth(); }
+    OffScratch(const OffScratch&) = delete;
+    OffScratch& operator=(const OffScratch&) = delete;
+    static std::vector<O>& take() {
+        auto& p = pool(); auto& d = depth();
+        if (p.size() <= d) p.emplace_back();
+        auto& r = p[d++];
+        r.clear();
+        return r;
+    }
+};
 inline auto buffs(FlatBufferBuilder& b, const std::vector<stdm::Buff>& v) {
     return structs<fb::Buff>(b, v, [](const stdm::Buff& x) { return fb::Buff(x.id, x.stacks, x.expire_ms); });
 }
 inline auto troops(FlatBufferBuilder& b, const std::vector<stdm::Troop>& v) {
     return structs<fb::Troop>(b, v, [](const stdm::Troop& x) { return fb::Troop(x.type, x.count, x.wounded); });
 }
-inline auto kv32(FlatBufferBuilder& b, const std::map<int32_t, int32_t>& m) {
+inline auto kv32(FlatBufferBuilder& b, const stdm::smap<int32_t, int32_t>& m) {
     return structs<fb::KV32>(b, m, [](const auto& kv) { return fb::KV32(kv.first, kv.second); });
 }
-inline auto kv64(FlatBufferBuilder& b, const std::map<int32_t, int64_t>& m) {
+inline auto kv64(FlatBufferBuilder& b, const stdm::smap<int32_t, int64_t>& m) {
     return structs<fb::KV64>(b, m, [](const auto& kv) { return fb::KV64(kv.first, kv.second); });
 }
 inline Offset<fb::Hero> build(FlatBufferBuilder& b, const stdm::Hero& h) {
@@ -45,10 +68,9 @@ inline Offset<fb::City> build(FlatBufferBuilder& b, const stdm::City& c);
 inline Offset<fb::March> build(FlatBufferBuilder& b, const stdm::March& m);
 template <class V> auto tables(FlatBufferBuilder& b, const V& v) {
     using O = decltype(build(b, v[0]));
-    std::vector<O> tmp;
-    tmp.reserve(v.size());
-    for (const auto& e : v) tmp.push_back(build(b, e));
-    return b.CreateVector(tmp);
+    OffScratch<O> sc;
+    for (const auto& e : v) sc.v.push_back(build(b, e));
+    return b.CreateVector(sc.v);
 }
 inline Offset<fb::Army> build(FlatBufferBuilder& b, const stdm::Army& a) {
     auto h = tables(b, a.heroes);
@@ -105,10 +127,9 @@ inline Offset<fb::ShardState> build(FlatBufferBuilder& b, const stdm::ShardState
 }
 
 inline Offset<flatbuffers::Vector<Offset<fb::ViewMarch>>> marches_of(FlatBufferBuilder& b, const std::vector<stdm::ViewMarch>& ms) {
-    std::vector<Offset<fb::ViewMarch>> tmp;
-    tmp.reserve(ms.size());
-    for (const auto& m : ms) tmp.push_back(fb::CreateViewMarch(b, m.id, m.owner, m.x0, m.y0, m.x1, m.y1, m.t0, m.t1));
-    return b.CreateVector(tmp);
+    OffScratch<Offset<fb::ViewMarch>> sc;
+    for (const auto& m : ms) sc.v.push_back(fb::CreateViewMarch(b, m.id, m.owner, m.x0, m.y0, m.x1, m.y1, m.t0, m.t1));
+    return b.CreateVector(sc.v);
 }
 
 inline Offset<fb::ViewUnit> unit_of(FlatBufferBuilder& b, const stdm::ViewUnit& u) {
@@ -124,20 +145,18 @@ inline Offset<fb::ViewUnit> unit_of(FlatBufferBuilder& b, const stdm::ViewUnit& 
 }
 
 inline Offset<fb::ViewSnapshot> build(FlatBufferBuilder& b, const stdm::ViewSnapshot& v) {
-    std::vector<Offset<fb::ViewUnit>> tmp;
-    tmp.reserve(v.units.size());
-    for (const auto& u : v.units) tmp.push_back(unit_of(b, u));
-    auto us = b.CreateVector(tmp);
+    OffScratch<Offset<fb::ViewUnit>> sc;
+    for (const auto& u : v.units) sc.v.push_back(unit_of(b, u));
+    auto us = b.CreateVector(sc.v);
     auto ms = marches_of(b, v.marches);
     auto tl = structs<fb::Tile>(b, v.tiles, [](const stdm::Tile& t) { return fb::Tile(t.x, t.y, t.terrain, t.level, t.owner); });
     return fb::CreateViewSnapshot(b, v.request_id, v.tick, v.x0, v.y0, v.x1, v.y1, us, ms, tl);
 }
 
 inline Offset<fb::ViewDelta> build(FlatBufferBuilder& b, const stdm::ViewDelta& v) {
-    std::vector<Offset<fb::ViewUnit>> tmp;
-    tmp.reserve(v.upserts.size());
-    for (const auto& u : v.upserts) tmp.push_back(unit_of(b, u));
-    auto us = b.CreateVector(tmp);
+    OffScratch<Offset<fb::ViewUnit>> sc;
+    for (const auto& u : v.upserts) sc.v.push_back(unit_of(b, u));
+    auto us = b.CreateVector(sc.v);
     auto rm = b.CreateVector(v.removed);
     auto ms = marches_of(b, v.marches);
     auto rmm = b.CreateVector(v.removed_marches);
@@ -304,6 +323,8 @@ template <bool Verify> struct FlatBuffersFormatT {
             return {b.GetBufferPointer(), b.GetSize()};
         }
         template <class T> void decode(std::span<const uint8_t> in, T& v) { FlatBuffersFormatT::decode(in, v); }
+        // Storage receive: run the Verifier and keep the bytes (no unpack).
+        template <class T> void store_check(std::span<const uint8_t> in, T&) { (void)verified_root<T>(in); }
     };
 
     template <class T> static const typename fbconv::table_of<T>::type* verified_root(std::span<const uint8_t> in) {

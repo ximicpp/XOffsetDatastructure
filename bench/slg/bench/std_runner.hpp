@@ -130,7 +130,7 @@ public:
             timed(st, "A.req_decode", [&] { rz_.decode(req, am_); });
             untimed(st, "A.simulate", [&] { simulate_battle(am_); });
             timed(st, "A.res_encode", [&] { res = rz_.encode(kRes, am_); });
-            timed(st, "A.res_decode", [&] { rz_.decode(res, ar_); });
+            timed(st, "A.res_decode", [&] { prefetch_army_for_apply(att); prefetch_army_for_apply(def); rz_.decode(res, ar_); });
             timed(st, "A.apply", [&] { apply_battle_army(att, ar_.attacker); apply_battle_army(def, ar_.defender); });
             st.bytes["A.req"] += req.size();
             st.bytes["A.res"] += res.size();
@@ -176,7 +176,7 @@ public:
             auto& slot = players_[std::size_t(p)];
             std::span<const uint8_t> w;
             timed(st, "S.save_encode", [&] { w = rz_.encode(kBack, slot); });
-            timed(st, "S.store_recv", [&] { rz_.decode(w, br_); });
+            timed(st, "S.store_recv", [&] { store_check(rz_, w, br_); });
             store_.assign(w.begin(), w.end());
             timed(st, "S.load_recv", [&] { rz_.decode(std::span<const uint8_t>(store_), bm_); });
             timed(st, "S.load_install", [&] { std::swap(slot, bm_); });
@@ -249,7 +249,7 @@ public:
         std::span<const uint8_t> w;
         stdm::PlayerState& player(int p) { return r->players_[std::size_t(p)]; }
         template <class Fill> std::size_t modules_encode(Fill&& fill) { fill(pm); w = r->rz_.encode(kBack, pm); return w.size(); }
-        void modules_recv() { r->rz_.decode(w, pr); }
+        void modules_recv() { store_check(r->rz_, w, pr); }
     };
 
     struct BlockOps {

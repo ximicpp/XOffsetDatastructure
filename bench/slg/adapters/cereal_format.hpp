@@ -90,7 +90,20 @@ struct CerealFormat {
             { cereal::BinaryOutputArchive ar(os); ar(id, seed, int32_t{0}, a, d, empty); }
             return bytes(out);
         }
-        template <class T> void decode(std::span<const uint8_t> in, T& v) { CerealFormat::decode(in, v); }
+        // The input stream is reused across messages (fairness review 2026-11-03).
+        struct InBuf : std::streambuf {
+            void set(std::span<const uint8_t> in) {
+                char* b = const_cast<char*>(reinterpret_cast<const char*>(in.data()));
+                setg(b, b, b + in.size());
+            }
+        } ib;
+        std::istream is{&ib};
+        template <class T> void decode(std::span<const uint8_t> in, T& v) {
+            ib.set(in);
+            is.clear();
+            cereal::BinaryInputArchive ar(is);
+            ar(v);
+        }
     };
 
     template <class T> static void decode(std::span<const uint8_t> in, T& v) {
