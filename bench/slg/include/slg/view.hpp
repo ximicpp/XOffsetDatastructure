@@ -3,7 +3,8 @@
 // A client sees one screen of the map, a 512 x 384 viewport. What it holds of
 // the map is exactly what lies in that rectangle: the tiles under it (32 x 32
 // px each, about 17 x 13 of them), the units standing in it (cities, stationed
-// troops, resource points) and the marches whose line crosses it. A march is a
+// troops, resource points; 40 fields each, see WorldUnit) and the marches whose
+// line crosses it. A march is a
 // line record (start, end, start tick, arrival tick); the client interpolates,
 // so a march changes only when it starts, is recalled or arrives.
 //
@@ -17,7 +18,9 @@
 //            inside its viewport only: units that changed, entered or left,
 //            marches that started, changed or left, tiles whose owner changed.
 //            Three change rates (Rate):
-//     peace  - a few unit events per tick (owner, state, hp), a few tile owner
+//     peace  - a few unit events per tick (captured: owner, names, alliance;
+//              state and its timer; a skirmish: hp, troops, wounded, power; a
+//              buff gained, lost or refreshed; a level-up), a few tile owner
 //              changes and march turnover (the main case);
 //     combat - peace plus two battle zones where every engaged unit changes
 //              every tick (a 1 s battle round) and 1/16 of the zone's tiles

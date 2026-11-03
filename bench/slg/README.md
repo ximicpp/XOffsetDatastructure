@@ -57,7 +57,9 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   3x3 block window; a client holds exactly what is inside its viewport). A
   client sees one screen (512x384) of the 4096 map: the tiles under it (32 px,
   about 17x13 = 221 with partly covered ones; terrain, level, owner), the units
-  standing in it and the marches whose line crosses it (line records: start,
+  standing in it (40 fields each since 2026-11-03: 33 scalars of int32, int64
+  timers and bools, name, alliance tag and a 12-byte owner name, a nested
+  commander, 1-3 heroes, 3-6 troops with wounded, 0-5 buffs) and the marches whose line crosses it (line records: start,
   end, start tick, arrival tick). Two cases:
   - EB browse (class 2): all 1,500 clients drag their viewport every tick (up
     to 48 px per axis, a jump elsewhere with p = 1/16) and pull everything in
