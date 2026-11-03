@@ -719,11 +719,13 @@ namespace XOffsetDatastructure {
         //
         // D3: the two outcomes that need no host allocation and run no host
         // callback are decided inline: an exact-bin hit (no split remainder,
-        // no map node) and a bump without padding inside the current extent.
-        // Their owner cannot change, so the identity copy and re-resolution of
-        // the general path are skipped. Placement is the general path's
-        // (exact bin, larger bin, large block, bump); every other request
-        // takes it unchanged.
+        // no map node) and a bump without padding inside the current extent,
+        // taken when the table records no hole of the size or larger (an
+        // empty table, or only smaller holes: appends after the first
+        // retirement). Their owner cannot change, so the identity copy and
+        // re-resolution of the general path are skipped. Placement is the
+        // general path's (exact bin, larger bin, large block, bump); every
+        // other request takes it unchanged.
         XOFFSET_DETAIL_MOVE_INLINE void* allocate_block(std::uint32_t bytes, std::size_t alignment,
                                                         bool allow_growth = true) {
             if (bytes != 0 && (bytes & 7u) == 0 && bytes <= FreeTable::small_max &&
@@ -741,7 +743,11 @@ namespace XOffsetDatastructure {
                         --table->count;
                         return payload_byte_address(offset);
                     }
-                } else if (auto* sm = arena()) {
+                    // A larger hole would be split: the general path. With
+                    // none, the general path bumps, as below.
+                    if (table->holds_hole_from(bin)) return allocate_block_general(bytes, alignment, allow_growth);
+                }
+                if (auto* sm = arena()) {
                     // No free block: bump_block, whose start is the current
                     // end when that address is already 8-byte aligned.
                     const size_type start = used_end_clamped();
@@ -940,6 +946,12 @@ namespace XOffsetDatastructure {
                 auto& word = nonempty[bin / 64u];
                 word &= ~(std::uint64_t(1) << (bin % 64u));
                 if (word == 0) nonempty_words &= ~(1u << (bin / 64u));
+            }
+            // Whether a hole of bin's size or larger is recorded: a small bin
+            // from `bin` up, or any large block (take_free_block's search).
+            bool holds_hole_from(std::uint32_t bin) const noexcept {
+                return (nonempty[bin / 64u] >> (bin % 64u)) != 0 ||
+                       (nonempty_words >> (bin / 64u) >> 1u) != 0 || !large.empty();
             }
         };
 
@@ -3534,10 +3546,12 @@ namespace XOffsetDatastructure {
         T& operator[](size_type index) noexcept { return data()[index]; }
         const T& operator[](size_type index) const noexcept { return data()[index]; }
 
+        // An empty head has a null data() and size_ 0; adding 0 to a null
+        // pointer is defined (null), so end() needs no test of its own.
         iterator begin() noexcept { return data(); }
-        iterator end() noexcept { return data() ? data() + size_ : nullptr; }
+        iterator end() noexcept { return data() + size_; }
         const_iterator begin() const noexcept { return data(); }
-        const_iterator end() const noexcept { return data() ? data() + size_ : nullptr; }
+        const_iterator end() const noexcept { return data() + size_; }
         T& front() noexcept { return data()[0]; }
         const T& front() const noexcept { return data()[0]; }
         T& back() noexcept { return data()[size_ - 1]; }
@@ -3952,8 +3966,11 @@ namespace XOffsetDatastructure {
                 auto* staged = reinterpret_cast<T*>(storage);
                 construct(staged);
                 if (size_ == capacity_) grow_for_insert<GrowOutOfLine>();
-                std::memmove(data() + index + 1, data() + index, (size_ - index) * sizeof(T));
-                std::memcpy(data() + index, staged, sizeof(T));
+                // An append moves nothing.
+                T* const items = data();
+                if (index != size_)
+                    std::memmove(items + index + 1, items + index, (size_ - index) * sizeof(T));
+                std::memcpy(items + index, staged, sizeof(T));
                 ++size_;
             } else if constexpr (detail::shift_relocate_supported<T>()) {
                 with_staged(construct, [&](T& staged) {
