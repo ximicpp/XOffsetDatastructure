@@ -69,6 +69,11 @@
 #                        block buffers: capacity reserved once (1.5x average + 32, was a fixed
 #                        2x + 64 slots), vectors as long as the most records held, free slots
 #                        reused lowest first. Application-level E/U and other formats unchanged.
+#   2026-11-03 A write-back (susu 03:41Z, thread 优化服务端进程间迁移性能): in the demo case
+#                        set a battle writes back troop counts and wounded only (a wiped troop
+#                        leaves); hero buffs stay in the battle (generic.hpp apply_battle_army,
+#                        all formats). SLG_A_FULL=1 restores the buff write-back as a report-only
+#                        stress variant. Default mode unchanged (same digests and report sums).
 # Contents: slg-reuse adapters (FlatBuffers verified_root runs the Verifier),
 # reuse protocol (c) (SLG_REUSE=1), ordinary-record declarations for every xm
 # record type in include/slg/model_xoffset.hpp, T4 adapter v2 (whole-container
@@ -92,7 +97,7 @@ eac6391a496578276cfe33afe8b2bb3866d3f1bc03127ac9a0bbb7bb7434583d  bench/runner.h
 a92b5d7928f7263adb55a07dbb2e134213394a2fbaff4aaa4e7b5db1930c17b6  bench/std_runner.hpp
 0b53d8d06e97e99d3da1694189a7a9f44592a2bc5da060437a62c74b1cb5aaa4  bench/xoffset_runner.hpp
 12cab27be9331a4a09ae66f444cf5852dd81e363df562748a4ea854932e35e44  include/slg/cista_free.hpp
-d383da79e1f656838311c9fc339c977cba69a53277adeb72910ed6cd3c1d92ed  include/slg/generic.hpp
+252eca51c89182293cb3a4c75298df8490c2c7073065b304bb91183721b3cf3f  include/slg/generic.hpp
 81cb33c36231773132abe77ae7a9839a67d1f408fe474cf0bcf9ecfcd6577700  include/slg/login.hpp
 a7ac4b83dce89750e858a3226ca7d62a269aa051acc5fb474d084f26d028753e  include/slg/model_cista.hpp
 5f5b98780705a520d92a8ee0ec27a07db8d833d84bfbd7c2112b8a69ada89069  include/slg/model_std.hpp
