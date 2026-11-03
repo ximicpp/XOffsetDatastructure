@@ -92,18 +92,23 @@ void into_exact_hot_and_oom() {
     bool oom=false;
     {Arm arm;try{source.save_verified_into(out);}catch(const std::bad_alloc&){oom=true;}}
     need(oom && out=="original destination value" && source.copy_bytes()==raw && source.get_size()==logical,
-         "new API output OOM changed value/source before normalization");
+         "new API output OOM changed value or source");
     source.save_verified_into(out);
     need(out==source.save_verified() && source.get_address()==base && source.epoch()==epoch && handle.get()==root,
          "into differs from exact save_verified V2 bytes or moved owner");
+    // Verified saves cut the wire at used_end and leave the logical length.
+    need(source.get_size()==logical,"save_verified_into changed the logical length");
     const auto capacity=out.capacity();
     {Arm arm;source.save_verified_into(out);need(host::remaining==0,"hot output capacity allocated");}
     need(out.capacity()==capacity,"hot capacity changed");
     auto loaded=xo::XBuffer::load_verified<PathsRoot>(out);check(loaded.root<PathsRoot>());
-    // Old contract deliberately differs: old save normalizes before output OOM.
-    auto old=make();const auto used=old.arena()->used_end;need(old.get_size()>used,"old OOM fixture lacks spare extent");
+    // The owning save_verified leaves the logical length too, on output OOM
+    // and after a successful save.
+    auto old=make();const auto old_logical=old.get_size();
+    need(old_logical>old.arena()->used_end,"OOM fixture lacks spare extent");
     {Arm arm;bool failed=false;try{(void)old.save_verified();}catch(const std::bad_alloc&){failed=true;}
-        need(failed && old.get_size()==used,"old save OOM normalization contract changed");}
+        need(failed && old.get_size()==old_logical,"save_verified output OOM changed the logical length");}
+    need(old.save_verified()==out && old.get_size()==old_logical,"save_verified changed the logical length");
 }
 
 void into_owner_callbacks() {
@@ -214,6 +219,8 @@ void hole_table_paths() {
     const auto saved=source.save_verified();
     const auto h=header_of(into);
     need(into==saved,"save_verified_into differs from save_verified with holes");
+    // A reused output that holds the dense size takes the one-pass path.
+    source.save_verified_into(into);need(into==saved,"one-pass save differs with holes");
     need(h.extent_count==0&&h.hole_count==holes&&
          into.size()==sizeof(h)+h.used_bytes-xo::XWIRE_PAYLOAD_BEGIN+holes*sizeof(xo::XBufferCore::WireHole),
          "dense V2.1 wire layout differs");
@@ -240,9 +247,11 @@ void hole_table_paths() {
     need(header_of(runs).extent_count==2&&runs.size()==dense_saved.size()-8192+16,"default emission did not skip the 8 KiB hole");
     std::string runs_into;large.save_verified_into(runs_into);
     need(runs_into==runs,"save_verified_into differs from save_verified for the default emission");
+    large.save_verified_into(runs_into);need(runs_into==runs,"reused output differs when free runs are skipped");
     const auto sparse=large.save_verified(elide);const auto sh=header_of(sparse);
     std::string sparse_into;large.save_verified_into(sparse_into,elide);
     need(sparse_into==sparse,"save_verified_into differs from save_verified for a sparse wire");
+    large.save_verified_into(sparse_into,elide);need(sparse_into==sparse,"one-pass save differs for a sparse wire");
     auto from_sparse=xo::XBuffer::load_verified<PathsRoot>(sparse);check(from_sparse.root<PathsRoot>());
     auto dense_snapshot=xo::freeze_verified(std::move(large));
     const auto dense=join(dense_snapshot);const auto dh=header_of(dense);

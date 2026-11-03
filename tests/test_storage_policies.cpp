@@ -203,6 +203,7 @@ void reclaim_integration() {
     const auto base = buffer.get_address();
     const auto epoch = buffer.epoch();
     const auto wire = buffer.save_verified();
+    buffer.shrink_to_fit(); // saves leave the logical length; trimming is explicit
     const auto logical = buffer.get_size();
     const auto before = buffer.accessible_bytes();
     const auto reclaimed = buffer.reclaim_tail_pages();
