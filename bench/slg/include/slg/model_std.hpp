@@ -2,14 +2,76 @@
 // Used by the cereal, protobuf and FlatBuffers paths (each decodes into these
 // types, runs the shared game logic, and encodes back) and by the trace generator.
 #pragma once
+#include <cstddef>
 #include <cstdint>
+#include <tuple>
 #include <map>
-#include <boost/container/flat_map.hpp>
+#include <algorithm>
+#include <utility>
 #include <string>
 #include <vector>
 
 namespace slg::stdm {
-template <class K, class V> using smap = boost::container::flat_map<K, V>;
+// A sorted flat map (one vector of pairs ordered by key), the same structure as
+// XOffset's and cista's maps (fairness review 2026-11-03). Written here so the
+// std model needs no extra dependency.
+template <class K, class V> class smap {
+public:
+    using key_type = K;
+    using mapped_type = V;
+    using value_type = std::pair<K, V>;
+    using size_type = std::size_t;
+    using iterator = typename std::vector<value_type>::iterator;
+    using const_iterator = typename std::vector<value_type>::const_iterator;
+
+    iterator begin() noexcept { return v_.begin(); }
+    iterator end() noexcept { return v_.end(); }
+    const_iterator begin() const noexcept { return v_.begin(); }
+    const_iterator end() const noexcept { return v_.end(); }
+    size_type size() const noexcept { return v_.size(); }
+    bool empty() const noexcept { return v_.empty(); }
+    void clear() noexcept { v_.clear(); }
+    void reserve(size_type n) { v_.reserve(n); }
+
+    iterator lower_bound(const K& k) { return std::lower_bound(v_.begin(), v_.end(), k, less); }
+    const_iterator lower_bound(const K& k) const { return std::lower_bound(v_.begin(), v_.end(), k, less); }
+    iterator find(const K& k) { auto it = lower_bound(k); return it != v_.end() && it->first == k ? it : v_.end(); }
+    const_iterator find(const K& k) const { auto it = lower_bound(k); return it != v_.end() && it->first == k ? it : v_.end(); }
+    size_type count(const K& k) const { return find(k) != v_.end() ? 1 : 0; }
+    bool contains(const K& k) const { return find(k) != v_.end(); }
+
+    V& operator[](const K& k) {
+        auto it = lower_bound(k);
+        if (it == v_.end() || it->first != k) it = v_.emplace(it, k, V{});
+        return it->second;
+    }
+    template <class... A> std::pair<iterator, bool> emplace(const K& k, A&&... a) {
+        auto it = lower_bound(k);
+        if (it != v_.end() && it->first == k) return {it, false};
+        return {v_.emplace(it, std::piecewise_construct, std::forward_as_tuple(k), std::forward_as_tuple(std::forward<A>(a)...)), true};
+    }
+    std::pair<iterator, bool> insert(const value_type& x) { return emplace(x.first, x.second); }
+    std::pair<iterator, bool> insert(value_type&& x) { return emplace(x.first, std::move(x.second)); }
+    // Hinted insert: appending keys in order (every decoder does) is O(1).
+    template <class KK, class... A> iterator emplace_hint(const_iterator hint, KK&& k, A&&... a) {
+        const K key(std::forward<KK>(k));
+        if (hint == v_.cend() && (v_.empty() || v_.back().first < key)) {
+            v_.emplace_back(std::piecewise_construct, std::forward_as_tuple(key), std::forward_as_tuple(std::forward<A>(a)...));
+            return v_.end() - 1;
+        }
+        return emplace(key, std::forward<A>(a)...).first;
+    }
+    iterator insert(const_iterator hint, const value_type& x) { return emplace_hint(hint, x.first, x.second); }
+    iterator insert(const_iterator hint, value_type&& x) { return emplace_hint(hint, x.first, std::move(x.second)); }
+    size_type erase(const K& k) { auto it = find(k); if (it == v_.end()) return 0; v_.erase(it); return 1; }
+    iterator erase(const_iterator it) { return v_.erase(it); }
+
+    friend bool operator==(const smap& a, const smap& b) { return a.v_ == b.v_; }
+
+private:
+    static bool less(const value_type& e, const K& k) { return e.first < k; }
+    std::vector<value_type> v_;
+};
 
 struct Buff  { int32_t id{}; int32_t stacks{}; int64_t expire_ms{}; };
 struct Skill { int32_t id{}; int32_t level{}; };
