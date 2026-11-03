@@ -138,8 +138,9 @@ template <class Ops> void run_login(Ops& ops, uint64_t seed, int cycle, int roun
         if constexpr (native) if (native_on()) {
             std::size_t k = 0;
             timed(st, "LK.send", [&] { k = ops.n_login_key(p); });
-            timed(st, "LK.recv", [&] { ops.n_login_recv(p); });
-            if (query_self(ops.n_held(p)) != q) throw std::runtime_error("native login: player differs");
+            uint64_t qk = 0;
+            timed(st, "LK.recv", [&] { ops.n_login_recv(p); qk = query_self(ops.n_held(p)); });   // as L.recv
+            if (qk != q) throw std::runtime_error("native login: player differs");
             st.bytes["LK.player"] += k;
         }
     }
