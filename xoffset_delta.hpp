@@ -27,6 +27,7 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <new>
 #include <span>
 #include <string>
 #include <vector>
@@ -66,7 +67,9 @@ namespace XOffsetDatastructure {
     // Delta format 1.0 (docs/DELTA_SYNC.md). Little-endian. The header:
     // 'X' 'D', the format byte (major << 4 | minor), the flags byte, the
     // stream (u64), then varints: the version, with EXTENT (used_end - 48) / 8
-    // and root_offset - 48, and the block count.
+    // and root_offset - 48, and the block count. Block k of the block
+    // section is payload bytes [64k, 64k + 64); no delta writes the arena
+    // header [0, 48).
     inline constexpr std::uint32_t XDELTA_FORMAT_MAJOR = 1;
     inline constexpr std::uint32_t XDELTA_FORMAT_MINOR = 0;
     inline constexpr std::uint32_t XDELTA_FLAG_KEY = 1u;    // apply to an all-zero payload; carries the fingerprint
@@ -87,6 +90,22 @@ namespace XOffsetDatastructure {
 
     namespace detail {
         inline constexpr std::size_t delta_block = 64;  // block size of the block section
+
+        // Allocates on 64-byte boundaries: a baseline's copy then has each
+        // block in one cache line, like the payload it copies.
+        template <typename T>
+        struct DeltaLineAllocator {
+            using value_type = T;
+            DeltaLineAllocator() noexcept = default;
+            template <typename U>
+            DeltaLineAllocator(const DeltaLineAllocator<U>&) noexcept {}
+            T* allocate(std::size_t n) {
+                return static_cast<T*>(::operator new(n * sizeof(T), std::align_val_t{delta_block}));
+            }
+            void deallocate(T* p, std::size_t) noexcept { ::operator delete(p, std::align_val_t{delta_block}); }
+            template <typename U>
+            bool operator==(const DeltaLineAllocator<U>&) const noexcept { return true; }
+        };
 
         // A delta header, decoded.
         struct DeltaHeader {
@@ -340,58 +359,82 @@ namespace XOffsetDatastructure {
             std::size_t size;     // encoded, after the skip varint
             std::size_t changed;  // bytes carried
         };
-        inline DeltaBlockForm delta_block_form(std::uint64_t mask, std::size_t start, std::size_t used) noexcept {
+        // inside: all 64 bytes of the block lie in the range sent.
+        inline DeltaBlockForm delta_block_form(std::uint64_t mask, bool inside) noexcept {
             const std::size_t changed = delta_popcount(mask);
             const std::size_t masked = delta_popcount(delta_byte_flags(mask)) + changed;
-            if (start + delta_block <= used && masked >= delta_block) return {true, 1u + delta_block, delta_block};
+            if (inside && masked >= delta_block) return {true, 1u + delta_block, delta_block};
             return {false, 1u + masked, changed};
         }
 
-        // The 64-byte blocks of [from, n) (the last may be shorter) where cur
-        // differs from base (Update) or from zero (!Update, base unused), with
-        // their masks, among the blocks next_run picks (next_run(i): the next
-        // run of picked block indexes, counted from `from`, as a pair
-        // [first, last) with first >= i and last > first, or first past the
-        // blocks when none is left; last may run past them). With Update,
-        // each block that differs is copied into base on the way, so base
-        // equals cur on the selected blocks afterwards. whole_blocks: every
-        // block that differs and lies inside [from, n) goes whole.
+        // The blocks (block k: payload bytes [64k, 64k + 64), one cache line
+        // of a line-aligned payload) holding bytes of [from, n) where cur
+        // differs from base (Update) or from zero (!Update, base unused),
+        // with the masks of those bytes (bytes below from or past n are
+        // never in a mask), among the blocks next_run picks (next_run(k):
+        // the next run of picked block indexes as a pair [first, last) with
+        // first >= k and last > first, or first past the blocks when none is
+        // left; last may run past them). With Update, each block that
+        // differs is copied into base on the way, so base equals cur on the
+        // selected bytes afterwards. whole_blocks: every block that differs
+        // and lies inside [from, n) goes whole.
         template <bool Update, typename NextRun>
         DeltaBlockTotals delta_scan(const char* cur, char* base, std::size_t from, std::size_t n,
                                     DeltaBlockBuffer& blocks, NextRun&& next_run, bool whole_blocks = false) {
             alignas(64) static constexpr char zeros[64] = {};
             DeltaBlockTotals totals;
-            DeltaBlock* w = blocks.reset_for((n - from + delta_block - 1) / delta_block);
+            const std::size_t count = (n + delta_block - 1) / delta_block;
+            const std::size_t full = n / delta_block;  // blocks that end by n (all but a shorter last)
+            const std::size_t first = from / delta_block;  // the block from falls in
+            const std::uint64_t first_mask = ~std::uint64_t(0) << (from % delta_block);
+            DeltaBlock* w = blocks.reset_for(count - std::min(first, count));
             std::size_t next = 0;  // index of the block after the last one recorded
-            const auto record = [&](std::size_t start, std::uint64_t mask) {
-                const std::size_t index = (start - from) / delta_block;
-                const DeltaBlockForm form = whole_blocks && start + delta_block <= n
-                                                ? DeltaBlockForm{true, 1u + delta_block, delta_block}
-                                                : delta_block_form(mask, start, n);
+            const auto record = [&](std::size_t index, std::uint64_t mask) {
+                const std::size_t start = index * delta_block;
+                const bool inside = start >= from && start + delta_block <= n;
+                const DeltaBlockForm form = whole_blocks && inside ? DeltaBlockForm{true, 1u + delta_block, delta_block}
+                                                                   : delta_block_form(mask, inside);
                 totals.encoded += delta_varint_size(static_cast<std::uint32_t>(index - next)) + form.size;
                 totals.changed += form.changed;
                 *w++ = {static_cast<std::uint32_t>(start), form.whole ? 1u : 0u, mask};
                 next = index + 1;
             };
-            const std::size_t count = (n - from + delta_block - 1) / delta_block;
-            const std::size_t full = (n - from) / delta_block;  // blocks of 64 bytes (all but a shorter last)
-            for (std::pair<std::size_t, std::size_t> run = next_run(std::size_t(0)); run.first < count;
+            for (std::pair<std::size_t, std::size_t> run = next_run(first); run.first < count;
                  run = next_run(std::min(run.second, count))) {
+                std::size_t index = std::max(run.first, first);
                 const std::size_t last = std::min(run.second, full);
-                for (std::size_t index = run.first; index < last; ++index) {
-                    const std::size_t i = from + index * delta_block;
+                if (index < last) totals.compared += (last - index) * delta_block;
+                if (index == first && index < last) {
+                    // The block from falls in: its bytes below from are not compared.
+                    totals.compared -= from % delta_block;
+                    const std::size_t i = index * delta_block;
+                    const std::uint64_t m = delta_block_mask(cur + i, Update ? base + i : zeros) & first_mask;
+                    if (m != 0) {
+                        if constexpr (Update) std::memcpy(base + from, cur + from, i + delta_block - from);
+                        record(index, m);
+                    }
+                    ++index;
+                }
+                for (; index < last; ++index) {
+                    const std::size_t i = index * delta_block;
                     const std::uint64_t m = delta_block_mask(cur + i, Update ? base + i : zeros);
                     if (m == 0) [[likely]] continue;
                     if constexpr (Update) std::memcpy(base + i, cur + i, delta_block);
-                    record(i, m);
+                    record(index, m);
                 }
-                if (last > run.first) totals.compared += (last - run.first) * delta_block;
                 if (full == count || run.second <= full) continue;
                 // The last, shorter block.
-                const std::size_t i = from + full * delta_block;
-                totals.compared += n - i;
+                const std::size_t lo = full == first ? from : full * delta_block;
+                const std::size_t i = full * delta_block;
+                totals.compared += n - lo;
                 std::uint64_t m = 0;
-                std::size_t k = 0;
+                std::size_t k = lo - i;
+                for (; k % 8 != 0 && i + k < n; ++k) {
+                    if (cur[i + k] != (Update ? base[i + k] : char(0))) {
+                        m |= std::uint64_t(1) << k;
+                        if constexpr (Update) base[i + k] = cur[i + k];
+                    }
+                }
                 for (; n - (i + k) >= 8; k += 8) {
                     const std::uint64_t x = Update ? delta_load64(cur + i + k) ^ delta_load64(base + i + k)
                                                    : delta_load64(cur + i + k);
@@ -405,7 +448,7 @@ namespace XOffsetDatastructure {
                         if constexpr (Update) base[i + k] = cur[i + k];
                     }
                 }
-                if (m != 0) record(i, m);
+                if (m != 0) record(full, m);
             }
             blocks.commit(w);
             return totals;
@@ -682,8 +725,8 @@ namespace XOffsetDatastructure {
         }
 
         // ---- receiver: the bytes that verification reads --------------------
-        // Per 64-byte block of the payload (block i: offsets 48 + 64 i to
-        // 48 + 64 i + 63), bit k stands for byte 48 + 64 i + k. `checked`: the
+        // Per 64-byte block of the payload (block i: offsets 64 i to
+        // 64 i + 63), bit k stands for byte 64 i + k. `checked`: the
         // verification of load_verified reads the byte: container heads,
         // string terminators, set and map keys with everything they reach,
         // bools, the length and padding of inline strings. Every other byte of
@@ -783,7 +826,7 @@ namespace XOffsetDatastructure {
             // reads: its size is checked in place (against its capacity); its
             // block and capacity are checked by the whole verification.
             void vector_head_at(std::size_t offset) noexcept {
-                const std::size_t i = offset - XWIRE_PAYLOAD_BEGIN;
+                const std::size_t i = offset;
                 const std::size_t bit = i % delta_block;
                 DeltaCheckBits& b = bits_[i / delta_block];
                 b.heads |= std::uint64_t(1) << bit;
@@ -800,7 +843,7 @@ namespace XOffsetDatastructure {
             // zero) reads as length 0: all its bytes are checked in place.
             void inline_head_at(std::size_t offset) noexcept {
                 const unsigned length = static_cast<unsigned char>(base_[offset + 11]) & 0x7Fu;  // at most 10
-                const std::size_t i = offset - XWIRE_PAYLOAD_BEGIN;
+                const std::size_t i = offset;
                 const std::size_t bit = i % delta_block;
                 DeltaCheckBits& b = bits_[i / delta_block];
                 b.heads |= std::uint64_t(1) << bit;
@@ -818,7 +861,7 @@ namespace XOffsetDatastructure {
             // fn(bits of a block, mask of the bytes of [offset, offset + n) in it).
             template <typename Fn>
             void for_bits(std::size_t offset, std::size_t n, Fn&& fn) noexcept {
-                std::size_t i = offset - XWIRE_PAYLOAD_BEGIN;
+                std::size_t i = offset;
                 const std::size_t bit = i % delta_block;
                 if (bit + n <= delta_block) {  // within one block (most marks)
                     const std::uint64_t m =
@@ -1078,7 +1121,7 @@ namespace XOffsetDatastructure {
         /// thread's baselines share.
         void release() noexcept {
             reset();
-            std::vector<char>().swap(payload_);
+            decltype(payload_)().swap(payload_);
             std::vector<XBufferCore::WireHole>().swap(holes_);
             own_scratch_.release();
 #if XOFFSET_THREAD_CACHES
@@ -1093,7 +1136,7 @@ namespace XOffsetDatastructure {
         std::uint32_t root_offset_ = 0;
         std::uint64_t schema_hash_ = 0;                   // fingerprint of the recorded root type
         std::uint64_t root_type_id_ = 0;
-        std::vector<char> payload_;                       // [0, used_end) as the receiver holds it ([0, 48) unused)
+        std::vector<char, detail::DeltaLineAllocator<char>> payload_;  // [0, used_end) as the receiver holds it ([0, 48) unused)
         std::vector<XBufferCore::WireHole> holes_;        // its hole table, by offset
         // touched_only: the touch log of the buffer the last delta came from
         // (0: none) and the stamp it had then (touches since have a later one).
@@ -1260,7 +1303,7 @@ namespace XOffsetDatastructure {
                 DeltaBlockTotals totals;
                 if (options.touched_only && !key && log && !log->lost && log->epoch == core.epoch() &&
                     b.touch_log_ == log->id) {
-                    const std::size_t count = (used - payload_begin + delta_block - 1) / delta_block;
+                    const std::size_t count = (used + delta_block - 1) / delta_block;
                     if (holes_changed) {
                         select_touched(b, scratch.want, *log, holes, base_used, used);
                         const std::uint8_t* want = scratch.want.data();
@@ -1282,7 +1325,7 @@ namespace XOffsetDatastructure {
                         const std::uint32_t* groups = log->groups.data();
                         const std::uint32_t since = b.touch_stamp_;
                         const std::size_t grown =
-                            used > base_used ? (std::max(base_used, payload_begin) - payload_begin) / delta_block : count;
+                            used > base_used ? std::max(base_used, payload_begin) / delta_block : count;
                         const std::size_t below = std::min(stamped, grown);  // blocks the stamps decide
                         totals = delta_scan<true>(
                             cur, base.data(), payload_begin, used, blocks,
@@ -1394,12 +1437,12 @@ namespace XOffsetDatastructure {
                                         std::size_t used) noexcept {
                 end = std::min(end, used);
                 if (end <= offset) return;
-                const std::size_t first = (offset - payload_begin) / delta_block;
-                const std::size_t last = (end - 1 - payload_begin) / delta_block;
+                const std::size_t first = offset / delta_block;
+                const std::size_t last = (end - 1) / delta_block;
                 if (log.stamps.size() <= last) {
                     XOFFSET_TRY {
                         const std::size_t blocks =
-                            std::max(last + 1, (used - payload_begin + delta_block - 1) / delta_block);
+                            std::max(last + 1, (used + delta_block - 1) / delta_block);
                         log.stamps.resize(blocks, 0u);
                         log.groups.resize((blocks + delta_touch_group - 1) / delta_touch_group, 0u);
                     } XOFFSET_CATCH(const std::bad_alloc&) {
@@ -1485,26 +1528,26 @@ namespace XOffsetDatastructure {
                 else ++log->now;
             }
             // The blocks a touched_only delta compares when the holes changed
-            // (want, per block from payload_begin): those touched since the
+            // (want, per block): those touched since the
             // baseline's stamp, those past its used size, those of holes that
             // came or went.
             // Blocks below both used sizes that the log has stamps for.
             static std::size_t touched_blocks(const DeltaTouchLog& log, std::size_t base_used, std::size_t used) noexcept {
                 const std::size_t common = std::min(base_used, used);
-                return std::min(common > payload_begin ? (common - payload_begin + delta_block - 1) / delta_block : 0u,
+                return std::min((common + delta_block - 1) / delta_block,
                                 log.stamps.size());
             }
             static void select_touched(const XDeltaBaseline& b, std::vector<std::uint8_t>& want,
                                        const DeltaTouchLog& log, const std::vector<XBufferCore::WireHole>& holes,
                                        std::size_t base_used, std::size_t used) {
-                const std::size_t count = (used - payload_begin + delta_block - 1) / delta_block;
+                const std::size_t count = (used + delta_block - 1) / delta_block;
                 want.assign(count, 0);
                 const auto mark = [&](std::size_t from, std::size_t to) {
                     from = std::max(from, payload_begin);
                     to = std::min(to, used);
                     if (to <= from) return;
-                    std::fill(want.begin() + std::ptrdiff_t((from - payload_begin) / delta_block),
-                              want.begin() + std::ptrdiff_t((to - 1 - payload_begin) / delta_block + 1), 1);
+                    std::fill(want.begin() + std::ptrdiff_t(from / delta_block),
+                              want.begin() + std::ptrdiff_t((to - 1) / delta_block + 1), 1);
                 };
                 const std::size_t stamped = touched_blocks(log, base_used, used);
                 const std::uint32_t since = b.touch_stamp_;
@@ -1603,7 +1646,7 @@ namespace XOffsetDatastructure {
                     }
                     std::size_t next = 0;
                     for (const auto& blk : blocks) {
-                        const std::size_t index = (blk.offset - payload_begin) / delta_block;
+                        const std::size_t index = blk.offset / delta_block;
                         p = delta_put_varint(p, static_cast<std::uint32_t>(index - next));
                         next = index + 1;
                         if (blk.whole) {
@@ -1789,10 +1832,13 @@ namespace XOffsetDatastructure {
                     if (!delta_get_varint(q, end, skip) || q == end)
                         XOFFSET_VFAIL(XException, XErrc::size_mismatch, msg(who, "delta block table truncated"));
                     const std::uint64_t index = next + skip;
-                    const std::uint64_t start = payload_begin + index * delta_block;
+                    const std::uint64_t start = index * delta_block;
                     if (start >= used)
                         XOFFSET_VFAIL(XException, XErrc::invalid_extent_table, msg(who, "delta block out of bounds"));
                     const unsigned sel = *q++;
+                    // Block 0 starts in the arena header, which no delta writes.
+                    if (start < payload_begin && sel == 0)
+                        XOFFSET_VFAIL(XException, XErrc::invalid_extent_table, msg(who, "delta block writes the header"));
                     std::uint64_t mask = ~std::uint64_t(0);
                     std::size_t bytes = delta_block;
                     if (sel == 0) {
@@ -1820,12 +1866,15 @@ namespace XOffsetDatastructure {
                             XOFFSET_VFAIL(XException, XErrc::invalid_extent_table, msg(who, "delta block mask byte is zero"));
                         if (start + 63u - unsigned(std::countl_zero(mask)) >= used)
                             XOFFSET_VFAIL(XException, XErrc::invalid_extent_table, msg(who, "delta block out of bounds"));
+                        if (start < payload_begin && start + unsigned(std::countr_zero(mask)) < payload_begin)
+                            XOFFSET_VFAIL(XException, XErrc::invalid_extent_table, msg(who, "delta block writes the header"));
                     }
                     if (std::size_t(end - q) < bytes)
                         XOFFSET_VFAIL(XException, XErrc::size_mismatch, msg(who, "delta block table truncated"));
                     refs[k] = {static_cast<std::uint32_t>(start), static_cast<std::uint32_t>(q - p), mask};
                     q += bytes;
-                    if (start < old_used) undo += std::min<std::size_t>(delta_block, old_used - std::size_t(start));
+                    const std::size_t lo = std::max<std::size_t>(std::size_t(start), payload_begin);
+                    if (lo < old_used) undo += std::min<std::size_t>(std::size_t(start) + delta_block, old_used) - lo;
                     next = index + 1;
                 }
                 out.blocks = refs;
@@ -1906,7 +1955,7 @@ namespace XOffsetDatastructure {
             static vstatus size_checks(XDeltaCursor& c, std::size_t used) {
                 c.checks_valid_ = false;
                 XOFFSET_TRY {
-                    c.checks_.resize((used - payload_begin + delta_block - 1) / delta_block);
+                    c.checks_.resize((used + delta_block - 1) / delta_block);
                 } XOFFSET_CATCH(const std::bad_alloc&) {
                     XOFFSET_VFAIL_BAD_ALLOC();
                 }
@@ -1955,11 +2004,11 @@ namespace XOffsetDatastructure {
                 const std::size_t blocks = c.checks_.size();
                 auto& index = c.range_index_;
                 index.assign(blocks + 1, 0u);
-                for (const DeltaNodeRange& r : c.ranges_) ++index[(r.begin - payload_begin) / delta_block + 1];
+                for (const DeltaNodeRange& r : c.ranges_) ++index[r.begin / delta_block + 1];
                 for (std::size_t b = 1; b <= blocks; ++b) index[b] += index[b - 1];
                 auto& sorted = c.range_scratch_;
                 sorted.resize(c.ranges_.size());
-                for (const DeltaNodeRange& r : c.ranges_) sorted[index[(r.begin - payload_begin) / delta_block]++] = r;
+                for (const DeltaNodeRange& r : c.ranges_) sorted[index[r.begin / delta_block]++] = r;
                 for (std::size_t b = blocks; b > 0; --b) index[b] = index[b - 1];  // back to bucket starts
                 index[0] = 0;
                 for (std::size_t i = 1; i < sorted.size(); ++i) {  // moves stay within a block
@@ -1973,7 +2022,7 @@ namespace XOffsetDatastructure {
             // The node whose range holds `offset`, or none: the last range
             // that begins at or before it, from its block or before.
             static const DeltaNodeRange* node_range_of(const XDeltaCursor& c, std::size_t offset) noexcept {
-                const std::size_t b = (offset - payload_begin) / delta_block;
+                const std::size_t b = offset / delta_block;
                 if (b + 1 >= c.range_index_.size()) return nullptr;
                 const DeltaNodeRange* r = c.ranges_.data();
                 std::size_t k = c.range_index_[b];
@@ -1993,7 +2042,7 @@ namespace XOffsetDatastructure {
                 }
                 for (std::size_t k = 0; k < parsed.block_count; ++k) {
                     const DeltaBlockRef& r = parsed.blocks[k];
-                    const DeltaCheckBits& b = c.checks_[(r.offset - payload_begin) / delta_block];
+                    const DeltaCheckBits& b = c.checks_[r.offset / delta_block];
                     for (std::uint64_t hit = r.mask & b.checked & ~b.local; hit != 0;) {
                         const std::size_t offset = r.offset + static_cast<std::size_t>(std::countr_zero(hit));
                         const DeltaNodeRange* range = node_range_of(c, offset);
@@ -2051,17 +2100,16 @@ namespace XOffsetDatastructure {
             // Heads do not overlap: at most one starts that close.
             template <std::uint64_t DeltaCheckBits::*Which>
             static std::size_t head_before(const DeltaCheckBits* bits, std::size_t offset, std::size_t reach) noexcept {
-                const std::size_t i = offset - payload_begin;
-                const std::size_t block = i / delta_block, bit = i % delta_block;  // reach < 64
+                const std::size_t block = offset / delta_block, bit = offset % delta_block;  // reach < 64
                 std::uint64_t in = (bits[block].*Which) & (bit == delta_block - 1 ? ~std::uint64_t(0)
                                                                                  : (std::uint64_t(2) << bit) - 1u);
                 if (bit >= reach) in &= ~((std::uint64_t(1) << (bit - reach)) - 1u);
-                if (in != 0) return payload_begin + block * delta_block + 63u - unsigned(std::countl_zero(in));
+                if (in != 0) return block * delta_block + 63u - unsigned(std::countl_zero(in));
                 if (bit < reach && block > 0) {  // the end of the block before
                     const unsigned from = unsigned(delta_block - (reach - bit));
                     const std::uint64_t before = (bits[block - 1].*Which) >> from;
                     if (before != 0)
-                        return payload_begin + (block - 1) * delta_block + from + 63u - unsigned(std::countl_zero(before));
+                        return (block - 1) * delta_block + from + 63u - unsigned(std::countl_zero(before));
                 }
                 return 0;
             }
@@ -2075,14 +2123,14 @@ namespace XOffsetDatastructure {
                 std::size_t last_head = 0;
                 for (std::size_t k = 0; k < parsed.block_count; ++k) {
                     const DeltaBlockRef& r = parsed.blocks[k];
-                    const std::uint64_t written = r.mask & bits[(r.offset - payload_begin) / delta_block].local;
+                    const std::uint64_t written = r.mask & bits[r.offset / delta_block].local;
                     for (std::uint64_t hit = written; hit != 0;) {
                         const std::size_t offset = r.offset + static_cast<std::size_t>(std::countr_zero(hit));
                         const std::size_t head =
                             head_before<&DeltaCheckBits::heads>(bits, offset, sizeof(XFixedString) - 1);
                         if (head != 0) {
                             // A vector head's last byte is not local, a string head's is.
-                            const std::size_t e = head + sizeof(XFixedString) - 1 - payload_begin;
+                            const std::size_t e = head + sizeof(XFixedString) - 1;
                             const bool vector = ((bits[e / delta_block].local >> (e % delta_block)) & 1u) == 0;
                             if (head != last_head && !(vector ? on_vector(head) : on_head(head))) return false;
                         } else {
@@ -2185,7 +2233,9 @@ namespace XOffsetDatastructure {
                         if (written < std::min(offset, stale_end))
                             std::memset(base + written, 0, std::min(offset, stale_end) - written);
                         const std::size_t words = std::min<std::size_t>(delta_block, used - offset) / 8u;
-                        delta_set_masked(base + offset, bytes, mask, words, src_end);
+                        // Block 0 starts in the arena header: its words from payload_begin.
+                        const std::size_t skip = offset < payload_begin ? payload_begin - offset : 0u;
+                        delta_set_masked(base + offset + skip, bytes, mask >> skip, words - skip / 8u, src_end);
                         written = offset + 8 * words;
                     });
                     if (written < stale_end) std::memset(base + written, 0, stale_end - written);
@@ -2216,9 +2266,10 @@ namespace XOffsetDatastructure {
                 char* base = core.data();
                 const std::size_t used = parsed.header.used_bytes;
                 for_each_block(parsed, [&](std::size_t offset, const char*, std::uint64_t) {
-                    if (offset < old_used) {
-                        const std::size_t kept = std::min(offset + delta_block, old_used) - offset;
-                        std::memcpy(base + offset, undo, kept);
+                    const std::size_t lo = std::max(offset, payload_begin);  // block 0: past the arena header
+                    if (lo < old_used) {
+                        const std::size_t kept = std::min(offset + delta_block, old_used) - lo;
+                        std::memcpy(base + lo, undo, kept);
                         undo += kept;
                     }
                     // Bytes at or past old_used were zero (N2); the block wrote
@@ -2254,7 +2305,7 @@ namespace XOffsetDatastructure {
                     const DeltaCheckBits* bits = cursor.checks_.data();
                     for (std::size_t k = 0; k < parsed.block_count; ++k) {
                         const DeltaBlockRef& r = parsed.blocks[k];
-                        const DeltaCheckBits& b = bits[(r.offset - payload_begin) / delta_block];
+                        const DeltaCheckBits& b = bits[r.offset / delta_block];
                         if ((r.mask & b.checked) != 0) {
                             check = XDeltaCheck::in_place;
                             break;
@@ -2286,10 +2337,11 @@ namespace XOffsetDatastructure {
                 if (keep_undo) {
                     char* u = undo.data();
                     for_each_block(parsed, [&](std::size_t offset, const char* bytes, std::uint64_t mask) {
-                        if (offset < old_used) {
-                            const std::size_t kept = std::min(offset + delta_block, old_used) - offset;
+                        const std::size_t lo = std::max(offset, payload_begin);  // block 0: past the arena header
+                        if (lo < old_used) {
+                            const std::size_t kept = std::min(offset + delta_block, old_used) - lo;
                             if (kept == delta_block) std::memcpy(u, base + offset, delta_block);
-                            else std::memcpy(u, base + offset, kept);
+                            else std::memcpy(u, base + lo, kept);
                             u += kept;
                         }
                         delta_get_masked(base + offset, bytes, mask, src_end);
