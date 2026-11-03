@@ -17,7 +17,7 @@ namespace slg::pbconv {
 #define SLG_PB_DECL(T) inline void to(pb::T&, const stdm::T&); inline void from(stdm::T&, const pb::T&);
 SLG_PB_DECL(Buff) SLG_PB_DECL(Skill) SLG_PB_DECL(Troop) SLG_PB_DECL(Event) SLG_PB_DECL(Tile)
 SLG_PB_DECL(Hero) SLG_PB_DECL(Army) SLG_PB_DECL(City) SLG_PB_DECL(PlayerState) SLG_PB_DECL(PlayerPatch) SLG_PB_DECL(Report)
-SLG_PB_DECL(BattleMsg) SLG_PB_DECL(March) SLG_PB_DECL(ShardState) SLG_PB_DECL(ViewUnit) SLG_PB_DECL(ViewMarch) SLG_PB_DECL(ViewSnapshot) SLG_PB_DECL(ViewDelta)
+SLG_PB_DECL(BattleMsg) SLG_PB_DECL(March) SLG_PB_DECL(ShardState) SLG_PB_DECL(UnitHero) SLG_PB_DECL(ViewUnit) SLG_PB_DECL(ViewMarch) SLG_PB_DECL(ViewSnapshot) SLG_PB_DECL(ViewDelta)
 #undef SLG_PB_DECL
 
 inline void to(pb::Buff& d, const stdm::Buff& s) { d.set_id(s.id); d.set_stacks(s.stacks); d.set_expire_ms(s.expire_ms); }
@@ -111,8 +111,13 @@ inline void from(stdm::ShardState& d, const pb::ShardState& s) {
     from_rep(d.tiles, s.tiles()); from_rep(d.cities, s.cities()); from_rep(d.marches, s.marches());
 }
 
+inline void to(pb::UnitHero& d, const stdm::UnitHero& s) { d.set_id(s.id); d.set_level(s.level); d.set_star(s.star); d.set_skin(s.skin); }
+inline void from(stdm::UnitHero& d, const pb::UnitHero& s) { d.id = s.id(); d.level = s.level(); d.star = s.star(); d.skin = s.skin(); }
 inline void to(pb::ViewUnit& d, const stdm::ViewUnit& s) {
-    d.set_id(s.id); d.set_owner(s.owner); d.set_x(s.x); d.set_y(s.y); d.set_hp(s.hp); d.set_state(s.state); d.set_name(s.name);
+    d.set_id(s.id); d.set_kind(s.kind); d.set_owner(s.owner); d.set_alliance(s.alliance); d.set_x(s.x); d.set_y(s.y); d.set_hp(s.hp); d.set_max_hp(s.max_hp); d.set_state(s.state); d.set_level(s.level); d.set_faction(s.faction); d.set_flags(s.flags); d.set_speed(s.speed); d.set_attack(s.attack); d.set_defense(s.defense); d.set_morale(s.morale); d.set_load(s.load); d.set_icon(s.icon); d.set_skin(s.skin); d.set_banner(s.banner); d.set_title(s.title); d.set_vip(s.vip); d.set_rank(s.rank); d.set_slots(s.slots); d.set_power(s.power); d.set_state_end(s.state_end); d.set_shield_end(s.shield_end); d.set_cooldown_end(s.cooldown_end); d.set_last_update(s.last_update); d.set_kills(s.kills); d.set_in_battle(s.in_battle); d.set_shielded(s.shielded); d.set_hidden(s.hidden);
+    d.set_name(s.name); d.set_alliance_tag(s.alliance_tag); d.set_owner_name(s.owner_name);
+    to(*d.mutable_commander(), s.commander);
+    to_rep(d.mutable_heroes(), s.heroes); to_rep(d.mutable_troops(), s.troops); to_rep(d.mutable_buffs(), s.buffs);
 }
 inline void to(pb::ViewMarch& d, const stdm::ViewMarch& s) {
     d.set_id(s.id); d.set_owner(s.owner); d.set_x0(s.x0); d.set_y0(s.y0); d.set_x1(s.x1); d.set_y1(s.y1); d.set_t0(s.t0); d.set_t1(s.t1);
@@ -127,7 +132,10 @@ inline void to(pb::ViewSnapshot& d, const stdm::ViewSnapshot& s) {
     to_rep(d.mutable_tiles(), s.tiles);
 }
 inline void from(stdm::ViewUnit& d, const pb::ViewUnit& s) {
-    d.id = s.id(); d.owner = s.owner(); d.x = s.x(); d.y = s.y(); d.hp = s.hp(); d.state = s.state(); d.name = s.name();
+    d.id = s.id(); d.kind = s.kind(); d.owner = s.owner(); d.alliance = s.alliance(); d.x = s.x(); d.y = s.y(); d.hp = s.hp(); d.max_hp = s.max_hp(); d.state = s.state(); d.level = s.level(); d.faction = s.faction(); d.flags = s.flags(); d.speed = s.speed(); d.attack = s.attack(); d.defense = s.defense(); d.morale = s.morale(); d.load = s.load(); d.icon = s.icon(); d.skin = s.skin(); d.banner = s.banner(); d.title = s.title(); d.vip = s.vip(); d.rank = s.rank(); d.slots = s.slots(); d.power = s.power(); d.state_end = s.state_end(); d.shield_end = s.shield_end(); d.cooldown_end = s.cooldown_end(); d.last_update = s.last_update(); d.kills = s.kills(); d.in_battle = s.in_battle(); d.shielded = s.shielded(); d.hidden = s.hidden();
+    d.name = s.name(); d.alliance_tag = s.alliance_tag(); d.owner_name = s.owner_name();
+    from(d.commander, s.commander());
+    from_rep(d.heroes, s.heroes()); from_rep(d.troops, s.troops()); from_rep(d.buffs, s.buffs());
 }
 inline void from(stdm::ViewSnapshot& d, const pb::ViewSnapshot& s) {
     d.request_id = s.request_id(); d.tick = s.tick(); d.x0 = s.x0(); d.y0 = s.y0(); d.x1 = s.x1(); d.y1 = s.y1();

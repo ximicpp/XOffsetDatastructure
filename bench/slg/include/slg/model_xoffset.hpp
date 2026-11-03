@@ -83,7 +83,14 @@ struct alignas(8) ShardState {
 };
 
 // Demo case set, scenario E (view.hpp).
-struct alignas(8) ViewUnit { int32_t id{}; int32_t owner{}; int32_t x{}; int32_t y{}; int32_t hp{}; int32_t state{}; XString name; };
+struct alignas(8) UnitHero { int32_t id{}; int32_t level{}; int32_t star{}; int32_t skin{}; };
+struct alignas(8) ViewUnit {
+    int32_t id{}; int32_t kind{}; int32_t owner{}; int32_t alliance{}; int32_t x{}; int32_t y{}; int32_t hp{}; int32_t max_hp{}; int32_t state{}; int32_t level{}; int32_t faction{}; int32_t flags{}; int32_t speed{}; int32_t attack{}; int32_t defense{}; int32_t morale{}; int32_t load{}; int32_t icon{}; int32_t skin{}; int32_t banner{}; int32_t title{}; int32_t vip{}; int32_t rank{}; int32_t slots{};
+    int64_t power{}; int64_t state_end{}; int64_t shield_end{}; int64_t cooldown_end{}; int64_t last_update{}; int64_t kills{}; bool in_battle{}; bool shielded{}; bool hidden{};
+    XString name; XString alliance_tag; XString owner_name;
+    UnitHero commander;
+    XVector<UnitHero> heroes; XVector<Troop> troops; XVector<Buff> buffs;
+};
 
 struct alignas(8) ViewMarch { int32_t id{}; int32_t owner{}; int32_t x0{}; int32_t y0{}; int32_t x1{}; int32_t y1{}; int64_t t0{}; int64_t t1{}; };
 
@@ -133,7 +140,8 @@ XOFFSET_RECORD(slg::xm::BattleMsg, battle_id, seed, winner, attacker, defender, 
 XOFFSET_RECORD(slg::xm::Tile, x, y, terrain, level, owner)
 XOFFSET_RECORD(slg::xm::March, march_id, owner, from_x, from_y, to_x, to_y, eta, troops)
 XOFFSET_RECORD(slg::xm::ShardState, shard_id, tick, width, tiles, cities, marches)
-XOFFSET_RECORD(slg::xm::ViewUnit, id, owner, x, y, hp, state, name)
+XOFFSET_RECORD(slg::xm::UnitHero, id, level, star, skin)
+XOFFSET_RECORD(slg::xm::ViewUnit, id, kind, owner, alliance, x, y, hp, max_hp, state, level, faction, flags, speed, attack, defense, morale, load, icon, skin, banner, title, vip, rank, slots, power, state_end, shield_end, cooldown_end, last_update, kills, in_battle, shielded, hidden, name, alliance_tag, owner_name, commander, heroes, troops, buffs)
 XOFFSET_RECORD(slg::xm::ViewMarch, id, owner, x0, y0, x1, y1, t0, t1)
 XOFFSET_RECORD(slg::xm::ViewSnapshot, request_id, tick, x0, y0, x1, y1, units, marches, tiles)
 XOFFSET_RECORD(slg::xm::ViewDelta, request_id, tick, x0, y0, x1, y1, upserts, removed, marches, removed_marches, tiles)
@@ -142,7 +150,7 @@ XOFFSET_RECORD(slg::xm::PlayerPatch, player_id, seq, army_index, armies, items, 
 XOFFSET_ORDINARY_RECORDS(slg::xm::Buff, slg::xm::Skill, slg::xm::Troop, slg::xm::Hero, slg::xm::Army,
                          slg::xm::City, slg::xm::PlayerState, slg::xm::PlayerPatch, slg::xm::Event, slg::xm::Report,
                          slg::xm::BattleMsg, slg::xm::Tile, slg::xm::March, slg::xm::ShardState,
-                         slg::xm::ViewUnit, slg::xm::ViewMarch, slg::xm::ViewSnapshot, slg::xm::ViewDelta)
+                         slg::xm::UnitHero, slg::xm::ViewUnit, slg::xm::ViewMarch, slg::xm::ViewSnapshot, slg::xm::ViewDelta)
 #else
 // Libraries without the macro: its two specializations, written out.
 #define SLG_XM_ORDINARY_RECORD(T)                                                      \
@@ -164,6 +172,7 @@ SLG_XM_ORDINARY_RECORD(slg::xm::BattleMsg)
 SLG_XM_ORDINARY_RECORD(slg::xm::Tile)
 SLG_XM_ORDINARY_RECORD(slg::xm::March)
 SLG_XM_ORDINARY_RECORD(slg::xm::ShardState)
+SLG_XM_ORDINARY_RECORD(slg::xm::UnitHero)
 SLG_XM_ORDINARY_RECORD(slg::xm::ViewUnit)
 SLG_XM_ORDINARY_RECORD(slg::xm::ViewMarch)
 SLG_XM_ORDINARY_RECORD(slg::xm::ViewSnapshot)
@@ -176,5 +185,5 @@ XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::PlayerPatch, "slg.PlayerPatch.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::BattleMsg, "slg.BattleMsg.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::ShardState, "slg.ShardState.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::Report, "slg.Report.v1")
-XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::ViewSnapshot, "slg.ViewSnapshot.v3")
-XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::ViewDelta, "slg.ViewDelta.v3")
+XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::ViewSnapshot, "slg.ViewSnapshot.v4")
+XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::ViewDelta, "slg.ViewDelta.v4")
