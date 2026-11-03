@@ -762,7 +762,14 @@ void check_path_case() {
     step("a scalar after moves", C::none, [&] { r.epoch = 80; });
     step("heap strings become inline and empty", C::in_place, [&] { r.items[2].name = "tiny"; r.title = ""; });
     step("an empty string gets a block", C::in_place, [&] { r.title = "a title that comes back on the heap again"; });
-    step("a vector of records grows within capacity", C::full, [&] { r.items.emplace_back().id = 9; });
+    step("a vector of records grows within capacity", C::in_place, [&] { r.items.emplace_back().id = 9; });
+    step("a new record with a heap name and values", C::in_place, [&] {
+        auto& it = r.items.emplace_back();
+        it.id = 10;
+        it.name = "a record name that needs a heap block";
+        for (int k = 0; k < 5; ++k) it.vals.push_back(std::uint16_t(k));
+    });
+    step("a vector of records shrinks", C::full, [&] { r.items.pop_back(); });
     step("a scalar vector gets its first block", C::in_place, [&] { r.items.back().vals.push_back(1); });
     step("a scalar after a full check", C::none, [&] { r.epoch = 79; });
 
@@ -821,6 +828,31 @@ void check_path_case() {
         rejects("a vector block into a hole the table keeps",
                 poke_delta(rep, cur, head, head_bytes(holes[0].first, 1, holes[0].second / 2)),
                 "wire validation");
+        {
+            // A record brought back past the size is verified on its own:
+            // first a bool of 2 in the slot past the size (a free byte then),
+            // then the size that takes it in.
+            const std::size_t items = off(&rep.root().items);
+            const std::uint32_t size = rep.root().items.size() + 1u;
+            need((items + 4) % 64 + 4 <= 64, "check path: vector size crosses a block");
+            const auto& slot = rep.root().items.data()[size - 1];
+            const std::size_t flag = off(&slot.flag);
+            auto res = apply_entry(rep, poke_delta(rep, cur, flag, std::string(1, '\x02')), cur);
+            need(bool(res) && cur.last_check() == C::none, "check path: a byte past the size was checked");
+            std::string b(4, '\0');
+            std::memcpy(&b[0], &size, 4);
+            rejects("a record brought back with a bool of 2", poke_delta(rep, cur, items + 4, b), "invalid bool");
+            res = apply_entry(rep, poke_delta(rep, cur, flag, std::string(1, '\x01')), cur);
+            need(bool(res), "check path: the slot past the size was not restored");
+            auto tc = cur;
+            res = apply_entry(rep, poke_delta(rep, cur, items + 4, b), tc);
+            // Accepted only if the whole verification accepts the result.
+            if (res) {
+                need(tc.last_check() == C::in_place, "check path: a record brought back was not checked in place");
+                need(bool(typed_load(rep.save_verified())), "check path: a record brought back does not verify");
+                cur = tc;
+            }
+        }
         const std::size_t title = off(&rep.root().title);  // a heap string with a block of at least 48 bytes
         if (title % 64 + 4 <= 64) {
             std::string t(4, '\0');
@@ -850,13 +882,34 @@ void mutate_touched(Buffer& src, std::mt19937_64& rng) {
     auto& r = src.root();
     for (int n = 1 + int(rng() % 4); n > 0; --n) {
         switch (rng() % 14) {
-        case 0: r.epoch = rng(); src.touch(r.epoch); break;
-        case 1: if (!r.items.empty()) { auto& it = r.items[rng() % r.items.size()]; it.id = std::uint32_t(rng()); src.touch(it.id); } break;
-        case 2: if (!r.items.empty()) { auto& it = r.items[rng() % r.items.size()]; it.flag = !it.flag; src.touch(it.flag); } break;
+        case 0:
+            // touch_set touches only the bytes that changed (a small step:
+            // mostly the low bytes).
+            if (rng() % 2) { r.epoch = rng(); src.touch(r.epoch); }
+            else src.touch_set(r.epoch, r.epoch + rng() % 300);
+            break;
+        case 1:
+            if (!r.items.empty()) {
+                auto& it = r.items[rng() % r.items.size()];
+                if (rng() % 2) { it.id = std::uint32_t(rng()); src.touch(it.id); }
+                else src.touch_set(it.id, std::uint32_t(rng() % 4 == 0 ? rng() : it.id ^ (rng() % 256) << (8 * (rng() % 4))));
+            }
+            break;
+        case 2:
+            if (!r.items.empty()) {
+                auto& it = r.items[rng() % r.items.size()];
+                if (rng() % 2) { it.flag = !it.flag; src.touch(it.flag); }
+                else src.touch_set(it.flag, rng() % 2 == 0);
+            }
+            break;
         case 3:
             if (!r.items.empty()) {
                 auto& it = r.items[rng() % r.items.size()];
-                if (!it.vals.empty()) { auto& v = it.vals[rng() % it.vals.size()]; v = std::uint16_t(rng()); src.touch(v); }
+                if (!it.vals.empty()) {
+                    auto& v = it.vals[rng() % it.vals.size()];
+                    if (rng() % 2) { v = std::uint16_t(rng()); src.touch(v); }
+                    else src.touch_set(v, std::uint16_t(v + rng() % 3));
+                }
             }
             break;
         case 4:
@@ -1098,6 +1151,19 @@ void touches_fixed_case() {
     // Nothing touched: nothing sent.
     st = src.save_delta_into(d, xb);
     need(st.empty, "touches: an untouched buffer sent a delta");
+    // touch_set: only the bytes that changed go; an equal value touches nothing.
+    {
+        auto& e = src.root().epoch;
+        const std::uint64_t low = (e & ~std::uint64_t(0xFF)) | ((e + 1) & 0xFF);
+        need(src.touch_set(e, low), "touches: touch_set did not assign");
+        need(!src.touch_set(e, low), "touches: touch_set assigned an equal value");
+        st = src.save_delta_into(d, xb);
+        need(!st.empty && st.blocks == 1 && st.changed_bytes == 1, "touches: touch_set of the low byte did not go as 1 byte");
+        need(bool(apply_entry(rep, d, cur)), "touches: touch_set delta");
+        same_state(src.root(), src, rep, "touches: touch_set");
+        st = src.save_delta_into(d, xb);
+        need(st.empty, "touches: an equal touch_set sent a delta");
+    }
     // An untouched change is not sent; the digest catches it.
     src.root().epoch += 1;
     src.root().items[0].id += 1;

@@ -742,6 +742,7 @@ namespace XOffsetDatastructure {
                         if (exact.empty()) table->clear_nonempty(bin);
                         table->bytes -= bytes;
                         --table->count;
+                        table->gen = FreeTable::next_gen();
                         return payload_byte_address(offset);
                     }
                     // A larger hole would be split: the general path. With
@@ -801,6 +802,7 @@ namespace XOffsetDatastructure {
                     table->mark_nonempty(bin);
                     table->bytes += bytes;
                     ++table->count;
+                    table->gen = FreeTable::next_gen();
                     return;
                 }
             }
@@ -817,6 +819,9 @@ namespace XOffsetDatastructure {
         }
         std::size_t free_block_count() const noexcept { return free_table_ ? free_table_->count : 0; }
         std::uint64_t free_block_bytes() const noexcept { return free_table_ ? free_table_->bytes : 0; }
+        // Changes whenever a free block comes or goes; two tables (of any
+        // buffers) with the same generation hold the same blocks.
+        std::uint64_t free_block_gen() const noexcept { return free_table_ ? free_table_->gen : 0; }
 
         // Free blocks in canonical emission order: ascending bin size, LIFO
         // vector order within a bin, then large blocks in (size, insertion)
@@ -900,6 +905,7 @@ namespace XOffsetDatastructure {
                     }
                     table->bytes += hole.bytes;
                     ++table->count;
+                    table->gen = FreeTable::next_gen();
                 }
             } XOFFSET_CATCH(const std::bad_alloc&) {
                 XOFFSET_THROW(XBadAlloc());
@@ -932,6 +938,13 @@ namespace XOffsetDatastructure {
             std::multimap<std::uint32_t, std::uint32_t> large;
             std::uint64_t bytes = 0;
             std::size_t count = 0;
+            // Changes with every entry that comes or goes (never repeats, in
+            // any buffer): the same gen means the same holes.
+            std::uint64_t gen = 0;
+            static std::uint64_t next_gen() noexcept {
+                static std::atomic<std::uint64_t> last{0};
+                return last.fetch_add(1, std::memory_order_relaxed) + 1u;
+            }
             // RL: false means no bin storage has grown since the last full
             // recycle (or construction), so what is kept is still within the
             // keep limits and a keep-recycle only empties the nonempty bins.
@@ -1034,6 +1047,7 @@ namespace XOffsetDatastructure {
                 table->large.clear();
                 table->bytes = 0;
                 table->count = 0;
+                table->gen = FreeTable::next_gen();
                 table->grown = false;
                 cache.tables[cache.count++] = table;
             }
@@ -1050,6 +1064,7 @@ namespace XOffsetDatastructure {
                 table.large.clear();
                 table.bytes = 0;
                 table.count = 0;
+                table.gen = FreeTable::next_gen();
             }
         };
         using FreeTablePtr = std::unique_ptr<FreeTable, FreeTableRecycler>;
@@ -1083,6 +1098,7 @@ namespace XOffsetDatastructure {
             table->large = src.large;
             table->bytes = src.bytes;
             table->count = src.count;
+            table->gen = FreeTable::next_gen();
             table->grown = true; // bins were assigned: the next keep-recycle re-applies the limits
             return table;
         }
@@ -1162,6 +1178,7 @@ namespace XOffsetDatastructure {
             table->mark_nonempty(bin);
             table->bytes += bytes;
             ++table->count;
+            table->gen = FreeTable::next_gen();
             return true;
         }
 
@@ -1208,6 +1225,7 @@ namespace XOffsetDatastructure {
                     }
                     table.bytes += bytes;
                     ++table.count;
+                    table.gen = FreeTable::next_gen();
                     return true;
                 }
             } XOFFSET_CATCH(...) {
@@ -1241,6 +1259,7 @@ namespace XOffsetDatastructure {
                     table.large.insert(std::move(split.node));
                     table.bytes += split.bytes;
                     ++table.count;
+                    table.gen = FreeTable::next_gen();
                     return;
                 }
             } else if (split.bytes == 0 || insert_free_block_inline(split.offset, split.bytes)) {
@@ -1263,6 +1282,7 @@ namespace XOffsetDatastructure {
                     if (exact.empty()) table.clear_nonempty(bin);
                     table.bytes -= bytes;
                     --table.count;
+                    table.gen = FreeTable::next_gen();
                     return payload_byte_address(found_offset);
                 }
                 // Smallest larger nonempty bin: the rest of bin's own word,
@@ -1297,6 +1317,7 @@ namespace XOffsetDatastructure {
             }
             table.bytes -= found_bytes;
             --table.count;
+            table.gen = FreeTable::next_gen();
             // Split: the remainder stays free (a multiple of 8, at least 8).
             if (found_bytes > bytes) {
                 split.offset = found_offset + bytes;
@@ -1775,10 +1796,18 @@ namespace XOffsetDatastructure {
             } XOFFSET_CATCH(...) {
                 return false;
             }
+            // With the content copied, a cached root is at the same offset:
+            // it follows the move (root<T>() keeps its fast path).
+            const bool rebase_root = copy && root_cache_ && root_cache_epoch_ == m_epoch;
+            const auto root_at = rebase_root ? static_cast<char*>(root_cache_) - buffer_.data() : 0;
             insert_owner_keeping(prepared);
             buffer_.swap(next);
             publish_host_owner();
             ++m_epoch;
+            if (rebase_root) {
+                root_cache_ = buffer_.data() + root_at;
+                root_cache_epoch_ = m_epoch;
+            }
             return true;
             // `next` (the old storage) is released here.
         }
@@ -8034,9 +8063,9 @@ namespace XOffsetDatastructure {
         void touch(const void* p, std::size_t bytes) noexcept;
         /// Assigns `value` to `field` (an object in this buffer's payload)
         /// only when they differ (field == value is false), then touches the
-        /// field; returns whether it assigned. Touches then name exactly what
-        /// changed, which is what a delta from an XDeltaRecord::touches
-        /// baseline sends.
+        /// field (a scalar: only its bytes that changed); returns whether it
+        /// assigned. Touches then name exactly what changed, which is what a
+        /// delta from an XDeltaRecord::touches baseline sends.
         template <typename T, typename V>
         bool touch_set(T& field, const V& value);
 

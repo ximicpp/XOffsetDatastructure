@@ -29,18 +29,29 @@
   the last delta while one baseline pairs (the baseline's lines of them are
   prefetched as they are touched), and stamps each block (4 bytes per
   block) only once a second baseline pairs or the list overflows.
-  `XBuffer::touch_set(field, value)` assigns and touches only on a change.
+  `XBuffer::touch_set(field, value)` assigns and touches only on a change,
+  and of a scalar only the bytes that changed.
   `XDeltaBaseline(XDeltaRecord::touches)` keeps no payload copy and sends
   the touched bytes instead.
+- The free-block table carries a generation that changes whenever a block
+  comes or goes (`XBufferCore::free_block_gen()`); a delta whose baseline
+  saw the same generation does not list, sort and compare the hole table
+  again.
+- A movable slot that outgrows its storage keeps its cached root (at the
+  same offset in the copied content), so `root<T>()` stays on its fast
+  path after the move instead of re-checking typed access and the schema
+  on every call.
 - The receiver checks a container that moved, got its first block or lost
   it (heap strings, vectors of plain elements, sets and maps of plain
   elements, strings entering or leaving the inline form) on its own, against
   a map of live blocks kept with the cursor (one bit per 8 bytes), and checks
   the hole table's coverage against the same map, instead of verifying the
   whole payload (`XDeltaCheck::in_place`). Deltas that change `used_end` or
-  the hole table take the same path. On the game demo's 40-field units, the
-  share of deltas verified in full went from 1.6% (peace) and 7% (combat) to
-  none.
+  the hole table take the same path. A vector of records (structs with
+  strings or containers) that grows within its capacity has only its new
+  records verified (each of their blocks claimed in the same map). On the
+  game demo's 40-field units, the share of deltas verified in full went
+  from 1.6% (peace), 7% (combat) and 16% (stress) to none.
 - Delta blocks lie on 64-byte payload offsets (block `i` = offsets `64 i`
   to `64 i + 63`, one cache line; block 0 never writes the arena header),
   and the baseline's copy is 64-aligned.
