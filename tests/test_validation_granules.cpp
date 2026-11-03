@@ -336,6 +336,55 @@ void storage() {
     }
 }
 
+// The hole table goes to the bitmaps directly (a valid entry implies
+// register_free_range's own checks): the same errors in the same order, the
+// first entry checked before any host words are taken, the header's cursor
+// range folded in before the first hole.
+void hole_table() {
+    constexpr std::size_t extent = 70000, header = sizeof(xo::XArena);
+    std::vector<std::uint64_t> storage(extent / 8 + 2);
+    const char* base = reinterpret_cast<const char*>(storage.data());
+    using Hole = xo::XBufferCore::WireHole;
+    constexpr const char* invalid = "wire validation failed: invalid hole table entry";
+    constexpr auto h = static_cast<std::uint32_t>(header);
+    struct Case { std::vector<Hole> holes; const char* expected; std::size_t allocations; };
+    const Case cases[] = {
+        {{{4, 8}}, invalid, 0},
+        {{{h, 0}}, invalid, 0},
+        {{{40000, 64}, {40032, 8}}, free_free, 1},
+        {{{40000, 64}, {69992, 16}}, invalid, 1},
+        {{{40000, 64}, {200, 4096}, {39992, 16}}, free_free, 1},
+        {{{h, 8}, {60000, 9992}, {304, 8}}, nullptr, 1},
+    };
+    for (const auto& c : cases) {
+        Resource upstream;
+        {
+            wd::WireValidationContext ctx{.base = base, .end = base + extent, .upstream = &upstream};
+            reg(false, base, header, ctx);
+            bool caught = false;
+            std::string what;
+            try { wd::register_wire_holes(c.holes.data(), c.holes.size(), ctx); }
+            catch (const xo::XException& e) { caught = true; what = e.what(); }
+            need(c.expected ? caught && what == c.expected : !caught, "hole table error differs");
+            need(upstream.allocations == c.allocations, "hole table took host words before its first entry passed");
+            if (!c.expected) {
+                std::uint64_t holes = 0;
+                for (const auto& hole : c.holes) holes += hole.bytes;
+                need(ctx.cursor == wd::WireValidationContext::no_cursor && ctx.owned_bytes == header &&
+                     ctx.free_bytes == holes, "hole table coverage differs");
+                for (std::size_t g = 0; g < extent / 8; ++g) {
+                    bool dead = false;
+                    for (const auto& hole : c.holes)
+                        dead = dead || (g * 8 >= hole.offset && g * 8 < hole.offset + hole.bytes);
+                    need(live_at(ctx, g) == (g * 8 < header) && dead_at(ctx, g) == dead, "hole table bitmaps differ");
+                }
+            }
+        }
+        upstream.balanced();
+        ++storage_cases;
+    }
+}
+
 template <class T> T read_at(const std::string& s, std::size_t p) { T x; std::memcpy(&x, s.data() + p, sizeof(x)); return x; }
 template <class T> void write_at(std::string& s, std::size_t p, T x) { std::memcpy(s.data() + p, &x, sizeof(x)); }
 template <class Root>
@@ -528,7 +577,7 @@ void alignment_fallback() {
 int main() {
     try {
         pairwise_oracle(); global_priority(); derived_extent_error_order(); recomputed_runs();
-        storage(); typed_head_checks(); typed_new_failures(); alignment_fallback();
+        storage(); hole_table(); typed_head_checks(); typed_new_failures(); alignment_fallback();
         std::cout << "{\"status\":\"passed\",\"oracle_operations\":" << oracle_operations
                   << ",\"cursor_operations\":" << cursor_operations
                   << ",\"priority_cases\":" << priority_cases << ",\"derived_extent_cases\":" << derived_cases
