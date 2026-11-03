@@ -1116,11 +1116,12 @@ namespace XOffsetDatastructure {
             // per range, none per change) and takes a new range when it runs
             // out. 0 (no table) is no range's value.
             std::uint64_t gen = next_range();
-            static std::uint64_t next_range() noexcept {
+            XOFFSET_DETAIL_NOINLINE static std::uint64_t next_range() noexcept {
                 static std::atomic<std::uint64_t> ranges{0};
                 return (ranges.fetch_add(1, std::memory_order_relaxed) + 1u) << 32;
             }
-            void bump_gen() noexcept {
+            // On every allocation and free: an add and a test, inline.
+            XOFFSET_DETAIL_MOVE_INLINE void bump_gen() noexcept {
                 if (static_cast<std::uint32_t>(++gen) == 0) [[unlikely]] gen = next_range();
             }
             // RL: false means no bin storage has grown since the last full
