@@ -20,6 +20,7 @@
 // Included at the end of xoffsetdatastructure.hpp.
 
 #include <algorithm>
+#include <tuple>
 #include <cstddef>
 #include <atomic>
 #include <bit>
@@ -837,8 +838,10 @@ namespace XOffsetDatastructure {
             delta_node_set,
             delta_node_map,
             delta_node_vector,
-            delta_node_records,  // a vector of elements that verification reads: grows within its block
-            delta_node_dead,     // a heap string that became inline or empty: no ranges
+            delta_node_records,  // a vector of elements that verification reads: grows within its block, or
+                                 // has all its elements verified again when it moves or shrinks
+            delta_node_dead,     // a heap string that became inline or empty, or a node inside the old
+                                 // elements of a rebuilt vector of records: no ranges
         };
         struct DeltaVerifyContext;
         struct DeltaCheckNode {
@@ -865,7 +868,10 @@ namespace XOffsetDatastructure {
             std::uint32_t head = 0;
             std::size_t old_begin = 0, old_bytes = 0;
             std::size_t new_begin = 0, new_bytes = 0;
-            bool grow = false;  // a vector of records grew in its block: elements [old_begin, new_begin)
+            std::uint32_t size = 0;  // rebuild: the vector's new size
+            bool grow = false;     // a vector of records grew in its block: elements [old_begin, new_begin)
+            bool rebuild = false;  // a vector of records moved or shrank: all its elements verified again
+            bool dropped = false;  // a node inside the old elements of a rebuilt vector: its block freed
         };
         // Bits [from, from + n) of a bit map.
         inline void delta_bits_set(std::uint64_t* w, std::size_t from, std::size_t n) noexcept {
@@ -953,6 +959,14 @@ namespace XOffsetDatastructure {
                 for_bits(offset, n, [](DeltaCheckBits& b, std::uint64_t m) {
                     b.checked &= ~m;
                     b.local &= ~m;
+                });
+            }
+            // Every mark in [offset, offset + n), head marks included.
+            void clear_all_at(std::size_t offset, std::size_t n) noexcept {
+                for_bits(offset, n, [](DeltaCheckBits& b, std::uint64_t m) {
+                    b.checked &= ~m;
+                    b.local &= ~m;
+                    b.heads &= ~m;
                 });
             }
             // A head that left the inline or empty form: its bits and its head mark.
@@ -2629,6 +2643,59 @@ namespace XOffsetDatastructure {
                 c.checks_built_ = true;
                 return true;
             }
+            // For tests: the map kept from delta to delta equals the one built
+            // afresh for the buffer's current state (marks, live blocks and
+            // nodes); true when no map is kept. what: the first difference.
+            template <typename T>
+            static bool checks_agree(const XDeltaCursor& c, XBufferCore& core, const char*& what) {
+                what = "";
+                if (!c.checks_valid_ || !c.checks_built_ || !checks_match(c, core)) return true;
+                const std::size_t used = static_cast<std::size_t>(core.arena()->used_end);
+                const T* root = find_root_at<T>(core, core.arena()->root_offset);
+                if (!root) return (what = "root not found"), false;
+                std::vector<DeltaCheckBits> bits((used + delta_block - 1) / delta_block);
+                std::vector<std::uint64_t> live(live_words(used));
+                std::vector<DeltaCheckNode> nodes;
+                std::vector<DeltaNodeRange> ranges;
+                DeltaCheckMarker m(static_cast<const char*>(core.get_address()), bits.data(), &nodes, &ranges, live.data());
+                m.live_at(0, payload_begin);
+                m.live(root, sizeof(T));
+                delta_mark_value(*root, m);
+                if (c.checks_.size() < bits.size()) return (what = "map shorter than the payload"), false;
+                for (std::size_t b = 0; b < c.checks_.size(); ++b) {
+                    const DeltaCheckBits want = b < bits.size() ? bits[b] : DeltaCheckBits{};
+                    if (c.checks_[b].checked != want.checked) return (what = "checked bytes differ"), false;
+                    if (c.checks_[b].local != want.local) return (what = "bytes checked in place differ"), false;
+                    if (c.checks_[b].heads != want.heads) return (what = "head marks differ"), false;
+                }
+                if (c.live_.size() < live.size()) return (what = "live map shorter than the payload"), false;
+                std::size_t granules = 0;
+                for (std::size_t w = 0; w < c.live_.size(); ++w) {
+                    if (c.live_[w] != (w < live.size() ? live[w] : 0u)) return (what = "live blocks differ"), false;
+                    granules += static_cast<std::size_t>(delta_popcount(c.live_[w]));
+                }
+                if (granules != c.live_granules_) return (what = "live block count differs"), false;
+                const auto key = [](const DeltaCheckNode& n) {  // a vector's size is checked in place, not kept
+                    return std::tuple(n.head, std::uint32_t(n.kind), n.capacity, n.data_delta,
+                                      n.kind == delta_node_vector ? 0u : n.size, n.element, n.key_size);
+                };
+                std::vector<decltype(key(nodes[0]))> have, want;
+                for (const DeltaCheckNode& n : c.nodes_)
+                    if (n.kind != delta_node_dead) have.push_back(key(n));
+                for (const DeltaCheckNode& n : nodes) want.push_back(key(n));
+                std::sort(have.begin(), have.end());
+                std::sort(want.begin(), want.end());
+                if (have != want) return (what = "nodes differ"), false;
+                std::size_t r = 0;  // the node ranges: the same set, by begin
+                if (c.ranges_.size() != ranges.size()) return (what = "node ranges differ"), false;
+                std::vector<std::pair<std::uint32_t, std::uint32_t>> hr, wr;
+                for (const DeltaNodeRange& x : c.ranges_) hr.emplace_back(x.begin, x.end);
+                for (const DeltaNodeRange& x : ranges) wr.emplace_back(x.begin, x.end);
+                std::sort(wr.begin(), wr.end());
+                for (; r < hr.size(); ++r)
+                    if (hr[r] != wr[r]) return (what = "node ranges differ"), false;
+                return true;
+            }
             // Sorts the node ranges by begin (they do not overlap), by block
             // first (a counting sort; then the few in one block), and indexes
             // them: range_index_[b] = the number of ranges that begin before
@@ -2739,7 +2806,11 @@ namespace XOffsetDatastructure {
             // 2 when its capacity or block changed (it moved, was allocated or
             // freed, or a heap string became inline or empty) and its head and
             // new block pass on their own (mv: the block freed and the block
-            // made live; overlaps are checked against the map later).
+            // made live; overlaps are checked against the map later). A vector
+            // of records: 2 when it grew within its block (its new elements
+            // are verified by cover), 3 when it moved or shrank and its head
+            // and new block pass (all its elements are verified again, and
+            // what its old elements owned is freed: drop_old_elements).
             static int node_check(const char* base, std::size_t used, const DeltaCheckNode& n, DeltaMove& mv) noexcept {
                 const char* head = base + n.head;
                 std::int32_t data_delta;
@@ -2748,15 +2819,22 @@ namespace XOffsetDatastructure {
                 std::memcpy(&size, head + 4, 4);
                 std::memcpy(&capacity, head + 8, 4);
                 if (n.kind == delta_node_records) {
-                    // Within its block only; new elements are verified by cover.
-                    if (capacity != n.capacity || data_delta != n.data_delta || size > capacity || size < n.size)
-                        return 0;
-                    if (size == n.size) return 1;
                     mv.head = n.head;
-                    mv.grow = true;
-                    mv.old_begin = n.size;
-                    mv.new_begin = size;
-                    return 2;
+                    if (capacity == n.capacity && data_delta == n.data_delta && size >= n.size) {
+                        if (size > capacity) return 0;
+                        if (size == n.size) return 1;
+                        mv.grow = true;
+                        mv.old_begin = n.size;
+                        mv.new_begin = size;
+                        return 2;
+                    }
+                    mv.rebuild = true;
+                    mv.size = size;
+                    if (n.capacity != 0) {
+                        mv.old_begin = static_cast<std::size_t>(std::int64_t(n.head) + n.data_delta);
+                        mv.old_bytes = node_block_bytes(n.kind, n.capacity, n.element);
+                    }
+                    return head_block(base, used, n.head, n.kind, n.element, mv.new_begin, mv.new_bytes) ? 3 : 0;
                 }
                 if (capacity == n.capacity && data_delta == n.data_delta) {
                     if (size > capacity) return 0;
@@ -2874,20 +2952,41 @@ namespace XOffsetDatastructure {
                     delta_bits_set(live, mv.new_begin / 8u, mv.new_bytes / 8u);
                     count += mv.new_bytes / 8u;
                 }
-                // New elements of vectors of records: verified, their blocks
-                // claimed, and marked (nodes appended; the ranges are rebuilt
-                // after the commit).
+                // The checked bytes of the blocks moved nodes freed are
+                // cleared first: a new element's block may lie where one of
+                // them was, and its marks come next.
+                {
+                    DeltaCheckMarker m(base, c.checks_.data());
+                    for (const DeltaMove& mv : c.moves_) {
+                        if (mv.node == DeltaMove::new_node || mv.grow || mv.rebuild || mv.dropped) continue;
+                        const DeltaCheckNode& n = c.nodes_[mv.node];
+                        if (n.capacity == 0 || n.kind == delta_node_vector) continue;
+                        const std::size_t data = static_cast<std::size_t>(std::int64_t(n.head) + n.data_delta);
+                        if (n.kind == delta_node_string) {
+                            m.clear_at(data + n.size, 1);
+                        } else {
+                            for (std::uint32_t i = 0; i < n.size; ++i)
+                                m.clear_at(data + std::size_t(i) * n.element, n.key_size);
+                        }
+                    }
+                }
+                // New elements of vectors of records, and all the elements
+                // of rebuilt ones: verified, their blocks claimed, and marked
+                // (nodes appended; the ranges are rebuilt after the commit).
                 bool grew = false;
                 XOFFSET_TRY {
                     DeltaCheckMarker m(base, c.checks_.data(), &c.nodes_, &c.ranges_, live);
                     for (std::size_t k = 0; k < c.moves_.size(); ++k) {
                         const DeltaMove mv = c.moves_[k];
-                        if (!mv.grow) continue;
+                        if (!mv.grow && !mv.rebuild) continue;
                         const DeltaCheckNode n = c.nodes_[mv.node];  // a copy: nodes may be appended
                         DeltaVerifyContext v{base, used, live, 0, &m};
-                        if (!n.grow(v, static_cast<std::size_t>(std::int64_t(n.head) + n.data_delta),
-                                    static_cast<std::uint32_t>(mv.old_begin), static_cast<std::uint32_t>(mv.new_begin)))
-                            return false;
+                        const bool ok = mv.rebuild
+                                            ? n.grow(v, mv.new_begin, 0, mv.size)
+                                            : n.grow(v, static_cast<std::size_t>(std::int64_t(n.head) + n.data_delta),
+                                                     static_cast<std::uint32_t>(mv.old_begin),
+                                                     static_cast<std::uint32_t>(mv.new_begin));
+                        if (!ok) return false;
                         count += v.claimed;
                         grew = true;
                     }
@@ -2923,6 +3022,78 @@ namespace XOffsetDatastructure {
                 c.live_granules_ = count;
                 return true;
             }
+            // A vector of records that moved or shrank (a rebuild move): the
+            // nodes inside its old elements, and inside theirs, become dead,
+            // their marks cleared and their blocks freed (moves with
+            // `dropped`); its old elements are unmarked. cover then verifies
+            // all its elements in the new block as it verifies new elements,
+            // which claims their blocks and marks them again. A rebuilt
+            // vector inside another one is dropped with it. (Before cover
+            // marks anything; a check that fails after this sends the delta
+            // to the whole verification, which rebuilds the map.)
+            static void drop_old_elements(XDeltaCursor& c) {
+                DeltaCheckMarker m(nullptr, c.checks_.data());
+                auto& regions = c.range_scratch_;  // old elements, [begin, end)
+                regions.clear();
+                const auto elements = [](const DeltaCheckNode& n) {
+                    return static_cast<std::size_t>(std::int64_t(n.head) + n.data_delta);
+                };
+                const auto add_region = [&](const DeltaCheckNode& n, std::uint32_t index) {
+                    if (n.capacity == 0 || n.size == 0) return;
+                    const std::size_t data = elements(n);
+                    regions.push_back({static_cast<std::uint32_t>(data),
+                                       static_cast<std::uint32_t>(data + std::size_t(n.size) * n.element), index});
+                };
+                for (const DeltaMove& mv : c.moves_)
+                    if (mv.rebuild) add_region(c.nodes_[mv.node], mv.node);
+                const auto inside = [&](std::uint32_t head) noexcept {
+                    for (const DeltaNodeRange& r : regions)
+                        if (head >= r.begin && head < r.end) return true;
+                    return false;
+                };
+                for (bool more = !regions.empty(); more;) {
+                    more = false;
+                    for (std::size_t i = 0; i < c.nodes_.size(); ++i) {
+                        DeltaCheckNode& n = c.nodes_[i];
+                        if (n.kind == delta_node_dead || !inside(n.head)) continue;
+                        const auto index = static_cast<std::uint32_t>(i);
+                        if (n.capacity != 0) {
+                            const std::size_t data = elements(n);
+                            DeltaMove mv;
+                            mv.node = index;
+                            mv.head = n.head;
+                            mv.dropped = true;
+                            mv.old_begin = data;
+                            mv.old_bytes = node_block_bytes(n.kind, n.capacity, n.element);
+                            c.moves_.push_back(mv);
+                            if (n.kind == delta_node_string) {
+                                m.clear_at(data + n.size, 1);
+                            } else if (n.kind != delta_node_vector) {  // keys, or the elements of records
+                                m.clear_all_at(data, std::size_t(n.size) * n.element);
+                                if (n.kind == delta_node_records && n.size != 0) {
+                                    add_region(n, index);
+                                    more = true;
+                                }
+                            }
+                        }
+                        n.kind = delta_node_dead;
+                        n.moved = c.stamp_;
+                    }
+                }
+                // Moves of nodes dropped with a rebuilt vector (a vector of
+                // records inside one that grew or was rebuilt itself) go.
+                c.moves_.erase(std::remove_if(c.moves_.begin(), c.moves_.end(),
+                                              [&](const DeltaMove& mv) {
+                                                  return !mv.dropped && mv.node != DeltaMove::new_node &&
+                                                         c.nodes_[mv.node].kind == delta_node_dead;
+                                              }),
+                               c.moves_.end());
+                for (const DeltaMove& mv : c.moves_) {
+                    if (!mv.rebuild) continue;
+                    const DeltaCheckNode& n = c.nodes_[mv.node];
+                    if (n.capacity != 0) m.clear_all_at(elements(n), std::size_t(n.size) * n.element);
+                }
+            }
             // The in-place checks: the containers, vector sizes, bools and inline
             // or empty string heads the delta wrote pass what verification
             // checks of them; a container whose capacity or block changed, and
@@ -2938,8 +3109,28 @@ namespace XOffsetDatastructure {
                                           std::size_t used, std::size_t old_used, bool structural) {
                 c.moves_.clear();
                 XOFFSET_TRY {
+                    // Vectors of records first: what the old elements of one
+                    // that moved or shrank owned is dropped before the other
+                    // nodes are checked (the nodes inside are verified again
+                    // with it).
+                    bool rebuilt = false;
                     for (const std::uint32_t index : c.touched_) {
                         DeltaCheckNode& n = c.nodes_[index];
+                        if (n.kind != delta_node_records) continue;
+                        DeltaMove mv;
+                        const int r = node_check(base, used, n, mv);
+                        if (r == 0) return false;
+                        if (r >= 2) {
+                            mv.node = index;
+                            n.moved = c.stamp_;
+                            c.moves_.push_back(mv);
+                            rebuilt = rebuilt || r == 3;
+                        }
+                    }
+                    if (rebuilt) drop_old_elements(c);
+                    for (const std::uint32_t index : c.touched_) {
+                        DeltaCheckNode& n = c.nodes_[index];
+                        if (n.kind == delta_node_records || n.kind == delta_node_dead) continue;
                         DeltaMove mv;
                         const int r = node_check(base, used, n, mv);
                         if (r == 0) return false;
@@ -3019,23 +3210,15 @@ namespace XOffsetDatastructure {
                 }
                 DeltaCheckMarker m(base, c.checks_.data(), &c.nodes_, &c.ranges_);
                 bool ranges_changed = false;
-                // The checked bytes of the freed blocks go first (a new block
-                // may lie where another one was).
-                for (const DeltaMove& mv : c.moves_) {
-                    if (mv.node == DeltaMove::new_node || mv.grow) continue;
-                    const DeltaCheckNode& n = c.nodes_[mv.node];
-                    if (n.capacity == 0 || n.kind == delta_node_vector) continue;
-                    const std::size_t data = static_cast<std::size_t>(std::int64_t(n.head) + n.data_delta);
-                    if (n.kind == delta_node_string) {
-                        m.clear_at(data + n.size, 1);
-                    } else {
-                        for (std::uint32_t i = 0; i < n.size; ++i)
-                            m.clear_at(data + std::size_t(i) * n.element, n.key_size);
-                    }
-                }
+                // (The checked bytes of the freed blocks were cleared by
+                // cover, before it marked new elements.)
                 for (const DeltaMove& mv : c.moves_) {
                     if (mv.node == DeltaMove::new_node) continue;
                     DeltaCheckNode& n = c.nodes_[mv.node];
+                    if (mv.dropped) {  // dead: dropped by rebuild_ranges
+                        ranges_changed = true;
+                        continue;
+                    }
                     if (mv.grow) {  // its new elements were marked by cover
                         n.size = static_cast<std::uint32_t>(mv.new_begin);
                         ranges_changed = true;
@@ -3047,6 +3230,13 @@ namespace XOffsetDatastructure {
                     std::memcpy(&data_delta, head, 4);
                     std::memcpy(&size, head + 4, 4);
                     std::memcpy(&capacity, head + 8, 4);
+                    if (mv.rebuild) {  // its elements were marked by cover
+                        n.capacity = capacity;
+                        n.data_delta = data_delta;
+                        n.size = size;
+                        ranges_changed = true;
+                        continue;
+                    }
                     if (n.kind != delta_node_vector) ranges_changed = true;
                     if (n.kind == delta_node_string && (capacity == 0 || (capacity & XFixedString::inline_flag) != 0)) {
                         // Inline or empty now: checked in place, no longer a node.

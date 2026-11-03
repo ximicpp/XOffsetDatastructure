@@ -240,9 +240,13 @@ decides. So:
   (elements with strings, containers or bools) that grows within its
   capacity and keeps its block has only its new records verified, as the
   whole verification would verify them, each block they reach claimed in
-  the map of live blocks.
-- **`full`**: anything else (the root moved, a vector of records that
-  shrank or moved, a marked byte no in-place check covers), and any delta whose in-place
+  the map of live blocks. One that moved, got its first block or shrank (an
+  erase from the middle, a pop, growth past its capacity) has everything its
+  old records reached taken out of the map of live blocks and the map of
+  checked bytes, and all its records verified again the same way from its
+  new block: only that vector, not the rest of the payload.
+- **`full`**: anything else (the root moved, a marked byte no in-place check
+  covers), and any delta whose in-place
   check fails: the whole verification then decides, so a delta is accepted or
   rejected, with the same error, exactly as a whole verification would.
 
@@ -349,6 +353,4 @@ bytes.
 
 - Moved data is not detected (an erase from the middle sends the shifted
   tail).
-- A vector of records (elements with strings, containers or bools) that moves
-  or shrinks is verified over the whole payload, not over that vector only.
 - No schema conversion of deltas.
