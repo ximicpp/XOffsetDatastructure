@@ -106,20 +106,66 @@ namespace XOffsetDatastructure {
     namespace detail {
         inline constexpr std::size_t delta_block = 64;  // block size of the block section
 
-        // Allocates on 64-byte boundaries: a baseline's copy then has each
-        // block in one cache line, like the payload it copies.
-        template <typename T>
-        struct DeltaLineAllocator {
-            using value_type = T;
-            DeltaLineAllocator() noexcept = default;
-            template <typename U>
-            DeltaLineAllocator(const DeltaLineAllocator<U>&) noexcept {}
-            T* allocate(std::size_t n) {
-                return static_cast<T*>(::operator new(n * sizeof(T), std::align_val_t{delta_block}));
+        // A baseline's copy of the payload: 64-byte aligned (each block in
+        // one cache line, like the payload it copies), zero-filled as it
+        // grows, with room to grow (a key delta reserves a quarter more, and
+        // growth past the room doubles it), moved with memcpy.
+        class DeltaCopy {
+        public:
+            DeltaCopy() noexcept = default;
+            DeltaCopy(const DeltaCopy& other) { *this = other; }
+            DeltaCopy(DeltaCopy&& other) noexcept { swap(other); }
+            DeltaCopy& operator=(const DeltaCopy& other) {
+                if (this == &other) return *this;
+                if (other.size_ > cap_) reallocate(other.size_, 0);
+                if (other.size_ != 0) std::memcpy(data_, other.data_, other.size_);
+                size_ = other.size_;
+                return *this;
             }
-            void deallocate(T* p, std::size_t) noexcept { ::operator delete(p, std::align_val_t{delta_block}); }
-            template <typename U>
-            bool operator==(const DeltaLineAllocator<U>&) const noexcept { return true; }
+            DeltaCopy& operator=(DeltaCopy&& other) noexcept {
+                DeltaCopy(std::move(other)).swap(*this);
+                return *this;
+            }
+            ~DeltaCopy() { release(); }
+            void swap(DeltaCopy& other) noexcept {
+                std::swap(data_, other.data_);
+                std::swap(size_, other.size_);
+                std::swap(cap_, other.cap_);
+            }
+            char* data() noexcept { return data_; }
+            const char* data() const noexcept { return data_; }
+            std::size_t size() const noexcept { return size_; }
+            bool empty() const noexcept { return size_ == 0; }
+            void clear() noexcept { size_ = 0; }
+            // n zero bytes (the old ones are not kept).
+            void assign_zero(std::size_t n) {
+                if (n > cap_) reallocate(n + n / 4, 0);
+                if (n != 0) std::memset(data_, 0, n);
+                size_ = n;
+            }
+            // Grows with zeros, or shrinks (never allocating).
+            void resize(std::size_t n) {
+                if (n > cap_) reallocate(std::max(n, 2 * cap_), size_);
+                if (n > size_) std::memset(data_ + size_, 0, n - size_);
+                size_ = n;
+            }
+            void release() noexcept {
+                if (data_) ::operator delete(data_, std::align_val_t{delta_block});
+                data_ = nullptr;
+                size_ = cap_ = 0;
+            }
+
+        private:
+            void reallocate(std::size_t cap, std::size_t keep) {
+                cap = (cap + delta_block - 1) / delta_block * delta_block;
+                char* fresh = static_cast<char*>(::operator new(cap, std::align_val_t{delta_block}));
+                if (keep != 0) std::memcpy(fresh, data_, keep);
+                if (data_) ::operator delete(data_, std::align_val_t{delta_block});
+                data_ = fresh;
+                cap_ = cap;
+            }
+            char* data_ = nullptr;
+            std::size_t size_ = 0, cap_ = 0;
         };
 
         // A delta header, decoded.
@@ -1391,7 +1437,7 @@ namespace XOffsetDatastructure {
         /// thread's baselines share.
         void release() noexcept {
             reset();
-            decltype(payload_)().swap(payload_);
+            payload_.release();
             std::vector<XBufferCore::WireHole>().swap(holes_);
             own_scratch_.release();
 #if XOFFSET_THREAD_CACHES
@@ -1408,7 +1454,7 @@ namespace XOffsetDatastructure {
         std::uint64_t root_type_id_ = 0;
         std::size_t used_ = 0;                            // the receiver's used_end (0: nothing recorded)
         XDeltaRecord record_ = XDeltaRecord::copy;
-        std::vector<char, detail::DeltaLineAllocator<char>> payload_;  // [0, used_end) as the receiver holds it ([0, 48) unused)
+        detail::DeltaCopy payload_;  // [0, used_end) as the receiver holds it ([0, 48) unused)
         std::vector<XBufferCore::WireHole> holes_;        // its hole table, by offset
         std::uint64_t holes_gen_ = 0;                     // the free-block table's generation it was taken at
         // touched_only: the touch log of the buffer the last delta came from
@@ -1581,8 +1627,8 @@ namespace XOffsetDatastructure {
                 const std::size_t base_used = b.used_;
                 auto& base = b.payload_;
                 if (!touches) {
-                    if (key) base.assign(used, '\0');
-                    else if (used > base.size()) base.resize(used, '\0');
+                    if (key) base.assign_zero(used);
+                    else if (used > base.size()) base.resize(used);
                 }
 
                 // The comparison brings the recorded copy up to date as it goes.
