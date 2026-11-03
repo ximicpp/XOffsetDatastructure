@@ -1855,8 +1855,12 @@ namespace XOffsetDatastructure {
                 } else {
                     const std::size_t stamped = std::min(log.stamps.size(), count);
                     const std::uint32_t since = b.touch_stamp_;
+                    // Only the current period came since and it kept its bytes:
+                    // those; otherwise whole blocks.
+                    const bool kept = log.masks_period == log.now && since + 1u == log.now && !log.shared &&
+                                      log.block_masks.size() >= stamped;
                     for (std::size_t i = 0; i < stamped; ++i)
-                        if (log.stamps[i] > since) m[i] = ~std::uint64_t(0);
+                        if (log.stamps[i] > since) m[i] = kept ? log.block_masks[i] : ~std::uint64_t(0);
                 }
                 const auto mark = [&](std::size_t from, std::size_t to) {
                     to = std::min(to, used);
@@ -1931,6 +1935,7 @@ namespace XOffsetDatastructure {
                 log.masks_on = false;
                 log.stamps_from = UINT32_MAX;
                 log.owner = nullptr;
+                log.masks_period = 0;
             }
             // Where touches go: the log and the payload they describe.
             struct TouchSink {
@@ -1951,11 +1956,15 @@ namespace XOffsetDatastructure {
             // Room in the stamps for block `last` (and every block below
             // used); false (the log lost a touch) when there is none.
             static bool reserve_touch_blocks(DeltaTouchLog& log, std::size_t last, std::size_t used = 0) noexcept {
-                if (log.stamps.size() > last) return true;
+                if (log.stamps.size() > last && (log.masks_period == 0 || log.block_masks.size() > last)) return true;
                 XOFFSET_TRY {
                     const std::size_t blocks = std::max(last + 1, (used + delta_block - 1) / delta_block);
-                    log.stamps.resize(blocks, 0u);
-                    log.groups.resize((blocks + delta_touch_group - 1) / delta_touch_group, 0u);
+                    if (log.stamps.size() < blocks) {
+                        log.stamps.resize(blocks, 0u);
+                        log.groups.resize((blocks + delta_touch_group - 1) / delta_touch_group, 0u);
+                    }
+                    if (log.masks_period != 0 && log.block_masks.size() < log.stamps.size())
+                        log.block_masks.resize(log.stamps.size(), 0u);
                 } XOFFSET_CATCH(const std::bad_alloc&) {
                     log.lost = true;
                     return false;
@@ -1970,8 +1979,27 @@ namespace XOffsetDatastructure {
             // The listed blocks into the stamps: from now on this period's
             // touches are all stamped.
             static void stamp_touch_list(DeltaTouchLog& log) noexcept {
-                for (std::uint32_t k = 0; k < log.listed; ++k) stamp_block(log, log.blocks[k]);
+                // With masks and one baseline the listed bytes go along, and
+                // the period's later touches keep theirs (block_masks).
+                log.masks_period = log.masks_on && !log.shared ? log.now : 0u;
+                for (std::uint32_t k = 0; k < log.listed; ++k) {
+                    stamp_block(log, log.blocks[k]);
+                    if (log.masks_period != 0 && log.block_masks.size() > log.blocks[k])
+                        log.block_masks[log.blocks[k]] = log.masks[k];
+                }
                 log.stamps_from = std::min(log.stamps_from, log.now);
+            }
+            // A stamped touch of the bytes `mask` of block i.
+            static void stamp_touch(DeltaTouchLog& log, std::size_t i, std::uint64_t mask) noexcept {
+                if (log.masks_period != log.now || log.shared) {
+                    stamp_block(log, i);
+                    return;
+                }
+                if (!reserve_touch_blocks(log, i)) return;
+                std::uint64_t& kept = log.block_masks[i];
+                kept = log.stamps[i] == log.now ? kept | mask : mask;
+                log.stamps[i] = log.now;
+                log.groups[i / delta_touch_group] = log.now;
             }
             // Records a touch of the bytes `mask` of block i.
             XOFFSET_DELTA_INLINE static void touch_block(DeltaTouchLog& log, std::size_t i, std::uint64_t mask) noexcept {
@@ -1997,7 +2025,7 @@ namespace XOffsetDatastructure {
                         stamp_touch_list(log);
                     }
                 }
-                if (log.shared || log.overflow) [[unlikely]] stamp_block(log, i);
+                if (log.shared || log.overflow) [[unlikely]] stamp_touch(log, i, mask);
             }
             // Records a touch of payload bytes [offset, end) (end past used is cut).
             static void stamp_touch_log(DeltaTouchLog& log, std::size_t offset, std::size_t end,
@@ -2120,6 +2148,7 @@ namespace XOffsetDatastructure {
                     // so each finds what was touched since its own last delta.
                     log->shared = true;
                     stamp_touch_list(*log);
+                    log->masks_period = 0;
                 }
                 log->owner = &b;
                 log->copy = !log->shared && b.record_ == XDeltaRecord::copy && !b.payload_.empty()

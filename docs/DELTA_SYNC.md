@@ -108,7 +108,11 @@ delta carries every byte touched since the baseline's previous delta (as if
 that came or went. Memory per receiver drops from one copy of the payload
 to a few words; the delta grows by the bytes that were touched but did not
 change, so touch exactly what changes (`touch_set`, which touches only the
-bytes of a scalar that changed, or `touch(p, bytes)` on the field). Where the touches do not say what changed (the first delta, content
+bytes of a scalar that changed, or `touch(p, bytes)` on the field). This holds past the touch log's 24 listed
+blocks too: the log then keeps each block's touched bytes (8 bytes per block),
+so a period with many touches still sends only those bytes. A block goes whole
+only while a second baseline pairs with the buffer or when the baseline
+missed a period. Where the touches do not say what changed (the first delta, content
 that was replaced, a baseline that missed deltas the log no longer records)
 the delta is a key delta. `key_delta_into` needs a copy and is not
 available on such a baseline.
@@ -333,7 +337,8 @@ per 64-byte block of payload (24 for the bits, 4 for the node index, 1 for the
 live blocks), plus about 64 bytes per heap string, vector, set or map of plain
 elements; the sender's
 touch log 384 bytes plus, once two baselines pair with it or a delta
-touches more than 24 blocks, 4 bytes per block. The scratch a delta needs while it is applied
+touches more than 24 blocks, 4 bytes per block (12 with a baseline without a
+copy). The scratch a delta needs while it is applied
 (a copy of a small delta, the old bytes it overwrites, its block list and
 the hole table) is shared by the cursors of one thread, so a receiver that
 holds many replicas keeps one copy, warm in cache, instead of one per

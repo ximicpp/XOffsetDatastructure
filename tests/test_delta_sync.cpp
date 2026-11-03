@@ -1244,18 +1244,30 @@ void touches_fixed_case() {
     need(!st.empty, "touches: no delta for growth");
     need(bool(apply_entry(rep, d, cur)), "touches: growth delta");
     same_state(src.root(), src, rep, "touches: growth");
-    // More touched blocks than the list holds: they go whole.
+    // More touched blocks than the list holds: each still goes by the bytes
+    // touched in it (one baseline keeps them past the list).
     const auto used = std::size_t(src.arena()->used_end);
     need(used / 64 > xo::detail::DeltaTouchLog::list_capacity + 4, "touches: payload too small for the list");
     for (std::size_t i = 0; i < vals.size(); i += 32) vals[i] = std::uint16_t(vals[i] + 1);
     for (std::size_t i = 0; i < vals.size(); i += 32) src.touch(vals[i]);
+    vals[0] = std::uint16_t(vals[0] + 1);
+    src.touch(vals[0]);  // a block touched twice in the overflowed period
     st = src.save_delta_into(d, xb);
     const std::size_t touched_blocks = (vals.size() + 31) / 32;
     need(touched_blocks > xo::detail::DeltaTouchLog::list_capacity && st.blocks == touched_blocks &&
-             st.changed_bytes > (touched_blocks - 2) * 64,  // all whole but maybe the payload's last
-         "touches: an overflowed list did not send whole blocks");
+             st.changed_bytes == touched_blocks * sizeof(vals[0]),
+         "touches: an overflowed list did not send the touched bytes");
     need(bool(apply_entry(rep, d, cur)), "touches: overflow delta");
     same_state(src.root(), src, rep, "touches: overflow");
+    // The next period overflows again: its own bytes, not the last period's.
+    for (std::size_t i = 16; i < vals.size(); i += 32) vals[i] = std::uint16_t(vals[i] + 1);
+    for (std::size_t i = 16; i < vals.size(); i += 32) src.touch(vals[i]);
+    st = src.save_delta_into(d, xb);
+    const std::size_t second = (vals.size() + 15) / 32;
+    need(st.blocks == second && st.changed_bytes == second * sizeof(vals[0]),
+         "touches: a second overflowed period sent other bytes");
+    need(bool(apply_entry(rep, d, cur)), "touches: second overflow delta");
+    same_state(src.root(), src, rep, "touches: second overflow");
     // Back within the list: only the touched bytes again.
     vals[5] = 7;
     src.touch(vals[5]);
