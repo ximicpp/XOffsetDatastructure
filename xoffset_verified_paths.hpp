@@ -54,10 +54,6 @@ namespace detail {
 
     template<class T>
     void VerifiedPathsAccess::save_into(XBufferCore& source, std::string& out, XSaveOptions options) {
-        // A shared record is an identity, not a mapping pin. Resolve it after
-        // reserve/new_handler; a moved owner may even be a plain XBufferCore.
-        const auto token = identity(source);
-        auto* current = &owner(token);
         auto check_alias = [&](XBufferCore& candidate) {
             if (out.capacity() == (std::numeric_limits<std::size_t>::max)())
                 XOFFSET_THROW(std::length_error("save_verified_into: output capacity overflows alias range"));
@@ -65,13 +61,45 @@ namespace detail {
                 verified_paths_intersect(out.data(), out.capacity() + 1, candidate.get_address(), candidate.segment_size()))
                 XOFFSET_THROW(XException(XErrc::invalid_state, "save_verified_into: output aliases source storage"));
         };
+        const auto emission = options.emission;
+        // Fast path: no host allocation can run before the wire is written,
+        // so no callback can move or change the source; it is examined once,
+        // in place. That holds when the reused output already holds the
+        // dense size (which bounds every emission: no reserve) and no
+        // free-run list is built (zero_runs, or free bytes below one run:
+        // wire_free_runs would return no runs). The output is the same as
+        // the general path's: free_runs with no runs is the dense wire.
+        if (const auto* arena = source.arena();
+            arena && owns_record(source) && source.free_table_complete() &&
+            arena->used_end >= XWIRE_PAYLOAD_BEGIN &&
+            (emission != XWireEmission::free_runs || source.free_block_bytes() < wire_free_run_min_gap) &&
+            sizeof(XWireHeaderV2) + std::uint64_t(arena->used_end - XWIRE_PAYLOAD_BEGIN) +
+                std::uint64_t(source.free_block_count()) * sizeof(XBufferCore::WireHole) <= out.capacity()) [[likely]] {
+            check_alias(source);
+            const auto final_header = header<T>(source);
+            const auto final_size = wire_dense_size(final_header, "save_verified_into");
+            const auto* base = static_cast<const char*>(source.get_address());
+            const WireGaps none{};
+#if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
+            out.resize_and_overwrite(final_size, [&](char* destination, std::size_t) noexcept {
+                return write_wire(destination, final_header, base, source, emission, none);
+            });
+#else
+            out.resize(final_size);
+            out.resize(write_wire(out.data(), final_header, base, source, emission, none));
+#endif
+            return;
+        }
+        // A shared record is an identity, not a mapping pin. Resolve it after
+        // reserve/new_handler; a moved owner may even be a plain XBufferCore.
+        const auto token = identity(source);
+        auto* current = &owner(token);
         check_alias(*current);
         // Host allocations (the free-run list, reserve) are the callback
         // boundaries: the owner is re-resolved after them, and the source
         // must be unchanged when the wire is written. A reused output that
         // already holds the dense size (which bounds every emission) needs no
         // reserve, so the source is examined once.
-        const auto emission = options.emission;
         auto size_of = [&](const XWireHeaderV2& h, const WireGaps& g) {
             return emission == XWireEmission::zero_runs ? wire_dense_size(h, "save_verified_into")
                                                         : wire_free_run_size(h, g, "save_verified_into");

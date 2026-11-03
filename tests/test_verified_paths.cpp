@@ -219,6 +219,8 @@ void hole_table_paths() {
     const auto saved=source.save_verified();
     const auto h=header_of(into);
     need(into==saved,"save_verified_into differs from save_verified with holes");
+    // A reused output that holds the dense size takes the one-pass path.
+    source.save_verified_into(into);need(into==saved,"one-pass save differs with holes");
     need(h.extent_count==0&&h.hole_count==holes&&
          into.size()==sizeof(h)+h.used_bytes-xo::XWIRE_PAYLOAD_BEGIN+holes*sizeof(xo::XBufferCore::WireHole),
          "dense V2.1 wire layout differs");
@@ -245,9 +247,11 @@ void hole_table_paths() {
     need(header_of(runs).extent_count==2&&runs.size()==dense_saved.size()-8192+16,"default emission did not skip the 8 KiB hole");
     std::string runs_into;large.save_verified_into(runs_into);
     need(runs_into==runs,"save_verified_into differs from save_verified for the default emission");
+    large.save_verified_into(runs_into);need(runs_into==runs,"reused output differs when free runs are skipped");
     const auto sparse=large.save_verified(elide);const auto sh=header_of(sparse);
     std::string sparse_into;large.save_verified_into(sparse_into,elide);
     need(sparse_into==sparse,"save_verified_into differs from save_verified for a sparse wire");
+    large.save_verified_into(sparse_into,elide);need(sparse_into==sparse,"one-pass save differs for a sparse wire");
     auto from_sparse=xo::XBuffer::load_verified<PathsRoot>(sparse);check(from_sparse.root<PathsRoot>());
     auto dense_snapshot=xo::freeze_verified(std::move(large));
     const auto dense=join(dense_snapshot);const auto dh=header_of(dense);
