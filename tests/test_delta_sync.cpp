@@ -234,8 +234,9 @@ void random_stream(std::uint64_t seed, int steps) {
         std::string d = "stale bytes from an earlier delta";
         const auto stats = src.save_delta_into(d, base, options);
         need(stats.delta_bytes == d.size(), where + ": stats disagree with the delta size");
-        // Whole blocks: every block but one ending past used_end carries 64 bytes.
-        need(!options.whole_blocks || stats.blocks == 0 || stats.changed_bytes > (stats.blocks - 1u) * 64u,
+        // Whole blocks: every block but block 0 (it starts in the arena
+        // header) and one ending past used_end carries 64 bytes.
+        need(!options.whole_blocks || stats.blocks <= 1 || stats.changed_bytes > (stats.blocks - 2u) * 64u,
              where + ": whole_blocks sent masked blocks");
         if (stats.empty) {
             need(d.empty() && !stats.key, where + ": an empty delta wrote bytes");
@@ -513,7 +514,8 @@ void view_sizes() {
 }
 
 // The block scan against a byte-by-byte reference: the blocks (offset, mask,
-// whole) of [from, n) and the updated copy, and both block-mask versions.
+// whole) holding bytes of [from, n) and the updated copy, and both
+// block-mask versions.
 void diff_reference_case() {
     std::mt19937_64 rng(20261102);
     xo::detail::DeltaBlockBuffer blocks;
@@ -536,14 +538,15 @@ void diff_reference_case() {
         if (trial % 50 == 0) for (auto& c : base) c = char(rng());   // everything differs
         if (trial % 50 == 1) for (std::size_t i = from; i + 1 < n; i += 2) base[i] = char(~cur[i]); // every other byte
         want.clear();
-        for (std::size_t start = from; start < n; start += 64) {
+        // Blocks at multiples of 64; bytes below from are never in a mask.
+        for (std::size_t start = from / 64 * 64; start < n; start += 64) {
             std::uint64_t mask = 0;
             for (std::size_t k = 0; k < 64 && start + k < n; ++k)
-                if (cur[start + k] != base[start + k]) mask |= std::uint64_t(1) << k;
+                if (start + k >= from && cur[start + k] != base[start + k]) mask |= std::uint64_t(1) << k;
             if (mask == 0) continue;
             int mask_bytes = 0;
             for (int k = 0; k < 8; ++k) mask_bytes += ((mask >> (8 * k)) & 0xFF) != 0;
-            const bool whole = start + 64 <= n && mask_bytes + std::popcount(mask) >= 64;
+            const bool whole = start >= from && start + 64 <= n && mask_bytes + std::popcount(mask) >= 64;
             want.push_back({start, mask, whole});
         }
         std::vector<char> copy = base;
@@ -615,7 +618,7 @@ void block_section_case() {
     src.root().epoch += 1;
     const std::string good = delta_of(src, base);
     const std::size_t used = std::size_t(rep.arena()->used_end);
-    const std::size_t last = (used - 48 - 1) / 64; // index of the last block
+    const std::size_t last = (used - 1) / 64; // index of the last block (block k: bytes [64k, 64k + 64))
     const auto make = [&](std::uint32_t count, std::string section) {
         return delta_header(cur.stream(), cur.version() + 1, count) + section;
     };
@@ -623,18 +626,23 @@ void block_section_case() {
     need(good.compare(0, header_size, make(1, "")) == 0, "block section: the scalar delta is not one plain block");
     struct Case { const char* what; std::string delta; xo::XErrc code; };
     std::vector<Case> cases = {
-        {"a zero mask byte", make(1, std::string("\0\x03\x01\0", 4) + "a"), xo::XErrc::invalid_extent_table},
-        {"a block at used", make(1, varint(std::uint32_t((used - 48 + 63) / 64)) + "\x01\x01" + "a"),
+        {"a zero mask byte", make(1, std::string("\x01\x03\x01\0", 4) + "a"), xo::XErrc::invalid_extent_table},
+        {"a block at used", make(1, varint(std::uint32_t((used + 63) / 64)) + "\x01\x01" + "a"),
          xo::XErrc::invalid_extent_table},
         {"a block far past used", make(1, varint(0x0FFFFFFF) + "\x01\x01" + "a"), xo::XErrc::invalid_extent_table},
-        {"a second block past used", make(2, std::string("\0\x01\x01", 3) + "a" + varint(std::uint32_t(last)) +
+        {"a second block past used", make(2, std::string("\x01\x01\x01", 3) + "a" + varint(std::uint32_t(last)) +
                                                  "\x01\x01" + "b"),
          xo::XErrc::invalid_extent_table},
-        {"a truncated entry", make(1, std::string("\0\x01", 2)), xo::XErrc::size_mismatch},
-        {"missing changed bytes", make(1, std::string("\0\x01\x03", 3) + "a"), xo::XErrc::size_mismatch},
-        {"a missing mask byte", make(1, std::string("\0\x03\x01", 3)), xo::XErrc::size_mismatch},
-        {"a block count past the section", make(100, std::string("\0\x01\x01", 3) + "a"), xo::XErrc::size_mismatch},
-        {"trailing bytes", make(1, std::string("\0\x01\x01", 3) + "ab"), xo::XErrc::size_mismatch},
+        {"a truncated entry", make(1, std::string("\x01\x01", 2)), xo::XErrc::size_mismatch},
+        {"missing changed bytes", make(1, std::string("\x01\x01\x03", 3) + "a"), xo::XErrc::size_mismatch},
+        {"a missing mask byte", make(1, std::string("\x01\x03\x01", 3)), xo::XErrc::size_mismatch},
+        {"a block count past the section", make(100, std::string("\x01\x01\x01", 3) + "a"), xo::XErrc::size_mismatch},
+        {"trailing bytes", make(1, std::string("\x01\x01\x01", 3) + "ab"), xo::XErrc::size_mismatch},
+        // Block 0 starts in the arena header [0, 48), which no delta writes.
+        {"block 0 whole", make(1, std::string(2, '\0') + std::string(64, 'w')), xo::XErrc::invalid_extent_table},
+        {"a mask bit in the header", make(1, std::string("\0\x01\x01", 3) + "a"), xo::XErrc::invalid_extent_table},
+        {"a mask bit just below 48", make(1, std::string("\0\x60\x80\x01", 4) + "ab"),
+         xo::XErrc::invalid_extent_table},
     };
     // Header cases.
     const std::string body = good.substr(header_size);
@@ -652,8 +660,8 @@ void block_section_case() {
     cases.push_back({"a stream of 0", delta_header(0, cur.version() + 1, 1) + body, xo::XErrc::delta_base_mismatch});
     cases.push_back({"another stream", delta_header(cur.stream() ^ 1, cur.version() + 1, 1) + body,
                      xo::XErrc::delta_base_mismatch});
-    if ((used - 48) % 64 != 0) {
-        const std::size_t tail = (used - 48) % 64; // bytes of the last, shorter block
+    if (used % 64 != 0) {
+        const std::size_t tail = used % 64; // bytes of the last, shorter block
         cases.push_back({"a whole block past used", make(1, varint(std::uint32_t(last)) + std::string(1, '\0') +
                                                                 std::string(64, 'w')),
                          xo::XErrc::invalid_extent_table});
@@ -683,7 +691,7 @@ void block_section_case() {
 // A delta with one block that writes `bytes` at payload offset `at`, as the
 // next delta of the cursor's stream onto the replica's current extent.
 std::string poke_delta(const xo::XBuffer& rep, const xo::XDeltaCursor& cur, std::size_t at, const std::string& bytes) {
-    const std::size_t i = at - 48;
+    const std::size_t i = at;  // block k: payload bytes [64k, 64k + 64)
     need(i % 64 + bytes.size() <= 64, "poke: bytes cross a block");
     std::uint64_t mask = 0;
     for (std::size_t k = 0; k < bytes.size(); ++k) mask |= std::uint64_t(1) << (i % 64 + k);
@@ -936,7 +944,12 @@ void touched_fixed_case() {
     src.root().epoch += 1;
     src.touch(src.root().epoch);
     auto st = src.save_delta_into(d, base, touched);
-    need(!st.empty && st.compared_bytes == 64, "touched: one touched scalar did not compare one block");
+    // Its block: 64 bytes, or the 16 past the arena header for block 0.
+    const auto epoch_at = std::size_t(reinterpret_cast<const char*>(&src.root().epoch) -
+                                      static_cast<const char*>(static_cast<const xo::XBufferCore&>(src).get_address()));
+    const std::size_t epoch_block = epoch_at < 64 ? 64 - xo::XWIRE_PAYLOAD_BEGIN : 64;
+    need(epoch_at % 64 + sizeof(src.root().epoch) <= 64, "touched: the scalar crosses a block");
+    need(!st.empty && st.compared_bytes == epoch_block, "touched: one touched scalar did not compare one block");
     need(bool(apply_entry(rep, d, cur)), "touched: scalar delta");
     same_state(src.root(), src, rep, "touched: scalar");
     // Nothing touched: nothing compared, nothing sent.
