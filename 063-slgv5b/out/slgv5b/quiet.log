@@ -1,0 +1,16 @@
+2026-11-03T11:05:23Z process 1 start: waited 180s load 1.26 WindowServer 4.3% remote 4
+2026-11-03T11:10:32Z process 1 done: 1793703924..1793704232 (308 s) load 2.19
+2026-11-03T11:13:34Z process 2 start: waited 180s load 1.96 WindowServer 4.7% remote 4
+2026-11-03T11:18:43Z process 2 done: 1793704414..1793704723 (309 s) load 2.36
+2026-11-03T11:21:45Z process 3 start: waited 180s load 1.68 WindowServer 4.6% remote 4
+2026-11-03T11:26:54Z process 3 done: 1793704905..1793705214 (309 s) load 2.05
+2026-11-03T11:29:55Z process 4 start: waited 180s load 2.33 WindowServer 4.5% remote 4
+2026-11-03T11:35:06Z process 4 done: 1793705396..1793705706 (310 s) load 2.27
+2026-11-03T11:38:07Z process 5 start: waited 180s load 1.36 WindowServer 4.6% remote 4
+2026-11-03T11:43:16Z process 5 done: 1793705887..1793706196 (309 s) load 2.01
+2026-11-03T11:46:18Z process 6 start: waited 180s load 1.41 WindowServer 4.5% remote 4
+2026-11-03T11:51:28Z process 6 done: 1793706378..1793706688 (310 s) load 2.07
+2026-11-03T11:54:29Z process 7 start: waited 180s load 1.34 WindowServer 4.5% remote 4
+2026-11-03T11:59:39Z process 7 done: 1793706870..1793707179 (309 s) load 2.40
+2026-11-03T12:02:40Z process 8 start: waited 180s load 1.49 WindowServer 4.5% remote 4
+2026-11-03T12:07:47Z process 8 done: 1793707360..1793707667 (307 s) load 2.57

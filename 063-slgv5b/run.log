@@ -1,0 +1,65 @@
+== 2026-11-03T11:01:15Z 0. tools
+cmake version 4.4.4
+1.13.2
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+== 2026-11-03T11:01:16Z 1. source
+source: tree 100b45c4acf3c6c9fd8864ffc1982a79be4862f3 (merge of 522f212917c5a31320b0f1da0c5d6b824d678e4d)
+/Volumes/XOffsetCS/perf-gate/src/slgv5b/bench/slg/MANIFEST: 25 files match
+== 2026-11-03T11:01:20Z 2. build
+-- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+slg_bench sha256 1fd2ad2402ab8c44530e7894e66c5d83316511f45ea14f3ac3dd76deac1579d9
+== 2026-11-03T11:01:47Z 3. verify
+default mode: cycle 2 xoffset      state=0439e37815b4d22a reports=2128166416352
+== 2026-11-03T11:02:22Z 4. timing
+2026-11-03T11:10:32Z process 1 done: 1793703924..1793704232 (308 s) load 2.19
+2026-11-03T11:18:43Z process 2 done: 1793704414..1793704723 (309 s) load 2.36
+2026-11-03T11:26:54Z process 3 done: 1793704905..1793705214 (309 s) load 2.05
+2026-11-03T11:35:06Z process 4 done: 1793705396..1793705706 (310 s) load 2.27
+2026-11-03T11:43:16Z process 5 done: 1793705887..1793706196 (309 s) load 2.01
+2026-11-03T11:51:28Z process 6 done: 1793706378..1793706688 (310 s) load 2.07
+2026-11-03T11:59:39Z process 7 done: 1793706870..1793707179 (309 s) load 2.40
+2026-11-03T12:07:47Z process 8 done: 1793707360..1793707667 (307 s) load 2.57
+screen watcher: 66 calls (dark.log)
+== 2026-11-03T12:07:47Z 5. pool
+# SLG demo cases v4 (viewport browse / static viewport deltas, login, dirty save)
+
+8 processes, M, 4 ticks per cycle; xoffset ÷ rival, geometric mean / one-sided 95% upper bound, Bonferroni k=85. Below 1: XOffset faster.
+
+| 用例 | zpp_bits | cista | flatbuffers | cereal | protobuf |
+| --- | --- | --- | --- | --- | --- |
+| 1 场景↔战斗 | 0.521 / 0.563 | 0.212 / 0.225 | 0.215 / 0.231 | 0.163 / 0.172 | 0.060 / 0.065 |
+| 1 场景↔场景 | 0.378 / 0.407 | 0.464 / 0.498 | 0.267 / 0.290 | 0.198 / 0.213 | 0.100 / 0.108 |
+| 1 场景↔存储（整份） | 0.260 / 0.274 | 0.284 / 0.303 | 0.187 / 0.198 | 0.133 / 0.141 | 0.068 / 0.072 |
+| 1 场景↔存储（只存脏模块） | 0.213 / 0.226 | 0.282 / 0.288 | 0.169 / 0.173 | 0.131 / 0.136 | 0.067 / 0.069 |
+| 2 登录全量 | 0.280 / 0.316 | 0.327 / 0.373 | 0.184 / 0.212 | 0.171 / 0.189 | 0.087 / 0.095 |
+| 2 浏览地图·视口全量 | 0.478 / 0.486 | 0.199 / 0.201 | 0.200 / 0.203 | 0.130 / 0.132 | 0.152 / 0.154 |
+| 2 浏览地图·视口全量（单设备热视图：EB.send + EBW.recv） | 0.445 / 0.449 | 0.182 / 0.184 | 0.191 / 0.192 | 0.117 / 0.118 | 0.144 / 0.145 |
+| 3 自身增量 | 0.400 / 0.451 | 0.934 / 1.043 | 0.359 / 0.404 | 0.310 / 0.351 | 0.178 / 0.200 |
+| 3 静止视口增量·和平 | 1.236 / 1.387 | 0.815 / 0.910 | 0.975 / 1.081 | 0.872 / 0.943 | 0.985 / 1.091 |
+| 3 静止视口增量·交战 | 0.634 / 0.685 | 0.417 / 0.456 | 0.409 / 0.444 | 0.282 / 0.309 | 0.355 / 0.385 |
+| 3 静止视口增量·压力（只报） | 0.621 / 0.643 | 0.328 / 0.339 | 0.322 / 0.334 | 0.232 / 0.241 | 0.261 / 0.271 |
+| 3 静止视口增量·和平（XOffset 原生） | 4.570 / 5.084 | 3.013 / 3.354 | 3.605 / 4.018 | 3.226 / 3.498 | 3.642 / 4.038 |
+| 3 静止视口增量·交战（XOffset 原生） | 1.683 / 1.869 | 1.108 / 1.249 | 1.087 / 1.214 | 0.747 / 0.842 | 0.941 / 1.049 |
+| 3 静止视口增量·压力（XOffset 原生，只报） | 1.189 / 1.268 | 0.629 / 0.668 | 0.617 / 0.659 | 0.444 / 0.474 | 0.499 / 0.533 |
+| 2 登录全量（XOffset 原生 key） | 0.465 / 0.502 | 0.542 / 0.592 | 0.305 / 0.337 | 0.283 / 0.307 | 0.145 / 0.156 |
+| 3 自身增量（XOffset 原生） | 0.245 / 0.287 | 0.572 / 0.659 | 0.220 / 0.256 | 0.190 / 0.224 | 0.109 / 0.127 |
+| 1 存储（XOffset 原生增量） | 1.691 / 1.922 | 2.237 / 2.477 | 1.342 / 1.484 | 1.037 / 1.169 | 0.529 / 0.583 |
+
+## Per message (µs; bytes)
+
+| | xoffset | zpp_bits | cista | flatbuffers | cereal | protobuf |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| A per battle µs | 0.80 | 1.50 | 4.01 | 3.88 | 5.07 | 14.28 |
+| B per player µs | 4.88 | 13.08 | 10.52 | 18.14 | 25.00 | 50.11 |
+| B 5,000 players, s | 0.024 | 0.065 | 0.053 | 0.091 | 0.125 | 0.251 |
+| S per player µs (save + store + load) | 4.68 | 18.59 | 16.71 | 25.58 | 35.79 | 70.82 |
+| SD per player µs | 1.61 | 7.58 | 5.76 | 9.58 | 12.42 | 24.57 |
+| SN per player µs (native) | 12.63 |  |  |  |  |  |
+| EB per pull µs (send + recv) | 15.1 | 32.1 | 77.4 | 77.4 | 118.6 | 102.1 |
+| EBW per pull µs (send + warm single-view recv) | 13.7 | 31.2 | 75.5 | 72.5 | 117.9 | 96.1 |
+| EB.recv / EBW.recv per pull µs (1,500 cold views / one warm view) | 5.40 / 4.01 | 10.55 / 9.59 | 42.50 / 40.50 | 27.60 / 22.70 | 48.83 / 48.20 | 49.82 / 43.86 |
+| EB bytes per pull (raw / zstd) | 53840 / 19977 | 46167 / 18039 | 55668 / 19891 | 55167 / 20547 | 48999 / 18530 | 30512 / 19735 |
+| UP per delivery µs (send + recv + apply) | 1.08 | 0.89 | 1.29 | 1.09 | 1.25 | 1.11 |
+| NP per delivery µs (native send + diff + recv) | 3.95 |  |  |  |  |  |
+== 2026-11-03T12:07:48Z finish rc=0
+result tarball: /Users/ximi/workspace/xo-queue/queue/063-slgv5b/out/slgv5b_result.tar.gz sha256 c1a0a88eddc2f5d04ec8337de332159bc77168313134eef9aad336c80d6fe320
