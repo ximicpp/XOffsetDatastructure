@@ -838,8 +838,11 @@ namespace XOffsetDatastructure {
         std::size_t free_block_count() const noexcept { return free_table_ ? free_table_->count : 0; }
         std::uint64_t free_block_bytes() const noexcept { return free_table_ ? free_table_->bytes : 0; }
         // Changes whenever a free block comes or goes; two tables (of any
-        // buffers) with the same generation hold the same blocks.
-        std::uint64_t free_block_gen() const noexcept { return free_table_ ? free_table_->gen : 0; }
+        // buffers) with the same generation hold the same blocks. A read
+        // after a change counts the generation up, so it is not a read for
+        // concurrent use (save_delta_into reads it, and takes the buffer
+        // non-const).
+        std::uint64_t free_block_gen() const noexcept { return free_table_ ? free_table_->current_gen() : 0; }
 
         // A hint: starts loading, without waiting, the host-side lines the
         // next allocation or release in this buffer reads first: the owner
@@ -1110,19 +1113,27 @@ namespace XOffsetDatastructure {
             std::multimap<std::uint32_t, std::uint32_t> large;
             std::uint64_t bytes = 0;
             std::size_t count = 0;
-            // Changes with every entry that comes or goes and never repeats,
-            // in any buffer: the same gen means the same holes. Each table
-            // counts up from its own range of 2^32 values (one shared atomic
-            // per range, none per change) and takes a new range when it runs
-            // out. 0 (no table) is no range's value.
+            // Read through current_gen(): it differs from every value read
+            // before if an entry came or went in between, in any buffer, so
+            // the same gen means the same holes. Each table counts up from
+            // its own range of 2^32 values (one shared atomic per range,
+            // none per change) and takes a new range when it runs out. 0 (no
+            // table) is no range's value. A change only marks the value
+            // stale (one store on every allocation and free); a read counts
+            // up once for any number of changes before it.
             std::uint64_t gen = next_range();
+            bool gen_stale = true;
             XOFFSET_DETAIL_NOINLINE static std::uint64_t next_range() noexcept {
                 static std::atomic<std::uint64_t> ranges{0};
                 return (ranges.fetch_add(1, std::memory_order_relaxed) + 1u) << 32;
             }
-            // On every allocation and free: an add and a test, inline.
-            XOFFSET_DETAIL_MOVE_INLINE void bump_gen() noexcept {
-                if (static_cast<std::uint32_t>(++gen) == 0) [[unlikely]] gen = next_range();
+            XOFFSET_DETAIL_MOVE_INLINE void bump_gen() noexcept { gen_stale = true; }
+            std::uint64_t current_gen() noexcept {
+                if (gen_stale) {
+                    gen_stale = false;
+                    if (static_cast<std::uint32_t>(++gen) == 0) [[unlikely]] gen = next_range();
+                }
+                return gen;
             }
             // RL: false means no bin storage has grown since the last full
             // recycle (or construction), so what is kept is still within the
