@@ -525,7 +525,8 @@ public:
         }
         void n_view(int c, const MapWorld& w, const ViewRect& r) {
             auto& n = nb[std::size_t(c)];
-            n.buf.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, cap()));
+            // One small buffer per client: the largest slot class, not a VM reservation.
+            n.buf.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, XBuffer::maximum_capacity(XBuffer::SLOT_MAX).with_growth(XOffsetDatastructure::XGrowPolicy::Automatic)));
             auto& v = n.buf->template root<xm::ViewSnapshot>();
             v.x0 = r.x0; v.y0 = r.y0; v.x1 = r.x1; v.y1 = r.y1;
             v.units.reserve(std::size_t(nucap));
@@ -565,32 +566,40 @@ public:
         void n_update(int c, const MapWorld& w, const DeltaPlan& p, int64_t id) {
             auto& n = nb[std::size_t(c)];
             auto& v = n.buf->template root<xm::ViewSnapshot>();
+            // Every change is touched after it is made, so the delta compares
+            // the touched blocks only (XDeltaOptions::touched_only).
+            XBuffer& b = *n.buf;
             v.request_id = id; v.tick = w.tick_no();
-            if (v.units.size() < std::size_t(n.usize)) v.units.resize(std::size_t(n.usize));
-            if (v.marches.size() < std::size_t(n.msize)) v.marches.resize(std::size_t(n.msize));
+            b.touch(v.request_id); b.touch(v.tick);
+            if (v.units.size() < std::size_t(n.usize)) { v.units.resize(std::size_t(n.usize)); b.touch(v.units); }
+            if (v.marches.size() < std::size_t(n.msize)) { v.marches.resize(std::size_t(n.msize)); b.touch(v.marches); }
             for (int32_t pos : n.urm) {
                 auto& u = v.units[std::size_t(pos)];
                 u.id = 0; u.owner = 0; u.x = 0; u.y = 0; u.hp = 0; u.state = 0;
                 u.name = std::string_view{};
+                b.touch(u);
             }
-            for (int32_t pos : n.mrm) v.marches[std::size_t(pos)] = xm::ViewMarch{};
+            for (int32_t pos : n.mrm) { v.marches[std::size_t(pos)] = xm::ViewMarch{}; b.touch(v.marches[std::size_t(pos)]); }
             for (const auto& [i, pos] : n.uup) {
                 const WorldUnit& s = w.unit(i);
                 auto& u = v.units[std::size_t(pos)];
                 u.id = s.id; u.owner = s.owner; u.x = s.x; u.y = s.y; u.hp = s.hp; u.state = s.state;
                 if (sv(u.name) != std::string_view(s.name)) u.name = std::string_view(s.name);
+                b.touch(u);
             }
-            for (const auto& [i, pos] : n.mup) copy_vmarch(v.marches[std::size_t(pos)], w.march(i));
+            for (const auto& [i, pos] : n.mup) { copy_vmarch(v.marches[std::size_t(pos)], w.march(i)); b.touch(v.marches[std::size_t(pos)]); }
             for (int32_t t : p.tiles) {
                 const int32_t tx = t % kTiles, ty = t / kTiles;
                 auto& d = v.tiles[tile_pos(v, tx, ty)];
                 const WorldTile& s = w.tile(tx, ty);
-                if (d.owner != s.owner) d.owner = s.owner;
+                if (d.owner != s.owner) { d.owner = s.owner; b.touch(d); }
             }
         }
         std::size_t n_diff(int c) {
             auto& n = nb[std::size_t(c)];
-            n.buf->template save_delta_into<xm::ViewSnapshot>(n.delta, n.base);
+            XOffsetDatastructure::XDeltaOptions o;
+            o.touched_only = true;
+            n.buf->template save_delta_into<xm::ViewSnapshot>(n.delta, n.base, o);
             return n.delta.size();
         }
         std::size_t n_key(int c) {

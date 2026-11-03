@@ -659,7 +659,12 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
             s.tracker.plan(w, c, rect, s.plan);
             ops.snap_encode(0, [&](auto& v) { fill_view(v, w, rect, 0, w.tick_no()); });
             ops.snap_recv(c, 0, 0);
-            build_index(ops.held(c, 0), s.index[std::size_t(c)]);
+            // The client keeps this view and edits it: room for the records
+            // that come and go (every format the same).
+            auto& h = ops.held(c, 0);
+            h.units.reserve(h.units.size() * 3 / 2 + 16);
+            h.marches.reserve(h.marches.size() * 3 / 2 + 16);
+            build_index(h, s.index[std::size_t(c)]);
             if constexpr (native) {
                 ops.n_view(c, w, rect);
                 ops.n_plan(c, w, s.plan);
