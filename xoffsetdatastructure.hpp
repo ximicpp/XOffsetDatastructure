@@ -604,6 +604,11 @@ namespace XOffsetDatastructure {
 
         void swap(XBufferCore& other) noexcept {
             if (this == &other) return;
+            // A cached root goes with its storage (the payload does not move).
+            const bool mine = root_cache_ && root_cache_epoch_ == m_epoch;
+            const bool theirs = other.root_cache_ && other.root_cache_epoch_ == other.m_epoch;
+            std::swap(root_cache_, other.root_cache_);
+            std::swap(root_cache_type_, other.root_cache_type_);
             buffer_.swap(other.buffer_);
             owner_record_.swap(other.owner_record_);
             free_table_.swap(other.free_table_);
@@ -618,6 +623,8 @@ namespace XOffsetDatastructure {
             std::swap(bound_schema_hash_, other.bound_schema_hash_);
             ++m_epoch;
             ++other.m_epoch;
+            root_cache_epoch_ = theirs ? m_epoch : 0u;  // 0: stale (the epoch is past 0)
+            other.root_cache_epoch_ = mine ? other.m_epoch : 0u;
             update_registry_owner();
             other.update_registry_owner();
         }
@@ -1667,6 +1674,8 @@ namespace XOffsetDatastructure {
                 // free list and schema state; other keeps this empty storage
                 // and gets the default state the retired path below leaves
                 // it. Each epoch still advances by one.
+                // A cached root comes along (the payload does not move).
+                const bool cached = other.root_cache_ && other.root_cache_epoch_ == other.m_epoch;
                 buffer_.swap(other.buffer_);
                 owner_record_.swap(other.owner_record_);
                 free_table_.swap(other.free_table_);
@@ -1680,6 +1689,11 @@ namespace XOffsetDatastructure {
                 bound_schema_hash_ = std::exchange(other.bound_schema_hash_, 0);
                 ++m_epoch;
                 ++other.m_epoch;
+                if (cached) {
+                    root_cache_ = other.root_cache_;
+                    root_cache_type_ = other.root_cache_type_;
+                    root_cache_epoch_ = m_epoch;
+                }
                 update_registry_owner();
                 return;
             }
@@ -1692,9 +1706,12 @@ namespace XOffsetDatastructure {
             // operator delete halfway through the incoming owner's transfer.
             retired.swap(*this);
             swap(other);
+            const bool cached = root_cache_epoch_ == m_epoch;  // other's, carried by the swap
             // Preserve the existing one-invalidation-per-Core epoch contract.
             m_epoch = target_epoch + 1u;
             other.m_epoch = source_epoch + 1u;
+            root_cache_epoch_ = cached ? m_epoch : 0u;
+            other.root_cache_epoch_ = 0u;
             // Only now destroy retired target resources. Any delete reentry
             // sees the fully published incoming payload, schema and free cache.
         }
@@ -2236,8 +2253,10 @@ namespace XOffsetDatastructure {
         // schema binding and the root offset change only with the epoch
         // (reinit, reset, move, swap, storage move) or on a fresh owner, so
         // a hit in root<T>() returns what its checked path would. Set only
-        // by those mutating calls, so root<T>() itself stays read-only. Not
-        // transferred: an owner whose epoch advanced misses.
+        // by those mutating calls, so root<T>() itself stays read-only. A
+        // move, a swap and a storage move that copies the content carry it
+        // to the new epoch (the root stays where it was in the payload);
+        // any other epoch change drops it.
         template <typename T>
         T* cached_root() const noexcept {
             return root_cache_epoch_ == m_epoch && root_cache_type_ == type_identity<T>()

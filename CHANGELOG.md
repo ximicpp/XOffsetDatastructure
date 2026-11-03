@@ -44,9 +44,10 @@
   growth after every key delta: on the game demo 1,863 copies of about
   85 KB in two cycles).
 - A movable slot that outgrows its storage keeps its cached root (at the
-  same offset in the copied content), so `root<T>()` stays on its fast
-  path after the move instead of re-checking typed access and the schema
-  on every call.
+  same offset in the copied content), and so does an `XBuffer` that is
+  moved or swapped (for example one built by `create` and then moved into
+  a container), so `root<T>()` stays on its fast path afterwards instead
+  of re-checking typed access and the schema on every call.
 - The receiver checks a container that moved, got its first block or lost
   it (heap strings, vectors of plain elements, sets and maps of plain
   elements, strings entering or leaving the inline form) on its own, against
