@@ -37,6 +37,12 @@
   comes or goes (`XBufferCore::free_block_gen()`); a delta whose baseline
   saw the same generation does not list, sort and compare the hole table
   again.
+- The baseline's copy is a 64-byte aligned buffer that a key delta sizes
+  a quarter larger than the payload and that grows by doubling, moved and
+  zero-filled with memcpy/memset (it was a vector with an aligned
+  allocator, filled and moved byte by byte, and reallocated at the first
+  growth after every key delta: on the game demo 1,863 copies of about
+  85 KB in two cycles).
 - A movable slot that outgrows its storage keeps its cached root (at the
   same offset in the copied content), so `root<T>()` stays on its fast
   path after the move instead of re-checking typed access and the schema
