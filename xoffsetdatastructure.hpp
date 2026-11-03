@@ -6580,7 +6580,8 @@ namespace XOffsetDatastructure {
         struct alignas(64) DeltaTouchLog {
             static constexpr std::uint32_t list_capacity = 24;  // the header and the first 8 in one line
             std::uint32_t now = 1;     // the current period
-            std::uint32_t listed = 0;  // entries of `blocks` (and `masks`), in touch order
+            std::uint16_t listed = 0;  // entries of `blocks` (and `masks`), in touch order
+            std::uint16_t seen = 0;    // bit k % 16 set for each listed block k: a block whose bit is clear is new
             std::uint64_t epoch = 0;   // the buffer content (epoch) the marks describe
             bool lost = false;         // a touch could not be recorded
             bool overflow = false;     // more blocks touched in this period than the list holds
