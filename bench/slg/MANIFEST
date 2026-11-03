@@ -129,6 +129,10 @@
 #                        parse (protobuf); std/cista prefetch the armies before A.apply (XOffset's hint
 #                        counterpart); LK.recv includes query_self; n_plan timed in N*.send; cereal
 #                        reuses its istream. Bytes unchanged (364 S records identical).
+#   2026-11-03 stdm::smap: the std model's sorted flat map is written in model_std.hpp (vector of
+#                        pairs) instead of boost::container::flat_map, which needed Boost.Move and
+#                        Boost.Assert outside cmake/XOffsetDependencyLock.cmake (Mac batches failed to
+#                        build). Rivals 5-15% faster in B/L/LD/S at S. Bytes unchanged (240 S records).
 # Contents: slg-reuse adapters (FlatBuffers verified_root runs the Verifier),
 # reuse protocol (c) (SLG_REUSE=1), ordinary-record declarations for every xm
 # record type in include/slg/model_xoffset.hpp, T4 adapter v2 (whole-container
@@ -139,7 +143,7 @@
 #   them (guarded; older trees keep the previous declarations). Same machine code under GCC 16
 #   and P2996 (asm_equal), the lines are tools/describe_dump output (describe_dump_slg).
 4bd68ec1a9dcb93c4cf4cced05cd5a5ce098e4612183badbdc4f001ed32ab4e5  CMakeLists.txt
-26f8f558482e34f681ff6da0f3b163ff69b4664bfc37eed5bca8aa8740bf6ec7  README.md
+562029e5205110961f77d474445f76bd94fba96d4f75a74ac8d059eaa040bd9e  README.md
 ea141af841831b376028f48ab0d4c22e66ce2671f01d9e14c9f66814f5ebaa6e  adapters/cereal_format.hpp
 6a4e08d8a8e02d8df667c9c9b9576f6b2f783eec810c50e39ccaa83070309064  adapters/flatbuffers_format.hpp
 b79ac73b09369288d013200b93f627aa7eb2cc59a8b1f02bcc392cc5731b43bd  adapters/protobuf_format.hpp
@@ -155,7 +159,7 @@ a907b785a112b841bc1972b589718054b70042946a1d96b6436e751012957684  bench/std_runn
 252eca51c89182293cb3a4c75298df8490c2c7073065b304bb91183721b3cf3f  include/slg/generic.hpp
 be9cf9fdb1a5be758b294b3571d27c49ac9822eecfbb6764b8b13876a2e8e24e  include/slg/login.hpp
 243e688dc0afcecc0d1ddb66c799846c60fb9292f48174173a611388c41d1ab4  include/slg/model_cista.hpp
-ed07364d5c6a3fe3251a0e4f602523d056ee153b15e5c54d46051d3696c3709f  include/slg/model_std.hpp
+7e7cf80086214432ef136739451a6bf2ae41ff5806dd3e1417207414733c2322  include/slg/model_std.hpp
 ffdf3ec14df638268b6b11dfc39836666a62aa82ba2e5594d71804700b35bee1  include/slg/model_xoffset.hpp
 3259eef215f98da7328da68bb5e7dd1f33141cdeb894511a039af075114c3391  include/slg/model_xoffset_optin.hpp
 36d5761eb46998e5040f7a19fb99f5ac1df5e31ee129a864e3872ba734e4a5db  include/slg/trace.hpp
