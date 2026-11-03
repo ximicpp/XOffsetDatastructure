@@ -7752,6 +7752,11 @@ namespace XOffsetDatastructure {
             using Identity = XBufferCore::OwnerRecordPtr;
             static Identity identity(XBufferCore& source) noexcept { return source.owner_record_; }
             static XBufferCore& owner(const Identity& value) { return XBufferCore::require_record_owner(value); }
+            // The source is its record's owner (what owner(identity(source))
+            // resolves to on entry), without copying the record.
+            static bool owns_record(const XBufferCore& source) noexcept {
+                return XBufferCore::record_owner(source.owner_record_) == &source;
+            }
             template<class T> static XWireHeaderV2 header(XBufferCore&);
             template<class T> static void save_into(XBufferCore&, std::string&, XSaveOptions);
             template<class T> static void save_compact_into(XBufferCore&, std::string&, XCompactOptions);
