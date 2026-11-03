@@ -61,7 +61,8 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   end, start tick, arrival tick). Two cases:
   - EB browse (class 2): all 1,500 clients drag their viewport every tick (up
     to 48 px per axis, a jump elsewhere with p = 1/16) and pull everything in
-    the new rectangle in full, one snapshot per client per tick. The world
+    the new rectangle in full, one snapshot per client per tick (the spatial
+    query of what lies in it is untimed bookkeeping, as for U*). The world
     changes at the peace rate, so this case is all full pulls. EB.send fills
     and encodes one viewport, EB.recv receives it with the format's checks and
     reads every tile, unit and march.
