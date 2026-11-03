@@ -893,10 +893,30 @@ namespace XOffsetDatastructure {
 
         // Writes free_block_count() little-endian entries.
         void write_free_blocks(char* out) const noexcept {
-            for_each_free_block([&](WireHole hole) {
+            if (!free_table_) return;
+            const auto& table = *free_table_;
+            // for_each_free_block's order. A hole is {offset, bytes}, so one
+            // little-endian word per entry with the bin's size in the high
+            // half; the loop over a bin's offsets vectorizes.
+            for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
+                for (auto bits = table.nonempty[word]; bits != 0; bits &= bits - 1u) {
+                    const auto bin = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
+                    const FreeBin& entries = table.bins[bin];
+                    const std::uint32_t* const offsets = entries.begin();
+                    const std::uint32_t n = entries.size();
+                    const std::uint64_t bytes = std::uint64_t((bin + 1u) * 8u) << 32;
+                    for (std::uint32_t i = 0; i < n; ++i) {
+                        const std::uint64_t hole = bytes | offsets[i];
+                        std::memcpy(out + std::size_t(i) * sizeof(WireHole), &hole, sizeof(hole));
+                    }
+                    out += std::size_t(n) * sizeof(WireHole);
+                }
+            }
+            for (const auto& [bytes, offset] : table.large) {
+                const WireHole hole{offset, bytes};
                 std::memcpy(out, &hole, sizeof(hole));
                 out += sizeof(hole);
-            });
+            }
         }
 
         // Replaces the free table with validated holes (wire order).
@@ -6708,21 +6728,51 @@ namespace XOffsetDatastructure {
             if (core.free_block_bytes() < wire_free_run_min_gap || used == 0) return gaps;
             std::vector<XBufferCore::WireHole> candidates;
             std::uint64_t total = 0;
+            std::uint32_t low = ~std::uint32_t(0), high = 0;
             core.for_each_free_block_at_least(wire_free_run_min_block, [&](XBufferCore::WireHole hole) {
                 candidates.push_back(hole);
                 total += hole.bytes;
+                low = (std::min)(low, hole.offset);
+                high = (std::max)(high, hole.offset);
             });
             if (total < wire_free_run_min_gap) return gaps;
+            // Sort by offset with one counting pass. Candidates are disjoint
+            // and at least 256 bytes, so a bucket 2^shift >= 256 bytes wide
+            // holds at most 2^shift / 256 of them: about four buckets per
+            // candidate over [low, high] usually leaves one per bucket (a
+            // bucket that gets more is sorted by insertion, or std::sort over
+            // 32). Offsets are distinct.
+            std::size_t limit = 4;
+            while (limit < 4u * candidates.size() && limit < (std::size_t(1) << 18)) limit <<= 1;
+            unsigned shift = 8;
+            while (((high - low) >> shift) >= limit) ++shift;
+            std::vector<std::uint32_t> bucket_end(std::size_t((high - low) >> shift) + 2u, 0u);
+            bool crowded = false;
+            for (const auto& hole : candidates)
+                crowded |= ++bucket_end[((hole.offset - low) >> shift) + 1u] > 1u;
+            for (std::size_t i = 1; i < bucket_end.size(); ++i) bucket_end[i] += bucket_end[i - 1u];
             std::vector<XBufferCore::WireHole> sorted(candidates.size());
-            unsigned bits = 0;
-            while (bits < 32u && (std::uint64_t(1) << bits) < used) ++bits;
-            for (unsigned shift = 0; shift < bits; shift += 11u) {
-                std::uint32_t count[2049] = {};
-                for (const auto& hole : candidates) ++count[((hole.offset >> shift) & 2047u) + 1u];
-                for (std::size_t i = 0; i < 2048u; ++i) count[i + 1u] += count[i];
-                for (const auto& hole : candidates) sorted[count[(hole.offset >> shift) & 2047u]++] = hole;
-                candidates.swap(sorted);
+            for (const auto& hole : candidates) sorted[bucket_end[(hole.offset - low) >> shift]++] = hole;
+            // bucket_end[b] is now where bucket b ends (and bucket b + 1 starts).
+            if (crowded) {
+                std::uint32_t first = 0;
+                for (std::size_t b = 0; b + 1u < bucket_end.size(); ++b) {
+                    const std::uint32_t last = bucket_end[b];
+                    if (last - first > 32u) {
+                        std::sort(sorted.begin() + first, sorted.begin() + last,
+                                  [](const auto& x, const auto& y) { return x.offset < y.offset; });
+                    } else {
+                        for (std::uint32_t i = first + 1u; i < last; ++i) {
+                            const auto hole = sorted[i];
+                            std::uint32_t j = i;
+                            for (; j > first && sorted[j - 1u].offset > hole.offset; --j) sorted[j] = sorted[j - 1u];
+                            sorted[j] = hole;
+                        }
+                    }
+                    first = last;
+                }
             }
+            candidates.swap(sorted);
             std::uint64_t start = 0, end = 0;
             auto close = [&] {
                 // The first extent starts at 48 and is not empty: a run there
@@ -6735,7 +6785,9 @@ namespace XOffsetDatastructure {
             };
             for (const auto& hole : candidates) {
                 if (hole.offset == end && end != 0) { end += hole.bytes; continue; }
-                close();
+                // close() only ever shortens a run, so most (lone) candidates
+                // skip the call.
+                if (end - start >= wire_free_run_min_gap) close();
                 start = hole.offset;
                 end = std::uint64_t(hole.offset) + hole.bytes;
             }
