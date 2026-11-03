@@ -567,12 +567,14 @@ public:
             auto& n = nb[std::size_t(c)];
             auto& v = n.buf->template root<xm::ViewSnapshot>();
             // Every change is touched after it is made, so the delta compares
-            // the touched blocks only (XDeltaOptions::touched_only).
+            // the touched blocks only (XDeltaOptions::touched_only). A vector
+            // that gains slots has its head touched; the new slots are filled
+            // and touched below.
             XBuffer& b = *n.buf;
             v.request_id = id; v.tick = w.tick_no();
             b.touch(v.request_id); b.touch(v.tick);
-            if (v.units.size() < std::size_t(n.usize)) { v.units.resize(std::size_t(n.usize)); b.touch(v.units); }
-            if (v.marches.size() < std::size_t(n.msize)) { v.marches.resize(std::size_t(n.msize)); b.touch(v.marches); }
+            if (v.units.size() < std::size_t(n.usize)) { v.units.resize(std::size_t(n.usize)); b.touch(&v.units, sizeof(v.units)); }
+            if (v.marches.size() < std::size_t(n.msize)) { v.marches.resize(std::size_t(n.msize)); b.touch(&v.marches, sizeof(v.marches)); }
             for (int32_t pos : n.urm) {
                 auto& u = v.units[std::size_t(pos)];
                 u.id = 0; u.owner = 0; u.x = 0; u.y = 0; u.hp = 0; u.state = 0;
