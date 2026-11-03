@@ -1,0 +1,9 @@
+CKPT7 10
+anchor c9fbaea2 (next_cpp26; library = v3.2.1, anchored by CKPT5c)
+screen watcher: 88 calls (dark.log)
+ABC: pass (max upper bound 0.9986; A 0.9957, B 0.9711, C 0.9986; 12 / 12 processes)
+GATE_D: head D÷flatbuffers 0.925 / 0.951 (O4 upper bound <= 1.0: met), D÷zpp_bits 1.053 / 1.068, D.read 67.8 µs; anc D÷flatbuffers 0.924 / 0.931, D÷zpp_bits 1.048 / 1.055, D.read 67.1 µs
+G8 met
+demo case set (report only): 4 ABBA blocks, 8 processes per point, 21 cycles; raw in demo_run.tar.gz, judged in the cloud
+G9R rc 0 (0 done, 2 prep check, 5 quiet gate); G9: 17 of 19 comparisons have UB <= 1.05; above: vec.push_back, set.erase.fresh
+ctest  (rc 2)

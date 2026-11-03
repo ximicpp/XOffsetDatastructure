@@ -1,0 +1,3 @@
+583d85de0f05f0cb5b34709287d2f1626e8a39de|reload zero watermark, adaptive D6 regrow step, member swap in the SLG demo installs (edae8c26; 583d85de adds its bench MANIFEST, the first point whose bench/slg passes the manifest check)
+5433b4ebb7b23f20b62389ffbcfe888564880ecc|reload zero tail: shrinking loads only, out-of-line reinit, D6 step reset keyed on the epoch (the range also holds adf72e50 1480b62b 0ce5897d)
+683b8b365b5bcad15fe9f5399921e0ccef265e6b|free table: small bins keep their first holes inline; cheaper first hole and XVector element access (the range also holds b251226b; the last range holds 6b151ac0 prefetch_for_update and c4925fa7 bench A adapter)

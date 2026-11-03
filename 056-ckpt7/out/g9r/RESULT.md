@@ -1,0 +1,386 @@
+# G9R3 result (2026-11-03T01:53:08Z)
+
+t0 c9fbaea2e980f6f708df615181ced209d653dc0f (next_cpp26 c9fbaea2 (library = v3.2.1)); t1 c4925fa7e7eb7406136685a2943af1ce1e9de96c (CKPT7 head (class 1 integration c4925fa7)); bench/reloc of t0 (a7e8b02792a9cf4258e012fe4881330c6c9d5e59) for both.
+
+```
+t0 c9fbaea2e980f6f708df615181ced209d653dc0f tree 379c21a13a1d596a466e7f80c35550c94d8c4727 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (next_cpp26 c9fbaea2 (library = v3.2.1))
+t1 c4925fa7e7eb7406136685a2943af1ce1e9de96c tree ca4688c1c9890a03c228fd7d329ef00c514e0ede typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (CKPT7 head (class 1 integration c4925fa7))
+t1: diff over t0 sha256 641339ee08bf428be547a27830dfc9e2ebd92b3c60ad4cd4891cbdf607d5b402 ( 14 files changed, 501 insertions(+), 63 deletions(-))
+t1: library header diff over t0:  2 files changed, 298 insertions(+), 38 deletions(-)
+t1: first-parent commits over t0:
+  c4925fa7 bench/slg: XOffset A adapter calls prefetch_for_update() on arrival
+  6b151ac0 XBuffer: prefetch_for_update() cache hint for cold buffers
+  683b8b36 Free table and XVector: cheaper first hole and element access
+  b251226b Free table: small bins keep their first holes inline
+  5433b4eb Reload zero tail: shrinking loads take an out-of-line reinit; D6 step reset keyed on the epoch
+  0ce5897d Reload zero tail: one compare inline, the rest out of line
+  1480b62b Reload zero tail: only for loads that shrink the logical length by a page or more
+  adf72e50 Reload zero tail: decide only on shrinking loads, before reading the header
+  583d85de bench/slg: MANIFEST for the demo install swap
+  edae8c26 Reload zero watermark, adaptive D6 regrow step, member swap in the SLG demo installs
+bench/reloc of t1: same tree as t0
+reloc_bench t0 sha256 8d7cf69da8f65111da5837039b75d16cf334d51cd6254d5cef1e9d6033665e20
+reloc_bench t1 sha256 37d945a7f33c5dcc003cb77bc6ccfc067f2da00c3206b001683860579109652f
+reloc_bench t0a sha256 6e809e648798c44452f1edefc4ea856bd6f3d6c152c8fc5480886d6ff2e74116
+reloc_bench t1a sha256 7361255d0c6b3515594dd614cce215eed58b7a76b24d3381aa75e93344d23d89
+```
+
+## G9 items, t1 / t0 and the aligned pair t1a / t0a (no item worse than the anchor)
+
+## XOffset / baseline, t1 / t0 (default build)
+
+| case | baseline | class | t0 GM | t1 GM | t1 / t0 | 95% interval | halves | note |
+| --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| hero.mid_erase.ord | std::vector | G9 | 0.729 | 0.724 | 0.994 | 0.990–0.997 | 0.984, 1.003 |  |
+| hero.mid_insert.ord | std::vector | G9 | 0.755 | 0.764 | 1.012 | 1.008–1.017 | 1.007, 1.017 | worse |
+| hero.push_back_grow.ord | std::vector | G9 | 0.384 | 0.382 | 0.995 | 0.992–0.997 | 0.980, 1.009 |  |
+| map.erase.fresh | std::flat_map | G9 | 0.939 | 0.942 | 1.002 | 0.998–1.007 | 1.004, 1.001 |  |
+| map.find.fresh | std::flat_map | G9 | 0.784 | 0.784 | 1.000 | 0.996–1.004 | 1.001, 0.999 |  |
+| map.insert.fresh | std::flat_map | G9 | 0.870 | 0.869 | 0.999 | 0.994–1.004 | 1.003, 0.995 |  |
+| nested.build.ord | std | G9 | 0.349 | 0.353 | 1.012 | 1.007–1.016 | 1.019, 1.004 | worse |
+| reset | std | G9 | 0.258 | 0.248 | 0.961 | 0.951–0.970 | 0.930, 0.993 |  |
+| set.erase.fresh | std::flat_set | G9 | 1.084 | 1.089 | 1.004 | 1.000–1.008 | 1.006, 1.003 | worse |
+| set.find.fresh | std::flat_set | G9 | 0.760 | 0.755 | 0.994 | 0.990–0.998 | 0.987, 1.001 |  |
+| set.insert.fresh | std::flat_set | G9 | 0.999 | 0.996 | 0.997 | 0.993–1.001 | 0.998, 0.995 |  |
+| str.append | std::string | G9 | 0.428 | 0.426 | 0.997 | 0.992–1.003 | 0.993, 1.002 |  |
+| str.assign_long | std::string | G9 | 0.800 | 0.865 | 1.081 | 1.078–1.084 | 1.081, 1.082 | worse |
+| str.assign_short.view | std::string | G9 | 0.317 | 0.343 | 1.083 | 1.080–1.086 | 1.082, 1.084 | worse |
+| vec.iterate | std::vector | G9 | 1.001 | 1.001 | 1.000 | 0.998–1.002 | 1.000, 1.000 |  |
+| vec.mid_erase | std::vector | G9 | 1.023 | 1.018 | 0.995 | 0.993–0.998 | 0.990, 1.001 |  |
+| vec.mid_insert | std::vector | G9 | 0.992 | 0.991 | 0.999 | 0.997–1.002 | 0.998, 1.000 |  |
+| vec.push_back | std::vector | G9 | 1.118 | 1.125 | 1.006 | 1.004–1.009 | 1.007, 1.005 | worse |
+| vec.push_back_grow | std::vector | G9 | 0.781 | 0.490 | 0.628 | 0.626–0.629 | 0.625, 0.630 |  |
+| hero.mid_erase.plain | std::vector | report | 4.056 | 4.061 | 1.001 | 0.997–1.005 | 0.996, 1.006 |  |
+| hero.mid_insert.plain | std::vector | report | 4.077 | 4.234 | 1.039 | 1.034–1.043 | 1.030, 1.047 | worse |
+| hero.push_back_grow.plain | std::vector | report | 0.423 | 0.426 | 1.007 | 1.004–1.010 | 0.992, 1.023 |  |
+| map.erase.fresh | std::map | report | 0.746 | 0.741 | 0.994 | 0.990–0.998 | 0.984, 1.003 |  |
+| map.erase.reused | std::flat_map | report | 1.078 | 1.084 | 1.006 | 1.002–1.009 | 1.003, 1.008 | worse |
+| map.erase.reused | std::map | report | 1.669 | 1.644 | 0.985 | 0.980–0.991 | 0.964, 1.007 |  |
+| map.find.fresh | std::map | report | 0.315 | 0.314 | 1.000 | 0.994–1.005 | 0.996, 1.003 |  |
+| map.find.reused | std::flat_map | report | 0.785 | 0.785 | 0.999 | 0.996–1.002 | 0.999, 0.999 |  |
+| map.find.reused | std::map | report | 0.723 | 0.687 | 0.950 | 0.946–0.955 | 0.960, 0.941 |  |
+| map.insert.fresh | std::map | report | 0.753 | 0.754 | 1.000 | 0.995–1.006 | 1.006, 0.994 |  |
+| map.insert.reused | std::flat_map | report | 1.007 | 1.004 | 0.997 | 0.994–1.000 | 0.999, 0.995 |  |
+| map.insert.reused | std::map | report | 1.845 | 1.815 | 0.984 | 0.977–0.990 | 0.988, 0.979 |  |
+| nested.build.plain | std | report | 0.357 | 0.363 | 1.016 | 1.013–1.020 | 1.019, 1.013 | worse |
+| set.erase.fresh | std::set | report | 0.673 | 0.665 | 0.987 | 0.984–0.991 | 0.975, 0.999 |  |
+| set.erase.reused | std::flat_set | report | 1.139 | 1.136 | 0.998 | 0.994–1.002 | 1.008, 0.987 |  |
+| set.erase.reused | std::set | report | 1.363 | 1.342 | 0.985 | 0.977–0.992 | 0.978, 0.991 |  |
+| set.find.fresh | std::set | report | 0.302 | 0.301 | 0.997 | 0.992–1.002 | 0.993, 1.001 |  |
+| set.find.reused | std::flat_set | report | 0.757 | 0.754 | 0.996 | 0.994–0.999 | 0.995, 0.998 |  |
+| set.find.reused | std::set | report | 0.697 | 0.721 | 1.035 | 1.031–1.038 | 1.022, 1.048 | worse |
+| set.insert.fresh | std::set | report | 0.657 | 0.655 | 0.997 | 0.993–1.000 | 0.997, 0.996 |  |
+| set.insert.reused | std::flat_set | report | 1.084 | 1.081 | 0.998 | 0.994–1.001 | 0.994, 1.001 |  |
+| set.insert.reused | std::set | report | 1.448 | 1.421 | 0.981 | 0.972–0.990 | 0.992, 0.971 |  |
+| str.assign_short | std::string | report | 1.771 | 1.766 | 0.997 | 0.995–0.999 | 0.997, 0.998 |  |
+| str.assign_short.copy | std::string | report | 1.150 | 1.147 | 0.997 | 0.995–1.000 | 0.995, 1.000 |  |
+
+worse at t1 than t0 (by the rule): hero.mid_insert.ord / std::vector (G9) 1.012; nested.build.ord / std (G9) 1.012; set.erase.fresh / std::flat_set (G9) 1.004; str.assign_long / std::string (G9) 1.081; str.assign_short.view / std::string (G9) 1.083; vec.push_back / std::vector (G9) 1.006; hero.mid_insert.plain / std::vector (report) 1.039; map.erase.reused / std::flat_map (report) 1.006; nested.build.plain / std (report) 1.016; set.find.reused / std::set (report) 1.035
+
+above 1.01 but not worse by the rule: none
+
+## XOffset ns/op alone, t1 / t0 (default build)
+
+| case | t0 ns/op | t1 ns/op | t1 / t0 | 95% interval | halves | note |
+| --- | ---: | ---: | ---: | --- | --- | --- |
+| hero.mid_erase.ord | 164.3 | 164 | 0.998 | 0.995–1.001 | 0.996, 1.000 |  |
+| hero.mid_erase.plain | 912.8 | 919 | 1.007 | 1.004–1.010 | 1.006, 1.008 | worse |
+| hero.mid_insert.ord | 227.8 | 231.2 | 1.015 | 1.012–1.018 | 1.017, 1.013 | worse |
+| hero.mid_insert.plain | 1222 | 1272 | 1.041 | 1.036–1.046 | 1.047, 1.035 | worse |
+| hero.push_back_grow.ord | 33.52 | 33.42 | 0.997 | 0.995–0.999 | 0.994, 1.000 |  |
+| hero.push_back_grow.plain | 36.92 | 37.05 | 1.004 | 1.002–1.006 | 1.002, 1.005 | worse |
+| map.erase.fresh | 33.19 | 33.1 | 0.997 | 0.994–1.001 | 0.998, 0.997 |  |
+| map.erase.reused | 29.74 | 29.71 | 0.999 | 0.997–1.001 | 0.999, 0.999 |  |
+| map.find.fresh | 5.164 | 5.17 | 1.001 | 0.998–1.005 | 1.003, 1.000 |  |
+| map.find.reused | 5.167 | 5.16 | 0.999 | 0.996–1.001 | 0.998, 0.999 |  |
+| map.insert.fresh | 32.66 | 33.26 | 1.018 | 1.011–1.026 | 1.053, 0.985 | worse? |
+| map.insert.reused | 29.64 | 29.56 | 0.997 | 0.995–0.999 | 0.999, 0.995 |  |
+| nested.build.ord | 294.8 | 293.3 | 0.995 | 0.992–0.998 | 0.995, 0.995 |  |
+| nested.build.plain | 302.4 | 300 | 0.992 | 0.989–0.995 | 0.989, 0.995 |  |
+| reset | 30.52 | 30.74 | 1.007 | 1.001–1.013 | 1.011, 1.003 | worse |
+| set.erase.fresh | 29.82 | 29.83 | 1.000 | 0.998–1.003 | 1.002, 0.998 |  |
+| set.erase.reused | 23.38 | 23.27 | 0.995 | 0.992–0.998 | 0.995, 0.996 |  |
+| set.find.fresh | 4.996 | 4.887 | 0.978 | 0.973–0.984 | 0.958, 0.999 |  |
+| set.find.reused | 4.899 | 4.885 | 0.997 | 0.995–0.999 | 0.997, 0.997 |  |
+| set.insert.fresh | 29.01 | 28.99 | 0.999 | 0.996–1.002 | 0.999, 0.999 |  |
+| set.insert.reused | 22.96 | 22.8 | 0.993 | 0.990–0.995 | 0.990, 0.996 |  |
+| str.append | 1.556 | 1.575 | 1.012 | 1.007–1.017 | 1.024, 1.000 | worse |
+| str.assign_long | 2.726 | 2.943 | 1.080 | 1.077–1.082 | 1.080, 1.079 | worse |
+| str.assign_short | 0.9357 | 0.9348 | 0.999 | 0.995–1.003 | 1.004, 0.994 |  |
+| str.assign_short.copy | 0.622 | 0.6251 | 1.005 | 1.000–1.010 | 1.012, 0.998 |  |
+| str.assign_short.view | 0.939 | 0.9443 | 1.006 | 1.002–1.009 | 1.013, 0.998 |  |
+| vec.iterate | 0.03316 | 0.03335 | 1.006 | 1.003–1.009 | 1.011, 1.000 | worse |
+| vec.mid_erase | 40.65 | 40.37 | 0.993 | 0.991–0.995 | 0.996, 0.990 |  |
+| vec.mid_insert | 40.59 | 40.64 | 1.001 | 1.000–1.002 | 1.003, 0.999 |  |
+| vec.push_back | 0.2916 | 0.2873 | 0.985 | 0.975–0.996 | 0.970, 1.001 |  |
+| vec.push_back_grow | 0.2796 | 0.2798 | 1.001 | 0.996–1.006 | 0.992, 1.010 |  |
+
+XOffset slower at t1 than t0 (worse by the rule): hero.mid_erase.plain 1.007; hero.mid_insert.ord 1.015; hero.mid_insert.plain 1.041; hero.push_back_grow.plain 1.004; reset 1.007; str.append 1.012; str.assign_long 1.080; vec.iterate 1.006
+
+## XOffset / baseline, t1a / t0a (functions aligned to 64 B, layout check)
+
+| case | baseline | class | t0a GM | t1a GM | t1a / t0a | 95% interval | halves | note |
+| --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| hero.mid_erase.ord | std::vector | G9 | 0.726 | 0.730 | 1.005 | 1.000–1.011 | 1.005, 1.006 |  |
+| hero.mid_insert.ord | std::vector | G9 | 0.762 | 0.759 | 0.996 | 0.990–1.002 | 1.006, 0.987 |  |
+| hero.push_back_grow.ord | std::vector | G9 | 0.381 | 0.381 | 1.000 | 0.996–1.005 | 0.994, 1.007 |  |
+| map.erase.fresh | std::flat_map | G9 | 0.942 | 0.939 | 0.997 | 0.994–1.000 | 0.996, 0.998 |  |
+| map.find.fresh | std::flat_map | G9 | 0.786 | 0.786 | 0.999 | 0.995–1.003 | 0.998, 1.000 |  |
+| map.insert.fresh | std::flat_map | G9 | 0.865 | 0.874 | 1.011 | 1.006–1.016 | 1.007, 1.014 | worse |
+| nested.build.ord | std | G9 | 0.336 | 0.353 | 1.051 | 1.046–1.056 | 1.078, 1.026 | worse |
+| reset | std | G9 | 0.246 | 0.247 | 1.004 | 0.992–1.016 | 1.002, 1.006 |  |
+| set.erase.fresh | std::flat_set | G9 | 1.092 | 1.090 | 0.998 | 0.995–1.001 | 1.000, 0.996 |  |
+| set.find.fresh | std::flat_set | G9 | 0.755 | 0.756 | 1.001 | 0.998–1.004 | 1.003, 0.999 |  |
+| set.insert.fresh | std::flat_set | G9 | 1.000 | 0.999 | 0.999 | 0.996–1.002 | 1.004, 0.994 |  |
+| str.append | std::string | G9 | 0.429 | 0.432 | 1.005 | 1.000–1.010 | 1.018, 0.992 |  |
+| str.assign_long | std::string | G9 | 0.865 | 0.867 | 1.002 | 0.997–1.006 | 1.002, 1.002 |  |
+| str.assign_short.view | std::string | G9 | 0.342 | 0.343 | 1.002 | 0.998–1.006 | 1.000, 1.004 |  |
+| vec.iterate | std::vector | G9 | 1.001 | 1.000 | 0.999 | 0.997–1.000 | 0.998, 1.000 |  |
+| vec.mid_erase | std::vector | G9 | 1.021 | 1.009 | 0.988 | 0.984–0.992 | 0.994, 0.982 |  |
+| vec.mid_insert | std::vector | G9 | 0.990 | 0.992 | 1.002 | 0.998–1.007 | 1.002, 1.003 |  |
+| vec.push_back | std::vector | G9 | 1.122 | 1.121 | 0.999 | 0.994–1.004 | 0.995, 1.003 |  |
+| vec.push_back_grow | std::vector | G9 | 0.769 | 0.777 | 1.011 | 1.007–1.015 | 1.017, 1.005 | worse |
+| hero.mid_erase.plain | std::vector | report | 4.050 | 4.083 | 1.008 | 1.004–1.013 | 1.011, 1.005 | worse |
+| hero.mid_insert.plain | std::vector | report | 4.172 | 4.210 | 1.009 | 1.004–1.014 | 1.013, 1.005 | worse |
+| hero.push_back_grow.plain | std::vector | report | 0.417 | 0.423 | 1.013 | 1.009–1.018 | 1.013, 1.014 | worse |
+| map.erase.fresh | std::map | report | 0.742 | 0.734 | 0.989 | 0.986–0.993 | 0.985, 0.994 |  |
+| map.erase.reused | std::flat_map | report | 1.082 | 1.079 | 0.997 | 0.994–1.001 | 0.997, 0.998 |  |
+| map.erase.reused | std::map | report | 1.657 | 1.621 | 0.979 | 0.973–0.985 | 0.984, 0.973 |  |
+| map.find.fresh | std::map | report | 0.315 | 0.315 | 0.998 | 0.993–1.003 | 0.999, 0.997 |  |
+| map.find.reused | std::flat_map | report | 0.786 | 0.785 | 0.998 | 0.995–1.001 | 1.000, 0.997 |  |
+| map.find.reused | std::map | report | 0.705 | 0.710 | 1.008 | 1.004–1.012 | 1.007, 1.008 | worse |
+| map.insert.fresh | std::map | report | 0.756 | 0.750 | 0.992 | 0.987–0.998 | 1.005, 0.979 |  |
+| map.insert.reused | std::flat_map | report | 1.009 | 1.009 | 1.000 | 0.998–1.002 | 1.002, 0.998 |  |
+| map.insert.reused | std::map | report | 1.790 | 1.870 | 1.045 | 1.038–1.051 | 1.079, 1.011 | worse |
+| nested.build.plain | std | report | 0.347 | 0.363 | 1.046 | 1.041–1.051 | 1.076, 1.017 | worse |
+| set.erase.fresh | std::set | report | 0.670 | 0.671 | 1.001 | 0.997–1.004 | 0.997, 1.004 |  |
+| set.erase.reused | std::flat_set | report | 1.141 | 1.138 | 0.997 | 0.993–1.001 | 0.998, 0.996 |  |
+| set.erase.reused | std::set | report | 1.341 | 1.304 | 0.973 | 0.965–0.981 | 0.971, 0.974 |  |
+| set.find.fresh | std::set | report | 0.300 | 0.299 | 0.998 | 0.992–1.003 | 1.000, 0.995 |  |
+| set.find.reused | std::flat_set | report | 0.755 | 0.756 | 1.001 | 0.998–1.004 | 1.001, 1.002 |  |
+| set.find.reused | std::set | report | 0.662 | 0.684 | 1.034 | 1.027–1.040 | 0.993, 1.076 | worse? |
+| set.insert.fresh | std::set | report | 0.663 | 0.654 | 0.987 | 0.984–0.990 | 0.997, 0.976 |  |
+| set.insert.reused | std::flat_set | report | 1.083 | 1.082 | 0.999 | 0.996–1.002 | 1.003, 0.995 |  |
+| set.insert.reused | std::set | report | 1.375 | 1.460 | 1.062 | 1.053–1.071 | 1.105, 1.021 | worse |
+| str.assign_short | std::string | report | 1.768 | 1.772 | 1.003 | 0.999–1.006 | 1.000, 1.005 |  |
+| str.assign_short.copy | std::string | report | 1.150 | 1.145 | 0.995 | 0.992–0.998 | 0.994, 0.996 |  |
+
+worse at t1a than t0a (by the rule): map.insert.fresh / std::flat_map (G9) 1.011; nested.build.ord / std (G9) 1.051; vec.push_back_grow / std::vector (G9) 1.011; hero.mid_erase.plain / std::vector (report) 1.008; hero.mid_insert.plain / std::vector (report) 1.009; hero.push_back_grow.plain / std::vector (report) 1.013; map.find.reused / std::map (report) 1.008; map.insert.reused / std::map (report) 1.045; nested.build.plain / std (report) 1.046; set.insert.reused / std::set (report) 1.062
+
+above 1.01 but not worse by the rule: set.find.reused / std::set (report) 1.034
+
+## XOffset ns/op alone, t1a / t0a (functions aligned to 64 B, layout check)
+
+| case | t0a ns/op | t1a ns/op | t1a / t0a | 95% interval | halves | note |
+| --- | ---: | ---: | ---: | --- | --- | --- |
+| hero.mid_erase.ord | 164.7 | 166.4 | 1.010 | 1.006–1.015 | 1.003, 1.017 | worse |
+| hero.mid_erase.plain | 912.2 | 927.2 | 1.016 | 1.012–1.020 | 1.009, 1.024 | worse |
+| hero.mid_insert.ord | 230.3 | 232.6 | 1.010 | 1.006–1.014 | 1.009, 1.011 | worse |
+| hero.mid_insert.plain | 1252 | 1271 | 1.015 | 1.011–1.019 | 1.007, 1.023 | worse |
+| hero.push_back_grow.ord | 33.29 | 34 | 1.021 | 1.016–1.027 | 1.021, 1.021 | worse |
+| hero.push_back_grow.plain | 36.51 | 37.42 | 1.025 | 1.020–1.030 | 1.022, 1.027 | worse |
+| map.erase.fresh | 33.06 | 33.08 | 1.000 | 0.998–1.003 | 0.999, 1.002 |  |
+| map.erase.reused | 29.69 | 29.61 | 0.997 | 0.995–1.000 | 0.997, 0.998 |  |
+| map.find.fresh | 5.152 | 5.165 | 1.003 | 0.999–1.006 | 0.999, 1.007 |  |
+| map.find.reused | 5.162 | 5.162 | 1.000 | 0.998–1.002 | 1.001, 0.999 |  |
+| map.insert.fresh | 32.31 | 32.75 | 1.014 | 1.008–1.019 | 1.005, 1.023 | worse |
+| map.insert.reused | 29.72 | 29.58 | 0.995 | 0.993–0.997 | 1.001, 0.990 |  |
+| nested.build.ord | 294.8 | 293.9 | 0.997 | 0.994–1.000 | 1.001, 0.993 |  |
+| nested.build.plain | 301.9 | 301.8 | 1.000 | 0.996–1.003 | 1.001, 0.999 |  |
+| reset | 30.35 | 30.28 | 0.998 | 0.992–1.003 | 0.992, 1.003 |  |
+| set.erase.fresh | 29.79 | 29.85 | 1.002 | 1.000–1.004 | 1.004, 1.000 |  |
+| set.erase.reused | 23.27 | 23.3 | 1.001 | 0.998–1.005 | 1.002, 1.001 |  |
+| set.find.fresh | 4.887 | 4.889 | 1.000 | 0.998–1.003 | 1.002, 0.999 |  |
+| set.find.reused | 4.881 | 4.895 | 1.003 | 1.001–1.005 | 1.003, 1.003 | worse |
+| set.insert.fresh | 28.99 | 28.91 | 0.997 | 0.995–0.999 | 1.000, 0.994 |  |
+| set.insert.reused | 22.91 | 22.85 | 0.997 | 0.995–1.000 | 1.002, 0.993 |  |
+| str.append | 1.562 | 1.573 | 1.007 | 1.002–1.012 | 1.007, 1.007 | worse |
+| str.assign_long | 2.952 | 3.015 | 1.021 | 1.017–1.026 | 1.014, 1.028 | worse |
+| str.assign_short | 0.9482 | 0.9521 | 1.004 | 0.999–1.010 | 0.999, 1.009 |  |
+| str.assign_short.copy | 0.6287 | 0.6305 | 1.003 | 0.997–1.008 | 1.000, 1.006 |  |
+| str.assign_short.view | 0.949 | 0.9597 | 1.011 | 1.006–1.017 | 1.009, 1.014 | worse |
+| vec.iterate | 0.03327 | 0.03343 | 1.005 | 1.002–1.007 | 1.007, 1.003 | worse |
+| vec.mid_erase | 40.61 | 40.83 | 1.005 | 1.002–1.009 | 0.999, 1.012 |  |
+| vec.mid_insert | 40.55 | 40.97 | 1.011 | 1.007–1.014 | 1.003, 1.018 | worse |
+| vec.push_back | 0.274 | 0.2724 | 0.994 | 0.990–0.998 | 0.999, 0.990 |  |
+| vec.push_back_grow | 0.2751 | 0.2773 | 1.008 | 1.003–1.013 | 1.018, 0.998 |  |
+
+XOffset slower at t1a than t0a (worse by the rule): hero.mid_erase.ord 1.010; hero.mid_erase.plain 1.016; hero.mid_insert.ord 1.010; hero.mid_insert.plain 1.015; hero.push_back_grow.ord 1.021; hero.push_back_grow.plain 1.025; map.insert.fresh 1.014; set.find.reused 1.003; str.append 1.007; str.assign_long 1.021; str.assign_short.view 1.011; vec.iterate 1.005; vec.mid_insert 1.011
+
+## layout check: what is worse at t1 in the default build, in the aligned build
+
+| comparison | t1 / t0 | t1a / t0a | 95% interval (aligned) | aligned |
+| --- | ---: | ---: | --- | --- |
+| hero.mid_erase.plain (XOffset ns/op) | 1.007 | 1.016 | 1.012–1.020 | still worse |
+| hero.mid_insert.ord (XOffset ns/op) | 1.015 | 1.010 | 1.006–1.014 | still worse |
+| hero.mid_insert.plain (XOffset ns/op) | 1.041 | 1.015 | 1.011–1.019 | still worse |
+| hero.push_back_grow.plain (XOffset ns/op) | 1.004 | 1.025 | 1.020–1.030 | still worse |
+| reset (XOffset ns/op) | 1.007 | 0.998 | 0.992–1.003 | not worse |
+| str.append (XOffset ns/op) | 1.012 | 1.007 | 1.002–1.012 | still worse |
+| str.assign_long (XOffset ns/op) | 1.080 | 1.021 | 1.017–1.026 | still worse |
+| vec.iterate (XOffset ns/op) | 1.006 | 1.005 | 1.002–1.007 | still worse |
+| hero.mid_insert.ord / std::vector (G9) | 1.012 | 0.996 | 0.990–1.002 | not worse |
+| hero.mid_insert.plain / std::vector (report) | 1.039 | 1.009 | 1.004–1.014 | still worse |
+| map.erase.reused / std::flat_map (report) | 1.006 | 0.997 | 0.994–1.001 | not worse |
+| nested.build.ord / std (G9) | 1.012 | 1.051 | 1.046–1.056 | still worse |
+| nested.build.plain / std (report) | 1.016 | 1.046 | 1.041–1.051 | still worse |
+| set.erase.fresh / std::flat_set (G9) | 1.004 | 0.998 | 0.995–1.001 | not worse |
+| set.find.reused / std::set (report) | 1.035 | 1.034 | 1.027–1.040 | worse? |
+| str.assign_long / std::string (G9) | 1.081 | 1.002 | 0.997–1.006 | not worse |
+| str.assign_short.view / std::string (G9) | 1.083 | 1.002 | 0.998–1.006 | not worse |
+| vec.push_back / std::vector (G9) | 1.006 | 0.999 | 0.994–1.004 | not worse |
+
+## reloc t1 / t0 (median per file, GM of 8 files each)
+
+| case | t0 xo ns/op | t1 xo ns/op | t1 / t0 | first baseline ns/op (t0 runs) | t1a / t0a (aligned) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| hero.mid_erase.ord | 163.90 | 163.57 | 0.998 | 224.80 | 1.000 |
+| hero.mid_erase.plain | 912.43 | 916.11 | 1.004 | 224.97 | 1.013 |
+| hero.mid_insert.ord | 227.42 | 230.06 | 1.012 | 300.50 | 0.999 |
+| hero.mid_insert.plain | 1217.22 | 1257.31 | 1.033 | 298.60 | 1.015 |
+| hero.push_back_grow.ord | 33.41 | 33.29 | 0.997 | 87.20 | 1.007 |
+| hero.push_back_grow.plain | 36.81 | 36.93 | 1.003 | 87.25 | 1.011 |
+| map.erase.fresh | 33.01 | 32.98 | 0.999 | 35.13 | 0.999 |
+| map.erase.reused | 29.62 | 29.58 | 0.999 | 27.35 | 0.998 |
+| map.find.fresh | 5.14 | 5.15 | 1.000 | 6.55 | 1.000 |
+| map.find.reused | 5.15 | 5.15 | 1.000 | 6.56 | 1.000 |
+| map.insert.fresh | 32.36 | 33.50 | 1.035 | 37.21 | 1.002 |
+| map.insert.reused | 29.60 | 29.50 | 0.997 | 29.37 | 0.995 |
+| nested.build.ord | 293.62 | 292.56 | 0.996 | 841.95 | 0.999 |
+| nested.build.plain | 301.17 | 299.79 | 0.995 | 844.71 | 1.002 |
+| reset | 30.55 | 30.66 | 1.004 | 117.83 | 0.998 |
+| set.erase.fresh | 29.79 | 29.77 | 0.999 | 27.43 | 1.000 |
+| set.erase.reused | 23.19 | 23.05 | 0.994 | 20.34 | 1.000 |
+| set.find.fresh | 5.01 | 4.88 | 0.973 | 6.50 | 1.001 |
+| set.find.reused | 4.89 | 4.88 | 0.998 | 6.46 | 1.001 |
+| set.insert.fresh | 28.92 | 28.89 | 0.999 | 28.93 | 0.997 |
+| set.insert.reused | 22.89 | 22.76 | 0.994 | 21.11 | 0.996 |
+| str.append | 1.53 | 1.56 | 1.015 | 3.60 | 1.004 |
+| str.assign_long | 2.71 | 2.93 | 1.082 | 3.39 | 1.017 |
+| str.assign_short | 0.93 | 0.92 | 0.996 | 0.52 | 1.000 |
+| str.assign_short.copy | 0.61 | 0.62 | 1.011 | 0.53 | 0.981 |
+| str.assign_short.view | 0.93 | 0.93 | 0.999 | 2.94 | 1.004 |
+| vec.iterate | 0.03 | 0.03 | 0.999 | 0.03 | 1.001 |
+| vec.mid_erase | 40.42 | 40.26 | 0.996 | 39.63 | 0.996 |
+| vec.mid_insert | 40.51 | 40.57 | 1.001 | 40.82 | 1.004 |
+| vec.push_back | 0.29 | 0.29 | 0.984 | 0.26 | 0.998 |
+| vec.push_back_grow | 0.28 | 0.28 | 0.997 | 0.36 | 0.997 |
+
+## analyze t0 (G9 at the anchor c9fbaea2)
+
+```
+files: 8  compiler: clang 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+G9 comparisons k = 19; one-sided 95% UB, Bonferroni t quantile 0.99737; limit UB <= 1.05
+
+| case                         | baseline       | role   |    n |  xo ns/op | base ns/op |     GM |     UB | verdict |
+| ---------------------------- | -------------- | ------ | ---: | --------: | ---------: | -----: | -----: | ------- |
+| vec.push_back                | std::vector    | G9     |  808 |      0.27 |       0.24 |  1.118 |  1.122 | fail    |
+| vec.push_back_grow           | std::vector    | G9     |  808 |      0.27 |       0.35 |  0.781 |  0.782 | pass    |
+| vec.iterate                  | std::vector    | G9     |  808 |      0.03 |       0.03 |  1.001 |  1.002 | pass    |
+| vec.mid_insert               | std::vector    | G9     |  808 |     40.61 |      40.94 |  0.992 |  0.995 | pass    |
+| vec.mid_erase                | std::vector    | G9     |  808 |     40.37 |      39.55 |  1.023 |  1.026 | pass    |
+| hero.mid_erase.ord           | std::vector    | G9     |  808 |    164.06 |     224.61 |  0.729 |  0.732 | pass    |
+| hero.mid_insert.ord          | std::vector    | G9     |  808 |    227.86 |     305.34 |  0.755 |  0.758 | pass    |
+| hero.push_back_grow.ord      | std::vector    | G9     |  808 |     33.45 |      87.32 |  0.384 |  0.385 | pass    |
+| hero.mid_erase.plain         | std::vector    | report |  808 |    912.11 |     225.25 |  4.056 |  4.071 | report  |
+| hero.mid_insert.plain        | std::vector    | report |  808 |   1220.70 |     305.01 |  4.077 |  4.093 | report  |
+| hero.push_back_grow.plain    | std::vector    | report |  808 |     36.82 |      87.12 |  0.423 |  0.424 | report  |
+| str.assign_short             | std::string    | report |  808 |      0.92 |       0.52 |  1.771 |  1.776 | report  |
+| str.assign_long              | std::string    | G9     |  808 |      2.71 |       3.39 |  0.800 |  0.802 | pass    |
+| str.assign_short.view        | std::string    | G9     |  808 |      0.93 |       2.93 |  0.317 |  0.318 | pass    |
+| str.assign_short.copy        | std::string    | report |  808 |      0.60 |       0.52 |  1.150 |  1.153 | report  |
+| str.append                   | std::string    | G9     |  808 |      1.54 |       3.61 |  0.428 |  0.430 | pass    |
+| map.insert.fresh             | std::flat_map  | G9     |  808 |     32.31 |      37.27 |  0.870 |  0.874 | pass    |
+| map.insert.fresh             | std::map       | report |  808 |     32.31 |      42.64 |  0.753 |  0.758 | report  |
+| map.find.fresh               | std::flat_map  | G9     |  808 |      5.15 |       6.55 |  0.784 |  0.787 | pass    |
+| map.find.fresh               | std::map       | report |  808 |      5.15 |      16.43 |  0.315 |  0.316 | report  |
+| map.erase.fresh              | std::flat_map  | G9     |  808 |     33.04 |      35.16 |  0.939 |  0.944 | pass    |
+| map.erase.fresh              | std::map       | report |  808 |     33.04 |      44.27 |  0.746 |  0.749 | report  |
+| set.insert.fresh             | std::flat_set  | G9     |  808 |     28.89 |      28.89 |  0.999 |  1.003 | pass    |
+| set.insert.fresh             | std::set       | report |  808 |     28.89 |      44.03 |  0.657 |  0.660 | report  |
+| set.find.fresh               | std::flat_set  | G9     |  808 |      4.89 |       6.47 |  0.760 |  0.764 | pass    |
+| set.find.fresh               | std::set       | report |  808 |      4.89 |      16.35 |  0.302 |  0.304 | report  |
+| set.erase.fresh              | std::flat_set  | G9     |  808 |     29.79 |      27.43 |  1.084 |  1.088 | fail    |
+| set.erase.fresh              | std::set       | report |  808 |     29.79 |      44.11 |  0.673 |  0.675 | report  |
+| map.insert.reused            | std::flat_map  | report |  808 |     29.54 |      29.38 |  1.007 |  1.010 | report  |
+| map.insert.reused            | std::map       | report |  808 |     29.54 |      16.03 |  1.845 |  1.852 | report  |
+| map.find.reused              | std::flat_map  | report |  808 |      5.15 |       6.56 |  0.785 |  0.788 | report  |
+| map.find.reused              | std::map       | report |  808 |      5.15 |       7.22 |  0.723 |  0.726 | report  |
+| map.erase.reused             | std::flat_map  | report |  808 |     29.62 |      27.34 |  1.078 |  1.083 | report  |
+| map.erase.reused             | std::map       | report |  808 |     29.62 |      17.58 |  1.669 |  1.678 | report  |
+| set.insert.reused            | std::flat_set  | report |  808 |     22.87 |      21.16 |  1.084 |  1.088 | report  |
+| set.insert.reused            | std::set       | report |  808 |     22.87 |      15.46 |  1.448 |  1.461 | report  |
+| set.find.reused              | std::flat_set  | report |  808 |      4.88 |       6.46 |  0.757 |  0.759 | report  |
+| set.find.reused              | std::set       | report |  808 |      4.88 |       7.02 |  0.697 |  0.699 | report  |
+| set.erase.reused             | std::flat_set  | report |  808 |     23.19 |      20.35 |  1.139 |  1.144 | report  |
+| set.erase.reused             | std::set       | report |  808 |     23.19 |      16.77 |  1.363 |  1.373 | report  |
+| nested.build.ord             | std            | G9     |  808 |    294.25 |     841.16 |  0.349 |  0.351 | pass    |
+| reset                        | std            | G9     |  808 |     30.59 |     117.19 |  0.258 |  0.260 | pass    |
+| nested.build.plain           | std            | report |  808 |    301.42 |     843.75 |  0.357 |  0.359 | report  |
+
+G9: 17 of 19 comparisons have UB <= 1.05; above: vec.push_back, set.erase.fresh
+```
+
+## analyze t1 (G9 at the integration head)
+
+```
+files: 8  compiler: clang 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+G9 comparisons k = 19; one-sided 95% UB, Bonferroni t quantile 0.99737; limit UB <= 1.05
+
+| case                         | baseline       | role   |    n |  xo ns/op | base ns/op |     GM |     UB | verdict |
+| ---------------------------- | -------------- | ------ | ---: | --------: | ---------: | -----: | -----: | ------- |
+| vec.push_back                | std::vector    | G9     |  808 |      0.27 |       0.24 |  1.125 |  1.127 | fail    |
+| vec.push_back_grow           | std::vector    | G9     |  808 |      0.28 |       0.56 |  0.490 |  0.492 | pass    |
+| vec.iterate                  | std::vector    | G9     |  808 |      0.03 |       0.03 |  1.001 |  1.003 | pass    |
+| vec.mid_insert               | std::vector    | G9     |  808 |     40.61 |      40.85 |  0.991 |  0.994 | pass    |
+| vec.mid_erase                | std::vector    | G9     |  808 |     40.20 |      39.55 |  1.018 |  1.021 | pass    |
+| hero.mid_erase.ord           | std::vector    | G9     |  808 |    163.42 |     225.27 |  0.724 |  0.727 | pass    |
+| hero.mid_insert.ord          | std::vector    | G9     |  808 |    229.83 |     306.00 |  0.764 |  0.768 | pass    |
+| hero.push_back_grow.ord      | std::vector    | G9     |  808 |     33.28 |      87.08 |  0.382 |  0.383 | pass    |
+| hero.mid_erase.plain         | std::vector    | report |  808 |    916.66 |     225.25 |  4.061 |  4.078 | report  |
+| hero.mid_insert.plain        | std::vector    | report |  808 |   1257.81 |     303.38 |  4.234 |  4.256 | report  |
+| hero.push_back_grow.plain    | std::vector    | report |  808 |     36.91 |      86.59 |  0.426 |  0.427 | report  |
+| str.assign_short             | std::string    | report |  808 |      0.92 |       0.52 |  1.766 |  1.768 | report  |
+| str.assign_long              | std::string    | G9     |  808 |      2.93 |       3.39 |  0.865 |  0.867 | pass    |
+| str.assign_short.view        | std::string    | G9     |  808 |      0.93 |       2.71 |  0.343 |  0.344 | pass    |
+| str.assign_short.copy        | std::string    | report |  808 |      0.60 |       0.52 |  1.147 |  1.149 | report  |
+| str.append                   | std::string    | G9     |  808 |      1.56 |       3.63 |  0.426 |  0.429 | pass    |
+| map.insert.fresh             | std::flat_map  | G9     |  808 |     32.31 |      37.11 |  0.869 |  0.873 | pass    |
+| map.insert.fresh             | std::map       | report |  808 |     32.31 |      42.89 |  0.754 |  0.758 | report  |
+| map.find.fresh               | std::flat_map  | G9     |  808 |      5.15 |       6.55 |  0.784 |  0.787 | pass    |
+| map.find.fresh               | std::map       | report |  808 |      5.15 |      16.41 |  0.314 |  0.316 | report  |
+| map.erase.fresh              | std::flat_map  | G9     |  808 |     32.96 |      35.07 |  0.942 |  0.945 | pass    |
+| map.erase.fresh              | std::map       | report |  808 |     32.96 |      44.35 |  0.741 |  0.744 | report  |
+| set.insert.fresh             | std::flat_set  | G9     |  808 |     28.89 |      28.97 |  0.996 |  1.000 | pass    |
+| set.insert.fresh             | std::set       | report |  808 |     28.89 |      44.07 |  0.655 |  0.658 | report  |
+| set.find.fresh               | std::flat_set  | G9     |  808 |      4.87 |       6.46 |  0.755 |  0.757 | pass    |
+| set.find.fresh               | std::set       | report |  808 |      4.87 |      16.32 |  0.301 |  0.302 | report  |
+| set.erase.fresh              | std::flat_set  | G9     |  808 |     29.79 |      27.34 |  1.089 |  1.093 | fail    |
+| set.erase.fresh              | std::set       | report |  808 |     29.79 |      44.43 |  0.665 |  0.667 | report  |
+| map.insert.reused            | std::flat_map  | report |  808 |     29.46 |      29.30 |  1.004 |  1.007 | report  |
+| map.insert.reused            | std::map       | report |  808 |     29.46 |      16.03 |  1.815 |  1.830 | report  |
+| map.find.reused              | std::flat_map  | report |  808 |      5.15 |       6.56 |  0.785 |  0.787 | report  |
+| map.find.reused              | std::map       | report |  808 |      5.15 |       7.55 |  0.687 |  0.689 | report  |
+| map.erase.reused             | std::flat_map  | report |  808 |     29.54 |      27.26 |  1.084 |  1.087 | report  |
+| map.erase.reused             | std::map       | report |  808 |     29.54 |      17.66 |  1.644 |  1.655 | report  |
+| set.insert.reused            | std::flat_set  | report |  808 |     22.79 |      21.08 |  1.081 |  1.084 | report  |
+| set.insert.reused            | std::set       | report |  808 |     22.79 |      15.71 |  1.421 |  1.434 | report  |
+| set.find.reused              | std::flat_set  | report |  808 |      4.88 |       6.46 |  0.754 |  0.756 | report  |
+| set.find.reused              | std::set       | report |  808 |      4.88 |       6.65 |  0.721 |  0.724 | report  |
+| set.erase.reused             | std::flat_set  | report |  808 |     23.03 |      20.35 |  1.136 |  1.141 | report  |
+| set.erase.reused             | std::set       | report |  808 |     23.03 |      16.85 |  1.342 |  1.352 | report  |
+| nested.build.ord             | std            | G9     |  808 |    292.97 |     824.22 |  0.353 |  0.355 | pass    |
+| reset                        | std            | G9     |  808 |     30.59 |     119.14 |  0.248 |  0.251 | pass    |
+| nested.build.plain           | std            | report |  808 |    299.47 |     820.31 |  0.363 |  0.364 | report  |
+
+G9: 17 of 19 comparisons have UB <= 1.05; above: vec.push_back, set.erase.fresh
+```
+
+## quiet
+
+```
+2026-11-03T01:43:50Z block 1 start: waited 180s load 1.44 WindowServer 2% remote 6
+2026-11-03T01:46:55Z block 2 start: waited 180s load 2.02 WindowServer 39% remote 6
+2026-11-03T01:49:59Z block 3 start: waited 180s load 2.03 WindowServer 5.7% remote 6
+2026-11-03T01:53:04Z block 4 start: waited 180s load 1.80 WindowServer 43.1% remote 6
+```

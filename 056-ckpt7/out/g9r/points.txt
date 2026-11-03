@@ -1,0 +1,20 @@
+t0 c9fbaea2e980f6f708df615181ced209d653dc0f tree 379c21a13a1d596a466e7f80c35550c94d8c4727 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (next_cpp26 c9fbaea2 (library = v3.2.1))
+t1 c4925fa7e7eb7406136685a2943af1ce1e9de96c tree ca4688c1c9890a03c228fd7d329ef00c514e0ede typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (CKPT7 head (class 1 integration c4925fa7))
+t1: diff over t0 sha256 641339ee08bf428be547a27830dfc9e2ebd92b3c60ad4cd4891cbdf607d5b402 ( 14 files changed, 501 insertions(+), 63 deletions(-))
+t1: library header diff over t0:  2 files changed, 298 insertions(+), 38 deletions(-)
+t1: first-parent commits over t0:
+  c4925fa7 bench/slg: XOffset A adapter calls prefetch_for_update() on arrival
+  6b151ac0 XBuffer: prefetch_for_update() cache hint for cold buffers
+  683b8b36 Free table and XVector: cheaper first hole and element access
+  b251226b Free table: small bins keep their first holes inline
+  5433b4eb Reload zero tail: shrinking loads take an out-of-line reinit; D6 step reset keyed on the epoch
+  0ce5897d Reload zero tail: one compare inline, the rest out of line
+  1480b62b Reload zero tail: only for loads that shrink the logical length by a page or more
+  adf72e50 Reload zero tail: decide only on shrinking loads, before reading the header
+  583d85de bench/slg: MANIFEST for the demo install swap
+  edae8c26 Reload zero watermark, adaptive D6 regrow step, member swap in the SLG demo installs
+bench/reloc of t1: same tree as t0
+reloc_bench t0 sha256 8d7cf69da8f65111da5837039b75d16cf334d51cd6254d5cef1e9d6033665e20
+reloc_bench t1 sha256 37d945a7f33c5dcc003cb77bc6ccfc067f2da00c3206b001683860579109652f
+reloc_bench t0a sha256 6e809e648798c44452f1edefc4ea856bd6f3d6c152c8fc5480886d6ff2e74116
+reloc_bench t1a sha256 7361255d0c6b3515594dd614cce215eed58b7a76b24d3381aa75e93344d23d89

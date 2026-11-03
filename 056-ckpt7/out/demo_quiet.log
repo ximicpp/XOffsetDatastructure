@@ -1,0 +1,20 @@
+2026-11-03T01:30:03Z demo block 1 start: waited 180s load 1.26 WindowServer 1.1% (gated 0) remote 6
+2026-11-03T01:30:08Z demo process 1 (head) done
+2026-11-03T01:30:13Z demo process 2 (anc) done
+2026-11-03T01:30:17Z demo process 3 (anc) done
+2026-11-03T01:30:22Z demo process 4 (head) done
+2026-11-03T01:33:24Z demo block 2 start: waited 180s load 1.32 WindowServer 1.1% (gated 0) remote 6
+2026-11-03T01:33:29Z demo process 5 (anc) done
+2026-11-03T01:33:33Z demo process 6 (head) done
+2026-11-03T01:33:38Z demo process 7 (head) done
+2026-11-03T01:33:43Z demo process 8 (anc) done
+2026-11-03T01:36:45Z demo block 3 start: waited 180s load 1.42 WindowServer 1% (gated 0) remote 6
+2026-11-03T01:36:49Z demo process 9 (head) done
+2026-11-03T01:36:54Z demo process 10 (anc) done
+2026-11-03T01:36:59Z demo process 11 (anc) done
+2026-11-03T01:37:03Z demo process 12 (head) done
+2026-11-03T01:40:05Z demo block 4 start: waited 180s load 1.34 WindowServer 42.2% (gated 0) remote 6
+2026-11-03T01:40:10Z demo process 13 (anc) done
+2026-11-03T01:40:15Z demo process 14 (head) done
+2026-11-03T01:40:20Z demo process 15 (head) done
+2026-11-03T01:40:25Z demo process 16 (anc) done

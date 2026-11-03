@@ -1,0 +1,244 @@
+-- The CXX compiler identification is Clang 21.0.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /Volumes/XOffsetCS/toolchain/p2996-d77eff1/bin/clang++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Using C++26 with reflection (schema backend: auto)
+-- Full-library reflection compile/link probe passed
+-- Polymorphic positive control passed; expected rejection diagnostic verified
+-- CTest inventory: 142 test programs + 20 subprocess scenarios + 5 tooling checks = 167; 3 configure checks listed separately
+-- Test inventory: /Volumes/XOffsetCS/perf-gate/build/ckpt7/ctest-head/test-inventory.json
+-- Configuring done (2.7s)
+-- Generating done (0.2s)
+CMake Warning (unused-cli):
+  Manually-specified variables were not used by the project:
+
+    CMAKE_C_COMPILER
+
+
+-- Build files have been written to: /Volumes/XOffsetCS/perf-gate/build/ckpt7/ctest-head
+[  0%] Building CXX object examples/CMakeFiles/xoffsetdatastructure_demo.dir/demo.cpp.o
+[  0%] Building CXX object examples/CMakeFiles/schema_handshake.dir/schema_handshake.cpp.o
+[  2%] Building CXX object examples/CMakeFiles/helloworld.dir/helloworld.cpp.o
+[  2%] Building CXX object examples/CMakeFiles/stable_storage.dir/stable_storage.cpp.o
+[  2%] Linking CXX executable ../bin/Release/stable_storage
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[  2%] Linking CXX executable ../bin/Release/helloworld
+[  2%] Built target stable_storage
+[  2%] Building CXX object tools/CMakeFiles/bench_compare.dir/bench_compare.cpp.o
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[  2%] Built target helloworld
+[  2%] Building CXX object tools/CMakeFiles/check_signature_matrix.dir/check_signature_matrix.cpp.o
+[  3%] Linking CXX executable ../bin/Release/schema_handshake
+[  4%] Linking CXX executable ../bin/Release/xoffsetdatastructure_demo
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[  4%] Built target schema_handshake
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[  4%] Building CXX object tools/CMakeFiles/export_signatures.dir/export_signatures.cpp.o
+[  4%] Built target xoffsetdatastructure_demo
+[  4%] Building CXX object tools/CMakeFiles/check_compat.dir/check_compat.cpp.o
+[  4%] Linking CXX executable ../bin/Release/check_signature_matrix
+[  4%] Built target check_signature_matrix
+[  4%] Building CXX object tools/CMakeFiles/describe_dump_slg.dir/describe_dump.cpp.o
+[  5%] Linking CXX executable ../bin/Release/check_compat
+[  5%] Built target check_compat
+[  7%] Building CXX object tools/CMakeFiles/describe_dump_cases.dir/describe_dump.cpp.o
+[  7%] Linking CXX executable ../bin/Release/bench_compare
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[  7%] Built target bench_compare
+[  7%] Building CXX object tests/CMakeFiles/test_virtual_memory_storage.dir/test_virtual_memory_storage.cpp.o
+[  8%] Linking CXX executable ../bin/Release/describe_dump_slg
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[  8%] Built target describe_dump_slg
+[  9%] Building CXX object tests/CMakeFiles/test_vm_pool.dir/test_vm_pool.cpp.o
+[  9%] Linking CXX executable ../bin/Release/describe_dump_cases
+[ 10%] Linking CXX executable ../bin/Release/test_virtual_memory_storage
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 10%] Built target describe_dump_cases
+[ 10%] Building CXX object tests/CMakeFiles/test_vm_storage_noexc.dir/test_vm_storage_noexc.cpp.o
+[ 10%] Built target test_virtual_memory_storage
+[ 10%] Building CXX object tests/CMakeFiles/test_basic_types.dir/test_basic_types.cpp.o
+[ 10%] Linking CXX executable ../bin/Release/export_signatures
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 10%] Built target export_signatures
+[ 11%] Building CXX object tests/CMakeFiles/test_vector.dir/test_vector.cpp.o
+[ 12%] Building CXX object tests/CMakeFiles/test_vm_storage_noexc.dir/test_vm_storage_noexc_tu2.cpp.o
+[ 12%] Linking CXX executable ../bin/Release/test_vm_pool
+[ 12%] Built target test_vm_pool
+[ 12%] Building CXX object tests/CMakeFiles/test_map_set.dir/test_map_set.cpp.o
+[ 12%] Linking CXX executable ../bin/Release/test_vm_storage_noexc
+[ 12%] Built target test_vm_storage_noexc
+[ 14%] Building CXX object tests/CMakeFiles/test_nested.dir/test_nested.cpp.o
+[ 14%] Linking CXX executable ../bin/Release/test_basic_types
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 14%] Built target test_basic_types
+[ 14%] Building CXX object tests/CMakeFiles/test_compaction.dir/test_compaction.cpp.o
+[ 14%] Linking CXX executable ../bin/Release/test_vector
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 14%] Built target test_vector
+[ 14%] Building CXX object tests/CMakeFiles/test_modify.dir/test_modify.cpp.o
+[ 14%] Linking CXX executable ../bin/Release/test_nested
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 15%] Linking CXX executable ../bin/Release/test_map_set
+[ 15%] Built target test_nested
+[ 15%] Building CXX object tests/CMakeFiles/test_xbuffer_api.dir/test_xbuffer_api.cpp.o
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 15%] Built target test_map_set
+[ 15%] Building CXX object tests/CMakeFiles/test_assign_range.dir/test_assign_range.cpp.o
+[ 16%] Linking CXX executable ../bin/Release/test_compaction
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 16%] Built target test_compaction
+[ 16%] Building CXX object tests/CMakeFiles/test_scalar_resize.dir/test_scalar_resize.cpp.o
+[ 17%] Linking CXX executable ../bin/Release/test_modify
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 17%] Built target test_modify
+[ 17%] Building CXX object tests/CMakeFiles/test_validation_granules.dir/test_validation_granules.cpp.o
+[ 18%] Linking CXX executable ../bin/Release/test_xbuffer_api
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 18%] Built target test_xbuffer_api
+[ 18%] Building CXX object tests/CMakeFiles/test_string_replace.dir/test_string_replace.cpp.o
+[ 20%] Linking CXX executable ../bin/Release/test_assign_range
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 20%] Built target test_assign_range
+[ 21%] Building CXX object tests/CMakeFiles/test_hot_path_constants.dir/test_hot_path_constants.cpp.o
+[ 22%] Linking CXX executable ../bin/Release/test_scalar_resize
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 22%] Built target test_scalar_resize
+[ 23%] Building CXX object tests/CMakeFiles/test_resize_growth.dir/test_resize_growth.cpp.o
+[ 24%] Linking CXX executable ../bin/Release/test_string_replace
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 24%] Built target test_string_replace
+[ 25%] Building CXX object tests/CMakeFiles/test_reflection_core.dir/test_reflection_core.cpp.o
+[ 25%] Linking CXX executable ../bin/Release/test_validation_granules
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 25%] Built target test_validation_granules
+[ 25%] Building CXX object tests/CMakeFiles/test_reflection_advanced.dir/test_reflection_advanced.cpp.o
+[ 25%] Linking CXX executable ../bin/Release/test_hot_path_constants
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 25%] Built target test_hot_path_constants
+[ 27%] Building CXX object tests/CMakeFiles/test_type_signatures.dir/test_type_signatures.cpp.o
+[ 27%] Linking CXX executable ../bin/Release/test_reflection_core
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 27%] Built target test_reflection_core
+[ 28%] Building CXX object tests/CMakeFiles/test_field_limit_fix.dir/test_field_limit_fix.cpp.o
+[ 28%] Linking CXX executable ../bin/Release/test_resize_growth
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 28%] Built target test_resize_growth
+[ 28%] Building CXX object tests/CMakeFiles/test_type_safety.dir/test_type_safety.cpp.o
+[ 29%] Linking CXX executable ../bin/Release/test_reflection_advanced
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 29%] Built target test_reflection_advanced
+[ 29%] Building CXX object tests/CMakeFiles/test_admission_typelayout.dir/test_admission_typelayout.cpp.o
+[ 29%] Linking CXX executable ../bin/Release/test_type_signatures
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 29%] Built target test_type_signatures
+[ 29%] Building CXX object tests/CMakeFiles/test_wire_admission.dir/test_wire_admission.cpp.o
+[ 30%] Linking CXX executable ../bin/Release/test_type_safety
+[ 30%] Linking CXX executable ../bin/Release/test_field_limit_fix
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 30%] Built target test_type_safety
+[ 31%] Building CXX object tests/CMakeFiles/test_enum_support.dir/test_enum_support.cpp.o
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 31%] Built target test_field_limit_fix
+[ 31%] Building CXX object tests/CMakeFiles/test_xstring_direct_assign.dir/test_xstring_direct_assign.cpp.o
+[ 31%] Linking CXX executable ../bin/Release/test_wire_admission
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 31%] Built target test_wire_admission
+[ 31%] Building CXX object tests/CMakeFiles/test_string_append.dir/test_string_append.cpp.o
+[ 32%] Linking CXX executable ../bin/Release/test_xstring_direct_assign
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 32%] Built target test_xstring_direct_assign
+[ 32%] Building CXX object tests/CMakeFiles/test_xhandle.dir/test_xhandle.cpp.o
+[ 32%] Linking CXX executable ../bin/Release/test_enum_support
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 32%] Built target test_enum_support
+[ 34%] Building CXX object tests/CMakeFiles/test_schema_envelope.dir/test_schema_envelope.cpp.o
+[ 34%] Linking CXX executable ../bin/Release/test_xhandle
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 34%] Built target test_xhandle
+[ 34%] Building CXX object tests/CMakeFiles/test_fixed_layout_containers.dir/test_fixed_layout_containers.cpp.o
+[ 34%] Linking CXX executable ../bin/Release/test_string_append
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 34%] Built target test_string_append
+[ 34%] Building CXX object tests/CMakeFiles/test_error_paths.dir/test_error_paths.cpp.o
+[ 34%] Linking CXX executable ../bin/Release/test_schema_envelope
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 34%] Linking CXX executable ../bin/Release/test_admission_typelayout
+[ 34%] Built target test_schema_envelope
+[ 34%] Building CXX object tests/CMakeFiles/test_memory_efficiency.dir/test_memory_efficiency.cpp.o
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 34%] Built target test_admission_typelayout
+[ 35%] Building CXX object tests/CMakeFiles/test_zero_boilerplate.dir/test_zero_boilerplate.cpp.o
+[ 35%] Linking CXX executable ../bin/Release/test_error_paths
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 35%] Built target test_error_paths
+[ 35%] Building CXX object tests/CMakeFiles/test_complex_nesting.dir/test_complex_nesting.cpp.o
+[ 35%] Linking CXX executable ../bin/Release/test_zero_boilerplate
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 35%] Built target test_zero_boilerplate
+[ 35%] Building CXX object tests/CMakeFiles/test_inheritance.dir/test_inheritance.cpp.o
+[ 35%] Linking CXX executable ../bin/Release/test_memory_efficiency
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 35%] Built target test_memory_efficiency
+[ 35%] Building CXX object tests/CMakeFiles/test_adaptive_reservation.dir/test_adaptive_reservation.cpp.o
+[ 35%] Linking CXX executable ../bin/Release/test_fixed_layout_containers
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 35%] Built target test_fixed_layout_containers
+[ 36%] Building CXX object tests/CMakeFiles/test_main_containers.dir/test_main_containers.cpp.o
+[ 36%] Linking CXX executable ../bin/Release/test_complex_nesting
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 37%] Linking CXX executable ../bin/Release/test_adaptive_reservation
+[ 37%] Built target test_complex_nesting
+[ 37%] Building CXX object tests/CMakeFiles/test_runtime_regressions.dir/test_runtime_regressions.cpp.o
+[ 38%] Linking CXX executable ../bin/Release/test_inheritance
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 38%] Built target test_adaptive_reservation
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 38%] Building CXX object tests/CMakeFiles/test_mutation_failures.dir/test_mutation_failures.cpp.o
+[ 38%] Built target test_inheritance
+[ 40%] Building CXX object tests/CMakeFiles/test_wire_validation.dir/test_wire_validation.cpp.o
+[ 40%] Linking CXX executable ../bin/Release/test_main_containers
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 40%] Built target test_main_containers
+[ 40%] Building CXX object tests/CMakeFiles/test_same_arena_move.dir/test_same_arena_move.cpp.o
+[ 41%] Linking CXX executable ../bin/Release/test_runtime_regressions
+[ 41%] Linking CXX executable ../bin/Release/test_mutation_failures
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 41%] Built target test_runtime_regressions
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 41%] Built target test_mutation_failures
+[ 41%] Building CXX object tests/CMakeFiles/test_shift_relocate.dir/test_shift_relocate.cpp.o
+[ 42%] Building CXX object tests/CMakeFiles/test_append_grow.dir/test_append_grow.cpp.o
+[ 42%] Linking CXX executable ../bin/Release/test_wire_validation
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 42%] Built target test_wire_validation
+[ 42%] Building CXX object tests/CMakeFiles/test_subtree_copy.dir/test_subtree_copy.cpp.o
+[ 42%] Linking CXX executable ../bin/Release/test_same_arena_move
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 42%] Built target test_same_arena_move
+[ 42%] Building CXX object tests/CMakeFiles/test_free_table_policy.dir/test_free_table_policy.cpp.o
+[ 42%] Linking CXX executable ../bin/Release/test_append_grow
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 42%] Built target test_append_grow
+[ 42%] Building CXX object tests/CMakeFiles/test_lower_bound_index.dir/test_lower_bound_index.cpp.o
+/Volumes/XOffsetCS/perf-gate/src/ckpt7/head-c4925fa/tests/test_free_table_policy.cpp:388:11: error: 'auto' deduced as 'std::size_t' (aka 'unsigned long') in declaration of 'count' and deduced as 'std::uint64_t' (aka 'unsigned long long') in declaration of 'freed'
+  388 |     const auto count = a.core.free_block_count(), freed = a.core.free_block_bytes();
+      |           ^            ~~~~~~~~~~~~~~~~~~~~~~~~~          ~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+make[2]: *** [tests/CMakeFiles/test_free_table_policy.dir/test_free_table_policy.cpp.o] Error 1
+make[1]: *** [tests/CMakeFiles/test_free_table_policy.dir/all] Error 2
+make[1]: *** Waiting for unfinished jobs....
+[ 43%] Linking CXX executable ../bin/Release/test_shift_relocate
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 43%] Built target test_shift_relocate
+[ 43%] Linking CXX executable ../bin/Release/test_subtree_copy
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 43%] Built target test_subtree_copy
+[ 44%] Linking CXX executable ../bin/Release/test_lower_bound_index
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[ 44%] Built target test_lower_bound_index
+make: *** [all] Error 2
