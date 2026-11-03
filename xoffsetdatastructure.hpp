@@ -3284,28 +3284,31 @@ namespace XOffsetDatastructure {
         }
 
         void assign(std::string_view rhs) {
-            if (is_inline()) {
-                // A nonempty short value into a bound inline head stays
-                // inline: the general path below would do the same after
-                // its checks. rhs may alias the inline bytes (store_inline
-                // reads them all first).
-                if (rhs.size() - 1u < inline_max) [[likely]] {
-                    store_inline(rhs.data(), static_cast<std::uint32_t>(rhs.size()));
+            // An inline head, or a null one (as emplace_back() builds it),
+            // takes a nonempty short value inline: the general path below
+            // would do the same after its checks.
+            bool inline_head = is_inline();
+            if (!inline_head) {
+                if (rhs.size() - 1u < capacity_) [[likely]] {
+                    // Nonempty and fits the out-of-line block. capacity_ != 0
+                    // without the inline flag implies a bound head with a live
+                    // block, and capacity_ < MAX_PAYLOAD: the checks below are
+                    // implied. rhs may alias the block (memmove).
+                    auto* const chars = fixed_detail::resolve_rel32_live<char>(&data_delta, data_delta);
+                    const auto new_size = static_cast<std::uint32_t>(rhs.size());
+                    const auto old_size = size_;
+                    std::memmove(chars, rhs.data(), new_size);
+                    chars[new_size] = '\0';
+                    // M4: zero the old characters after the terminator.
+                    if (old_size > new_size) std::memset(chars + new_size + 1, 0, old_size - new_size);
+                    size_ = new_size;
                     return;
                 }
-            } else if (rhs.size() - 1u < capacity_) [[likely]] {
-                // Nonempty and fits the out-of-line block. capacity_ != 0
-                // without the inline flag implies a bound head with a live
-                // block, and capacity_ < MAX_PAYLOAD: the checks below are
-                // implied. rhs may alias the block (memmove).
-                auto* const chars = fixed_detail::resolve_rel32_live<char>(&data_delta, data_delta);
-                const auto new_size = static_cast<std::uint32_t>(rhs.size());
-                const auto old_size = size_;
-                std::memmove(chars, rhs.data(), new_size);
-                chars[new_size] = '\0';
-                // M4: zero the old characters after the terminator.
-                if (old_size > new_size) std::memset(chars + new_size + 1, 0, old_size - new_size);
-                size_ = new_size;
+                inline_head = data_delta == 0;
+            }
+            // rhs may alias the inline bytes (store_inline reads them all first).
+            if (inline_head && rhs.size() - 1u < inline_max) [[likely]] {
+                store_inline(rhs.data(), static_cast<std::uint32_t>(rhs.size()));
                 return;
             }
             assign_general(rhs);
@@ -4073,9 +4076,22 @@ namespace XOffsetDatastructure {
         }
 
         T& emplace_back() {
+#if !defined(__clang__)
+            // GCC and MSVC: the append fast path at the caller, as push_back
+            // has it; the general path stays out of line.
+            const size_type n = size_;
+            if (n < capacity_) [[likely]] {
+                T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + n;
+                fixed_detail::default_construct(slot, element_binding());
+                size_ = n + 1u;
+                return *slot;
+            }
+            return emplace_back_general();
+#else
             return *append_construct([&](T* dst) {
                 fixed_detail::default_construct(dst, element_binding());
             });
+#endif
         }
 
         template <typename... Args>
@@ -4087,6 +4103,13 @@ namespace XOffsetDatastructure {
         }
 
     protected:
+#if !defined(__clang__)
+        XOFFSET_DETAIL_NOINLINE T& emplace_back_general() {
+            return *insert_construct(size_, [&](T* dst) {
+                fixed_detail::default_construct(dst, element_binding());
+            });
+        }
+#endif
         struct Grown {
             std::int32_t data_delta;
             char32_t capacity;
@@ -4157,7 +4180,8 @@ namespace XOffsetDatastructure {
 
         // Appends (emplace_back, push_back_general) keep the general path in
         // the same function: under Clang a call to it there costs more than
-        // it saves (slg.A). GCC and MSVC take insert_construct as before.
+        // it saves (slg.A). GCC and MSVC take insert_construct as before,
+        // except emplace_back(), which has its fast path at the caller.
         template <typename Construct>
 #if defined(__clang__)
         iterator append_construct(Construct&& construct) {
