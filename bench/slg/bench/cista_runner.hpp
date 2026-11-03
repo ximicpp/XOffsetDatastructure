@@ -85,8 +85,8 @@ public:
         shard_.receive(save(tmp, s));
         if (demo_cases()) {
             const ViewScale& vs = *find_view_scale(sc.name);
-            for (int i = 0; i < 3; ++i) {
-                bs_[i].setup(BlockRates::seed(seed, i), vs, BlockRates::rates[i]);
+            for (int i = 0; i < ViewCases::count; ++i) {
+                bs_[i].setup(seed, vs, i);
                 ops_[i].setup(vs.clients);
             }
             lops_.srv.clear();
@@ -259,14 +259,14 @@ public:
         }
     }
 
-    // Demo case set, server -> client map data (view.hpp, run_blocks): the server
-    // fills its reused message object and serializes it into the block's send
+    // Demo case set, server -> client map data (view.hpp, run_view_case): the server
+    // fills its reused message object and serializes it into the send
     // buffer; a client copies the wire into its held view's buffer, deserializes
     // it there with the runner's checks, reads it in place and keeps it, changing
     // it in place when deltas arrive.
     void run_view(int cycle, CycleStats& st, SampleWires* keep) {
-        for (int i = 0; i < 3; ++i)
-            run_blocks(bs_[i], ops_[i], BlockRates::keys(i), cycle, st, keep ? &keep->view : nullptr, keep ? &keep->delta : nullptr);
+        for (int i = 0; i < ViewCases::count; ++i)
+            run_view_case(bs_[i], ops_[i], ViewCases::keys(i), cycle, st, keep ? &keep->view : nullptr, keep ? &keep->delta : nullptr);
         run_login(lops_, mix_seed(seed_, 0x1062), cycle, 4, st, lseq_);
     }
 
@@ -305,8 +305,8 @@ public:
         Held<cm::ViewDelta> dd;
         Bytes dw;
         void setup(int clients) {
-            snaps.assign(std::size_t(kBlocks), {});
-            held_views = std::vector<Held<cm::ViewSnapshot>>(std::size_t(clients) * 9);
+            snaps.assign(1, {});
+            held_views = std::vector<Held<cm::ViewSnapshot>>(std::size_t(clients));
         }
         template <class Fill> std::size_t snap_encode(int b, Fill&& fill) { fill(ev); return save(snaps[std::size_t(b)], ev).size(); }
         std::string_view snap_wire(int b) const {
@@ -315,9 +315,9 @@ public:
         }
         void snap_recv(int c, int k, int b) {
             const auto& v = snaps[std::size_t(b)];
-            held_views[std::size_t(c) * 9 + std::size_t(k)].receive({v.data(), v.size()});
+            held_views[std::size_t(c) + std::size_t(k)].receive({v.data(), v.size()});
         }
-        cm::ViewSnapshot& held(int c, int k) { return *held_views[std::size_t(c) * 9 + std::size_t(k)]; }
+        cm::ViewSnapshot& held(int c, int k) { return *held_views[std::size_t(c) + std::size_t(k)]; }
         template <class Fill> std::size_t delta_encode(Fill&& fill) { fill(ds); return save(dw, ds).size(); }
         std::string_view delta_wire() const { return {reinterpret_cast<const char*>(dw.data()), dw.size()}; }
         void delta_recv() { dd.receive({dw.data(), dw.size()}); }
@@ -367,8 +367,8 @@ private:
     Held<cm::Report> d_;
     Bytes req_, res_, out_, back_, snap_, snap2_;
     Bytes store_;
-    BlockSession bs_[3];
-    BlockOps ops_[3];
+    ViewSession bs_[ViewCases::count];
+    BlockOps ops_[ViewCases::count];
     LoginOps lops_;
     StoreOps sops_;
     std::vector<int64_t> lseq_;

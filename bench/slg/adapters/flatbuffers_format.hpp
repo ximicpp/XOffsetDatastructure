@@ -120,7 +120,8 @@ inline Offset<fb::ViewSnapshot> build(FlatBufferBuilder& b, const stdm::ViewSnap
     }
     auto us = b.CreateVector(tmp);
     auto ms = marches_of(b, v.marches);
-    return fb::CreateViewSnapshot(b, v.request_id, v.tick, v.x0, v.y0, v.x1, v.y1, us, ms);
+    auto tl = structs<fb::Tile>(b, v.tiles, [](const stdm::Tile& t) { return fb::Tile(t.x, t.y, t.terrain, t.level, t.owner); });
+    return fb::CreateViewSnapshot(b, v.request_id, v.tick, v.x0, v.y0, v.x1, v.y1, us, ms, tl);
 }
 
 inline Offset<fb::ViewDelta> build(FlatBufferBuilder& b, const stdm::ViewDelta& v) {
@@ -134,7 +135,8 @@ inline Offset<fb::ViewDelta> build(FlatBufferBuilder& b, const stdm::ViewDelta& 
     auto rm = b.CreateVector(v.removed);
     auto ms = marches_of(b, v.marches);
     auto rmm = b.CreateVector(v.removed_marches);
-    return fb::CreateViewDelta(b, v.request_id, v.tick, v.x0, v.y0, v.x1, v.y1, us, rm, ms, rmm);
+    auto tl = structs<fb::Tile>(b, v.tiles, [](const stdm::Tile& t) { return fb::Tile(t.x, t.y, t.terrain, t.level, t.owner); });
+    return fb::CreateViewDelta(b, v.request_id, v.tick, v.x0, v.y0, v.x1, v.y1, us, rm, ms, rmm, tl);
 }
 
 template <class V, class FV, class Conv> void unpack_vec(V& out, const FV* in, Conv&& c) {
@@ -202,11 +204,14 @@ inline void unpack(stdm::March& d, const fb::March* s) {
     d.march_id = s->march_id(); d.owner = s->owner(); d.from_x = s->from_x(); d.from_y = s->from_y();
     d.to_x = s->to_x(); d.to_y = s->to_y(); d.eta = s->eta(); unpack_troops(d.troops, s->troops());
 }
-inline void unpack(stdm::ShardState& d, const fb::ShardState* s) {
-    d.shard_id = s->shard_id(); d.tick = s->tick(); d.width = s->width();
-    unpack_vec(d.tiles, s->tiles(), [](stdm::Tile& x, const fb::Tile* y) {
+inline void unpack_tiles(std::vector<stdm::Tile>& o, const flatbuffers::Vector<const fb::Tile*>* in) {
+    unpack_vec(o, in, [](stdm::Tile& x, const fb::Tile* y) {
         x.x = y->x(); x.y = y->y(); x.terrain = y->terrain(); x.level = y->level(); x.owner = y->owner();
     });
+}
+inline void unpack(stdm::ShardState& d, const fb::ShardState* s) {
+    d.shard_id = s->shard_id(); d.tick = s->tick(); d.width = s->width();
+    unpack_tiles(d.tiles, s->tiles());
     unpack_vec(d.cities, s->cities(), [](stdm::City& x, const fb::City* y) { unpack(x, y); });
     unpack_vec(d.marches, s->marches(), [](stdm::March& x, const fb::March* y) { unpack(x, y); });
 }
@@ -222,6 +227,7 @@ inline void unpack(stdm::ViewSnapshot& d, const fb::ViewSnapshot* s) {
         x.name = y->name() ? y->name()->str() : std::string();
     });
     unpack_vec(d.marches, s->marches(), [](stdm::ViewMarch& x, const fb::ViewMarch* y) { unpack(x, y); });
+    unpack_tiles(d.tiles, s->tiles());
 }
 
 inline void unpack(stdm::ViewDelta& d, const fb::ViewDelta* s) {
@@ -235,6 +241,7 @@ inline void unpack(stdm::ViewDelta& d, const fb::ViewDelta* s) {
     unpack_vec(d.marches, s->marches(), [](stdm::ViewMarch& x, const fb::ViewMarch* y) { unpack(x, y); });
     d.removed_marches.clear();
     if (const auto* r = s->removed_marches()) d.removed_marches.assign(r->begin(), r->end());
+    unpack_tiles(d.tiles, s->tiles());
 }
 
 template <class T> struct table_of;
