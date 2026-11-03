@@ -3546,10 +3546,12 @@ namespace XOffsetDatastructure {
         T& operator[](size_type index) noexcept { return data()[index]; }
         const T& operator[](size_type index) const noexcept { return data()[index]; }
 
+        // An empty head has a null data() and size_ 0; adding 0 to a null
+        // pointer is defined (null), so end() needs no test of its own.
         iterator begin() noexcept { return data(); }
-        iterator end() noexcept { return data() ? data() + size_ : nullptr; }
+        iterator end() noexcept { return data() + size_; }
         const_iterator begin() const noexcept { return data(); }
-        const_iterator end() const noexcept { return data() ? data() + size_ : nullptr; }
+        const_iterator end() const noexcept { return data() + size_; }
         T& front() noexcept { return data()[0]; }
         const T& front() const noexcept { return data()[0]; }
         T& back() noexcept { return data()[size_ - 1]; }
