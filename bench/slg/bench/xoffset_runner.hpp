@@ -2,9 +2,11 @@
 // XBuffer; messages are built in, saved from and loaded into arenas, and the game logic
 // runs in place on the received arena. Requires P2996 Clang.
 #pragma once
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -15,6 +17,7 @@
 #include "slg/model_xoffset.hpp"
 #include "slg/model_xoffset_optin.hpp"
 #include "slg/trace.hpp"
+#include "slg/login.hpp"
 #include "slg/view.hpp"
 
 namespace slg {
@@ -65,29 +68,19 @@ public:
             c_r_.emplace(XBuffer::create<ShardState>(kShardInitial, cap(true)));
             d_.emplace(XBuffer::create<Report>(kReportInitial, cap()));
             if (demo_cases()) {
-                world_.setup(seed, *find_view_scale(sc.name));
-                e_s_.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, cap()));
-                e_r_.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, cap()));
                 const ViewScale& vs = *find_view_scale(sc.name);
-                wu_.setup(mix_seed(seed, 0xde17), vs);
-                dt_.setup(vs.clients);
-                u_s_.emplace(XBuffer::create<xm::ViewDelta>(kViewInitial, cap()));
-                u_r_.emplace(XBuffer::create<xm::ViewDelta>(kViewInitial, cap()));
-                held_.clear();
-                for (int c = 0; c < vs.clients; ++c) held_.push_back(XBuffer::create<xm::ViewSnapshot>(kViewInitial, cap()));
-                at_.assign(std::size_t(vs.clients), {});
-#ifdef XOFFSET_DELTA_SYNC_API
-                // N: XOffset's own delta sync (same plan as U; see run_view).
-                ns_.clear(); nr_.clear();
-                for (int c = 0; c < vs.clients; ++c) {
-                    ns_.push_back(XBuffer::create<xm::ViewSnapshot>(kViewInitial, cap()));
-                    nr_.emplace_back(kViewInitial, cap());
+                for (int k = 0; k < 3; ++k) {
+                    bs_[k].setup(BlockRates::seed(seed, k), vs, BlockRates::rates[k]);
+                    ops_[k].setup(vs.clients, vs.units, vs.marches);
                 }
-                nb_.assign(std::size_t(vs.clients), {});
-                nc_.assign(std::size_t(vs.clients), {});
-                nslot_.assign(std::size_t(vs.clients), {});
-                nfree_.assign(std::size_t(vs.clients), {});
-#endif
+                lops_.srv.clear();
+                for (int i = 0; i < sc.migrants; ++i) {
+                    XBuffer b = XBuffer::create<PlayerState>(kPlayerInitial, cap());
+                    copy_player(b.root<PlayerState>(), make_player(mix_seed(seed, 0x1061), i + 1));
+                    lops_.srv.push_back(std::move(b));
+                }
+                lops_.setup();
+                sops_.r = this;
             }
         }
     }
@@ -287,6 +280,7 @@ public:
             timed(st, "S.load_install", [&] { slot.swap(*b_m_); });
             st.bytes["S.player"] += back_.size();
         }
+        if (demo_cases()) run_dirty_save(sops_, pick_storage(seed_, cycle, sc.players, sc.migrants), cycle, st);
 
         if (!demo_cases()) {  // the demo case set has no shard snapshot (susu 2026-11-02)
             timed(st, "C.snapshot", [&] { shard_->save_verified_into<ShardState>(snap_); });
@@ -332,126 +326,298 @@ public:
         }
     }
 
-    // Demo case set, E: viewport sync (view.hpp). The server resets its reused
-    // message buffer, fills it from the world and saves it; the client reloads
-    // (full verification) into its reused buffer and reads every unit in place.
+    // Demo case set, server -> client map data (view.hpp, run_blocks). The server
+    // resets its reused message buffer, fills it from the world and saves it into
+    // the block's send buffer; a client reloads it (full verification) into its
+    // held view's buffer, reads it in place and keeps it; deltas change it in
+    // place.
     void run_view(int cycle, CycleStats& st, SampleWires* keep) {
-        const ViewScale& vs = world_.scale();
-        for (int r = 0; r < vs.rounds; ++r) {
-            world_.tick();
-            for (int c = 0; c < vs.clients; ++c) {
-                const auto& sel = world_.request(c);
-                const int64_t id = (int64_t(cycle) * vs.rounds + r) * vs.clients + c;
-                timed(st, "E.send", [&] {
-                    fill_view(e_s_->reset<xm::ViewSnapshot>(), world_, sel, id);
-                    e_s_->save_verified_into<xm::ViewSnapshot>(view_);
-                });
-                timed(st, "E.recv", [&] {
-                    e_r_->reload_verified<xm::ViewSnapshot>(view_);
-                    st.report_sum += query_view(e_r_->root<xm::ViewSnapshot>());
-                });
-                st.bytes["E.view"] += view_.size();
-                if (keep) keep->view = view_;
-            }
-        }
-        // U: delta sync on a second world (view.hpp). The client applies the delta to
-        // the view it holds in its own XBuffer, in place.
-        const ViewScale& us = wu_.scale();
-        for (int r = 0; r < us.rounds; ++r) {
-            wu_.tick();
-            for (int c = 0; c < us.clients; ++c) {
-                const auto& sel = wu_.request(c);
-                dt_.plan(wu_, c, sel, plan_);
-                const int64_t id = (int64_t(cycle) * us.rounds + r) * us.clients + c;
-                timed(st, "U.send", [&] {
-                    fill_delta(u_s_->reset<xm::ViewDelta>(), wu_, plan_, id);
-                    u_s_->save_verified_into<xm::ViewDelta>(delta_);
-                });
-                timed(st, "U.recv", [&] { u_r_->reload_verified<xm::ViewDelta>(delta_); });
-                timed(st, "U.apply", [&] {
-                    apply_delta(held_[std::size_t(c)].root<xm::ViewSnapshot>(), at_[std::size_t(c)], u_r_->root<xm::ViewDelta>());
-                });
-                st.report_sum += query_held(held_[std::size_t(c)].root<xm::ViewSnapshot>());
-                st.bytes["U.delta"] += delta_.size();
-                if (keep) keep->delta = delta_;
-                st.bytes["U.units"] += plan_.upserts.size();
-                st.bytes["U.removed"] += plan_.removed.size();
-#ifdef XOFFSET_DELTA_SYNC_API
-                run_native_delta(st, c, id, query_held(held_[std::size_t(c)].root<xm::ViewSnapshot>()));
-#endif
-            }
-        }
+        for (int k = 0; k < 3; ++k)
+            run_blocks(bs_[k], ops_[k], BlockRates::keys(k), cycle, st, keep ? &keep->view : nullptr, keep ? &keep->delta : nullptr);
+        run_login(lops_, mix_seed(seed_, 0x1062), cycle, 4, st, lseq_);
     }
 
+    // L / LD (login.hpp): the server's players are resident XBuffers; a client
+    // reloads the login wire into the XBuffer it keeps and changes it in place.
+    // Native (LK / LN): one baseline per online client over the server's player.
+    struct LoginOps {
+        using XBuffer = XOffsetDatastructure::XBuffer;
+        std::vector<XBuffer> srv;
+        std::vector<std::optional<XBuffer>> hold;
+        std::optional<XBuffer> pm, pr;
+        std::string lw, pw;
+        void setup() {
+            hold.clear(); hold.resize(srv.size());
+            pm.emplace(XBuffer::create<xm::PlayerPatch>(kViewInitial, cap()));
+            pr.emplace(XBuffer::create<xm::PlayerPatch>(kViewInitial, cap()));
 #ifdef XOFFSET_DELTA_SYNC_API
-    // N: the same delta sync with XOffset's own delta (xoffset_delta.hpp). The
-    // server keeps, per client, an XBuffer holding the client's view in stable
-    // slots (a unit that leaves zeroes its slot, a unit that enters takes a free
-    // slot), mutates it in place from the same plan as U, and sends
-    // save_delta_into against that client's baseline: the changed payload bytes.
-    // The client applies it with try_apply_delta_verified (patch + full
-    // verification) and reads in place: no decode and no apply step. Zeroed
-    // slots add nothing to query_held, so the client's read must equal U's.
-    // Timed: N.send (mutate the server's copy), N.diff (save_delta_into),
-    // N.recv (apply + verify).
-    void run_native_delta(CycleStats& st, int c, int64_t id, uint64_t want) {
-        using namespace XOffsetDatastructure;
-        const std::size_t k = std::size_t(c);
-        auto& sb = ns_[k];
-        auto& slot = nslot_[k];
-        auto& fr = nfree_[k];
-        // Untimed bookkeeping, like U's plan: which slot each removed / upserted unit
-        // uses (a leaving unit frees its slot first, an entering one takes a free slot
-        // or appends).
-        nrm_.clear(); nup_.clear();
-        for (int32_t gone : plan_.removed) {
-            const auto it = slot.find(gone);
-            if (it == slot.end()) continue;
-            nrm_.push_back(it->second);
-            fr.push_back(it->second);
-            slot.erase(it);
+            nb.assign(srv.size(), {});
+            nc.assign(srv.size(), {});
+            nh.clear(); nh.resize(srv.size());
+#endif
         }
-        int32_t size = int32_t(sb.root<xm::ViewSnapshot>().units.size());
-        for (int32_t i : plan_.upserts) {
-            const int32_t uid = wu_.unit(i).id;
-            auto it = slot.find(uid);
-            int32_t pos;
-            if (it != slot.end()) pos = it->second;
-            else {
-                if (fr.empty()) pos = size++;
-                else { pos = fr.back(); fr.pop_back(); }
-                slot.emplace(uid, pos);
+        int online() const { return int(srv.size()); }
+        PlayerState& server(int p) { return srv[std::size_t(p)].template root<PlayerState>(); }
+        std::size_t login_encode(int p) { srv[std::size_t(p)].template save_verified_into<PlayerState>(lw); return lw.size(); }
+        void login_recv(int p) {
+            auto& h = hold[std::size_t(p)];
+            if (!h) h.emplace(XBuffer::create<PlayerState>(kPlayerInitial, cap()));
+            h->template reload_verified<PlayerState>(lw);
+        }
+        PlayerState& held(int p) { return hold[std::size_t(p)]->template root<PlayerState>(); }
+        template <class Fill> std::size_t patch_encode(Fill&& fill) {
+            fill(pm->template reset<xm::PlayerPatch>());
+            pm->template save_verified_into<xm::PlayerPatch>(pw);
+            return pw.size();
+        }
+        void patch_recv() { pr->template reload_verified<xm::PlayerPatch>(pw); }
+        const xm::PlayerPatch& patch() { return pr->template root<xm::PlayerPatch>(); }
+#ifdef XOFFSET_DELTA_SYNC_API
+        std::vector<XOffsetDatastructure::XDeltaBaseline> nb;
+        std::vector<XOffsetDatastructure::XDeltaCursor> nc;
+        std::vector<std::optional<XBuffer>> nh;
+        std::string nd;
+        std::size_t n_login_key(int p) {
+            nb[std::size_t(p)].reset();
+            srv[std::size_t(p)].template save_delta_into<PlayerState>(nd, nb[std::size_t(p)]);
+            return nd.size();
+        }
+        void n_login_recv(int p) {
+            auto& h = nh[std::size_t(p)];
+            if (!h) h.emplace(XBuffer::create<PlayerState>(kPlayerInitial, cap()));
+            const XOffsetDatastructure::XStatus r = h->template try_apply_delta_verified<PlayerState>(nd, nc[std::size_t(p)]);
+            if (!r) throw std::runtime_error("native login rejected: " + std::string(r.error().message));
+        }
+        std::size_t n_diff(int p) { srv[std::size_t(p)].template save_delta_into<PlayerState>(nd, nb[std::size_t(p)]); return nd.size(); }
+        // The edit's dirty marks as touches; the delta compares only what was touched
+        // (SLG_NO_TOUCH=1: compare everything, as before).
+        static bool touch_on() { static const bool on = std::getenv("SLG_NO_TOUCH") == nullptr; return on; }
+        template <class T> void n_touch(int p, const T& obj) { if (touch_on()) srv[std::size_t(p)].touch(obj); }
+        template <class D> std::size_t n_diff_dirty(int p, const D&) {
+            if (!touch_on()) return n_diff(p);
+            auto& b = srv[std::size_t(p)];
+            XOffsetDatastructure::XDeltaOptions o;
+            o.touched_only = true;
+            b.template save_delta_into<PlayerState>(nd, nb[std::size_t(p)], o);
+            return nd.size();
+        }
+        void n_recv(int p) {
+            if (nd.empty()) return;
+            const XOffsetDatastructure::XStatus r = nh[std::size_t(p)]->template try_apply_delta_verified<PlayerState>(nd, nc[std::size_t(p)]);
+            if (!r) throw std::runtime_error("native self delta rejected: " + std::string(r.error().message));
+        }
+        PlayerState& n_held(int p) { return nh[std::size_t(p)]->template root<PlayerState>(); }
+#endif
+    };
+    // SD (login.hpp): dirty modules to storage. Native SN: a delta against what
+    // storage holds of that player (one baseline per player, kept across cycles).
+    struct StoreOps {
+        using XBuffer = XOffsetDatastructure::XBuffer;
+        XOffsetRunnerT* r = nullptr;
+        std::optional<XBuffer> pm, pr;
+        std::string w;
+        PlayerState& player(int p) { return r->players_[std::size_t(p)].template root<PlayerState>(); }
+        template <class Fill> std::size_t modules_encode(Fill&& fill) {
+            if (!pm) { pm.emplace(XBuffer::create<xm::PlayerPatch>(kPlayerInitial, cap())); pr.emplace(XBuffer::create<xm::PlayerPatch>(kPlayerInitial, cap())); }
+            fill(pm->template reset<xm::PlayerPatch>());
+            pm->template save_verified_into<xm::PlayerPatch>(w);
+            return w.size();
+        }
+        void modules_recv() { pr->template reload_verified<xm::PlayerPatch>(w); }
+#ifdef XOFFSET_DELTA_SYNC_API
+        std::unordered_map<int, XOffsetDatastructure::XDeltaBaseline> nb;
+        std::unordered_map<int, XOffsetDatastructure::XDeltaCursor> nc;
+        std::unordered_map<int, XBuffer> nh;
+        std::string nd;
+        std::size_t n_store_diff(int p) { r->players_[std::size_t(p)].template save_delta_into<PlayerState>(nd, nb[p]); return nd.size(); }
+        void n_store_recv(int p) {
+            if (nd.empty()) return;
+            auto it = nh.find(p);
+            if (it == nh.end()) it = nh.emplace(p, XBuffer::create<PlayerState>(kPlayerInitial, cap())).first;
+            const XOffsetDatastructure::XStatus st = it->second.template try_apply_delta_verified<PlayerState>(nd, nc[p]);
+            if (!st) throw std::runtime_error("native storage delta rejected: " + std::string(st.error().message));
+        }
+        PlayerState& n_store_held(int p) { return nh.at(p).template root<PlayerState>(); }
+        // Which check the last storage apply ran: 0 key, 1 none, 2 in place, 3 full; 4 = nothing changed.
+        int n_store_check(int p) { return nd.empty() ? 4 : int(nc[p].last_check()); }
+        void n_store_prime_all() {
+            for (int p = 0; p < int(r->players_.size()); ++p) { n_store_diff(p); n_store_recv(p); }
+        }
+#endif
+    };
+
+    // Held views are small: slot storage (no VM reservation each), 32 KiB at most.
+    static XOffsetDatastructure::XBuffer::MaximumCapacity held_cap() {
+        using XOffsetDatastructure::XBuffer;
+        return XBuffer::maximum_capacity(32 * 1024).with_growth(XOffsetDatastructure::XGrowPolicy::Automatic);
+    }
+
+    struct BlockOps {
+        using XBuffer = XOffsetDatastructure::XBuffer;
+        std::optional<XBuffer> es, ds, dr;
+        std::vector<std::string> snaps;
+        std::string dw, comp;
+        std::vector<std::optional<XBuffer>> held_views;
+        void setup(int clients, int units, int marches) {
+            es.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, cap()));
+            ds.emplace(XBuffer::create<xm::ViewDelta>(kViewInitial, cap()));
+            dr.emplace(XBuffer::create<xm::ViewDelta>(kViewInitial, cap()));
+            snaps.assign(std::size_t(kBlocks), {});
+            held_views.clear();
+            held_views.resize(std::size_t(clients) * 9);
+#ifdef XOFFSET_DELTA_SYNC_API
+            n_setup(clients, units, marches);
+#endif
+        }
+        template <class Fill> std::size_t snap_encode(int b, Fill&& fill) {
+            fill(es->reset<xm::ViewSnapshot>());
+            es->save_verified_into<xm::ViewSnapshot>(snaps[std::size_t(b)]);
+            return snaps[std::size_t(b)].size();
+        }
+        std::string_view snap_wire(int b) const { return snaps[std::size_t(b)]; }
+        // Bytes only: the same snapshot as save_compact (default slack: the client edits it).
+        std::string_view snap_compact(int) { es->save_compact_into<xm::ViewSnapshot>(comp); return comp; }
+        void snap_recv(int c, int k, int b) {
+            auto& h = held_views[std::size_t(c) * 9 + std::size_t(k)];
+            if (!h) h.emplace(XBuffer::create<xm::ViewSnapshot>(4096, held_cap()));
+            h->reload_verified<xm::ViewSnapshot>(snaps[std::size_t(b)]);
+        }
+        xm::ViewSnapshot& held(int c, int k) { return held_views[std::size_t(c) * 9 + std::size_t(k)]->root<xm::ViewSnapshot>(); }
+        template <class Fill> std::size_t delta_encode(Fill&& fill) {
+            fill(ds->reset<xm::ViewDelta>());
+            ds->save_verified_into<xm::ViewDelta>(dw);
+            return dw.size();
+        }
+        std::string_view delta_wire() const { return dw; }
+        void delta_recv() { dr->reload_verified<xm::ViewDelta>(dw); }
+        const xm::ViewDelta& delta() { return dr->root<xm::ViewDelta>(); }
+
+#ifdef XOFFSET_DELTA_SYNC_API
+        // Native delta (N*, K*): the server keeps each block in an XBuffer with
+        // stable slots (a record that leaves zeroes its slot, a new one takes the
+        // lowest free slot or is appended), mutates it in place, and writes one
+        // delta per block against a baseline shared by all its subscribers; a new
+        // subscriber gets the baseline's key delta. Clients patch + verify and
+        // read in place.
+        struct NBlock {
+            std::optional<XBuffer> buf;
+            XOffsetDatastructure::XDeltaBaseline base;
+            std::unordered_map<int32_t, int32_t> uslot, mslot;
+            std::vector<int32_t> ufree, mfree;
+            int32_t usize = 0, msize = 0;
+            std::vector<int32_t> urm, mrm;
+            std::vector<std::pair<int32_t, int32_t>> uup, mup;
+            std::string delta, key;
+        };
+        std::vector<NBlock> nb;
+        std::vector<std::optional<XBuffer>> nheld;
+        std::vector<XOffsetDatastructure::XDeltaCursor> ncur;
+        int32_t napply_b = -1;
+        // Capacity per block is reserved once (about 1.5x the average plus
+        // margin), so the layout does not move from tick to tick; the vectors
+        // are as long as the most records the block has held (free slots are
+        // reused lowest first) and grow past the reservation only on overflow.
+        // A new subscriber checks and reads every slot up to that length, so
+        // slots past it cost nothing (a fixed 2x + 64 slots cost 25% more key
+        // receive time).
+        void n_setup(int clients, int units, int marches) {
+            nb.clear();
+            nb.resize(std::size_t(kBlocks));
+            const int32_t ucap = 3 * units / (2 * kBlocks) + 32, mcap = 3 * marches / kBlocks + 32;
+            for (int32_t b = 0; b < kBlocks; ++b) {
+                auto& n = nb[std::size_t(b)];
+                n.buf.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, cap()));
+                auto& v = n.buf->template root<xm::ViewSnapshot>();
+                block_rect(b, v.x0, v.y0, v.x1, v.y1);
+                v.units.reserve(std::size_t(ucap));
+                v.marches.reserve(std::size_t(mcap));
             }
-            nup_.emplace_back(i, pos);
+            nheld.clear();
+            nheld.resize(std::size_t(clients) * 9);
+            ncur.assign(std::size_t(clients) * 9, {});
+            nblock_of.assign(std::size_t(clients) * 9, -1);
         }
-        timed(st, "N.send", [&] {
-            const Viewport& r = wu_.current();
-            auto& v = sb.root<xm::ViewSnapshot>();
-            v.request_id = id; v.tick = wu_.tick_no();
-            v.x0 = r.x0; v.y0 = r.y0; v.x1 = r.x0 + kViewW; v.y1 = r.y0 + kViewH;
-            if (v.units.size() < std::size_t(size)) v.units.resize(std::size_t(size));
-            for (int32_t pos : nrm_) {
+        void n_plan(int b, const BlockWorld& w, const DeltaPlan& p) {
+            auto& n = nb[std::size_t(b)];
+            n.urm.clear(); n.mrm.clear(); n.uup.clear(); n.mup.clear();
+            auto take = [](std::unordered_map<int32_t, int32_t>& at, std::vector<int32_t>& fr, int32_t& size, int32_t id) {
+                const auto it = at.find(id);
+                if (it != at.end()) return it->second;
+                int32_t pos;
+                if (fr.empty()) pos = size++;
+                else { std::pop_heap(fr.begin(), fr.end(), std::greater<>{}); pos = fr.back(); fr.pop_back(); }
+                at.emplace(id, pos);
+                return pos;
+            };
+            for (int32_t id : p.removed) {
+                const auto it = n.uslot.find(id);
+                if (it == n.uslot.end()) continue;
+                n.urm.push_back(it->second); n.ufree.push_back(it->second); n.uslot.erase(it);
+                std::push_heap(n.ufree.begin(), n.ufree.end(), std::greater<>{});
+            }
+            for (int32_t id : p.removed_marches) {
+                const auto it = n.mslot.find(id);
+                if (it == n.mslot.end()) continue;
+                n.mrm.push_back(it->second); n.mfree.push_back(it->second); n.mslot.erase(it);
+                std::push_heap(n.mfree.begin(), n.mfree.end(), std::greater<>{});
+            }
+            for (int32_t i : p.units) n.uup.emplace_back(i, take(n.uslot, n.ufree, n.usize, w.unit(i).id));
+            for (int32_t i : p.marches) n.mup.emplace_back(i, take(n.mslot, n.mfree, n.msize, w.march(i).id));
+        }
+        void n_update(int b, const BlockWorld& w, const DeltaPlan&, int64_t id) {
+            auto& n = nb[std::size_t(b)];
+            auto& v = n.buf->template root<xm::ViewSnapshot>();
+            v.request_id = id; v.tick = w.tick_no();
+            if (v.units.size() < std::size_t(n.usize)) v.units.resize(std::size_t(n.usize));
+            if (v.marches.size() < std::size_t(n.msize)) v.marches.resize(std::size_t(n.msize));
+            for (int32_t pos : n.urm) {
                 auto& u = v.units[std::size_t(pos)];
                 u.id = 0; u.owner = 0; u.x = 0; u.y = 0; u.hp = 0; u.state = 0;
                 u.name = std::string_view{};
             }
-            for (const auto& [i, pos] : nup_) {
-                const WorldUnit& s = wu_.unit(i);
+            for (int32_t pos : n.mrm) v.marches[std::size_t(pos)] = xm::ViewMarch{};
+            for (const auto& [i, pos] : n.uup) {
+                const WorldUnit& s = w.unit(i);
                 auto& u = v.units[std::size_t(pos)];
                 u.id = s.id; u.owner = s.owner; u.x = s.x; u.y = s.y; u.hp = s.hp; u.state = s.state;
                 if (sv(u.name) != std::string_view(s.name)) u.name = std::string_view(s.name);
             }
-        });
-        timed(st, "N.diff", [&] { sb.save_delta_into<xm::ViewSnapshot>(ndelta_, nb_[k]); });
-        if (ndelta_.empty()) throw std::runtime_error("native delta: empty delta");
-        timed(st, "N.recv", [&] {
-            const XStatus r = nr_[k].try_apply_delta_verified<xm::ViewSnapshot>(ndelta_, nc_[k]);
+            for (const auto& [i, pos] : n.mup) copy_vmarch(v.marches[std::size_t(pos)], w.march(i));
+        }
+        std::size_t n_diff(int b) {
+            auto& n = nb[std::size_t(b)];
+            n.buf->template save_delta_into<xm::ViewSnapshot>(n.delta, n.base);
+            return n.delta.size();
+        }
+        std::string_view n_key_wire(int b) const { return nb[std::size_t(b)].key; }
+        std::size_t n_key(int b) {
+            auto& n = nb[std::size_t(b)];
+            if (n.base.empty()) n_diff(b);   // a block that never changed
+            n.base.key_delta_into(n.key);
+            return n.key.size();
+        }
+        std::optional<XBuffer>& n_slot(int c, int k) {
+            auto& h = nheld[std::size_t(c) * 9 + std::size_t(k)];
+            // The replica holds the server's non-compact block layout (free slots,
+            // growth slack), which can pass 32 KiB: the largest slot class.
+            if (!h) h.emplace(XBuffer::create<xm::ViewSnapshot>(4096, XBuffer::maximum_capacity(XBuffer::SLOT_MAX).with_growth(XOffsetDatastructure::XGrowPolicy::Automatic)));
+            return h;
+        }
+        void n_key_recv(int c, int k, int b) {
+            const std::size_t i = std::size_t(c) * 9 + std::size_t(k);
+            const XOffsetDatastructure::XStatus r = n_slot(c, k)->template try_apply_delta_verified<xm::ViewSnapshot>(nb[std::size_t(b)].key, ncur[i]);
+            if (!r) throw std::runtime_error("native key delta rejected: " + std::string(r.error().message));
+            nblock_of[i] = b;
+        }
+        void n_apply(int c, int k) {
+            const std::size_t i = std::size_t(c) * 9 + std::size_t(k);
+            const XOffsetDatastructure::XStatus r = nheld[i]->template try_apply_delta_verified<xm::ViewSnapshot>(nb[std::size_t(nblock_of[i])].delta, ncur[i]);
             if (!r) throw std::runtime_error("native delta rejected: " + std::string(r.error().message));
-        });
-        if (query_held(nr_[k].root<xm::ViewSnapshot>()) != want) throw std::runtime_error("native delta: client view differs from U");
-        st.bytes["N.delta"] += ndelta_.size();
-    }
+        }
+        std::vector<int32_t> nblock_of;
+        xm::ViewSnapshot& n_held(int c, int k) { return nheld[std::size_t(c) * 9 + std::size_t(k)]->template root<xm::ViewSnapshot>(); }
 #endif
+    };
 
     uint64_t world_digest() override {
         Digest g;
@@ -562,25 +728,12 @@ private:
     // Reuse protocol state.
     std::optional<XOffsetDatastructure::XBuffer> a_req_, a_m_, a_r_, b_m_, b_r_, c_r_, d_;
     std::string req_, res_, out_, back_, snap_, snap2_;
-    ViewWorld world_;
-    std::optional<XOffsetDatastructure::XBuffer> e_s_, e_r_;
-    std::string view_, store_, delta_;
-    ViewWorld wu_;
-    DeltaTracker dt_;
-    DeltaPlan plan_;
-    std::optional<XOffsetDatastructure::XBuffer> u_s_, u_r_;
-    std::vector<XOffsetDatastructure::XBuffer> held_;
-    std::vector<std::unordered_map<int32_t, int32_t>> at_;
-#ifdef XOFFSET_DELTA_SYNC_API
-    std::vector<XOffsetDatastructure::XBuffer> ns_, nr_;
-    std::vector<XOffsetDatastructure::XDeltaBaseline> nb_;
-    std::vector<XOffsetDatastructure::XDeltaCursor> nc_;
-    std::vector<std::unordered_map<int32_t, int32_t>> nslot_;
-    std::vector<std::vector<int32_t>> nfree_;
-    std::vector<int32_t> nrm_;
-    std::vector<std::pair<int32_t, int32_t>> nup_;
-    std::string ndelta_;
-#endif
+    std::string store_;
+    BlockSession bs_[3];
+    BlockOps ops_[3];
+    LoginOps lops_;
+    StoreOps sops_;
+    std::vector<int64_t> lseq_;
 };
 
 using XOffsetRunner = XOffsetRunnerT<XoModel, false>;

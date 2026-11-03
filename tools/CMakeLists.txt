@@ -114,7 +114,7 @@ configure_xoffset_target(describe_dump_slg)
 target_include_directories(describe_dump_slg PRIVATE "${PROJECT_SOURCE_DIR}/bench/slg/include")
 target_compile_definitions(describe_dump_slg PRIVATE
     "XOFFSET_DESCRIBE_DUMP_INCLUDE=\"slg/model_xoffset.hpp\""
-    "XOFFSET_DESCRIBE_DUMP_ROOTS=slg::xm::PlayerState, slg::xm::BattleMsg, slg::xm::ShardState, slg::xm::ViewSnapshot, slg::xm::ViewDelta")
+    "XOFFSET_DESCRIBE_DUMP_ROOTS=slg::xm::PlayerState, slg::xm::BattleMsg, slg::xm::ShardState, slg::xm::ViewSnapshot, slg::xm::ViewDelta, slg::xm::PlayerPatch")
 if(XOFFSET_BUILD_TESTS)
 add_test(NAME describe_dump_slg
     COMMAND describe_dump_slg --check
