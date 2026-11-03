@@ -4,10 +4,12 @@
 #pragma once
 #include <cstdint>
 #include <map>
+#include <boost/container/flat_map.hpp>
 #include <string>
 #include <vector>
 
 namespace slg::stdm {
+template <class K, class V> using smap = boost::container::flat_map<K, V>;
 
 struct Buff  { int32_t id{}; int32_t stacks{}; int64_t expire_ms{}; };
 struct Skill { int32_t id{}; int32_t level{}; };
@@ -29,8 +31,8 @@ struct Army {
 
 struct City {
     int64_t city_id{}; int32_t level{};
-    std::map<int32_t, int32_t> buildings;
-    std::map<int32_t, int64_t> resources;
+    smap<int32_t, int32_t> buildings;
+    smap<int32_t, int64_t> resources;
 };
 
 struct PlayerState {
@@ -39,8 +41,8 @@ struct PlayerState {
     City city;
     std::vector<Army> armies;
     std::vector<Hero> heroes;
-    std::map<int32_t, int32_t> research;
-    std::map<int32_t, int64_t> items;
+    smap<int32_t, int32_t> research;
+    smap<int32_t, int64_t> items;
 };
 
 // Login self deltas and dirty-module saves (login.hpp): changed armies (whole,
@@ -49,7 +51,7 @@ struct PlayerPatch {
     int64_t player_id{}; int64_t seq{};
     std::vector<int32_t> army_index;
     std::vector<Army> armies;
-    std::map<int32_t, int64_t> items;
+    smap<int32_t, int64_t> items;
     int32_t city_changed{};
     City city;
 };

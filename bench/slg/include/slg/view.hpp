@@ -710,7 +710,7 @@ template <class V, class D> void apply_delta(V& v, HeldIndex& at, const D& d) {
 // Optional native delta (XOffset with XOFFSET_DELTA_SYNC_API), keys N*; every
 // client c has its own server-side view and baseline:
 //   void n_view(int c, const MapWorld&, const ViewRect&)   lay out the view's rect and tiles (untimed)
-//   void n_plan(int c, const MapWorld&, const DeltaPlan&)  which slot each change uses (untimed)
+//   void n_plan(int c, const MapWorld&, const DeltaPlan&)  which slot each change uses (timed in N*.send)
 //   void n_update(int c, const MapWorld&, const DeltaPlan&, int64_t id)   mutate the server's view
 //   std::size_t n_diff(int c)                  save_delta_into against the client's baseline
 //   std::size_t n_key(int c)                   key delta for the first pull (untimed here)
@@ -869,8 +869,9 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
             if (s.plan.empty()) continue;   // nothing changed in this view: nothing sent
             std::size_t nd = 0;
             if constexpr (native) if (native_on()) {
-                ops.n_plan(c, w, s.plan);   // slot bookkeeping, untimed like the tracker
-                timed(st, k.nsend.c_str(), [&] { ops.n_update(c, w, s.plan, base + c); });
+                // Slot bookkeeping is timed with the update, as the application-level
+                // client's id index is timed in U*.apply (fairness review 2026-11-03).
+                timed(st, k.nsend.c_str(), [&] { ops.n_plan(c, w, s.plan); ops.n_update(c, w, s.plan, base + c); });
                 timed(st, k.ndiff.c_str(), [&] { nd = ops.n_diff(c); });
             }
             std::size_t n = 0;

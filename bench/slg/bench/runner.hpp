@@ -87,6 +87,25 @@ template <class F> void untimed(CycleStats& st, const char* key, F&& f) {
 // processes and the native rows from processes with them on.
 inline bool native_on() { static const bool on = std::getenv("SLG_NATIVE_OFF") == nullptr; return on; }
 
+// The storage process checks a received player and keeps the bytes. A format
+// with a check that needs no application model (FlatBuffers' Verifier,
+// protobuf's parse) runs only that; the others decode, which is their check.
+template <class R, class T> void store_check(R& rz, std::span<const uint8_t> in, T& scratch) {
+    if constexpr (requires { rz.store_check(in, scratch); }) rz.store_check(in, scratch);
+    else rz.decode(in, scratch);
+}
+
+// The counterpart of XOffset's prefetch_for_update() hint before A.apply for
+// the other runners (fairness review 2026-11-03): when the battle result is
+// arriving, the scene starts loading the two armies it will write (the army
+// and its hero and troop arrays). Timed in A.res_decode, as XOffset's hint.
+template <class A> void prefetch_army_for_apply(const A& a) {
+    __builtin_prefetch(&a, 1);
+    if (!a.heroes.empty()) __builtin_prefetch(&a.heroes[0], 1);
+    if (!a.troops.empty()) __builtin_prefetch(&a.troops[0], 1);
+    if (!a.buffs.empty()) __builtin_prefetch(&a.buffs[0], 1);
+}
+
 struct Runner {
     virtual ~Runner() = default;
     virtual std::string name() const = 0;
