@@ -995,7 +995,8 @@ namespace XOffsetDatastructure {
                         ++i;
                     }
                 }
-                if (table) table->bump_gen();
+                // No bump_gen: a table from make_free_table() is new or came
+                // from the cache through recycle(), so it is already stale.
             } XOFFSET_CATCH(const std::bad_alloc&) {
                 XOFFSET_THROW(XBadAlloc());
             }
@@ -1113,16 +1114,27 @@ namespace XOffsetDatastructure {
             std::multimap<std::uint32_t, std::uint32_t> large;
             std::uint64_t bytes = 0;
             std::size_t count = 0;
-            // Read through current_gen(): it differs from every value read
-            // before if an entry came or went in between, in any buffer, so
-            // the same gen means the same holes. Each table counts up from
-            // its own range of 2^32 values (one shared atomic per range,
-            // none per change) and takes a new range when it runs out. 0 (no
-            // table) is no range's value. A change only marks the value
-            // stale (one store on every allocation and free); a read counts
-            // up once for any number of changes before it.
-            std::uint64_t gen = next_range();
+            // RL: false means no bin storage has grown since the last full
+            // recycle (or construction), so what is kept is still within the
+            // keep limits and a keep-recycle only empties the nonempty bins.
+            // Every bin growth (load_free_blocks, insert_free_block,
+            // copy_free_table) sets it.
+            bool grown = false;
+            // The generation, read through current_gen(): it differs from
+            // every value read before if an entry came or went in between, in
+            // any buffer, so the same gen means the same holes. Each table
+            // counts up from its own range of 2^32 values (one shared atomic
+            // per range, none per change) and takes a new range when it runs
+            // out. 0 (no table) is no range's value. A change only marks the
+            // value stale (one store on every allocation and free); a read
+            // counts up once for any number of changes before it. Both fields
+            // come after the ones above, which keep the offsets they had
+            // before the generation came, and gen_stale fills the padding
+            // after `grown`: the store a change makes stays next to bytes,
+            // count and grown (one cache line when the table is 64-byte
+            // aligned, as macOS's allocator places it).
             bool gen_stale = true;
+            std::uint64_t gen = next_range();
             XOFFSET_DETAIL_NOINLINE static std::uint64_t next_range() noexcept {
                 static std::atomic<std::uint64_t> ranges{0};
                 return (ranges.fetch_add(1, std::memory_order_relaxed) + 1u) << 32;
@@ -1135,12 +1147,6 @@ namespace XOffsetDatastructure {
                 }
                 return gen;
             }
-            // RL: false means no bin storage has grown since the last full
-            // recycle (or construction), so what is kept is still within the
-            // keep limits and a keep-recycle only empties the nonempty bins.
-            // Every bin growth (load_free_blocks, insert_free_block,
-            // copy_free_table) sets it.
-            bool grown = false;
 
             void mark_nonempty(std::uint32_t bin) noexcept {
                 nonempty[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
