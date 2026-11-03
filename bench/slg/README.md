@@ -145,8 +145,11 @@ game server's dirty flags, and every client's native delta goes into one
 shared buffer (thread 设计并实现增量同步).
 
 Fairness review (thread 审查三类对比测试的公平性, 2026-11-03): the std model's
-maps (items, research, buildings, resources) are `boost::container::flat_map`,
-sorted flat maps like XOffset's and cista's (were `std::map`). FlatBuffers
+maps (items, research, buildings, resources) are `stdm::smap`, a sorted flat
+map (one vector of pairs) written in `model_std.hpp`, like XOffset's and
+cista's (were `std::map`; briefly `boost::container::flat_map`, which needs
+Boost.Move and Boost.Assert outside the dependency lock and ran 5-15% slower
+for the rivals). FlatBuffers
 collects struct elements and table offsets in reused scratch vectors (no
 allocation per list once warm). The storage process runs only the
 format's own check where one exists without the application model
