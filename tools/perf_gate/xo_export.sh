@@ -8,8 +8,9 @@
 #
 # DEST gets: the repository tree at COMMIT (git archive), external/typelayout at the
 # commit's gitlink, and external/boost with only what the build reads: LICENSE_1_0.txt and
-# libs/<lib>/include of the libraries cmake/XOffsetDependencyLock.cmake pins. CMake checks
-# those bytes against the lock, so no .git metadata is needed.
+# libs/<lib>/include of the libraries cmake/XOffsetDependencyLock.cmake pins (CMake checks
+# those bytes against the lock, so no .git metadata is needed) and of the few more the SLG
+# std model's boost::container::flat_map reads (move, assert, describe, mp11).
 #
 # Mirrors live under XO_GIT (default /Volumes/XOffsetCS/git) and are created on first use:
 #   XOffsetDatastructure.git, TypeLayout.git   bare mirrors, fetched when a commit is missing
@@ -18,7 +19,7 @@ set -euo pipefail
 [ $# -eq 2 ] || { sed -n '2,17p' "$0"; exit 2; }
 COMMIT=$1; DEST=$2
 XO_GIT=${XO_GIT:-/Volumes/XOffsetCS/git}
-BOOST_LIBS="container core config throw_exception static_assert container_hash type_traits winapi intrusive predef"
+BOOST_LIBS="container core config throw_exception static_assert container_hash type_traits winapi intrusive predef move assert describe mp11"
 mkdir -p "$XO_GIT"
 [ ! -e "$DEST" ] || { echo "$DEST exists" >&2; exit 1; }
 

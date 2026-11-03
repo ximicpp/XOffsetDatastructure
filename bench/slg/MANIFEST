@@ -129,6 +129,8 @@
 #                        parse (protobuf); std/cista prefetch the armies before A.apply (XOffset's hint
 #                        counterpart); LK.recv includes query_self; n_plan timed in N*.send; cereal
 #                        reuses its istream. Bytes unchanged (364 S records identical).
+#   2026-11-03 CMakeLists.txt adds the Boost headers that flat_map reads (SLG_BOOST_LIBS, default
+#                        the repository's external/boost/libs); build only, the program is unchanged.
 # Contents: slg-reuse adapters (FlatBuffers verified_root runs the Verifier),
 # reuse protocol (c) (SLG_REUSE=1), ordinary-record declarations for every xm
 # record type in include/slg/model_xoffset.hpp, T4 adapter v2 (whole-container
@@ -138,7 +140,7 @@
 #   describe their records with XOFFSET_RECORD / XOFFSET_RECORD_DERIVED when the library has
 #   them (guarded; older trees keep the previous declarations). Same machine code under GCC 16
 #   and P2996 (asm_equal), the lines are tools/describe_dump output (describe_dump_slg).
-4bd68ec1a9dcb93c4cf4cced05cd5a5ce098e4612183badbdc4f001ed32ab4e5  CMakeLists.txt
+0f41ceb23b987f47cb338e5f63dd18ef4dcfb6b85c827f16896f8de5533663e2  CMakeLists.txt
 26f8f558482e34f681ff6da0f3b163ff69b4664bfc37eed5bca8aa8740bf6ec7  README.md
 ea141af841831b376028f48ab0d4c22e66ce2671f01d9e14c9f66814f5ebaa6e  adapters/cereal_format.hpp
 6a4e08d8a8e02d8df667c9c9b9576f6b2f783eec810c50e39ccaa83070309064  adapters/flatbuffers_format.hpp

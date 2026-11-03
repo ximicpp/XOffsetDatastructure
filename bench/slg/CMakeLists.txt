@@ -29,6 +29,18 @@ endif()
 
 add_executable(slg_bench bench/slg_bench.cpp)
 target_include_directories(slg_bench PRIVATE include adapters bench)
+# The std model's maps are boost::container::flat_map (header-only): the
+# headers come from the repository's Boost submodule, or SLG_BOOST_LIBS.
+set(SLG_BOOST_LIBS "${CMAKE_CURRENT_SOURCE_DIR}/../../external/boost/libs" CACHE PATH
+    "Boost modular libraries directory (each library's headers in <name>/include)")
+foreach(lib assert config container container_hash core describe intrusive move mp11 predef
+            static_assert throw_exception type_traits winapi)
+  if(NOT EXISTS "${SLG_BOOST_LIBS}/${lib}/include")
+    message(FATAL_ERROR "slg_bench needs Boost.${lib} headers in ${SLG_BOOST_LIBS}/${lib}/include "
+                        "(git submodule update --init --recursive external/boost, or -DSLG_BOOST_LIBS=)")
+  endif()
+  target_include_directories(slg_bench SYSTEM PRIVATE "${SLG_BOOST_LIBS}/${lib}/include")
+endforeach()
 if(SLG_IR_COUNT)
   find_path(VALGRIND_INCLUDE valgrind/callgrind.h REQUIRED)
   target_include_directories(slg_bench SYSTEM PRIVATE ${VALGRIND_INCLUDE})

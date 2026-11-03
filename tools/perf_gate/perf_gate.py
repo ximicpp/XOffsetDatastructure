@@ -107,8 +107,43 @@ def sha256_file(p):
 
 # ---------------------------------------------------------------- prepare
 
+# Boost libraries whose headers the benchmarks read (the SLG std model's
+# boost::container::flat_map); the library's own subset is a part of it.
+BENCH_BOOST_LIBS = ("assert", "config", "container", "container_hash", "core", "describe", "intrusive",
+                    "move", "mp11", "predef", "static_assert", "throw_exception", "type_traits", "winapi")
+
+
+def export_boost(repo: Path, sha: str, dest: Path):
+    """BENCH_BOOST_LIBS headers of the checked-out Boost submodule, which must be `sha`'s gitlink."""
+    bl = sh(["git", "-C", str(repo), "ls-tree", sha, "external/boost"]).split()
+    if len(bl) < 3 or bl[1] != "commit":
+        raise SystemExit(f"{sha}: external/boost is not a submodule")
+    sub = repo / "external/boost"
+    head = subprocess.run(["git", "-C", str(sub), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    if head != bl[2]:
+        raise SystemExit(f"external/boost is checked out at {head or 'nothing'}, {sha[:12]} pins {bl[2]}; "
+                         "run git submodule update --init --recursive external/boost")
+    for lib in BENCH_BOOST_LIBS:
+        src = sub / "libs" / lib / "include"
+        if not src.is_dir():
+            raise SystemExit(f"external/boost/libs/{lib} is not checked out; "
+                             "run git submodule update --init --recursive external/boost")
+        shutil.copytree(src, dest / "external/boost/libs" / lib / "include", dirs_exist_ok=True)
+
+
+def boost_includes(lib: Path):
+    """-isystem flags for the Boost headers export_boost (or xo_export.sh) placed in `lib`."""
+    out = []
+    for name in BENCH_BOOST_LIBS:
+        d = lib / "external/boost/libs" / name / "include"
+        if d.is_dir():
+            out += ["-isystem", str(d)]
+    return out
+
+
 def export_tree(repo: Path, sha: str, dest: Path):
-    """Library tree of `sha` (git archive) plus its pinned TypeLayout headers."""
+    """Library tree of `sha` (git archive) plus its pinned TypeLayout headers and the
+    benchmarks' Boost headers."""
     dest.mkdir(parents=True)
     archive = subprocess.run(["git", "-C", str(repo), "archive", "--format=tar", sha],
                              check=True, capture_output=True).stdout
@@ -127,6 +162,7 @@ def export_tree(repo: Path, sha: str, dest: Path):
                              check=True, capture_output=True).stdout
     (dest / "external/typelayout").mkdir(parents=True, exist_ok=True)
     subprocess.run(["tar", "-x", "-C", str(dest / "external/typelayout")], input=archive, check=True)
+    export_boost(repo, sha, dest)
     return tl_sha
 
 
@@ -192,11 +228,12 @@ def build_one(prof, lib: Path, bench: Path, slg_dir, formal_dir, cereal, outdir:
     outdir.mkdir(parents=True, exist_ok=True)
     cxx = shlex.split(prof["cxx"])
     common = ["-O3", "-DNDEBUG", f"-I{lib}", "-isystem", f"{lib}/external/typelayout/include"] + extra
+    boost = boost_includes(lib)
     slg = bench / slg_dir
     formal = bench / formal_dir
     cmds = {
         "slg_bench": cxx + prof["std"] + common + [
-            f"-I{slg}/include", f"-I{slg}/adapters", f"-I{slg}/bench", "-isystem", str(cereal),
+            f"-I{slg}/include", f"-I{slg}/adapters", f"-I{slg}/bench", "-isystem", str(cereal)] + boost + [
             "-DSLG_WITH_XOFFSET=1", "-DSLG_WITH_CEREAL=1", "-DSLG_IR_COUNT=1",
             f"{slg}/bench/slg_bench.cpp", "-o", str(outdir / "slg_bench")] + prof["link"],
         "sc_xoffset": cxx + prof["formal_std"] + common + [
