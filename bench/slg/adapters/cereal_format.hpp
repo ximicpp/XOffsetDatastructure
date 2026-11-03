@@ -25,6 +25,7 @@ template <CerealArchive A> void serialize(A& ar, Troop& v) { ar(v.type, v.count,
 template <CerealArchive A> void serialize(A& ar, Hero& v) { ar(v.id, v.level, v.star, v.name, v.skills, v.buffs); }
 template <CerealArchive A> void serialize(A& ar, Army& v) { ar(v.army_id, v.owner_id, v.x, v.y, v.heroes, v.troops, v.buffs); }
 template <CerealArchive A> void serialize(A& ar, City& v) { ar(v.city_id, v.level, v.buildings, v.resources); }
+template <CerealArchive A> void serialize(A& ar, PlayerPatch& v) { ar(v.player_id, v.seq, v.army_index, v.armies, v.items, v.city_changed, v.city); }
 template <CerealArchive A> void serialize(A& ar, PlayerState& v) { ar(v.player_id, v.name, v.city, v.armies, v.heroes, v.research, v.items); }
 template <CerealArchive A> void serialize(A& ar, Event& v) { ar(v.round, v.hero_id, v.skill_id, v.target, v.damage); }
 template <CerealArchive A> void serialize(A& ar, Report& v) { ar(v.battle_id, v.summary, v.events); }
@@ -33,8 +34,9 @@ template <CerealArchive A> void serialize(A& ar, Tile& v) { ar(v.x, v.y, v.terra
 template <CerealArchive A> void serialize(A& ar, March& v) { ar(v.march_id, v.owner, v.from_x, v.from_y, v.to_x, v.to_y, v.eta, v.troops); }
 template <CerealArchive A> void serialize(A& ar, ShardState& v) { ar(v.shard_id, v.tick, v.width, v.tiles, v.cities, v.marches); }
 template <CerealArchive A> void serialize(A& ar, ViewUnit& v) { ar(v.id, v.owner, v.x, v.y, v.hp, v.state, v.name); }
-template <CerealArchive A> void serialize(A& ar, ViewSnapshot& v) { ar(v.request_id, v.tick, v.x0, v.y0, v.x1, v.y1, v.units); }
-template <CerealArchive A> void serialize(A& ar, ViewDelta& v) { ar(v.request_id, v.tick, v.x0, v.y0, v.x1, v.y1, v.upserts, v.removed); }
+template <CerealArchive A> void serialize(A& ar, ViewMarch& v) { ar(v.id, v.owner, v.x0, v.y0, v.x1, v.y1, v.t0, v.t1); }
+template <CerealArchive A> void serialize(A& ar, ViewSnapshot& v) { ar(v.request_id, v.tick, v.x0, v.y0, v.x1, v.y1, v.units, v.marches); }
+template <CerealArchive A> void serialize(A& ar, ViewDelta& v) { ar(v.request_id, v.tick, v.x0, v.y0, v.x1, v.y1, v.upserts, v.removed, v.marches, v.removed_marches); }
 } // namespace slg::stdm
 
 namespace slg {

@@ -16,8 +16,8 @@ namespace slg::pbconv {
 // Forward declarations so the container helpers below find every overload.
 #define SLG_PB_DECL(T) inline void to(pb::T&, const stdm::T&); inline void from(stdm::T&, const pb::T&);
 SLG_PB_DECL(Buff) SLG_PB_DECL(Skill) SLG_PB_DECL(Troop) SLG_PB_DECL(Event) SLG_PB_DECL(Tile)
-SLG_PB_DECL(Hero) SLG_PB_DECL(Army) SLG_PB_DECL(City) SLG_PB_DECL(PlayerState) SLG_PB_DECL(Report)
-SLG_PB_DECL(BattleMsg) SLG_PB_DECL(March) SLG_PB_DECL(ShardState) SLG_PB_DECL(ViewUnit) SLG_PB_DECL(ViewSnapshot) SLG_PB_DECL(ViewDelta)
+SLG_PB_DECL(Hero) SLG_PB_DECL(Army) SLG_PB_DECL(City) SLG_PB_DECL(PlayerState) SLG_PB_DECL(PlayerPatch) SLG_PB_DECL(Report)
+SLG_PB_DECL(BattleMsg) SLG_PB_DECL(March) SLG_PB_DECL(ShardState) SLG_PB_DECL(ViewUnit) SLG_PB_DECL(ViewMarch) SLG_PB_DECL(ViewSnapshot) SLG_PB_DECL(ViewDelta)
 #undef SLG_PB_DECL
 
 inline void to(pb::Buff& d, const stdm::Buff& s) { d.set_id(s.id); d.set_stacks(s.stacks); d.set_expire_ms(s.expire_ms); }
@@ -44,6 +44,13 @@ inline void to(pb::PlayerState& d, const stdm::PlayerState& s) {
     d.set_player_id(s.player_id); d.set_name(s.name); to(*d.mutable_city(), s.city);
     to_rep(d.mutable_armies(), s.armies); to_rep(d.mutable_heroes(), s.heroes);
     to_map(d.mutable_research(), s.research); to_map(d.mutable_items(), s.items);
+}
+inline void to(pb::PlayerPatch& d, const stdm::PlayerPatch& s) {
+    d.set_player_id(s.player_id); d.set_seq(s.seq);
+    d.mutable_army_index()->Reserve(int(s.army_index.size()));
+    for (int32_t i : s.army_index) d.add_army_index(i);
+    to_rep(d.mutable_armies(), s.armies); to_map(d.mutable_items(), s.items);
+    d.set_city_changed(s.city_changed); to(*d.mutable_city(), s.city);
 }
 inline void to(pb::Report& d, const stdm::Report& s) { d.set_battle_id(s.battle_id); d.set_summary(s.summary); to_rep(d.mutable_events(), s.events); }
 inline void to(pb::BattleMsg& d, const stdm::BattleMsg& s) {
@@ -84,6 +91,12 @@ inline void from(stdm::PlayerState& d, const pb::PlayerState& s) {
     from_rep(d.armies, s.armies()); from_rep(d.heroes, s.heroes());
     from_map(d.research, s.research()); from_map(d.items, s.items());
 }
+inline void from(stdm::PlayerPatch& d, const pb::PlayerPatch& s) {
+    d.player_id = s.player_id(); d.seq = s.seq();
+    d.army_index.assign(s.army_index().begin(), s.army_index().end());
+    from_rep(d.armies, s.armies()); from_map(d.items, s.items());
+    d.city_changed = s.city_changed(); from(d.city, s.city());
+}
 inline void from(stdm::Report& d, const pb::Report& s) { d.battle_id = s.battle_id(); d.summary = s.summary(); from_rep(d.events, s.events()); }
 inline void from(stdm::BattleMsg& d, const pb::BattleMsg& s) {
     d.battle_id = s.battle_id(); d.seed = s.seed(); d.winner = s.winner();
@@ -101,9 +114,16 @@ inline void from(stdm::ShardState& d, const pb::ShardState& s) {
 inline void to(pb::ViewUnit& d, const stdm::ViewUnit& s) {
     d.set_id(s.id); d.set_owner(s.owner); d.set_x(s.x); d.set_y(s.y); d.set_hp(s.hp); d.set_state(s.state); d.set_name(s.name);
 }
+inline void to(pb::ViewMarch& d, const stdm::ViewMarch& s) {
+    d.set_id(s.id); d.set_owner(s.owner); d.set_x0(s.x0); d.set_y0(s.y0); d.set_x1(s.x1); d.set_y1(s.y1); d.set_t0(s.t0); d.set_t1(s.t1);
+}
+inline void from(stdm::ViewMarch& d, const pb::ViewMarch& s) {
+    d.id = s.id(); d.owner = s.owner(); d.x0 = s.x0(); d.y0 = s.y0(); d.x1 = s.x1(); d.y1 = s.y1(); d.t0 = s.t0(); d.t1 = s.t1();
+}
 inline void to(pb::ViewSnapshot& d, const stdm::ViewSnapshot& s) {
     d.set_request_id(s.request_id); d.set_tick(s.tick); d.set_x0(s.x0); d.set_y0(s.y0); d.set_x1(s.x1); d.set_y1(s.y1);
     to_rep(d.mutable_units(), s.units);
+    to_rep(d.mutable_marches(), s.marches);
 }
 inline void from(stdm::ViewUnit& d, const pb::ViewUnit& s) {
     d.id = s.id(); d.owner = s.owner(); d.x = s.x(); d.y = s.y(); d.hp = s.hp(); d.state = s.state(); d.name = s.name();
@@ -111,6 +131,7 @@ inline void from(stdm::ViewUnit& d, const pb::ViewUnit& s) {
 inline void from(stdm::ViewSnapshot& d, const pb::ViewSnapshot& s) {
     d.request_id = s.request_id(); d.tick = s.tick(); d.x0 = s.x0(); d.y0 = s.y0(); d.x1 = s.x1(); d.y1 = s.y1();
     from_rep(d.units, s.units());
+    from_rep(d.marches, s.marches());
 }
 
 inline void to(pb::ViewDelta& d, const stdm::ViewDelta& s) {
@@ -118,15 +139,21 @@ inline void to(pb::ViewDelta& d, const stdm::ViewDelta& s) {
     to_rep(d.mutable_upserts(), s.upserts);
     d.mutable_removed()->Reserve(int(s.removed.size()));
     for (int32_t id : s.removed) d.add_removed(id);
+    to_rep(d.mutable_marches(), s.marches);
+    d.mutable_removed_marches()->Reserve(int(s.removed_marches.size()));
+    for (int32_t id : s.removed_marches) d.add_removed_marches(id);
 }
 inline void from(stdm::ViewDelta& d, const pb::ViewDelta& s) {
     d.request_id = s.request_id(); d.tick = s.tick(); d.x0 = s.x0(); d.y0 = s.y0(); d.x1 = s.x1(); d.y1 = s.y1();
     from_rep(d.upserts, s.upserts());
     d.removed.assign(s.removed().begin(), s.removed().end());
+    from_rep(d.marches, s.marches());
+    d.removed_marches.assign(s.removed_marches().begin(), s.removed_marches().end());
 }
 
 template <class T> struct msg_of;
 template <> struct msg_of<stdm::PlayerState> { using type = pb::PlayerState; };
+template <> struct msg_of<stdm::PlayerPatch> { using type = pb::PlayerPatch; };
 template <> struct msg_of<stdm::BattleMsg> { using type = pb::BattleMsg; };
 template <> struct msg_of<stdm::ShardState> { using type = pb::ShardState; };
 template <> struct msg_of<stdm::Report> { using type = pb::Report; };
@@ -164,6 +191,7 @@ struct ProtobufFormat {
         Pair<pb::Report> report;
         Pair<pb::ViewSnapshot> view;
         Pair<pb::ViewDelta> delta;
+        Pair<pb::PlayerPatch> patch;
         std::string slot[kSlots];
         template <class T> auto& pair() {
             if constexpr (std::is_same_v<T, stdm::BattleMsg>) return battle;
@@ -171,6 +199,7 @@ struct ProtobufFormat {
             else if constexpr (std::is_same_v<T, stdm::ShardState>) return shard;
             else if constexpr (std::is_same_v<T, stdm::ViewSnapshot>) return view;
             else if constexpr (std::is_same_v<T, stdm::ViewDelta>) return delta;
+            else if constexpr (std::is_same_v<T, stdm::PlayerPatch>) return patch;
             else return report;
         }
         template <class T> std::span<const uint8_t> encode(int s, const T& v) {
