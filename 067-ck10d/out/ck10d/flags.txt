@@ -1,0 +1,4 @@
+head CMAKE_CXX_FLAGS:STRING=-stdlib=libc++ -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk
+anc CMAKE_CXX_FLAGS:STRING=-stdlib=libc++ -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk
+heada CMAKE_CXX_FLAGS:STRING=-stdlib=libc++ -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk -falign-functions=64
+anca CMAKE_CXX_FLAGS:STRING=-stdlib=libc++ -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk -falign-functions=64

@@ -1,0 +1,32 @@
+== 2026-11-03T17:41:11Z 0. tools
+cmake version 4.4.4
+1.13.2
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+init cache /Volumes/XOffsetCS/perf-gate/slg-init-p2996-d77eff1.cmake sha ed916a0cf280cedf798d20f523b09c055e24ba4da58723df5d51d5558ebedde9; CMAKE_CXX_FLAGS [-stdlib=libc++ -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk]; aligned builds add [-falign-functions=64]
+== 2026-11-03T17:41:11Z 1. export
+head 3e026071a28e0032801666edc8ccdb5f82f19e39 tree 2fba9da672d40aa893264a33202f76059e183c48 bench/slg 98bfe2995c5ee6cce62cdada7423419e459d4495
+anc cc5b28eed7184138f7755da72f73a78e89848929 tree ca39b4bf6943112cd8a358f67667a4ca717f8107 bench/slg 98bfe2995c5ee6cce62cdada7423419e459d4495
+== 2026-11-03T17:41:12Z 2. build
+slg head: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+slg anc: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+slg heada: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+slg anca: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+head 743b33409a9ecd349287cda70534d8607002214c051b892ab14690ec49bde603
+anc 8f5d78f0dcd4be27c40eef96d90d37b5c6ef6f609a09861b7a998990bb0e45b8
+heada 8b1481918246ec5533b31572d6c5361a64b766da9cbc9f55904e1520b4dbbcd5
+anca 7325cf75e0962947d57a4384396c5aca224b4addf5da82174b8475c3ca1e0ef0
+CKPT10 slg.head 743b33409a9ecd349287cda70534d8607002214c051b892ab14690ec49bde603 (default head same file: yes)
+CKPT10 slg.anchor 8f5d78f0dcd4be27c40eef96d90d37b5c6ef6f609a09861b7a998990bb0e45b8 (default anc same file: yes)
+== 2026-11-03T17:42:55Z 3. verify
+head xoffset byte row [1166 2358 12964 842240 712]
+anc xoffset byte row [1166 2358 12964 842240 712]
+heada xoffset byte row [1166 2358 12964 842240 712]
+anca xoffset byte row [1166 2358 12964 842240 712]
+== 2026-11-03T17:43:02Z 4. disasm
+strict 45 identical / 162 differ; loose 171 identical / 36 differ; 1 only in one binary -> /Users/ximi/workspace/xo-queue/queue/067-ck10d/out/ck10d/ck10d_disasm.md
+strict 45 identical / 162 differ; loose 171 identical / 36 differ; 1 only in one binary -> /Users/ximi/workspace/xo-queue/queue/067-ck10d/out/ck10d/ck10d_disasm_aligned.md
+== 2026-11-03T17:43:05Z 5. timing
+== 2026-11-03T17:48:54Z 6. analysis
+判读行：heada÷anca A.total 1.0057 [0.9889, 1.0228]；heada÷anca A.req_encode 1.0026 [0.9796, 1.0260]；heada÷anca A.res_decode 1.0234 [1.0090, 1.0380]；head÷anc A.total 0.9896 [0.9785, 1.0007]；head÷anc A.req_encode 0.9764 [0.9655, 0.9873]；head÷anc A.res_decode 1.0017 [0.9838, 1.0199]
+== 2026-11-03T17:48:54Z finish rc=0
+result tarball: /Users/ximi/workspace/xo-queue/queue/067-ck10d/out/ck10d_result.tar.gz sha256 d33f8ca3bc1cccd0708b733774be3426d3949e745a5322431f92b59156531430

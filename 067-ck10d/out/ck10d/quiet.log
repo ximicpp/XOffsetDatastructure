@@ -1,0 +1,12 @@
+2026-11-03T17:46:07Z block 1 start: need 180s waited 180s load 1.96 WindowServer 4.9% remote 4
+2026-11-03T17:46:10Z block 1 done (8 processes) load 1.97
+2026-11-03T17:46:41Z block 2 start: need 30s waited 30s load 1.93 WindowServer 4.6% remote 4
+2026-11-03T17:46:43Z block 2 done (12 processes) load 1.95
+2026-11-03T17:47:13Z block 3 start: need 30s waited 30s load 1.69 WindowServer 4.6% remote 4
+2026-11-03T17:47:16Z block 3 done (20 processes) load 1.58
+2026-11-03T17:47:47Z block 4 start: need 30s waited 30s load 1.76 WindowServer 4.4% remote 4
+2026-11-03T17:47:48Z block 4 done (24 processes) load 1.82
+2026-11-03T17:48:18Z block 5 start: need 30s waited 30s load 1.86 WindowServer 4.4% remote 4
+2026-11-03T17:48:22Z block 5 done (32 processes) load 1.73
+2026-11-03T17:48:52Z block 6 start: need 30s waited 30s load 1.79 WindowServer 4.4% remote 4
+2026-11-03T17:48:54Z block 6 done (36 processes) load 1.78

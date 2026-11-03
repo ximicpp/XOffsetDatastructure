@@ -1,0 +1,1 @@
+strict 45 identical / 162 differ; loose 171 identical / 36 differ; 1 only in one binary -> /Users/ximi/workspace/xo-queue/queue/067-ck10d/out/ck10d/ck10d_disasm_aligned.md
