@@ -86,15 +86,14 @@ def main():
     if meta.get("cases") == "demo":  # SLG_CASES=demo (include/slg/view.hpp)
         scen = {"A": "场景↔战斗", "B": "场景↔场景", "S": "场景↔存储", "SD": "场景↔存储（只存脏模块）",
                 "L": "登录全量", "LD": "登录后自身增量"}
+        scen["EB"] = "浏览地图，视口全量"
         for r, name in (("P", "和平"), ("C", "交战"), ("S", "压力")):
-            scen["E" + r] = f"视口九宫格全量（{name}）"
-            scen["U" + r] = f"块增量（{name}）"
-        # XOffset's own delta sync (xoffset_delta.hpp): N* deltas, K* key deltas for
-        # new subscribers; compared with each baseline's U* and E*.
+            scen["U" + r] = f"静止视口增量（{name}）"
+        # XOffset's own delta sync (xoffset_delta.hpp): N* deltas per static
+        # client, compared with each baseline's U*.
         if any(m.startswith("N") and m[2:3] == "." for f in formats for m in ns[f]):
             for r, name in (("P", "和平"), ("C", "交战"), ("S", "压力")):
-                scen["N" + r] = f"块增量 XOffset 原生 ÷ 对手 U{r}（{name}）"
-                scen["K" + r] = f"九宫格 XOffset 原生 key ÷ 对手 E{r}（{name}）"
+                scen["N" + r] = f"静止视口增量 XOffset 原生 ÷ 对手 U{r}（{name}）"
             scen["LK"] = "登录全量 XOffset 原生 key ÷ 对手 L"
             scen["LN"] = "自身增量 XOffset 原生 ÷ 对手 LD"
             scen["SN"] = "存盘 XOffset 原生增量 ÷ 对手 SD"
@@ -135,7 +134,7 @@ def main():
             cells = []
             for b in base:
                 x = ns[a.subject].get(s + ".total", {})
-                alt = {"LK": "L", "LN": "LD", "SN": "SD"}.get(s) or ({"N": "U", "K": "E"}.get(s[0]) and {"N": "U", "K": "E"}[s[0]] + s[1:] if len(s) == 2 else None)
+                alt = {"LK": "L", "LN": "LD", "SN": "SD"}.get(s) or ({"N": "U"}.get(s[0]) and "U" + s[1:] if len(s) == 2 else None)
                 y = ns[b].get((alt if alt and s + ".total" not in ns[b] else s) + ".total", {})
                 cs = sorted(set(x) & set(y))
                 lr = [math.log(x[c] / y[c]) for c in cs if x[c] > 0 and y[c] > 0]

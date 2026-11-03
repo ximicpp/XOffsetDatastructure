@@ -53,35 +53,47 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   place and sends it on at the next hop; S scene <-> storage, the storage
   process receives the player with the format's checks and keeps the bytes,
   then sends them back on log-in.
-- server -> client (`include/slg/view.hpp`, revised 2026-11-02 after the SLG
-  use-case research, doc 67f2Y3BpccPrANT5vjBdkH): the 4096 map is split into
-  88 blocks of one screen (512x384). Each client view subscribes to the 3x3
-  block window around its centre and pulls the whole window (one snapshot per
-  block, E*) only when its centre crosses into another block; in between, every
-  block's changes go out as one delta per block (U*), encoded once and fanned out
-  to every subscriber, which applies it to its held view. Blocks hold units
-  (points) and marches (line records: start, end, start tick, arrival tick).
-  Three worlds by change rate: P peace (1 unit in 500 changes per tick, march
-  turnover), C combat (peace plus two battle zones whose units all change every
-  1 s tick), S stress (the earlier E world, a quarter of all units move every
-  tick). M: 10,000 units, 1,500 views, 1,000 marches, 4 ticks per cycle. Stage
-  keys: E*.send (once per block per tick), E*.recv and E*.index (per client and
-  block), U*.send (once per block), U*.recv and U*.apply (per subscriber). Bytes
-  include zstd-3 and, for XOffset, the save_compact window.
+- server -> client (`include/slg/view.hpp`, revised 2026-11-03 per susu: no
+  3x3 block window; a client holds exactly what is inside its viewport). A
+  client sees one screen (512x384) of the 4096 map: the tiles under it (32 px,
+  about 17x13 = 221 with partly covered ones; terrain, level, owner), the units
+  standing in it and the marches whose line crosses it (line records: start,
+  end, start tick, arrival tick). Two cases:
+  - EB browse (class 2): all 1,500 clients drag their viewport every tick (up
+    to 48 px per axis, a jump elsewhere with p = 1/16) and pull everything in
+    the new rectangle in full, one snapshot per client per tick (the spatial
+    query of what lies in it is untimed bookkeeping, as for U*). The world
+    changes at the peace rate, so this case is all full pulls. EB.send fills
+    and encodes one viewport, EB.recv receives it with the format's checks and
+    reads every tile, unit and march.
+  - U* static (class 3): clients do not move. After one untimed full pull the
+    server sends each client, every tick, only what changed inside its
+    viewport (units changed, entered or left; marches started, recalled or
+    gone; tiles whose owner changed), one delta per client; a client with no
+    change gets nothing. Three change rates: UP peace (1 unit in 500 and 1 tile
+    in 1024 change per tick, march turnover; the main case), UC combat (peace
+    plus two battle zones whose units all change every 1 s tick and whose
+    tiles change owner with p = 1/16; reference), US stress (a quarter of all
+    units move, 1/64 of the tiles change owner; upper bound, report only).
+    After the first pull each client reserves 1.5x + 16 unit and march slots in
+    its held view (all formats; a compact view regrows on its first append).
+    U*.send fills and encodes one client's delta, U*.recv receives it, U*.apply
+    applies it to the held view through the client's id index.
+  M: 10,000 units, 1,500 clients, 1,000 marches, 4 ticks per cycle. Bytes
+  include zstd-3 and, for XOffset, the save_compact pull.
 - native delta (XOffset only, built when the library has
-  `XOFFSET_DELTA_SYNC_API` with `XDeltaBaseline::key_delta_into`): the same
-  plan, but the server keeps each block in an XBuffer in stable slots, mutates
-  it in place (N*.send), writes one `save_delta_into` per block against a
-  baseline shared by its subscribers (N*.diff), and a new subscriber gets the
-  baseline's key delta (K*.send / K*.recv). Clients apply with
-  `try_apply_delta_verified` (N*.recv, patch + full verification) and read in
-  place; every delivery's view is checked equal to the application-level one.
-  K*.recv is timed like E*.recv: the key delta receive plus the read of every
-  unit and march. The server reserves each block's capacity once (1.5x the
-  average plus 32); its vectors are as long as the most records the block has
-  held, a record that leaves zeroes its slot and the lowest free slot is reused,
-  so a new subscriber checks and reads only that many slots.
-  `tools/analyze.py` compares N* with the other formats' U* and K* with E*.
+  `XOFFSET_DELTA_SYNC_API` with `XDeltaBaseline::key_delta_into`), keys N*
+  beside U*: the server keeps each static client's view in an XBuffer in
+  stable slots (a record that leaves zeroes its slot, the lowest free slot is
+  reused, tiles stay in place), mutates it in place (N*.send) and writes one
+  `save_delta_into` against that client's baseline (N*.diff); the client
+  applies it with `try_apply_delta_verified` (N*.recv, patch + full
+  verification) and reads in place. Every delivery's view is checked equal to
+  the application-level one. Every change is touched and the delta uses
+  `touched_only`. The first pull is the baseline's key delta
+  (untimed, like the other formats' first pull). Each view reserves 1.5x the
+  average units in a viewport plus 32 and a quarter of all marches plus 32.
+  `tools/analyze.py` compares N* with the other formats' U*.
 - the player's own data (`include/slg/login.hpp`): L, a client logs in and
   gets its whole player once (256 online players at M, a quarter log in again
   each cycle); LD, the server then changes the player every tick (troops,
