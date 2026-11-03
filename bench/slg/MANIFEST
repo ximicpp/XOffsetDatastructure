@@ -52,12 +52,23 @@
 #                        ids that left; app-level for every format). No C or D in that set.
 #                        N (xoffset only, with XOFFSET_DELTA_SYNC_API): the same U plan through
 #                        XOffset's own save_delta_into / try_apply_delta_verified.
+#   2026-11-02 E/U revised (research doc 67f2Y3BpccPrANT5vjBdkH, adopted by susu): block
+#                        windows pulled on block crossing, per-block deltas fanned out, march
+#                        lines, three change rates (keys E*/U*/N*/K*, P/C/S); ViewMarch added.
+#   2026-11-02 L/LD login full + self deltas, SD dirty-module save (login.hpp, PlayerPatch);
+#                        XOffset native LK/LN/SN. Unit names shortened to u_N / sq_N.
 #                        Unset: A/B/C/D and their stage keys unchanged (same digests and report
 #                        sums as before at S, both protocols). New message types ViewUnit /
 #                        ViewSnapshot / ViewDelta in every model, adapter and schema; Slot kView.
 #   bench/xoffset_runner.hpp  2026-11-02: demo B.install and S.load_install call XBuffer::swap
 #                        (std::swap did three moves); thread 优化服务端进程间迁移性能. Default
 #                        A/B/C/D unchanged.
+#   2026-11-02 viewport sync (thread 优化客户端视口同步性能): K*.recv times the key
+#                        delta receive and the read of every unit and march, as E*.recv does
+#                        (the read was untimed before); K*.window_zstd added. XOffset native
+#                        block buffers: capacity reserved once (1.5x average + 32, was a fixed
+#                        2x + 64 slots), vectors as long as the most records held, free slots
+#                        reused lowest first. Application-level E/U and other formats unchanged.
 # Contents: slg-reuse adapters (FlatBuffers verified_root runs the Verifier),
 # reuse protocol (c) (SLG_REUSE=1), ordinary-record declarations for every xm
 # record type in include/slg/model_xoffset.hpp, T4 adapter v2 (whole-container
@@ -68,26 +79,27 @@
 #   them (guarded; older trees keep the previous declarations). Same machine code under GCC 16
 #   and P2996 (asm_equal), the lines are tools/describe_dump output (describe_dump_slg).
 4bd68ec1a9dcb93c4cf4cced05cd5a5ce098e4612183badbdc4f001ed32ab4e5  CMakeLists.txt
-e60d56cfb3cef28a6242f2b8ad67d6a433b5a30652cb64f104008e9fd1f94bf8  README.md
-26793b8192760da887a3db1b7afa9ee673a8257b8b01f14d6e7a38ca7d5a37a1  adapters/cereal_format.hpp
-67888cfee1aecdbc14d15dbdf919f1c39edfade985fc2385cf430947743a3bc0  adapters/flatbuffers_format.hpp
-70bfdee054800b8ea0a291ec8b4ff0c868036824c3d1198eeef44ff67f07ed5a  adapters/protobuf_format.hpp
+571d3bba42030be388aa5701242af4fb905020416ce62487088582f1056ea5f4  README.md
+17df29f77131fdc3996d6606180a88b548007d5f16fc2c71a3ac45878fce26fd  adapters/cereal_format.hpp
+6bb4c5619efe2bf89de0e784266ab4c414a934495e83cffbee96ab37dd5209ee  adapters/flatbuffers_format.hpp
+93dde0e701e2bfa23f2e63653e8f214e1410912906237af57d04a8c8eacad49c  adapters/protobuf_format.hpp
 61fce58cd26e87f1c003b9cf55b690a9e553a7bde47b7e0e287e85c813ede0c9  adapters/zpp_bits_format.hpp
-f271236b82f29eef6bb345a42d18bb52e7859d4baca0b20193ab19c6030b94ed  bench/cista_runner.hpp
+fab6ef1b22e54146703115dc9f54e223aa73a63930e2cfe5db6c19e5b987c0a6  bench/cista_runner.hpp
 f5e58fceecd0c7b22503a4b0652b4164aea055ee31fc24b859efa48496cd245f  bench/erase_probe.cpp
 eac6391a496578276cfe33afe8b2bb3866d3f1bc03127ac9a0bbb7bb7434583d  bench/runner.hpp
-c332435d838943330aeffa243d50dc958347177d376ae3ce78e183825e1170c9  bench/slg_bench.cpp
+65d0f3e276ecd4b4824113e09343ec30c3084ca055ed5eaa162d40d3133f87d7  bench/slg_bench.cpp
 730a66f677d9d20077175f629cf0b13919e66ccedaf880e4eb414c6bc94c0610  bench/small_msg_probe.cpp
-b8ea1fcd3368b9acfb65760dd52a9d4bc05750bdc2ea56a221b0dd338a7f7925  bench/std_runner.hpp
-25f883b7b83571887b467e1d898f5bd93df3919125bc0fae3ad5fbfe6b7edb1b  bench/xoffset_runner.hpp
+a92b5d7928f7263adb55a07dbb2e134213394a2fbaff4aaa4e7b5db1930c17b6  bench/std_runner.hpp
+0b53d8d06e97e99d3da1694189a7a9f44592a2bc5da060437a62c74b1cb5aaa4  bench/xoffset_runner.hpp
 12cab27be9331a4a09ae66f444cf5852dd81e363df562748a4ea854932e35e44  include/slg/cista_free.hpp
 d383da79e1f656838311c9fc339c977cba69a53277adeb72910ed6cd3c1d92ed  include/slg/generic.hpp
-d64ef2095a2be911ac33fdf651b384f4403fd8731562b8fb53373130fc692f2d  include/slg/model_cista.hpp
-2d6ef7b1a9e74956716e59a165b4c53cf8112d796ec87b142a4dda177e7bc926  include/slg/model_std.hpp
-030429a294fc752555f4519886deb01fa410651a9380d17ba2efca6ac825b56d  include/slg/model_xoffset.hpp
+81cb33c36231773132abe77ae7a9839a67d1f408fe474cf0bcf9ecfcd6577700  include/slg/login.hpp
+a7ac4b83dce89750e858a3226ca7d62a269aa051acc5fb474d084f26d028753e  include/slg/model_cista.hpp
+5f5b98780705a520d92a8ee0ec27a07db8d833d84bfbd7c2112b8a69ada89069  include/slg/model_std.hpp
+42e19bfb2bdddf2581db0b6a34ea54a36ce1aaadc2c47cc2a9eb1a6f08fc9d7a  include/slg/model_xoffset.hpp
 3259eef215f98da7328da68bb5e7dd1f33141cdeb894511a039af075114c3391  include/slg/model_xoffset_optin.hpp
 36d5761eb46998e5040f7a19fb99f5ac1df5e31ee129a864e3872ba734e4a5db  include/slg/trace.hpp
-5bbbf22111c27aba91fdcaef94fa235aeb607c4ae557646b543651224b896955  include/slg/view.hpp
-53054f1836f60b966f86242d891d4a5c10666e6b2c500d51a4242f775c7d05dc  schema/slg.fbs
-58d7b40bfd2d46e9ad29a8efc23e0916a1399f066826c29650fa67ec147894b8  schema/slg.proto
-764ed029e4e30c5cce0bdc302399a7d77517a06a43b7a339e7be8576c12809d5  tools/analyze.py
+8aa040a4aeb93dc2edadd86de6c5b1958e7a0efed0c8c9ac9ea58bf2e7d7cc1f  include/slg/view.hpp
+74667dd9fa7ac0c31e37252e5934ec95ff8d63337ff7e9d85428ae9d445bb862  schema/slg.fbs
+2d7fc7c3743978f7d7460333ffc989427333d2213b9345efb55e828ee4a2b19b  schema/slg.proto
+a6f4067932355c6781a25a370633706f7d998cabccf571a282b913e6e5240772  tools/analyze.py

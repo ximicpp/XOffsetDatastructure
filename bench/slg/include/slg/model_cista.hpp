@@ -73,6 +73,15 @@ struct City {
     FlatMap<int32_t, int64_t> resources;
 };
 
+struct PlayerPatch {
+    int64_t player_id{}; int64_t seq{};
+    data::vector<int32_t> army_index;
+    data::vector<Army> armies;
+    FlatMap<int32_t, int64_t> items;
+    int32_t city_changed{};
+    City city;
+};
+
 struct PlayerState {
     int64_t player_id{};
     data::string name;
@@ -115,10 +124,13 @@ struct ShardState {
 
 struct ViewUnit { int32_t id{}; int32_t owner{}; int32_t x{}; int32_t y{}; int32_t hp{}; int32_t state{}; data::string name; };
 
+struct ViewMarch { int32_t id{}; int32_t owner{}; int32_t x0{}; int32_t y0{}; int32_t x1{}; int32_t y1{}; int64_t t0{}; int64_t t1{}; };
+
 struct ViewSnapshot {
     int64_t request_id{}; int64_t tick{};
     int32_t x0{}; int32_t y0{}; int32_t x1{}; int32_t y1{};
     data::vector<ViewUnit> units;
+    data::vector<ViewMarch> marches;
 };
 
 struct ViewDelta {
@@ -126,6 +138,8 @@ struct ViewDelta {
     int32_t x0{}; int32_t y0{}; int32_t x1{}; int32_t y1{};
     data::vector<ViewUnit> upserts;
     data::vector<int32_t> removed;
+    data::vector<ViewMarch> marches;
+    data::vector<int32_t> removed_marches;
 };
 
 } // namespace slg::cm
