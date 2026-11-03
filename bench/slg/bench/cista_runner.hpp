@@ -306,7 +306,7 @@ public:
         Bytes dw;
         void setup(int clients) {
             snaps.assign(1, {});
-            held_views = std::vector<Held<cm::ViewSnapshot>>(std::size_t(clients));
+            held_views = std::vector<Held<cm::ViewSnapshot>>(std::size_t(clients) + 1);   // [clients]: warm view (EBW)
         }
         template <class Fill> std::size_t snap_encode(int b, Fill&& fill) { fill(ev); return save(snaps[std::size_t(b)], ev).size(); }
         std::string_view snap_wire(int b) const {

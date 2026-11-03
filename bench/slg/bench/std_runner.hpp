@@ -262,7 +262,7 @@ public:
         void setup(typename F::Reuse* r, int clients) {
             rz = r;
             snaps.assign(1, {});
-            held_views.assign(std::size_t(clients), {});
+            held_views.assign(std::size_t(clients) + 1, {});   // [clients]: the warm single-device view (EBW)
         }
         template <class Fill> std::size_t snap_encode(int b, Fill&& fill) {
             fill(ev);
