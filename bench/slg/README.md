@@ -71,7 +71,11 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
     format) receives the same pull once more into one extra held view that
     every pull reuses, as a single device holding one view would (warm caches;
     the 1,500 held views of EB.recv are cold). The warm view must read the same
-    as the client's; EB keys and numbers are unchanged.
+    as the client's; EB keys and numbers are unchanged. The compressed and
+    compact sizes (EB.window_zstd, EB.window_compact*) are taken in a second
+    untimed pass after each round's timed pulls (the same pulls rebuilt), so
+    the compressor and the compact save do not evict the server's working set
+    between two timed pulls.
   - U* static (class 3): clients do not move. After one untimed full pull the
     server sends each client, every tick, only what changed inside its
     viewport (units changed, entered or left; marches started, recalled or

@@ -92,6 +92,11 @@
 #                        received into one extra held view (index clients) reused by every pull,
 #                        the warm single-device receive; must read the same as the client's view.
 #                        EB keys and numbers unchanged; class 3 unchanged.
+#   2026-11-03 EB bytes pass (thread 优化客户端视口同步性能): EB.window_zstd and the compact
+#                        sizes come from a second untimed pass per round that rebuilds the same
+#                        pulls (checked: same wire size); compression and the compact save no
+#                        longer run between timed pulls (they evicted the world and send buffers:
+#                        EB.send fell ~45% for XOffset, ~30% for zpp_bits). Byte totals unchanged.
 # Contents: slg-reuse adapters (FlatBuffers verified_root runs the Verifier),
 # reuse protocol (c) (SLG_REUSE=1), ordinary-record declarations for every xm
 # record type in include/slg/model_xoffset.hpp, T4 adapter v2 (whole-container
@@ -102,7 +107,7 @@
 #   them (guarded; older trees keep the previous declarations). Same machine code under GCC 16
 #   and P2996 (asm_equal), the lines are tools/describe_dump output (describe_dump_slg).
 4bd68ec1a9dcb93c4cf4cced05cd5a5ce098e4612183badbdc4f001ed32ab4e5  CMakeLists.txt
-c9d08e09044a76f4a44bddbebfe78df575767e4d57c82fc241c31737b0d19132  README.md
+b766b9e2a203c520842195d68ccac74078609ed226a92acd72e3fb377811887a  README.md
 a1657f3820123c10eb69174e25308745399d5761c139aa93eb492e7e80839268  adapters/cereal_format.hpp
 9722875cd3ca20495d723a08a57d370eaf05b03df62dce618bd687fe179ab2f1  adapters/flatbuffers_format.hpp
 fc8d51f16e1df7b30fd7b712cd9b3b6c57544464dba716712ddf52a0e0ec8aac  adapters/protobuf_format.hpp
@@ -122,7 +127,7 @@ e8ec75af0d2c914841ec860e3bd058624d927788fe469efb45f54b598f5b861d  include/slg/mo
 ffdf3ec14df638268b6b11dfc39836666a62aa82ba2e5594d71804700b35bee1  include/slg/model_xoffset.hpp
 3259eef215f98da7328da68bb5e7dd1f33141cdeb894511a039af075114c3391  include/slg/model_xoffset_optin.hpp
 36d5761eb46998e5040f7a19fb99f5ac1df5e31ee129a864e3872ba734e4a5db  include/slg/trace.hpp
-eecf7e154f286c67e17f52ee5c80d536cd5f0fb6120b4e5e66a852ef608a6e43  include/slg/view.hpp
+ab2df89e60f622a41a4f5b9bbcad50ab99affb8332c778df0a3c1cd7f30d3794  include/slg/view.hpp
 bf2ab42341c4db797200c2302cbcf3c62fc08030c98210e3270deb6d2d072605  schema/slg.fbs
 e7b20776bf0f93be063a8228ded1e15b00f50fd3be507e957a0033afd9f79761  schema/slg.proto
 e9a5d6968a681f956cccf4e1523ed98ce7120c6bfab1e838a1a719c5b703ba1e  tools/analyze.py

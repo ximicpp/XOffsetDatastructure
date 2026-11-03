@@ -735,8 +735,10 @@ struct ViewSession {
     ViewQuery query;
     bool browse = false, primed = false;
     std::vector<HeldIndex> index;   // per client
+    std::vector<std::size_t> wire_size;   // browse: this round's pull per client (bytes pass check)
     void setup(uint64_t seed, const ViewScale& vs, int which) {
         browse = ViewCases::browse(which); primed = false;
+        wire_size.assign(std::size_t(vs.clients), 0);
         world.setup(ViewCases::seed(seed, which), vs, ViewCases::rates[which]);
         tracker.setup(vs.clients);
         index.assign(std::size_t(vs.clients), {});
@@ -778,13 +780,25 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
                 if (qw != q) throw std::runtime_error("warm view differs from the client's view");
                 st.bytes[k.ereq] += 1;
                 st.bytes[k.ewin] += ops.snap_wire(0).size();
+                s.wire_size[std::size_t(c)] = ops.snap_wire(0).size();
+                if (keep_view && c == 0) *keep_view = std::string(ops.snap_wire(0));
+            }
+            // Bytes only, in a second untimed pass after the timed one: the same
+            // pulls are built again (same world tick, rectangles and request ids,
+            // so the same wires) and compressed. Compressing (zstd's tables) and
+            // the compact save between two timed pulls would evict the server's
+            // working set and charge that to the next pull's EB.send.
+            for (int c = 0; c < vs.clients; ++c) {
+                const ViewRect rect = w.rect(c);
+                s.query.run(w, rect);
+                ops.snap_encode(0, [&](auto& v) { fill_view(v, w, rect, s.query, base + c, w.tick_no()); });
+                if (ops.snap_wire(0).size() != s.wire_size[std::size_t(c)]) throw std::runtime_error("bytes pass: pull differs from the timed one");
                 st.bytes[k.ezstd] += zstd_size(ops.snap_wire(0));
                 if constexpr (requires { ops.snap_compact(0); }) {
                     const std::string_view cw = ops.snap_compact(0);
                     st.bytes[k.ecomp] += cw.size();
                     st.bytes[k.ecompz] += zstd_size(cw);
                 }
-                if (keep_view && c == 0) *keep_view = std::string(ops.snap_wire(0));
             }
         }
         return;
