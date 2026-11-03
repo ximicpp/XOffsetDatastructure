@@ -254,7 +254,7 @@ public:
 
     struct BlockOps {
         typename F::Reuse* rz = nullptr;
-        std::vector<std::vector<uint8_t>> snaps;
+        std::vector<std::span<const uint8_t>> snaps;   // each pull's wire, where the format wrote it (its reuse slot)
         std::vector<stdm::ViewSnapshot> held_views;
         stdm::ViewSnapshot ev;
         stdm::ViewDelta ds, dd;
@@ -266,9 +266,8 @@ public:
         }
         template <class Fill> std::size_t snap_encode(int b, Fill&& fill) {
             fill(ev);
-            const auto w = rz->encode(kView, ev);
-            snaps[std::size_t(b)].assign(w.begin(), w.end());
-            return w.size();
+            snaps[std::size_t(b)] = rz->encode(kView, ev);   // no second copy: the slot is the send buffer
+            return snaps[std::size_t(b)].size();
         }
         std::string_view snap_wire(int b) const {
             const auto& v = snaps[std::size_t(b)];
@@ -276,7 +275,7 @@ public:
         }
         void snap_recv(int c, int k, int b) {
             const auto& v = snaps[std::size_t(b)];
-            rz->decode(std::span<const uint8_t>(v.data(), v.size()), held(c, k));
+            rz->decode(v, held(c, k));
         }
         stdm::ViewSnapshot& held(int c, int k) { return held_views[std::size_t(c) + std::size_t(k)]; }
         template <class Fill> std::size_t delta_encode(Fill&& fill) { fill(ds); dw = rz->encode(kDelta, ds); return dw.size(); }
