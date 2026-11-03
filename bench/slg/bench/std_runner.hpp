@@ -53,7 +53,7 @@ public:
             std::optional<stdm::BattleMsg> m, r;
             timed(st, "A.req_encode", [&] { req = F::encode_battle_request(pr.battle_id, pr.seed, att, def); });
             timed(st, "A.req_decode", [&] { m.emplace(); F::decode(F::bytes(req), *m); });
-            timed(st, "A.simulate", [&] { simulate_battle(*m); });
+            untimed(st, "A.simulate", [&] { simulate_battle(*m); });
             timed(st, "A.res_encode", [&] { res = F::encode(*m); });
             timed(st, "A.res_decode", [&] { r.emplace(); F::decode(F::bytes(res), *r); });
             timed(st, "A.apply", [&] { apply_battle_army(att, r->attacker); apply_battle_army(def, r->defender); });
@@ -72,7 +72,7 @@ public:
             std::optional<stdm::PlayerState> m, r;
             timed(st, "B.out_encode", [&] { out = F::encode(slot); });
             timed(st, "B.in_decode", [&] { m.emplace(); F::decode(F::bytes(out), *m); });
-            timed(st, "B.season_edits", [&] { season_edits(*m, mix_seed(seed_, uint64_t(cycle) * 1000003u + k), sc.season_ops); });
+            untimed(st, "B.season_edits", [&] { season_edits(*m, mix_seed(seed_, uint64_t(cycle) * 1000003u + k), sc.season_ops); });
             timed(st, "B.back_encode", [&] { back = F::encode(*m); });
             timed(st, "B.back_decode", [&] { r.emplace(); F::decode(F::bytes(back), *r); });
             timed(st, "B.writeback", [&] { slot = std::move(*r); });
@@ -88,7 +88,7 @@ public:
             std::optional<stdm::ShardState> r;
             timed(st, "C.snapshot", [&] { snap = F::encode(shard_); });
             timed(st, "C.restore", [&] { r.emplace(); F::decode(F::bytes(snap), *r); });
-            timed(st, "C.ticks", [&] { shard_ticks(*r, mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
+            untimed(st, "C.ticks", [&] { shard_ticks(*r, mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
             timed(st, "C.snapshot2", [&] { snap2 = F::encode(*r); });
             timed(st, "C.replace", [&] { shard_ = std::move(*r); });
             st.bytes["C.snapshot"] += F::bytes(snap).size();
@@ -97,7 +97,7 @@ public:
             timed(st, "C.cleanup", [&] { r.reset(); snap = W(); snap2 = W(); });
             {
                 stdm::ShardState m = shard_;  // untimed copy of the current shard
-                timed(st, "S.ticks_middle", [&] { shard_ticks_middle_erase(m, mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
+                untimed(st, "S.ticks_middle", [&] { shard_ticks_middle_erase(m, mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
             }
         }
 
@@ -128,7 +128,7 @@ public:
             std::span<const uint8_t> req, res;
             timed(st, "A.req_encode", [&] { req = rz_.encode_battle_request(kReq, pr.battle_id, pr.seed, att, def); });
             timed(st, "A.req_decode", [&] { rz_.decode(req, am_); });
-            timed(st, "A.simulate", [&] { simulate_battle(am_); });
+            untimed(st, "A.simulate", [&] { simulate_battle(am_); });
             timed(st, "A.res_encode", [&] { res = rz_.encode(kRes, am_); });
             timed(st, "A.res_decode", [&] { rz_.decode(res, ar_); });
             timed(st, "A.apply", [&] { apply_battle_army(att, ar_.attacker); apply_battle_army(def, ar_.defender); });
@@ -148,7 +148,7 @@ public:
             std::span<const uint8_t> out;
             timed(st, "B.out_encode", [&] { out = rz_.encode(kOut, slot); });
             timed(st, "B.in_decode", [&] { rz_.decode(out, bm_); });
-            timed(st, "B.scene_edits", [&] { season_edits(bm_, mix_seed(seed_, uint64_t(cycle) * 1000003u + k), sc.season_ops); });
+            untimed(st, "B.scene_edits", [&] { season_edits(bm_, mix_seed(seed_, uint64_t(cycle) * 1000003u + k), sc.season_ops); });
             timed(st, "B.install", [&] { std::swap(slot, bm_); });
             st.bytes["B.out"] += out.size();
             if (keep) keep->player = to_string_bytes(out);
@@ -158,7 +158,7 @@ public:
             std::span<const uint8_t> out, back;
             timed(st, "B.out_encode", [&] { out = rz_.encode(kOut, slot); });
             timed(st, "B.in_decode", [&] { rz_.decode(out, bm_); });
-            timed(st, "B.season_edits", [&] { season_edits(bm_, mix_seed(seed_, uint64_t(cycle) * 1000003u + k), sc.season_ops); });
+            untimed(st, "B.season_edits", [&] { season_edits(bm_, mix_seed(seed_, uint64_t(cycle) * 1000003u + k), sc.season_ops); });
             timed(st, "B.back_encode", [&] { back = rz_.encode(kBack, bm_); });
             timed(st, "B.back_decode", [&] { rz_.decode(back, br_); });
             timed(st, "B.writeback", [&] { std::swap(slot, br_); });
@@ -188,7 +188,7 @@ public:
             std::span<const uint8_t> snap, snap2;
             timed(st, "C.snapshot", [&] { snap = rz_.encode(kSnap, shard_); });
             timed(st, "C.restore", [&] { rz_.decode(snap, cr_); });
-            timed(st, "C.ticks", [&] { shard_ticks(cr_, mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
+            untimed(st, "C.ticks", [&] { shard_ticks(cr_, mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
             timed(st, "C.snapshot2", [&] { snap2 = rz_.encode(kSnap2, cr_); });
             timed(st, "C.replace", [&] { std::swap(shard_, cr_); });
             st.bytes["C.snapshot"] += snap.size();
@@ -197,7 +197,7 @@ public:
             timed(st, "C.cleanup", [] {});
             {
                 stdm::ShardState m = shard_;  // untimed copy of the current shard
-                timed(st, "S.ticks_middle", [&] { shard_ticks_middle_erase(m, mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
+                untimed(st, "S.ticks_middle", [&] { shard_ticks_middle_erase(m, mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
             }
         }
 
@@ -262,7 +262,7 @@ public:
         void setup(typename F::Reuse* r, int clients) {
             rz = r;
             snaps.assign(1, {});
-            held_views.assign(std::size_t(clients), {});
+            held_views.assign(std::size_t(clients) + 1, {});   // [clients]: the warm single-device view (EBW)
         }
         template <class Fill> std::size_t snap_encode(int b, Fill&& fill) {
             fill(ev);
