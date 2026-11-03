@@ -1910,6 +1910,7 @@ namespace XOffsetDatastructure {
                 log.epoch = core.epoch();
                 log.now = 1;
                 log.listed = 0;
+                log.seen = 0;
                 log.lost = false;
                 log.overflow = false;
                 log.shared = false;
@@ -1962,11 +1963,16 @@ namespace XOffsetDatastructure {
             XOFFSET_DELTA_INLINE static void touch_block(DeltaTouchLog& log, std::size_t i, std::uint64_t mask) noexcept {
                 if (!log.overflow) [[likely]] {
                     const auto block = static_cast<std::uint32_t>(i);
-                    std::uint32_t k = log.listed;
-                    while (k > 0 && log.blocks[k - 1] != block) --k;  // touched before in this period?
+                    const auto bit = static_cast<std::uint16_t>(1u << (block % 16u));
+                    std::uint32_t k = 0;
+                    if (log.seen & bit) {  // touched before in this period?
+                        k = log.listed;
+                        while (k > 0 && log.blocks[k - 1] != block) --k;
+                    }
                     if (k > 0) {
                         if (log.masks_on) log.masks[k - 1] |= mask;
                     } else if (log.listed < DeltaTouchLog::list_capacity) {
+                        log.seen = static_cast<std::uint16_t>(log.seen | bit);
                         log.blocks[log.listed] = block;
                         if (log.masks_on) log.masks[log.listed] = mask;
                         // The next delta compares this block with the baseline's copy.
@@ -2113,6 +2119,7 @@ namespace XOffsetDatastructure {
                 }
                 ++log->now;
                 log->listed = 0;
+                log->seen = 0;
                 log->overflow = false;
                 // The only baseline needs no stamps beyond the list.
                 if (!log->shared) log->stamps_from = UINT32_MAX;
@@ -2538,12 +2545,23 @@ namespace XOffsetDatastructure {
                 c.checks_free_complete_ = core.free_table_complete();
                 c.checks_valid_ = true;
             }
+            // Room for at least n elements, growing by half again at least: a
+            // map that grows a little with each delta reallocates (and copies
+            // itself) only now and then, not at every growth.
+            template <typename V>
+            static void reserve_room(V& v, std::size_t n) {
+                if (v.capacity() < n) v.reserve(std::max(n, v.capacity() + v.capacity() / 2));
+            }
             // Room for the map of a payload of `used` bytes (before the payload
-            // changes, so that rebuilding it cannot fail).
+            // changes, so that rebuilding it cannot fail), with a quarter more
+            // for the payload to grow into.
             static vstatus size_checks(XDeltaCursor& c, std::size_t used) {
                 c.checks_valid_ = false;
                 XOFFSET_TRY {
-                    c.checks_.resize((used + delta_block - 1) / delta_block);
+                    const std::size_t blocks = (used + delta_block - 1) / delta_block;
+                    reserve_room(c.checks_, blocks + blocks / 4);
+                    reserve_room(c.live_, live_words(used + used / 4));
+                    c.checks_.resize(blocks);
                     c.live_.resize(live_words(used));
                 } XOFFSET_CATCH(const std::bad_alloc&) {
                     XOFFSET_VFAIL_BAD_ALLOC();
@@ -2555,8 +2573,14 @@ namespace XOffsetDatastructure {
             static bool grow_checks(XDeltaCursor& c, std::size_t used) noexcept {
                 const std::size_t blocks = (used + delta_block - 1) / delta_block;
                 XOFFSET_TRY {
-                    if (c.checks_.size() < blocks) c.checks_.resize(blocks);
-                    if (c.live_.size() < live_words(used)) c.live_.resize(live_words(used));
+                    if (c.checks_.size() < blocks) {
+                        reserve_room(c.checks_, blocks);
+                        c.checks_.resize(blocks);
+                    }
+                    if (c.live_.size() < live_words(used)) {
+                        reserve_room(c.live_, live_words(used));
+                        c.live_.resize(live_words(used));
+                    }
                 } XOFFSET_CATCH(const std::bad_alloc&) {
                     return false;
                 }
@@ -2869,9 +2893,9 @@ namespace XOffsetDatastructure {
                     }
                     if (grew) {
                         const std::size_t nodes = c.nodes_.size();
-                        c.touched_.reserve(nodes);
-                        c.ranges_.reserve(2 * nodes);
-                        c.range_scratch_.reserve(2 * nodes);
+                        reserve_room(c.touched_, nodes);
+                        reserve_room(c.ranges_, 2 * nodes);
+                        reserve_room(c.range_scratch_, 2 * nodes);
                     }
                 } XOFFSET_CATCH(const std::bad_alloc&) {
                     return false;
@@ -2953,11 +2977,11 @@ namespace XOffsetDatastructure {
                     // Room for the map after the commit, which cannot fail.
                     std::size_t nodes = c.nodes_.size();
                     for (const DeltaMove& mv : c.moves_) nodes += mv.node == DeltaMove::new_node;
-                    c.nodes_.reserve(nodes);
-                    c.touched_.reserve(nodes);
-                    c.ranges_.reserve(2 * nodes);
-                    c.range_scratch_.reserve(2 * nodes);
-                    c.range_index_.reserve(c.checks_.size() + 1);
+                    reserve_room(c.nodes_, nodes);
+                    reserve_room(c.touched_, nodes);
+                    reserve_room(c.ranges_, 2 * nodes);
+                    reserve_room(c.range_scratch_, 2 * nodes);
+                    reserve_room(c.range_index_, c.checks_.size() + 1);
                 } XOFFSET_CATCH(const std::bad_alloc&) {
                     return false;
                 }
