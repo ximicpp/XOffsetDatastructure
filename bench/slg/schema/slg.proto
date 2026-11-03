@@ -33,11 +33,11 @@ message ViewUnit { int32 id = 1; int32 owner = 2; int32 x = 3; int32 y = 4; int3
 message ViewMarch { int32 id = 1; int32 owner = 2; int32 x0 = 3; int32 y0 = 4; int32 x1 = 5; int32 y1 = 6; int64 t0 = 7; int64 t1 = 8; }
 message ViewSnapshot {
   int64 request_id = 1; int64 tick = 2; int32 x0 = 3; int32 y0 = 4; int32 x1 = 5; int32 y1 = 6;
-  repeated ViewUnit units = 7; repeated ViewMarch marches = 8;
+  repeated ViewUnit units = 7; repeated ViewMarch marches = 8; repeated Tile tiles = 9;
 }
 message ViewDelta {
   int64 request_id = 1; int64 tick = 2; int32 x0 = 3; int32 y0 = 4; int32 x1 = 5; int32 y1 = 6;
   repeated ViewUnit upserts = 7; repeated int32 removed = 8;
-  repeated ViewMarch marches = 9; repeated int32 removed_marches = 10;
+  repeated ViewMarch marches = 9; repeated int32 removed_marches = 10; repeated Tile tiles = 11;
 }
 message ShardState { int32 shard_id = 1; int64 tick = 2; int32 width = 3; repeated Tile tiles = 4; repeated City cities = 5; repeated March marches = 6; }

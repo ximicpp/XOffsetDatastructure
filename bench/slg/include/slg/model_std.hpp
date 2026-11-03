@@ -97,6 +97,7 @@ struct ViewSnapshot {
     int32_t x0{}; int32_t y0{}; int32_t x1{}; int32_t y1{};
     std::vector<ViewUnit> units;
     std::vector<ViewMarch> marches;
+    std::vector<Tile> tiles;          // every tile under the viewport, row-major
 };
 
 // Scenario U (view.hpp): changes since the client's last sync.
@@ -107,6 +108,7 @@ struct ViewDelta {
     std::vector<int32_t> removed;
     std::vector<ViewMarch> marches;
     std::vector<int32_t> removed_marches;
+    std::vector<Tile> tiles;          // tiles whose owner changed
 };
 
 } // namespace slg::stdm
