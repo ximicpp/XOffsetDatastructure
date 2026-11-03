@@ -64,7 +64,12 @@
   strings or containers) that grows within its capacity has only its new
   records verified (each of their blocks claimed in the same map). On the
   game demo's 40-field units, the share of deltas verified in full went
-  from 1.6% (peace), 7% (combat) and 16% (stress) to none.
+  from 1.6% (peace), 7% (combat) and 16% (stress) to none. One that moved,
+  got its first block or shrank (an erase from the middle, growth past its
+  capacity) drops what its old records reached from both maps and has all
+  its records verified again from its new block, instead of the whole
+  payload: the game demo's storage saves of players whose hero list changed
+  (65 of 284 saves per cycle) no longer take the whole verification.
 - Delta blocks lie on 64-byte payload offsets (block `i` = offsets `64 i`
   to `64 i + 63`, one cache line; block 0 never writes the arena header),
   and the baseline's copy is 64-aligned.

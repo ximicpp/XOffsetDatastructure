@@ -86,6 +86,14 @@ xo::XStatus apply_entry(xo::TypedXBuffer<Root>& rep, const std::string& d, xo::X
 #endif
     auto r = rep.try_apply_delta_verified(d, cur);
     if (!r) need(r.code() != xo::XErrc::ok && !r.error().message.empty(), "rejected without a code and message");
+    {
+        // The receiver's map of checked bytes, kept from delta to delta,
+        // equals the one built afresh (a stale mark could let a later delta
+        // skip a check the whole verification makes).
+        const char* what = "";
+        const bool agree = xo::detail::DeltaAccess::checks_agree<Root>(cur, rep, what);
+        need(agree, std::string("receiver map differs from a fresh one: ") + what);
+    }
 #if !XOFFSET_NO_EXCEPTIONS
     need(bool(thrown) != bool(r), std::string("try_apply_delta_verified ") + (r ? "accepted" : "rejected (" +
          r.error().message + ")") + " where apply_delta_verified " + (thrown ? "threw (" + thrown->message + ")"
@@ -769,7 +777,22 @@ void check_path_case() {
         it.name = "a record name that needs a heap block";
         for (int k = 0; k < 5; ++k) it.vals.push_back(std::uint16_t(k));
     });
-    step("a vector of records shrinks", C::full, [&] { r.items.pop_back(); });
+    step("a vector of records shrinks", C::in_place, [&] { r.items.pop_back(); });
+    // (items[0..2] stay where they are: the hand-made deltas below use them.)
+    step("a vector of records past capacity", C::in_place, [&] {
+        for (std::uint32_t k = 0; k < 6; ++k) {
+            auto& it = r.items.emplace_back();
+            it.id = 20 + k;
+            it.name = k % 2 ? "short" : "a record name long enough for a heap block";
+            it.vals.push_back(std::uint16_t(k));
+        }
+    });
+    step("a record erased from the middle", C::in_place, [&] { r.items.erase(r.items.begin() + 4); });
+    step("records erased and one added", C::in_place, [&] {
+        r.items.erase(r.items.begin() + 3);
+        r.items.erase(r.items.begin() + 5);
+        r.items.emplace_back().name = "another record name long enough for a heap block";
+    });
     step("a scalar vector gets its first block", C::in_place, [&] { r.items.back().vals.push_back(1); });
     step("a scalar after a full check", C::none, [&] { r.epoch = 79; });
 
@@ -864,6 +887,41 @@ void check_path_case() {
             const std::uint32_t tcap = 0x10000;
             std::memcpy(&t[0], &tcap, 4);
             rejects("a string block past used_end", poke_delta(rep, cur, title + 8, t), "wire validation");
+        }
+    }
+    {
+        // A vector of records that moves or shrinks has all its elements
+        // verified again and what its old elements owned freed.
+        const std::size_t items = off(&rep.root().items);
+        const auto items_head = [&](std::int64_t data_at, std::uint32_t size, std::uint32_t capacity) {
+            const auto delta = std::int32_t(data_at - std::int64_t(items));
+            std::string b(12, '\0');
+            std::memcpy(&b[0], &delta, 4);
+            std::memcpy(&b[4], &size, 4);
+            std::memcpy(&b[8], &capacity, 4);
+            return b;
+        };
+        need(items % 64 + 12 <= 64, "check path: records head crosses a block");
+        need(!rep.root().title.empty() && rep.root().title.size() > 10, "check path: no heap title");
+        rejects("a vector of records moved onto a live block",
+                poke_delta(rep, cur, items, items_head(std::int64_t(off(rep.root().title.data())), 1, 1)),
+                "wire validation");
+        // Shrunk by hand, with no hole for what the last record owned:
+        // accepted only if the whole verification accepts the result.
+        const std::uint32_t size = rep.root().items.size();
+        need(size > 1, "check path: too few records");
+        std::string b(4, '\0');
+        const std::uint32_t smaller = size - 1u;
+        std::memcpy(&b[0], &smaller, 4);
+        const auto before = payload_of(rep);
+        auto tc = cur;
+        auto res = apply_entry(rep, poke_delta(rep, cur, items + 4, b), tc);
+        if (res) {
+            need(tc.last_check() == C::in_place, "check path: a shrunk vector of records was not checked in place");
+            need(bool(typed_load(rep.save_verified())), "check path: a shrunk vector of records does not verify");
+            cur = tc;
+        } else {
+            need(payload_of(rep) == before, "check path: rejecting a shrunk vector of records changed the replica");
         }
     }
     {
