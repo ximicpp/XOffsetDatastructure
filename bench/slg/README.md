@@ -144,6 +144,18 @@ the world marked dirty this tick (`touch(u, bits)`, `MapWorld::dirty`), as a
 game server's dirty flags, and every client's native delta goes into one
 shared buffer (thread 设计并实现增量同步).
 
+Fairness review (thread 审查三类对比测试的公平性, 2026-11-03): the std model's
+maps (items, research, buildings, resources) are `boost::container::flat_map`,
+sorted flat maps like XOffset's and cista's (were `std::map`). FlatBuffers
+collects struct elements and table offsets in reused scratch vectors (no
+allocation per list once warm). The storage process runs only the
+format's own check where one exists without the application model
+(FlatBuffers' Verifier, protobuf's parse; the others decode). The std and
+cista runners prefetch the two armies before A.apply, the counterpart of
+XOffset's `prefetch_for_update()` hint. LK.recv includes the query, as
+L.recv. The native slot bookkeeping (`n_plan`) is timed in N*.send. cereal
+reuses its input stream. Allocator: glibc malloc for every format.
+
 ## Instruction counts (CI performance gate)
 
 `-DSLG_IR_COUNT=ON` (or `-DSLG_IR_COUNT=1` on a direct compile) builds a

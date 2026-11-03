@@ -235,6 +235,12 @@ struct ProtobufFormat {
             if (!m.ParseFromArray(in.data(), int(in.size()))) throw std::runtime_error("protobuf: parse failed");
             pbconv::from(v, m);
         }
+        // Storage receive: the storage process checks the message and keeps
+        // the bytes; it does not need the application model (parse only).
+        template <class T> void store_check(std::span<const uint8_t> in, T&) {
+            auto& m = pair<T>().dec;
+            if (!m.ParseFromArray(in.data(), int(in.size()))) throw std::runtime_error("protobuf: parse failed");
+        }
     };
 
     template <class T> static void decode(std::span<const uint8_t> in, T& v) {

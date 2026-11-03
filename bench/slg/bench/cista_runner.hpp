@@ -130,6 +130,7 @@ public:
             recv(st, "A.req_decode", m, req);
             untimed(st, "A.simulate", [&] { simulate_battle(*m); });
             timed(st, "A.res_encode", [&] { save(res, *m); });
+            timed(st, "A.res_decode", [&] { prefetch_army_for_apply(att); prefetch_army_for_apply(def); });
             recv(st, "A.res_decode", r, res);
             timed(st, "A.apply", [&] {
                 const auto& out = *r;
