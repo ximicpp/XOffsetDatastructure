@@ -2485,19 +2485,33 @@ namespace XOffsetDatastructure {
         friend struct detail::VerifiedReceiveAccess;
         friend struct detail::DeltaAccess;
         friend struct fixed_detail::StableEraseOwnerWitness;
-        OwnerRecordPtr owner_record_;
-        detail::VirtualMemoryStorage buffer_;
-        // Next D6 growth step below zero_from() (ensure_allocation_extent).
-        std::uint32_t dirty_step_ = first_dirty_step;
-        uint64_t dirty_epoch_ = 0;  // m_epoch when dirty_step_ was last reset
-        XGrowPolicy growth_policy_ = XGrowPolicy::Explicit;
+        // Hot fields first, in one run of 56 bytes: the free table, the epoch
+        // and the root cache (all root<T>()'s fast path reads), then the
+        // storage, whose first two fields are the payload base and size. A
+        // root<T>() and the update that follows it (prefetch_for_update(), an
+        // allocation) then find base, size and free table on the line(s) the
+        // root lookup already brought in, instead of on two more lines.
         FreeTablePtr free_table_;
-        bool free_table_lost_ = false;
-        const void* root_type_identity_ = nullptr;
         std::uint64_t m_epoch = 0;
         void* root_cache_ = nullptr;
         const void* root_cache_type_ = nullptr;
         std::uint64_t root_cache_epoch_ = 0;
+        detail::VirtualMemoryStorage buffer_;
+        OwnerRecordPtr owner_record_;
+        bool free_table_lost_ = false;
+
+    protected:
+        // XBuffer's flag for an open direct reload (VerifiedReloadToken),
+        // kept here in padding so that XBuffer adds only its two pointers
+        // (see the static_assert after XBuffer).
+        bool direct_reload_open_ = false;
+
+    private:
+        // Next D6 growth step below zero_from() (ensure_allocation_extent).
+        std::uint32_t dirty_step_ = first_dirty_step;
+        uint64_t dirty_epoch_ = 0;  // m_epoch when dirty_step_ was last reset
+        XGrowPolicy growth_policy_ = XGrowPolicy::Explicit;
+        const void* root_type_identity_ = nullptr;
     };
 
     // ========================================================================
@@ -8412,7 +8426,7 @@ namespace XOffsetDatastructure {
 
         std::unique_ptr<detail::WireValidationScratch> reload_scratch_;
         std::unique_ptr<detail::DeltaTouchLog> touch_log_;  // touch() marks (delta senders)
-        bool direct_reload_open_ = false;
+        // direct_reload_open_ is in XBufferCore's padding (see there).
         template <typename> friend class VerifiedReloadToken;
         friend struct detail::DeltaAccess;
 
@@ -8727,6 +8741,12 @@ namespace XOffsetDatastructure {
         }
 
     };
+
+    // XBuffer adds its two pointers to XBufferCore and nothing else: a new
+    // flag goes into XBufferCore's padding, so that vectors of XBuffer and
+    // std::optional<XBuffer> members keep their size.
+    static_assert(sizeof(XBuffer) == sizeof(XBufferCore) + 2 * sizeof(void*),
+                  "XBuffer grew: put the new field into XBufferCore's padding");
 
     // Open direct reload of one XBuffer (XBuffer::begin_verified_reload).
     template <typename T>
