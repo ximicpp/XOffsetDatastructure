@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Verified saves (`save_verified`, `save_verified_into`) no longer shrink the
+  source's logical length to `used_end`; the wire was always cut at
+  `used_end`, so its bytes are unchanged. A sender that resets and refills
+  the same buffer (`reset<T>()`, fill, save) now refills within the extent it
+  had instead of regrowing it every message. Raw `save()` still shrinks.
+  GCC 16 instructions, bench/slg (M): UP.send (fill one viewport delta and
+  save it) -10.5%, EB.send -0.9%.
 - Wire validation off the cursor path: a live block within one bitmap word
   that meets nothing is marked directly in the out-of-line registration
   (no second call, no saved registers); the first block off the cursor,

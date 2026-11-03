@@ -7752,7 +7752,7 @@ namespace XOffsetDatastructure {
             using Identity = XBufferCore::OwnerRecordPtr;
             static Identity identity(XBufferCore& source) noexcept { return source.owner_record_; }
             static XBufferCore& owner(const Identity& value) { return XBufferCore::require_record_owner(value); }
-            template<class T> static XWireHeaderV2 header(XBufferCore&, bool);
+            template<class T> static XWireHeaderV2 header(XBufferCore&);
             template<class T> static void save_into(XBufferCore&, std::string&, XSaveOptions);
             template<class T> static void save_compact_into(XBufferCore&, std::string&, XCompactOptions);
             template<class T, class... M> static void save_composed_into(XBufferCore&, std::string&, XCompactOptions,
@@ -8017,7 +8017,12 @@ namespace XOffsetDatastructure {
 
         template <typename T>
         XWireHeaderV2 wire_header_v2(const T& root) const {
-            return detail::make_wire_header<T>(this->segment_size(),
+            // The used extent (what the logical length was after the
+            // shrink_to_fit that saves no longer do): used_end, at least the
+            // header, at most the logical length.
+            const auto used = std::min<std::uint64_t>(
+                std::max<std::uint64_t>(this->arena()->used_end, sizeof(arena_header)), this->segment_size());
+            return detail::make_wire_header<T>(used,
                 reinterpret_cast<std::uintptr_t>(&root) - reinterpret_cast<std::uintptr_t>(this->get_address()),
                 this->free_block_count());
         }
@@ -8032,7 +8037,6 @@ namespace XOffsetDatastructure {
 #endif
             require_typed_root_access("save_verified<T>(): unverified payload cannot be relabeled as verified");
             require_schema_match<T>("save_verified<T>(): schema mismatch for requested root type");
-            this->shrink_to_fit();
             auto* root_ptr = detail::find_root<T>(*this);
             if (!root_ptr) {
                 XOFFSET_THROW(XException(XErrc::no_root, "save_verified<T>(): no root object of requested type"));

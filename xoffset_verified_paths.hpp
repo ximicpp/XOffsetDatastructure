@@ -17,7 +17,7 @@ namespace detail {
     }
 
     template<class T>
-    XWireHeaderV2 VerifiedPathsAccess::header(XBufferCore& source, bool normalize) {
+    XWireHeaderV2 VerifiedPathsAccess::header(XBufferCore& source) {
         static_assert(is_v1_wire_admitted_v<T>);
 #ifdef XOFFSET_REJECT_IMPLICIT_PADDING
         static_assert(!has_implicit_padding_v<T>,
@@ -36,9 +36,6 @@ namespace detail {
         if (arena->used_end < XBufferCore::min_payload_size() ||
             arena->used_end > source.segment_size() || arena->used_end > XBufferCore::MAX_PAYLOAD)
             XOFFSET_THROW(XException(XErrc::invalid_payload_header, "verified paths: payload used_end out of range"));
-        // shrink_to_fit changes only the logical VM length: it does not
-        // allocate, shrink host capacity or call T.
-        if (normalize) source.shrink_to_fit();
         auto* root = find_root<T>(source);
         if (!root) XOFFSET_THROW(XException(XErrc::root_mismatch, "verified paths: root not found"));
         // V2: the free table is the wire hole table; recompute it exactly if a
@@ -73,7 +70,7 @@ namespace detail {
         // boundaries: the owner is re-resolved after them, and the source
         // must be unchanged when the wire is written. A reused output that
         // already holds the dense size (which bounds every emission) needs no
-        // reserve, so the source is examined and normalized once.
+        // reserve, so the source is examined once.
         const auto emission = options.emission;
         auto size_of = [&](const XWireHeaderV2& h, const WireGaps& g) {
             return emission == XWireEmission::zero_runs ? wire_dense_size(h, "save_verified_into")
@@ -99,14 +96,14 @@ namespace detail {
             const auto used = current->arena() ? current->arena()->used_end : 0;
             const auto holes = current->free_block_count();
             const auto hole_bytes = current->free_block_bytes();
-            final_header = header<T>(*current, true);
+            final_header = header<T>(*current);
             if (final_header.used_bytes != used || final_header.hole_count != holes ||
                 current->free_block_bytes() != hole_bytes)
                 XOFFSET_THROW(XException(XErrc::invalid_state, "save_verified_into: source changed while preparing the output"));
             final_size = size_of(final_header, gaps);
         }
         if (final_size == 0 || final_size > out.capacity()) {
-            const auto initial = header<T>(*current, false);
+            const auto initial = header<T>(*current);
             const auto initial_hole_bytes = current->free_block_bytes();
             gaps = gaps_of(*current, initial.used_bytes);
             const auto prepared_size = size_of(initial, gaps);
@@ -115,7 +112,7 @@ namespace detail {
             out.reserve(prepared_size);
             current = &owner(token);
             check_alias(*current);
-            final_header = header<T>(*current, true);
+            final_header = header<T>(*current);
             final_size = size_of(final_header, gaps);
             if (final_size > out.capacity() || final_size != prepared_size ||
                 !same_holes(initial, initial_hole_bytes, final_header, current->free_block_bytes()))
@@ -622,7 +619,7 @@ namespace detail {
                 XOFFSET_THROW(XException(XErrc::invalid_state, "save_compact_into: output aliases source storage"));
         };
         check_alias(*current);
-        auto h = header<T>(*current, false);
+        auto h = header<T>(*current);
         current = &owner(token); // header may have recomputed the free table
         check_alias(*current);
         const ComposeSet<> none{};
@@ -671,7 +668,7 @@ namespace detail {
             current = &owner(token);
             check_alias(*current);
             const auto used = std::size_t(h.used_bytes);
-            h = header<T>(*current, false);
+            h = header<T>(*current);
             if (std::size_t(h.used_bytes) != used)
                 XOFFSET_THROW(XException(XErrc::invalid_state, "save_compact_into: source changed beyond prepared output capacity"));
         }
@@ -848,7 +845,7 @@ VerifiedSnapshot<T> freeze_verified(TypedXBuffer<T>&& source, std::pmr::memory_r
     auto& current = detail::VerifiedPathsAccess::owner(identity);
     if (&current != static_cast<XBufferCore*>(&source))
         XOFFSET_THROW(XException(XErrc::invalid_state, "freeze_verified: source moved during preparation"));
-    const auto header = detail::VerifiedPathsAccess::header<T>(current, false);
+    const auto header = detail::VerifiedPathsAccess::header<T>(current);
     if (current.arena()->flags != 0 || current.arena()->reserved0 != 0 || current.arena()->reserved1 != 0)
         XOFFSET_THROW(XException(XErrc::unsupported_flags, "freeze_verified: unsupported payload flags"));
     owner->holes.reserve(current.free_block_count());
