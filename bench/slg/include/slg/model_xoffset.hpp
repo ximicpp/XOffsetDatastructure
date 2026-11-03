@@ -92,6 +92,7 @@ struct alignas(8) ViewSnapshot {
     int32_t x0{}; int32_t y0{}; int32_t x1{}; int32_t y1{};
     XVector<ViewUnit> units;
     XVector<ViewMarch> marches;
+    XVector<Tile> tiles;
 };
 
 // Scenario U (view.hpp).
@@ -102,6 +103,7 @@ struct alignas(8) ViewDelta {
     XVector<int32_t> removed;
     XVector<ViewMarch> marches;
     XVector<int32_t> removed_marches;
+    XVector<Tile> tiles;
 };
 
 } // namespace slg::xm
@@ -133,8 +135,8 @@ XOFFSET_RECORD(slg::xm::March, march_id, owner, from_x, from_y, to_x, to_y, eta,
 XOFFSET_RECORD(slg::xm::ShardState, shard_id, tick, width, tiles, cities, marches)
 XOFFSET_RECORD(slg::xm::ViewUnit, id, owner, x, y, hp, state, name)
 XOFFSET_RECORD(slg::xm::ViewMarch, id, owner, x0, y0, x1, y1, t0, t1)
-XOFFSET_RECORD(slg::xm::ViewSnapshot, request_id, tick, x0, y0, x1, y1, units, marches)
-XOFFSET_RECORD(slg::xm::ViewDelta, request_id, tick, x0, y0, x1, y1, upserts, removed, marches, removed_marches)
+XOFFSET_RECORD(slg::xm::ViewSnapshot, request_id, tick, x0, y0, x1, y1, units, marches, tiles)
+XOFFSET_RECORD(slg::xm::ViewDelta, request_id, tick, x0, y0, x1, y1, upserts, removed, marches, removed_marches, tiles)
 XOFFSET_RECORD(slg::xm::PlayerPatch, player_id, seq, army_index, armies, items, city_changed, city)
 #elif defined(XOFFSET_ORDINARY_RECORDS)
 XOFFSET_ORDINARY_RECORDS(slg::xm::Buff, slg::xm::Skill, slg::xm::Troop, slg::xm::Hero, slg::xm::Army,
@@ -174,5 +176,5 @@ XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::PlayerPatch, "slg.PlayerPatch.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::BattleMsg, "slg.BattleMsg.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::ShardState, "slg.ShardState.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::Report, "slg.Report.v1")
-XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::ViewSnapshot, "slg.ViewSnapshot.v2")
-XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::ViewDelta, "slg.ViewDelta.v2")
+XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::ViewSnapshot, "slg.ViewSnapshot.v3")
+XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::ViewDelta, "slg.ViewDelta.v3")
