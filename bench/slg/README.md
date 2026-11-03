@@ -67,7 +67,11 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
     query of what lies in it is untimed bookkeeping, as for U*). The world
     changes at the peace rate, so this case is all full pulls. EB.send fills
     and encodes one viewport, EB.recv receives it with the format's checks and
-    reads every tile, unit and march.
+    reads every tile, unit and march. EBW.recv (report column, same for every
+    format) receives the same pull once more into one extra held view that
+    every pull reuses, as a single device holding one view would (warm caches;
+    the 1,500 held views of EB.recv are cold). The warm view must read the same
+    as the client's; EB keys and numbers are unchanged.
   - U* static (class 3): clients do not move. After one untimed full pull the
     server sends each client, every tick, only what changed inside its
     viewport (units changed, entered or left; marches started, recalled or
