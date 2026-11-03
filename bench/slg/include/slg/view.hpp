@@ -37,6 +37,9 @@
 //             untimed, as the tracker's work is for U*)
 //   EB.recv   the client receives it (the format's checked receive) and reads
 //             every tile, unit and march
+//   EBW.recv  the same, into one view reused for every pull (one real device
+//             holds one view, warm in cache; EB.recv's views, one per
+//             simulated client, are cold when their client pulls again)
 //   U*.send   fill one client's viewport delta from the bookkeeping and encode it
 //   U*.recv   the client receives the delta
 //   U*.apply  it applies the delta to its held view (through its id index)
@@ -667,7 +670,8 @@ template <class V, class D> void apply_delta(V& v, HeldIndex& at, const D& d) {
 //   void setup(int clients)                    held views: one per client
 //   std::size_t snap_encode(int b, auto fill)  fill(model&) then encode into send slot b (always 0)
 //   std::string_view snap_wire(int b)
-//   void snap_recv(int c, int k, int b)        receive slot b's wire into client c's held view (k = 0)
+//   void snap_recv(int c, int k, int b)        receive slot b's wire into client c's held view (k = 0);
+//                                              c = clients is the warm view (EBW), so held views are clients + 1
 //   auto& held(int c, int k)                   the held view (model object)
 //   std::size_t delta_encode(auto fill)        fill(model&) then encode the delta
 //   std::string_view delta_wire()
@@ -686,12 +690,12 @@ template <class V, class D> void apply_delta(V& v, HeldIndex& at, const D& d) {
 //   auto& n_held(int c, int k)                 its view; must read the same as held(c, k)
 
 struct ViewKeys {
-    std::string esend, erecv, usend, urecv, uapply;
+    std::string esend, erecv, ewrecv, usend, urecv, uapply;
     std::string ewin, ereq, ezstd, ecomp, ecompz, udelta, umsg, uzstd, uunits, umarch, utiles;
     std::string nsend, ndiff, nrecv, ndelta;
     ViewKeys(const char* e, const char* u, const char* n) {
         const std::string E(e), U(u), N(n);
-        esend = E + ".send"; erecv = E + ".recv";
+        esend = E + ".send"; erecv = E + ".recv"; ewrecv = E + "W.recv";
         ewin = E + ".window"; ereq = E + ".requests"; ezstd = E + ".window_zstd";
         ecomp = E + ".window_compact"; ecompz = E + ".window_compact_zstd";
         usend = U + ".send"; urecv = U + ".recv"; uapply = U + ".apply";
@@ -761,6 +765,17 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
                     q = query_view(ops.held(c, 0));
                 });
                 st.report_sum += q;
+                // The same pull received by one device that holds one view (EBW):
+                // the client's view is reused pull after pull, so it is warm in
+                // cache, as on a real client. EB.recv above keeps every simulated
+                // client's view (vs.clients of them), which is cold by the time
+                // that client pulls again.
+                uint64_t qw = 0;
+                timed(st, k.ewrecv.c_str(), [&] {
+                    ops.snap_recv(vs.clients, 0, 0);
+                    qw = query_view(ops.held(vs.clients, 0));
+                });
+                if (qw != q) throw std::runtime_error("warm view differs from the client's view");
                 st.bytes[k.ereq] += 1;
                 st.bytes[k.ewin] += ops.snap_wire(0).size();
                 st.bytes[k.ezstd] += zstd_size(ops.snap_wire(0));

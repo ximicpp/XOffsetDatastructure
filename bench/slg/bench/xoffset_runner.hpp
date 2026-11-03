@@ -460,7 +460,7 @@ public:
             dr.emplace(XBuffer::create<xm::ViewDelta>(kViewInitial, cap()));
             snaps.assign(1, {});
             held_views.clear();
-            held_views.resize(std::size_t(clients));
+            held_views.resize(std::size_t(clients) + 1);   // [clients]: the warm single-device view (EBW)
 #ifdef XOFFSET_DELTA_SYNC_API
             n_setup(clients, units, marches);
 #else
