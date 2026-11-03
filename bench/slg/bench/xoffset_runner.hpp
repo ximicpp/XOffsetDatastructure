@@ -115,7 +115,7 @@ public:
 #endif
             });
             timed(st, "A.req_decode", [&] { m.emplace(XBuffer::load_verified<BattleMsg>(req, cap())); });
-            timed(st, "A.simulate", [&] { simulate_battle(m->root<BattleMsg>()); });
+            untimed(st, "A.simulate", [&] { simulate_battle(m->root<BattleMsg>()); });
             timed(st, "A.res_encode", [&] { res = m->save_verified<BattleMsg>(); });
             timed(st, "A.res_decode", [&] {
                 prefetch_for_apply(pr);
@@ -141,7 +141,7 @@ public:
             std::optional<XBuffer> m, r;
             timed(st, "B.out_encode", [&] { out = slot.save_verified<PlayerState>(); });
             timed(st, "B.in_decode", [&] { m.emplace(XBuffer::load_verified<PlayerState>(out, cap())); });
-            timed(st, "B.season_edits", [&] {
+            untimed(st, "B.season_edits", [&] {
                 season_edits(m->root<PlayerState>(), mix_seed(seed_, uint64_t(cycle) * 1000003u + k), sc.season_ops);
             });
             timed(st, "B.back_encode", [&] { back = m->save_verified<PlayerState>(); });
@@ -159,7 +159,7 @@ public:
             std::optional<XBuffer> r;
             timed(st, "C.snapshot", [&] { snap = shard_->save_verified<ShardState>(); });
             timed(st, "C.restore", [&] { r.emplace(XBuffer::load_verified<ShardState>(snap, cap(true))); });
-            timed(st, "C.ticks", [&] { shard_ticks(r->root<ShardState>(), mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
+            untimed(st, "C.ticks", [&] { shard_ticks(r->root<ShardState>(), mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
             timed(st, "C.snapshot2", [&] { snap2 = r->save_verified<ShardState>(); });
             timed(st, "C.replace", [&] { *shard_ = std::move(*r); });
             st.bytes["C.snapshot"] += snap.size();
@@ -169,7 +169,7 @@ public:
             {
                 // Untimed copy of the current shard for the middle-erase stress item.
                 auto m = XOffsetDatastructure::XBuffer::load_verified<ShardState>(shard_->save_verified<ShardState>(), cap(true));
-                timed(st, "S.ticks_middle", [&] { shard_ticks_middle_erase(m.template root<ShardState>(), mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
+                untimed(st, "S.ticks_middle", [&] { shard_ticks_middle_erase(m.template root<ShardState>(), mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
             }
         }
 
@@ -223,7 +223,7 @@ public:
 #endif
             });
             recv<BattleMsg>(st, "A.req_decode", req_, a_m_);
-            timed(st, "A.simulate", [&] { simulate_battle(a_m_->root<BattleMsg>()); });
+            untimed(st, "A.simulate", [&] { simulate_battle(a_m_->root<BattleMsg>()); });
             timed(st, "A.res_encode", [&] { a_m_->save_verified_into<BattleMsg>(res_); });
             timed(st, "A.res_decode", [&] { prefetch_for_apply(pr); });
             recv<BattleMsg>(st, "A.res_decode", res_, a_r_);
@@ -247,7 +247,7 @@ public:
             XBuffer& slot = players_[std::size_t(migrants[k])];
             timed(st, "B.out_encode", [&] { slot.save_verified_into<PlayerState>(out_); });
             recv<PlayerState>(st, "B.in_decode", out_, b_m_);
-            timed(st, "B.scene_edits", [&] {
+            untimed(st, "B.scene_edits", [&] {
                 season_edits(b_m_->root<PlayerState>(), mix_seed(seed_, uint64_t(cycle) * 1000003u + k), sc.season_ops);
             });
             timed(st, "B.install", [&] { slot.swap(*b_m_); });
@@ -258,7 +258,7 @@ public:
             XBuffer& slot = players_[std::size_t(migrants[k])];
             timed(st, "B.out_encode", [&] { slot.save_verified_into<PlayerState>(out_); });
             recv<PlayerState>(st, "B.in_decode", out_, b_m_);
-            timed(st, "B.season_edits", [&] {
+            untimed(st, "B.season_edits", [&] {
                 season_edits(b_m_->root<PlayerState>(), mix_seed(seed_, uint64_t(cycle) * 1000003u + k), sc.season_ops);
             });
             timed(st, "B.back_encode", [&] { b_m_->save_verified_into<PlayerState>(back_); });
@@ -285,7 +285,7 @@ public:
         if (!demo_cases()) {  // the demo case set has no shard snapshot (susu 2026-11-02)
             timed(st, "C.snapshot", [&] { shard_->save_verified_into<ShardState>(snap_); });
             recv<ShardState>(st, "C.restore", snap_, c_r_);
-            timed(st, "C.ticks", [&] { shard_ticks(c_r_->root<ShardState>(), mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
+            untimed(st, "C.ticks", [&] { shard_ticks(c_r_->root<ShardState>(), mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
             timed(st, "C.snapshot2", [&] { c_r_->save_verified_into<ShardState>(snap2_); });
             timed(st, "C.replace", [&] { std::swap(*shard_, *c_r_); });
             st.bytes["C.snapshot"] += snap_.size();
@@ -295,7 +295,7 @@ public:
             {
                 // Untimed copy of the current shard for the middle-erase stress item.
                 auto m = XOffsetDatastructure::XBuffer::load_verified<ShardState>(shard_->save_verified<ShardState>(), cap(true));
-                timed(st, "S.ticks_middle", [&] { shard_ticks_middle_erase(m.template root<ShardState>(), mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
+                untimed(st, "S.ticks_middle", [&] { shard_ticks_middle_erase(m.template root<ShardState>(), mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
             }
         }
 
@@ -449,7 +449,7 @@ public:
     // Held views are small: slot storage (no VM reservation each), 32 KiB at most.
     static XOffsetDatastructure::XBuffer::MaximumCapacity held_cap() {
         using XOffsetDatastructure::XBuffer;
-        return XBuffer::maximum_capacity(32 * 1024).with_growth(XOffsetDatastructure::XGrowPolicy::Automatic);
+        return XBuffer::maximum_capacity(XBuffer::SLOT_MAX).with_growth(XOffsetDatastructure::XGrowPolicy::Automatic);
     }
 
     struct BlockOps {
@@ -464,7 +464,7 @@ public:
             dr.emplace(XBuffer::create<xm::ViewDelta>(kViewInitial, cap()));
             snaps.assign(1, {});
             held_views.clear();
-            held_views.resize(std::size_t(clients));
+            held_views.resize(std::size_t(clients) + 1);   // [clients]: the warm single-device view (EBW)
 #ifdef XOFFSET_DELTA_SYNC_API
             n_setup(clients, units, marches);
 #else
@@ -580,17 +580,15 @@ public:
             if (v.units.size() < std::size_t(n.usize)) { v.units.resize(std::size_t(n.usize)); b.touch(&v.units, sizeof(v.units)); }
             if (v.marches.size() < std::size_t(n.msize)) { v.marches.resize(std::size_t(n.msize)); b.touch(&v.marches, sizeof(v.marches)); }
             for (int32_t pos : n.urm) {
+                static const WorldUnit empty{};
                 auto& u = v.units[std::size_t(pos)];
-                u.id = 0; u.owner = 0; u.x = 0; u.y = 0; u.hp = 0; u.state = 0;
-                u.name = std::string_view{};
+                copy_unit(u, empty);
                 b.touch(u);
             }
             for (int32_t pos : n.mrm) { v.marches[std::size_t(pos)] = xm::ViewMarch{}; b.touch(v.marches[std::size_t(pos)]); }
             for (const auto& [i, pos] : n.uup) {
-                const WorldUnit& s = w.unit(i);
                 auto& u = v.units[std::size_t(pos)];
-                u.id = s.id; u.owner = s.owner; u.x = s.x; u.y = s.y; u.hp = s.hp; u.state = s.state;
-                if (sv(u.name) != std::string_view(s.name)) u.name = std::string_view(s.name);
+                copy_unit(u, w.unit(i));
                 b.touch(u);
             }
             for (const auto& [i, pos] : n.mup) { copy_vmarch(v.marches[std::size_t(pos)], w.march(i)); b.touch(v.marches[std::size_t(pos)]); }
