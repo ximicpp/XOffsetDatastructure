@@ -11,6 +11,23 @@
   `data()` without testing for null. Instructions, GCC 16 (P2996):
   slg.A.simulate -3.0% (-2.4%), formal.mutate -2.7% (-4.6%), push_back
   growth of heroes -3.9% (-3.2%).
+- New `XBufferCore::prefetch_for_update()` (and so `XBuffer`), with feature
+  macro `XOFFSET_PREFETCH_FOR_UPDATE_API`: a cache hint that starts loading the
+  host-side lines the next allocation or release in a cold buffer reads first
+  (owner map entry, owner word, arena header, free table counters and first
+  small bins). It changes nothing. Calling it when an update's data starts
+  arriving overlaps those misses with the receive; bench/slg A calls it for
+  both players while the battle result is received.
+- Free table: small bins keep their first four holes inline, and reloads
+  reuse a cached table on the inline paths; `XVector` element access resolves
+  the data pointer directly.
+- `XString` assignment of a short value (at most 10 bytes) into a null
+  head, as `emplace_back()` leaves it, stores it inline on the fast path
+  instead of the general one. Under GCC and MSVC, `XVector::emplace_back()`
+  appends into spare capacity at the caller, as `push_back` does, and grows
+  out of line. Wire bytes are unchanged. GCC 16: slg.EB.send (fill one
+  viewport snapshot and save it) 274.8M -> 253.9M instructions (zpp_bits
+  250.8M), cloud time -7%.
 
 ## 3.2.1: iPhone test host serves by default
 
