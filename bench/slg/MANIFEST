@@ -60,6 +60,9 @@
 #                        Unset: A/B/C/D and their stage keys unchanged (same digests and report
 #                        sums as before at S, both protocols). New message types ViewUnit /
 #                        ViewSnapshot / ViewDelta in every model, adapter and schema; Slot kView.
+#   bench/xoffset_runner.hpp  2026-11-02: demo B.install and S.load_install call XBuffer::swap
+#                        (std::swap did three moves); thread 优化服务端进程间迁移性能. Default
+#                        A/B/C/D unchanged.
 #   2026-11-02 viewport sync (thread 优化客户端视口同步性能): K*.recv times the key
 #                        delta receive and the read of every unit and march, as E*.recv does
 #                        (the read was untimed before); K*.window_zstd added. XOffset native
@@ -105,7 +108,7 @@ eac6391a496578276cfe33afe8b2bb3866d3f1bc03127ac9a0bbb7bb7434583d  bench/runner.h
 9f066f3062f44dc0ab507009af9108408f645f55baa72886985d9cc76a33328b  bench/slg_bench.cpp
 730a66f677d9d20077175f629cf0b13919e66ccedaf880e4eb414c6bc94c0610  bench/small_msg_probe.cpp
 6a3fda7327a877173f29aba3b956b2afd2627bc3de1765285f45fef9449e36be  bench/std_runner.hpp
-c9e656abfbe646214a4afbba6e19a80801a089723c47fc17d7243a3131da5b14  bench/xoffset_runner.hpp
+3d54d5719b51e871db7390beed5fca242f19449e6c9728ec0dd1b6e781414f79  bench/xoffset_runner.hpp
 12cab27be9331a4a09ae66f444cf5852dd81e363df562748a4ea854932e35e44  include/slg/cista_free.hpp
 252eca51c89182293cb3a4c75298df8490c2c7073065b304bb91183721b3cf3f  include/slg/generic.hpp
 81cb33c36231773132abe77ae7a9839a67d1f408fe474cf0bcf9ecfcd6577700  include/slg/login.hpp
