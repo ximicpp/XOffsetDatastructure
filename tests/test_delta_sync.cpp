@@ -11,7 +11,8 @@
 // out-of-order and repeated deltas, wrong root type, a replica changed
 // locally (caught by the digest), capacity limits, rejected key deltas, the
 // xxHash64 digest against reference values, replicas fed on several threads
-// at once (and one at thread exit), and a viewport-like model whose
+// at once (and one at thread exit), baselines that record touches instead
+// of a copy (XDeltaRecord::touches), and a viewport-like model whose
 // delta sizes are reported. With exceptions on, the throwing entry must
 // report exactly what the try_ entry reports. No try/catch of its own: also
 // built as test_delta_sync_noexc.
@@ -860,7 +861,7 @@ void mutate_touched(Buffer& src, std::mt19937_64& rng) {
 // compares less. A relay forwards what it applies (the blocks a delta wrote
 // count as touches) and its deltas match a whole comparison too.
 struct TouchTotals {
-    std::size_t deltas = 0, relayed = 0, replaced = 0;
+    std::size_t deltas = 0, relayed = 0, replaced = 0, second = 0;
     std::uint64_t compared_touched = 0, compared_whole = 0;
 } touch_totals;
 
@@ -875,6 +876,11 @@ void touched_stream(std::uint64_t seed, int steps) {
     xo::XDeltaBaseline rtb(seed * 4 + 3), rwb(seed * 4 + 3);
     Buffer down(4096, xo::XBuffer::maximum_capacity(kLimit));
     xo::XDeltaCursor down_cur;
+    // A second touched_only receiver of src that gets a delta now and then
+    // (the touch log is then shared: each baseline finds its own touches).
+    xo::XDeltaBaseline tb2(seed * 8 + 5);
+    Buffer rep2(4096, cap);
+    xo::XDeltaCursor cur2;
     for (int step = 0; step < steps; ++step) {
         const std::string where = "touched seed " + std::to_string(seed) + " step " + std::to_string(step);
         const auto op = rng() % 16;
@@ -906,6 +912,15 @@ void touched_stream(std::uint64_t seed, int steps) {
         if (replaced || st.key) need(st.compared_bytes == sw.compared_bytes, where + ": replaced content not compared whole");
         touch_totals.compared_touched += st.compared_bytes;
         touch_totals.compared_whole += sw.compared_bytes;
+        if (rng() % 3 == 0) {
+            std::string d2 = "stale";
+            if (!src.save_delta_into(d2, tb2, touched).empty) {
+                auto r2 = apply_entry(rep2, d2, cur2);
+                need(bool(r2), where + ": second receiver's delta rejected: " + (r2 ? std::string() : r2.error().message));
+                same_state(src.root(), src, rep2, where + " (second receiver)");
+                ++touch_totals.second;
+            }
+        }
         if (st.empty) continue;
         ++touch_totals.deltas;
         auto r = apply_entry(rep, dt, cur);
@@ -923,6 +938,165 @@ void touched_stream(std::uint64_t seed, int steps) {
         need(bool(dr), where + ": relayed delta rejected: " + (dr ? std::string() : dr.error().message));
         same_state(src.root(), src, down, where + " (downstream)");
     }
+}
+
+// XDeltaRecord::touches: no copy; each delta carries the bytes touched since
+// the baseline's last one, and the replica holds the source after every
+// delta. Mostly the baseline is the only one pairing with the source's touch
+// log (its list holds the touches); sometimes a copy baseline pairs in
+// between (the next touches delta sends whole touched blocks), the content
+// is replaced (a key delta) or the receiver asks for one. A relay forwards
+// what it applies with a touches baseline too.
+struct TouchesTotals {
+    std::size_t deltas = 0, keys = 0, relayed = 0, interleaved = 0;
+    std::uint64_t bytes = 0, copy_bytes = 0;
+} touches_totals;
+
+void touches_stream(std::uint64_t seed, int steps) {
+    std::mt19937_64 rng(seed);
+    const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
+    auto src = Buffer::create(4096, cap);
+    fill(src.root(), rng);
+    xo::XDeltaBaseline xb(xo::XDeltaRecord::touches), cb(seed * 2 + 1);
+    Buffer rep(4096, cap);
+    xo::XDeltaCursor cur;
+    Buffer crep(4096, cap);
+    xo::XDeltaCursor ccur;
+    xo::XDeltaBaseline rb(xo::XDeltaRecord::touches, seed * 4 + 3);
+    Buffer down(4096, xo::XBuffer::maximum_capacity(kLimit));
+    xo::XDeltaCursor down_cur;
+    for (int step = 0; step < steps; ++step) {
+        const std::string where = "touches seed " + std::to_string(seed) + " step " + std::to_string(step);
+        const auto op = rng() % 16;
+        if (op == 0) {
+            src.reset();  // content replaced: a key delta
+            fill(src.root(), rng);
+        } else if (op == 1) {
+            mutate_valid(src.root(), rng);
+            src.touch(src.root());  // everything (often more blocks than the list holds)
+        } else if (op == 2) {
+            xb.reset();  // the receiver asked for a key delta
+        } else if (op != 3) {  // op 3: nothing changes
+            mutate_touched(src, rng);
+        }
+        xo::XDeltaOptions options;
+        options.digest = rng() % 2;
+        options.whole_blocks = rng() % 8 == 0;
+        std::string d = "stale";
+        const auto st = src.save_delta_into(d, xb, options);
+        need(xb.recorded_bytes() == 0 && xb.record() == xo::XDeltaRecord::touches, where + ": a touches baseline kept a copy");
+        need(st.key || st.compared_bytes == 0, where + ": a touches delta compared bytes");
+        if (st.empty) {
+            need(d.empty() && payload_of(src) == payload_of(rep), where + ": empty touches delta although the payload changed");
+        } else {
+            ++touches_totals.deltas;
+            touches_totals.keys += st.key;
+            touches_totals.bytes += d.size();
+            auto r = apply_entry(rep, d, cur);
+            need(bool(r), where + ": touches delta rejected: " + (r ? std::string() : r.error().message));
+            same_state(src.root(), src, rep, where);
+        }
+        if (rng() % 6 == 0) {
+            // A copy baseline pairs in between.
+            ++touches_totals.interleaved;
+            xo::XDeltaOptions touched;
+            touched.touched_only = true;
+            std::string dc = "stale";
+            const auto sc = src.save_delta_into(dc, cb, touched);
+            if (!sc.empty) {
+                touches_totals.copy_bytes += dc.size();
+                auto r = apply_entry(crep, dc, ccur);
+                need(bool(r), where + ": copy delta rejected: " + (r ? std::string() : r.error().message));
+                same_state(src.root(), src, crep, where + " (copy)");
+            }
+        }
+        // The relay forwards.
+        std::string rd = "stale";
+        const auto rst = rep.save_delta_into(rd, rb, options);
+        if (rst.empty) {
+            need(payload_of(rep) == payload_of(down) || down_cur.empty(), where + ": empty relayed delta although it changed");
+            continue;
+        }
+        ++touches_totals.relayed;
+        auto dr = apply_entry(down, rd, down_cur);
+        need(bool(dr), where + ": relayed touches delta rejected: " + (dr ? std::string() : dr.error().message));
+        same_state(src.root(), src, down, where + " (downstream)");
+    }
+}
+
+// Touches deltas: touched bytes go even unchanged, untouched changes do not;
+// more touched blocks than the list holds go whole; growth and shrinking;
+// the copy is never kept and key_delta_into is not offered.
+void touches_fixed_case() {
+    std::mt19937_64 rng(23);
+    const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
+    auto src = Buffer::create(4096, cap);
+    fill(src.root(), rng);
+    while (src.root().items.size() < 2) src.root().items.emplace_back().id = 1;
+    xo::XDeltaBaseline xb(xo::XDeltaRecord::touches);
+    Buffer rep(4096, cap);
+    xo::XDeltaCursor cur;
+    std::string d;
+    auto st = src.save_delta_into(d, xb);
+    need(st.key && xb.recorded_bytes() == 0 && !xb.empty(), "touches: first delta is not a key delta");
+    need(bool(apply_entry(rep, d, cur)), "touches: key delta");
+    // A touched scalar that did not change still goes (its 8 bytes).
+    src.touch(src.root().epoch);
+    st = src.save_delta_into(d, xb);
+    need(!st.empty && st.blocks == 1 && st.changed_bytes == sizeof(src.root().epoch) && st.compared_bytes == 0,
+         "touches: an unchanged touched scalar did not go as its bytes");
+    need(bool(apply_entry(rep, d, cur)), "touches: scalar delta");
+    same_state(src.root(), src, rep, "touches: scalar");
+    // Nothing touched: nothing sent.
+    st = src.save_delta_into(d, xb);
+    need(st.empty, "touches: an untouched buffer sent a delta");
+    // An untouched change is not sent; the digest catches it.
+    src.root().epoch += 1;
+    src.root().items[0].id += 1;
+    src.touch(src.root().items[0].id);
+    xo::XDeltaOptions digest;
+    digest.digest = true;
+    st = src.save_delta_into(d, xb, digest);
+    need(!st.empty && st.changed_bytes == sizeof(src.root().items[0].id), "touches: the touched id did not go alone");
+    auto res = apply_entry(rep, d, cur);
+    need(!res && res.code() == xo::XErrc::digest_mismatch, "touches: the digest did not catch an untouched change");
+    xb.reset();
+    need(bool(apply_entry(rep, src.save_delta(xb), cur)) && src.save_delta_into(d, xb).empty,
+         "touches: resync key delta");
+    same_state(src.root(), src, rep, "touches: resync");
+    // Growth: the bytes past the receiver's used size go where nonzero.
+    auto& vals = src.root().items[1].vals;
+    for (int i = 0; i < 3000; ++i) vals.push_back(std::uint16_t(i + 1));
+    src.touch(vals);
+    st = src.save_delta_into(d, xb);
+    need(!st.empty, "touches: no delta for growth");
+    need(bool(apply_entry(rep, d, cur)), "touches: growth delta");
+    same_state(src.root(), src, rep, "touches: growth");
+    // More touched blocks than the list holds: they go whole.
+    const auto used = std::size_t(src.arena()->used_end);
+    need(used / 64 > xo::detail::DeltaTouchLog::list_capacity + 4, "touches: payload too small for the list");
+    for (std::size_t i = 0; i < vals.size(); i += 32) vals[i] = std::uint16_t(vals[i] + 1);
+    for (std::size_t i = 0; i < vals.size(); i += 32) src.touch(vals[i]);
+    st = src.save_delta_into(d, xb);
+    const std::size_t touched_blocks = (vals.size() + 31) / 32;
+    need(touched_blocks > xo::detail::DeltaTouchLog::list_capacity && st.blocks == touched_blocks &&
+             st.changed_bytes > (touched_blocks - 2) * 64,  // all whole but maybe the payload's last
+         "touches: an overflowed list did not send whole blocks");
+    need(bool(apply_entry(rep, d, cur)), "touches: overflow delta");
+    same_state(src.root(), src, rep, "touches: overflow");
+    // Back within the list: only the touched bytes again.
+    vals[5] = 7;
+    src.touch(vals[5]);
+    st = src.save_delta_into(d, xb);
+    need(st.blocks == 1 && st.changed_bytes == sizeof(std::uint16_t), "touches: the list was not used again");
+    need(bool(apply_entry(rep, d, cur)), "touches: delta after overflow");
+    // An item erased: its blocks become holes (they go with the hole change).
+    src.root().items.erase(src.root().items.begin() + 1);
+    src.touch(src.root().items);
+    st = src.save_delta_into(d, xb);
+    need(st.holes, "touches: erasing an item changed no hole");
+    need(bool(apply_entry(rep, d, cur)), "touches: erase delta");
+    same_state(src.root(), src, rep, "touches: erase");
 }
 
 void touched_fixed_case() {
@@ -955,6 +1129,33 @@ void touched_fixed_case() {
     // Nothing touched: nothing compared, nothing sent.
     st = src.save_delta_into(d, base, touched);
     need(st.empty && st.compared_bytes == 0, "touched: an untouched buffer compared bytes");
+    {
+        // A copy of the baseline left behind while the original goes on:
+        // the touches since it are not kept for it, so it compares everything.
+        xo::XDeltaBaseline behind = base;
+        Buffer rep_behind = rep.clone();
+        xo::XDeltaCursor cur_behind = cur;
+        for (int i = 0; i < 2; ++i) {
+            src.root().epoch += 1;
+            src.touch(src.root().epoch);
+            need(bool(apply_entry(rep, src.save_delta(base, touched), cur)), "touched: delta ahead of a copy");
+        }
+        auto sb = src.save_delta_into(d, behind, touched);
+        need(sb.compared_bytes == whole, "touched: a baseline left behind did not compare everything");
+        need(bool(apply_entry(rep_behind, d, cur_behind)), "touched: delta of a baseline left behind");
+        same_state(src.root(), src, rep_behind, "touched: baseline left behind");
+        // Its delta paired it: the log is now shared, and the original
+        // still compares only what was touched since its own last delta.
+        src.root().epoch += 1;
+        src.touch(src.root().epoch);
+        st = src.save_delta_into(d, base, touched);
+        need(st.compared_bytes == epoch_block, "touched: the original compared more once the log was shared");
+        need(bool(apply_entry(rep, d, cur)), "touched: delta after sharing");
+        sb = src.save_delta_into(d, behind, touched);
+        need(sb.compared_bytes == epoch_block, "touched: the second baseline compared more than its touches");
+        need(bool(apply_entry(rep_behind, d, cur_behind)), "touched: second baseline's delta");
+        same_state(src.root(), src, rep_behind, "touched: second baseline");
+    }
     // A change not touched is not sent; with a digest the receiver finds out.
     src.root().epoch += 1;
     st = src.save_delta_into(d, base, touched);
@@ -1130,12 +1331,16 @@ int main(int argc, char** argv) {
     view_sizes();
     touched_fixed_case();
     touched_growth_case();
+    touches_fixed_case();
     thread_scratch_case();
     for (int s = 0; s < streams; ++s) random_stream(20261102u + std::uint64_t(s), steps);
     for (int s = 0; s < streams; ++s) touched_stream(20261103u + std::uint64_t(s), steps);
     need(touch_totals.compared_touched * 4 < touch_totals.compared_whole * 3 && touch_totals.relayed > 0 &&
-             touch_totals.replaced > 0,
+             touch_totals.replaced > 0 && touch_totals.second > 0,
          "touched_only: compared too much, or a path was never taken");
+    for (int s = 0; s < streams; ++s) touches_stream(20261104u + std::uint64_t(s), steps);
+    need(touches_totals.deltas > touches_totals.keys && touches_totals.relayed > 0 && touches_totals.interleaved > 0,
+         "touches: a path was never taken");
     need(totals.keys >= std::size_t(streams), "too few key deltas");
     need(totals.shrinks > 0 && totals.digests > 0 && totals.corrupt_rejected > 0 && totals.late_joins > 0,
          "a path was never taken");
@@ -1149,6 +1354,8 @@ int main(int argc, char** argv) {
               << totals.corrupt_accepted << " accepted as valid payloads; delta bytes " << totals.delta_bytes
               << " vs full wires " << totals.full_bytes << "; touched_only: " << touch_totals.deltas << " deltas, "
               << touch_totals.relayed << " relayed, compared " << touch_totals.compared_touched << " of "
-              << touch_totals.compared_whole << " bytes\n";
+              << touch_totals.compared_whole << " bytes; touches: " << touches_totals.deltas << " deltas ("
+              << touches_totals.keys << " key), " << touches_totals.relayed << " relayed, " << touches_totals.bytes
+              << " bytes\n";
     return 0;
 }
