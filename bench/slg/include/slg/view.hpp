@@ -3,7 +3,8 @@
 // A client sees one screen of the map, a 512 x 384 viewport. What it holds of
 // the map is exactly what lies in that rectangle: the tiles under it (32 x 32
 // px each, about 17 x 13 of them), the units standing in it (cities, stationed
-// troops, resource points) and the marches whose line crosses it. A march is a
+// troops, resource points; 40 fields each, see WorldUnit) and the marches whose
+// line crosses it. A march is a
 // line record (start, end, start tick, arrival tick); the client interpolates,
 // so a march changes only when it starts, is recalled or arrives.
 //
@@ -17,7 +18,9 @@
 //            inside its viewport only: units that changed, entered or left,
 //            marches that started, changed or left, tiles whose owner changed.
 //            Three change rates (Rate):
-//     peace  - a few unit events per tick (owner, state, hp), a few tile owner
+//     peace  - a few unit events per tick (captured: owner, names, alliance;
+//              state and its timer; a skirmish: hp, troops, wounded, power; a
+//              buff gained, lost or refreshed; a level-up), a few tile owner
 //              changes and march turnover (the main case);
 //     combat - peace plus two battle zones where every engaged unit changes
 //              every tick (a 1 s battle round) and 1/16 of the zone's tiles
@@ -34,6 +37,9 @@
 //             untimed, as the tracker's work is for U*)
 //   EB.recv   the client receives it (the format's checked receive) and reads
 //             every tile, unit and march
+//   EBW.recv  the same, into one view reused for every pull (one real device
+//             holds one view, warm in cache; EB.recv's views, one per
+//             simulated client, are cold when their client pulls again)
 //   U*.send   fill one client's viewport delta from the bookkeeping and encode it
 //   U*.recv   the client receives the delta
 //   U*.apply  it applies the delta to its held view (through its id index)
@@ -113,11 +119,75 @@ template <class V> std::size_t tile_pos(const V& v, int32_t tx, int32_t ty) {
     return std::size_t((ty - s.ty0) * s.cols + (tx - s.tx0));
 }
 
+// A map unit (city, army, resource point) with the fields a real SLG map entity
+// carries: 33 scalars (int32, int64 timers, bools), three strings (the owner's
+// name passes 10 bytes, so it is not inline in XOffset), a nested commander and
+// three lists. Every model's ViewUnit has these fields under these names.
+#define SLG_VUNIT_SCALARS(X) X(id) X(kind) X(owner) X(alliance) X(x) X(y) X(hp) X(max_hp) X(state) X(level) \
+    X(faction) X(flags) X(speed) X(attack) X(defense) X(morale) X(load) X(icon) X(skin) X(banner) X(title) X(vip) \
+    X(rank) X(slots) X(power) X(state_end) X(shield_end) X(cooldown_end) X(last_update) X(kills) \
+    X(in_battle) X(shielded) X(hidden)
+
+struct WorldHero { int32_t id{}; int32_t level{}; int32_t star{}; int32_t skin{}; };
+struct WorldTroop { int32_t type{}; int32_t count{}; int32_t wounded{}; };
+struct WorldBuff { int32_t id{}; int32_t stacks{}; int64_t expire_ms{}; };
 struct WorldUnit {
-    int32_t id{}; int32_t owner{}; int32_t x{}; int32_t y{};
-    int32_t vx{}; int32_t vy{}; int32_t hp{}; int32_t state{};
-    std::string name;
+    int32_t id{}; int32_t kind{}; int32_t owner{}; int32_t alliance{}; int32_t x{}; int32_t y{}; int32_t hp{};
+    int32_t max_hp{}; int32_t state{}; int32_t level{}; int32_t faction{}; int32_t flags{}; int32_t speed{};
+    int32_t attack{}; int32_t defense{}; int32_t morale{}; int32_t load{}; int32_t icon{}; int32_t skin{};
+    int32_t banner{}; int32_t title{}; int32_t vip{}; int32_t rank{}; int32_t slots{};
+    int64_t power{}; int64_t state_end{}; int64_t shield_end{}; int64_t cooldown_end{}; int64_t last_update{}; int64_t kills{};
+    bool in_battle{}; bool shielded{}; bool hidden{};
+    std::string name, alliance_tag, owner_name;
+    WorldHero commander;
+    std::vector<WorldHero> heroes;
+    std::vector<WorldTroop> troops;
+    std::vector<WorldBuff> buffs;
+    int32_t vx{}; int32_t vy{};     // world only: velocity (stress)
+    uint32_t ver = 0;               // world only: bumped on every change (server bookkeeping)
 };
+
+// Copies of a unit between any two models (std, cista, XOffset, the world).
+// A string is assigned only when it differs, through a copy (the source may
+// live in the same buffer); a list of the same length is updated in place.
+template <class D, class S> void set_str(D& d, const S& s) {
+    const std::string_view v = sv(s);
+    if (sv(d) == v) return;
+    const std::string t(v);
+    d = std::string_view(t);
+}
+template <class D, class S, class F> void copy_list(D& d, const S& s, F&& f) {
+    if (d.size() == s.size()) { for (std::size_t i = 0; i < s.size(); ++i) f(d[i], s[i]); return; }
+    d.clear();
+    d.reserve(s.size());
+    for (const auto& e : s) f(d.emplace_back(), e);
+}
+template <class D, class S> void copy_uhero(D& d, const S& s) { d.id = s.id; d.level = s.level; d.star = s.star; d.skin = s.skin; }
+template <class D, class S> void copy_unit(D& d, const S& s) {
+#define SLG_X(f) d.f = s.f;
+    SLG_VUNIT_SCALARS(SLG_X)
+#undef SLG_X
+    set_str(d.name, s.name); set_str(d.alliance_tag, s.alliance_tag); set_str(d.owner_name, s.owner_name);
+    copy_uhero(d.commander, s.commander);
+    copy_list(d.heroes, s.heroes, [](auto& a, const auto& b) { copy_uhero(a, b); });
+    copy_list(d.troops, s.troops, [](auto& a, const auto& b) { a.type = b.type; a.count = b.count; a.wounded = b.wounded; });
+    copy_list(d.buffs, s.buffs, [](auto& a, const auto& b) { a.id = b.id; a.stacks = b.stacks; a.expire_ms = b.expire_ms; });
+}
+// A unit read field by field (what a renderer / client logic touches). A
+// zeroed (free) slot reads as 0.
+template <class U> uint64_t query_unit(const U& u) {
+    if (u.id == 0) return 0;
+    uint64_t h = 0;
+#define SLG_X(f) h = h * 31u + uint64_t(u.f);
+    SLG_VUNIT_SCALARS(SLG_X)
+#undef SLG_X
+    h += sv(u.name).size() * 7u + sv(u.alliance_tag).size() * 11u + sv(u.owner_name).size() * 13u;
+    h += uint64_t(u.commander.id) * 3u + uint64_t(u.commander.level + u.commander.star + u.commander.skin);
+    for (const auto& e : u.heroes) h = h * 17u + uint64_t(e.id) + uint64_t(e.level) * 5u + uint64_t(e.star + e.skin);
+    for (const auto& e : u.troops) h = h * 19u + uint64_t(e.type) + uint64_t(e.count) * 3u + uint64_t(e.wounded);
+    for (const auto& e : u.buffs) h = h * 23u + uint64_t(e.id) + uint64_t(e.stacks) + uint64_t(e.expire_ms);
+    return h;
+}
 
 struct WorldMarch {
     int32_t id{}; int32_t owner{}; int32_t x0{}; int32_t y0{}; int32_t x1{}; int32_t y1{};
@@ -144,6 +214,7 @@ public:
             u.vx = rng.range(-8, 8); u.vy = rng.range(-8, 8);
             u.hp = rng.range(100, 1000); u.state = rng.below(4);
             u.name = std::string(rng.below(2) ? "u_" : "sq_") + std::to_string(u.id);   // at most 8 bytes
+            dress(rng, u);
             units_.push_back(std::move(u));
         }
         for (auto& z : zones_) { z[0] = rng.range(kZoneR, kMapSize - kZoneR); z[1] = rng.range(kZoneR, kMapSize - kZoneR); }
@@ -179,10 +250,10 @@ public:
         if (rate_ == Rate::Stress) {
             for (auto& u : units_) {
                 const int32_t k = r.below(16);
-                if (k == 0) u.hp = u.hp > 10 ? u.hp - r.range(1, 10) : u.hp + 500;
-                else if (k == 1) u.state = r.below(4);
+                if (k == 0) { u.hp = u.hp > 10 ? u.hp - r.range(1, 10) : u.hp + 500; hit_troop(r, u); touch(u); }
+                else if (k == 1) { set_state(r, u); touch(u); }
                 if (u.state != 0) continue;   // state 0 = moving: about a quarter of the units
-                u.x += u.vx; u.y += u.vy;
+                u.x += u.vx; u.y += u.vy; touch(u);
                 if (u.x < 0 || u.x >= kMapSize) { u.vx = -u.vx; u.x = u.x < 0 ? -u.x : 2 * kMapSize - 1 - u.x; }
                 if (u.y < 0 || u.y >= kMapSize) { u.vy = -u.vy; u.y = u.y < 0 ? -u.y : 2 * kMapSize - 1 - u.y; }
             }
@@ -192,11 +263,19 @@ public:
             const int events = std::max(1, int(units_.size()) / 500);
             for (int e = 0; e < events; ++e) {
                 auto& u = units_[std::size_t(r.below(int32_t(units_.size())))];
-                switch (r.below(3)) {
-                case 0: u.owner = 1 + r.below(5000); break;
-                case 1: u.state = r.below(4); break;
-                default: u.hp = u.hp > 50 ? u.hp - r.range(1, 50) : u.hp + 500; break;
+                switch (r.below(5)) {
+                case 0: set_owner(r, u); break;                         // captured
+                case 1: set_state(r, u); break;                         // starts gathering, garrisons, ...
+                case 2:                                                 // skirmish
+                    u.hp = u.hp > 50 ? u.hp - r.range(1, 50) : u.hp + 500;
+                    hit_troop(r, u);
+                    break;
+                case 3: change_buff(r, u); break;                       // buff gained, lost or refreshed
+                default:                                                // levels up
+                    ++u.level; u.power += r.range(100, 5000); u.commander.level = std::min(u.commander.level + 1, 60);
+                    break;
                 }
+                touch(u);
             }
             // 1 tile in 1024 changes owner (occupied, abandoned).
             for (int e = 0; e < int(tiles_.size()) / 1024; ++e) take_tile(r.below(int32_t(tiles_.size())), r);
@@ -205,7 +284,13 @@ public:
                 for (int32_t i : engaged_) {
                     auto& u = units_[std::size_t(i)];
                     u.hp = u.hp > 30 ? u.hp - r.range(1, 30) : u.hp + 800;
-                    if (r.below(8) == 0) u.state = r.below(4);
+                    u.in_battle = true;
+                    hit_troop(r, u);
+                    u.morale = std::max(0, u.morale - r.below(3));
+                    u.kills += r.below(20);
+                    if (r.below(8) == 0) set_state(r, u);
+                    if (r.below(16) == 0) change_buff(r, u);
+                    touch(u);
                 }
                 for (int32_t t : zone_tiles_) if (r.below(16) == 0) take_tile(t, r);
             }
@@ -266,6 +351,52 @@ public:
     const ViewScale& scale() const { return *vs_; }
 
 private:
+    void touch(WorldUnit& u) const { ++u.ver; u.last_update = tick_; }
+    static std::string owner_name_of(int32_t owner) {
+        std::string d = std::to_string(owner);
+        return "lord_" + std::string(7 - std::min<std::size_t>(7, d.size()), '0') + d;   // 12 bytes
+    }
+    static std::string tag_of(int32_t alliance) { return alliance ? "[A" + std::to_string(alliance % 1000) + "]" : std::string(); }
+    void set_owner(Rng& r, WorldUnit& u) const {
+        u.owner = 1 + r.below(5000);
+        u.owner_name = owner_name_of(u.owner);
+        u.alliance = r.below(3) ? 1 + r.below(800) : 0;
+        u.alliance_tag = tag_of(u.alliance);
+    }
+    void set_state(Rng& r, WorldUnit& u) const { u.state = r.below(4); u.state_end = tick_ + r.range(5, 600); }
+    static void hit_troop(Rng& r, WorldUnit& u) {
+        if (u.troops.empty()) return;
+        auto& t = u.troops[std::size_t(r.below(int32_t(u.troops.size())))];
+        const int32_t loss = std::min(t.count, r.range(1, 200));
+        t.count = t.count > loss ? t.count - loss : t.count + 5000;
+        t.wounded += loss / 2;
+        u.power = std::max<int64_t>(0, u.power - loss);
+    }
+    void change_buff(Rng& r, WorldUnit& u) const {
+        const int32_t k = r.below(3);
+        if (k == 0 && u.buffs.size() < 5) u.buffs.push_back({1 + r.below(200), 1 + r.below(5), (tick_ + r.range(30, 3600)) * 1000});
+        else if (k == 1 && !u.buffs.empty()) u.buffs.erase(u.buffs.begin() + r.below(int32_t(u.buffs.size())));
+        else if (!u.buffs.empty()) u.buffs[std::size_t(r.below(int32_t(u.buffs.size())))].expire_ms = (tick_ + r.range(30, 3600)) * 1000;
+    }
+    static void dress(Rng& r, WorldUnit& u) {
+        u.kind = r.below(4); u.max_hp = u.hp + r.range(0, 500); u.level = 1 + r.below(30); u.faction = r.below(6);
+        u.flags = r.below(1 << 16); u.speed = r.range(10, 100); u.attack = r.range(100, 5000); u.defense = r.range(100, 5000);
+        u.morale = r.range(50, 100); u.load = r.below(100000); u.icon = r.below(200); u.skin = r.below(50);
+        u.banner = r.below(100); u.title = r.below(20); u.vip = r.below(16); u.rank = r.below(5); u.slots = 1 + r.below(5);
+        u.power = int64_t(r.range(1000, 1000000)) * 3; u.state_end = r.range(0, 600); u.shield_end = r.below(4) ? 0 : r.range(1, 86400);
+        u.cooldown_end = r.range(0, 300); u.last_update = 0; u.kills = r.below(100000);
+        u.in_battle = false; u.shielded = r.below(8) == 0; u.hidden = r.below(32) == 0;
+        u.owner_name = owner_name_of(u.owner);
+        u.alliance = r.below(3) ? 1 + r.below(800) : 0;
+        u.alliance_tag = tag_of(u.alliance);
+        u.commander = {1 + r.below(300), 1 + r.below(60), 1 + r.below(6), r.below(10)};
+        u.heroes.clear();
+        for (int32_t i = 0, n = 1 + r.below(3); i < n; ++i) u.heroes.push_back({1 + r.below(300), 1 + r.below(60), 1 + r.below(6), r.below(10)});
+        u.troops.clear();
+        for (int32_t i = 0, n = 3 + r.below(4); i < n; ++i) u.troops.push_back({i + 1, r.range(100, 20000), r.below(500)});
+        u.buffs.clear();
+        for (int32_t i = 0, n = r.below(6); i < n; ++i) u.buffs.push_back({1 + r.below(200), 1 + r.below(5), int64_t(r.range(30, 3600)) * 1000});
+    }
     static void jump(Rng& rng, ViewClient& v) { v.cx = rng.below(kMapSize); v.cy = rng.below(kMapSize); }
     bool in_zone(int32_t x, int32_t y) const {
         for (const auto& z : zones_) {
@@ -356,10 +487,7 @@ template <class V> void fill_view(V& v, const MapWorld& w, const ViewRect& r, co
     v.units.clear();
     v.units.reserve(us.size());
     for (int32_t i : us) {
-        const WorldUnit& s = w.unit(i);
-        auto& d = v.units.emplace_back();
-        d.id = s.id; d.owner = s.owner; d.x = s.x; d.y = s.y; d.hp = s.hp; d.state = s.state;
-        d.name = std::string_view(s.name);
+        copy_unit(v.units.emplace_back(), w.unit(i));
     }
     v.marches.clear();
     v.marches.reserve(ms.size());
@@ -376,10 +504,7 @@ template <class V> void fill_view(V& v, const MapWorld& w, const ViewRect& r, co
 // formats. Zeroed (free) unit and march slots add nothing.
 template <class V> uint64_t query_view(const V& v) {
     uint64_t h = uint64_t(v.request_id) * 31u + uint64_t(v.tick) + uint64_t(v.x0) * 7u + uint64_t(v.y1);
-    for (const auto& u : v.units) {
-        h += uint64_t(u.hp) * 3u + uint64_t(u.x ^ u.y) + uint64_t(u.state) + uint64_t(u.id) * 1315423911u;
-        h += uint64_t(u.owner) + sv(u.name).size();
-    }
+    for (const auto& u : v.units) h += query_unit(u);
     for (const auto& m : v.marches)
         h += uint64_t(m.id) * 2654435761u + uint64_t(m.x0 ^ m.y1) + uint64_t(m.x1 ^ m.y0) + uint64_t(m.t0) * 5u + uint64_t(m.t1) + uint64_t(m.owner);
     for (const auto& t : v.tiles)
@@ -414,10 +539,7 @@ public:
             const WorldUnit& u = w.unit(i);
             auto [it, fresh] = lu.try_emplace(u.id);
             SentU& s = it->second;
-            if (fresh || s.x != u.x || s.y != u.y || s.hp != u.hp || s.state != u.state || s.owner != u.owner) {
-                s.x = u.x; s.y = u.y; s.hp = u.hp; s.state = u.state; s.owner = u.owner;
-                p.units.push_back(i);
-            }
+            if (fresh || s.ver != u.ver) { s.ver = u.ver; p.units.push_back(i); }
             s.gen = gen_;
         }
         for (auto it = lu.begin(); it != lu.end();) {
@@ -448,7 +570,7 @@ public:
         std::sort(p.removed_marches.begin(), p.removed_marches.end());
     }
 private:
-    struct SentU { int32_t x{}, y{}, hp{}, state{}, owner{}; uint64_t gen{}; };
+    struct SentU { uint32_t ver{}; uint64_t gen{}; };
     struct SentM { int32_t x1{}, y1{}; int64_t t1{}; uint64_t gen{}; };
     std::vector<std::unordered_map<int32_t, SentU>> u_;
     std::vector<std::unordered_map<int32_t, SentM>> m_;
@@ -462,10 +584,7 @@ template <class D> void fill_delta(D& d, const MapWorld& w, const ViewRect& r, c
     d.upserts.clear();
     d.upserts.reserve(p.units.size());
     for (int32_t i : p.units) {
-        const WorldUnit& s = w.unit(i);
-        auto& u = d.upserts.emplace_back();
-        u.id = s.id; u.owner = s.owner; u.x = s.x; u.y = s.y; u.hp = s.hp; u.state = s.state;
-        u.name = std::string_view(s.name);
+        copy_unit(d.upserts.emplace_back(), w.unit(i));
     }
     d.removed.clear();
     d.removed.reserve(p.removed.size());
@@ -501,10 +620,11 @@ template <class V, class D> void apply_delta(V& v, HeldIndex& at, const D& d) {
         if (it == at.units.end()) continue;
         const int32_t pos = it->second, last = int32_t(v.units.size()) - 1;
         if (pos != last) {
+            // Through a plain copy: the source lives in the same container.
+            static thread_local WorldUnit tmp;
+            copy_unit(tmp, v.units[std::size_t(last)]);
             auto& dst = v.units[std::size_t(pos)];
-            const auto& src = v.units[std::size_t(last)];
-            dst.id = src.id; dst.owner = src.owner; dst.x = src.x; dst.y = src.y; dst.hp = src.hp; dst.state = src.state;
-            if (sv(dst.name) != sv(src.name)) dst.name = std::string(sv(src.name));
+            copy_unit(dst, tmp);
             at.units[dst.id] = pos;
         }
         v.units.pop_back();
@@ -513,14 +633,10 @@ template <class V, class D> void apply_delta(V& v, HeldIndex& at, const D& d) {
     for (const auto& u : d.upserts) {
         const auto it = at.units.find(u.id);
         if (it != at.units.end()) {
-            auto& dst = v.units[std::size_t(it->second)];
-            dst.owner = u.owner; dst.x = u.x; dst.y = u.y; dst.hp = u.hp; dst.state = u.state;
-            if (sv(dst.name) != sv(u.name)) dst.name = sv(u.name);
+            copy_unit(v.units[std::size_t(it->second)], u);
         } else {
             at.units.emplace(u.id, int32_t(v.units.size()));
-            auto& dst = v.units.emplace_back();
-            dst.id = u.id; dst.owner = u.owner; dst.x = u.x; dst.y = u.y; dst.hp = u.hp; dst.state = u.state;
-            dst.name = sv(u.name);
+            copy_unit(v.units.emplace_back(), u);
         }
     }
     for (const auto& id : d.removed_marches) {
@@ -554,7 +670,8 @@ template <class V, class D> void apply_delta(V& v, HeldIndex& at, const D& d) {
 //   void setup(int clients)                    held views: one per client
 //   std::size_t snap_encode(int b, auto fill)  fill(model&) then encode into send slot b (always 0)
 //   std::string_view snap_wire(int b)
-//   void snap_recv(int c, int k, int b)        receive slot b's wire into client c's held view (k = 0)
+//   void snap_recv(int c, int k, int b)        receive slot b's wire into client c's held view (k = 0);
+//                                              c = clients is the warm view (EBW), so held views are clients + 1
 //   auto& held(int c, int k)                   the held view (model object)
 //   std::size_t delta_encode(auto fill)        fill(model&) then encode the delta
 //   std::string_view delta_wire()
@@ -573,12 +690,12 @@ template <class V, class D> void apply_delta(V& v, HeldIndex& at, const D& d) {
 //   auto& n_held(int c, int k)                 its view; must read the same as held(c, k)
 
 struct ViewKeys {
-    std::string esend, erecv, usend, urecv, uapply;
+    std::string esend, erecv, ewrecv, usend, urecv, uapply;
     std::string ewin, ereq, ezstd, ecomp, ecompz, udelta, umsg, uzstd, uunits, umarch, utiles;
     std::string nsend, ndiff, nrecv, ndelta;
     ViewKeys(const char* e, const char* u, const char* n) {
         const std::string E(e), U(u), N(n);
-        esend = E + ".send"; erecv = E + ".recv";
+        esend = E + ".send"; erecv = E + ".recv"; ewrecv = E + "W.recv";
         ewin = E + ".window"; ereq = E + ".requests"; ezstd = E + ".window_zstd";
         ecomp = E + ".window_compact"; ecompz = E + ".window_compact_zstd";
         usend = U + ".send"; urecv = U + ".recv"; uapply = U + ".apply";
@@ -618,8 +735,10 @@ struct ViewSession {
     ViewQuery query;
     bool browse = false, primed = false;
     std::vector<HeldIndex> index;   // per client
+    std::vector<std::size_t> wire_size;   // browse: this round's pull per client (bytes pass check)
     void setup(uint64_t seed, const ViewScale& vs, int which) {
         browse = ViewCases::browse(which); primed = false;
+        wire_size.assign(std::size_t(vs.clients), 0);
         world.setup(ViewCases::seed(seed, which), vs, ViewCases::rates[which]);
         tracker.setup(vs.clients);
         index.assign(std::size_t(vs.clients), {});
@@ -648,15 +767,38 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
                     q = query_view(ops.held(c, 0));
                 });
                 st.report_sum += q;
+                // The same pull received by one device that holds one view (EBW):
+                // the client's view is reused pull after pull, so it is warm in
+                // cache, as on a real client. EB.recv above keeps every simulated
+                // client's view (vs.clients of them), which is cold by the time
+                // that client pulls again.
+                uint64_t qw = 0;
+                timed(st, k.ewrecv.c_str(), [&] {
+                    ops.snap_recv(vs.clients, 0, 0);
+                    qw = query_view(ops.held(vs.clients, 0));
+                });
+                if (qw != q) throw std::runtime_error("warm view differs from the client's view");
                 st.bytes[k.ereq] += 1;
                 st.bytes[k.ewin] += ops.snap_wire(0).size();
+                s.wire_size[std::size_t(c)] = ops.snap_wire(0).size();
+                if (keep_view && c == 0) *keep_view = std::string(ops.snap_wire(0));
+            }
+            // Bytes only, in a second untimed pass after the timed one: the same
+            // pulls are built again (same world tick, rectangles and request ids,
+            // so the same wires) and compressed. Compressing (zstd's tables) and
+            // the compact save between two timed pulls would evict the server's
+            // working set and charge that to the next pull's EB.send.
+            for (int c = 0; c < vs.clients; ++c) {
+                const ViewRect rect = w.rect(c);
+                s.query.run(w, rect);
+                ops.snap_encode(0, [&](auto& v) { fill_view(v, w, rect, s.query, base + c, w.tick_no()); });
+                if (ops.snap_wire(0).size() != s.wire_size[std::size_t(c)]) throw std::runtime_error("bytes pass: pull differs from the timed one");
                 st.bytes[k.ezstd] += zstd_size(ops.snap_wire(0));
                 if constexpr (requires { ops.snap_compact(0); }) {
                     const std::string_view cw = ops.snap_compact(0);
                     st.bytes[k.ecomp] += cw.size();
                     st.bytes[k.ecompz] += zstd_size(cw);
                 }
-                if (keep_view && c == 0) *keep_view = std::string(ops.snap_wire(0));
             }
         }
         return;
@@ -687,6 +829,8 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
         }
         s.primed = true;
     }
+    static thread_local std::string zbuf;          // this round's delta wires, for the untimed zstd sizes
+    static thread_local std::vector<std::size_t> zoff;
     for (int r = 0; r < vs.rounds; ++r) {
         w.tick();
         const int64_t base = (int64_t(cycle) * vs.rounds + r) * (vs.clients + 1) + 1;
@@ -714,12 +858,18 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
                 st.bytes[k.ndelta] += nd;
             }
             st.bytes[k.udelta] += n;
-            st.bytes[k.uzstd] += zstd_size(ops.delta_wire());
+            // zstd size after the round (below): compressing here would evict
+            // the server's working set and charge it to the next timed delivery.
+            { const auto dw = ops.delta_wire(); zoff.push_back(zbuf.size()); zbuf.append(dw.data(), dw.size()); }
             st.bytes[k.umsg] += 1;
             st.bytes[k.uunits] += s.plan.units.size() + s.plan.removed.size();
             st.bytes[k.umarch] += s.plan.marches.size() + s.plan.removed_marches.size();
             st.bytes[k.utiles] += s.plan.tiles.size();
         }
+        zoff.push_back(zbuf.size());
+        for (std::size_t i = 0; i + 1 < zoff.size(); ++i)
+            st.bytes[k.uzstd] += zstd_size(std::string_view(zbuf).substr(zoff[i], zoff[i + 1] - zoff[i]));
+        zbuf.clear(); zoff.clear();
     }
 }
 

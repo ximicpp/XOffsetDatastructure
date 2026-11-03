@@ -57,7 +57,9 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   3x3 block window; a client holds exactly what is inside its viewport). A
   client sees one screen (512x384) of the 4096 map: the tiles under it (32 px,
   about 17x13 = 221 with partly covered ones; terrain, level, owner), the units
-  standing in it and the marches whose line crosses it (line records: start,
+  standing in it (40 fields each since 2026-11-03: 33 scalars of int32, int64
+  timers and bools, name, alliance tag and a 12-byte owner name, a nested
+  commander, 1-3 heroes, 3-6 troops with wounded, 0-5 buffs) and the marches whose line crosses it (line records: start,
   end, start tick, arrival tick). Two cases:
   - EB browse (class 2): all 1,500 clients drag their viewport every tick (up
     to 48 px per axis, a jump elsewhere with p = 1/16) and pull everything in
@@ -65,7 +67,15 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
     query of what lies in it is untimed bookkeeping, as for U*). The world
     changes at the peace rate, so this case is all full pulls. EB.send fills
     and encodes one viewport, EB.recv receives it with the format's checks and
-    reads every tile, unit and march.
+    reads every tile, unit and march. EBW.recv (report column, same for every
+    format) receives the same pull once more into one extra held view that
+    every pull reuses, as a single device holding one view would (warm caches;
+    the 1,500 held views of EB.recv are cold). The warm view must read the same
+    as the client's; EB keys and numbers are unchanged. The compressed and
+    compact sizes (EB.window_zstd, EB.window_compact*) are taken in a second
+    untimed pass after each round's timed pulls (the same pulls rebuilt), so
+    the compressor and the compact save do not evict the server's working set
+    between two timed pulls.
   - U* static (class 3): clients do not move. After one untimed full pull the
     server sends each client, every tick, only what changed inside its
     viewport (units changed, entered or left; marches started, recalled or
@@ -111,6 +121,17 @@ equivalent; libraries without `XOFFSET_PREFETCH_FOR_UPDATE_API` skip it.
 
 There is no C or D in this set, and `MANIFEST` lists the change. With
 `SLG_CASES` unset nothing changes: same stage keys, digests and report sums.
+
+Timing scope (susu 2026-11-03, every demo case): a timed stage holds only data
+reads and writes, encode/decode, send and receive. Game logic runs untimed
+through `untimed()` in `bench/runner.hpp`: the battle simulation
+(`A.simulate`), the scene and season edits (`B.scene_edits`,
+`B.season_edits`), and the shard ticks (`C.ticks`, `S.ticks_middle`); those
+keys are not recorded in this set (with `SLG_CASES` unset they stay
+timed, for the perf gate). The world's own events in the viewport cases and
+the player edits before LD were already untimed. Byte sizes that compress
+(EB.window_zstd, the compact sizes, U*.delta_zstd) are computed after each
+round's timed loop, so zstd never runs between two timed deliveries.
 
 ## Instruction counts (CI performance gate)
 

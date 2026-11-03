@@ -19,7 +19,8 @@ table Report { battle_id:long; summary:string; events:[Event]; }
 table BattleMsg { battle_id:long; seed:long; winner:int; attacker:Army; defender:Army; report:Report; }
 table March { march_id:long; owner:long; from_x:int; from_y:int; to_x:int; to_y:int; eta:int; troops:[Troop]; }
 table ShardState { shard_id:int; tick:long; width:int; tiles:[Tile]; cities:[City]; marches:[March]; }
-table ViewUnit { id:int; owner:int; x:int; y:int; hp:int; state:int; name:string; }
+struct UnitHero { id:int; level:int; star:int; skin:int; }
+table ViewUnit { id:int; kind:int; owner:int; alliance:int; x:int; y:int; hp:int; max_hp:int; state:int; level:int; faction:int; flags:int; speed:int; attack:int; defense:int; morale:int; load:int; icon:int; skin:int; banner:int; title:int; vip:int; rank:int; slots:int; power:long; state_end:long; shield_end:long; cooldown_end:long; last_update:long; kills:long; in_battle:bool; shielded:bool; hidden:bool; name:string; alliance_tag:string; owner_name:string; commander:UnitHero; heroes:[UnitHero]; troops:[Troop]; buffs:[Buff]; }
 table ViewMarch { id:int; owner:int; x0:int; y0:int; x1:int; y1:int; t0:long; t1:long; }
 table ViewSnapshot { request_id:long; tick:long; x0:int; y0:int; x1:int; y1:int; units:[ViewUnit]; marches:[ViewMarch]; tiles:[Tile]; }
 table ViewDelta { request_id:long; tick:long; x0:int; y0:int; x1:int; y1:int; upserts:[ViewUnit]; removed:[int]; marches:[ViewMarch]; removed_marches:[int]; tiles:[Tile]; }
