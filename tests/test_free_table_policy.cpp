@@ -371,6 +371,38 @@ void lifecycle_move_swap_reload() {
     need(sizeof(xo::XBufferCore::arena_header) == 48 && sizeof(Hole) == 8, "V2 layout changed");
 }
 
+// prefetch_for_update() is a hint: no payload byte, hole, counter or later
+// allocation decision may change, with or without a free table, and on a
+// buffer whose storage has moved away.
+void prefetch_hint_changes_nothing() {
+    xo::XBufferCore empty;
+    empty.prefetch_for_update();
+    Arena a;
+    a.core.prefetch_for_update();          // no free table yet
+    std::vector<std::pair<void*, std::uint32_t>> live;
+    for (std::uint32_t n : {8u, 24u, 40u, 24u, 256u, 248u, 512u, 4096u, 5000u, 16u})
+        live.emplace_back(a.alloc(n), n);
+    for (std::size_t i = 0; i < live.size(); i += 2) a.retire(live[i].first, live[i].second);
+    const auto bytes = a.core.copy_bytes();
+    const auto holes = holes_of(a.core);
+    const std::size_t count = a.core.free_block_count();
+    const std::uint64_t freed = a.core.free_block_bytes();
+    for (int k = 0; k < 3; ++k) a.core.prefetch_for_update();
+    need(a.core.copy_bytes() == bytes && same_holes(holes_of(a.core), holes) &&
+             a.core.free_block_count() == count && a.core.free_block_bytes() == freed,
+         "prefetch_for_update changed the buffer or its free table");
+    a.agree("prefetch_for_update changed the free table");
+    for (std::uint32_t n : {24u, 8u, 512u, 64u, 4096u}) {   // decisions still follow the oracle
+        a.core.prefetch_for_update();
+        a.alloc(n);
+    }
+    a.check_tiling();
+    xo::XBufferCore moved(std::move(a.core));
+    a.core.prefetch_for_update();
+    moved.prefetch_for_update();
+    need(moved.free_block_count() == a.oracle.free.size(), "prefetch_for_update after move changed the table");
+}
+
 void existing_owner_and_invalid_requests() {
     Arena a; auto* p = a.alloc(32); a.retire(p, 32);
     xo::detail::fail_next_registry_registration();
@@ -407,7 +439,8 @@ int main() {
         for (auto n : {512u, 1024u, 2048u, 4096u}) { mixed(n, false); mixed(n, true); }
         actual_M_prefix(); query_changes_and_randomized_oracle(); inline_and_general_paths_interleaved();
         split_and_remainder_reuse();
-        tail_alignment_and_expansion(); lifecycle_move_swap_reload(); existing_owner_and_invalid_requests();
+        tail_alignment_and_expansion(); lifecycle_move_swap_reload(); prefetch_hint_changes_nothing();
+        existing_owner_and_invalid_requests();
         std::cout << "{\"status\":\"passed\",\"performance_measurement\":false}\n";
         return 0;
     } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }
