@@ -6243,15 +6243,35 @@ namespace XOffsetDatastructure {
         bool whole_blocks = false;
     };
     namespace detail {
-        // A delta sender's touch marks (XBuffer::touch): per 64-byte block of
-        // the payload, the stamp of its last touch.
-        struct DeltaTouchLog {
+        // A delta sender's touch marks (XBuffer::touch). Touches are counted
+        // in periods: a delta from the buffer (DeltaAccess::pair_touch_log)
+        // ends one. The blocks (block k: payload bytes [64k, 64k + 64))
+        // touched in the current period are listed, up to list_capacity of
+        // them, in the first cache line; with masks, the bytes touched in
+        // each. Per-block stamps (the period of the block's last touch) are
+        // kept only where a delta needs more than the list: once a second
+        // baseline pairs with the log (each finds what was touched since its
+        // own last delta), and in a period whose touches overflow the list.
+        struct alignas(64) DeltaTouchLog {
+            static constexpr std::uint32_t list_capacity = 24;  // the header and the first 8 in one line
+            std::uint32_t now = 1;     // the current period
+            std::uint32_t listed = 0;  // entries of `blocks` (and `masks`), in touch order
+            std::uint64_t epoch = 0;   // the buffer content (epoch) the marks describe
+            bool lost = false;         // a touch could not be recorded
+            bool overflow = false;     // more blocks touched in this period than the list holds
+            bool shared = false;       // several baselines pair: every touch is stamped
+            bool masks_on = false;     // an XDeltaRecord::touches baseline pairs: masks are kept
+            std::uint32_t stamps_from = UINT32_MAX;  // stamps hold every touch of the periods from this one
+            // Where the copy of the only baseline that pairs is (0: none, or
+            // several): a touched block's line of it is fetched ahead of the
+            // next delta (a hint: the address is never dereferenced).
+            std::uintptr_t copy = 0;
+            std::uint32_t blocks[list_capacity];
+            std::uint64_t masks[list_capacity];
+            std::uint64_t id = 0;            // changes when the log starts over
+            const void* owner = nullptr;     // the baseline that paired last
             std::vector<std::uint32_t> stamps;
             std::vector<std::uint32_t> groups;  // per 16 blocks: the latest of their stamps
-            std::uint64_t id = 0;     // changes when the stamps start over
-            std::uint64_t epoch = 0;  // the buffer content (epoch) they describe
-            std::uint32_t now = 1;    // stamp of touches from now on
-            bool lost = false;        // a touch could not be recorded
         };
     } // namespace detail
     // What one save_delta_into wrote.
@@ -8012,6 +8032,13 @@ namespace XOffsetDatastructure {
         void touch(const T& value) noexcept;
         /// The same for the payload bytes [p, p + bytes) alone.
         void touch(const void* p, std::size_t bytes) noexcept;
+        /// Assigns `value` to `field` (an object in this buffer's payload)
+        /// only when they differ (field == value is false), then touches the
+        /// field; returns whether it assigned. Touches then name exactly what
+        /// changed, which is what a delta from an XDeltaRecord::touches
+        /// baseline sends.
+        template <typename T, typename V>
+        bool touch_set(T& field, const V& value);
 
         /// Applies a delta of save_delta_into to this buffer, which holds the
         /// state `cursor` records (any buffer for a key delta). The patched

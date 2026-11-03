@@ -25,7 +25,16 @@
   touched since the baseline's last delta instead of the whole payload
   (`XDeltaStats::compared_bytes`). `XDeltaOptions::digest` carries a hash
   of the result; `XDeltaOptions::whole_blocks` sends changed blocks whole
-  for a cheaper apply.
+  for a cheaper apply. The touch log is a list of the blocks touched since
+  the last delta while one baseline pairs (the baseline's lines of them are
+  prefetched as they are touched), and stamps each block (4 bytes per
+  block) only once a second baseline pairs or the list overflows.
+  `XBuffer::touch_set(field, value)` assigns and touches only on a change.
+  `XDeltaBaseline(XDeltaRecord::touches)` keeps no payload copy and sends
+  the touched bytes instead.
+- Delta blocks lie on 64-byte payload offsets (block `i` = offsets `64 i`
+  to `64 i + 63`, one cache line; block 0 never writes the arena header),
+  and the baseline's copy is 64-aligned.
 - Block bytes are gathered and scattered with one byte shuffle per 8-byte
   word: SSSE3 (checked at run time) on x86-64, NEON on AArch64, plain code
   elsewhere. The scratch of applying a delta is shared by the cursors of

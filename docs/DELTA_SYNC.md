@@ -80,8 +80,14 @@ bytes. A delta with `touched_only` compares the 64-byte blocks touched since
 the baseline's previous delta from this buffer, the bytes past the baseline's
 used size, and the holes that came or went (a container that moved left its
 old block as a hole, cleared; the delta finds it without a touch). Touches go
-to a log in the buffer (four bytes per 64-byte block), so one buffer can feed
-any number of baselines (a client, the storage process, a relay).
+to a log in the buffer, so one buffer can feed any number of baselines (a
+client, the storage process, a relay). While one baseline pairs with the
+buffer, the log is a short list of the blocks touched since its last delta
+(up to 24; the baseline's lines of them are fetched into cache as they are
+touched); with a second baseline, or more blocks than the list holds, it also
+stamps each touched block with the delta it belongs to (four bytes per
+64-byte block), so a baseline that skipped deltas still finds its blocks.
+`touch_set(field, value)` assigns and touches only when the value differs.
 
 The rule: **touch everything you change, after you change it** (a container
 that moved is marked where it is now). A change that is not touched is not
@@ -93,6 +99,19 @@ touched since it), after the buffer's content was replaced
 (`reload_verified`, `reset`, `swap`, a key delta applied, storage that moved),
 and after a touch outside the payload. A buffer that receives deltas and
 forwards them (a relay) gets the blocks each applied delta wrote as touches.
+
+### A baseline without a copy
+
+`XDeltaBaseline(XDeltaRecord::touches)` keeps no copy of the payload: each
+delta carries every byte touched since the baseline's previous delta (as if
+`touched_only`), the bytes past the receiver's used size and those of holes
+that came or went. Memory per receiver drops from one copy of the payload
+to a few words; the delta grows by the bytes that were touched but did not
+change, so touch exactly what changes (`touch_set`, `touch(p, bytes)` on the
+field). Where the touches do not say what changed (the first delta, content
+that was replaced, a baseline that missed deltas the log no longer records)
+the delta is a key delta. `key_delta_into` needs a copy and is not
+available on such a baseline.
 
 ### Statistics and options
 
@@ -141,8 +160,11 @@ Then, in this order:
 - DIGEST: xxHash64 (seed 0) of payload bytes `[48, used_end)` after this
   delta.
 - Block section: `block count` × { varint `skip`, u8 `selector`, mask bytes,
-  data bytes }. The payload is cut into 64-byte blocks from offset 48 (block
-  `i` holds offsets `48 + 64 i` to `48 + 64 i + 63`). An entry's block index is
+  data bytes }. The payload is cut into 64-byte blocks from its start (block
+  `i` holds offsets `64 i` to `64 i + 63`; a payload starts 64-aligned in
+  memory, so a block is one cache line). Block 0 holds the arena header in
+  offsets 0 to 47, which no delta writes: block 0 never goes whole and its
+  mask bits for those bytes are 0. An entry's block index is
   the previous entry's index + 1 + `skip` (the first: `skip`), so blocks are
   ascending. `selector` 0: the whole block follows (64 bytes; it ends at or
   before `used_end`). Otherwise bit `w` of `selector` says that a mask byte for
@@ -288,7 +310,8 @@ rebuilt, also proportional, when a later delta needs it); with `digest`, one
 hash pass. The receiver's map takes 28 bytes
 per 64-byte block of payload (24 for the bits, 4 for the node index), plus
 about 64 bytes per heap string, set or map of plain elements; the sender's
-touch log 4 bytes per block. The scratch a delta needs while it is applied
+touch log 384 bytes plus, once two baselines pair with it or a delta
+touches more than 24 blocks, 4 bytes per block. The scratch a delta needs while it is applied
 (a copy of a small delta, the old bytes it overwrites, its block list and
 the hole table) is shared by the cursors of one thread, so a receiver that
 holds many replicas keeps one copy, warm in cache, instead of one per
@@ -300,7 +323,7 @@ baseline keeps its own.
 
 Viewport-like model in `tests/test_delta_sync.cpp` (120 units in 128 stable
 slots, each tick 30% move a few cells, 5% lose hp, 2 leave and 2 enter):
-about 270 bytes per tick in 38 blocks, against 5946 bytes for `save_compact`
+about 270 bytes per tick in 39 blocks, against 5946 bytes for `save_compact`
 and 7225 bytes for `save_verified` of the same view; the key delta is 3214
 bytes.
 
