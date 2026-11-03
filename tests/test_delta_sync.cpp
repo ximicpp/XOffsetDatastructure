@@ -750,14 +750,20 @@ void check_path_case() {
     step("an inline length", C::in_place, [&] { r.items[0].name = "longer"; });
     step("an inline string emptied", C::in_place, [&] { r.items[2].name = ""; });
     step("a scalar after in-place checks", C::none, [&] { r.epoch = 78; });
-    step("a heap string", C::full, [&] { r.items[2].name = "a name too long to be inline"; });
+    step("a heap string", C::in_place, [&] { r.items[2].name = "a name too long to be inline"; });
     step("a heap string within its block", C::in_place, [&] { r.title = "a shorter title, still on the heap"; });
     step("a set insert within capacity", C::in_place, [&] { r.keys.insert(7); r.keys.insert(1); });
     step("a set erase", C::in_place, [&] { r.keys.erase(*r.keys.begin()); });
     step("scalar vector sizes within capacity", C::in_place, [&] { r.items[0].vals.push_back(4); r.items[0].vals.push_back(5); });
     step("a scalar vector shrinks", C::in_place, [&] { r.items[0].vals.pop_back(); });
-    step("a set insert past capacity", C::full, [&] { for (std::uint32_t k = 100; k < 120; ++k) r.keys.insert(k); });
+    step("a set insert past capacity", C::in_place, [&] { for (std::uint32_t k = 100; k < 120; ++k) r.keys.insert(k); });
+    step("a scalar vector past capacity", C::in_place, [&] { for (int k = 0; k < 40; ++k) r.items[1].vals.push_back(std::uint16_t(k)); });
+    step("a heap string past its block", C::in_place, [&] { r.items[2].name = std::string(70, 'q'); });
+    step("a scalar after moves", C::none, [&] { r.epoch = 80; });
+    step("heap strings become inline and empty", C::in_place, [&] { r.items[2].name = "tiny"; r.title = ""; });
+    step("an empty string gets a block", C::in_place, [&] { r.title = "a title that comes back on the heap again"; });
     step("a vector of records grows within capacity", C::full, [&] { r.items.emplace_back().id = 9; });
+    step("a scalar vector gets its first block", C::in_place, [&] { r.items.back().vals.push_back(1); });
     step("a scalar after a full check", C::none, [&] { r.epoch = 79; });
 
     // Hand-made deltas through the in-place checks and the unchecked path.
@@ -786,6 +792,48 @@ void check_path_case() {
     rejects("a missing terminator",
             poke_delta(rep, cur, off(rep.root().title.data() + rep.root().title.size()), std::string(1, 'x')),
             "missing terminator");
+    {
+        // Moved blocks are checked against the live blocks and holes.
+        const std::size_t head = off(&rep.root().items[0].vals);
+        const auto head_bytes = [&](std::int64_t data_at, std::uint32_t size, std::uint32_t capacity) {
+            const auto delta = std::int32_t(data_at - std::int64_t(head));
+            std::string b(12, '\0');
+            std::memcpy(&b[0], &delta, 4);
+            std::memcpy(&b[4], &size, 4);
+            std::memcpy(&b[8], &capacity, 4);
+            return b;
+        };
+        need(head % 64 + 12 <= 64, "check path: vector head crosses a block");
+        rejects("a vector block onto another live block",
+                poke_delta(rep, cur, head, head_bytes(std::int64_t(off(rep.root().items[2].vals.data())), 2, 4)),
+                "wire validation");
+        rejects("a vector block over the arena header", poke_delta(rep, cur, head, head_bytes(8, 2, 4)),
+                "wire validation");
+        rejects("a vector block past used_end",
+                poke_delta(rep, cur, head, head_bytes(std::int64_t(rep.arena()->used_end) - 8, 2, 8)),
+                "wire validation");
+        rejects("a vector block that is not 8-aligned",
+                poke_delta(rep, cur, head, head_bytes(std::int64_t(off(rep.root().items[0].vals.data())) + 2, 2, 4)),
+                "wire validation");
+        std::vector<std::pair<std::uint32_t, std::uint32_t>> holes;
+        rep.for_each_free_block([&](xo::XBufferCore::WireHole h) { holes.emplace_back(h.offset, h.bytes); });
+        need(!holes.empty(), "check path: no hole to move into");
+        rejects("a vector block into a hole the table keeps",
+                poke_delta(rep, cur, head, head_bytes(holes[0].first, 1, holes[0].second / 2)),
+                "wire validation");
+        const std::size_t title = off(&rep.root().title);  // a heap string with a block of at least 48 bytes
+        if (title % 64 + 4 <= 64) {
+            std::string t(4, '\0');
+            const auto tdelta = std::int32_t(std::int64_t(off(rep.root().items[2].vals.data())) - std::int64_t(title));
+            std::memcpy(&t[0], &tdelta, 4);
+            rejects("a string block onto a vector's block", poke_delta(rep, cur, title, t), "wire validation");
+        } else {
+            std::string t(4, '\0');
+            const std::uint32_t tcap = 0x10000;
+            std::memcpy(&t[0], &tcap, 4);
+            rejects("a string block past used_end", poke_delta(rep, cur, title + 8, t), "wire validation");
+        }
+    }
     {
         // Free bytes take any value without a check.
         auto tc = cur;
