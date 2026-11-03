@@ -6,6 +6,7 @@
 #pragma once
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -217,6 +218,19 @@ template <class Msg> void simulate_battle(Msg& m) {
 }
 
 // Scene server applies a battle result to the army it owns.
+// What a battle writes back to the scene. Demo case set (SLG_CASES=demo, susu
+// 11-03): troop counts and wounded only (a wiped troop leaves); hero buffs are the
+// battle's own temporary state and stay in the battle. SLG_A_FULL=1 (report-only
+// stress variant) and the default mode also write the hero buffs back, as before.
+inline bool battle_writes_buffs() {
+    static const bool on = [] {
+        const char* c = std::getenv("SLG_CASES");
+        const bool demo = c && std::string_view(c) == "demo";
+        return !demo || std::getenv("SLG_A_FULL") != nullptr;
+    }();
+    return on;
+}
+
 template <class Dst, class Src> void apply_battle_army(Dst& army, const Src& result) {
     // T4 adapter (c): a copy between two values of the same model is the
     // model's own whole-container assignment (std::vector or XVector).
@@ -224,6 +238,7 @@ template <class Dst, class Src> void apply_battle_army(Dst& army, const Src& res
         army.troops = result.troops;
     else
         copy_vec(army.troops, result.troops, [](auto& a, const auto& b) { copy_troop(a, b); });
+    if (!battle_writes_buffs()) return;
     for (std::size_t i = 0; i < army.heroes.size() && i < result.heroes.size(); ++i) {
         if constexpr (std::is_same_v<decltype(army.heroes[i].buffs), decltype(result.heroes[i].buffs)>)
             army.heroes[i].buffs = result.heroes[i].buffs;
