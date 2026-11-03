@@ -303,11 +303,20 @@ void callback_during_allocation_bookkeeping() {
     // the host free table. That new_handler may transfer, release or reenter
     // the owner; the allocation must commit to, and return memory of, the
     // actual payload owner, or fail closed once that payload is released.
+    // A bin records its first free_bin_inline_entries holes without host
+    // storage, so the fixture first fills the remainder's bin (16 bytes): the
+    // remainder is the hole that needs bin storage.
+    constexpr std::size_t fillers = xo::XBufferCore::free_bin_inline_entries;
     for (Action which : {Action::move, Action::swap, Action::release, Action::reenter}) {
         auto from = make_buffer(), to = make_buffer(), unrelated = make_buffer();
         from.root<OwnerRoot>().numbers.resize(3, 29u); auto ref = binding(from);
-        auto* larger = fd::allocate_dynamic_bytes(ref, 48, 8); fd::retire_dynamic_bytes(ref, larger, 48);
-        need(from.free_block_count() == 1 && from.free_block_bytes() == 48, "fixture free block missing");
+        auto* larger = fd::allocate_dynamic_bytes(ref, 48, 8);
+        std::array<void*, fillers> small{};
+        for (auto& q : small) q = fd::allocate_dynamic_bytes(ref, 16, 8);
+        for (auto q : small) fd::retire_dynamic_bytes(ref, q, 16);
+        fd::retire_dynamic_bytes(ref, larger, 48);
+        need(from.free_block_count() == fillers + 1 && from.free_block_bytes() == 48 + fillers * 16,
+             "fixture free block missing");
         source = &from; target = &to; auxiliary = &unrelated; active = ref;
         void* raw = nullptr; bool caught = false;
         {
@@ -324,7 +333,7 @@ void callback_during_allocation_bookkeeping() {
                  "allocation after callback owner transfer");
             need(raw == larger, "split did not hand out the front of the larger free block");
             std::memset(raw, 0x43, 32); fd::retire_dynamic_bytes(ref, raw, 32);
-            const std::uint64_t expected = which == Action::reenter ? 72 : 48;
+            const std::uint64_t expected = (which == Action::reenter ? 72 : 48) + fillers * 16;
             need(current.free_table_complete() && current.free_block_bytes() == expected,
                  "split remainder lost or committed to a stale owner");
             auto loaded = xo::XBuffer::load_verified<OwnerRoot>(current.save_verified<OwnerRoot>(), policy());
@@ -342,6 +351,9 @@ void callback_during_free_table_retirement() {
         auto* p = ref.segment->allocate_aligned(32, 8);
         need(from.free_block_count() == 0, "fixture already has a free table entry");
         source = &from; target = &to; active = ref;
+        // With no cached table, the table itself is the host allocation (one
+        // hole needs no bin storage).
+        xo::XBufferCore::trim_free_table_cache();
         {
             HandlerScope handler(which); host::fail_after = 0;
             ref.segment->deallocate(p, 32); // the first retirement creates the host table
@@ -373,6 +385,7 @@ void free_table_host_oom_is_recorded_and_recomputed() {
     // retirement marks the host table incomplete and saving recomputes holes.
     auto b = make_buffer(); auto ref = binding(b);
     auto* p = fd::allocate_dynamic_bytes(ref, 24, 8);
+    xo::XBufferCore::trim_free_table_cache(); // the table is the failing host allocation
     host::fail_after = 0; fd::retire_dynamic_bytes(ref, p, 24); host::fail_after = -1;
     need(!b.free_table_complete(), "host OOM during retirement was not recorded");
     const auto wire = b.save_verified<OwnerRoot>();
@@ -405,7 +418,13 @@ void delete_callbacks_observe_complete_move() {
         auto from = make_buffer();
         auto to = xo::XBuffer::create<OtherOwnerRoot>(4096, policy());
         from.root<OwnerRoot>().numbers.resize(3, 313u);
+        // Releasing the table returns its bins' host storage. A bin holds its
+        // first free_bin_inline_entries holes inline, so the fixture fills
+        // bin 32 first and captures the storage the next hole allocates.
+        std::array<void*, xo::XBufferCore::free_bin_inline_entries> fill{};
+        for (auto& q : fill) q = to.arena()->allocate_aligned(32, 8);
         auto* p = to.arena()->allocate_aligned(32, 8);
+        for (auto q : fill) to.arena()->deallocate(q, 32);
         begin_capture(); to.arena()->deallocate(p, 32);
         need(!host::capture_next, "target free-table allocation not captured");
         auto* old_table = host::captured;

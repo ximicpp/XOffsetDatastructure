@@ -109,15 +109,19 @@ void reload_keeps_small_bin_storage() {
 #endif
     require(m1>=1 && m2>=1,"bin storage above the keep limit was kept");
     require(same(first,second) && same(first,third),"kept bin storage changed the hole table");
+    // A bin holds its first free_bin_inline_entries holes inline; the next
+    // one needs bin storage, which a table released by destroying its buffer
+    // must not have kept.
     b=XBuffer::create<AllocatorFailureRoot>(1024*1024,XBuffer::maximum_capacity(1024*1024));
-    auto* p=b.arena()->allocate_aligned(64,8);
+    std::array<void*,XBufferCore::free_bin_inline_entries+1> blocks{};
+    for(auto& q:blocks) q=b.arena()->allocate_aligned(64,8);
     attempts=hits=0;fail_after=-1;watch=true;
-    b.arena()->deallocate(p,64);
+    for(auto q:blocks) b.arena()->deallocate(q,64);
     watch=false;
 #if XOFFSET_THREAD_CACHES
     require(attempts==1,"a table released by destroying its buffer kept bin storage");
 #else
-    require(attempts==2,"without thread caches the retire allocates its table and bin");
+    require(attempts==2,"without thread caches the retires allocate their table and bin");
 #endif
     XBufferCore::trim_free_table_cache();
 }
@@ -228,12 +232,16 @@ void inline_paths_without_host_allocation() {
     b.arena()->deallocate(blocks[8],64);                       // 64 bin: capacity 16, holds 8
     require(attempts==0,"retire into spare capacity attempted a host allocation");
     for(std::size_t i=9;i<16;++i) b.arena()->deallocate(blocks[i],64);
-    auto* extra=b.arena()->allocate_aligned(80,8); b.arena()->deallocate(extra,80); // new bin: general path
+    // Bin 80 records its first free_bin_inline_entries holes inline; the next
+    // one needs bin storage, which only the general path allocates.
+    std::array<void*,XBufferCore::free_bin_inline_entries+1> extra{};
+    for(auto& p:extra) p=b.arena()->allocate_aligned(80,8);
+    for(auto p:extra) b.arena()->deallocate(p,80);
     watch=false;fail_after=-1;
     require(hits==1 && !b.free_table_complete(),"general-path bin growth failure was not recorded");
-    require(b.free_block_count()==8+16,"inline retires lost an entry");
+    require(b.free_block_count()==8+16+XBufferCore::free_bin_inline_entries,"inline retires lost an entry");
     auto again=XBuffer::load_verified<AllocatorFailureRoot>(b.save_verified<AllocatorFailureRoot>());
-    require(again.free_block_bytes()>=8*72+16*64+80,"lost block not recovered as a hole");
+    require(again.free_block_bytes()>=8*72+16*64+80*extra.size(),"lost block not recovered as a hole");
 }
 // V1 released cached in-arena blocks exactly once before growing. V2 keeps
 // free blocks in the host table: an allocation no free block can serve grows
@@ -257,6 +265,32 @@ void growth_probe_keeps_cached_blocks() {
     }
 }
 }
+// A bin keeps its first free_bin_inline_entries holes in the bin header (no
+// host storage); the next hole of that size moves them to host storage. Both
+// forms serve the same LIFO order, emit the same hole table and clone it.
+void inline_bin_transition() {
+    constexpr std::size_t inline_entries=XBufferCore::free_bin_inline_entries;
+    auto b=XBuffer::create<AllocatorFailureRoot>(1024*1024,XBuffer::maximum_capacity(1024*1024));
+    std::array<void*,inline_entries+2> blocks{};
+    for(auto& p:blocks) p=b.arena()->allocate_aligned(40,8);
+    auto* other=b.arena()->allocate_aligned(48,8); b.arena()->deallocate(other,48); // the table exists
+    attempts=hits=0;fail_after=-1;watch=true;
+    for(std::size_t i=0;i<inline_entries;++i) b.arena()->deallocate(blocks[i],40);
+    require(attempts==0,"an inline bin entry made a host allocation");
+    b.arena()->deallocate(blocks[inline_entries],40);
+    require(attempts==1,"the hole past the inline entries did not allocate bin storage once");
+    b.arena()->deallocate(blocks[inline_entries+1],40);
+    watch=false;
+    require(b.free_table_complete() && b.free_block_count()==blocks.size()+1,"bin transition lost an entry");
+    const auto before=holes_of(b);
+    auto copy=b.clone();
+    require(same(holes_of(copy),before),"clone of a host bin changed the hole table");
+    auto loaded=XBuffer::load_verified<AllocatorFailureRoot>(b.save_verified<AllocatorFailureRoot>());
+    require(same(holes_of(loaded),before),"reload of a host bin changed the hole table");
+    for(std::size_t i=blocks.size();i-->0;)
+        require(b.arena()->allocate_aligned(40,8)==blocks[i],"bin did not hand out its newest hole first");
+    require(b.free_block_count()==1,"exact takes left a 40-byte hole");
+}
 int main() {try {
     std::size_t points=0,max_lost=0;
     reload_keeps_small_bin_storage();
@@ -267,5 +301,5 @@ int main() {try {
             require(r.free<=normal.free,"failure invented free bytes");max_lost=std::max(max_lost,normal.free-r.free);++points;}
     }
     points+=hole_table_load();
-    lazy_load(); inline_paths_without_host_allocation(); growth_probe_without_host_allocation(); growth_probe_keeps_cached_blocks(); std::cout<<"{\"status\":\"passed\",\"actual_failure_points\":"<<points+1<<",\"max_unreclaimed_bytes\":"<<max_lost<<"}\n";
+    lazy_load(); inline_paths_without_host_allocation(); inline_bin_transition(); growth_probe_without_host_allocation(); growth_probe_keeps_cached_blocks(); std::cout<<"{\"status\":\"passed\",\"actual_failure_points\":"<<points+1<<",\"max_unreclaimed_bytes\":"<<max_lost<<"}\n";
 } catch(const std::exception& e) {watch=false;std::cerr<<e.what()<<'\n';return 1;} }
