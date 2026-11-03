@@ -1,0 +1,7 @@
+slg_bench sha256 7c010d8c9dd9ca12f363b6d091fc4e1d4603a19a3bbd2452344068dc5cc78360
+/Volumes/XOffsetCS/perf-gate/runs/2026-11-03-slgv6/slg_bench:
+	/opt/homebrew/opt/zstd/lib/libzstd.1.dylib (compatibility version 1.0.0, current version 1.5.7)
+	/opt/homebrew/opt/lz4/lib/liblz4.1.dylib (compatibility version 1.0.0, current version 1.10.0)
+	@rpath/libc++.1.dylib (compatibility version 1.0.0, current version 1.0.0)
+	/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1356.0.0)
+	@rpath/libunwind.1.dylib (compatibility version 1.0.0, current version 1.0.0)

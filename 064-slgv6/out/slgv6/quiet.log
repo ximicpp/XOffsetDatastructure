@@ -1,0 +1,32 @@
+2026-11-03T13:05:25Z process 1 app start: need 180s waited 220s load 1.64 WindowServer 5.3% remote 4
+2026-11-03T13:10:23Z process 1 app done: 1793711125..1793711423 (298 s) load 1.98
+2026-11-03T13:10:53Z process 1 native start: need 30s waited 30s load 2.18 WindowServer 5.1% remote 4
+2026-11-03T13:11:44Z process 1 native done: 1793711453..1793711504 (51 s) load 1.81
+2026-11-03T13:12:15Z process 2 app start: need 30s waited 30s load 1.74 WindowServer 4.7% remote 4
+2026-11-03T13:17:21Z process 2 app done: 1793711535..1793711841 (306 s) load 3.28
+2026-11-03T13:19:12Z process 2 native start: need 30s waited 110s load 2.51 WindowServer 36.4% remote 4
+2026-11-03T13:20:03Z process 2 native done: 1793711952..1793712003 (51 s) load 2.93
+2026-11-03T13:20:54Z process 3 app start: need 30s waited 50s load 2.22 WindowServer 5.2% remote 4
+2026-11-03T13:25:59Z process 3 app done: 1793712054..1793712359 (305 s) load 2.93
+2026-11-03T13:26:30Z process 3 native start: need 30s waited 30s load 2.63 WindowServer 4.3% remote 4
+2026-11-03T13:27:21Z process 3 native done: 1793712390..1793712441 (51 s) load 2.49
+2026-11-03T13:27:51Z process 4 app start: need 30s waited 30s load 2.42 WindowServer 5.3% remote 4
+2026-11-03T13:33:00Z process 4 app done: 1793712471..1793712780 (309 s) load 2.99
+2026-11-03T13:33:30Z process 4 native start: need 30s waited 30s load 2.63 WindowServer 4.3% remote 4
+2026-11-03T13:34:21Z process 4 native done: 1793712810..1793712861 (51 s) load 2.67
+2026-11-03T13:34:52Z process 5 app start: need 30s waited 30s load 2.44 WindowServer 4.6% remote 4
+2026-11-03T13:39:55Z process 5 app done: 1793712892..1793713195 (303 s) load 2.03
+2026-11-03T13:40:25Z process 5 native start: need 30s waited 30s load 2.17 WindowServer 5.1% remote 4
+2026-11-03T13:41:16Z process 5 native done: 1793713225..1793713276 (51 s) load 2.30
+2026-11-03T13:41:47Z process 6 app start: need 30s waited 30s load 2.27 WindowServer 5.1% remote 4
+2026-11-03T13:46:49Z process 6 app done: 1793713307..1793713609 (302 s) load 2.67
+2026-11-03T13:47:20Z process 6 native start: need 30s waited 30s load 2.46 WindowServer 5% remote 4
+2026-11-03T13:48:11Z process 6 native done: 1793713640..1793713691 (51 s) load 2.99
+2026-11-03T13:48:41Z process 7 app start: need 30s waited 30s load 2.70 WindowServer 5.3% remote 4
+2026-11-03T13:53:45Z process 7 app done: 1793713721..1793714025 (304 s) load 2.60
+2026-11-03T13:54:15Z process 7 native start: need 30s waited 30s load 2.45 WindowServer 5% remote 4
+2026-11-03T13:55:06Z process 7 native done: 1793714055..1793714106 (51 s) load 2.08
+2026-11-03T13:55:37Z process 8 app start: need 30s waited 30s load 2.06 WindowServer 4.7% remote 4
+2026-11-03T14:00:40Z process 8 app done: 1793714137..1793714440 (303 s) load 2.44
+2026-11-03T14:01:10Z process 8 native start: need 30s waited 30s load 2.31 WindowServer 5.9% remote 4
+2026-11-03T14:02:01Z process 8 native done: 1793714470..1793714521 (51 s) load 2.60
