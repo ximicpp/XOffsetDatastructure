@@ -1,10 +1,10 @@
 # Mac queue
 
-Updated 2026-11-03T15:22:44Z after 065-ckpt10: running 2026-11-03T15:22:41Z
+Updated 2026-11-03T16:40:47Z after 065-ckpt10: done 10 2026-11-03T16:40:42Z
 
 ```
 runner: pid 4651 (version 2)
-free: 40 GB on /Volumes/XOffsetCS, 40 GB on /Users/ximi
+free: 39 GB on /Volumes/XOffsetCS, 39 GB on /Users/ximi
 001-GATE_COMPOSED                        done 0 2026-10-26T09:59:24Z
 002-int1-r2                              done 0 2026-10-26T11:33:59Z
 003-d5-diag-pre                          done 21 2026-10-26T11:47:50Z
@@ -69,5 +69,6 @@ free: 40 GB on /Volumes/XOffsetCS, 40 GB on /Users/ximi
 062-slgv5b                               cancelled
 063-slgv5b                               done 0 2026-11-03T12:07:48Z
 064-slgv6                                done 0 2026-11-03T14:02:02Z
-065-ckpt10                               running 2026-11-03T15:22:41Z
+065-ckpt10                               done 10 2026-11-03T16:40:42Z
+066-slgv7                                queued
 ```
