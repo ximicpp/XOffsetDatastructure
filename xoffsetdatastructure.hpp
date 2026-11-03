@@ -5386,6 +5386,13 @@ namespace XOffsetDatastructure {
             std::vector<std::byte> tables_;
         };
 
+#if defined(_MSC_VER)
+#define XOFFSET_DETAIL_V4_INLINE __forceinline
+#elif defined(__clang__) || defined(__GNUC__)
+#define XOFFSET_DETAIL_V4_INLINE inline __attribute__((always_inline))
+#else
+#define XOFFSET_DETAIL_V4_INLINE inline
+#endif
         // V2 validation index: one bit per 8-byte granule of the payload, one
         // bitmap for live blocks and one for holes. Every range the validator
         // registers is granule aligned: a block is 8-byte aligned with its
@@ -5446,15 +5453,20 @@ namespace XOffsetDatastructure {
 
             // [g0, g1) nonempty, g1 <= granules(). 0 none, 1 live, 2 free. A
             // live hit anywhere in the range wins over a free hit.
-            unsigned overlap(std::size_t g0, std::size_t g1) const noexcept {
+            // One word inline, more out of line (the callers stay small).
+            XOFFSET_DETAIL_V4_INLINE unsigned overlap(std::size_t g0, std::size_t g1) const noexcept {
                 const auto w0 = g0 / 64u, w1 = (g1 - 1u) / 64u;
-                const auto first = ~std::uint64_t(0) << (g0 % 64u);
-                const auto last = ~std::uint64_t(0) >> (63u - (g1 - 1u) % 64u);
-                if (w0 == w1) {
-                    const auto m = first & last;
+                if (w0 == w1) [[likely]] {
+                    const auto m = (~std::uint64_t(0) << (g0 % 64u)) & (~std::uint64_t(0) >> (63u - (g1 - 1u) % 64u));
                     if (owned_[w0] & m) return 1;
                     return (free_[w0] & m) ? 2 : 0;
                 }
+                return overlap_words(g0, g1);
+            }
+            XOFFSET_DETAIL_NOINLINE unsigned overlap_words(std::size_t g0, std::size_t g1) const noexcept {
+                const auto w0 = g0 / 64u, w1 = (g1 - 1u) / 64u;
+                const auto first = ~std::uint64_t(0) << (g0 % 64u);
+                const auto last = ~std::uint64_t(0) >> (63u - (g1 - 1u) % 64u);
                 if (owned_[w0] & first) return 1;
                 std::uint64_t dead = free_[w0] & first;
                 for (auto w = w0 + 1u; w < w1; ++w) {
@@ -5466,15 +5478,19 @@ namespace XOffsetDatastructure {
                 return dead ? 2 : 0;
             }
 
-            void mark(bool free, std::size_t g0, std::size_t g1) noexcept {
+            XOFFSET_DETAIL_V4_INLINE void mark(bool free, std::size_t g0, std::size_t g1) noexcept {
                 auto* bits = free ? free_ : owned_;
+                const auto w0 = g0 / 64u, w1 = (g1 - 1u) / 64u;
+                if (w0 == w1) [[likely]] {
+                    bits[w0] |= (~std::uint64_t(0) << (g0 % 64u)) & (~std::uint64_t(0) >> (63u - (g1 - 1u) % 64u));
+                    return;
+                }
+                mark_words(bits, g0, g1);
+            }
+            XOFFSET_DETAIL_NOINLINE static void mark_words(std::uint64_t* bits, std::size_t g0, std::size_t g1) noexcept {
                 const auto w0 = g0 / 64u, w1 = (g1 - 1u) / 64u;
                 const auto first = ~std::uint64_t(0) << (g0 % 64u);
                 const auto last = ~std::uint64_t(0) >> (63u - (g1 - 1u) % 64u);
-                if (w0 == w1) {
-                    bits[w0] |= first & last;
-                    return;
-                }
                 bits[w0] |= first;
                 for (auto w = w0 + 1u; w < w1; ++w) bits[w] = ~std::uint64_t(0);
                 bits[w1] |= last;
@@ -5580,13 +5596,12 @@ namespace XOffsetDatastructure {
                 return static_cast<std::size_t>(reinterpret_cast<std::uintptr_t>(end) -
                                                 reinterpret_cast<std::uintptr_t>(base));
             }
-            WireGranuleIndex& index() {
-                if (!granules.prepared()) granules.prepare(extent(), upstream, retained);
-                return granules;
-            }
-            // The bitmaps with the cursor's live range folded in.
+            // The bitmaps with the cursor's live range folded in. The only
+            // place that prepares them, so prepared() implies cursor ==
+            // no_cursor (register_owned_bitmap relies on it).
             WireGranuleIndex& general() {
-                auto& bits = index();
+                auto& bits = granules;
+                if (!bits.prepared()) bits.prepare(extent(), upstream, retained);
                 if (cursor != no_cursor) {
                     if (cursor) bits.mark(false, 0, cursor / 8u);
                     cursor = no_cursor;
@@ -5595,13 +5610,6 @@ namespace XOffsetDatastructure {
             }
         };
 
-#if defined(_MSC_VER)
-#define XOFFSET_DETAIL_V4_INLINE __forceinline
-#elif defined(__clang__) || defined(__GNUC__)
-#define XOFFSET_DETAIL_V4_INLINE inline __attribute__((always_inline))
-#else
-#define XOFFSET_DETAIL_V4_INLINE inline
-#endif
         XOFFSET_DETAIL_V4_INLINE vstatus validate_storage_range(const void* ptr, std::size_t bytes,
                                            std::size_t alignment,
                                            const WireValidationContext& ctx,
@@ -5643,10 +5651,28 @@ namespace XOffsetDatastructure {
             return register_owned_bitmap(begin, bytes, ctx);
         }
 
+        vstatus register_owned_general(std::size_t begin, std::size_t bytes, WireValidationContext& ctx);
+
         // Bitmap registration, kept out of line so that the validators the
-        // cursor path inlines into stay small.
+        // cursor path inlines into stay small. A range within one bitmap word
+        // that meets nothing is marked here with no further call (prepared
+        // bitmaps hold the cursor's range already: see general()); the first
+        // registration off the cursor, a longer range and every rejection go
+        // through register_owned_general.
         XOFFSET_DETAIL_NOINLINE inline vstatus register_owned_bitmap(std::size_t begin, std::size_t bytes,
                                                                WireValidationContext& ctx) {
+            auto& index = ctx.granules;
+            const auto g0 = begin / 8u, g1 = (begin + bytes) / 8u;
+            if (index.prepared() && g0 / 64u == (g1 - 1u) / 64u && index.overlap(g0, g1) == 0) [[likely]] {
+                index.mark(false, g0, g1);
+                ctx.owned_bytes += bytes;
+                return vok();
+            }
+            return register_owned_general(begin, bytes, ctx);
+        }
+
+        XOFFSET_DETAIL_NOINLINE inline vstatus register_owned_general(std::size_t begin, std::size_t bytes,
+                                                                WireValidationContext& ctx) {
             auto& index = ctx.general();
             const auto g0 = begin / 8u, g1 = (begin + bytes) / 8u;
             const auto overlap = index.overlap(g0, g1);
@@ -5757,17 +5783,31 @@ namespace XOffsetDatastructure {
         // V2 wire hole table: each entry is a free block of the payload.
         inline vstatus register_wire_holes(const void* holes, std::size_t count,
                                            WireValidationContext& ctx) {
+            // A valid entry is a nonempty range on 8-byte granules inside the
+            // payload, so register_free_range's own checks would pass: each
+            // hole goes to the bitmaps directly, with its errors in its order.
+            // The bitmaps are prepared after the first entry's check (an
+            // invalid first entry is rejected with no host words taken).
             const auto used = static_cast<std::uint64_t>(ctx.end - ctx.base);
-            for (std::size_t i = 0; i < count; ++i) {
-                XBufferCore::WireHole hole;
+            const auto entry = [&](std::size_t i, XBufferCore::WireHole& hole) {
                 std::memcpy(&hole, static_cast<const char*>(holes) + i * sizeof(hole), sizeof(hole));
-                if (hole.bytes == 0 || (hole.bytes & 7u) != 0 || (hole.offset & 7u) != 0 ||
-                    hole.offset < sizeof(XArena) || hole.offset > used ||
-                    hole.bytes > used - hole.offset) {
-                    return wire_reject("wire validation failed: invalid hole table entry");
-                }
-                XOFFSET_VTRY(register_free_range(ctx.base + hole.offset, hole.bytes, ctx,
-                                                 "wire validation failed: invalid hole table entry"));
+                return hole.bytes != 0 && (hole.bytes & 7u) == 0 && (hole.offset & 7u) == 0 &&
+                       hole.offset >= sizeof(XArena) && hole.offset <= used && hole.bytes <= used - hole.offset;
+            };
+            XBufferCore::WireHole hole;
+            if (count == 0) return vok();
+            if (!entry(0, hole)) return wire_reject("wire validation failed: invalid hole table entry");
+            auto& index = ctx.general();
+            for (std::size_t i = 0; i < count; ++i) {
+                if (!entry(i, hole)) [[unlikely]] return wire_reject("wire validation failed: invalid hole table entry");
+                const auto g0 = std::size_t(hole.offset) / 8u, g1 = (std::size_t(hole.offset) + hole.bytes) / 8u;
+                const auto overlap = index.overlap(g0, g1);
+                if (overlap == 1) [[unlikely]]
+                    return wire_reject("wire validation detected free-list overlap with live ranges");
+                if (overlap == 2) [[unlikely]]
+                    return wire_reject("wire validation detected overlapping free-list ranges");
+                index.mark(true, g0, g1);
+                ctx.free_bytes += hole.bytes;
             }
             return vok();
         }
@@ -6077,7 +6117,7 @@ namespace XOffsetDatastructure {
                 return wire_reject("wire validation: unsupported arena header flags");
             }
             XOFFSET_VTRY(register_owned_range(ctx.base, sizeof(XArena), ctx, "wire validation: invalid arena header"));
-            if (holes) XOFFSET_VTRY(register_wire_holes(holes, hole_count, ctx));
+            if (holes && hole_count != 0) XOFFSET_VTRY(register_wire_holes(holes, hole_count, ctx));
             XOFFSET_VTRY(register_allocation(&root, sizeof(T), alignof(T), ctx));
             XOFFSET_VTRY(validate_wire_value(root, ctx));
             if (check_coverage) XOFFSET_VTRY(require_exact_coverage(ctx));
