@@ -829,6 +829,8 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
         }
         s.primed = true;
     }
+    static thread_local std::string zbuf;          // this round's delta wires, for the untimed zstd sizes
+    static thread_local std::vector<std::size_t> zoff;
     for (int r = 0; r < vs.rounds; ++r) {
         w.tick();
         const int64_t base = (int64_t(cycle) * vs.rounds + r) * (vs.clients + 1) + 1;
@@ -856,12 +858,18 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
                 st.bytes[k.ndelta] += nd;
             }
             st.bytes[k.udelta] += n;
-            st.bytes[k.uzstd] += zstd_size(ops.delta_wire());
+            // zstd size after the round (below): compressing here would evict
+            // the server's working set and charge it to the next timed delivery.
+            { const auto dw = ops.delta_wire(); zoff.push_back(zbuf.size()); zbuf.append(dw.data(), dw.size()); }
             st.bytes[k.umsg] += 1;
             st.bytes[k.uunits] += s.plan.units.size() + s.plan.removed.size();
             st.bytes[k.umarch] += s.plan.marches.size() + s.plan.removed_marches.size();
             st.bytes[k.utiles] += s.plan.tiles.size();
         }
+        zoff.push_back(zbuf.size());
+        for (std::size_t i = 0; i + 1 < zoff.size(); ++i)
+            st.bytes[k.uzstd] += zstd_size(std::string_view(zbuf).substr(zoff[i], zoff[i + 1] - zoff[i]));
+        zbuf.clear(); zoff.clear();
     }
 }
 

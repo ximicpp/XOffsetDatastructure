@@ -6,6 +6,7 @@
 #include <map>
 #include <span>
 #include <string>
+#include <string_view>
 #include "slg/trace.hpp"
 #if SLG_IR_COUNT
 #include <string_view>
@@ -66,6 +67,17 @@ template <class F> void timed(CycleStats& st, const char* key, F&& f) {
     if (ir_on) CALLGRIND_TOGGLE_COLLECT;
 #endif
     st.ns[key] += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - t0).count();
+}
+
+// Game logic between the data steps (battle simulation, scene/season edits,
+// shard ticks). In the demo case set (SLG_CASES=demo) it runs untimed: a timed
+// stage there holds only data reads and writes, encode/decode, send and
+// receive (susu 2026-11-03), and the key is not recorded. With SLG_CASES unset
+// it stays timed under its key, so the perf gate's stage keys do not change.
+template <class F> void untimed(CycleStats& st, const char* key, F&& f) {
+    static const bool demo = [] { const char* e = std::getenv("SLG_CASES"); return e && std::string_view(e) == "demo"; }();
+    if (demo) f();
+    else timed(st, key, std::forward<F>(f));
 }
 
 struct Runner {

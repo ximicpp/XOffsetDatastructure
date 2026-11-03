@@ -116,6 +116,17 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
 There is no C or D in this set, and `MANIFEST` lists the change. With
 `SLG_CASES` unset nothing changes: same stage keys, digests and report sums.
 
+Timing scope (susu 2026-11-03, every demo case): a timed stage holds only data
+reads and writes, encode/decode, send and receive. Game logic runs untimed
+through `untimed()` in `bench/runner.hpp`: the battle simulation
+(`A.simulate`), the scene and season edits (`B.scene_edits`,
+`B.season_edits`), and the shard ticks (`C.ticks`, `S.ticks_middle`); those
+keys are not recorded in this set (with `SLG_CASES` unset they stay
+timed, for the perf gate). The world's own events in the viewport cases and
+the player edits before LD were already untimed. Byte sizes that compress
+(EB.window_zstd, the compact sizes, U*.delta_zstd) are computed after each
+round's timed loop, so zstd never runs between two timed deliveries.
+
 ## Instruction counts (CI performance gate)
 
 `-DSLG_IR_COUNT=ON` (or `-DSLG_IR_COUNT=1` on a direct compile) builds a
