@@ -508,9 +508,14 @@ public:
             int32_t usize = 0, msize = 0;
             std::vector<int32_t> urm, mrm;
             std::vector<std::pair<int32_t, int32_t>> uup, mup;
-            std::string delta, key;
+            std::vector<uint8_t> unew;   // uup[k] took a slot this tick: the unit is new to the view
+            std::string key;
         };
         std::vector<NView> nb;
+        // Every client's delta is written into one buffer, as the application-
+        // level path writes every message into one, and read by that client's
+        // apply right after.
+        std::string ndelta;
         std::vector<std::optional<XBuffer>> nheld;
         std::vector<XOffsetDatastructure::XDeltaCursor> ncur;
         int32_t nucap = 0, nmcap = 0;
@@ -542,7 +547,7 @@ public:
         }
         void n_plan(int c, const MapWorld& w, const DeltaPlan& p) {
             auto& n = nb[std::size_t(c)];
-            n.urm.clear(); n.mrm.clear(); n.uup.clear(); n.mup.clear();
+            n.urm.clear(); n.mrm.clear(); n.uup.clear(); n.mup.clear(); n.unew.clear();
             auto take = [](std::unordered_map<int32_t, int32_t>& at, std::vector<int32_t>& fr, int32_t& size, int32_t id) {
                 const auto it = at.find(id);
                 if (it != at.end()) return it->second;
@@ -564,7 +569,10 @@ public:
                 n.mrm.push_back(it->second); n.mfree.push_back(it->second); n.mslot.erase(it);
                 std::push_heap(n.mfree.begin(), n.mfree.end(), std::greater<>{});
             }
-            for (int32_t i : p.units) n.uup.emplace_back(i, take(n.uslot, n.ufree, n.usize, w.unit(i).id));
+            for (int32_t i : p.units) {
+                n.unew.push_back(n.uslot.find(w.unit(i).id) == n.uslot.end() ? 1 : 0);
+                n.uup.emplace_back(i, take(n.uslot, n.ufree, n.usize, w.unit(i).id));
+            }
             for (int32_t i : p.marches) n.mup.emplace_back(i, take(n.mslot, n.mfree, n.msize, w.march(i).id));
         }
         void n_update(int c, const MapWorld& w, const DeltaPlan& p, int64_t id) {
@@ -586,10 +594,36 @@ public:
                 b.touch(u);
             }
             for (int32_t pos : n.mrm) { v.marches[std::size_t(pos)] = xm::ViewMarch{}; b.touch(v.marches[std::size_t(pos)]); }
-            for (const auto& [i, pos] : n.uup) {
-                auto& u = v.units[std::size_t(pos)];
-                copy_unit(u, w.unit(i));
-                b.touch(u);
+            // A unit new to the view is copied whole; one the view holds gets
+            // the fields the world changed this tick (its dirty flags, as a
+            // game server keeps them), each written and touched where its
+            // value differs (touch_set: the bytes that changed).
+            for (std::size_t k = 0; k < n.uup.size(); ++k) {
+                const auto [i, pos] = n.uup[k];
+                auto& d = v.units[std::size_t(pos)];
+                const WorldUnit& s = w.unit(i);
+                if (n.unew[k]) { copy_unit(d, s); b.touch(d); continue; }
+                const uint64_t m = w.dirty(i);
+#define SLG_X(f) if (m & SLG_D(f)) b.touch_set(d.f, s.f);
+                SLG_VUNIT_SCALARS(SLG_X)
+#undef SLG_X
+                if (m & SLG_D(name)) { set_str(d.name, s.name); b.touch(d.name); }
+                if (m & SLG_D(alliance_tag)) { set_str(d.alliance_tag, s.alliance_tag); b.touch(d.alliance_tag); }
+                if (m & SLG_D(owner_name)) { set_str(d.owner_name, s.owner_name); b.touch(d.owner_name); }
+                const auto hero = [&](auto& a, const auto& e) { b.touch_set(a.id, e.id); b.touch_set(a.level, e.level); b.touch_set(a.star, e.star); b.touch_set(a.skin, e.skin); };
+                // A list of the same length is written element by element; one
+                // whose length changed is copied whole and touched.
+                const auto list = [&](auto& dl, const auto& sl, auto&& each, auto&& assign) {
+                    if (dl.size() == sl.size()) { for (std::size_t q = 0; q < sl.size(); ++q) each(dl[q], sl[q]); return; }
+                    copy_list(dl, sl, assign);
+                    b.touch(dl);
+                };
+                if (m & SLG_D(commander)) hero(d.commander, s.commander);
+                if (m & SLG_D(heroes)) list(d.heroes, s.heroes, hero, [](auto& a, const auto& e) { copy_uhero(a, e); });
+                if (m & SLG_D(troops)) list(d.troops, s.troops, [&](auto& a, const auto& e) { b.touch_set(a.type, e.type); b.touch_set(a.count, e.count); b.touch_set(a.wounded, e.wounded); },
+                                            [](auto& a, const auto& e) { a.type = e.type; a.count = e.count; a.wounded = e.wounded; });
+                if (m & SLG_D(buffs)) list(d.buffs, s.buffs, [&](auto& a, const auto& e) { b.touch_set(a.id, e.id); b.touch_set(a.stacks, e.stacks); b.touch_set(a.expire_ms, e.expire_ms); },
+                                           [](auto& a, const auto& e) { a.id = e.id; a.stacks = e.stacks; a.expire_ms = e.expire_ms; });
             }
             for (const auto& [i, pos] : n.mup) { copy_vmarch(v.marches[std::size_t(pos)], w.march(i)); b.touch(v.marches[std::size_t(pos)]); }
             for (int32_t t : p.tiles) {
@@ -603,8 +637,8 @@ public:
             auto& n = nb[std::size_t(c)];
             XOffsetDatastructure::XDeltaOptions o;
             o.touched_only = true;
-            n.buf->template save_delta_into<xm::ViewSnapshot>(n.delta, n.base, o);
-            return n.delta.size();
+            n.buf->template save_delta_into<xm::ViewSnapshot>(ndelta, n.base, o);
+            return ndelta.size();
         }
         std::size_t n_key(int c) {
             auto& n = nb[std::size_t(c)];
@@ -624,7 +658,7 @@ public:
             if (!r) throw std::runtime_error("native key delta rejected: " + std::string(r.error().message));
         }
         void n_apply(int c, int) {
-            const XOffsetDatastructure::XStatus r = nheld[std::size_t(c)]->template try_apply_delta_verified<xm::ViewSnapshot>(nb[std::size_t(c)].delta, ncur[std::size_t(c)]);
+            const XOffsetDatastructure::XStatus r = nheld[std::size_t(c)]->template try_apply_delta_verified<xm::ViewSnapshot>(ndelta, ncur[std::size_t(c)]);
             if (!r) throw std::runtime_error("native delta rejected: " + std::string(r.error().message));
         }
         xm::ViewSnapshot& n_held(int c, int) { return nheld[std::size_t(c)]->template root<xm::ViewSnapshot>(); }
