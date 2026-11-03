@@ -385,7 +385,8 @@ void prefetch_hint_changes_nothing() {
     for (std::size_t i = 0; i < live.size(); i += 2) a.retire(live[i].first, live[i].second);
     const auto bytes = a.core.copy_bytes();
     const auto holes = holes_of(a.core);
-    const auto count = a.core.free_block_count(), freed = a.core.free_block_bytes();
+    const std::size_t count = a.core.free_block_count();
+    const std::uint64_t freed = a.core.free_block_bytes();
     for (int k = 0; k < 3; ++k) a.core.prefetch_for_update();
     need(a.core.copy_bytes() == bytes && same_holes(holes_of(a.core), holes) &&
              a.core.free_block_count() == count && a.core.free_block_bytes() == freed,
