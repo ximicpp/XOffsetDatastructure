@@ -117,7 +117,10 @@ public:
             timed(st, "A.req_decode", [&] { m.emplace(XBuffer::load_verified<BattleMsg>(req, cap())); });
             untimed(st, "A.simulate", [&] { simulate_battle(m->root<BattleMsg>()); });
             timed(st, "A.res_encode", [&] { res = m->save_verified<BattleMsg>(); });
-            timed(st, "A.res_decode", [&] { r.emplace(XBuffer::load_verified<BattleMsg>(res, cap())); });
+            timed(st, "A.res_decode", [&] {
+                prefetch_for_apply(pr);
+                r.emplace(XBuffer::load_verified<BattleMsg>(res, cap()));
+            });
             timed(st, "A.apply", [&] {
                 const auto& out = r->root<BattleMsg>();
                 apply_battle_army(att, out.attacker);
@@ -222,6 +225,7 @@ public:
             recv<BattleMsg>(st, "A.req_decode", req_, a_m_);
             untimed(st, "A.simulate", [&] { simulate_battle(a_m_->root<BattleMsg>()); });
             timed(st, "A.res_encode", [&] { a_m_->save_verified_into<BattleMsg>(res_); });
+            timed(st, "A.res_decode", [&] { prefetch_for_apply(pr); });
             recv<BattleMsg>(st, "A.res_decode", res_, a_r_);
             timed(st, "A.apply", [&] {
                 const auto& out = a_r_->root<BattleMsg>();
@@ -246,7 +250,7 @@ public:
             untimed(st, "B.scene_edits", [&] {
                 season_edits(b_m_->root<PlayerState>(), mix_seed(seed_, uint64_t(cycle) * 1000003u + k), sc.season_ops);
             });
-            timed(st, "B.install", [&] { std::swap(slot, *b_m_); });
+            timed(st, "B.install", [&] { slot.swap(*b_m_); });
             st.bytes["B.out"] += out_.size();
             if (keep) keep->player = out_;
         }
@@ -273,7 +277,7 @@ public:
             recv<PlayerState>(st, "S.store_recv", back_, b_r_);
             store_ = back_;
             recv<PlayerState>(st, "S.load_recv", store_, b_m_);
-            timed(st, "S.load_install", [&] { std::swap(slot, *b_m_); });
+            timed(st, "S.load_install", [&] { slot.swap(*b_m_); });
             st.bytes["S.player"] += back_.size();
         }
         if (demo_cases()) run_dirty_save(sops_, pick_storage(seed_, cycle, sc.players, sc.migrants), cycle, st);
@@ -665,6 +669,17 @@ private:
         return p;
     }
     PlayerState& player(int i) { return players_[std::size_t(i)].template root<PlayerState>(); }
+    // Adapter (2026-11-02): the battle result for these two players is
+    // arriving, so the scene server starts loading their buffers' allocator
+    // lines (public cache hint, changes nothing) and A.apply does not wait on
+    // those misses one after another. Timed as part of A.res_decode; a no-op
+    // with libraries that do not have the hint.
+    void prefetch_for_apply([[maybe_unused]] const Pairing& pr) const {
+#if defined(XOFFSET_PREFETCH_FOR_UPDATE_API)
+        players_[std::size_t(pr.ap)].prefetch_for_update();
+        players_[std::size_t(pr.dp)].prefetch_for_update();
+#endif
+    }
 
     // Receive in the reuse protocol. Default: reload_verified copies the wire into the
     // slot's long-lived buffer and verifies it there. Direct ("xoffset_direct", the

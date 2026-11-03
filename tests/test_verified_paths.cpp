@@ -1,4 +1,5 @@
 #include "xoffsetdatastructure.hpp"
+#include <array>
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
@@ -252,9 +253,17 @@ void hole_table_paths() {
     need(from_dense.root<PathsRoot>().blob.size()==8192,"dense snapshot reload differs");
     // A lost retirement (host OOM in the free table) is recomputed before emission.
     auto lost=make();
-    // A size class with no bin yet: retiring it needs a host allocation.
+    // A size class whose bin is full: retiring it needs a host allocation.
     lost.root().name=std::string(300,'q');
     lost.root().blob.reserve(lost.root().blob.capacity()+64); // name block leaves the tail
+    {   // A bin holds its first free_bin_inline_entries holes inline: fill the name block's bin.
+        const std::uint32_t name_block=static_cast<std::uint32_t>((lost.root().name.capacity()+1+7)/8*8);
+        std::array<void*,xo::XBufferCore::free_bin_inline_entries> fill{};
+        const auto before=lost.free_block_count();
+        for(auto& p:fill)p=lost.arena()->allocate_aligned(name_block,8);
+        for(auto p:fill)lost.arena()->deallocate(p,name_block);
+        need(lost.free_block_count()==before+fill.size(),"bin fixture differs");
+    }
     {Arm arm;lost.root().name.reserve(1000);need(host::remaining==-1,"free-table host failure not reached");}
     need(!lost.free_table_complete(),"lost retirement not recorded");
     std::string recomputed;lost.save_verified_into(recomputed);
