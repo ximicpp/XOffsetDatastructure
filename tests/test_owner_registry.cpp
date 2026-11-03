@@ -46,8 +46,6 @@ XBuffer make_buffer(std::int64_t value) {
 }
 
 // The registry record (identity used by save_verified_into) follows the owner.
-// The save normalizes the payload extent, so call it after the owner's last
-// allocation in explicit-growth fixtures.
 void check_registry_identity(XBuffer& owner, std::int64_t value) {
     std::string out;
     owner.save_verified_into<RegistryRoot>(out);
@@ -187,7 +185,7 @@ void transfer_matrix() {
     *p = 27;
     assert(*p == 27);
     allocator.deallocate(p, 1);
-    check_registry_identity(first, 11); // last: save normalizes the explicit-growth buffer
+    check_registry_identity(first, 11);
 }
 
 // std::swap of two loaded buffers (the SLG writeback) is three moves into an

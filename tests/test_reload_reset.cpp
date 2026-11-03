@@ -76,7 +76,9 @@ void reload_reuses_owner() {
     in.root<ReloadRoot>().values.push_back(7);
     auto out = XBuffer::load_verified<ReloadRoot>(in.save_verified<ReloadRoot>(), cap());
     need(out.root<ReloadRoot>().values.back() == 7, "mutate after reload");
-    // Trimming is explicit.
+    // Trimming is explicit (saves leave the logical length): shrink, then
+    // return the pages beyond it.
+    in.shrink_to_fit();
     (void)in.reclaim_tail_pages();
     need(in.accessible_bytes() < committed, "reclaim_tail_pages did not release pages");
 }

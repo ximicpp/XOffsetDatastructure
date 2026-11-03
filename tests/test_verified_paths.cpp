@@ -92,18 +92,23 @@ void into_exact_hot_and_oom() {
     bool oom=false;
     {Arm arm;try{source.save_verified_into(out);}catch(const std::bad_alloc&){oom=true;}}
     need(oom && out=="original destination value" && source.copy_bytes()==raw && source.get_size()==logical,
-         "new API output OOM changed value/source before normalization");
+         "new API output OOM changed value or source");
     source.save_verified_into(out);
     need(out==source.save_verified() && source.get_address()==base && source.epoch()==epoch && handle.get()==root,
          "into differs from exact save_verified V2 bytes or moved owner");
+    // Verified saves cut the wire at used_end and leave the logical length.
+    need(source.get_size()==logical,"save_verified_into changed the logical length");
     const auto capacity=out.capacity();
     {Arm arm;source.save_verified_into(out);need(host::remaining==0,"hot output capacity allocated");}
     need(out.capacity()==capacity,"hot capacity changed");
     auto loaded=xo::XBuffer::load_verified<PathsRoot>(out);check(loaded.root<PathsRoot>());
-    // Old contract deliberately differs: old save normalizes before output OOM.
-    auto old=make();const auto used=old.arena()->used_end;need(old.get_size()>used,"old OOM fixture lacks spare extent");
+    // The owning save_verified leaves the logical length too, on output OOM
+    // and after a successful save.
+    auto old=make();const auto old_logical=old.get_size();
+    need(old_logical>old.arena()->used_end,"OOM fixture lacks spare extent");
     {Arm arm;bool failed=false;try{(void)old.save_verified();}catch(const std::bad_alloc&){failed=true;}
-        need(failed && old.get_size()==used,"old save OOM normalization contract changed");}
+        need(failed && old.get_size()==old_logical,"save_verified output OOM changed the logical length");}
+    need(old.save_verified()==out && old.get_size()==old_logical,"save_verified changed the logical length");
 }
 
 void into_owner_callbacks() {
