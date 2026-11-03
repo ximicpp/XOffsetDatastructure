@@ -82,7 +82,8 @@
 #                        Default mode unchanged (same digests and report sums). After the
 #                        untimed first pull every static client reserves 1.5x + 16 unit and march
 #                        slots in its held view (all formats). Native views: one slot-class buffer
-#                        per client, every change touched, deltas with touched_only.
+#                        per client, every change touched, deltas with touched_only. EB.send excludes
+#                        the spatial query (units_in / marches_in), untimed bookkeeping like U*'s tracker.
 # Contents: slg-reuse adapters (FlatBuffers verified_root runs the Verifier),
 # reuse protocol (c) (SLG_REUSE=1), ordinary-record declarations for every xm
 # record type in include/slg/model_xoffset.hpp, T4 adapter v2 (whole-container
@@ -93,7 +94,7 @@
 #   them (guarded; older trees keep the previous declarations). Same machine code under GCC 16
 #   and P2996 (asm_equal), the lines are tools/describe_dump output (describe_dump_slg).
 4bd68ec1a9dcb93c4cf4cced05cd5a5ce098e4612183badbdc4f001ed32ab4e5  CMakeLists.txt
-712b096deb1c409d93824690902c7b33dbdd48bf2087667f06541b871babd443  README.md
+d146b797495a306ad06b2a0927a0dccdc8916e53d04f2aca55c94df72b044688  README.md
 ac70796dbfd56abaf2f396e3a94581ff751c29cf727d12ca75f4254d9be47842  adapters/cereal_format.hpp
 0570c765f3b6e680f8df2e1d5a41975ad42a678de96e7080a987c2d3bbe98803  adapters/flatbuffers_format.hpp
 2ea28c427d214c1c4f348794b74e130edc3eb4b00758e48e3f99f4b6a0a6abbf  adapters/protobuf_format.hpp
@@ -113,7 +114,7 @@ eac6391a496578276cfe33afe8b2bb3866d3f1bc03127ac9a0bbb7bb7434583d  bench/runner.h
 2c55e6329f5433e8eb736c1521f1d2ab97ae303de91c92db5cee7eb28f0a6c1f  include/slg/model_xoffset.hpp
 3259eef215f98da7328da68bb5e7dd1f33141cdeb894511a039af075114c3391  include/slg/model_xoffset_optin.hpp
 36d5761eb46998e5040f7a19fb99f5ac1df5e31ee129a864e3872ba734e4a5db  include/slg/trace.hpp
-65de0831ac29494d3bdabf927212e66969b741dba15602aa08ba2554856e7dec  include/slg/view.hpp
+805a719a01c1378a6f590dca4ceb7c50d351ece55ee088fa7d4807d6bf780fc7  include/slg/view.hpp
 458a8aab0a291055764df36f2847258957dfc9b9eddd8fb6509e11d3bbf41d6f  schema/slg.fbs
 fad4825f74e40fc3a0d7bd62f97da78f30d40a13aa5d1bfc3825ea320f0e2eb9  schema/slg.proto
 6df29c4b3b0cb37a3d1ebec7fad40db7e2a181087d6d97ce2be972a20b93edc7  tools/analyze.py

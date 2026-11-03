@@ -30,6 +30,8 @@
 // client holds are plain game-server code, the same in every runner, and not
 // timed. Timed, per format (run_view_case):
 //   EB.send   fill one client's viewport snapshot from the world and encode it
+//             (the spatial query of what lies in the viewport is bookkeeping,
+//             untimed, as the tracker's work is for U*)
 //   EB.recv   the client receives it (the format's checked receive) and reads
 //             every tile, unit and march
 //   U*.send   fill one client's viewport delta from the bookkeeping and encode it
@@ -337,13 +339,20 @@ template <class T> void copy_vtile(T& d, const MapWorld& w, int32_t tx, int32_t 
     d.x = tx; d.y = ty; d.terrain = s.terrain; d.level = s.level; d.owner = s.owner;
 }
 
+// What lies in a viewport (server bookkeeping, untimed like the tracker):
+// world unit and march indices from the spatial index.
+struct ViewQuery {
+    std::vector<int32_t> units, marches;
+    void run(const MapWorld& w, const ViewRect& r) { w.units_in(r, units); w.marches_in(r, marches); }
+};
+
 // Fill a viewport snapshot of any model (std, XOffset, cista) from the world:
-// every tile under r (row-major), every unit in it, every march crossing it.
-template <class V> void fill_view(V& v, const MapWorld& w, const ViewRect& r, int64_t request_id, int64_t tick) {
-    static thread_local std::vector<int32_t> us, ms;
+// every tile under r (row-major), the units and marches q found in it.
+template <class V> void fill_view(V& v, const MapWorld& w, const ViewRect& r, const ViewQuery& q, int64_t request_id, int64_t tick) {
+    const auto& us = q.units;
+    const auto& ms = q.marches;
     v.request_id = request_id; v.tick = tick;
     v.x0 = r.x0; v.y0 = r.y0; v.x1 = r.x1; v.y1 = r.y1;
-    w.units_in(r, us);
     v.units.clear();
     v.units.reserve(us.size());
     for (int32_t i : us) {
@@ -352,7 +361,6 @@ template <class V> void fill_view(V& v, const MapWorld& w, const ViewRect& r, in
         d.id = s.id; d.owner = s.owner; d.x = s.x; d.y = s.y; d.hp = s.hp; d.state = s.state;
         d.name = std::string_view(s.name);
     }
-    w.marches_in(r, ms);
     v.marches.clear();
     v.marches.reserve(ms.size());
     for (int32_t i : ms) copy_vmarch(v.marches.emplace_back(), w.march(i));
@@ -607,6 +615,7 @@ struct ViewSession {
     MapWorld world;
     ViewTracker tracker;
     DeltaPlan plan;
+    ViewQuery query;
     bool browse = false, primed = false;
     std::vector<HeldIndex> index;   // per client
     void setup(uint64_t seed, const ViewScale& vs, int which) {
@@ -629,8 +638,9 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
             for (int c = 0; c < vs.clients; ++c) {
                 w.move(c);
                 const ViewRect rect = w.rect(c);
+                s.query.run(w, rect);   // the spatial query: server bookkeeping, untimed
                 timed(st, k.esend.c_str(), [&] {
-                    ops.snap_encode(0, [&](auto& v) { fill_view(v, w, rect, base + c, w.tick_no()); });
+                    ops.snap_encode(0, [&](auto& v) { fill_view(v, w, rect, s.query, base + c, w.tick_no()); });
                 });
                 uint64_t q = 0;
                 timed(st, k.erecv.c_str(), [&] {
@@ -657,7 +667,8 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
         for (int c = 0; c < vs.clients; ++c) {
             const ViewRect rect = w.rect(c);
             s.tracker.plan(w, c, rect, s.plan);
-            ops.snap_encode(0, [&](auto& v) { fill_view(v, w, rect, 0, w.tick_no()); });
+            s.query.run(w, rect);
+            ops.snap_encode(0, [&](auto& v) { fill_view(v, w, rect, s.query, 0, w.tick_no()); });
             ops.snap_recv(c, 0, 0);
             // The client keeps this view and edits it: room for the records
             // that come and go (every format the same).
