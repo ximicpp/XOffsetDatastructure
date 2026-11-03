@@ -1,0 +1,54 @@
+cycle 0 xoffset      state=de41d3eaa9576c8f reports=1608308144675004811
+cycle 0 cereal       state=de41d3eaa9576c8f reports=1608308144675004811
+cycle 0 protobuf     state=de41d3eaa9576c8f reports=1608308144675004811
+cycle 0 flatbuffers  state=de41d3eaa9576c8f reports=1608308144675004811
+cycle 0 zpp_bits     state=de41d3eaa9576c8f reports=1608308144675004811
+cycle 0 cista        state=de41d3eaa9576c8f reports=1608308144675004811
+cycle 1 xoffset      state=6d899e6c7c46c38e reports=2049482128998121479
+cycle 1 cereal       state=6d899e6c7c46c38e reports=2049482128998121479
+cycle 1 protobuf     state=6d899e6c7c46c38e reports=2049482128998121479
+cycle 1 flatbuffers  state=6d899e6c7c46c38e reports=2049482128998121479
+cycle 1 zpp_bits     state=6d899e6c7c46c38e reports=2049482128998121479
+cycle 1 cista        state=6d899e6c7c46c38e reports=2049482128998121479
+
+wire bytes per message, demo case set (average over the last cycle)
+format            A.req      A.res   B.player   S.player
+xoffset            1179       2375      10995      11373
+cereal             1009       1519       7342       7302
+protobuf            565        921       4479       4463
+flatbuffers        1211       1726       8505       8463
+zpp_bits            881       1391       6589       6558
+cista              1416       1927       9969       9919
+
+server -> client, bytes: EB = one viewport pull while browsing (raw / zstd-3),
+U = one viewport delta to a static client (raw / zstd-3), rate P/C/S
+format       case       pull  pull.zstd    U.delta     U.zstd      pulls deliveries
+xoffset      B         11658       4273          0          0       6000          0
+                       13158       4297   (save_compact pull / zstd-3)
+xoffset      P             0          0        228        139          0       5908
+                                                95              (native delta)
+xoffset      C             0          0        543        291          0       5993
+                                               173              (native delta)
+xoffset      S             0          0       1996        985          0       6000
+                                               390              (native delta)
+cereal       B         11413       4117          0          0       6000          0
+cereal       P             0          0        161        102          0       5908
+cereal       C             0          0        467        247          0       5993
+cereal       S             0          0       1865        913          0       6000
+protobuf     B          6703       4298          0          0       6000          0
+protobuf     P             0          0         73         82          0       5908
+protobuf     C             0          0        273        239          0       5993
+protobuf     S             0          0       1190        959          0       6000
+flatbuffers  B         13013       5192          0          0       6000          0
+flatbuffers  P             0          0        245        143          0       5908
+flatbuffers  C             0          0        631        338          0       5993
+flatbuffers  S             0          0       2292       1223          0       6000
+zpp_bits     B         10932       4089          0          0       6000          0
+zpp_bits     P             0          0        141         99          0       5908
+zpp_bits     C             0          0        423        241          0       5993
+zpp_bits     S             0          0       1688        887          0       6000
+cista        B         11650       4246          0          0       6000          0
+cista        P             0          0        242        120          0       5908
+cista        C             0          0        558        270          0       5993
+cista        S             0          0       2012        950          0       6000
+verify: all formats agree

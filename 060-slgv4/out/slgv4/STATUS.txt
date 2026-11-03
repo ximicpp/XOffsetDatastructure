@@ -1,0 +1,2 @@
+SLGV4 done: 8 processes x 21 cycles, slg_bench 2c87f7f299ff9de0d68c5ba08de8ffc8eb6602a79985861b574cb4869995a6d2, source tree c47f4fbb18da9f3f07aa1f05aefeba4f292d6ff2 (merge of dffba8ad8d2aa1f37fb6257b11656321cfc4b59f)
+screen watcher: 34 calls (dark.log)
