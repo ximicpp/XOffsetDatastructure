@@ -87,6 +87,7 @@ def main():
         scen = {"A": "场景↔战斗", "B": "场景↔场景", "S": "场景↔存储", "SD": "场景↔存储（只存脏模块）",
                 "L": "登录全量", "LD": "登录后自身增量"}
         scen["EB"] = "浏览地图，视口全量"
+        scen["EBW"] = "浏览地图，单设备热视图接收"
         for r, name in (("P", "和平"), ("C", "交战"), ("S", "压力")):
             scen["U" + r] = f"静止视口增量（{name}）"
         # XOffset's own delta sync (xoffset_delta.hpp): N* deltas per static
