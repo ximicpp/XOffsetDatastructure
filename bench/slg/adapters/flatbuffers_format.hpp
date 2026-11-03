@@ -111,13 +111,22 @@ inline Offset<flatbuffers::Vector<Offset<fb::ViewMarch>>> marches_of(FlatBufferB
     return b.CreateVector(tmp);
 }
 
+inline Offset<fb::ViewUnit> unit_of(FlatBufferBuilder& b, const stdm::ViewUnit& u) {
+    auto n = b.CreateString(u.name);
+    auto at = b.CreateString(u.alliance_tag);
+    auto on = b.CreateString(u.owner_name);
+    auto hs = structs<fb::UnitHero>(b, u.heroes, [](const stdm::UnitHero& h) { return fb::UnitHero(h.id, h.level, h.star, h.skin); });
+    auto ts = troops(b, u.troops);
+    auto bs = buffs(b, u.buffs);
+    const fb::UnitHero cmd(u.commander.id, u.commander.level, u.commander.star, u.commander.skin);
+    return fb::CreateViewUnit(b, u.id, u.kind, u.owner, u.alliance, u.x, u.y, u.hp, u.max_hp, u.state, u.level, u.faction, u.flags, u.speed, u.attack, u.defense, u.morale, u.load, u.icon, u.skin, u.banner, u.title, u.vip, u.rank, u.slots, u.power, u.state_end, u.shield_end, u.cooldown_end, u.last_update, u.kills, u.in_battle, u.shielded, u.hidden,
+                              n, at, on, &cmd, hs, ts, bs);
+}
+
 inline Offset<fb::ViewSnapshot> build(FlatBufferBuilder& b, const stdm::ViewSnapshot& v) {
     std::vector<Offset<fb::ViewUnit>> tmp;
     tmp.reserve(v.units.size());
-    for (const auto& u : v.units) {
-        auto n = b.CreateString(u.name);
-        tmp.push_back(fb::CreateViewUnit(b, u.id, u.owner, u.x, u.y, u.hp, u.state, n));
-    }
+    for (const auto& u : v.units) tmp.push_back(unit_of(b, u));
     auto us = b.CreateVector(tmp);
     auto ms = marches_of(b, v.marches);
     auto tl = structs<fb::Tile>(b, v.tiles, [](const stdm::Tile& t) { return fb::Tile(t.x, t.y, t.terrain, t.level, t.owner); });
@@ -127,10 +136,7 @@ inline Offset<fb::ViewSnapshot> build(FlatBufferBuilder& b, const stdm::ViewSnap
 inline Offset<fb::ViewDelta> build(FlatBufferBuilder& b, const stdm::ViewDelta& v) {
     std::vector<Offset<fb::ViewUnit>> tmp;
     tmp.reserve(v.upserts.size());
-    for (const auto& u : v.upserts) {
-        auto n = b.CreateString(u.name);
-        tmp.push_back(fb::CreateViewUnit(b, u.id, u.owner, u.x, u.y, u.hp, u.state, n));
-    }
+    for (const auto& u : v.upserts) tmp.push_back(unit_of(b, u));
     auto us = b.CreateVector(tmp);
     auto rm = b.CreateVector(v.removed);
     auto ms = marches_of(b, v.marches);
@@ -220,22 +226,28 @@ inline void unpack(stdm::ViewMarch& x, const fb::ViewMarch* y) {
     x.id = y->id(); x.owner = y->owner(); x.x0 = y->x0(); x.y0 = y->y0(); x.x1 = y->x1(); x.y1 = y->y1(); x.t0 = y->t0(); x.t1 = y->t1();
 }
 
+inline void unpack(stdm::ViewUnit& x, const fb::ViewUnit* y) {
+    x.id = y->id(); x.kind = y->kind(); x.owner = y->owner(); x.alliance = y->alliance(); x.x = y->x(); x.y = y->y(); x.hp = y->hp(); x.max_hp = y->max_hp(); x.state = y->state(); x.level = y->level(); x.faction = y->faction(); x.flags = y->flags(); x.speed = y->speed(); x.attack = y->attack(); x.defense = y->defense(); x.morale = y->morale(); x.load = y->load(); x.icon = y->icon(); x.skin = y->skin(); x.banner = y->banner(); x.title = y->title(); x.vip = y->vip(); x.rank = y->rank(); x.slots = y->slots(); x.power = y->power(); x.state_end = y->state_end(); x.shield_end = y->shield_end(); x.cooldown_end = y->cooldown_end(); x.last_update = y->last_update(); x.kills = y->kills(); x.in_battle = y->in_battle(); x.shielded = y->shielded(); x.hidden = y->hidden();
+    x.name = y->name() ? y->name()->str() : std::string();
+    x.alliance_tag = y->alliance_tag() ? y->alliance_tag()->str() : std::string();
+    x.owner_name = y->owner_name() ? y->owner_name()->str() : std::string();
+    if (const auto* c = y->commander()) { x.commander.id = c->id(); x.commander.level = c->level(); x.commander.star = c->star(); x.commander.skin = c->skin(); }
+    else x.commander = {};
+    unpack_vec(x.heroes, y->heroes(), [](stdm::UnitHero& d, const fb::UnitHero* s) { d.id = s->id(); d.level = s->level(); d.star = s->star(); d.skin = s->skin(); });
+    unpack_troops(x.troops, y->troops());
+    unpack_buffs(x.buffs, y->buffs());
+}
+
 inline void unpack(stdm::ViewSnapshot& d, const fb::ViewSnapshot* s) {
     d.request_id = s->request_id(); d.tick = s->tick(); d.x0 = s->x0(); d.y0 = s->y0(); d.x1 = s->x1(); d.y1 = s->y1();
-    unpack_vec(d.units, s->units(), [](stdm::ViewUnit& x, const fb::ViewUnit* y) {
-        x.id = y->id(); x.owner = y->owner(); x.x = y->x(); x.y = y->y(); x.hp = y->hp(); x.state = y->state();
-        x.name = y->name() ? y->name()->str() : std::string();
-    });
+    unpack_vec(d.units, s->units(), [](stdm::ViewUnit& x, const fb::ViewUnit* y) { unpack(x, y); });
     unpack_vec(d.marches, s->marches(), [](stdm::ViewMarch& x, const fb::ViewMarch* y) { unpack(x, y); });
     unpack_tiles(d.tiles, s->tiles());
 }
 
 inline void unpack(stdm::ViewDelta& d, const fb::ViewDelta* s) {
     d.request_id = s->request_id(); d.tick = s->tick(); d.x0 = s->x0(); d.y0 = s->y0(); d.x1 = s->x1(); d.y1 = s->y1();
-    unpack_vec(d.upserts, s->upserts(), [](stdm::ViewUnit& x, const fb::ViewUnit* y) {
-        x.id = y->id(); x.owner = y->owner(); x.x = y->x(); x.y = y->y(); x.hp = y->hp(); x.state = y->state();
-        x.name = y->name() ? y->name()->str() : std::string();
-    });
+    unpack_vec(d.upserts, s->upserts(), [](stdm::ViewUnit& x, const fb::ViewUnit* y) { unpack(x, y); });
     d.removed.clear();
     if (const auto* r = s->removed()) d.removed.assign(r->begin(), r->end());
     unpack_vec(d.marches, s->marches(), [](stdm::ViewMarch& x, const fb::ViewMarch* y) { unpack(x, y); });

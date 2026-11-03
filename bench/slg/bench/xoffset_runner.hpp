@@ -445,7 +445,7 @@ public:
     // Held views are small: slot storage (no VM reservation each), 32 KiB at most.
     static XOffsetDatastructure::XBuffer::MaximumCapacity held_cap() {
         using XOffsetDatastructure::XBuffer;
-        return XBuffer::maximum_capacity(32 * 1024).with_growth(XOffsetDatastructure::XGrowPolicy::Automatic);
+        return XBuffer::maximum_capacity(XBuffer::SLOT_MAX).with_growth(XOffsetDatastructure::XGrowPolicy::Automatic);
     }
 
     struct BlockOps {
@@ -576,17 +576,15 @@ public:
             if (v.units.size() < std::size_t(n.usize)) { v.units.resize(std::size_t(n.usize)); b.touch(&v.units, sizeof(v.units)); }
             if (v.marches.size() < std::size_t(n.msize)) { v.marches.resize(std::size_t(n.msize)); b.touch(&v.marches, sizeof(v.marches)); }
             for (int32_t pos : n.urm) {
+                static const WorldUnit empty{};
                 auto& u = v.units[std::size_t(pos)];
-                u.id = 0; u.owner = 0; u.x = 0; u.y = 0; u.hp = 0; u.state = 0;
-                u.name = std::string_view{};
+                copy_unit(u, empty);
                 b.touch(u);
             }
             for (int32_t pos : n.mrm) { v.marches[std::size_t(pos)] = xm::ViewMarch{}; b.touch(v.marches[std::size_t(pos)]); }
             for (const auto& [i, pos] : n.uup) {
-                const WorldUnit& s = w.unit(i);
                 auto& u = v.units[std::size_t(pos)];
-                u.id = s.id; u.owner = s.owner; u.x = s.x; u.y = s.y; u.hp = s.hp; u.state = s.state;
-                if (sv(u.name) != std::string_view(s.name)) u.name = std::string_view(s.name);
+                copy_unit(u, w.unit(i));
                 b.touch(u);
             }
             for (const auto& [i, pos] : n.mup) { copy_vmarch(v.marches[std::size_t(pos)], w.march(i)); b.touch(v.marches[std::size_t(pos)]); }
