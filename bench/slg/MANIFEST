@@ -79,7 +79,10 @@
 #                        and get one delta per tick of the changes inside their viewport; NP/NC/NS
 #                        native with one baseline per client; K* removed. ViewSnapshot/ViewDelta
 #                        gain a tiles list in every model, adapter and schema (schema names v3).
-#                        Default mode unchanged (same digests and report sums).
+#                        Default mode unchanged (same digests and report sums). After the
+#                        untimed first pull every static client reserves 1.5x + 16 unit and march
+#                        slots in its held view (all formats). Native views: one slot-class buffer
+#                        per client, every change touched, deltas with touched_only.
 # Contents: slg-reuse adapters (FlatBuffers verified_root runs the Verifier),
 # reuse protocol (c) (SLG_REUSE=1), ordinary-record declarations for every xm
 # record type in include/slg/model_xoffset.hpp, T4 adapter v2 (whole-container
@@ -90,7 +93,7 @@
 #   them (guarded; older trees keep the previous declarations). Same machine code under GCC 16
 #   and P2996 (asm_equal), the lines are tools/describe_dump output (describe_dump_slg).
 4bd68ec1a9dcb93c4cf4cced05cd5a5ce098e4612183badbdc4f001ed32ab4e5  CMakeLists.txt
-671e9a0802e743b0c529441936a5c2a528055490fa1eb9ef8d23af5df4318085  README.md
+712b096deb1c409d93824690902c7b33dbdd48bf2087667f06541b871babd443  README.md
 ac70796dbfd56abaf2f396e3a94581ff751c29cf727d12ca75f4254d9be47842  adapters/cereal_format.hpp
 0570c765f3b6e680f8df2e1d5a41975ad42a678de96e7080a987c2d3bbe98803  adapters/flatbuffers_format.hpp
 2ea28c427d214c1c4f348794b74e130edc3eb4b00758e48e3f99f4b6a0a6abbf  adapters/protobuf_format.hpp
@@ -101,7 +104,7 @@ eac6391a496578276cfe33afe8b2bb3866d3f1bc03127ac9a0bbb7bb7434583d  bench/runner.h
 9f066f3062f44dc0ab507009af9108408f645f55baa72886985d9cc76a33328b  bench/slg_bench.cpp
 730a66f677d9d20077175f629cf0b13919e66ccedaf880e4eb414c6bc94c0610  bench/small_msg_probe.cpp
 6a3fda7327a877173f29aba3b956b2afd2627bc3de1765285f45fef9449e36be  bench/std_runner.hpp
-2e66eb2e5d48bb8f62ec7044570b299206f3e4d8aec5f6851b1e1d65872c24c5  bench/xoffset_runner.hpp
+1c00da01735a2da569ced485b35fb798e16fe40eab719c4bcde803736ab063b0  bench/xoffset_runner.hpp
 12cab27be9331a4a09ae66f444cf5852dd81e363df562748a4ea854932e35e44  include/slg/cista_free.hpp
 252eca51c89182293cb3a4c75298df8490c2c7073065b304bb91183721b3cf3f  include/slg/generic.hpp
 81cb33c36231773132abe77ae7a9839a67d1f408fe474cf0bcf9ecfcd6577700  include/slg/login.hpp
@@ -110,7 +113,7 @@ eac6391a496578276cfe33afe8b2bb3866d3f1bc03127ac9a0bbb7bb7434583d  bench/runner.h
 2c55e6329f5433e8eb736c1521f1d2ab97ae303de91c92db5cee7eb28f0a6c1f  include/slg/model_xoffset.hpp
 3259eef215f98da7328da68bb5e7dd1f33141cdeb894511a039af075114c3391  include/slg/model_xoffset_optin.hpp
 36d5761eb46998e5040f7a19fb99f5ac1df5e31ee129a864e3872ba734e4a5db  include/slg/trace.hpp
-03bd2fcd0bb8a8e2ac49eb86bead530aaa88e4be7e254738787c810855b95840  include/slg/view.hpp
+65de0831ac29494d3bdabf927212e66969b741dba15602aa08ba2554856e7dec  include/slg/view.hpp
 458a8aab0a291055764df36f2847258957dfc9b9eddd8fb6509e11d3bbf41d6f  schema/slg.fbs
 fad4825f74e40fc3a0d7bd62f97da78f30d40a13aa5d1bfc3825ea320f0e2eb9  schema/slg.proto
 6df29c4b3b0cb37a3d1ebec7fad40db7e2a181087d6d97ce2be972a20b93edc7  tools/analyze.py

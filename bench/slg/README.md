@@ -74,6 +74,8 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
     plus two battle zones whose units all change every 1 s tick and whose
     tiles change owner with p = 1/16; reference), US stress (a quarter of all
     units move, 1/64 of the tiles change owner; upper bound, report only).
+    After the first pull each client reserves 1.5x + 16 unit and march slots in
+    its held view (all formats; a compact view regrows on its first append).
     U*.send fills and encodes one client's delta, U*.recv receives it, U*.apply
     applies it to the held view through the client's id index.
   M: 10,000 units, 1,500 clients, 1,000 marches, 4 ticks per cycle. Bytes
@@ -86,7 +88,8 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   `save_delta_into` against that client's baseline (N*.diff); the client
   applies it with `try_apply_delta_verified` (N*.recv, patch + full
   verification) and reads in place. Every delivery's view is checked equal to
-  the application-level one. The first pull is the baseline's key delta
+  the application-level one. Every change is touched and the delta uses
+  `touched_only`. The first pull is the baseline's key delta
   (untimed, like the other formats' first pull). Each view reserves 1.5x the
   average units in a viewport plus 32 and a quarter of all marches plus 32.
   `tools/analyze.py` compares N* with the other formats' U*.
