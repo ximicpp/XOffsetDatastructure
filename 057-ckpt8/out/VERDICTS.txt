@@ -1,0 +1,10 @@
+CKPT8 10
+anchor c9fbaea2 (next_cpp26; library = v3.2.1, anchored by CKPT5c)
+screen watcher: 85 calls (dark.log)
+ABC: pass (max upper bound 1.0163; A 0.9991, B 1.0136, C 1.0163; 24 / 24 processes)
+GATE_D: head D÷flatbuffers 0.921 / 0.927 (O4 upper bound <= 1.0: met), D÷zpp_bits 1.055 / 1.062, D.read 67.2 µs; anc D÷flatbuffers 0.917 / 0.925, D÷zpp_bits 1.046 / 1.050, D.read 66.8 µs
+G8 met
+demo case set (report only): 4 ABBA blocks, 8 processes per point, 21 cycles; raw in demo_run.tar.gz, judged in the cloud
+v3 demo cases (report only): 4 ABBA blocks, 8 processes per point, 21 cycles; raw in v3a_run.tar.gz, judged in the cloud
+G9R not in this batch
+ctest 100% tests passed out of 167 (rc 0)

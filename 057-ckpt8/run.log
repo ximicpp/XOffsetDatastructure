@@ -1,0 +1,353 @@
+== 2026-11-03T02:10:56Z 0. tools
+selftest: 73 ok, 0 FAIL (cloud: 73 ok)
+cmake version 4.4.4
+1.13.2
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+anchor: c9fbaea2 (next_cpp26; library = v3.2.1, anchored by CKPT5c)
+== 2026-11-03T02:11:14Z 1. export
+head 5433b4ebb7b23f20b62389ffbcfe888564880ecc tree e471b0f559d1131017ef1acbcfcc241339e642df typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+anc c9fbaea2e980f6f708df615181ced209d653dc0f tree 379c21a13a1d596a466e7f80c35550c94d8c4727 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+== 2026-11-03T02:11:16Z 2. build
+slg init cache /Volumes/XOffsetCS/perf-gate/slg-init-p2996-d77eff1.cmake sha ed916a0cf280cedf798d20f523b09c055e24ba4da58723df5d51d5558ebedde9
+slg head: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+slg anc: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+== 2026-11-03T02:11:58Z 3c. r3v3 reference
+r3v3 reference /Volumes/XOffsetCS/perf-gate/refs/R3V3-formal-mac-v1 ok
+r3v3: reusing /Volumes/XOffsetCS/perf-gate/refs/R3V3-formal-mac-v1
+== 2026-11-03T02:11:58Z 4. wires and prep
+point	commit	sc_xoffset	slg_bench	wire
+head	5433b4ebb7b23f20b62389ffbcfe888564880ecc	15a0bede15dcde1f531914e046ce838e7258d927eb1bca9fbe23e725a0bb4340	c3662b5c2d701388fbed0b6adcd6957bd2050c77e53183560ddf23edc97e1bef	89fd02d2d36fce705cc519d1a6a6298ff23e595c01fb01211e360d6249d2edcc
+anc	c9fbaea2e980f6f708df615181ced209d653dc0f	6eece9b8d14ba644f0f87c9cb62e74005223d07bba4dddca6efb09145c553051	19978229bfc1997e8e5c11c3c2cd3acabfba409116c33964a09dede0e6612270	89fd02d2d36fce705cc519d1a6a6298ff23e595c01fb01211e360d6249d2edcc
+reuse: cycle 0 xoffset      state=ddb6224bbbcecad3 reports=37196452043336
+default: cycle 0 xoffset      state=ddb6224bbbcecad3 reports=37196452043336
+reuse bytes head [1166 2358 12964 842240 712] anchor [1166 2358 12964 842240 712]
+default bytes head [1166 2358 12964 842240 712] anchor [1166 2358 12964 842240 712]
+== 2026-11-03T02:12:23Z 4a. v3 bench against the head and anchor libraries
+v3 head: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+v3 head: slg_bench 3cbba8b243f31b3622ac342a47fe7a0001945486a9908282e671b9380c8a48fc, demo S agree, default S [state=0439e37815b4d22a reports=2128166416352]
+v3 anc: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+v3 anc: slg_bench 36604ee2ab7aab4daffeaab4ed0bba672ad4a14e4d355ffcd088ed9ca59b8090, demo S agree, default S [state=0439e37815b4d22a reports=2128166416352]
+== 2026-11-03T02:13:09Z 4b. prebuild the bisection points
+c583d85d 583d85de0f05f0cb5b34709287d2f1626e8a39de tree 21a88bfaa4c42551c97d2e7fe45851bb93a89f7d typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+slg c583d85de0f05f0cb5b34709287d2f1626e8a39de: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+prebuilt 583d85de0f05: sc_xoffset 33ea555ed5acba97f21561cff64b218f715e67fc1d749ec3cf22a35d9e1be981 slg_bench e3c6228992d6d082b6b47b9c0e9f0893dfcc63fc958bfaaa93e4faffb9c48e4a
+== 2026-11-03T02:13:30Z 5. CKPT8 L2
+FREEZE.json written: /Volumes/XOffsetCS/perf-gate/runs/2026-11-03-ckpt8-5433b4e-smoke
+  head         15a0bede15dcde1f531914e046ce838e7258d927eb1bca9fbe23e725a0bb4340
+  head_aa      15a0bede15dcde1f531914e046ce838e7258d927eb1bca9fbe23e725a0bb4340
+  anchor       6eece9b8d14ba644f0f87c9cb62e74005223d07bba4dddca6efb09145c553051
+  r3           328d8872af63eceee99c9f3c529dae5bce69eba67de6515ef1463a6f4fd883a9
+  cista        1cffe48e6c9b3cc961943a26ff8b361b2e63e9dcc779c138557686af922b4f9c
+  flatbuffers  51e053ddd6afe1652771ba49d3243fa25f367e8a959c90243e004e1ee37ec4b7
+  capnproto    e528cb3cbb42b49780398f164192ff41a1dbdfd983580c79ad5d3cb31e5639bc
+  cereal       4d65fc64843c0c469ca90c76e14e792ba5ccf3c01eb066bf6aff44eafbcf600f
+  bisect 583d85de0f05 reload zero watermark, adaptive D6 regrow step, member swap (edae8c26 + its bench MANIFEST); the last range holds adf72e50 1480b62b 0ce5897d 5433b4eb (reload zero tail): deferred (built when the bisection reaches it)
+== formal-1 start 2026-11-03T02:13:31+00:00 {'waited_s': 40.2, 'load1': 2.71, 'quiet_s': 40.1, 'screen': {'WindowServer': 5.0, 'UURemoteServer': 10.5, 'parsecd': 0.0}, 'remote_active': ['UURemoteServer'], 'screen_over': [], 'screen_gated': False}
+formal-1: this batch alone: max UB head/anchor 1.3660, A/A ok False, old 3/12, cpu {'samples': 19, 'other_busy_samples': 1, 'compile_samples': 0, 'other_busy_top': {'Claude Helper (Renderer)': 1}, 'chrome_busy_mean': 0, 'chrome_busy_max': 0, 'load1_max': 2.84}  (the gate verdict needs the pooled batches: run analyze)
+== slg start 2026-11-03T02:14:50+00:00 {'waited_s': 10.1, 'load1': 2.79, 'quiet_s': 10.1, 'screen': {'WindowServer': 7.6, 'UURemoteServer': 9.1, 'parsecd': 0.0}, 'remote_active': ['UURemoteServer'], 'screen_over': [], 'screen_gated': False}
+run 1/12 head: 3.6 s rc=0
+run 2/12 anch: 0.5 s rc=0
+run 3/12 anch: 0.4 s rc=0
+run 4/12 head: 0.4 s rc=0
+run 5/12 head: 0.4 s rc=0
+run 6/12 anch: 0.4 s rc=0
+run 7/12 anch: 0.4 s rc=0
+run 8/12 head: 0.4 s rc=0
+run 9/12 head: 0.4 s rc=0
+run 10/12 anch: 0.4 s rc=0
+run 11/12 anch: 0.4 s rc=0
+run 12/12 head: 0.5 s rc=0
+slg: A 1.0192 [0.9715, 1.0693]  B 1.0083 [0.9828, 1.0344]  C 0.9865 [0.8908, 1.0926]  D 1.0030 [0.9714, 1.0357]  verdict fail (1 group(s) pooled)
+FREEZE.json written: /Volumes/XOffsetCS/perf-gate/runs/2026-11-03-ckpt8-5433b4e
+  head         15a0bede15dcde1f531914e046ce838e7258d927eb1bca9fbe23e725a0bb4340
+  head_aa      15a0bede15dcde1f531914e046ce838e7258d927eb1bca9fbe23e725a0bb4340
+  anchor       6eece9b8d14ba644f0f87c9cb62e74005223d07bba4dddca6efb09145c553051
+  r3           328d8872af63eceee99c9f3c529dae5bce69eba67de6515ef1463a6f4fd883a9
+  cista        1cffe48e6c9b3cc961943a26ff8b361b2e63e9dcc779c138557686af922b4f9c
+  flatbuffers  51e053ddd6afe1652771ba49d3243fa25f367e8a959c90243e004e1ee37ec4b7
+  capnproto    e528cb3cbb42b49780398f164192ff41a1dbdfd983580c79ad5d3cb31e5639bc
+  cereal       4d65fc64843c0c469ca90c76e14e792ba5ccf3c01eb066bf6aff44eafbcf600f
+  bisect 583d85de0f05 reload zero watermark, adaptive D6 regrow step, member swap (edae8c26 + its bench MANIFEST); the last range holds adf72e50 1480b62b 0ce5897d 5433b4eb (reload zero tail): deferred (built when the bisection reaches it)
+== formal-1 start 2026-11-03T02:15:10+00:00 {'waited_s': 241.0, 'load1': 2.27, 'quiet_s': 241.0, 'screen': {'WindowServer': 43.7, 'UURemoteServer': 15.8, 'parsecd': 0.0}, 'remote_active': ['UURemoteServer'], 'screen_over': ['WindowServer'], 'screen_gated': False}
+formal-1: this batch alone: max UB head/anchor 1.0045, A/A ok True, old 11/12, cpu {'samples': 217, 'other_busy_samples': 26, 'compile_samples': 0, 'other_busy_top': {'WindowServer': 19, 'duetexpertd': 2, 'Codex (Renderer)': 2, 'launchd': 2, 'deleted': 1}, 'chrome_busy_mean': 0, 'chrome_busy_max': 0, 'load1_max': 2.62}  (the gate verdict needs the pooled batches: run analyze)
+== formal-2 start 2026-11-03T02:26:33+00:00 {'waited_s': 241.2, 'load1': 1.13, 'quiet_s': 241.1, 'screen': {'WindowServer': 1.7, 'UURemoteServer': 8.3, 'parsecd': 0.0}, 'remote_active': ['UURemoteServer'], 'screen_over': [], 'screen_gated': False}
+formal-2: this batch alone: max UB head/anchor 1.0204, A/A ok True, old 11/12, cpu {'samples': 205, 'other_busy_samples': 13, 'compile_samples': 0, 'other_busy_top': {'WindowServer': 8, 'duetexpertd': 2, 'runningboardd': 1, 'PerfPowerServices': 1, 'WallpaperAerialsExtension': 1}, 'chrome_busy_mean': 0, 'chrome_busy_max': 0, 'load1_max': 3.22}  (the gate verdict needs the pooled batches: run analyze)
+RESULT.json / RESULT.md written: verdict incomplete
+== slg start 2026-11-03T02:37:31+00:00 {'waited_s': 240.9, 'load1': 2.55, 'quiet_s': 240.9, 'screen': {'WindowServer': 42.4, 'UURemoteServer': 18.3, 'parsecd': 0.0}, 'remote_active': ['UURemoteServer'], 'screen_over': ['WindowServer'], 'screen_gated': False}
+run 1/12 head: 6.3 s rc=0
+run 2/12 anch: 4.8 s rc=0
+run 3/12 anch: 4.2 s rc=0
+run 4/12 head: 4.2 s rc=0
+run 5/12 head: 4.2 s rc=0
+run 6/12 anch: 4.2 s rc=0
+run 7/12 anch: 4.2 s rc=0
+run 8/12 head: 4.2 s rc=0
+run 9/12 head: 4.2 s rc=0
+run 10/12 anch: 4.2 s rc=0
+run 11/12 anch: 4.2 s rc=0
+run 12/12 head: 4.2 s rc=0
+slg: A 0.9884 [0.9694, 1.0077]  B 1.0049 [0.9938, 1.0161]  C 1.0048 [0.9666, 1.0444]  D 0.9988 [0.9827, 1.0151]  verdict fail (1 group(s) pooled)
+RESULT.json / RESULT.md written: verdict fail
+RESULT.json / RESULT.md written: verdict fail
+AUTO /Volumes/XOffsetCS/perf-gate/runs/2026-11-03-ckpt8-5433b4e: verdict fail
+BUILD 583d85de0f05f0cb5b34709287d2f1626e8a39de reload zero watermark, adaptive D6 regrow step, member swap (edae8c26 + its bench MANIFEST); the last range holds adf72e50 1480b62b 0ce5897d 5433b4eb (reload zero tail); then: bisect-supply /Volumes/XOffsetCS/perf-gate/runs/2026-11-03-ckpt8-5433b4e 583d85de0f05f0cb5b34709287d2f1626e8a39de SC WIRE SLG; then: bisect /Volumes/XOffsetCS/perf-gate/runs/2026-11-03-ckpt8-5433b4e
+AUTO bisect: build -> build 583d85de0f05f0cb5b34709287d2f1626e8a39de
+CKPT8 L2 rc=15 (0 pass, 10 fail, 11 pending, 12 invalid, 13 incomplete, 14 n/a, 15 fail: bisection after GATED, other = stopped)
+== 2026-11-03T02:42:26Z 5b. GATED
+head six formats: cycle 0 xoffset      state=ddb6224bbbcecad3 reports=37196452043336; bytes [1166 2358 12964 842240 712]
+anc six formats: cycle 0 xoffset      state=ddb6224bbbcecad3 reports=37196452043336; bytes [1166 2358 12964 842240 712]
+== 2026-11-03T03:04:53Z 5c. GATED analysis
+== 2026-11-03T03:04:56Z 5c. GATED ABC pending: 6 more ABBA blocks
+## head: xoffset ÷ 基线，场景合计（24 个进程，每个 40 个周期）
+
+进程级几何均值 / 单侧 95% 上界（Bonferroni k=20，df=23）。G8 看 A、B、C 对 zpp_bits 和 cista 的这个上界是否 ≤1.0。
+
+| 场景 | zpp_bits | cista | cereal | protobuf | flatbuffers |
+| --- | --- | --- | --- | --- | --- |
+| A | 0.769 / 0.773 | 0.289 / 0.291 | 0.239 / 0.241 | 0.095 / 0.096 | 0.324 / 0.325 |
+| B | 0.257 / 0.259 | 0.250 / 0.251 | 0.132 / 0.132 | 0.068 / 0.069 | 0.175 / 0.176 |
+| C | 0.389 / 0.393 | 0.224 / 0.228 | 0.105 / 0.107 | 0.065 / 0.066 | 0.257 / 0.261 |
+| D | 1.055 / 1.062 | 0.237 / 0.238 | 0.226 / 0.227 | 0.345 / 0.346 | 0.921 / 0.927 |
+
+同一组数据的另两种上界（只报）：全部周期合并后的上界（S1 口径用在更多数据上）；单个进程按 S1 口径算出的上界里最大的一个。每格是逐周期比值的中位数 / 合并上界 / 单进程最大上界。
+
+| 场景 | zpp_bits | cista | cereal | protobuf | flatbuffers |
+| --- | --- | --- | --- | --- | --- |
+| A | 0.754 / 0.777 / 0.837 | 0.278 / 0.293 / 0.317 | 0.230 / 0.243 / 0.264 | 0.091 / 0.097 / 0.106 | 0.310 / 0.328 / 0.353 |
+| B | 0.255 / 0.259 / 0.284 | 0.251 / 0.251 / 0.266 | 0.131 / 0.132 / 0.145 | 0.067 / 0.069 / 0.075 | 0.173 / 0.176 / 0.184 |
+| C | 0.396 / 0.393 / 0.446 | 0.224 / 0.226 / 0.256 | 0.106 / 0.106 / 0.122 | 0.066 / 0.066 / 0.074 | 0.263 / 0.260 / 0.288 |
+| D | 1.062 / 1.062 / 1.146 | 0.262 / 0.242 / 0.267 | 0.252 / 0.231 / 0.263 | 0.388 / 0.354 / 0.397 | 0.952 / 0.932 / 1.001 |
+
+### head: 各阶段 xoffset ÷ zpp_bits（只报）
+
+每个进程取各阶段 40 个周期的中位数（µs）和逐周期 log 比值的均值；表里是进程间的中位数、几何均值和单侧 95% 上界（不做多重校正）。
+
+| 阶段 | xoffset µs | zpp_bits µs | 逐周期比值中位数 | 几何均值 | 上界 | Δ µs/周期 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| A.apply | 108.3 | 48.4 | 2.273 | 2.346 | 2.368 | +59.9 |
+| A.cleanup | 6.6 | 6.3 | 1.038 | 1.039 | 1.045 | +0.3 |
+| A.req_decode | 57.7 | 192.8 | 0.303 | 0.304 | 0.306 | -135.1 |
+| A.req_encode | 209.9 | 244.1 | 0.861 | 0.884 | 0.889 | -34.2 |
+| A.res_decode | 80.1 | 139.8 | 0.573 | 0.577 | 0.581 | -59.7 |
+| A.res_encode | 26.2 | 98.6 | 0.266 | 0.271 | 0.271 | -72.4 |
+| A.simulate | 115.1 | 86.8 | 1.309 | 1.310 | 1.314 | +28.2 |
+| B.back_decode | 413.5 | 1921.6 | 0.218 | 0.219 | 0.221 | -1508.0 |
+| B.back_encode | 65.5 | 298.4 | 0.222 | 0.223 | 0.225 | -232.9 |
+| B.cleanup | 3.6 | 3.6 | 0.999 | 1.003 | 1.009 | -0.0 |
+| B.in_decode | 264.0 | 1996.5 | 0.133 | 0.135 | 0.135 | -1732.5 |
+| B.out_encode | 198.5 | 935.3 | 0.213 | 0.213 | 0.216 | -736.8 |
+| B.season_edits | 514.7 | 762.6 | 0.680 | 0.690 | 0.691 | -247.9 |
+| B.writeback | 37.1 | 9.8 | 3.732 | 3.626 | 3.675 | +27.3 |
+| C.cleanup | 0.0 | 0.0 | 1.000 | 0.998 | 1.001 | +0.0 |
+| C.replace | 0.2 | 0.1 | 1.672 | 1.800 | 1.965 | +0.1 |
+| C.restore | 49.8 | 333.0 | 0.149 | 0.150 | 0.151 | -283.2 |
+| C.snapshot | 44.3 | 73.8 | 0.597 | 0.544 | 0.547 | -29.5 |
+| C.snapshot2 | 34.0 | 52.4 | 0.662 | 0.567 | 0.573 | -18.3 |
+| C.ticks | 128.7 | 183.4 | 0.694 | 0.698 | 0.702 | -54.7 |
+| D.read | 67.2 | 62.7 | 1.062 | 1.055 | 1.059 | +4.5 |
+| S.ticks_middle | 1188.5 | 1847.1 | 0.643 | 0.644 | 0.647 | -658.5 |
+
+### head: 各阶段 xoffset ÷ cista（只报）
+
+每个进程取各阶段 40 个周期的中位数（µs）和逐周期 log 比值的均值；表里是进程间的中位数、几何均值和单侧 95% 上界（不做多重校正）。
+
+| 阶段 | xoffset µs | cista µs | 逐周期比值中位数 | 几何均值 | 上界 | Δ µs/周期 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| A.apply | 108.3 | 47.2 | 2.298 | 2.473 | 2.499 | +61.1 |
+| A.cleanup | 6.6 | 6.7 | 0.976 | 0.978 | 0.983 | -0.1 |
+| A.req_decode | 57.7 | 533.6 | 0.109 | 0.110 | 0.110 | -475.9 |
+| A.req_encode | 209.9 | 644.3 | 0.326 | 0.326 | 0.328 | -434.4 |
+| A.res_decode | 80.1 | 546.9 | 0.148 | 0.149 | 0.150 | -466.8 |
+| A.res_encode | 26.2 | 293.0 | 0.090 | 0.090 | 0.090 | -266.8 |
+| A.simulate | 115.1 | 117.7 | 0.984 | 0.983 | 0.986 | -2.7 |
+| B.back_decode | 413.5 | 1676.3 | 0.248 | 0.248 | 0.249 | -1262.7 |
+| B.back_encode | 65.5 | 770.6 | 0.086 | 0.086 | 0.087 | -705.1 |
+| B.cleanup | 3.6 | 4.0 | 0.926 | 0.927 | 0.934 | -0.3 |
+| B.in_decode | 264.0 | 1676.9 | 0.157 | 0.157 | 0.157 | -1412.9 |
+| B.out_encode | 198.5 | 811.5 | 0.242 | 0.239 | 0.241 | -613.0 |
+| B.season_edits | 514.7 | 1061.0 | 0.487 | 0.494 | 0.495 | -546.3 |
+| B.writeback | 37.1 | 3.8 | 9.691 | 9.410 | 9.470 | +33.2 |
+| C.cleanup | 0.0 | 0.0 | 1.000 | 1.002 | 1.006 | +0.0 |
+| C.replace | 0.2 | 0.0 | 4.976 | 4.749 | 4.902 | +0.2 |
+| C.restore | 49.8 | 488.2 | 0.101 | 0.102 | 0.103 | -438.5 |
+| C.snapshot | 44.3 | 258.2 | 0.169 | 0.156 | 0.158 | -213.9 |
+| C.snapshot2 | 34.0 | 248.3 | 0.135 | 0.118 | 0.120 | -214.3 |
+| C.ticks | 128.7 | 117.6 | 1.090 | 1.085 | 1.088 | +11.1 |
+| D.read | 67.2 | 254.8 | 0.262 | 0.237 | 0.237 | -187.6 |
+| S.ticks_middle | 1188.5 | 8301.4 | 0.142 | 0.142 | 0.143 | -7112.9 |
+
+## anc: xoffset ÷ 基线，场景合计（24 个进程，每个 40 个周期）
+
+进程级几何均值 / 单侧 95% 上界（Bonferroni k=20，df=23）。G8 看 A、B、C 对 zpp_bits 和 cista 的这个上界是否 ≤1.0。
+
+| 场景 | zpp_bits | cista | cereal | protobuf | flatbuffers |
+| --- | --- | --- | --- | --- | --- |
+| A | 0.776 / 0.779 | 0.292 / 0.294 | 0.239 / 0.240 | 0.096 / 0.097 | 0.327 / 0.330 |
+| B | 0.255 / 0.258 | 0.250 / 0.252 | 0.130 / 0.132 | 0.068 / 0.069 | 0.174 / 0.176 |
+| C | 0.391 / 0.398 | 0.224 / 0.229 | 0.107 / 0.109 | 0.065 / 0.067 | 0.257 / 0.262 |
+| D | 1.046 / 1.050 | 0.235 / 0.236 | 0.224 / 0.225 | 0.342 / 0.343 | 0.917 / 0.925 |
+
+同一组数据的另两种上界（只报）：全部周期合并后的上界（S1 口径用在更多数据上）；单个进程按 S1 口径算出的上界里最大的一个。每格是逐周期比值的中位数 / 合并上界 / 单进程最大上界。
+
+| 场景 | zpp_bits | cista | cereal | protobuf | flatbuffers |
+| --- | --- | --- | --- | --- | --- |
+| A | 0.760 / 0.784 / 0.845 | 0.282 / 0.296 / 0.319 | 0.230 / 0.243 / 0.266 | 0.091 / 0.097 / 0.107 | 0.315 / 0.332 / 0.363 |
+| B | 0.251 / 0.257 / 0.291 | 0.250 / 0.251 / 0.277 | 0.129 / 0.131 / 0.146 | 0.067 / 0.069 / 0.077 | 0.172 / 0.176 / 0.198 |
+| C | 0.397 / 0.396 / 0.486 | 0.223 / 0.226 / 0.277 | 0.107 / 0.108 / 0.134 | 0.066 / 0.066 / 0.073 | 0.261 / 0.260 / 0.320 |
+| D | 1.054 / 1.051 / 1.101 | 0.260 / 0.240 / 0.266 | 0.248 / 0.229 / 0.255 | 0.383 / 0.350 / 0.392 | 0.942 / 0.928 / 0.994 |
+
+### anc: 各阶段 xoffset ÷ zpp_bits（只报）
+
+每个进程取各阶段 40 个周期的中位数（µs）和逐周期 log 比值的均值；表里是进程间的中位数、几何均值和单侧 95% 上界（不做多重校正）。
+
+| 阶段 | xoffset µs | zpp_bits µs | 逐周期比值中位数 | 几何均值 | 上界 | Δ µs/周期 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| A.apply | 113.6 | 48.6 | 2.352 | 2.410 | 2.430 | +65.0 |
+| A.cleanup | 6.6 | 6.4 | 1.045 | 1.042 | 1.048 | +0.3 |
+| A.req_decode | 57.5 | 193.0 | 0.301 | 0.302 | 0.303 | -135.5 |
+| A.req_encode | 210.6 | 243.8 | 0.865 | 0.884 | 0.888 | -33.2 |
+| A.res_decode | 79.2 | 140.4 | 0.567 | 0.571 | 0.574 | -61.3 |
+| A.res_encode | 26.3 | 98.4 | 0.267 | 0.272 | 0.273 | -72.2 |
+| A.simulate | 118.1 | 86.8 | 1.349 | 1.348 | 1.352 | +31.3 |
+| B.back_decode | 411.1 | 1935.0 | 0.214 | 0.217 | 0.218 | -1523.8 |
+| B.back_encode | 63.4 | 299.5 | 0.213 | 0.211 | 0.212 | -236.1 |
+| B.cleanup | 3.6 | 3.6 | 1.010 | 1.007 | 1.015 | +0.0 |
+| B.in_decode | 263.0 | 1996.5 | 0.131 | 0.135 | 0.137 | -1733.5 |
+| B.out_encode | 196.9 | 917.7 | 0.211 | 0.212 | 0.213 | -720.8 |
+| B.season_edits | 513.8 | 761.1 | 0.678 | 0.688 | 0.689 | -247.3 |
+| B.writeback | 37.0 | 9.9 | 3.743 | 3.619 | 3.639 | +27.2 |
+| C.cleanup | 0.0 | 0.0 | 1.000 | 1.000 | 1.003 | +0.0 |
+| C.replace | 0.2 | 0.1 | 1.976 | 1.729 | 1.890 | +0.1 |
+| C.restore | 49.6 | 330.0 | 0.149 | 0.151 | 0.153 | -280.4 |
+| C.snapshot | 43.9 | 73.2 | 0.597 | 0.544 | 0.548 | -29.3 |
+| C.snapshot2 | 33.8 | 52.3 | 0.650 | 0.563 | 0.571 | -18.5 |
+| C.ticks | 129.6 | 182.9 | 0.701 | 0.705 | 0.709 | -53.3 |
+| D.read | 66.8 | 63.0 | 1.054 | 1.046 | 1.048 | +3.8 |
+| S.ticks_middle | 1194.4 | 1845.8 | 0.644 | 0.644 | 0.647 | -651.3 |
+
+### anc: 各阶段 xoffset ÷ cista（只报）
+
+每个进程取各阶段 40 个周期的中位数（µs）和逐周期 log 比值的均值；表里是进程间的中位数、几何均值和单侧 95% 上界（不做多重校正）。
+
+| 阶段 | xoffset µs | cista µs | 逐周期比值中位数 | 几何均值 | 上界 | Δ µs/周期 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| A.apply | 113.6 | 45.8 | 2.480 | 2.584 | 2.605 | +67.8 |
+| A.cleanup | 6.6 | 6.8 | 0.974 | 0.977 | 0.982 | -0.1 |
+| A.req_decode | 57.5 | 533.8 | 0.108 | 0.109 | 0.109 | -476.2 |
+| A.req_encode | 210.6 | 640.2 | 0.328 | 0.327 | 0.330 | -429.6 |
+| A.res_decode | 79.2 | 547.1 | 0.146 | 0.147 | 0.148 | -467.9 |
+| A.res_encode | 26.3 | 291.2 | 0.091 | 0.091 | 0.091 | -264.9 |
+| A.simulate | 118.1 | 116.5 | 1.012 | 1.010 | 1.016 | +1.6 |
+| B.back_decode | 411.1 | 1677.8 | 0.246 | 0.247 | 0.248 | -1266.7 |
+| B.back_encode | 63.4 | 769.2 | 0.083 | 0.083 | 0.083 | -705.8 |
+| B.cleanup | 3.6 | 3.9 | 0.930 | 0.927 | 0.935 | -0.3 |
+| B.in_decode | 263.0 | 1683.3 | 0.156 | 0.158 | 0.160 | -1420.3 |
+| B.out_encode | 196.9 | 808.1 | 0.242 | 0.240 | 0.242 | -611.2 |
+| B.season_edits | 513.8 | 1063.8 | 0.485 | 0.492 | 0.493 | -550.0 |
+| B.writeback | 37.0 | 3.7 | 9.761 | 9.646 | 9.730 | +33.3 |
+| C.cleanup | 0.0 | 0.0 | 1.000 | 1.003 | 1.006 | +0.0 |
+| C.replace | 0.2 | 0.0 | 4.952 | 4.378 | 4.502 | +0.2 |
+| C.restore | 49.6 | 493.1 | 0.100 | 0.102 | 0.103 | -443.6 |
+| C.snapshot | 43.9 | 258.2 | 0.166 | 0.155 | 0.158 | -214.3 |
+| C.snapshot2 | 33.8 | 246.9 | 0.134 | 0.118 | 0.120 | -213.0 |
+| C.ticks | 129.6 | 119.7 | 1.077 | 1.071 | 1.077 | +9.8 |
+| D.read | 66.8 | 254.6 | 0.260 | 0.235 | 0.236 | -187.8 |
+| S.ticks_middle | 1194.4 | 8302.9 | 0.142 | 0.142 | 0.143 | -7108.4 |
+
+## head ÷ anc：xoffset 场景合计（进程级，Welch 双侧 95% k=4，只报）
+
+| 场景 | head÷anc | 区间 |
+| --- | --- | --- |
+| A | 0.9915 | [0.9834, 0.9997] |
+| B | 1.0038 | [0.9959, 1.0119] |
+| C | 0.9956 | [0.9695, 1.0225] |
+| D | 1.0054 | [1.0001, 1.0106] |
+
+## head ÷ anc：xoffset 各阶段（进程级，Welch 双侧 95%，不做多重校正，只报）
+
+| 阶段 | head µs | anc µs | head÷anc | 区间 | Δ µs/周期 |
+| --- | ---: | ---: | ---: | --- | ---: |
+| A.apply | 108.3 | 113.6 | 0.9702 | [0.9555, 0.9850] | -5.3 |
+| A.cleanup | 6.6 | 6.6 | 0.9962 | [0.9896, 1.0029] | -0.0 |
+| A.req_decode | 57.7 | 57.5 | 1.0072 | [0.9988, 1.0156] | +0.2 |
+| A.req_encode | 209.9 | 210.6 | 1.0017 | [0.9918, 1.0117] | -0.7 |
+| A.res_decode | 80.1 | 79.2 | 1.0086 | [1.0000, 1.0172] | +0.9 |
+| A.res_encode | 26.2 | 26.3 | 0.9957 | [0.9914, 1.0000] | -0.1 |
+| A.simulate | 115.1 | 118.1 | 0.9747 | [0.9713, 0.9781] | -3.1 |
+| B.back_decode | 413.5 | 411.1 | 1.0045 | [0.9939, 1.0153] | +2.4 |
+| B.back_encode | 65.5 | 63.4 | 1.0503 | [1.0357, 1.0650] | +2.1 |
+| B.cleanup | 3.6 | 3.6 | 1.0119 | [1.0037, 1.0202] | +0.0 |
+| B.in_decode | 264.0 | 263.0 | 0.9938 | [0.9740, 1.0140] | +1.0 |
+| B.out_encode | 198.5 | 196.9 | 1.0039 | [0.9874, 1.0206] | +1.6 |
+| B.season_edits | 514.7 | 513.8 | 1.0043 | [1.0013, 1.0073] | +0.9 |
+| B.writeback | 37.1 | 37.0 | 1.0030 | [0.9967, 1.0092] | +0.1 |
+| C.cleanup | 0.0 | 0.0 | 0.9995 | [0.9979, 1.0011] | +0.0 |
+| C.replace | 0.2 | 0.2 | 1.0552 | [1.0303, 1.0808] | +0.0 |
+| C.restore | 49.8 | 49.6 | 0.9951 | [0.9780, 1.0125] | +0.2 |
+| C.snapshot | 44.3 | 43.9 | 1.0047 | [0.9779, 1.0322] | +0.4 |
+| C.snapshot2 | 34.0 | 33.8 | 1.0066 | [0.9826, 1.0311] | +0.2 |
+| C.ticks | 128.7 | 129.6 | 0.9918 | [0.9722, 1.0118] | -0.9 |
+| D.read | 67.2 | 66.8 | 1.0054 | [1.0013, 1.0094] | +0.4 |
+| S.ticks_middle | 1188.5 | 1194.4 | 0.9997 | [0.9895, 1.0101] | -5.9 |
+
+## head ÷ anc：A/B/C 不退判定（每周期 xoffset ÷ 同周期五家几何均值，进程级 Welch 双侧 95% k=4）
+
+A、B、C 最大上界 ≤1.02 通过；>1.03 失败；之间待定（已是加跑后的全部进程：>1.02 即失败）。D 只报。
+
+| 场景 | head÷anc | 区间 | 进程 head / anc |
+| --- | --- | --- | --- |
+| A | 0.9928 | [0.9864, 0.9991] | 24 / 24 |
+| B | 1.0046 | [0.9956, 1.0136] | 24 / 24 |
+| C | 0.9955 | [0.9751, 1.0163] | 24 / 24 |
+| D | 1.0076 | [1.0033, 1.0119] | 24 / 24 |
+
+ABC: pass (max upper bound 1.0163; A 0.9991, B 1.0136, C 1.0163; 24 / 24 processes)
+
+GATE_D: head D÷flatbuffers 0.921 / 0.927 (O4 upper bound <= 1.0: met), D÷zpp_bits 1.055 / 1.062, D.read 67.2 µs; anc D÷flatbuffers 0.917 / 0.925, D÷zpp_bits 1.046 / 1.050, D.read 66.8 µs
+
+G8: met
+GATED: ABC: pass (max upper bound 1.0163; A 0.9991, B 1.0136, C 1.0163; 24 / 24 processes); GATE_D: head D÷flatbuffers 0.921 / 0.927 (O4 upper bound <= 1.0: met), D÷zpp_bits 1.055 / 1.062, D.read 67.2 µs; anc D÷flatbuffers 0.917 / 0.925, D÷zpp_bits 1.046 / 1.050, D.read 66.8 µs; G8 met
+== 2026-11-03T03:33:10Z 5e. bisection (prebuilt points)
+== 2026-11-03T03:33:10Z bisection of 2026-11-03-ckpt8-5433b4e reached 583d85de0f05: build it
+c583d85d 583d85de0f05f0cb5b34709287d2f1626e8a39de tree 21a88bfaa4c42551c97d2e7fe45851bb93a89f7d typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+NOTE 583d85de0f05: M input wire 89fd02d2d36fce705cc519d1a6a6298ff23e595c01fb01211e360d6249d2edcc (head 89fd02d2d36fce705cc519d1a6a6298ff23e595c01fb01211e360d6249d2edcc, anchor 89fd02d2d36fce705cc519d1a6a6298ff23e595c01fb01211e360d6249d2edcc; the step uses its own wire)
+supplied 583d85de0f05 reload zero watermark, adaptive D6 regrow step, member swap (edae8c26 + its bench MANIFEST); the last range holds adf72e50 1480b62b 0ce5897d 5433b4eb (reload zero tail): formal 33ea555ed5ac slg e3c6228992d6 wire 89fd02d2d36f
+FREEZE.json written: /Volumes/XOffsetCS/perf-gate/runs/2026-11-03-ckpt8-5433b4e/bisect-1
+  head         33ea555ed5acba97f21561cff64b218f715e67fc1d749ec3cf22a35d9e1be981
+  head_aa      33ea555ed5acba97f21561cff64b218f715e67fc1d749ec3cf22a35d9e1be981
+  anchor       6eece9b8d14ba644f0f87c9cb62e74005223d07bba4dddca6efb09145c553051
+  r3           328d8872af63eceee99c9f3c529dae5bce69eba67de6515ef1463a6f4fd883a9
+  cista        1cffe48e6c9b3cc961943a26ff8b361b2e63e9dcc779c138557686af922b4f9c
+  flatbuffers  51e053ddd6afe1652771ba49d3243fa25f367e8a959c90243e004e1ee37ec4b7
+  capnproto    e528cb3cbb42b49780398f164192ff41a1dbdfd983580c79ad5d3cb31e5639bc
+  cereal       4d65fc64843c0c469ca90c76e14e792ba5ccf3c01eb066bf6aff44eafbcf600f
+NEXT bisection step 1 (reload zero watermark, adaptive D6 regrow step, member swap (edae8c26 + its bench MANIFEST); the last range holds adf72e50 1480b62b 0ce5897d 5433b4eb (reload zero tail) 583d85de0f05): slg /Volumes/XOffsetCS/perf-gate/runs/2026-11-03-ckpt8-5433b4e/bisect-1; then: bisect /Volumes/XOffsetCS/perf-gate/runs/2026-11-03-ckpt8-5433b4e
+== slg start 2026-11-03T03:33:16+00:00 {'waited_s': 241.0, 'load1': 2.52, 'quiet_s': 240.9, 'screen': {'WindowServer': 40.1, 'UURemoteServer': 17.4, 'parsecd': 0.0}, 'remote_active': ['UURemoteServer'], 'screen_over': ['WindowServer'], 'screen_gated': False}
+run 1/12 head: 6.3 s rc=0
+run 2/12 anch: 4.8 s rc=0
+run 3/12 anch: 4.2 s rc=0
+run 4/12 head: 4.3 s rc=0
+run 5/12 head: 4.5 s rc=0
+run 6/12 anch: 4.2 s rc=0
+run 7/12 anch: 4.3 s rc=0
+run 8/12 head: 4.3 s rc=0
+run 9/12 head: 4.5 s rc=0
+run 10/12 anch: 4.2 s rc=0
+run 11/12 anch: 4.2 s rc=0
+run 12/12 head: 4.3 s rc=0
+slg: A 0.9938 [0.9642, 1.0244]  B 1.0016 [0.9653, 1.0393]  C 1.0024 [0.9752, 1.0305]  D 1.0371 [1.0215, 1.0530]  verdict fail (1 group(s) pooled)
+DONE culprit 583d85de0f05f0cb5b34709287d2f1626e8a39de reload zero watermark, adaptive D6 regrow step, member swap (edae8c26 + its bench MANIFEST); the last range holds adf72e50 1480b62b 0ce5897d 5433b4eb (reload zero tail)
+AUTO bisect: culprit -> 583d85de0f05f0cb5b34709287d2f1626e8a39de reload zero watermark, adaptive D6 regrow step, member swap (edae8c26 + its bench MANIFEST); the last range holds adf72e50 1480b62b 0ce5897d 5433b4eb (reload zero tail)
+CKPT8 L2 after the bisection rc=10
+== 2026-11-03T03:38:11Z 5f. demo case set (report only)
+head demo: cycle 0 xoffset      state=457a5cd859944ada reports=1591138187572627380
+anc demo: cycle 0 xoffset      state=457a5cd859944ada reports=1591138187572627380
+demo case set (report only): 4 ABBA blocks, 8 processes per point, 21 cycles; raw in demo_run.tar.gz, judged in the cloud
+== 2026-11-03T03:51:36Z 5g. v3 demo cases (report only)
+v3 demo cases (report only): 4 ABBA blocks, 8 processes per point, 21 cycles; raw in v3a_run.tar.gz, judged in the cloud
+== 2026-11-03T04:45:11Z 6. G9R: not in this batch
+G9R: not in this batch
+screen watcher: 85 calls (dark.log)
+== 2026-11-03T04:45:11Z 7. ctest
+head: 100% tests passed out of 167 (rc 0)
+== 2026-11-03T04:47:38Z finish rc=10

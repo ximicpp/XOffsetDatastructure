@@ -1,0 +1,20 @@
+2026-11-03T03:54:38Z v3 block 1 start: waited 180s load 1.29 WindowServer 2% (gated 0) remote 6
+2026-11-03T03:56:09Z v3 process 1 (head) done
+2026-11-03T03:57:37Z v3 process 2 (anc) done
+2026-11-03T03:59:08Z v3 process 3 (anc) done
+2026-11-03T04:00:41Z v3 process 4 (head) done
+2026-11-03T04:15:40Z v3 block 2 start: waited 890s load 2.64 WindowServer 44.5% (gated 0) remote 6
+2026-11-03T04:17:25Z v3 process 5 (anc) done
+2026-11-03T04:19:01Z v3 process 6 (head) done
+2026-11-03T04:20:43Z v3 process 7 (head) done
+2026-11-03T04:22:26Z v3 process 8 (anc) done
+2026-11-03T04:29:20Z v3 block 3 start: waited 410s load 1.94 WindowServer 15.5% (gated 0) remote 4
+2026-11-03T04:30:54Z v3 process 9 (head) done
+2026-11-03T04:32:24Z v3 process 10 (anc) done
+2026-11-03T04:34:02Z v3 process 11 (anc) done
+2026-11-03T04:35:38Z v3 process 12 (head) done
+2026-11-03T04:39:00Z v3 block 4 start: waited 200s load 1.72 WindowServer 4.8% (gated 0) remote 4
+2026-11-03T04:40:33Z v3 process 13 (anc) done
+2026-11-03T04:42:05Z v3 process 14 (head) done
+2026-11-03T04:43:37Z v3 process 15 (head) done
+2026-11-03T04:45:11Z v3 process 16 (anc) done
