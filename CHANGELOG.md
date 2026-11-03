@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- `root<T>()` on a cold buffer reads one cache line: its cache is two
+  words (root type, root pointer) aligned to 16 bytes, and every epoch
+  change clears it, instead of four words (with the root's epoch and the
+  buffer's) that straddled a line for 3 of 8 placements of an `XBuffer`
+  in a `std::vector`. `alignof(XBufferCore)` (and `XBuffer`) is now 16;
+  `sizeof` is unchanged. Last-level read misses (cache simulation), GCC 16:
+  slg UP.apply -1.9% (about one per three deliveries); instructions
+  A.apply -1.5%, UP.apply -0.5%.
 - Wire validation off the cursor path: a live block within one bitmap word
   that meets nothing is marked directly in the out-of-line registration
   (no second call, no saved registers); the first block off the cursor,
