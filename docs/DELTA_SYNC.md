@@ -209,28 +209,38 @@ another state than the replica holds, or the replica holds no key delta) and
 ## 3. What the receiver checks
 
 The result must pass exactly what `load_verified<T>` checks of a wire of the
-same payload. A key delta, and any delta that changes `used_end`, the root or
-the hole table, is verified in full (`key`, `full`). For the others the
-receiver keeps, next to the cursor, a map of the bytes verification reads (per
-64-byte block, one bit per byte): container heads, heap string terminators,
-set and map keys with everything they reach, bools, the length and padding of
-inline strings, the heads of empty strings. Every other byte of a verified payload may take any value
-without changing what verification visits or decides. So:
+same payload. A key delta, and any delta that changes the root, is verified in
+full (`key`, `full`). For the others the receiver keeps, next to the cursor, a
+map of the bytes verification reads (per 64-byte block, one bit per byte):
+container heads, heap string terminators, set and map keys with everything
+they reach, bools, the length and padding of inline strings, the heads of
+empty strings; and a map of the live blocks (one bit per 8 bytes: the arena
+header, the root and every container block). Every other byte of a verified
+payload may take any value without changing what verification visits or
+decides. So:
 
 - **`none`**: the delta writes no byte the map marks (scalars, vector elements
-  of plain types, map values, inline characters, free bytes). Nothing is
-  checked; no undo copy is kept.
+  of plain types, map values, inline characters, free bytes) and keeps
+  `used_end` and the hole table. Nothing is checked; no undo copy is kept.
 - **`in_place`**: the marked bytes it writes are bools (0 or 1), inline or
   empty string heads (still inline, length at most 10, zero padding; or all
-  zero), sizes of vectors of
-  plain elements (at most the capacity), or the head and block of a heap
-  string, set or map of plain elements whose capacity and block stay (the
+  zero), sizes of vectors of plain elements (at most the capacity), or the
+  heads and blocks of heap strings, sets or maps of plain elements (the
   terminator in place; keys strictly ordered). Those are checked one by one.
-- **`full`**: anything else (a block or capacity that changed, a vector of
-  records that grew, a marked byte no in-place check covers), and any delta
-  whose in-place check fails: the whole verification then decides, so a delta
-  is accepted or rejected, with the same error, exactly as a whole
-  verification would.
+  A heap string, vector of plain elements, set or map of plain elements whose
+  capacity or block changed (it moved, got its first block, or lost it), and a
+  string head that left or entered the inline or empty form, is checked on its
+  own the same way, and its new block against the map of live blocks: inside
+  the payload, 8-aligned, overlapping no live block once the blocks this delta
+  frees are taken out. With a new `used_end` or hole table, or any such
+  change, the hole table (the delta's, or the replica's when the delta carries
+  none) must tile the rest: every hole valid and in no live block, live and
+  hole bytes adding up to `used_end`. That is the coverage the whole
+  verification checks, without walking the payload.
+- **`full`**: anything else (the root moved, a vector of records that grew or
+  moved, a marked byte no in-place check covers), and any delta whose in-place
+  check fails: the whole verification then decides, so a delta is accepted or
+  rejected, with the same error, exactly as a whole verification would.
 
 The map holds for the buffer state it was built with; a buffer that was
 moved, reloaded, reset, swapped, grown into new storage, or that allocated or
@@ -304,12 +314,14 @@ changed bytes gathered by their masks (one byte shuffle per 8-byte word:
 SSSE3 when the CPU has it, NEON on AArch64, byte by byte elsewhere); with
 `digest`, one hash pass. Receiver, per delta: the header and section checks,
 the bytes scattered by their masks, then the check of section 3: for `none`
-nothing more, for `in_place` an undo copy and the checks of the bytes written,
-for `full` the whole verification (proportional to the payload; the map is
+nothing more, for `in_place` an undo copy and the checks of the bytes written
+(for a moved container, its block's bits in the live map and a pass over the
+hole table), for `full` the whole verification (proportional to the payload; the map is
 rebuilt, also proportional, when a later delta needs it); with `digest`, one
-hash pass. The receiver's map takes 28 bytes
-per 64-byte block of payload (24 for the bits, 4 for the node index), plus
-about 64 bytes per heap string, set or map of plain elements; the sender's
+hash pass. The receiver's maps take 29 bytes
+per 64-byte block of payload (24 for the bits, 4 for the node index, 1 for the
+live blocks), plus about 64 bytes per heap string, vector, set or map of plain
+elements; the sender's
 touch log 384 bytes plus, once two baselines pair with it or a delta
 touches more than 24 blocks, 4 bytes per block. The scratch a delta needs while it is applied
 (a copy of a small delta, the old bytes it overwrites, its block list and
@@ -331,6 +343,6 @@ bytes.
 
 - Moved data is not detected (an erase from the middle sends the shifted
   tail).
-- A change of a block, capacity, `used_end` or the hole table is verified over
-  the whole payload, not over the changed part only.
+- A vector of records (elements with strings, containers or bools) that moves
+  is verified over the whole payload, not over that vector only.
 - No schema conversion of deltas.

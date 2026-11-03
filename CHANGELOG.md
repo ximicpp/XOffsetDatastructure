@@ -32,6 +32,15 @@
   `XBuffer::touch_set(field, value)` assigns and touches only on a change.
   `XDeltaBaseline(XDeltaRecord::touches)` keeps no payload copy and sends
   the touched bytes instead.
+- The receiver checks a container that moved, got its first block or lost
+  it (heap strings, vectors of plain elements, sets and maps of plain
+  elements, strings entering or leaving the inline form) on its own, against
+  a map of live blocks kept with the cursor (one bit per 8 bytes), and checks
+  the hole table's coverage against the same map, instead of verifying the
+  whole payload (`XDeltaCheck::in_place`). Deltas that change `used_end` or
+  the hole table take the same path. On the game demo's 40-field units, the
+  share of deltas verified in full went from 1.6% (peace) and 7% (combat) to
+  none.
 - Delta blocks lie on 64-byte payload offsets (block `i` = offsets `64 i`
   to `64 i + 63`, one cache line; block 0 never writes the arena header),
   and the baseline's copy is 64-aligned.
