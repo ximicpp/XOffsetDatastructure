@@ -1,0 +1,6 @@
+  sectname __text
+   segname __TEXT
+      addr 0x0000000100001d00
+      size 0x000000000030c3e4
+    offset 7424
+     align 2^5 (32)

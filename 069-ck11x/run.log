@@ -1,0 +1,23 @@
+== 2026-11-03T19:25:37Z 0. tools
+cmake version 4.4.4
+1.13.2
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+init cache /Volumes/XOffsetCS/perf-gate/slg-init-p2996-d77eff1.cmake sha ed916a0cf280cedf798d20f523b09c055e24ba4da58723df5d51d5558ebedde9; CMAKE_CXX_FLAGS [-stdlib=libc++ -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk]; default builds only
+== 2026-11-03T19:25:38Z 1. export
+head 827943cfb9725aeb54b2ff93ac99ff1eaf9351e2 tree c01689129b306891a3ba1129b861b3a4087da659 bench/slg cd85a32f9e7d88392b09f524f8c95410a82a77c4
+anc b6e06788102838dc1364a22aba146cc23d70a030 tree cc6991a670c7aa918c13f95c7e21c4834e73e6ed bench/slg cd85a32f9e7d88392b09f524f8c95410a82a77c4
+== 2026-11-03T19:25:38Z 2. build
+slg head: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+slg anc: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+head d03d592c293e248a5f4ab5ca04cb681b6ad062bba251fe963cdcbf83e47048c1
+anc 09abcb48c09ce8be25a88627284b1a6ca7e959107f4ab7f710c58c3bb79be22f
+== 2026-11-03T19:26:29Z 3. verify
+head xoffset byte row [1166 2358 12964 842240 712]
+anc xoffset byte row [1166 2358 12964 842240 712]
+== 2026-11-03T19:26:32Z 4. disasm
+strict 45 identical / 162 differ; loose 172 identical / 35 differ; 1 only in one binary -> /Users/ximi/workspace/xo-queue/queue/069-ck11x/out/ck11x/ck11x_disasm.md
+== 2026-11-03T19:26:33Z 5. timing
+== 2026-11-03T19:33:28Z 6. analysis
+判读行：head÷anc A.total 0.9997 [0.9889, 1.0107]；head÷anc A.req_encode 0.9787 [0.9676, 0.9900]；head÷anc A.res_decode 1.0230 [1.0044, 1.0419]
+== 2026-11-03T19:33:28Z finish rc=0
+result tarball: /Users/ximi/workspace/xo-queue/queue/069-ck11x/out/ck11x_result.tar.gz sha256 cb8c975154620685a86a0f85373ce6b4133f154cb7869be19a38a8f06ed352e6
