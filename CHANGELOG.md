@@ -21,6 +21,13 @@
 - Free table: small bins keep their first four holes inline, and reloads
   reuse a cached table on the inline paths; `XVector` element access resolves
   the data pointer directly.
+- `XString` assignment of a short value (at most 10 bytes) into a null
+  head, as `emplace_back()` leaves it, stores it inline on the fast path
+  instead of the general one. Under GCC and MSVC, `XVector::emplace_back()`
+  appends into spare capacity at the caller, as `push_back` does, and grows
+  out of line. Wire bytes are unchanged. GCC 16: slg.EB.send (fill one
+  viewport snapshot and save it) 274.8M -> 253.9M instructions (zpp_bits
+  250.8M), cloud time -7%.
 
 ## 3.2.1: iPhone test host serves by default
 
