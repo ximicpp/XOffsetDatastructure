@@ -43,6 +43,12 @@
   allocator, filled and moved byte by byte, and reallocated at the first
   growth after every key delta: on the game demo 1,863 copies of about
   85 KB in two cycles).
+- The delta receiver's map of checked and live blocks starts with a quarter
+  more room than the payload and grows by half again at least, as do its
+  node ranges: a view that grew a little reallocated and copied the whole
+  map (32 KB on the game demo view) at its next growth.
+- A touch of a block the period has not listed yet skips the scan of the
+  list (a 16-bit filter of the listed blocks, in the log's first line).
 - A movable slot that outgrows its storage keeps its cached root (at the
   same offset in the copied content), and so does an `XBuffer` that is
   moved or swapped (for example one built by `create` and then moved into
