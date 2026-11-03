@@ -21,7 +21,7 @@ table March { march_id:long; owner:long; from_x:int; from_y:int; to_x:int; to_y:
 table ShardState { shard_id:int; tick:long; width:int; tiles:[Tile]; cities:[City]; marches:[March]; }
 table ViewUnit { id:int; owner:int; x:int; y:int; hp:int; state:int; name:string; }
 table ViewMarch { id:int; owner:int; x0:int; y0:int; x1:int; y1:int; t0:long; t1:long; }
-table ViewSnapshot { request_id:long; tick:long; x0:int; y0:int; x1:int; y1:int; units:[ViewUnit]; marches:[ViewMarch]; }
-table ViewDelta { request_id:long; tick:long; x0:int; y0:int; x1:int; y1:int; upserts:[ViewUnit]; removed:[int]; marches:[ViewMarch]; removed_marches:[int]; }
+table ViewSnapshot { request_id:long; tick:long; x0:int; y0:int; x1:int; y1:int; units:[ViewUnit]; marches:[ViewMarch]; tiles:[Tile]; }
+table ViewDelta { request_id:long; tick:long; x0:int; y0:int; x1:int; y1:int; upserts:[ViewUnit]; removed:[int]; marches:[ViewMarch]; removed_marches:[int]; tiles:[Tile]; }
 
 root_type BattleMsg;
