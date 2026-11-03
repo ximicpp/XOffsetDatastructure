@@ -791,8 +791,10 @@ namespace XOffsetDatastructure {
             delta_node_set,
             delta_node_map,
             delta_node_vector,
-            delta_node_dead,  // a heap string that became inline or empty: no ranges
+            delta_node_records,  // a vector of elements that verification reads: grows within its block
+            delta_node_dead,     // a heap string that became inline or empty: no ranges
         };
+        struct DeltaVerifyContext;
         struct DeltaCheckNode {
             std::uint32_t head = 0;      // offset of the head
             DeltaNodeKind kind = delta_node_string;
@@ -804,6 +806,9 @@ namespace XOffsetDatastructure {
             std::uint32_t stamp = 0;     // scratch: last delta that touched it
             std::uint32_t moved = 0;     // scratch: last delta that changed its capacity or block
             bool (*keys_ordered)(const char* data, std::uint32_t size) = nullptr;  // set, map
+            // records: verifies elements [from, to) of the block at `data` and
+            // marks them (DeltaVerifyContext).
+            bool (*grow)(DeltaVerifyContext& v, std::size_t data, std::uint32_t from, std::uint32_t to) = nullptr;
         };
         // A block that a delta freed and one that it made live (bytes rounded
         // to 8; 0: none), for node `node` (none: a string head that left the
@@ -814,6 +819,7 @@ namespace XOffsetDatastructure {
             std::uint32_t head = 0;
             std::size_t old_begin = 0, old_bytes = 0;
             std::size_t new_begin = 0, new_bytes = 0;
+            bool grow = false;  // a vector of records grew in its block: elements [old_begin, new_begin)
         };
         // Bits [from, from + n) of a bit map.
         inline void delta_bits_set(std::uint64_t* w, std::size_t from, std::size_t n) noexcept {
@@ -980,6 +986,8 @@ namespace XOffsetDatastructure {
 
         template <typename T>
         void delta_mark_pinned(const T& value, DeltaCheckMarker& m);
+        template <typename Elem>
+        bool delta_grow_records(DeltaVerifyContext& v, std::size_t data, std::uint32_t from, std::uint32_t to);
 
         // A string with a block: its head, its terminator, and a node.
         XOFFSET_DELTA_COLD inline void delta_mark_heap_string(const XFixedString& s, DeltaCheckMarker& m) {
@@ -1038,6 +1046,19 @@ namespace XOffsetDatastructure {
                     return;  // its elements hold nothing verification reads
                 }
                 m.mark(&v, sizeof(v), false);
+                if constexpr (!is_fixed_flat_set_v<CleanT> && !is_fixed_flat_map_v<CleanT> && alignof(Elem) <= 8) {
+                    // A vector of records: a node (its head only) whose growth
+                    // within its block is verified element by element.
+                    DeltaCheckNode n;
+                    n.head = static_cast<std::uint32_t>(m.offset_of(&v));
+                    n.kind = delta_node_records;
+                    n.capacity = v.capacity_;
+                    n.data_delta = v.data_delta;
+                    n.size = v.size_;
+                    n.element = sizeof(Elem);
+                    n.grow = &delta_grow_records<Elem>;
+                    m.node(n, 0, 0);
+                }
                 if constexpr (!wire_value_needs_validation_v<Elem>) {  // a set or map
                     DeltaCheckNode n;
                     n.head = static_cast<std::uint32_t>(m.offset_of(&v));
@@ -1130,6 +1151,125 @@ namespace XOffsetDatastructure {
                         return vok();
                     });
             }
+        }
+
+        // Verifies values a delta brought into a verified payload (the new
+        // elements of a vector of records), as validate_wire_value does, with
+        // every block they own claimed in the map of live blocks (it must be
+        // free; the delta's freed blocks are out of the map already). A
+        // failure only sends the delta to the whole verification, which then
+        // decides (and gives the error).
+        struct DeltaVerifyContext {
+            const char* base;
+            std::size_t used;
+            std::uint64_t* live;
+            std::size_t claimed = 0;  // granules claimed
+            DeltaCheckMarker* marker;  // marks what it verified (with nodes)
+            bool claim(std::size_t begin, std::size_t bytes) noexcept {
+                if (delta_bits_any(live, begin / 8u, bytes / 8u)) return false;
+                delta_bits_set(live, begin / 8u, bytes / 8u);
+                claimed += bytes / 8u;
+                return true;
+            }
+            // The block of a container head (as head_block in DeltaAccess),
+            // claimed: false when it fails.
+            bool block(const void* head, bool string, std::uint32_t element, std::size_t& begin,
+                       std::size_t& bytes) noexcept {
+                const std::size_t at = static_cast<std::size_t>(static_cast<const char*>(head) - base);
+                std::int32_t data_delta;
+                std::uint32_t size, capacity;
+                std::memcpy(&data_delta, base + at, 4);
+                std::memcpy(&size, base + at + 4, 4);
+                std::memcpy(&capacity, base + at + 8, 4);
+                bytes = 0;
+                if (size > capacity) return false;
+                if (string ? capacity >= XBufferCore::MAX_PAYLOAD : capacity > (XBufferCore::MAX_PAYLOAD - 8u) / element)
+                    return false;
+                if (capacity == 0) return size == 0 && data_delta == 0;
+                const std::size_t raw = string ? std::size_t(capacity) + 1u : std::size_t(capacity) * element;
+                const std::size_t block = (raw + 7u) & ~std::size_t(7u);
+                const std::int64_t where = std::int64_t(at) + data_delta;
+                if (where < 0 || (where & 7) != 0 || std::uint64_t(where) > used || block > used - std::size_t(where))
+                    return false;
+                begin = static_cast<std::size_t>(where);
+                bytes = block;
+                if (string && base[begin + size] != '\0') return false;
+                return claim(begin, bytes);
+            }
+        };
+
+        template <typename T>
+        bool delta_verify_value(const T& value, DeltaVerifyContext& v) {
+            using CleanT = std::remove_cv_t<T>;
+            if constexpr (!wire_value_needs_validation_v<CleanT>) {
+                (void)value;
+                (void)v;
+                return true;
+            } else if constexpr (std::is_same_v<CleanT, bool>) {
+                unsigned char bits;
+                std::memcpy(&bits, &value, 1);
+                return bits <= 1u;
+            } else if constexpr (std::is_array_v<CleanT>) {
+                for (const auto& elem : value)
+                    if (!delta_verify_value(elem, v)) return false;
+                return true;
+            } else if constexpr (is_fixed_string_v<CleanT>) {
+                const auto& s = static_cast<const XFixedString&>(value);
+                if (s.is_inline() || (s.capacity_ == 0 && s.size_ == 0 && s.data_delta == 0)) {
+                    std::uint64_t low;
+                    std::uint32_t high;
+                    std::memcpy(&low, &s, 8);
+                    std::memcpy(&high, reinterpret_cast<const char*>(&s) + 8, 4);
+                    if ((low | high) == 0) return true;
+                    const unsigned length = (high >> 24) & 0x7Fu;
+                    return (high & XFixedString::inline_flag) != 0 && length <= XFixedString::inline_max &&
+                           ((low & inline_pad_masks.low[length]) | (high & inline_pad_masks.high[length])) == 0;
+                }
+                std::size_t begin, bytes;
+                return v.block(&s, true, 1, begin, bytes);
+            } else if constexpr (is_fixed_flat_set_v<CleanT> || is_fixed_flat_map_v<CleanT> ||
+                                 is_fixed_vector_v<CleanT>) {
+                using Elem = typename CleanT::value_type;
+                if constexpr (alignof(Elem) > 8) {
+                    return false;  // the whole verification decides
+                } else {
+                    const auto& vec = static_cast<const XFixedVector<Elem>&>(value);
+                    std::size_t begin, bytes;
+                    if (!v.block(&vec, false, sizeof(Elem), begin, bytes)) return false;
+                    if (bytes == 0) return true;
+                    const Elem* data = reinterpret_cast<const Elem*>(v.base + begin);
+                    if constexpr (wire_value_needs_validation_v<Elem>)
+                        for (std::uint32_t i = 0; i < vec.size_; ++i)
+                            if (!delta_verify_value(data[i], v)) return false;
+                    if constexpr (is_fixed_flat_set_v<CleanT>) return delta_keys_ordered<Elem, false>(v.base + begin, vec.size_);
+                    else if constexpr (is_fixed_flat_map_v<CleanT>) return delta_keys_ordered<Elem, true>(v.base + begin, vec.size_);
+                    else return true;
+                }
+            } else if constexpr (std::is_class_v<CleanT>) {
+                bool ok = true;
+                (void)for_each_reflected_subobject_v<CleanT>(
+                    [&](auto index) {
+                        if (ok) ok = delta_verify_value(static_cast<const schema::base_t<CleanT, decltype(index)::value>&>(value), v);
+                        return vok();
+                    },
+                    [&](auto index) {
+                        using member = schema::member_t<CleanT, decltype(index)::value>;
+                        if (ok) ok = delta_verify_value(member::get(value), v);
+                        return vok();
+                    });
+                return ok;
+            } else {
+                return false;
+            }
+        }
+
+        template <typename Elem>
+        bool delta_grow_records(DeltaVerifyContext& v, std::size_t data, std::uint32_t from, std::uint32_t to) {
+            const Elem* elems = reinterpret_cast<const Elem*>(v.base + data);
+            for (std::uint32_t i = from; i < to; ++i)
+                if (!delta_verify_value(elems[i], v)) return false;
+            for (std::uint32_t i = from; i < to; ++i) delta_mark_value(elems[i], *v.marker);
+            return true;
         }
 
         // What writing one delta needs only while it runs: the buffer's hole
@@ -1231,6 +1371,7 @@ namespace XOffsetDatastructure {
         void reset() noexcept {
             payload_.clear();
             holes_.clear();
+            holes_gen_ = 0;
             touch_log_ = 0;
             used_ = 0;
         }
@@ -1269,6 +1410,7 @@ namespace XOffsetDatastructure {
         XDeltaRecord record_ = XDeltaRecord::copy;
         std::vector<char, detail::DeltaLineAllocator<char>> payload_;  // [0, used_end) as the receiver holds it ([0, 48) unused)
         std::vector<XBufferCore::WireHole> holes_;        // its hole table, by offset
+        std::uint64_t holes_gen_ = 0;                     // the free-block table's generation it was taken at
         // touched_only: the touch log of the buffer the last delta came from
         // (0: none) and the stamp it had then (touches since have a later one).
         std::uint64_t touch_log_ = 0;
@@ -1399,27 +1541,35 @@ namespace XOffsetDatastructure {
                     b.schema_hash_ = schema_hash;
                     b.root_type_id_ = root_type_id;
                 }
-                // The delta is written into out's storage; the old hole table
-                // is compared: their lines are fetched while the rest runs.
-                XOFFSET_DELTA_PREFETCH(out.data());
-                if (!b.holes_.empty()) XOFFSET_DELTA_PREFETCH(b.holes_.data());
                 // A touches baseline whose touches no longer say what changed
                 // starts over with a key delta.
                 const bool touches = b.record_ == XDeltaRecord::touches;
                 if (touches && !b.empty() && !touches_known(xbuf, b)) b.reset();
                 const bool key = b.empty();
+                // The free-block table as of the baseline's last delta (the
+                // same generation): the same holes, not listed again.
+                const std::uint64_t holes_gen = core.free_block_gen();
+                const bool holes_same = !key && b.holes_gen_ == holes_gen;
+                // The delta is written into out's storage; the old hole table
+                // is compared: their lines are fetched while the rest runs.
+                XOFFSET_DELTA_PREFETCH(out.data());
+                if (!holes_same && !b.holes_.empty()) XOFFSET_DELTA_PREFETCH(b.holes_.data());
 
                 // The hole table, by offset.
                 DeltaSendScratch& scratch = send_scratch(b);
                 auto& holes = scratch.holes;
                 holes.clear();
-                holes.reserve(core.free_block_count());
-                core.for_each_free_block([&](XBufferCore::WireHole h) { holes.push_back(h); });
-                std::sort(holes.begin(), holes.end(),
-                          [](const XBufferCore::WireHole& x, const XBufferCore::WireHole& y) { return x.offset < y.offset; });
-                const bool holes_changed = key || holes.size() != b.holes_.size() ||
-                    (!holes.empty() &&
-                     std::memcmp(holes.data(), b.holes_.data(), holes.size() * sizeof(XBufferCore::WireHole)) != 0);
+                if (!holes_same) {
+                    holes.reserve(core.free_block_count());
+                    core.for_each_free_block([&](XBufferCore::WireHole h) { holes.push_back(h); });
+                    std::sort(holes.begin(), holes.end(), [](const XBufferCore::WireHole& x, const XBufferCore::WireHole& y) {
+                        return x.offset < y.offset;
+                    });
+                }
+                const bool holes_changed = !holes_same &&
+                    (key || holes.size() != b.holes_.size() ||
+                     (!holes.empty() &&
+                      std::memcmp(holes.data(), b.holes_.data(), holes.size() * sizeof(XBufferCore::WireHole)) != 0));
 
                 // The hole section is checked and sized before the baseline
                 // changes.
@@ -1533,6 +1683,7 @@ namespace XOffsetDatastructure {
                 const bool pair = options.touched_only || touches;
                 if (!key && blocks.empty() && !holes_changed && used == base_used && root == b.root_offset_) {
                     if (pair) pair_touch_log(xbuf, b);
+                    b.holes_gen_ = holes_gen;
                     drop.b = nullptr;
                     out.clear();
                     stats.empty = true;
@@ -1550,6 +1701,7 @@ namespace XOffsetDatastructure {
                 header.block_count = static_cast<std::uint32_t>(blocks.size());
                 write_delta(out, header, b.schema_hash_, b.root_type_id_, cur, blocks, totals, holes, hole_section);
                 if (holes_changed) b.holes_.swap(holes);
+                b.holes_gen_ = holes_gen;
                 if (used < base.size()) base.resize(used); // shrinking never allocates
                 b.used_ = used;
                 b.version_ = header.version;
@@ -1818,6 +1970,29 @@ namespace XOffsetDatastructure {
             static void touch(XBuffer& xbuf, const void* p, std::size_t bytes) noexcept {
                 TouchSink sink;
                 if (touch_sink(xbuf, sink)) touch_bytes(sink, p, bytes);
+            }
+            // A touch of the bytes of [p, p + bytes) (bytes <= 8) that changed:
+            // bit k of `changed` set when byte k did.
+            static void touch_changed(XBuffer& xbuf, const void* p, std::size_t bytes, std::uint64_t changed) noexcept {
+                if (changed == 0) return;
+                TouchSink sink;
+                if (!touch_sink(xbuf, sink)) return;
+                const char* at = static_cast<const char*>(p);
+                if (!sink.base || at < sink.base + payload_begin || std::size_t(at - sink.base) > sink.segment ||
+                    bytes > sink.segment - std::size_t(at - sink.base)) {
+                    sink.log->lost = true;
+                    return;
+                }
+                const auto offset = static_cast<std::size_t>(at - sink.base);
+                if (offset + bytes > sink.used) {
+                    stamp_touch_log(*sink.log, offset, offset + bytes, sink.used);
+                    return;
+                }
+                const std::size_t first = offset / delta_block, lo = offset % delta_block;
+                if (const std::uint64_t low = changed << lo) touch_block(*sink.log, first, low);
+                if (lo + bytes > delta_block) {
+                    if (const std::uint64_t high = changed >> (delta_block - lo)) touch_block(*sink.log, first + 1, high);
+                }
             }
             // value's bytes and the blocks of every string and container it reaches.
             template <typename T>
@@ -2502,6 +2677,17 @@ namespace XOffsetDatastructure {
                 std::memcpy(&data_delta, head, 4);
                 std::memcpy(&size, head + 4, 4);
                 std::memcpy(&capacity, head + 8, 4);
+                if (n.kind == delta_node_records) {
+                    // Within its block only; new elements are verified by cover.
+                    if (capacity != n.capacity || data_delta != n.data_delta || size > capacity || size < n.size)
+                        return 0;
+                    if (size == n.size) return 1;
+                    mv.head = n.head;
+                    mv.grow = true;
+                    mv.old_begin = n.size;
+                    mv.new_begin = size;
+                    return 2;
+                }
                 if (capacity == n.capacity && data_delta == n.data_delta) {
                     if (size > capacity) return 0;
                     if (capacity == 0) return size == 0 ? 1 : 0;
@@ -2524,7 +2710,7 @@ namespace XOffsetDatastructure {
                 const char* head = m.base() + n.head;
                 std::uint32_t size;
                 std::memcpy(&size, head + 4, 4);
-                if (n.capacity != 0 && n.kind != delta_node_vector) {
+                if (n.capacity != 0 && n.kind != delta_node_vector && n.kind != delta_node_records) {
                     const std::size_t data = n.head + static_cast<std::size_t>(std::int64_t(n.data_delta));
                     if (n.kind == delta_node_string) {
                         m.clear_at(data + n.size, 1);
@@ -2600,23 +2786,49 @@ namespace XOffsetDatastructure {
             // and hole bytes adding up to used_end. This is the coverage that
             // the whole verification checks. False: it does not hold (the map
             // is then rebuilt by the whole verification).
-            static bool cover(XDeltaCursor& c, const XBufferCore& core, const Parsed& parsed,
+            static bool cover(XDeltaCursor& c, const XBufferCore& core, const char* base, const Parsed& parsed,
                               const std::vector<XBufferCore::WireHole>& holes, std::size_t used,
-                              std::size_t old_used) noexcept {
+                              std::size_t old_used) {
                 std::uint64_t* live = c.live_.data();
                 std::size_t count = c.live_granules_;
                 for (const DeltaMove& mv : c.moves_) {
-                    if (mv.old_bytes == 0) continue;
+                    if (mv.grow || mv.old_bytes == 0) continue;
                     if (mv.old_begin + mv.old_bytes > old_used) return false;  // cannot happen: it was verified
                     for (std::size_t g = mv.old_begin / 8u, e = g + mv.old_bytes / 8u; g < e; ++g)
                         count -= (live[g / 64] >> (g % 64)) & 1u;
                     delta_bits_clear(live, mv.old_begin / 8u, mv.old_bytes / 8u);
                 }
                 for (const DeltaMove& mv : c.moves_) {
-                    if (mv.new_bytes == 0) continue;
+                    if (mv.grow || mv.new_bytes == 0) continue;
                     if (delta_bits_any(live, mv.new_begin / 8u, mv.new_bytes / 8u)) return false;
                     delta_bits_set(live, mv.new_begin / 8u, mv.new_bytes / 8u);
                     count += mv.new_bytes / 8u;
+                }
+                // New elements of vectors of records: verified, their blocks
+                // claimed, and marked (nodes appended; the ranges are rebuilt
+                // after the commit).
+                bool grew = false;
+                XOFFSET_TRY {
+                    DeltaCheckMarker m(base, c.checks_.data(), &c.nodes_, &c.ranges_, live);
+                    for (std::size_t k = 0; k < c.moves_.size(); ++k) {
+                        const DeltaMove mv = c.moves_[k];
+                        if (!mv.grow) continue;
+                        const DeltaCheckNode n = c.nodes_[mv.node];  // a copy: nodes may be appended
+                        DeltaVerifyContext v{base, used, live, 0, &m};
+                        if (!n.grow(v, static_cast<std::size_t>(std::int64_t(n.head) + n.data_delta),
+                                    static_cast<std::uint32_t>(mv.old_begin), static_cast<std::uint32_t>(mv.new_begin)))
+                            return false;
+                        count += v.claimed;
+                        grew = true;
+                    }
+                    if (grew) {
+                        const std::size_t nodes = c.nodes_.size();
+                        c.touched_.reserve(nodes);
+                        c.ranges_.reserve(2 * nodes);
+                        c.range_scratch_.reserve(2 * nodes);
+                    }
+                } XOFFSET_CATCH(const std::bad_alloc&) {
+                    return false;
                 }
                 if (used < old_used && delta_bits_any(live, used / 8u, (old_used - used) / 8u)) return false;
                 std::uint64_t free = 0;
@@ -2703,7 +2915,7 @@ namespace XOffsetDatastructure {
                 } XOFFSET_CATCH(const std::bad_alloc&) {
                     return false;
                 }
-                return cover(c, core, parsed, holes, used, old_used);
+                return cover(c, core, base, parsed, holes, used, old_used);
             }
             // The node ranges, from the nodes (after nodes came, went or moved);
             // nodes that are no longer containers are dropped.
@@ -2717,7 +2929,7 @@ namespace XOffsetDatastructure {
                     if (n.kind == delta_node_dead) continue;
                     const auto index = static_cast<std::uint32_t>(i);
                     c.ranges_.push_back({n.head, n.head + static_cast<std::uint32_t>(sizeof(XFixedString)), index});
-                    if (n.capacity == 0 || n.kind == delta_node_vector) continue;
+                    if (n.capacity == 0 || n.kind == delta_node_vector || n.kind == delta_node_records) continue;
                     const auto data = static_cast<std::uint32_t>(std::int64_t(n.head) + n.data_delta);
                     const std::size_t bytes =
                         n.kind == delta_node_string ? std::size_t(n.capacity) + 1u : std::size_t(n.capacity) * n.element;
@@ -2740,7 +2952,7 @@ namespace XOffsetDatastructure {
                 // The checked bytes of the freed blocks go first (a new block
                 // may lie where another one was).
                 for (const DeltaMove& mv : c.moves_) {
-                    if (mv.node == DeltaMove::new_node) continue;
+                    if (mv.node == DeltaMove::new_node || mv.grow) continue;
                     const DeltaCheckNode& n = c.nodes_[mv.node];
                     if (n.capacity == 0 || n.kind == delta_node_vector) continue;
                     const std::size_t data = static_cast<std::size_t>(std::int64_t(n.head) + n.data_delta);
@@ -2754,6 +2966,11 @@ namespace XOffsetDatastructure {
                 for (const DeltaMove& mv : c.moves_) {
                     if (mv.node == DeltaMove::new_node) continue;
                     DeltaCheckNode& n = c.nodes_[mv.node];
+                    if (mv.grow) {  // its new elements were marked by cover
+                        n.size = static_cast<std::uint32_t>(mv.new_begin);
+                        ranges_changed = true;
+                        continue;
+                    }
                     const char* head = base + n.head;
                     std::int32_t data_delta;
                     std::uint32_t size, capacity;
@@ -3075,8 +3292,19 @@ namespace XOffsetDatastructure {
     template <typename T, typename V>
     bool XBuffer::touch_set(T& field, const V& value) {
         if (field == value) return false;
-        field = value;
-        touch(field);
+        if constexpr (std::is_trivially_copyable_v<T> && !std::is_class_v<T> && !std::is_array_v<T> &&
+                      sizeof(T) <= 8) {
+            // A scalar: only the bytes that changed are touched (what a delta
+            // from an XDeltaRecord::touches baseline then sends).
+            std::uint64_t before = 0, after = 0;
+            std::memcpy(&before, &field, sizeof(T));
+            field = value;
+            std::memcpy(&after, &field, sizeof(T));
+            detail::DeltaAccess::touch_changed(*this, &field, sizeof(T), detail::delta_byte_flags(before ^ after));
+        } else {
+            field = value;
+            touch(field);
+        }
         return true;
     }
 

@@ -107,8 +107,8 @@ delta carries every byte touched since the baseline's previous delta (as if
 `touched_only`), the bytes past the receiver's used size and those of holes
 that came or went. Memory per receiver drops from one copy of the payload
 to a few words; the delta grows by the bytes that were touched but did not
-change, so touch exactly what changes (`touch_set`, `touch(p, bytes)` on the
-field). Where the touches do not say what changed (the first delta, content
+change, so touch exactly what changes (`touch_set`, which touches only the
+bytes of a scalar that changed, or `touch(p, bytes)` on the field). Where the touches do not say what changed (the first delta, content
 that was replaced, a baseline that missed deltas the log no longer records)
 the delta is a key delta. `key_delta_into` needs a copy and is not
 available on such a baseline.
@@ -236,9 +236,13 @@ decides. So:
   change, the hole table (the delta's, or the replica's when the delta carries
   none) must tile the rest: every hole valid and in no live block, live and
   hole bytes adding up to `used_end`. That is the coverage the whole
-  verification checks, without walking the payload.
-- **`full`**: anything else (the root moved, a vector of records that grew or
-  moved, a marked byte no in-place check covers), and any delta whose in-place
+  verification checks, without walking the payload. A vector of records
+  (elements with strings, containers or bools) that grows within its
+  capacity and keeps its block has only its new records verified, as the
+  whole verification would verify them, each block they reach claimed in
+  the map of live blocks.
+- **`full`**: anything else (the root moved, a vector of records that
+  shrank or moved, a marked byte no in-place check covers), and any delta whose in-place
   check fails: the whole verification then decides, so a delta is accepted or
   rejected, with the same error, exactly as a whole verification would.
 
@@ -309,7 +313,9 @@ verification, like a store receiving saves, does not rebuild it each time).
 
 Sender, per delta: the comparison of the payload (or, with `touched_only`, of
 the touched blocks) against the baseline in 64-byte blocks, where each block
-that differs is copied into the baseline; the free table sorted by offset; the
+that differs is copied into the baseline; the free table sorted by offset
+(only when it changed since the baseline's last delta: the table carries a
+generation that changes with every block that comes or goes); the
 changed bytes gathered by their masks (one byte shuffle per 8-byte word:
 SSSE3 when the CPU has it, NEON on AArch64, byte by byte elsewhere); with
 `digest`, one hash pass. Receiver, per delta: the header and section checks,
@@ -344,5 +350,5 @@ bytes.
 - Moved data is not detected (an erase from the middle sends the shifted
   tail).
 - A vector of records (elements with strings, containers or bools) that moves
-  is verified over the whole payload, not over that vector only.
+  or shrinks is verified over the whole payload, not over that vector only.
 - No schema conversion of deltas.
