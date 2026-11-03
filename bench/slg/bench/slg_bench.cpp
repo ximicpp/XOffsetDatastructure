@@ -112,24 +112,23 @@ void print_sizes(const std::vector<std::unique_ptr<Runner>>& rs, const std::vect
             std::printf("%-12s %10.0f %10.0f %10.0f %10.0f\n", rs[i]->name().c_str(), avg("A.req", sc.battles),
                         avg("A.res", sc.battles), avg("B.out", sc.migrants), avg("S.player", sc.migrants));
         }
-        std::printf("\nserver -> client, bytes: E = one 3x3 window pull (raw / zstd-3), U = one block delta per subscriber (raw / zstd-3)\n");
-        std::printf("%-12s %-4s %10s %10s %10s %10s %10s %10s\n", "format", "rate", "E.window", "E.zstd", "U.delta", "U.zstd", "pulls", "deliveries");
+        std::printf("\nserver -> client, bytes: EB = one viewport pull while browsing (raw / zstd-3),\n"
+                    "U = one viewport delta to a static client (raw / zstd-3), rate P/C/S\n");
+        std::printf("%-12s %-4s %10s %10s %10s %10s %10s %10s\n", "format", "case", "pull", "pull.zstd", "U.delta", "U.zstd", "pulls", "deliveries");
         for (std::size_t i = 0; i < rs.size(); ++i)
-            for (const char* r : {"P", "C", "S"}) {
+            for (const char* r : {"B", "P", "C", "S"}) {
                 const auto& b = st[i].bytes;
                 auto get = [&](const std::string& k) { const auto it = b.find(k); return it == b.end() ? 0.0 : double(it->second); };
-                const std::string E = std::string("E") + r, U = std::string("U") + r;
+                const std::string E = std::string("E") + r, U = std::string("U") + r, N = std::string("N") + r;
                 const double req = get(E + ".requests"), del = get(U + ".deliveries");
                 std::printf("%-12s %-4s %10.0f %10.0f %10.0f %10.0f %10.0f %10.0f\n", rs[i]->name().c_str(), r,
                             req ? get(E + ".window") / req : 0, req ? get(E + ".window_zstd") / req : 0,
                             del ? get(U + ".delta") / del : 0, del ? get(U + ".delta_zstd") / del : 0, req, del);
                 if (get(E + ".window_compact") > 0)
-                    std::printf("%-12s %-4s %10.0f %10.0f   (save_compact window / zstd-3)\n", "", "", get(E + ".window_compact") / req,
+                    std::printf("%-12s %-4s %10.0f %10.0f   (save_compact pull / zstd-3)\n", "", "", get(E + ".window_compact") / req,
                                 get(E + ".window_compact_zstd") / req);
-                const std::string N = std::string("N") + r, K = std::string("K") + r;
                 if (get(N + ".delta") > 0)
-                    std::printf("%-12s %-4s %10.0f %10s %10.0f %10s   (native: key window / delta)\n", "", "", get(K + ".window") / req, "",
-                                get(N + ".delta") / del, "");
+                    std::printf("%-12s %-4s %10s %10s %10.0f %10s   (native delta)\n", "", "", "", "", get(N + ".delta") / del, "");
             }
         (void)keep;
         return;

@@ -1,37 +1,46 @@
 // SLG benchmark, demo case set (SLG_CASES=demo): server -> client map data.
 //
-// The map is split into blocks of one screen (512 x 384). A client subscribes
-// to the 3 x 3 block window around the centre of its view; it pulls the whole
-// window (one snapshot message per block) only when its view centre crosses
-// into another block, and in between it gets every change of its blocks as
-// per-block delta messages. A block's snapshot and its delta are each encoded
-// once per tick and fanned out to every client that wants them (the usual SLG
-// map broadcast: views hang on blocks).
+// A client sees one screen of the map, a 512 x 384 viewport. What it holds of
+// the map is exactly what lies in that rectangle: the tiles under it (32 x 32
+// px each, about 17 x 13 of them), the units standing in it (cities, stationed
+// troops, resource points) and the marches whose line crosses it. A march is a
+// line record (start, end, start tick, arrival tick); the client interpolates,
+// so a march changes only when it starts, is recalled or arrives.
 //
-// Block content: the units standing in it (cities, stationed troops, resource
-// points) and the marches whose line crosses it. A march is a line record
-// (start, end, start tick, arrival tick); the client interpolates, so a march
-// changes only when it starts, is recalled or arrives.
-//
-// Three change rates (one world each, see Rate):
-//   peace  - a few unit events per tick (owner, state, hp) and march turnover;
-//   combat - peace plus two battle zones where every engaged unit changes every
-//            tick (a 1 s battle round);
-//   stress - the earlier E world: a quarter of all units move every tick, 1/16
-//            change hp, 1/16 change state (upper bound).
+// Two cases (ViewCases):
+//   browse (class 2, key EB) - every client keeps dragging its viewport (or
+//            jumps elsewhere now and then) and every tick pulls everything in
+//            the new rectangle in full. The world changes at the peace rate, so
+//            this is almost all full snapshots.
+//   static (class 3, keys UP / UC / US) - clients do not move. After one full
+//            pull (untimed), each tick the server sends each client the changes
+//            inside its viewport only: units that changed, entered or left,
+//            marches that started, changed or left, tiles whose owner changed.
+//            Three change rates (Rate):
+//     peace  - a few unit events per tick (owner, state, hp), a few tile owner
+//              changes and march turnover (the main case);
+//     combat - peace plus two battle zones where every engaged unit changes
+//              every tick (a 1 s battle round) and 1/16 of the zone's tiles
+//              change owner (reference);
+//     stress - a quarter of all units move every tick, 1/16 change hp, 1/16
+//              change state, 1/64 of the tiles change owner (upper bound, report
+//              only).
 //
 // The world, the clients' movement and the server's bookkeeping of what each
-// block's subscribers hold are plain game-server code, the same in every runner,
-// and not timed. Timed, per format (run_blocks, keys <E>.* and <U>.*):
-//   E.send   fill one block snapshot from the world and encode it (once per block
-//            per tick, however many clients pull it)
-//   E.recv   one client receives one block snapshot (the format's checked
-//            receive), reads every unit and march, and keeps it as its held view
-//   E.index  the client builds its id -> position index of that view (the same
-//            code for every format; needed to apply deltas by id)
-//   U.send   fill one block delta from the bookkeeping and encode it (once)
-//   U.recv   one subscriber receives the delta
-//   U.apply  that subscriber applies it to its held view of the block
+// client holds are plain game-server code, the same in every runner, and not
+// timed. Timed, per format (run_view_case):
+//   EB.send   fill one client's viewport snapshot from the world and encode it
+//             (the spatial query of what lies in the viewport is bookkeeping,
+//             untimed, as the tracker's work is for U*)
+//   EB.recv   the client receives it (the format's checked receive) and reads
+//             every tile, unit and march
+//   U*.send   fill one client's viewport delta from the bookkeeping and encode it
+//   U*.recv   the client receives the delta
+//   U*.apply  it applies the delta to its held view (through its id index)
+// XOffset native (with XOFFSET_DELTA_SYNC_API), keys N*: the server keeps each
+// client's view as an XBuffer, mutates it in place (N*.send) and writes the
+// delta against that client's baseline (N*.diff); the client patches and
+// verifies (N*.recv) and reads in place.
 #pragma once
 #include <algorithm>
 #include <cstdint>
@@ -67,18 +76,42 @@ inline const ViewScale* find_view_scale(std::string_view n) {
 }
 
 constexpr int32_t kMapSize = 4096;      // map [0, 4096) x [0, 4096)
-constexpr int32_t kBlockW = 512;        // one block = one screen
-constexpr int32_t kBlockH = 384;
-constexpr int32_t kBX = (kMapSize + kBlockW - 1) / kBlockW;   // 8
-constexpr int32_t kBY = (kMapSize + kBlockH - 1) / kBlockH;   // 11
-constexpr int32_t kBlocks = kBX * kBY;                         // 88
-constexpr int32_t kPanStep = 48;        // view centre pan per tick, each axis, at most
-constexpr int32_t kJumpOneIn = 16;      // the view jumps elsewhere with p = 1/16 per tick
+constexpr int32_t kViewW = 512;         // one screen
+constexpr int32_t kViewH = 384;
+constexpr int32_t kTile = 32;           // tile edge, px
+constexpr int32_t kTiles = kMapSize / kTile;    // 128 x 128 tiles
+constexpr int32_t kCell = 128;          // spatial index cell (server bookkeeping)
+constexpr int32_t kCells = kMapSize / kCell;    // 32 x 32 cells
+constexpr int32_t kPanStep = 48;        // browse: view pan per tick, each axis, at most
+constexpr int32_t kJumpOneIn = 16;      // browse: the view jumps elsewhere with p = 1/16 per tick
 constexpr int32_t kZoneR = 384;         // combat zone radius
 
 enum class Rate { Peace, Combat, Stress };
 
-inline int32_t block_of(int32_t x, int32_t y) { return (y / kBlockH) * kBX + x / kBlockW; }
+struct ViewRect { int32_t x0{}, y0{}, x1{}, y1{}; };   // [x0, x1) x [y0, y1), px
+
+inline int32_t clamp_i(int32_t v, int32_t lo, int32_t hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+// The viewport centred on (cx, cy), kept inside the map.
+inline ViewRect view_rect(int32_t cx, int32_t cy) {
+    ViewRect r;
+    r.x0 = clamp_i(cx - kViewW / 2, 0, kMapSize - kViewW); r.x1 = r.x0 + kViewW;
+    r.y0 = clamp_i(cy - kViewH / 2, 0, kMapSize - kViewH); r.y1 = r.y0 + kViewH;
+    return r;
+}
+inline bool in_rect(const ViewRect& r, int32_t x, int32_t y) { return x >= r.x0 && x < r.x1 && y >= r.y0 && y < r.y1; }
+
+// Tiles a viewport covers (partly covered ones included), in tile coordinates.
+struct TileSpan { int32_t tx0, ty0, cols, rows; };
+inline TileSpan tile_span(int32_t x0, int32_t y0, int32_t x1, int32_t y1) {
+    const int32_t tx0 = x0 / kTile, ty0 = y0 / kTile;
+    return {tx0, ty0, (x1 - 1) / kTile - tx0 + 1, (y1 - 1) / kTile - ty0 + 1};
+}
+// Position of tile (tx, ty) in a view's tile list (row-major over its span).
+template <class V> std::size_t tile_pos(const V& v, int32_t tx, int32_t ty) {
+    const TileSpan s = tile_span(v.x0, v.y0, v.x1, v.y1);
+    return std::size_t((ty - s.ty0) * s.cols + (tx - s.tx0));
+}
 
 struct WorldUnit {
     int32_t id{}; int32_t owner{}; int32_t x{}; int32_t y{};
@@ -89,15 +122,18 @@ struct WorldUnit {
 struct WorldMarch {
     int32_t id{}; int32_t owner{}; int32_t x0{}; int32_t y0{}; int32_t x1{}; int32_t y1{};
     int64_t t0{}; int64_t t1{};
-    std::vector<int32_t> blocks;   // blocks its line crosses
+    std::vector<int32_t> pts;     // its line sampled every 32 px: x, y, x, y, ...
+    std::vector<int32_t> cells;   // index cells those points fall in
 };
 
-struct ViewClient { int32_t cx{}; int32_t cy{}; int32_t block = -1; int32_t n = 0; int32_t win[9]{}; };
+struct WorldTile { int32_t terrain{}; int32_t level{}; int64_t owner{}; int64_t changed = -1; };
 
-class BlockWorld {
+struct ViewClient { int32_t cx{}; int32_t cy{}; };
+
+class MapWorld {
 public:
     void setup(uint64_t seed, const ViewScale& vs, Rate rate) {
-        vs_ = &vs; rate_ = rate;
+        vs_ = &vs; rate_ = rate; tick_ = 0;
         Rng rng(mix_seed(seed, 0x7e3));
         units_.clear();
         units_.reserve(std::size_t(vs.units));
@@ -125,6 +161,13 @@ public:
         }
         clients_.assign(std::size_t(vs.clients), {});
         for (auto& c : clients_) jump(rng, c);
+        Rng tr(mix_seed(seed, 0x7e6));
+        tiles_.assign(std::size_t(kTiles) * kTiles, {});
+        for (auto& t : tiles_) { t.terrain = tr.below(6); t.level = 1 + tr.below(10); t.owner = tr.below(3) ? 0 : 1 + tr.below(5000); }
+        zone_tiles_.clear();
+        for (int32_t ty = 0; ty < kTiles; ++ty)
+            for (int32_t tx = 0; tx < kTiles; ++tx)
+                if (in_zone(tx * kTile + kTile / 2, ty * kTile + kTile / 2)) zone_tiles_.push_back(ty * kTiles + tx);
         tick_rng_ = Rng(mix_seed(seed, 0x7e4));
         view_rng_ = Rng(mix_seed(seed, 0x7e5));
         rebuild();
@@ -143,6 +186,7 @@ public:
                 if (u.x < 0 || u.x >= kMapSize) { u.vx = -u.vx; u.x = u.x < 0 ? -u.x : 2 * kMapSize - 1 - u.x; }
                 if (u.y < 0 || u.y >= kMapSize) { u.vy = -u.vy; u.y = u.y < 0 ? -u.y : 2 * kMapSize - 1 - u.y; }
             }
+            for (int e = 0; e < int(tiles_.size()) / 64; ++e) take_tile(r.below(int32_t(tiles_.size())), r);
         } else {
             // A few events per tick across the map: 1 unit in 500 changes owner, state or hp.
             const int events = std::max(1, int(units_.size()) / 500);
@@ -154,6 +198,8 @@ public:
                 default: u.hp = u.hp > 50 ? u.hp - r.range(1, 50) : u.hp + 500; break;
                 }
             }
+            // 1 tile in 1024 changes owner (occupied, abandoned).
+            for (int e = 0; e < int(tiles_.size()) / 1024; ++e) take_tile(r.below(int32_t(tiles_.size())), r);
             if (rate_ == Rate::Combat) {
                 // One battle round per tick: every engaged unit loses (or regains) hp, 1 in 8 changes state.
                 for (int32_t i : engaged_) {
@@ -161,6 +207,7 @@ public:
                     u.hp = u.hp > 30 ? u.hp - r.range(1, 30) : u.hp + 800;
                     if (r.below(8) == 0) u.state = r.below(4);
                 }
+                for (int32_t t : zone_tiles_) if (r.below(16) == 0) take_tile(t, r);
             }
         }
         // Marches: arrivals leave, a few are recalled (new end and arrival), new ones start.
@@ -171,43 +218,54 @@ public:
         for (auto& m : marches_)
             if (r.below(100) == 0) {
                 m.x1 = (m.x0 + m.x1) / 2; m.y1 = (m.y0 + m.y1) / 2; m.t1 = tick_ + r.range(2, 8);
-                m.blocks = blocks_of_line(m.x0, m.y0, m.x1, m.y1);
+                trace(m);
             }
         const int born = vs_->marches / duration();
         for (int i = 0; i < born; ++i) add_march(r);
         rebuild();
     }
 
-    // Client c moves its view centre; true when it entered another block (it then
-    // pulls window(c), the 3 x 3 blocks around it).
-    bool move(int c) {
+    // Browse: client c drags its view (or jumps elsewhere).
+    void move(int c) {
         ViewClient& v = clients_[std::size_t(c)];
         if (view_rng_.below(kJumpOneIn) == 0) jump(view_rng_, v);
         else {
-            v.cx = clamp(v.cx + view_rng_.range(-kPanStep, kPanStep), 0, kMapSize - 1);
-            v.cy = clamp(v.cy + view_rng_.range(-kPanStep, kPanStep), 0, kMapSize - 1);
+            v.cx = clamp_i(v.cx + view_rng_.range(-kPanStep, kPanStep), 0, kMapSize - 1);
+            v.cy = clamp_i(v.cy + view_rng_.range(-kPanStep, kPanStep), 0, kMapSize - 1);
         }
-        const int32_t b = block_of(v.cx, v.cy);
-        if (b == v.block) return false;
-        v.block = b;
-        v.n = 0;
-        const int32_t bx = b % kBX, by = b / kBX;
-        for (int32_t y = by - 1; y <= by + 1; ++y)
-            for (int32_t x = bx - 1; x <= bx + 1; ++x)
-                if (x >= 0 && x < kBX && y >= 0 && y < kBY) v.win[v.n++] = y * kBX + x;
-        return true;
+    }
+    ViewRect rect(int c) const { return view_rect(clients_[std::size_t(c)].cx, clients_[std::size_t(c)].cy); }
+
+    // World unit indices standing in r (index cells row-major, then index order).
+    void units_in(const ViewRect& r, std::vector<int32_t>& out) const {
+        out.clear();
+        for (int32_t cy = r.y0 / kCell; cy <= (r.y1 - 1) / kCell; ++cy)
+            for (int32_t cx = r.x0 / kCell; cx <= (r.x1 - 1) / kCell; ++cx)
+                for (int32_t i : ucell_[std::size_t(cy * kCells + cx)])
+                    if (in_rect(r, units_[std::size_t(i)].x, units_[std::size_t(i)].y)) out.push_back(i);
+    }
+    // World march indices whose line crosses r (a sample point inside it).
+    void marches_in(const ViewRect& r, std::vector<int32_t>& out) const {
+        out.clear();
+        ++mgen_;
+        for (int32_t cy = r.y0 / kCell; cy <= (r.y1 - 1) / kCell; ++cy)
+            for (int32_t cx = r.x0 / kCell; cx <= (r.x1 - 1) / kCell; ++cx)
+                for (int32_t i : mcell_[std::size_t(cy * kCells + cx)]) {
+                    if (mstamp_[std::size_t(i)] == mgen_) continue;
+                    mstamp_[std::size_t(i)] = mgen_;
+                    const auto& p = marches_[std::size_t(i)].pts;
+                    for (std::size_t k = 0; k < p.size(); k += 2)
+                        if (in_rect(r, p[k], p[k + 1])) { out.push_back(i); break; }
+                }
     }
 
-    const ViewClient& client(int c) const { return clients_[std::size_t(c)]; }
     const WorldUnit& unit(int32_t i) const { return units_[std::size_t(i)]; }
     const WorldMarch& march(int32_t i) const { return marches_[std::size_t(i)]; }
-    const std::vector<int32_t>& block_units(int32_t b) const { return bunits_[std::size_t(b)]; }
-    const std::vector<int32_t>& block_marches(int32_t b) const { return bmarches_[std::size_t(b)]; }
+    const WorldTile& tile(int32_t tx, int32_t ty) const { return tiles_[std::size_t(ty * kTiles + tx)]; }
     int64_t tick_no() const { return tick_; }
     const ViewScale& scale() const { return *vs_; }
 
 private:
-    static int32_t clamp(int32_t v, int32_t lo, int32_t hi) { return v < lo ? lo : v > hi ? hi : v; }
     static void jump(Rng& rng, ViewClient& v) { v.cx = rng.below(kMapSize); v.cy = rng.below(kMapSize); }
     bool in_zone(int32_t x, int32_t y) const {
         for (const auto& z : zones_) {
@@ -216,48 +274,59 @@ private:
         }
         return false;
     }
+    void take_tile(int32_t t, Rng& r) {
+        auto& x = tiles_[std::size_t(t)];
+        x.owner = r.below(4) ? 1 + r.below(5000) : 0;
+        x.changed = tick_;
+    }
     int duration() const { return rate_ == Rate::Peace ? 30 : rate_ == Rate::Combat ? 15 : 10; }
-    // Blocks a line crosses: sampled every 64 units of length (blocks are at least 384).
-    static std::vector<int32_t> blocks_of_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1) {
-        std::vector<int32_t> out;
-        const int32_t dx = x1 - x0, dy = y1 - y0;
-        const int32_t steps = std::max(1, (std::max(std::abs(dx), std::abs(dy)) + 63) / 64);
+    static void trace(WorldMarch& m) {
+        m.pts.clear(); m.cells.clear();
+        const int32_t dx = m.x1 - m.x0, dy = m.y1 - m.y0;
+        const int32_t steps = std::max(1, (std::max(std::abs(dx), std::abs(dy)) + 31) / 32);
         for (int32_t s = 0; s <= steps; ++s) {
-            const int32_t b = block_of(x0 + int32_t(int64_t(dx) * s / steps), y0 + int32_t(int64_t(dy) * s / steps));
-            if (std::find(out.begin(), out.end(), b) == out.end()) out.push_back(b);
+            const int32_t x = m.x0 + int32_t(int64_t(dx) * s / steps), y = m.y0 + int32_t(int64_t(dy) * s / steps);
+            m.pts.push_back(x); m.pts.push_back(y);
+            const int32_t c = (y / kCell) * kCells + x / kCell;
+            if (std::find(m.cells.begin(), m.cells.end(), c) == m.cells.end()) m.cells.push_back(c);
         }
-        return out;
     }
     void add_march(Rng& r) {
         WorldMarch m;
         m.id = next_march_++; m.owner = 1 + r.below(5000);
         m.x0 = r.below(kMapSize); m.y0 = r.below(kMapSize);
-        m.x1 = clamp(m.x0 + r.range(-1500, 1500), 0, kMapSize - 1);
-        m.y1 = clamp(m.y0 + r.range(-1500, 1500), 0, kMapSize - 1);
+        m.x1 = clamp_i(m.x0 + r.range(-1500, 1500), 0, kMapSize - 1);
+        m.y1 = clamp_i(m.y0 + r.range(-1500, 1500), 0, kMapSize - 1);
         const int d = duration();
         m.t0 = tick_; m.t1 = tick_ + r.range(d / 2, d + d / 2);
-        m.blocks = blocks_of_line(m.x0, m.y0, m.x1, m.y1);
+        trace(m);
         marches_.push_back(std::move(m));
     }
     void rebuild() {
-        bunits_.resize(std::size_t(kBlocks));
-        bmarches_.resize(std::size_t(kBlocks));
-        for (auto& b : bunits_) b.clear();
-        for (auto& b : bmarches_) b.clear();
-        for (std::size_t i = 0; i < units_.size(); ++i) bunits_[std::size_t(block_of(units_[i].x, units_[i].y))].push_back(int32_t(i));
+        ucell_.resize(std::size_t(kCells) * kCells);
+        mcell_.resize(std::size_t(kCells) * kCells);
+        for (auto& c : ucell_) c.clear();
+        for (auto& c : mcell_) c.clear();
+        for (std::size_t i = 0; i < units_.size(); ++i)
+            ucell_[std::size_t((units_[i].y / kCell) * kCells + units_[i].x / kCell)].push_back(int32_t(i));
         for (std::size_t i = 0; i < marches_.size(); ++i)
-            for (int32_t b : marches_[i].blocks) bmarches_[std::size_t(b)].push_back(int32_t(i));
+            for (int32_t c : marches_[i].cells) mcell_[std::size_t(c)].push_back(int32_t(i));
+        mstamp_.assign(marches_.size(), 0);
+        mgen_ = 0;
     }
 
     const ViewScale* vs_ = nullptr;
     Rate rate_ = Rate::Stress;
     std::vector<WorldUnit> units_;
     std::vector<WorldMarch> marches_;
-    std::vector<int32_t> engaged_;
+    std::vector<WorldTile> tiles_;
+    std::vector<int32_t> engaged_, zone_tiles_;
     int32_t zones_[2][2]{};
     int32_t next_march_ = 1;
     std::vector<ViewClient> clients_;
-    std::vector<std::vector<int32_t>> bunits_, bmarches_;
+    std::vector<std::vector<int32_t>> ucell_, mcell_;
+    mutable std::vector<uint32_t> mstamp_;
+    mutable uint32_t mgen_ = 0;
     int64_t tick_ = 0;
     Rng tick_rng_{0}, view_rng_{0};
 };
@@ -265,19 +334,25 @@ private:
 template <class M, class W> void copy_vmarch(M& d, const W& s) {
     d.id = s.id; d.owner = s.owner; d.x0 = s.x0; d.y0 = s.y0; d.x1 = s.x1; d.y1 = s.y1; d.t0 = s.t0; d.t1 = s.t1;
 }
-
-inline void block_rect(int32_t b, int32_t& x0, int32_t& y0, int32_t& x1, int32_t& y1) {
-    x0 = (b % kBX) * kBlockW; y0 = (b / kBX) * kBlockH;
-    x1 = std::min(x0 + kBlockW, kMapSize); y1 = std::min(y0 + kBlockH, kMapSize);
+template <class T> void copy_vtile(T& d, const MapWorld& w, int32_t tx, int32_t ty) {
+    const WorldTile& s = w.tile(tx, ty);
+    d.x = tx; d.y = ty; d.terrain = s.terrain; d.level = s.level; d.owner = s.owner;
 }
 
-// Fill a block snapshot of any model (std, XOffset, cista) from the world.
-// request_id / tick: those of the block's last delta (so a snapshot and the
-// deltas before it leave the client with the same view).
-template <class V> void fill_view(V& v, const BlockWorld& w, int32_t b, int64_t request_id, int64_t tick) {
+// What lies in a viewport (server bookkeeping, untimed like the tracker):
+// world unit and march indices from the spatial index.
+struct ViewQuery {
+    std::vector<int32_t> units, marches;
+    void run(const MapWorld& w, const ViewRect& r) { w.units_in(r, units); w.marches_in(r, marches); }
+};
+
+// Fill a viewport snapshot of any model (std, XOffset, cista) from the world:
+// every tile under r (row-major), the units and marches q found in it.
+template <class V> void fill_view(V& v, const MapWorld& w, const ViewRect& r, const ViewQuery& q, int64_t request_id, int64_t tick) {
+    const auto& us = q.units;
+    const auto& ms = q.marches;
     v.request_id = request_id; v.tick = tick;
-    block_rect(b, v.x0, v.y0, v.x1, v.y1);
-    const auto& us = w.block_units(b);
+    v.x0 = r.x0; v.y0 = r.y0; v.x1 = r.x1; v.y1 = r.y1;
     v.units.clear();
     v.units.reserve(us.size());
     for (int32_t i : us) {
@@ -286,15 +361,19 @@ template <class V> void fill_view(V& v, const BlockWorld& w, int32_t b, int64_t 
         d.id = s.id; d.owner = s.owner; d.x = s.x; d.y = s.y; d.hp = s.hp; d.state = s.state;
         d.name = std::string_view(s.name);
     }
-    const auto& ms = w.block_marches(b);
     v.marches.clear();
     v.marches.reserve(ms.size());
     for (int32_t i : ms) copy_vmarch(v.marches.emplace_back(), w.march(i));
+    const TileSpan sp = tile_span(r.x0, r.y0, r.x1, r.y1);
+    v.tiles.clear();
+    v.tiles.reserve(std::size_t(sp.cols * sp.rows));
+    for (int32_t ty = sp.ty0; ty < sp.ty0 + sp.rows; ++ty)
+        for (int32_t tx = sp.tx0; tx < sp.tx0 + sp.cols; ++tx) copy_vtile(v.tiles.emplace_back(), w, tx, ty);
 }
 
-// The client reads every unit and march of a block it holds (what a renderer
-// touches); order-independent, and the result must match across formats. Zeroed
-// (free) slots add nothing.
+// The client reads every tile, unit and march of the view it holds (what a
+// renderer touches); order-independent, and the result must match across
+// formats. Zeroed (free) unit and march slots add nothing.
 template <class V> uint64_t query_view(const V& v) {
     uint64_t h = uint64_t(v.request_id) * 31u + uint64_t(v.tick) + uint64_t(v.x0) * 7u + uint64_t(v.y1);
     for (const auto& u : v.units) {
@@ -303,31 +382,35 @@ template <class V> uint64_t query_view(const V& v) {
     }
     for (const auto& m : v.marches)
         h += uint64_t(m.id) * 2654435761u + uint64_t(m.x0 ^ m.y1) + uint64_t(m.x1 ^ m.y0) + uint64_t(m.t0) * 5u + uint64_t(m.t1) + uint64_t(m.owner);
+    for (const auto& t : v.tiles)
+        h += uint64_t(t.owner) * 40503u + uint64_t(t.level) * 3u + uint64_t(t.terrain) + uint64_t(t.x * 131 + t.y) * 17u;
     return h;
 }
 
 // ---- deltas -----------------------------------------------------------------
 //
-// Server bookkeeping (not timed): for every block, what its subscribers hold.
-// Every block is planned every tick, so a block's record is always the state a
-// client gets from that tick's snapshot.
+// Server bookkeeping (not timed): for every static client, what it holds.
+// Every client is planned every tick, so its record is always the state the
+// client holds after that tick's delta.
 
 struct DeltaPlan {
     std::vector<int32_t> units;            // world unit indices: entered or changed
     std::vector<int32_t> removed;          // unit ids that left
     std::vector<int32_t> marches;          // world march indices: new or changed
     std::vector<int32_t> removed_marches;  // march ids that left
-    bool empty() const { return units.empty() && removed.empty() && marches.empty() && removed_marches.empty(); }
+    std::vector<int32_t> tiles;            // tiles changed this tick: ty * kTiles + tx
+    bool empty() const { return units.empty() && removed.empty() && marches.empty() && removed_marches.empty() && tiles.empty(); }
 };
 
-class BlockTracker {
+class ViewTracker {
 public:
-    void setup() { u_.assign(std::size_t(kBlocks), {}); m_.assign(std::size_t(kBlocks), {}); }
-    void plan(const BlockWorld& w, int32_t b, DeltaPlan& p) {
-        p.units.clear(); p.removed.clear(); p.marches.clear(); p.removed_marches.clear();
+    void setup(int clients) { u_.assign(std::size_t(clients), {}); m_.assign(std::size_t(clients), {}); }
+    void plan(const MapWorld& w, int c, const ViewRect& r, DeltaPlan& p) {
+        p.units.clear(); p.removed.clear(); p.marches.clear(); p.removed_marches.clear(); p.tiles.clear();
         ++gen_;
-        auto& lu = u_[std::size_t(b)];
-        for (int32_t i : w.block_units(b)) {
+        auto& lu = u_[std::size_t(c)];
+        w.units_in(r, tmp_);
+        for (int32_t i : tmp_) {
             const WorldUnit& u = w.unit(i);
             auto [it, fresh] = lu.try_emplace(u.id);
             SentU& s = it->second;
@@ -341,8 +424,9 @@ public:
             if (it->second.gen != gen_) { p.removed.push_back(it->first); it = lu.erase(it); }
             else ++it;
         }
-        auto& lm = m_[std::size_t(b)];
-        for (int32_t i : w.block_marches(b)) {
+        auto& lm = m_[std::size_t(c)];
+        w.marches_in(r, tmp_);
+        for (int32_t i : tmp_) {
             const WorldMarch& m = w.march(i);
             auto [it, fresh] = lm.try_emplace(m.id);
             SentM& s = it->second;
@@ -353,6 +437,11 @@ public:
             if (it->second.gen != gen_) { p.removed_marches.push_back(it->first); it = lm.erase(it); }
             else ++it;
         }
+        // The client's tiles never change place; a tile is sent when its owner changed this tick.
+        const TileSpan sp = tile_span(r.x0, r.y0, r.x1, r.y1);
+        for (int32_t ty = sp.ty0; ty < sp.ty0 + sp.rows; ++ty)
+            for (int32_t tx = sp.tx0; tx < sp.tx0 + sp.cols; ++tx)
+                if (w.tile(tx, ty).changed == w.tick_no()) p.tiles.push_back(ty * kTiles + tx);
         // Deterministic order (unordered_map iteration order is the same code in
         // every runner, but sorting keeps the messages independent of it).
         std::sort(p.removed.begin(), p.removed.end());
@@ -363,12 +452,13 @@ private:
     struct SentM { int32_t x1{}, y1{}; int64_t t1{}; uint64_t gen{}; };
     std::vector<std::unordered_map<int32_t, SentU>> u_;
     std::vector<std::unordered_map<int32_t, SentM>> m_;
+    std::vector<int32_t> tmp_;
     uint64_t gen_ = 0;
 };
 
-template <class D> void fill_delta(D& d, const BlockWorld& w, int32_t b, const DeltaPlan& p, int64_t request_id) {
+template <class D> void fill_delta(D& d, const MapWorld& w, const ViewRect& r, const DeltaPlan& p, int64_t request_id) {
     d.request_id = request_id; d.tick = w.tick_no();
-    block_rect(b, d.x0, d.y0, d.x1, d.y1);
+    d.x0 = r.x0; d.y0 = r.y0; d.x1 = r.x1; d.y1 = r.y1;
     d.upserts.clear();
     d.upserts.reserve(p.units.size());
     for (int32_t i : p.units) {
@@ -386,9 +476,12 @@ template <class D> void fill_delta(D& d, const BlockWorld& w, int32_t b, const D
     d.removed_marches.clear();
     d.removed_marches.reserve(p.removed_marches.size());
     for (int32_t id : p.removed_marches) d.removed_marches.emplace_back(id);
+    d.tiles.clear();
+    d.tiles.reserve(p.tiles.size());
+    for (int32_t t : p.tiles) copy_vtile(d.tiles.emplace_back(), w, t % kTiles, t / kTiles);
 }
 
-// Client side: id -> position of a held block view (units and marches).
+// Client side: id -> position of a held view's units and marches.
 struct HeldIndex { std::unordered_map<int32_t, int32_t> units, marches; };
 
 template <class V> void build_index(const V& v, HeldIndex& at) {
@@ -398,9 +491,9 @@ template <class V> void build_index(const V& v, HeldIndex& at) {
     for (std::size_t i = 0; i < v.marches.size(); ++i) at.marches.emplace(v.marches[i].id, int32_t(i));
 }
 
-// Apply a received delta to a held block view (any model) through its index. A
-// record that left is replaced by the last one (order is not kept); a changed
-// one is updated in place; a new one is appended.
+// Apply a received delta to a held view (any model) through its index. A record
+// that left is replaced by the last one (order is not kept); a changed one is
+// updated in place; a new one is appended. Tiles are updated at their place.
 template <class V, class D> void apply_delta(V& v, HeldIndex& at, const D& d) {
     v.request_id = d.request_id; v.tick = d.tick; v.x0 = d.x0; v.y0 = d.y0; v.x1 = d.x1; v.y1 = d.y1;
     for (const auto& id : d.removed) {
@@ -449,45 +542,49 @@ template <class V, class D> void apply_delta(V& v, HeldIndex& at, const D& d) {
             copy_vmarch(v.marches.emplace_back(), m);
         }
     }
+    for (const auto& t : d.tiles) {
+        auto& dst = v.tiles[tile_pos(v, t.x, t.y)];
+        dst.terrain = t.terrain; dst.level = t.level; dst.owner = t.owner;
+    }
 }
 
 // ---- the driver ---------------------------------------------------------------
 //
-// Ops (one per world, provided by each runner):
-//   void setup(int clients)                    held views: clients x 9 slots
-//   std::size_t snap_encode(int b, auto fill)  fill(model&) then encode into block b's slot
+// Ops (one per case, provided by each runner):
+//   void setup(int clients)                    held views: one per client
+//   std::size_t snap_encode(int b, auto fill)  fill(model&) then encode into send slot b (always 0)
 //   std::string_view snap_wire(int b)
-//   void snap_recv(int c, int k, int b)        receive block b's wire into held slot (c, k)
+//   void snap_recv(int c, int k, int b)        receive slot b's wire into client c's held view (k = 0)
 //   auto& held(int c, int k)                   the held view (model object)
 //   std::size_t delta_encode(auto fill)        fill(model&) then encode the delta
 //   std::string_view delta_wire()
 //   void delta_recv()                          receive the delta into the reused receive object
 //   const auto& delta()                        that object
 // Optional: std::string_view snap_compact(int b) (XOffset: the compact wire, for bytes only).
-// Optional native delta (XOffset with XOFFSET_DELTA_SYNC_API), keys N* and K*:
-//   void n_plan(int b, const BlockWorld&, const DeltaPlan&)   which slot each change uses (untimed)
-//   void n_update(int b, const BlockWorld&, const DeltaPlan&, int64_t id)   mutate the server's block buffer
-//   std::size_t n_diff(int b)                  save_delta_into against the block's shared baseline
-//   std::size_t n_key(int b)                   key delta of the block for a new subscriber
-//   std::string_view n_key_wire(int b)         that key delta (bytes only)
-//   void n_apply(int c, int k)                 subscriber applies the block's delta (patch + verify)
-//   void n_key_recv(int c, int k, int b)       new subscriber applies the key delta
+// Optional native delta (XOffset with XOFFSET_DELTA_SYNC_API), keys N*; every
+// client c has its own server-side view and baseline:
+//   void n_view(int c, const MapWorld&, const ViewRect&)   lay out the view's rect and tiles (untimed)
+//   void n_plan(int c, const MapWorld&, const DeltaPlan&)  which slot each change uses (untimed)
+//   void n_update(int c, const MapWorld&, const DeltaPlan&, int64_t id)   mutate the server's view
+//   std::size_t n_diff(int c)                  save_delta_into against the client's baseline
+//   std::size_t n_key(int c)                   key delta for the first pull (untimed here)
+//   void n_key_recv(int c, int k, int b)       the client applies the key delta (b = c)
+//   void n_apply(int c, int k)                 the client applies its delta (patch + verify)
 //   auto& n_held(int c, int k)                 its view; must read the same as held(c, k)
 
-struct BlockKeys {
-    std::string esend, erecv, eindex, usend, urecv, uapply;
-    std::string ewin, ereq, eenc, ezstd, ecomp, ecompz, udelta, umsg, uenc, uzstd, uunits, umarch;
-    std::string nsend, ndiff, nrecv, ndelta, kenc, krecv, kbytes, kzstd;
-    BlockKeys(const char* e, const char* u, const char* n, const char* kk) {
-        const std::string E(e), U(u), N(n), K(kk);
-        nsend = N + ".send"; ndiff = N + ".diff"; nrecv = N + ".recv"; ndelta = N + ".delta";
-        kenc = K + ".send"; krecv = K + ".recv"; kbytes = K + ".window"; kzstd = K + ".window_zstd";
-        esend = E + ".send"; erecv = E + ".recv"; eindex = E + ".index";
-        usend = U + ".send"; urecv = U + ".recv"; uapply = U + ".apply";
-        ewin = E + ".window"; ereq = E + ".requests"; eenc = E + ".encoded"; ezstd = E + ".window_zstd";
+struct ViewKeys {
+    std::string esend, erecv, usend, urecv, uapply;
+    std::string ewin, ereq, ezstd, ecomp, ecompz, udelta, umsg, uzstd, uunits, umarch, utiles;
+    std::string nsend, ndiff, nrecv, ndelta;
+    ViewKeys(const char* e, const char* u, const char* n) {
+        const std::string E(e), U(u), N(n);
+        esend = E + ".send"; erecv = E + ".recv";
+        ewin = E + ".window"; ereq = E + ".requests"; ezstd = E + ".window_zstd";
         ecomp = E + ".window_compact"; ecompz = E + ".window_compact_zstd";
-        udelta = U + ".delta"; umsg = U + ".deliveries"; uenc = U + ".encoded"; uzstd = U + ".delta_zstd";
-        uunits = U + ".units"; umarch = U + ".marches";
+        usend = U + ".send"; urecv = U + ".recv"; uapply = U + ".apply";
+        udelta = U + ".delta"; umsg = U + ".deliveries"; uzstd = U + ".delta_zstd";
+        uunits = U + ".units"; umarch = U + ".marches"; utiles = U + ".tiles";
+        nsend = N + ".send"; ndiff = N + ".diff"; nrecv = N + ".recv"; ndelta = N + ".delta";
     }
 };
 
@@ -502,148 +599,129 @@ inline std::size_t zstd_size(std::string_view w) {
 #endif
 }
 
-struct BlockSession {
-    BlockWorld world;
-    BlockTracker tracker;
-    DeltaPlan plan;
-    std::vector<std::vector<std::pair<int32_t, int32_t>>> subs;   // block -> (client, slot)
-    std::vector<HeldIndex> index;                                  // client * 9 + slot
-    std::vector<int64_t> snap_tick;                                // block -> tick its snapshot was encoded
-    std::vector<std::size_t> snap_z, snap_c, snap_cz;              // zstd / compact sizes of that snapshot
-    std::vector<int64_t> last_id, last_tick;                       // block -> id and tick of its last delta
-    std::vector<std::size_t> nkey, nkey_z;                         // native: key delta size (raw / zstd), this tick
-    void setup(uint64_t seed, const ViewScale& vs, Rate rate) {
-        world.setup(seed, vs, rate);
-        tracker.setup();
-        subs.assign(std::size_t(kBlocks), {});
-        index.assign(std::size_t(vs.clients) * 9, {});
-        snap_tick.assign(std::size_t(kBlocks), -1);
-        snap_z.assign(std::size_t(kBlocks), 0); snap_c.assign(std::size_t(kBlocks), 0); snap_cz.assign(std::size_t(kBlocks), 0);
-        last_id.assign(std::size_t(kBlocks), 0); last_tick.assign(std::size_t(kBlocks), 0);
-        nkey.assign(std::size_t(kBlocks), 0); nkey_z.assign(std::size_t(kBlocks), 0);
-    }
-};
-
-template <class Ops> void run_blocks(BlockSession& s, Ops& ops, const BlockKeys& k, int cycle, CycleStats& st, std::string* keep_view, std::string* keep_delta) {
-    BlockWorld& w = s.world;
-    const ViewScale& vs = w.scale();
-    constexpr bool native = requires { ops.n_diff(0); };
-    for (int r = 0; r < vs.rounds; ++r) {
-        w.tick();
-        const int64_t base = (int64_t(cycle) * vs.rounds + r) * (kBlocks + 1) * 2;
-        // U: every block's changes since the last tick, encoded once, to every subscriber.
-        for (int32_t b = 0; b < kBlocks; ++b) {
-            s.tracker.plan(w, b, s.plan);
-            if (s.plan.empty()) continue;
-            s.last_id[std::size_t(b)] = base + b; s.last_tick[std::size_t(b)] = w.tick_no();
-            std::size_t nd = 0;
-            if constexpr (native) {
-                // The server's block buffer follows every change (it is the state new
-                // subscribers' key deltas come from), subscribed or not.
-                ops.n_plan(b, w, s.plan);   // slot bookkeeping, untimed like the tracker
-                timed(st, k.nsend.c_str(), [&] { ops.n_update(b, w, s.plan, base + b); });
-                timed(st, k.ndiff.c_str(), [&] { nd = ops.n_diff(b); });
-            }
-            const auto& subs = s.subs[std::size_t(b)];
-            if (subs.empty()) continue;
-            std::size_t n = 0;
-            timed(st, k.usend.c_str(), [&] { n = ops.delta_encode([&](auto& d) { fill_delta(d, w, b, s.plan, base + b); }); });
-            const std::size_t z = zstd_size(ops.delta_wire());
-            st.bytes[k.uenc] += 1;
-            st.bytes[k.uunits] += s.plan.units.size() + s.plan.removed.size();
-            st.bytes[k.umarch] += s.plan.marches.size() + s.plan.removed_marches.size();
-            if (keep_delta) *keep_delta = std::string(ops.delta_wire());
-            for (const auto& [c, slot] : subs) {
-                timed(st, k.urecv.c_str(), [&] { ops.delta_recv(); });
-                HeldIndex& at = s.index[std::size_t(c) * 9 + std::size_t(slot)];
-                timed(st, k.uapply.c_str(), [&] { apply_delta(ops.held(c, slot), at, ops.delta()); });
-                const uint64_t q = query_view(ops.held(c, slot));
-                st.report_sum += q;
-                if constexpr (native) {
-                    timed(st, k.nrecv.c_str(), [&] { ops.n_apply(c, slot); });
-                    if (query_view(ops.n_held(c, slot)) != q) throw std::runtime_error("native delta: view differs from the application-level one");
-                    st.bytes[k.ndelta] += nd;
-                }
-                st.bytes[k.udelta] += n;
-                st.bytes[k.uzstd] += z;
-                st.bytes[k.umsg] += 1;
-            }
-        }
-        // E: clients move; one that entered another block pulls its 3 x 3 window.
-        for (int c = 0; c < vs.clients; ++c) {
-            const int32_t old_block = w.client(c).block;
-            int32_t old_win[9]; int32_t old_n = w.client(c).n;
-            std::copy(w.client(c).win, w.client(c).win + 9, old_win);
-            if (!w.move(c)) continue;
-            if (old_block >= 0)
-                for (int32_t slot = 0; slot < old_n; ++slot) {
-                    auto& v = s.subs[std::size_t(old_win[slot])];
-                    v.erase(std::find(v.begin(), v.end(), std::pair<int32_t, int32_t>(c, slot)));
-                }
-            const ViewClient& vc = w.client(c);
-            st.bytes[k.ereq] += 1;
-            for (int32_t slot = 0; slot < vc.n; ++slot) {
-                const int32_t b = vc.win[slot];
-                if (s.snap_tick[std::size_t(b)] != w.tick_no()) {
-                    timed(st, k.esend.c_str(), [&] {
-                        ops.snap_encode(b, [&](auto& v) { fill_view(v, w, b, s.last_id[std::size_t(b)], s.last_tick[std::size_t(b)]); });
-                    });
-                    if constexpr (native) {
-                        timed(st, k.kenc.c_str(), [&] { s.nkey[std::size_t(b)] = ops.n_key(b); });
-                        s.nkey_z[std::size_t(b)] = zstd_size(ops.n_key_wire(b));
-                    }
-                    s.snap_tick[std::size_t(b)] = w.tick_no();
-                    s.snap_z[std::size_t(b)] = zstd_size(ops.snap_wire(b));
-                    if constexpr (requires { ops.snap_compact(b); }) {
-                        const std::string_view cw = ops.snap_compact(b);
-                        s.snap_c[std::size_t(b)] = cw.size();
-                        s.snap_cz[std::size_t(b)] = zstd_size(cw);
-                    }
-                    st.bytes[k.eenc] += 1;
-                    if (keep_view) *keep_view = std::string(ops.snap_wire(b));
-                }
-                uint64_t q = 0;
-                timed(st, k.erecv.c_str(), [&] {
-                    ops.snap_recv(c, slot, b);
-                    q = query_view(ops.held(c, slot));
-                });
-                st.report_sum += q;
-                if constexpr (native) {
-                    // Timed like E.recv: receive, then read every unit and march.
-                    uint64_t nq = 0;
-                    timed(st, k.krecv.c_str(), [&] {
-                        ops.n_key_recv(c, slot, b);
-                        nq = query_view(ops.n_held(c, slot));
-                    });
-                    if (nq != q) throw std::runtime_error("native key delta: view differs from the snapshot");
-                    st.bytes[k.kbytes] += s.nkey[std::size_t(b)];
-                    st.bytes[k.kzstd] += s.nkey_z[std::size_t(b)];
-                }
-                HeldIndex& at = s.index[std::size_t(c) * 9 + std::size_t(slot)];
-                timed(st, k.eindex.c_str(), [&] { build_index(ops.held(c, slot), at); });
-                s.subs[std::size_t(b)].emplace_back(c, slot);
-                st.bytes[k.ewin] += ops.snap_wire(b).size();
-                st.bytes[k.ezstd] += s.snap_z[std::size_t(b)];
-                if constexpr (requires { ops.snap_compact(b); }) {
-                    st.bytes[k.ecomp] += s.snap_c[std::size_t(b)];
-                    st.bytes[k.ecompz] += s.snap_cz[std::size_t(b)];
-                }
-            }
-        }
-    }
-}
-
-// The three demo worlds, by change rate: peace (P), combat (C), stress (S).
-// E* block snapshots, U* application-level deltas; XOffset native: N* deltas,
-// K* key deltas (its snapshots for new subscribers).
-struct BlockRates {
-    static constexpr Rate rates[3] = {Rate::Peace, Rate::Combat, Rate::Stress};
-    static const BlockKeys& keys(int i) {
-        static const BlockKeys k[3] = {{"EP", "UP", "NP", "KP"}, {"EC", "UC", "NC", "KC"}, {"ES", "US", "NS", "KS"}};
+// The demo cases: 0 browse (class 2), 1..3 static at peace / combat / stress (class 3).
+struct ViewCases {
+    static constexpr int count = 4;
+    static constexpr Rate rates[count] = {Rate::Peace, Rate::Peace, Rate::Combat, Rate::Stress};
+    static bool browse(int i) { return i == 0; }
+    static const ViewKeys& keys(int i) {
+        static const ViewKeys k[count] = {{"EB", "UB", "NB"}, {"EP", "UP", "NP"}, {"EC", "UC", "NC"}, {"ES", "US", "NS"}};
         return k[i];
     }
     static uint64_t seed(uint64_t s, int i) { return mix_seed(s, 0xb10c + uint64_t(i)); }
 };
+
+struct ViewSession {
+    MapWorld world;
+    ViewTracker tracker;
+    DeltaPlan plan;
+    ViewQuery query;
+    bool browse = false, primed = false;
+    std::vector<HeldIndex> index;   // per client
+    void setup(uint64_t seed, const ViewScale& vs, int which) {
+        browse = ViewCases::browse(which); primed = false;
+        world.setup(ViewCases::seed(seed, which), vs, ViewCases::rates[which]);
+        tracker.setup(vs.clients);
+        index.assign(std::size_t(vs.clients), {});
+    }
+};
+
+template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys& k, int cycle, CycleStats& st, std::string* keep_view, std::string* keep_delta) {
+    MapWorld& w = s.world;
+    const ViewScale& vs = w.scale();
+    constexpr bool native = requires { ops.n_diff(0); };
+    if (s.browse) {
+        // Class 2: every client moves its view and pulls the whole rectangle.
+        for (int r = 0; r < vs.rounds; ++r) {
+            w.tick();
+            const int64_t base = (int64_t(cycle) * vs.rounds + r) * (vs.clients + 1);
+            for (int c = 0; c < vs.clients; ++c) {
+                w.move(c);
+                const ViewRect rect = w.rect(c);
+                s.query.run(w, rect);   // the spatial query: server bookkeeping, untimed
+                timed(st, k.esend.c_str(), [&] {
+                    ops.snap_encode(0, [&](auto& v) { fill_view(v, w, rect, s.query, base + c, w.tick_no()); });
+                });
+                uint64_t q = 0;
+                timed(st, k.erecv.c_str(), [&] {
+                    ops.snap_recv(c, 0, 0);
+                    q = query_view(ops.held(c, 0));
+                });
+                st.report_sum += q;
+                st.bytes[k.ereq] += 1;
+                st.bytes[k.ewin] += ops.snap_wire(0).size();
+                st.bytes[k.ezstd] += zstd_size(ops.snap_wire(0));
+                if constexpr (requires { ops.snap_compact(0); }) {
+                    const std::string_view cw = ops.snap_compact(0);
+                    st.bytes[k.ecomp] += cw.size();
+                    st.bytes[k.ecompz] += zstd_size(cw);
+                }
+                if (keep_view && c == 0) *keep_view = std::string(ops.snap_wire(0));
+            }
+        }
+        return;
+    }
+    if (!s.primed) {
+        // Class 3, before the first timed tick: every client pulls its view once
+        // (untimed: that is a class 2 pull) and the server records what it holds.
+        for (int c = 0; c < vs.clients; ++c) {
+            const ViewRect rect = w.rect(c);
+            s.tracker.plan(w, c, rect, s.plan);
+            s.query.run(w, rect);
+            ops.snap_encode(0, [&](auto& v) { fill_view(v, w, rect, s.query, 0, w.tick_no()); });
+            ops.snap_recv(c, 0, 0);
+            // The client keeps this view and edits it: room for the records
+            // that come and go (every format the same).
+            auto& h = ops.held(c, 0);
+            h.units.reserve(h.units.size() * 3 / 2 + 16);
+            h.marches.reserve(h.marches.size() * 3 / 2 + 16);
+            build_index(h, s.index[std::size_t(c)]);
+            if constexpr (native) {
+                ops.n_view(c, w, rect);
+                ops.n_plan(c, w, s.plan);
+                ops.n_update(c, w, s.plan, 0);
+                ops.n_key(c);
+                ops.n_key_recv(c, 0, c);
+                if (query_view(ops.n_held(c, 0)) != query_view(ops.held(c, 0))) throw std::runtime_error("native key delta: view differs from the snapshot");
+            }
+        }
+        s.primed = true;
+    }
+    for (int r = 0; r < vs.rounds; ++r) {
+        w.tick();
+        const int64_t base = (int64_t(cycle) * vs.rounds + r) * (vs.clients + 1) + 1;
+        for (int c = 0; c < vs.clients; ++c) {
+            const ViewRect rect = w.rect(c);
+            s.tracker.plan(w, c, rect, s.plan);
+            if (s.plan.empty()) continue;   // nothing changed in this view: nothing sent
+            std::size_t nd = 0;
+            if constexpr (native) {
+                ops.n_plan(c, w, s.plan);   // slot bookkeeping, untimed like the tracker
+                timed(st, k.nsend.c_str(), [&] { ops.n_update(c, w, s.plan, base + c); });
+                timed(st, k.ndiff.c_str(), [&] { nd = ops.n_diff(c); });
+            }
+            std::size_t n = 0;
+            timed(st, k.usend.c_str(), [&] { n = ops.delta_encode([&](auto& d) { fill_delta(d, w, rect, s.plan, base + c); }); });
+            if (keep_delta && c == 0) *keep_delta = std::string(ops.delta_wire());
+            timed(st, k.urecv.c_str(), [&] { ops.delta_recv(); });
+            HeldIndex& at = s.index[std::size_t(c)];
+            timed(st, k.uapply.c_str(), [&] { apply_delta(ops.held(c, 0), at, ops.delta()); });
+            const uint64_t q = query_view(ops.held(c, 0));
+            st.report_sum += q;
+            if constexpr (native) {
+                timed(st, k.nrecv.c_str(), [&] { ops.n_apply(c, 0); });
+                if (query_view(ops.n_held(c, 0)) != q) throw std::runtime_error("native delta: view differs from the application-level one");
+                st.bytes[k.ndelta] += nd;
+            }
+            st.bytes[k.udelta] += n;
+            st.bytes[k.uzstd] += zstd_size(ops.delta_wire());
+            st.bytes[k.umsg] += 1;
+            st.bytes[k.uunits] += s.plan.units.size() + s.plan.removed.size();
+            st.bytes[k.umarch] += s.plan.marches.size() + s.plan.removed_marches.size();
+            st.bytes[k.utiles] += s.plan.tiles.size();
+        }
+    }
+}
 
 // Demo case set, scene <-> storage: players saved to the storage process this cycle
 // (log-outs), then loaded back into the scene (log-ins).
