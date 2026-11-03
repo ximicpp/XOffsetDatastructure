@@ -128,7 +128,7 @@ public:
                 }
             });
             recv(st, "A.req_decode", m, req);
-            timed(st, "A.simulate", [&] { simulate_battle(*m); });
+            untimed(st, "A.simulate", [&] { simulate_battle(*m); });
             timed(st, "A.res_encode", [&] { save(res, *m); });
             recv(st, "A.res_decode", r, res);
             timed(st, "A.apply", [&] {
@@ -153,7 +153,7 @@ public:
             auto& slot = players_[std::size_t(migrants[k])];
             timed(st, "B.out_encode", [&] { save(out_, *slot); });
             recv(st, "B.in_decode", b_m_, out_);
-            timed(st, "B.scene_edits", [&] { season_edits(*b_m_, mix_seed(seed_, uint64_t(cycle) * 1000003u + k), sc.season_ops); });
+            untimed(st, "B.scene_edits", [&] { season_edits(*b_m_, mix_seed(seed_, uint64_t(cycle) * 1000003u + k), sc.season_ops); });
             timed(st, "B.install", [&] { swap(slot, b_m_); });
             st.bytes["B.out"] += out_.size();
             if (keep) keep->player = to_string_bytes(out_);
@@ -168,7 +168,7 @@ public:
             Held<cm::PlayerState>& r = reuse ? b_r_ : r_local;
             timed(st, "B.out_encode", [&] { save(out, *slot); });
             recv(st, "B.in_decode", m, out);
-            timed(st, "B.season_edits", [&] { season_edits(*m, mix_seed(seed_, uint64_t(cycle) * 1000003u + k), sc.season_ops); });
+            untimed(st, "B.season_edits", [&] { season_edits(*m, mix_seed(seed_, uint64_t(cycle) * 1000003u + k), sc.season_ops); });
             timed(st, "B.back_encode", [&] { save(back, *m); });
             recv(st, "B.back_decode", r, back);
             timed(st, "B.writeback", [&] { swap(slot, r); });
@@ -200,7 +200,7 @@ public:
             Held<cm::ShardState>& r = reuse ? c_r_ : r_local;
             timed(st, "C.snapshot", [&] { save(snap, *shard_); });
             recv(st, "C.restore", r, snap);
-            timed(st, "C.ticks", [&] { shard_ticks(*r, mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
+            untimed(st, "C.ticks", [&] { shard_ticks(*r, mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
             timed(st, "C.snapshot2", [&] { save(snap2, *r); });
             timed(st, "C.replace", [&] { swap(shard_, r); });
             st.bytes["C.snapshot"] += snap.size();
@@ -213,7 +213,7 @@ public:
                 Bytes tmp;
                 Held<cm::ShardState> m;
                 m.receive(save(tmp, *shard_));
-                timed(st, "S.ticks_middle", [&] { shard_ticks_middle_erase(*m, mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
+                untimed(st, "S.ticks_middle", [&] { shard_ticks_middle_erase(*m, mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
             }
         }
 
@@ -306,7 +306,7 @@ public:
         Bytes dw;
         void setup(int clients) {
             snaps.assign(1, {});
-            held_views = std::vector<Held<cm::ViewSnapshot>>(std::size_t(clients));
+            held_views = std::vector<Held<cm::ViewSnapshot>>(std::size_t(clients) + 1);   // [clients]: warm view (EBW)
         }
         template <class Fill> std::size_t snap_encode(int b, Fill&& fill) { fill(ev); return save(snaps[std::size_t(b)], ev).size(); }
         std::string_view snap_wire(int b) const {

@@ -135,7 +135,7 @@ template <class Ops> void run_login(Ops& ops, uint64_t seed, int cycle, int roun
         st.report_sum += q;
         st.bytes["L.player"] += n;
         st.bytes["L.logins"] += 1;
-        if constexpr (native) {
+        if constexpr (native) if (native_on()) {
             std::size_t k = 0;
             timed(st, "LK.send", [&] { k = ops.n_login_key(p); });
             timed(st, "LK.recv", [&] { ops.n_login_recv(p); });
@@ -161,7 +161,7 @@ template <class Ops> void run_login(Ops& ops, uint64_t seed, int cycle, int roun
             st.report_sum += q;
             st.bytes["LD.patch"] += n;
             st.bytes["LD.patches"] += 1;
-            if constexpr (native) {
+            if constexpr (native) if (native_on()) {
                 std::size_t k = 0;
                 if constexpr (requires { ops.n_diff_dirty(0, dirty); })
                     timed(st, "LN.diff", [&] { k = ops.n_diff_dirty(p, dirty); });
@@ -190,7 +190,7 @@ template <class Ops> void run_dirty_save(Ops& ops, const std::vector<int>& who, 
         timed(st, "SD.save_encode", [&] { n = ops.modules_encode([&](auto& m) { fill_modules(m, ops.player(p), cycle); }); });
         timed(st, "SD.store_recv", [&] { ops.modules_recv(); });
         st.bytes["SD.modules"] += n;
-        if constexpr (native) {
+        if constexpr (native) if (native_on()) {
             std::size_t k = 0;
             timed(st, "SN.diff", [&] { k = ops.n_store_diff(p); });
             timed(st, "SN.store_recv", [&] { ops.n_store_recv(p); });

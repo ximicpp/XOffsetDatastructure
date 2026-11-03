@@ -33,7 +33,10 @@ template <CerealArchive A> void serialize(A& ar, BattleMsg& v) { ar(v.battle_id,
 template <CerealArchive A> void serialize(A& ar, Tile& v) { ar(v.x, v.y, v.terrain, v.level, v.owner); }
 template <CerealArchive A> void serialize(A& ar, March& v) { ar(v.march_id, v.owner, v.from_x, v.from_y, v.to_x, v.to_y, v.eta, v.troops); }
 template <CerealArchive A> void serialize(A& ar, ShardState& v) { ar(v.shard_id, v.tick, v.width, v.tiles, v.cities, v.marches); }
-template <CerealArchive A> void serialize(A& ar, ViewUnit& v) { ar(v.id, v.owner, v.x, v.y, v.hp, v.state, v.name); }
+template <CerealArchive A> void serialize(A& ar, UnitHero& v) { ar(v.id, v.level, v.star, v.skin); }
+template <CerealArchive A> void serialize(A& ar, ViewUnit& v) {
+    ar(v.id, v.kind, v.owner, v.alliance, v.x, v.y, v.hp, v.max_hp, v.state, v.level, v.faction, v.flags, v.speed, v.attack, v.defense, v.morale, v.load, v.icon, v.skin, v.banner, v.title, v.vip, v.rank, v.slots, v.power, v.state_end, v.shield_end, v.cooldown_end, v.last_update, v.kills, v.in_battle, v.shielded, v.hidden, v.name, v.alliance_tag, v.owner_name, v.commander, v.heroes, v.troops, v.buffs);
+}
 template <CerealArchive A> void serialize(A& ar, ViewMarch& v) { ar(v.id, v.owner, v.x0, v.y0, v.x1, v.y1, v.t0, v.t1); }
 template <CerealArchive A> void serialize(A& ar, ViewSnapshot& v) { ar(v.request_id, v.tick, v.x0, v.y0, v.x1, v.y1, v.units, v.marches, v.tiles); }
 template <CerealArchive A> void serialize(A& ar, ViewDelta& v) { ar(v.request_id, v.tick, v.x0, v.y0, v.x1, v.y1, v.upserts, v.removed, v.marches, v.removed_marches, v.tiles); }

@@ -87,7 +87,16 @@ struct ShardState {
 };
 
 // Demo case set, scenario E (view.hpp): units inside one client's viewport.
-struct ViewUnit { int32_t id{}; int32_t owner{}; int32_t x{}; int32_t y{}; int32_t hp{}; int32_t state{}; std::string name; };
+// A map unit as the client sees it (city, army, resource point): the fields a real SLG
+// map entity carries, with strings, a nested commander and three lists.
+struct UnitHero { int32_t id{}; int32_t level{}; int32_t star{}; int32_t skin{}; };
+struct ViewUnit {
+    int32_t id{}; int32_t kind{}; int32_t owner{}; int32_t alliance{}; int32_t x{}; int32_t y{}; int32_t hp{}; int32_t max_hp{}; int32_t state{}; int32_t level{}; int32_t faction{}; int32_t flags{}; int32_t speed{}; int32_t attack{}; int32_t defense{}; int32_t morale{}; int32_t load{}; int32_t icon{}; int32_t skin{}; int32_t banner{}; int32_t title{}; int32_t vip{}; int32_t rank{}; int32_t slots{};
+    int64_t power{}; int64_t state_end{}; int64_t shield_end{}; int64_t cooldown_end{}; int64_t last_update{}; int64_t kills{}; bool in_battle{}; bool shielded{}; bool hidden{};
+    std::string name; std::string alliance_tag; std::string owner_name;
+    UnitHero commander;
+    std::vector<UnitHero> heroes; std::vector<Troop> troops; std::vector<Buff> buffs;
+};
 
 // A march as the client sees it: a line from (x0,y0) to (x1,y1), start and arrival tick.
 struct ViewMarch { int32_t id{}; int32_t owner{}; int32_t x0{}; int32_t y0{}; int32_t x1{}; int32_t y1{}; int64_t t0{}; int64_t t1{}; };
