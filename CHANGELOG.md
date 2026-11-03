@@ -49,6 +49,13 @@
   map (32 KB on the game demo view) at its next growth.
 - A touch of a block the period has not listed yet skips the scan of the
   list (a 16-bit filter of the listed blocks, in the log's first line).
+- A baseline without a copy (`XDeltaRecord::touches`) sends only the touched
+  bytes after a period that touched more than 24 blocks too (the log keeps
+  each block's touched bytes past its list, 8 bytes per block); it sent
+  those blocks whole. On the game demo's viewport deltas with such a
+  baseline: 2,043 to 452 bytes per delta in the battle case, 7,440 to
+  1,297 in the stress case, and the receiver's time in the stress case
+  from 25.9 to 12.3 us.
 - A movable slot that outgrows its storage keeps its cached root (at the
   same offset in the copied content), and so does an `XBuffer` that is
   moved or swapped (for example one built by `create` and then moved into

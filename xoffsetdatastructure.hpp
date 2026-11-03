@@ -6622,6 +6622,12 @@ namespace XOffsetDatastructure {
             const void* owner = nullptr;     // the baseline that paired last
             std::vector<std::uint32_t> stamps;
             std::vector<std::uint32_t> groups;  // per 16 blocks: the latest of their stamps
+            // With masks and one baseline, a period that overflows the list
+            // keeps the bytes touched per block: block_masks[i] holds block
+            // i's touches of period masks_period where stamps[i] is that
+            // period (0: no period's bytes are kept).
+            std::vector<std::uint64_t> block_masks;
+            std::uint32_t masks_period = 0;
         };
     } // namespace detail
     // What one save_delta_into wrote.
