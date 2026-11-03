@@ -1,0 +1,42 @@
+2026-11-03T06:00:57Z v3 block 1 start: waited 180s load 1.16 WindowServer 1% (gated 0) remote 6
+2026-11-03T06:02:26Z v3 process 1 (new head) done
+2026-11-03T06:03:55Z v3 process 2 (new p1) done
+2026-11-03T06:05:25Z v3 process 3 (new anc) done
+2026-11-03T06:06:52Z v3 process 4 (new anc) done
+2026-11-03T06:08:20Z v3 process 5 (new p1) done
+2026-11-03T06:09:47Z v3 process 6 (new head) done
+2026-11-03T06:12:49Z v3 block 2 start: waited 180s load 1.09 WindowServer 1.1% (gated 0) remote 5
+2026-11-03T06:14:17Z v3 process 7 (new p1) done
+2026-11-03T06:15:46Z v3 process 8 (new anc) done
+2026-11-03T06:17:15Z v3 process 9 (new head) done
+2026-11-03T06:18:44Z v3 process 10 (new head) done
+2026-11-03T06:20:12Z v3 process 11 (new anc) done
+2026-11-03T06:21:40Z v3 process 12 (new p1) done
+2026-11-03T06:24:42Z v3 block 3 start: waited 180s load 1.06 WindowServer 1.2% (gated 0) remote 5
+2026-11-03T06:26:10Z v3 process 13 (new anc) done
+2026-11-03T06:27:40Z v3 process 14 (new head) done
+2026-11-03T06:29:08Z v3 process 15 (new p1) done
+2026-11-03T06:30:35Z v3 process 16 (new p1) done
+2026-11-03T06:32:02Z v3 process 17 (new head) done
+2026-11-03T06:33:29Z v3 process 18 (new anc) done
+2026-11-03T06:36:31Z v3 block 4 start: waited 180s load 1.22 WindowServer 1.2% (gated 0) remote 4
+2026-11-03T06:37:58Z v3 process 19 (new head) done
+2026-11-03T06:39:24Z v3 process 20 (new p1) done
+2026-11-03T06:40:53Z v3 process 21 (new anc) done
+2026-11-03T06:42:22Z v3 process 22 (new anc) done
+2026-11-03T06:43:50Z v3 process 23 (new p1) done
+2026-11-03T06:45:19Z v3 process 24 (new head) done
+2026-11-03T06:48:21Z v3 SLG_A_FULL=1 block 1 start: waited 180s load 1.30 WindowServer 1.1% (gated 0) remote 4
+2026-11-03T06:49:45Z v3 process 25 (full head) done
+2026-11-03T06:51:09Z v3 process 26 (full p1) done
+2026-11-03T06:52:34Z v3 process 27 (full anc) done
+2026-11-03T06:54:00Z v3 process 28 (full anc) done
+2026-11-03T06:55:25Z v3 process 29 (full p1) done
+2026-11-03T06:56:49Z v3 process 30 (full head) done
+2026-11-03T06:59:51Z v3 SLG_A_FULL=1 block 2 start: waited 180s load 1.70 WindowServer 1.2% (gated 0) remote 4
+2026-11-03T07:01:17Z v3 process 31 (full p1) done
+2026-11-03T07:03:01Z v3 process 32 (full anc) done
+2026-11-03T07:04:32Z v3 process 33 (full head) done
+2026-11-03T07:06:02Z v3 process 34 (full head) done
+2026-11-03T07:07:30Z v3 process 35 (full anc) done
+2026-11-03T07:08:57Z v3 process 36 (full p1) done

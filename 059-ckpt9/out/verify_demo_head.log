@@ -1,0 +1,31 @@
+cycle 0 xoffset      state=457a5cd859944ada reports=1591138187572627380
+cycle 0 cereal       state=457a5cd859944ada reports=1591138187572627380
+cycle 0 protobuf     state=457a5cd859944ada reports=1591138187572627380
+cycle 0 flatbuffers  state=457a5cd859944ada reports=1591138187572627380
+cycle 0 zpp_bits     state=457a5cd859944ada reports=1591138187572627380
+cycle 0 cista        state=457a5cd859944ada reports=1591138187572627380
+cycle 1 xoffset      state=802bdc0658b69ebc reports=1583176514690477126
+cycle 1 cereal       state=802bdc0658b69ebc reports=1583176514690477126
+cycle 1 protobuf     state=802bdc0658b69ebc reports=1583176514690477126
+cycle 1 flatbuffers  state=802bdc0658b69ebc reports=1583176514690477126
+cycle 1 zpp_bits     state=802bdc0658b69ebc reports=1583176514690477126
+cycle 1 cista        state=802bdc0658b69ebc reports=1583176514690477126
+
+wire bytes per message, demo case set (average over the last cycle)
+format              A.req        A.res     B.player     S.player       E.view      U.delta
+xoffset              1166         2358        11099        11476         4791         2226
+cereal                995         1513         7321         7276         4905         2247
+protobuf              557          918         4468         4448         3521         1553
+flatbuffers          1197         1721         8484         8436         6102         2742
+zpp_bits              867         1386         6569         6531         4431         2034
+cista                1402         1922         9948         9892         4758         2208
+
+compressed size of one sample message (zstd -3 / lz4), bytes
+format                       A.res              B.player                E.view               U.delta
+xoffset             464/       605       2390/      3668       2368/      3612       1118/      1675
+cereal              377/       525       2042/      3142       2278/      3427       1078/      1551
+protobuf            389/       415       2146/      2702       2435/      3037       1125/      1316
+flatbuffers         497/       678       2433/      3724       3242/      4704       1469/      2104
+zpp_bits            361/       479       1998/      2985       2252/      3381       1050/      1522
+cista               446/       627       2322/      3865       2368/      3581       1082/      1649
+verify: all formats agree
