@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- HFT demo: the hot-path packet and the state snapshot (late join) as SBE.
+     Group counts are SBE's standard uint16; the encoder checks they fit. -->
+<sbe:messageSchema xmlns:sbe="http://fixprotocol.io/2016/sbe"
+                   package="hft_sbe" id="1" version="0" semanticVersion="1"
+                   byteOrder="littleEndian">
+  <types>
+    <composite name="messageHeader">
+      <type name="blockLength" primitiveType="uint16"/>
+      <type name="templateId" primitiveType="uint16"/>
+      <type name="schemaId" primitiveType="uint16"/>
+      <type name="version" primitiveType="uint16"/>
+    </composite>
+    <composite name="groupSizeEncoding">
+      <type name="blockLength" primitiveType="uint16"/>
+      <type name="numInGroup" primitiveType="uint16"/>
+    </composite>
+  </types>
+
+  <sbe:message name="Packet" id="1">
+    <field name="seqFirst" id="1" type="uint64"/>
+    <group name="updates" id="2" dimensionType="groupSizeEncoding">
+      <field name="orderId" id="3" type="uint64"/>
+      <field name="ts" id="4" type="uint64"/>
+      <field name="price" id="5" type="int64"/>
+      <field name="qty" id="6" type="uint32"/>
+      <field name="side" id="7" type="uint8"/>
+      <field name="action" id="8" type="uint8"/>
+      <field name="flags" id="9" type="uint8"/>
+      <field name="instrument" id="10" type="uint32"/>
+      <field name="seq" id="11" type="uint32"/>
+    </group>
+  </sbe:message>
+
+  <sbe:message name="Snapshot" id="2">
+    <field name="seq" id="1" type="uint64"/>
+    <group name="rows" id="2" dimensionType="groupSizeEncoding">
+      <field name="symbol" id="3" type="uint64"/>
+      <field name="instrument" id="4" type="uint32"/>
+      <field name="liveOrders" id="5" type="uint32"/>
+      <field name="liveShares" id="6" type="uint64"/>
+      <field name="bestBid" id="7" type="int64"/>
+      <field name="bestAsk" id="8" type="int64"/>
+      <field name="lastPrice" id="9" type="int64"/>
+      <field name="volume" id="10" type="uint64"/>
+      <field name="trades" id="11" type="uint64"/>
+      <field name="adds" id="12" type="uint64"/>
+      <field name="removes" id="13" type="uint64"/>
+      <field name="high" id="14" type="int64"/>
+      <field name="low" id="15" type="int64"/>
+      <field name="lastTs" id="16" type="uint64"/>
+    </group>
+    <group name="books" id="20" dimensionType="groupSizeEncoding">
+      <field name="instrument" id="21" type="uint32"/>
+      <field name="symbol" id="22" type="uint64"/>
+      <group name="bids" id="23" dimensionType="groupSizeEncoding">
+        <field name="price" id="24" type="int64"/>
+        <field name="qty" id="25" type="uint64"/>
+        <field name="orderCount" id="26" type="uint32"/>
+        <group name="orders" id="27" dimensionType="groupSizeEncoding">
+          <field name="orderId" id="28" type="uint64"/>
+          <field name="ts" id="29" type="uint64"/>
+          <field name="price" id="30" type="int64"/>
+          <field name="qty" id="31" type="uint32"/>
+          <field name="side" id="32" type="uint8"/>
+        </group>
+      </group>
+      <group name="asks" id="33" dimensionType="groupSizeEncoding">
+        <field name="price" id="34" type="int64"/>
+        <field name="qty" id="35" type="uint64"/>
+        <field name="orderCount" id="36" type="uint32"/>
+        <group name="orders" id="37" dimensionType="groupSizeEncoding">
+          <field name="orderId" id="38" type="uint64"/>
+          <field name="ts" id="39" type="uint64"/>
+          <field name="price" id="40" type="int64"/>
+          <field name="qty" id="41" type="uint32"/>
+          <field name="side" id="42" type="uint8"/>
+        </group>
+      </group>
+    </group>
+  </sbe:message>
+</sbe:messageSchema>
