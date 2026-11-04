@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Verified saves of a buffer whose root was admitted at the current epoch
+  (`make<T>()`, `reset<T>()`, a verified load) take the root from the
+  cache `root<T>()` uses and skip the typed-access and schema checks and
+  the root lookup that admission already did; the payload header checks
+  still run. Output and errors are unchanged. Instructions, GCC 16,
+  bench/slg (M): UP.send -1.9%, A.res_encode -3.6%.
 - `root<T>()` on a cold buffer reads one cache line: its cache is two
   words (root type, root pointer) aligned to 16 bytes, and every epoch
   change clears it, instead of four words (with the root's epoch and the
