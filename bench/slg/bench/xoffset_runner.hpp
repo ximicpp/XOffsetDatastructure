@@ -204,6 +204,7 @@ public:
         std::vector<stdm::Report> reports;
         reports.reserve(std::size_t(sc.battles));
 
+        timed(st, "DIAG.A_loop", [&] {  // DIAGNOSTIC (CK14L): the whole A loop, timed and untimed
         for (const Pairing& pr : make_pairings(seed_, cycle, sc, armies_)) {
             auto& att = player(pr.ap).armies[std::size_t(pr.aa)];
             auto& def = player(pr.dp).armies[std::size_t(pr.da)];
@@ -238,6 +239,7 @@ public:
             if (keep) { keep->req = req_; keep->res = res_; }
             timed(st, "A.cleanup", [] {});
         }
+        });
 
         const auto migrants = pick_migrants(seed_, cycle, sc);
         // Demo case set, B: one hop between two scene servers. The received buffer
