@@ -873,11 +873,12 @@ namespace XOffsetDatastructure {
         // reproduces identical bytes.
         template <typename Fn>
         void for_each_free_block(Fn&& fn) const {
-            if (!free_table_) return;
+            if (!free_table_ || free_table_->count == 0) return;
             const auto& table = *free_table_;
-            // Empty bins emit nothing, so visiting only nonempty bins in
-            // ascending order keeps the canonical order.
-            for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
+            // Empty bins emit nothing, so visiting only nonempty bins (of
+            // nonempty words) in ascending order keeps the canonical order.
+            for (auto words = table.nonempty_words; words != 0; words &= words - 1u) {
+                const auto word = static_cast<std::uint32_t>(std::countr_zero(words));
                 for (auto bits = table.nonempty[word]; bits != 0; bits &= bits - 1u) {
                     const auto bin = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
                     const auto bytes = (bin + 1u) * 8u;
@@ -908,12 +909,17 @@ namespace XOffsetDatastructure {
 
         // Writes free_block_count() little-endian entries.
         void write_free_blocks(char* out) const noexcept {
-            if (!free_table_) return;
+            // A reload keeps its emptied table (begin_reinit), so a save of a
+            // buffer with no holes often finds an empty table: only its count
+            // is read, not its index words, map or bins (lines nothing has
+            // touched since the reload).
+            if (!free_table_ || free_table_->count == 0) return;
             const auto& table = *free_table_;
             // for_each_free_block's order. A hole is {offset, bytes}, so one
             // little-endian word per entry with the bin's size in the high
             // half; the loop over a bin's offsets vectorizes.
-            for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
+            for (auto words = table.nonempty_words; words != 0; words &= words - 1u) {
+                const auto word = static_cast<std::uint32_t>(std::countr_zero(words));
                 for (auto bits = table.nonempty[word]; bits != 0; bits &= bits - 1u) {
                     const auto bin = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
                     const FreeBin& entries = table.bins[bin];
@@ -3195,6 +3201,19 @@ namespace XOffsetDatastructure {
             }
             return first;
         }
+
+        // Where a sorted insert of `key` goes. Keys arriving in ascending
+        // order (a copy, a decode, a rebuild) append after one compare with
+        // the last element instead of a search; otherwise key <= last, so the
+        // bound lies in [0, size - 1] and the search skips the last element.
+        // The inserts that use it are always inlined: with the extra compare
+        // Clang stopped inlining XSet::insert at its callers.
+        template <typename Elem, typename KeyLike, typename KeyFn>
+        std::uint32_t insert_index(const Elem* data, std::uint32_t size,
+                                   const KeyLike& key, KeyFn&& key_fn) {
+            if (size == 0 || ordered_less(key_fn(data[size - 1]), key)) return size;
+            return lower_bound_index(data, size - 1, key, key_fn);
+        }
     } // namespace fixed_detail
 
     template <typename K, typename V>
@@ -4770,9 +4789,9 @@ namespace XOffsetDatastructure {
             return find(key) != Base::end();
         }
 
-        std::pair<iterator, bool> insert(const T& value) {
+        XOFFSET_DETAIL_MOVE_INLINE std::pair<iterator, bool> insert(const T& value) {
             auto* items = Base::data();
-            auto index = fixed_detail::lower_bound_index(
+            auto index = fixed_detail::insert_index(
                 items, Base::size(), value, [](const T& item) -> const T& { return item; });
             if (index < Base::size() && fixed_detail::ordered_equal(items[index], value)) {
                 return {items + index, false};
@@ -4784,9 +4803,9 @@ namespace XOffsetDatastructure {
 
         template <typename Arg>
             requires alloc_aware_convertible<T, Arg>
-        std::pair<iterator, bool> insert(Arg&& arg) {
+        XOFFSET_DETAIL_MOVE_INLINE std::pair<iterator, bool> insert(Arg&& arg) {
             auto* items = Base::data();
-            auto index = fixed_detail::lower_bound_index(
+            auto index = fixed_detail::insert_index(
                 items, Base::size(), arg, [](const T& item) -> const T& { return item; });
             if (index < Base::size() && fixed_detail::ordered_equal(items[index], arg)) {
                 return {items + index, false};
@@ -4873,9 +4892,9 @@ namespace XOffsetDatastructure {
         }
 
         template <typename KeyArg, typename... Args>
-        std::pair<iterator, bool> try_emplace(KeyArg&& key, Args&&... args) {
+        XOFFSET_DETAIL_MOVE_INLINE std::pair<iterator, bool> try_emplace(KeyArg&& key, Args&&... args) {
             auto* items = value_base::data();
-            auto index = fixed_detail::lower_bound_index(
+            auto index = fixed_detail::insert_index(
                 items, value_base::size(), key,
                 [](const value_type& item) -> const K& { return item.first; });
             if (index < value_base::size() && fixed_detail::ordered_equal(items[index].first, key)) {
