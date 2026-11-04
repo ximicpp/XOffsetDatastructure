@@ -1,0 +1,16 @@
+Monitoring boot status for iPhone 17 (BF939968-6A21-42F1-88EB-D44C85C3E0FC).
+[2026-11-04 19:22:13 +0000] Status=1, isTerminal=NO, Elapsed=00:03.
+	Waiting on BackBoard
+
+[2026-11-04 19:22:14 +0000] Status=4, isTerminal=NO, Elapsed=00:04.
+	Waiting on System App
+
+[2026-11-04 19:22:14 +0000] Status=4, isTerminal=NO, Elapsed=00:04.
+	Waiting on System App
+
+[2026-11-04 19:22:14 +0000] Status=4, isTerminal=NO, Elapsed=00:04.
+	Waiting on System App
+
+[2026-11-04 19:22:15 +0000] Status=4294967295, isTerminal=YES, Elapsed=00:05.
+	Finished
+

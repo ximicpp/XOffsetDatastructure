@@ -1,0 +1,20 @@
+reference corpus: /Volumes/XOffsetCS/apple330/ref-corpus (24 files)
+== 19:22:15Z macos
+macos rc=0
+- reference corpus: `/Volumes/XOffsetCS/apple330/ref-corpus` (      24 files)
+| configure | passed | `native-logs/configure.log` |
+| build | passed | `native-logs/build.log` |
+| ctest summary | 100% tests passed out of 148 | |
+| corpus write | passed | `native-logs/corpus-write.log` |
+| corpus read (reference wires accepted, same bytes) | passed | `native-logs/corpus-read.log` |
+| corpus diff -r against reference | passed | `native-logs/corpus-diff.log` |
+== 19:23:46Z ios-sim
+ios-sim rc=0
+- reference corpus: `/Volumes/XOffsetCS/apple330/ref-corpus` (      24 files)
+| configure | passed | `native-logs/configure.log` |
+| build | passed | `native-logs/build.log` |
+| ctest summary | 100% tests passed out of 148 | |
+| corpus write | passed | `native-logs/corpus-write.log` |
+| corpus read (reference wires accepted, same bytes) | passed | `native-logs/corpus-read.log` |
+| corpus diff -r against reference | passed | `native-logs/corpus-diff.log` |
+result tarball sha256 71c7022267ae98ddb8d6783312fc02d4de86b361f2ee8dad07bbae7de6f61bfa

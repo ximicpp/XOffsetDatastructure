@@ -1,0 +1,8 @@
+empty accepted and byte-identical, edits byte-identical
+small accepted and byte-identical, edits byte-identical
+medium_holes accepted and byte-identical, edits byte-identical
+reloaded_mutated accepted and byte-identical, edits byte-identical
+sparse accepted and byte-identical, edits byte-identical
+elided accepted and byte-identical, edits byte-identical
+compact_slack0 accepted and byte-identical, edits byte-identical
+compact_slack8 accepted and byte-identical, edits byte-identical

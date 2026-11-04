@@ -1,0 +1,314 @@
+Test project /Volumes/XOffsetCS/apple330/build-macos
+        Start  95: fuzz_v2_wire_replay_seeds
+        Start  98: fuzz_wire_schemas_replay_seeds
+        Start 101: fuzz_delta_sync_replay_seeds
+        Start   1: check_signature_matrix
+        Start   2: test_virtual_memory_storage
+        Start   3: test_vm_pool
+        Start   4: test_vm_storage_noexc
+        Start   5: test_basic_types
+        Start   6: test_vector
+        Start   7: test_map_set
+  1/148 Test   #7: test_map_set ...............................   Passed    2.59 sec
+        Start   8: test_nested
+  2/148 Test   #2: test_virtual_memory_storage ................   Passed    2.61 sec
+        Start   9: test_compaction
+  3/148 Test   #6: test_vector ................................   Passed    2.62 sec
+        Start  10: test_modify
+  4/148 Test #101: fuzz_delta_sync_replay_seeds ...............   Passed    2.64 sec
+        Start  11: test_xbuffer_api
+  5/148 Test   #5: test_basic_types ...........................   Passed    2.65 sec
+        Start  12: test_assign_range
+  6/148 Test   #1: check_signature_matrix .....................   Passed    2.66 sec
+        Start  13: test_scalar_resize
+  7/148 Test   #4: test_vm_storage_noexc ......................   Passed    2.69 sec
+        Start  14: test_validation_granules
+  8/148 Test  #98: fuzz_wire_schemas_replay_seeds .............   Passed    2.72 sec
+        Start  15: test_string_replace
+  9/148 Test  #95: fuzz_v2_wire_replay_seeds ..................   Passed    2.78 sec
+        Start  16: test_hot_path_constants
+ 10/148 Test   #3: test_vm_pool ...............................   Passed    2.87 sec
+        Start  17: test_resize_growth
+ 11/148 Test   #8: test_nested ................................   Passed    0.46 sec
+        Start  18: test_wire_admission
+ 12/148 Test  #11: test_xbuffer_api ...........................   Passed    0.45 sec
+        Start  19: test_xstring_direct_assign
+ 13/148 Test  #12: test_assign_range ..........................   Passed    0.47 sec
+        Start  20: test_string_append
+ 14/148 Test   #9: test_compaction ............................   Passed    0.51 sec
+        Start  21: test_xhandle
+ 15/148 Test  #10: test_modify ................................   Passed    0.51 sec
+        Start  22: test_schema_envelope
+ 16/148 Test  #16: test_hot_path_constants ....................   Passed    0.54 sec
+        Start  23: test_fixed_layout_containers
+ 17/148 Test  #15: test_string_replace ........................   Passed    0.60 sec
+        Start  24: test_error_paths
+ 18/148 Test  #13: test_scalar_resize .........................   Passed    0.68 sec
+        Start  25: test_memory_efficiency
+ 19/148 Test  #17: test_resize_growth .........................   Passed    0.58 sec
+        Start  26: test_complex_nesting
+ 20/148 Test  #18: test_wire_admission ........................   Passed    0.61 sec
+        Start  27: test_inheritance
+ 21/148 Test  #22: test_schema_envelope .......................   Passed    0.62 sec
+        Start  28: test_adaptive_reservation
+ 22/148 Test  #19: test_xstring_direct_assign .................   Passed    0.69 sec
+        Start  29: test_main_containers
+ 23/148 Test  #21: test_xhandle ...............................   Passed    0.67 sec
+        Start  30: test_runtime_regressions
+ 24/148 Test  #24: test_error_paths ...........................   Passed    0.52 sec
+        Start  31: test_mutation_failures
+ 25/148 Test  #23: test_fixed_layout_containers ...............   Passed    0.55 sec
+        Start  32: test_wire_validation
+ 26/148 Test  #25: test_memory_efficiency .....................   Passed    0.51 sec
+        Start  33: test_same_arena_move
+ 27/148 Test  #26: test_complex_nesting .......................   Passed    0.64 sec
+        Start  34: test_shift_relocate
+ 28/148 Test  #27: test_inheritance ...........................   Passed    0.49 sec
+        Start  35: test_append_grow
+ 29/148 Test  #30: test_runtime_regressions ...................   Passed    0.50 sec
+        Start  36: test_free_table_policy
+ 30/148 Test  #29: test_main_containers .......................   Passed    0.52 sec
+        Start  37: test_lower_bound_index
+ 31/148 Test  #28: test_adaptive_reservation ..................   Passed    0.58 sec
+        Start  38: test_stable_storage
+ 32/148 Test  #32: test_wire_validation .......................   Passed    0.67 sec
+        Start  39: test_slot_storage
+ 33/148 Test  #33: test_same_arena_move .......................   Passed    0.66 sec
+ 34/148 Test  #31: test_mutation_failures .....................   Passed    0.69 sec
+        Start  40: test_ordinary_records
+        Start  41: test_schema_describe
+ 35/148 Test  #20: test_string_append .........................   Passed    1.43 sec
+        Start  42: test_vm_lifecycle
+ 36/148 Test  #34: test_shift_relocate ........................   Passed    0.47 sec
+        Start  43: test_vm_transport
+ 37/148 Test  #35: test_append_grow ...........................   Passed    0.53 sec
+        Start  44: test_owner_identity
+ 38/148 Test  #14: test_validation_granules ...................   Passed    2.23 sec
+        Start  45: test_owner_registry
+ 39/148 Test  #38: test_stable_storage ........................   Passed    0.60 sec
+        Start  46: test_owner_map
+ 40/148 Test  #37: test_lower_bound_index .....................   Passed    0.63 sec
+        Start  47: test_tail_expansion
+ 41/148 Test  #42: test_vm_lifecycle ..........................   Passed    0.43 sec
+        Start  48: test_regrow_used_range
+ 42/148 Test  #41: test_schema_describe .......................   Passed    0.45 sec
+        Start  49: test_storage_policies
+ 43/148 Test  #40: test_ordinary_records ......................   Passed    0.46 sec
+        Start  50: test_allocator_model
+ 44/148 Test  #39: test_slot_storage ..........................   Passed    0.48 sec
+        Start  51: test_allocator_failures
+ 45/148 Test  #43: test_vm_transport ..........................   Passed    0.51 sec
+        Start  52: test_v2_golden
+ 46/148 Test  #36: test_free_table_policy .....................   Passed    0.94 sec
+        Start  53: test_cross_compiler_wire
+ 47/148 Test  #44: test_owner_identity ........................   Passed    0.60 sec
+        Start  54: test_schema_pin
+ 48/148 Test  #45: test_owner_registry ........................   Passed    0.47 sec
+        Start  55: test_stability_contract
+ 49/148 Test  #46: test_owner_map .............................   Passed    0.47 sec
+        Start  56: test_wire_hole_zeroing
+ 50/148 Test  #47: test_tail_expansion ........................   Passed    0.47 sec
+        Start  57: test_implicit_padding
+ 51/148 Test  #49: test_storage_policies ......................   Passed    0.88 sec
+        Start  58: test_v2_fuzz
+ 52/148 Test  #55: test_stability_contract ....................   Passed    0.48 sec
+        Start  59: test_save_compact
+ 53/148 Test  #56: test_wire_hole_zeroing .....................   Passed    0.53 sec
+        Start  60: test_save_composed
+ 54/148 Test  #53: test_cross_compiler_wire ...................   Passed    0.70 sec
+        Start  61: test_free_run_emission
+ 55/148 Test  #54: test_schema_pin ............................   Passed    0.68 sec
+        Start  62: test_wire_populate
+ 56/148 Test  #48: test_regrow_used_range .....................   Passed    1.00 sec
+        Start  63: test_reload_reset
+ 57/148 Test  #51: test_allocator_failures ....................   Passed    0.99 sec
+        Start  64: test_reset_used_range
+ 58/148 Test  #52: test_v2_golden .............................   Passed    0.93 sec
+        Start  65: test_clone
+ 59/148 Test  #57: test_implicit_padding ......................   Passed    0.60 sec
+        Start  66: test_delta_sync
+ 60/148 Test  #50: test_allocator_model .......................   Passed    1.02 sec
+        Start  67: test_schema_handshake
+ 61/148 Test  #61: test_free_run_emission .....................   Passed    0.47 sec
+        Start  68: test_schema_snapshot
+ 62/148 Test  #62: test_wire_populate .........................   Passed    0.49 sec
+        Start  69: test_fixed_message
+ 63/148 Test  #64: test_reset_used_range ......................   Passed    0.50 sec
+        Start  70: test_no_exceptions
+ 64/148 Test  #65: test_clone .................................   Passed    0.50 sec
+        Start  71: test_no_exceptions_noexc
+ 65/148 Test  #67: test_schema_handshake ......................   Passed    0.49 sec
+        Start  72: test_free_run_emission_noexc
+ 66/148 Test  #59: test_save_compact ..........................   Passed    0.63 sec
+        Start  73: test_hot_path_constants_noexc
+ 67/148 Test  #63: test_reload_reset ..........................   Passed    0.64 sec
+        Start  74: test_implicit_padding_noexc
+ 68/148 Test  #60: test_save_composed .........................   Passed    0.70 sec
+        Start  75: test_inheritance_noexc
+ 69/148 Test  #68: test_schema_snapshot .......................   Passed    0.44 sec
+        Start  76: test_lower_bound_index_noexc
+ 70/148 Test  #69: test_fixed_message .........................   Passed    0.49 sec
+        Start  77: test_memory_efficiency_noexc
+ 71/148 Test  #71: test_no_exceptions_noexc ...................   Passed    0.46 sec
+        Start  78: test_ordinary_records_noexc
+ 72/148 Test  #72: test_free_run_emission_noexc ...............   Passed    0.46 sec
+        Start  79: test_regrow_used_range_noexc
+ 73/148 Test  #70: test_no_exceptions .........................   Passed    0.49 sec
+        Start  80: test_save_compact_noexc
+ 74/148 Test  #73: test_hot_path_constants_noexc ..............   Passed    0.62 sec
+        Start  81: test_schema_pin_noexc
+ 75/148 Test  #74: test_implicit_padding_noexc ................   Passed    0.53 sec
+        Start  82: test_shift_relocate_noexc
+ 76/148 Test  #75: test_inheritance_noexc .....................   Passed    0.53 sec
+        Start  83: test_stability_contract_noexc
+ 77/148 Test  #66: test_delta_sync ............................   Passed    1.30 sec
+        Start  84: test_string_append_noexc
+ 78/148 Test  #76: test_lower_bound_index_noexc ...............   Passed    0.50 sec
+        Start  85: test_v2_fuzz_noexc
+ 79/148 Test  #78: test_ordinary_records_noexc ................   Passed    0.62 sec
+        Start  86: test_wire_populate_noexc
+ 80/148 Test  #77: test_memory_efficiency_noexc ...............   Passed    0.63 sec
+        Start  87: test_xhandle_noexc
+ 81/148 Test  #79: test_regrow_used_range_noexc ...............   Passed    0.65 sec
+        Start  88: test_xstring_direct_assign_noexc
+ 82/148 Test  #80: test_save_compact_noexc ....................   Passed    0.68 sec
+        Start  89: test_schema_handshake_noexc
+ 83/148 Test  #81: test_schema_pin_noexc ......................   Passed    0.60 sec
+        Start  90: test_delta_sync_noexc
+ 84/148 Test  #82: test_shift_relocate_noexc ..................   Passed    0.59 sec
+        Start  91: test_fixed_message_noexc
+ 85/148 Test  #83: test_stability_contract_noexc ..............   Passed    0.59 sec
+        Start  92: test_no_exceptions_fatal
+ 86/148 Test  #92: test_no_exceptions_fatal ...................   Passed    0.00 sec
+        Start  93: test_no_exceptions_noexc_fatal
+ 87/148 Test  #93: test_no_exceptions_noexc_fatal .............   Passed    0.00 sec
+        Start  94: fuzz_v2_wire_replay
+ 88/148 Test  #94: fuzz_v2_wire_replay ........................   Passed    0.00 sec
+        Start  96: fuzz_v2_wire_replay_corpus
+ 89/148 Test  #96: fuzz_v2_wire_replay_corpus .................   Passed    0.05 sec
+        Start  97: fuzz_wire_schemas_replay
+ 90/148 Test  #97: fuzz_wire_schemas_replay ...................   Passed    0.00 sec
+        Start  99: fuzz_wire_schemas_replay_corpus
+ 91/148 Test  #99: fuzz_wire_schemas_replay_corpus ............   Passed    0.01 sec
+        Start 100: fuzz_delta_sync_replay
+ 92/148 Test #100: fuzz_delta_sync_replay .....................   Passed    0.00 sec
+        Start 102: fuzz_delta_sync_replay_corpus
+ 93/148 Test #102: fuzz_delta_sync_replay_corpus ..............   Passed    0.03 sec
+        Start 103: fuzz_v2_wire_replay_noexc
+ 94/148 Test  #89: test_schema_handshake_noexc ................   Passed    0.48 sec
+        Start 104: fuzz_v2_wire_replay_noexc_corpus
+ 95/148 Test  #88: test_xstring_direct_assign_noexc ...........   Passed    0.53 sec
+        Start 105: fuzz_wire_schemas_replay_noexc
+ 96/148 Test  #86: test_wire_populate_noexc ...................   Passed    0.59 sec
+        Start 106: fuzz_wire_schemas_replay_noexc_corpus
+ 97/148 Test  #87: test_xhandle_noexc .........................   Passed    0.58 sec
+        Start 107: test_v2_fuzz_replay
+ 98/148 Test #107: test_v2_fuzz_replay ........................   Passed    0.08 sec
+        Start 108: test_v2_fuzz_replay_boundary
+ 99/148 Test #108: test_v2_fuzz_replay_boundary ...............   Passed    0.08 sec
+        Start 109: test_vm_lifecycle_empty-globals
+100/148 Test #109: test_vm_lifecycle_empty-globals ............   Passed    0.01 sec
+        Start 110: test_vm_lifecycle_global-assigned
+101/148 Test #103: fuzz_v2_wire_replay_noexc ..................   Passed    0.49 sec
+        Start 111: test_vm_lifecycle_static-before-registry
+102/148 Test #110: test_vm_lifecycle_global-assigned ..........   Passed    0.01 sec
+        Start 112: test_vm_lifecycle_static-after-registry
+103/148 Test #111: test_vm_lifecycle_static-before-registry ...   Passed    0.01 sec
+        Start 113: test_vm_lifecycle_shutdown-transfers
+104/148 Test #112: test_vm_lifecycle_static-after-registry ....   Passed    0.01 sec
+        Start 114: test_shift_relocate_overflow-up
+105/148 Test  #91: test_fixed_message_noexc ...................   Passed    0.62 sec
+        Start 115: test_shift_relocate_overflow-down
+106/148 Test #113: test_vm_lifecycle_shutdown-transfers .......   Passed    0.01 sec
+        Start 116: test_shift_relocate_overflow-mid
+107/148 Test #114: test_shift_relocate_overflow-up ............   Passed    0.01 sec
+108/148 Test #104: fuzz_v2_wire_replay_noexc_corpus ...........   Passed    0.23 sec
+        Start 117: test_owner_registry_fail-record
+        Start 118: test_owner_registry_record-only
+109/148 Test #115: test_shift_relocate_overflow-down ..........   Passed    0.01 sec
+        Start 119: schema_pin_mismatch
+110/148 Test #116: test_shift_relocate_overflow-mid ...........   Passed    0.01 sec
+111/148 Test #117: test_owner_registry_fail-record ............   Passed    0.01 sec
+        Start 120: require_no_padding_fail
+        Start 121: schema_describe_omitted_fail
+112/148 Test #118: test_owner_registry_record-only ............   Passed    0.02 sec
+        Start 122: schema_describe_order_fail
+113/148 Test  #85: test_v2_fuzz_noexc .........................   Passed    1.08 sec
+        Start 123: schema_describe_duplicate_fail
+114/148 Test  #90: test_delta_sync_noexc ......................   Passed    0.98 sec
+        Start 124: schema_describe_array_fail
+115/148 Test #106: fuzz_wire_schemas_replay_noexc_corpus ......   Passed    0.58 sec
+116/148 Test #105: fuzz_wire_schemas_replay_noexc .............   Passed    0.59 sec
+        Start 125: schema_describe_padding_fail
+        Start 126: schema_describe_enum_fail
+117/148 Test  #84: test_string_append_noexc ...................   Passed    1.50 sec
+        Start 127: schema_describe_undescribed_fail
+118/148 Test #121: schema_describe_omitted_fail ...............   Passed    1.70 sec
+        Start 128: portable_schema_set_char_fail
+119/148 Test #123: schema_describe_duplicate_fail .............   Passed    1.68 sec
+        Start 129: portable_schema_map_char_fail
+120/148 Test #120: require_no_padding_fail ....................   Passed    1.76 sec
+        Start 130: portable_schema_char_enum_fail
+121/148 Test #119: schema_pin_mismatch ........................   Passed    1.79 sec
+        Start 131: portable_schema_record_member_fail
+122/148 Test #122: schema_describe_order_fail .................   Passed    1.79 sec
+        Start 132: portable_schema_array_member_fail
+123/148 Test #124: schema_describe_array_fail .................   Passed    1.61 sec
+        Start 133: portable_schema_unfixed_enum_fail
+124/148 Test #127: schema_describe_undescribed_fail ...........   Passed    1.54 sec
+        Start 134: portable_schema_portable_build
+125/148 Test #125: schema_describe_padding_fail ...............   Passed    1.65 sec
+        Start 135: receive_raw_nonfixed_Nonfixed_fail
+126/148 Test #126: schema_describe_enum_fail ..................   Passed    1.68 sec
+        Start 136: receive_raw_nonfixed_Negative_fail
+127/148 Test #129: portable_schema_map_char_fail ..............   Passed    1.42 sec
+        Start 137: receive_raw_nonfixed_Zero_fail
+128/148 Test #128: portable_schema_set_char_fail ..............   Passed    1.49 sec
+        Start 138: receive_raw_nonfixed_EmptyEnum_fail
+129/148 Test #130: portable_schema_char_enum_fail .............   Passed    1.49 sec
+        Start 139: receive_raw_nonfixed_Wide_fail
+130/148 Test #132: portable_schema_array_member_fail ..........   Passed    1.50 sec
+        Start 140: receive_raw_nonfixed_UnsignedWide_fail
+131/148 Test #131: portable_schema_record_member_fail .........   Passed    1.53 sec
+        Start 141: test_verified_paths
+132/148 Test #133: portable_schema_unfixed_enum_fail ..........   Passed    1.53 sec
+        Start 142: test_stable_erase_if
+133/148 Test #135: receive_raw_nonfixed_Nonfixed_fail .........   Passed    1.48 sec
+        Start 143: test_locator_soundness
+134/148 Test #136: receive_raw_nonfixed_Negative_fail .........   Passed    1.53 sec
+        Start 144: test_snapshot_index_header_only
+135/148 Test #134: portable_schema_portable_build .............   Passed    1.65 sec
+        Start 145: test_core_lifetime
+136/148 Test #141: test_verified_paths ........................   Passed    0.65 sec
+        Start 146: test_receive_raw
+137/148 Test #143: test_locator_soundness .....................   Passed    0.50 sec
+        Start 147: test_verified_receive
+138/148 Test #142: test_stable_erase_if .......................   Passed    0.52 sec
+        Start 148: test_canonical_registry_v2
+139/148 Test #144: test_snapshot_index_header_only ............   Passed    0.56 sec
+140/148 Test #145: test_core_lifetime .........................   Passed    0.53 sec
+141/148 Test #148: test_canonical_registry_v2 .................   Passed    0.55 sec
+142/148 Test #146: test_receive_raw ...........................   Passed    0.61 sec
+143/148 Test #137: receive_raw_nonfixed_Zero_fail .............   Passed    1.42 sec
+144/148 Test #147: test_verified_receive ......................   Passed    0.60 sec
+145/148 Test #138: receive_raw_nonfixed_EmptyEnum_fail ........   Passed    1.45 sec
+146/148 Test #140: receive_raw_nonfixed_UnsignedWide_fail .....   Passed    1.42 sec
+147/148 Test #139: receive_raw_nonfixed_Wide_fail .............   Passed    1.49 sec
+148/148 Test  #58: test_v2_fuzz ...............................   Passed   12.23 sec
+
+100% tests passed out of 148
+
+Label Time Summary:
+basic            =   9.78 sec*proc (7 tests)
+evolution        =   0.93 sec*proc (2 tests)
+four-paths       =   2.23 sec*proc (4 tests)
+lifecycle        =   0.05 sec*proc (5 tests)
+no-exceptions    =  18.38 sec*proc (28 tests)
+reflection       =  82.43 sec*proc (117 tests)
+registry         =   0.03 sec*proc (2 tests)
+replay           =  10.11 sec*proc (13 tests)
+schema           =  31.05 sec*proc (20 tests)
+storage          =   8.17 sec*proc (3 tests)
+tooling          =   2.66 sec*proc (1 test)
+
+Total Test time (real) =  18.11 sec
