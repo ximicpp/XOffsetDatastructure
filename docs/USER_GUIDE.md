@@ -507,7 +507,7 @@ XStatus done = token ? token->try_finish() : XStatus(token.error());
 | K1 | 用普通 C++ 聚合体定义 schema，不用 IDL：服务端（C++26）由反射自动得出布局和指纹，不写样板；客户端（C++20/C++23）每个记录加一行字段表，由编译器证明列全（偏移严格递增 + 聚合初始化元数相符），C++26 构建同时用反射核对字段表，两种构建的 wire 字节相同（第 2.1 节） | `XOFFSET_REGISTER_SCHEMA_NAME`、`XOFFSET_RECORD`、`XOFFSET_RECORD_DERIVED`、`XString`、`XVector`、`XFixedVector`、`XSet`、`XMap` |
 | K2 | 对象直接建在 arena 里，原地读、原地改（含变长修改），空闲块复用 | `XBuffer::create<T>`、`root<T>`、`has_root<T>`、容器的公开成员函数、`maximum_capacity`、`with_growth`、`XGrowPolicy` |
 | K3 | 独立输出：发出的是调用方独占的副本，发完可以继续改 | `save_verified<T>` |
-| K4 | 接收时完整结构校验：截断、越界、重叠、未铺满、非法值、schema 不符一律拒绝；增量输入（K9）同样适用。每次发版前对每个接收入口（含增量 apply）跑一轮 ASan fuzz，无发现才发版 | `load_verified<T>`、`XException`、增量 apply |
+| K4 | 接收时默认完整结构校验：截断、越界、重叠、未铺满、非法值、schema 不符一律拒绝；增量输入（K9）同样适用。每次发版前对每个接收入口（含增量 apply，以及信任档入口落地后的这些入口）跑一轮 ASan fuzz，无发现才发版 | `load_verified<T>`、`XException`、增量 apply |
 | K5 | 接收后接着改、再发出，空闲空间随空洞表带过去，不退化 | 同上 |
 | K6 | schema 指纹精确匹配，不同就拒绝；版本不同的两端走演进握手和转换（E0） | wire 头 `schema_hash` |
 | K7 | 跨编译器、跨平台的对象表示一致 | 用户 schema：`XOFFSET_PIN_SCHEMA`；库自带类型：`tools/sigs/` 签名基线；跨编译器 wire 语料比对（`tools/platform_matrix.sh`） |
@@ -517,6 +517,11 @@ K0 的边界：搬的单位是整个区域，不是其中单个对象（容器�
 buffer 地址固定（在 VM 预留内增长），只在显式时间点搬：输出、接收、reload、`XCompactor`
 压缩；`XHandle` 用 epoch 在搬动后重新定位。同 ABI、已信任的数据可以用 `load_unverified`
 省掉校验，不可信输入走 K4。
+
+信任档（3.4 计划，尚未提供）：可信链路可以显式跳过校验。名字带 trusted 的 reload、load 和增量 apply
+只保留 wire 头准入和空洞表边界，跳过图遍历和增量的检查维护；调试和 sanitizer 构建里照样完整校验。
+服务端之间和存档可用；发往客户端要显式打开，默认仍校验，并且需要 TLS 或同等保护；客户端上行永远
+校验。信任档入口不是不可信输入的入口，默认的接收入口都完整校验。
 
 K7 的现状：
 
@@ -557,7 +562,7 @@ iOS 的地址空间和最低部署目标（系统 libc++ 的 `std::pmr` 在 macO
 3.1.0 没有这条构建路径：Android、iOS 和 MSVC 编不了。
 
 **目标（尚未承诺）K9 原生增量同步**：程序改完工作状态后只发改过的字节；接收方把增量合并进自己的副本，
-完整校验后接着读写，覆盖视口增量和玩家自身增量。API 在 3.3 加入。升为核心承诺的条件：增量 wire 1.0
+默认完整校验后接着读写，覆盖视口增量和玩家自身增量。API 在 3.3 加入。升为核心承诺的条件：增量 wire 1.0
 在 1.x 内冻结；增量 apply 进入发版前 ASan fuzz（K4）；有增量使用指南和示例；与演进握手衔接（schema
 版本变了就回落全量）；视口 demo 端到端用原生增量；字节、服务端、客户端的性能门槛达标。
 

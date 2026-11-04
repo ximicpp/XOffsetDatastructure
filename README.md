@@ -235,6 +235,8 @@ native client builds (iOS, Android, Windows) sharing one library and one wire
 with the servers, became a core guarantee on 2026-11-04. Schema evolution
 (different schema versions on the two ends, since 3.2.0) is provided, see
 [SCHEMA_EVOLUTION.md](docs/SCHEMA_EVOLUTION.md). K9, native delta sync (send
-only the bytes that changed; the receiver merges and verifies them), is a
-target: its API arrives in 3.3, and it becomes a guarantee once the conditions
-in the user guide are met.
+only the bytes that changed; the receiver merges them and, by default,
+verifies them), is a target: its API arrives in 3.3, and it becomes a guarantee once the conditions
+in the user guide are met. Receivers verify in full by default; an explicit
+trusted tier for trusted links (servers, storage) that skips the graph walk
+is planned for 3.4 and is never an entry point for untrusted input.
