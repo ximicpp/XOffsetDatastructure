@@ -88,7 +88,12 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
     After the first pull each client reserves 1.5x + 16 unit and march slots in
     its held view (all formats; a compact view regrows on its first append).
     U*.send fills and encodes one client's delta, U*.recv receives it, U*.apply
-    applies it to the held view through the client's id index.
+    applies it to the held view through the client's id index. Each client
+    holds its view object as a real client would: zpp_bits and the std formats
+    hold the decoded object, cista its pointer, and XOffset (2026-11-04) the
+    root reference, refreshed in snap_recv, the only point where the view's
+    epoch changes, so U*.apply starts at the root rather than looking it up in
+    the arena for every delta (-DSLG_RP_CHECK checks each use, off by default).
   M: 10,000 units, 1,500 clients, 1,000 marches, 4 ticks per cycle. Bytes
   include zstd-3 and, for XOffset, the save_compact pull.
 - native delta (XOffset only, built when the library has
