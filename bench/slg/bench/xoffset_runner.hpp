@@ -4,6 +4,7 @@
 #pragma once
 #include <algorithm>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <functional>
@@ -458,6 +459,13 @@ public:
         std::vector<std::string> snaps;
         std::string dw, comp;
         std::vector<std::optional<XBuffer>> held_views;
+        // The client keeps its view's root reference, as a real client holds the
+        // object it reads (the zpp_bits/std and cista adapters hold the decoded
+        // object or its pointer). The root moves only when the view is reloaded,
+        // so snap_recv, the only epoch change point, refreshes it; U*.apply then
+        // starts at the root instead of looking it up in the arena on every delta.
+        // -DSLG_RP_CHECK checks every use against root<ViewSnapshot>() (off by default).
+        std::vector<xm::ViewSnapshot*> held_roots;
         void setup(int clients, int units, int marches) {
             es.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, cap()));
             ds.emplace(XBuffer::create<xm::ViewDelta>(kViewInitial, cap()));
@@ -465,6 +473,7 @@ public:
             snaps.assign(1, {});
             held_views.clear();
             held_views.resize(std::size_t(clients) + 1);   // [clients]: the warm single-device view (EBW)
+            held_roots.assign(std::size_t(clients) + 1, nullptr);
 #ifdef XOFFSET_DELTA_SYNC_API
             n_setup(clients, units, marches);
 #else
@@ -483,8 +492,18 @@ public:
             auto& h = held_views[std::size_t(c) + std::size_t(k)];
             if (!h) h.emplace(XBuffer::create<xm::ViewSnapshot>(4096, held_cap()));
             h->reload_verified<xm::ViewSnapshot>(snaps[std::size_t(b)]);
+            held_roots[std::size_t(c) + std::size_t(k)] = &h->root<xm::ViewSnapshot>();
         }
-        xm::ViewSnapshot& held(int c, int k) { return held_views[std::size_t(c) + std::size_t(k)]->root<xm::ViewSnapshot>(); }
+        xm::ViewSnapshot& held(int c, int k) {
+            const std::size_t i = std::size_t(c) + std::size_t(k);
+#ifdef SLG_RP_CHECK
+            if (held_roots[i] != &held_views[i]->root<xm::ViewSnapshot>()) {
+                std::fprintf(stderr, "SLG_RP_CHECK: held root of view %zu is stale\n", i);
+                std::abort();
+            }
+#endif
+            return *held_roots[i];
+        }
         template <class Fill> std::size_t delta_encode(Fill&& fill) {
             fill(ds->reset<xm::ViewDelta>());
             ds->save_verified_into<xm::ViewDelta>(dw);
@@ -500,10 +519,62 @@ public:
         // one takes the lowest free slot or is appended; tiles stay in place),
         // mutates it in place, and writes one delta against that client's
         // baseline. The client patches + verifies and reads in place.
+        // A view's record id -> slot map: open addressing with linear probing
+        // and backward-shift erase, at most half full, so an id that enters or
+        // leaves the view allocates and frees nothing (std::unordered_map does
+        // one node per insert). The slots it maps to are chosen as before.
+        struct SlotMap {
+            struct Cell { int32_t key, val; };
+            static constexpr int32_t kEmpty = INT32_MIN;
+            std::vector<Cell> cells;
+            std::size_t count = 0;
+            unsigned shift = 32;
+            std::size_t home(int32_t id) const { return std::size_t((uint32_t(id) * 0x9E3779B1u) >> shift); }
+            std::size_t mask() const { return cells.size() - 1; }
+            // The cell of id, or of the empty cell where it would go.
+            std::size_t probe(int32_t id) const {
+                std::size_t i = home(id);
+                while (cells[i].key != id && cells[i].key != kEmpty) i = (i + 1) & mask();
+                return i;
+            }
+            int32_t* find(int32_t id) {
+                if (cells.empty()) return nullptr;
+                const std::size_t i = probe(id);
+                return cells[i].key == id ? &cells[i].val : nullptr;
+            }
+            void grow() {
+                std::vector<Cell> old(cells.empty() ? 32 : cells.size() * 2, Cell{kEmpty, 0});
+                old.swap(cells);
+                shift = 32;
+                for (std::size_t n = cells.size(); n > 1; n >>= 1) --shift;
+                for (const Cell& c : old) if (c.key != kEmpty) cells[probe(c.key)] = c;
+            }
+            // The value of id and whether it was added (then 0).
+            std::pair<int32_t*, bool> try_emplace(int32_t id) {
+                if (2 * (count + 1) > cells.size()) grow();
+                const std::size_t i = probe(id);
+                if (cells[i].key == id) return {&cells[i].val, false};
+                cells[i] = Cell{id, 0};
+                ++count;
+                return {&cells[i].val, true};
+            }
+            // Removes id (present): later cells of its run move back, so no
+            // tombstones are left.
+            void erase(int32_t id) {
+                std::size_t i = probe(id);
+                for (std::size_t j = (i + 1) & mask(); cells[j].key != kEmpty; j = (j + 1) & mask()) {
+                    const std::size_t h = home(cells[j].key);
+                    // cells[j] may fill the hole at i unless its home lies in (i, j].
+                    if (((j - h) & mask()) >= ((j - i) & mask())) { cells[i] = cells[j]; i = j; }
+                }
+                cells[i].key = kEmpty;
+                --count;
+            }
+        };
         struct NView {
             std::optional<XBuffer> buf;
             XOffsetDatastructure::XDeltaBaseline base;
-            std::unordered_map<int32_t, int32_t> uslot, mslot;
+            SlotMap uslot, mslot;
             std::vector<int32_t> ufree, mfree;
             int32_t usize = 0, msize = 0;
             std::string key;
@@ -554,26 +625,28 @@ public:
             np.urm.clear(); np.mrm.clear(); np.uup.clear(); np.mup.clear(); np.unew.clear();
             // The slot of id, taking the lowest free one (or a new one) for an
             // id the view does not hold yet: one lookup either way.
-            auto take = [](std::unordered_map<int32_t, int32_t>& at, std::vector<int32_t>& fr, int32_t& size, int32_t id, bool& fresh) {
-                const auto [it, added] = at.try_emplace(id, 0);
+            auto take = [](SlotMap& at, std::vector<int32_t>& fr, int32_t& size, int32_t id, bool& fresh) {
+                const auto [val, added] = at.try_emplace(id);
                 fresh = added;
-                if (!added) return it->second;
+                if (!added) return *val;
                 int32_t pos;
                 if (fr.empty()) pos = size++;
                 else { std::pop_heap(fr.begin(), fr.end(), std::greater<>{}); pos = fr.back(); fr.pop_back(); }
-                it->second = pos;
+                *val = pos;
                 return pos;
             };
             for (int32_t id : p.removed) {
-                const auto it = n.uslot.find(id);
-                if (it == n.uslot.end()) continue;
-                np.urm.push_back(it->second); n.ufree.push_back(it->second); n.uslot.erase(it);
+                const int32_t* at = n.uslot.find(id);
+                if (!at) continue;
+                const int32_t pos = *at;
+                np.urm.push_back(pos); n.ufree.push_back(pos); n.uslot.erase(id);
                 std::push_heap(n.ufree.begin(), n.ufree.end(), std::greater<>{});
             }
             for (int32_t id : p.removed_marches) {
-                const auto it = n.mslot.find(id);
-                if (it == n.mslot.end()) continue;
-                np.mrm.push_back(it->second); n.mfree.push_back(it->second); n.mslot.erase(it);
+                const int32_t* at = n.mslot.find(id);
+                if (!at) continue;
+                const int32_t pos = *at;
+                np.mrm.push_back(pos); n.mfree.push_back(pos); n.mslot.erase(id);
                 std::push_heap(n.mfree.begin(), n.mfree.end(), std::greater<>{});
             }
             bool fresh = false;
