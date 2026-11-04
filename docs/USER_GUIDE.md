@@ -415,6 +415,48 @@ A 场景整体仍快于 zpp_bits（上界 0.78）。下面是来源和使用方�
 
 两条约定都不影响正确性和 wire 格式；上面的对策也只改性能，不改语义和 wire 的接受集合。
 
+### 4.4 定长消息：不经 XBuffer，按自身字节收发
+
+只含标量、枚举、数组和由它们组成的记录、内部没有任何 arena 容器（`XString`、`XVector`、
+`XSet`、`XMap`、`XBlob`）、也没有隐式填充的类型是定长消息（`is_fixed_message_v<T>`）：
+行情更新、委托、回报这类小消息。它的字节里没有偏移，所以不需要 arena、根和 wire 线头，
+`xoffset_fixed_message.hpp` 让它直接按自身的字节收发：
+
+```cpp
+#include "xoffset_fixed_message.hpp"
+
+struct alignas(8) Quote { std::uint64_t ts; std::int64_t price; std::uint32_t qty, instrument;
+                          Side side; std::uint8_t flags; std::uint8_t reserved[6]; };
+XOFFSET_RECORD(Quote, ts, price, qty, instrument, side, flags, reserved)
+XOFFSET_REGISTER_SCHEMA_NAME(Quote, "mkt.Quote")
+
+// 连接建立时：像其他根类型一样列进握手（xoffset_handshake.hpp），之后每条消息不带线头。
+std::string hello = make_schema_hello<Quote, Ack>("feed-1");
+
+// 发送：一条就是 sizeof(Quote) 字节；一批是 8 字节头 {条数, 类型标签} 加记录。
+std::size_t n = write_fixed_batch<Quote>(send_buf, quotes);      // 或 place_fixed_batch 原地填
+// 接收：在收到的字节上直接读，不复制。
+if (auto v = view_fixed_batch<Quote>(recv_bytes))
+    for (const Quote& q : v.records) on_quote(q);
+```
+
+- 视图检查长度（单条恰好 `sizeof(T)`，一批与条数相符）、`T` 的对齐、批的类型标签，以及每个
+  `bool` 的字节是 0 或 1（与 `load_verified` 相同；枚举不查范围）。这就是定长消息的全部
+  结构校验：没有偏移，就没有越界可查。没有 `bool` 的类型，取值检查在编译期消失；有 `bool`
+  时单条消息约多 5 条指令，一批每条记录约多 4 条、另有约 10 条固定开销。标志位用
+  `std::uint8_t` 就没有这项检查。
+  失败时 `status` 说明原因（`wrong_size`、`misaligned`、`wrong_tag`、`invalid_value`）。
+- 单条消息不带标签，只在只传一种类型的连接上发单条；一个连接传多种定长类型时发批，
+  按 `peek_fixed_batch_tag(bytes)` 对 `fixed_message_tag_v<T>` 分发。
+- 视图就地读取，收到的字节在用完之前不能改动或释放。字节须由会隐式创建对象的操作写入：
+  `memcpy`、读 socket 到字节缓冲区，或这里的写函数。
+- 同一个类型也可以作为普通根里的元素（例如快照里的 `XVector<Quote>`），两边记录的字节相同。
+- 不抛异常，不分配内存。属于实验接口（第 8 节 E6）。
+
+成本（云端 callgrind，40 字节记录，见 `bench/fixedmsg/README.md`）：编码比手写结构体多
+1 到 8 条指令，每个读者多 5 到 8 条；与把同样记录放进 XOffset 根相比，编码少 6 到 12 倍，
+读少 1.7 到 6 倍。
+
 ## 5. 必须遵守的约束
 
 | 约束 | 不遵守的后果 |
@@ -585,6 +627,7 @@ iOS 的地址空间和最低部署目标（系统 libc++ 的 `std::pmr` 在 macO
 | E3 | `XBufferPool`、预留与增长策略细节、`XStorage` / `storage_kind()`、`SLOT_MAX`、`trim_slot_storage` | 小 buffer 高频场景 |
 | E4 | `load_unverified` | 只用于调用方已信任的数据 |
 | E5 | `XCompactor` | 同类型压缩整理 |
+| E6 | `xoffset_fixed_message.hpp`（定长消息，4.4 节） | 不经 XBuffer 收发定长记录 |
 
 `XHandle`、诊断与统计接口、`XBufferCore` 的底层成员不属于承诺范围。
 
