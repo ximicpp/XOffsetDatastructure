@@ -155,6 +155,9 @@ GCC 16 ASan+UBSan 差分 fuzz 代替。
   再 `-fork=4` 跑约 20 分钟，然后合并语料、复现并最小化发现。语料以 tar 包跨夜保存在
   项目文件里；调试信息里的路径映射为 `/workspace`，签名与 Docker 作业一致。首晚即发现
   #130（harness 对短于头部的输入检查过严，已修复，输入入回归目录）。
+- 客户端构建（2026-10-28 起）：同一晚在 C++20 字段表构建上跑 libFuzzer（`v2_wire`、
+  `wire_schemas`），再用 `tools/fuzz_outcome_diff.sh` 让反射、字段表、关异常三种构建回放
+  同一批语料，逐条比较各入口的结果和错误文字。
 - 仍有的缺口：没有 PR 短跑（PR 的合并证据是 `tools/local_validate.sh`）。
 
 - **F1 覆盖率引导 fuzz**：libFuzzer harness（`LLVMFuzzerTestOneInput`），入口为
