@@ -1,0 +1,2 @@
+HFT HFT head/anc: xo_nest/ptr 0.988, xo_nest/root 0.966, xo_pool/ptr 0.992, xo_pool/root 1.050
+demo demo head/anc: UP.apply 0.987, UC.apply 0.997, NP.recv 0.999, UP.send 1.016, UC.send 0.996, NP.send 0.997, UP.recv 1.031, UC.recv 1.008 (BYTES DIFFER)

@@ -1,0 +1,13 @@
+t0 fe8c07437224d9462f407cd115eae18a3972a829 tree d4f4865f4f4c657f8dd768c95d25fcf983175471 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (next_cpp26 fe8c0743 (#191 merged; base of PR #222))
+t1 6578f4039c5fe746430c2f0c3889bca59cf77e25 tree 33c241701572bb55163fd7d37e79e85cf7fb1123 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (CKPT19b head (PR #222 6578f403))
+t1: diff over t0 sha256 6e3c2d04fa61b2a1d79acf411b748a6402355f2ec1e162442ba0c7b124945e28 ( 6 files changed, 262 insertions(+), 91 deletions(-))
+t1: library header diff over t0:  1 file changed, 52 insertions(+), 27 deletions(-)
+t1: first-parent commits over t0:
+  6578f403 VM color does not raise the region alignment
+  209fe35f test_owner_map: expect min(8, colors) VM colors on 16 KiB pages
+  60288a20 Color payload starts so many buffers do not share TLB sets
+bench/reloc of t1: same tree as t0
+reloc_bench t0 sha256 5d3a5f4b2d326c7cbaa036b8c53d31a776b1a4fd674c8ecd20794add4813f531
+reloc_bench t1 sha256 b62e19b7fb3817eb6de04ea09c5a8d2167777e683d02de54194f877fcc73adfe
+reloc_bench t0a sha256 6fa9ff1605a6e8edffb26f903f8afb0b6da9714d55e303986704d466811888f6
+reloc_bench t1a sha256 ec1a0cdcfbae123425a24c23572daea72318efd16f0d4af5b84290f1a9d2cb60
