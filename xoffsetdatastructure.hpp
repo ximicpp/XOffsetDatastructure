@@ -138,6 +138,7 @@ namespace XOffsetDatastructure {
 #endif
         struct VerifiedPathsAccess;
         struct VerifiedReceiveAccess;
+        struct DeltaAccess;
         // Registration is the only registry operation allowed to allocate.
         // One-shot thread-local injection leaves existing owners untouched.
         inline thread_local bool pending_registry_failure = false;
@@ -748,6 +749,7 @@ namespace XOffsetDatastructure {
                         if (exact.empty()) table->clear_nonempty(bin);
                         table->bytes -= bytes;
                         --table->count;
+                        table->bump_gen();
                         return payload_byte_address(offset);
                     }
                     // A larger hole would be split: the general path. With
@@ -808,6 +810,7 @@ namespace XOffsetDatastructure {
                     table->mark_nonempty(bin);
                     table->bytes += bytes;
                     ++table->count;
+                    table->bump_gen();
                     return;
                 }
             }
@@ -827,6 +830,12 @@ namespace XOffsetDatastructure {
         }
         std::size_t free_block_count() const noexcept { return free_table_ ? free_table_->count : 0; }
         std::uint64_t free_block_bytes() const noexcept { return free_table_ ? free_table_->bytes : 0; }
+        // Changes whenever a free block comes or goes; two tables (of any
+        // buffers) with the same generation hold the same blocks. A read
+        // after a change counts the generation up, so it is not a read for
+        // concurrent use (save_delta_into reads it, and takes the buffer
+        // non-const).
+        std::uint64_t free_block_gen() const noexcept { return free_table_ ? free_table_->current_gen() : 0; }
 
         // A hint: starts loading, without waiting, the host-side lines the
         // next allocation or release in this buffer reads first: the owner
@@ -987,6 +996,12 @@ namespace XOffsetDatastructure {
                         ++i;
                     }
                 }
+                // A table from make_free_table() is new or came from the
+                // cache through recycle(), so it is already stale. Marked
+                // anyway: a table this path fills that had its generation
+                // read since its last change (an owner's kept, emptied
+                // table) must not keep that value with new holes in it.
+                if (count != 0) table->bump_gen();
             } XOFFSET_CATCH(const std::bad_alloc&) {
                 XOFFSET_THROW(XBadAlloc());
             }
@@ -1110,6 +1125,33 @@ namespace XOffsetDatastructure {
             // Every bin growth (load_free_blocks, insert_free_block,
             // copy_free_table) sets it.
             bool grown = false;
+            // The generation, read through current_gen(): it differs from
+            // every value read before if an entry came or went in between, in
+            // any buffer, so the same gen means the same holes. Each table
+            // counts up from its own range of 2^32 values (one shared atomic
+            // per range, none per change) and takes a new range when it runs
+            // out. 0 (no table) is no range's value. A change only marks the
+            // value stale (one store on every allocation and free); a read
+            // counts up once for any number of changes before it. Both fields
+            // come after the ones above, which keep the offsets they had
+            // before the generation came, and gen_stale fills the padding
+            // after `grown`: the store a change makes stays next to bytes,
+            // count and grown (one cache line when the table is 64-byte
+            // aligned, as macOS's allocator places it).
+            bool gen_stale = true;
+            std::uint64_t gen = next_range();
+            XOFFSET_DETAIL_NOINLINE static std::uint64_t next_range() noexcept {
+                static std::atomic<std::uint64_t> ranges{0};
+                return (ranges.fetch_add(1, std::memory_order_relaxed) + 1u) << 32;
+            }
+            XOFFSET_DETAIL_MOVE_INLINE void bump_gen() noexcept { gen_stale = true; }
+            std::uint64_t current_gen() noexcept {
+                if (gen_stale) {
+                    gen_stale = false;
+                    if (static_cast<std::uint32_t>(++gen) == 0) [[unlikely]] gen = next_range();
+                }
+                return gen;
+            }
 
             void mark_nonempty(std::uint32_t bin) noexcept {
                 nonempty[bin / 64u] |= std::uint64_t(1) << (bin % 64u);
@@ -1223,6 +1265,7 @@ namespace XOffsetDatastructure {
                 table->large.clear();
                 table->bytes = 0;
                 table->count = 0;
+                table->bump_gen();
                 table->grown = false;
             }
 
@@ -1238,6 +1281,7 @@ namespace XOffsetDatastructure {
                 table.large.clear();
                 table.bytes = 0;
                 table.count = 0;
+                table.bump_gen();
             }
         };
         using FreeTablePtr = std::unique_ptr<FreeTable, FreeTableRecycler>;
@@ -1284,6 +1328,7 @@ namespace XOffsetDatastructure {
             table->large = src.large;
             table->bytes = src.bytes;
             table->count = src.count;
+            table->bump_gen();
             table->grown = true; // bins were assigned: the next keep-recycle re-applies the limits
             return table;
         }
@@ -1365,6 +1410,7 @@ namespace XOffsetDatastructure {
             table->mark_nonempty(bin);
             table->bytes += bytes;
             ++table->count;
+            table->bump_gen();
             return true;
         }
 
@@ -1416,6 +1462,7 @@ namespace XOffsetDatastructure {
                     }
                     table.bytes += bytes;
                     ++table.count;
+                    table.bump_gen();
                     return true;
                 }
             } XOFFSET_CATCH(...) {
@@ -1449,6 +1496,7 @@ namespace XOffsetDatastructure {
                     table.large.insert(std::move(split.node));
                     table.bytes += split.bytes;
                     ++table.count;
+                    table.bump_gen();
                     return;
                 }
             } else if (split.bytes == 0 || insert_free_block_inline(split.offset, split.bytes)) {
@@ -1471,6 +1519,7 @@ namespace XOffsetDatastructure {
                     if (exact.empty()) table.clear_nonempty(bin);
                     table.bytes -= bytes;
                     --table.count;
+                    table.bump_gen();
                     return payload_byte_address(found_offset);
                 }
                 // Smallest larger nonempty bin: the rest of bin's own word,
@@ -1505,6 +1554,7 @@ namespace XOffsetDatastructure {
             }
             table.bytes -= found_bytes;
             --table.count;
+            table.bump_gen();
             // Split: the remainder stays free (a multiple of 8, at least 8).
             if (found_bytes > bytes) {
                 split.offset = found_offset + bytes;
@@ -2412,13 +2462,6 @@ namespace XOffsetDatastructure {
             if (used < buffer_.size()) std::memset(buffer_.data() + used, 0, buffer_.size() - used);
         }
 
-        // Storage-associated access/schema state belongs to the owner so even
-        // transfers through XBufferCore cannot leave derived flags behind.
-        bool typed_root_access_allowed_ = true;
-        bool schema_bound_ = false;
-        std::uint64_t bound_root_type_id_ = 0;
-        std::uint64_t bound_schema_hash_ = 0;
-
         // The root that make<T>() or a verified load of T admitted, valid
         // until the epoch advances. Typed access, the schema binding and the
         // root offset change only with the epoch (reinit, reset, move, swap,
@@ -2445,21 +2488,41 @@ namespace XOffsetDatastructure {
     private:
         friend struct detail::VerifiedPathsAccess;
         friend struct detail::VerifiedReceiveAccess;
+        friend struct detail::DeltaAccess;
         friend struct fixed_detail::StableEraseOwnerWitness;
-        OwnerRecordPtr owner_record_;
+        // Hot fields first, in one run of 40 bytes at offset 0: the root
+        // cache (all that root<T>()'s fast path reads; 16-byte aligned, so
+        // its two words never straddle a line), the free table, then the
+        // storage, whose first two fields are the payload base and size. A
+        // root<T>() and the update that follows it (prefetch_for_update(), an
+        // allocation) find base, size and free table on the line the root
+        // lookup brought in.
+        alignas(16) const void* root_cache_type_ = nullptr;
+        void* root_cache_ = nullptr;
+        FreeTablePtr free_table_;
         detail::VirtualMemoryStorage buffer_;
+        std::uint64_t m_epoch = 0;
+        OwnerRecordPtr owner_record_;
+        bool free_table_lost_ = false;
+
+    protected:
+        // XBuffer's flag for an open direct reload (VerifiedReloadToken),
+        // kept here in padding so that XBuffer adds only its two pointers
+        // (see the static_assert after XBuffer).
+        bool direct_reload_open_ = false;
+        // Storage-associated access/schema state belongs to the owner so even
+        // transfers through XBufferCore cannot leave derived flags behind.
+        bool typed_root_access_allowed_ = true;
+        bool schema_bound_ = false;
+        std::uint64_t bound_root_type_id_ = 0;
+        std::uint64_t bound_schema_hash_ = 0;
+
+    private:
         // Next D6 growth step below zero_from() (ensure_allocation_extent).
         std::uint32_t dirty_step_ = first_dirty_step;
         uint64_t dirty_epoch_ = 0;  // m_epoch when dirty_step_ was last reset
         XGrowPolicy growth_policy_ = XGrowPolicy::Explicit;
-        FreeTablePtr free_table_;
-        bool free_table_lost_ = false;
         const void* root_type_identity_ = nullptr;
-        std::uint64_t m_epoch = 0;
-        // root<T>() reads only these two words: 16-byte aligned, they never
-        // straddle a cache line (a cold buffer costs one line, not two).
-        alignas(16) const void* root_cache_type_ = nullptr;
-        void* root_cache_ = nullptr;
     };
 
     // ========================================================================
@@ -6594,6 +6657,86 @@ namespace XOffsetDatastructure {
         std::uint32_t slack_div = 8;
     };
 
+    // Delta sync (xoffset_delta.hpp, docs/DELTA_SYNC.md): a sender keeps an
+    // XDeltaBaseline per receiver (the state that receiver holds) and sends
+    // only the payload bytes that changed since; the receiver patches its
+    // copy in place, verifies it as load_verified would and keeps an
+    // XDeltaCursor (which state it holds).
+    class XDeltaBaseline;
+    class XDeltaCursor;
+    // Options of save_delta / save_delta_into.
+    struct XDeltaOptions {
+        // Carry the digest of the whole resulting payload; the receiver
+        // rejects (and rolls back) a delta whose result differs, which also
+        // catches a replica changed locally since the last delta. Costs one
+        // hash pass over the payload on each side.
+        bool digest = false;
+        // Compare only what changed by this buffer's touch() marks: the
+        // 64-byte blocks touched since the baseline's last delta from this
+        // buffer, plus the bytes past the baseline's used size and the
+        // holes that came or went, instead of the whole payload. The sender
+        // touches everything it changes (a change it does not touch is not
+        // sent). A baseline's first such delta from a buffer (unless a key
+        // delta from a buffer already keeping touches came before), and any
+        // after the buffer's content was replaced (reload, reset, swap, a
+        // move of its storage), compares everything.
+        bool touched_only = false;
+        // Send each changed 64-byte block whole instead of its changed bytes
+        // (a block that ends past used_end still goes by its mask): a larger
+        // delta that the receiver applies with one copy per block. For key
+        // deltas to receivers where apply time counts more than bytes.
+        bool whole_blocks = false;
+    };
+    namespace detail {
+        // A delta sender's touch marks (XBuffer::touch). Touches are counted
+        // in periods: a delta from the buffer (DeltaAccess::pair_touch_log)
+        // ends one. The blocks (block k: payload bytes [64k, 64k + 64))
+        // touched in the current period are listed, up to list_capacity of
+        // them, in the first cache line; with masks, the bytes touched in
+        // each. Per-block stamps (the period of the block's last touch) are
+        // kept only where a delta needs more than the list: once a second
+        // baseline pairs with the log (each finds what was touched since its
+        // own last delta), and in a period whose touches overflow the list.
+        struct alignas(64) DeltaTouchLog {
+            static constexpr std::uint32_t list_capacity = 24;  // the header and the first 8 in one line
+            std::uint32_t now = 1;     // the current period
+            std::uint16_t listed = 0;  // entries of `blocks` (and `masks`), in touch order
+            std::uint16_t seen = 0;    // bit k % 16 set for each listed block k: a block whose bit is clear is new
+            std::uint64_t epoch = 0;   // the buffer content (epoch) the marks describe
+            bool lost = false;         // a touch could not be recorded
+            bool overflow = false;     // more blocks touched in this period than the list holds
+            bool shared = false;       // several baselines pair: every touch is stamped
+            bool masks_on = false;     // an XDeltaRecord::touches baseline pairs: masks are kept
+            std::uint32_t stamps_from = UINT32_MAX;  // stamps hold every touch of the periods from this one
+            // Where the copy of the only baseline that pairs is (0: none, or
+            // several): a touched block's line of it is fetched ahead of the
+            // next delta (a hint: the address is never dereferenced).
+            std::uintptr_t copy = 0;
+            std::uint32_t blocks[list_capacity];
+            std::uint64_t masks[list_capacity];
+            std::uint64_t id = 0;            // changes when the log starts over
+            const void* owner = nullptr;     // the baseline that paired last
+            std::vector<std::uint32_t> stamps;
+            std::vector<std::uint32_t> groups;  // per 16 blocks: the latest of their stamps
+            // With masks and one baseline, a period that overflows the list
+            // keeps the bytes touched per block: block_masks[i] holds block
+            // i's touches of period masks_period where stamps[i] is that
+            // period (0: no period's bytes are kept).
+            std::vector<std::uint64_t> block_masks;
+            std::uint32_t masks_period = 0;
+        };
+    } // namespace detail
+    // What one save_delta_into wrote.
+    struct XDeltaStats {
+        bool key = false;                 // a key delta: the receiver starts from an empty payload
+        bool holes = false;               // the hole table changed and was sent
+        bool empty = false;               // nothing changed: no delta written, version not advanced
+        std::uint32_t blocks = 0;         // 64-byte payload blocks sent (those with a changed byte)
+        std::uint64_t changed_bytes = 0;  // payload bytes carried in them
+        std::uint64_t compared_bytes = 0; // payload bytes compared against the baseline
+        std::size_t delta_bytes = 0;      // size of the delta written (0 when empty)
+    };
+
     // One assignment of save_compact_into(out, options, xassign(target,
     // source)...): the wire is written as if `*target = *source` had been
     // done first, without doing it. target: a member subobject (any depth,
@@ -7871,6 +8014,7 @@ namespace XOffsetDatastructure {
             if (this == &other) return;
             XBufferCore::swap(other);
             reload_scratch_.swap(other.reload_scratch_);
+            touch_log_.swap(other.touch_log_);
             std::swap(direct_reload_open_, other.direct_reload_open_);
         }
 
@@ -8354,8 +8498,67 @@ namespace XOffsetDatastructure {
         }
 
         std::unique_ptr<detail::WireValidationScratch> reload_scratch_;
-        bool direct_reload_open_ = false;
+        std::unique_ptr<detail::DeltaTouchLog> touch_log_;  // touch() marks (delta senders)
+        // direct_reload_open_ is in XBufferCore's padding (see there).
         template <typename> friend class VerifiedReloadToken;
+        friend struct detail::DeltaAccess;
+
+    public:
+        // ---- Delta sync (xoffset_delta.hpp, docs/DELTA_SYNC.md) ----------
+        /// Writes into `out` a delta that turns the state `baseline` records
+        /// (what one receiver holds) into this buffer's current state, and
+        /// advances `baseline` to it. Only payload bytes that differ are sent
+        /// (plus the hole table when it changed); an empty baseline gives a
+        /// key delta, which a receiver applies to any buffer. When nothing
+        /// changed, `out` is left empty and the version does not advance
+        /// (send nothing). The buffer is not changed (beyond an incomplete
+        /// free table being recomputed, as save_verified does).
+        template <typename T>
+        XDeltaStats save_delta_into(std::string& out, XDeltaBaseline& baseline, XDeltaOptions options = {});
+        template <typename T>
+        std::string save_delta(XDeltaBaseline& baseline, XDeltaOptions options = {});
+        /// For deltas with XDeltaOptions::touched_only: records that `value`
+        /// (an object in this buffer's payload) may have changed, with
+        /// everything it reaches (the blocks of its strings and containers,
+        /// nested). Call it after the change: a container that moved to a new
+        /// block is marked where it is now (the block it left becomes a
+        /// hole, which the delta finds by itself).
+        template <typename T>
+        void touch(const T& value) noexcept;
+        /// The same for the payload bytes [p, p + bytes) alone.
+        void touch(const void* p, std::size_t bytes) noexcept;
+        /// Assigns `value` to `field` (an object in this buffer's payload)
+        /// only when they differ (field == value is false), then touches the
+        /// field (a scalar: only its bytes that changed); returns whether it
+        /// assigned. Touches then name exactly what changed, which is what a
+        /// delta from an XDeltaRecord::touches baseline sends.
+        template <typename T, typename V>
+        bool touch_set(T& field, const V& value);
+
+        /// Applies a delta of save_delta_into to this buffer, which holds the
+        /// state `cursor` records (any buffer for a key delta). The patched
+        /// payload is verified exactly as load_verified<T> verifies a wire;
+        /// on success this buffer holds the sender's payload byte for byte
+        /// and `cursor` advances. A rejected non-key delta leaves the buffer
+        /// and `cursor` exactly as they were; a key delta rejected after its
+        /// header checks leaves the buffer empty (as a failed
+        /// reload_verified) and `cursor` cleared.
+        /// Either way the receiver asks the sender for a key delta
+        /// (XDeltaBaseline::reset). Element pointers into the previous
+        /// content are invalidated (the root keeps its address while the
+        /// root offset and the storage stay; XHandles re-resolve).
+        template <typename T>
+        void apply_delta_verified(std::span<const std::byte> delta, XDeltaCursor& cursor);
+        template <typename T>
+        void apply_delta_verified(const std::string& delta, XDeltaCursor& cursor);
+        /// apply_delta_verified without exceptions: ok, or the code and
+        /// message it would have thrown (same buffer and cursor state).
+        template <typename T>
+        XStatus try_apply_delta_verified(std::span<const std::byte> delta, XDeltaCursor& cursor);
+        template <typename T>
+        XStatus try_apply_delta_verified(const std::string& delta, XDeltaCursor& cursor);
+
+    private:
 
     public:
         /// Direct receive into this buffer: reload_verified<T>() without the
@@ -8612,6 +8815,12 @@ namespace XOffsetDatastructure {
 
     };
 
+    // XBuffer adds its two pointers to XBufferCore and nothing else: a new
+    // flag goes into XBufferCore's padding, so that vectors of XBuffer and
+    // std::optional<XBuffer> members keep their size.
+    static_assert(sizeof(XBuffer) == sizeof(XBufferCore) + 2 * sizeof(void*),
+                  "XBuffer grew: put the new field into XBufferCore's padding");
+
     // Open direct reload of one XBuffer (XBuffer::begin_verified_reload).
     template <typename T>
     class VerifiedReloadToken {
@@ -8844,6 +9053,26 @@ namespace XOffsetDatastructure {
 
         XStatus try_reload_verified(std::span<const std::byte> data) { return XBuffer::try_reload_verified<T>(data); }
         XStatus try_reload_verified(const std::string& data) { return XBuffer::try_reload_verified<T>(data); }
+
+        /// Delta sync (see XBuffer::save_delta_into / apply_delta_verified).
+        XDeltaStats save_delta_into(std::string& out, XDeltaBaseline& baseline, XDeltaOptions options = {}) {
+            return XBuffer::save_delta_into<T>(out, baseline, options);
+        }
+        std::string save_delta(XDeltaBaseline& baseline, XDeltaOptions options = {}) {
+            return XBuffer::save_delta<T>(baseline, options);
+        }
+        void apply_delta_verified(std::span<const std::byte> delta, XDeltaCursor& cursor) {
+            XBuffer::apply_delta_verified<T>(delta, cursor);
+        }
+        void apply_delta_verified(const std::string& delta, XDeltaCursor& cursor) {
+            XBuffer::apply_delta_verified<T>(delta, cursor);
+        }
+        XStatus try_apply_delta_verified(std::span<const std::byte> delta, XDeltaCursor& cursor) {
+            return XBuffer::try_apply_delta_verified<T>(delta, cursor);
+        }
+        XStatus try_apply_delta_verified(const std::string& delta, XDeltaCursor& cursor) {
+            return XBuffer::try_apply_delta_verified<T>(delta, cursor);
+        }
 
         /// Construct from an existing XBuffer (e.g., after compaction).
         TypedXBuffer(XBuffer&& other) noexcept
@@ -9206,5 +9435,6 @@ XOFFSET_REGISTER_MIGRATION_MAP(XFixedFlatMap, Container)
 #include "xoffset_verified_paths.hpp"
 #include "xoffset_verified_receive.hpp"
 #include "xoffset_core_lifetime.hpp"
+#include "xoffset_delta.hpp"
 
 #endif
