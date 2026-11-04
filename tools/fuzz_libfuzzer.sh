@@ -21,6 +21,13 @@
 # XOFFSET-INJECT input on v2_wire (one finding expected) and keeps the corpus
 # out of the store.
 #
+# --backend fieldlist fuzzes the build clients use: C++20 with XOFFSET_RECORD
+# field lists instead of reflection (same compiler and sanitizers; targets
+# v2_wire and wire_schemas, schema evolution is server side). Its jobs are
+# libfuzzer-fieldlist-<target> under the needs key `libfuzzer-fieldlist`, its
+# corpus fieldlist-<target>.tar.gz (started from <target>.tar.gz), its notes
+# libfuzzer-fieldlist-meta.json.
+#
 # Exit status: 0 when the run finished (findings or not; see needs.json),
 # 2 on bad arguments.
 set -uo pipefail
@@ -31,7 +38,7 @@ P2996_TARBALL=${P2996_TARBALL:-/mnt/project-files/toolchains/p2996-d77eff1-linux
 FUZZ_FLAGS='-max_len=262144 -rss_limit_mb=2048 -timeout=30'
 MODE_FLAGS='-fork=4 -ignore_crashes=1 -ignore_ooms=1 -ignore_timeouts=1 -use_value_profile=1'
 
-OUT='' SECS=1200 INJECT=OFF TARGETS='v2_wire wire_schemas schema_evolution'
+OUT='' SECS=1200 INJECT=OFF TARGETS='' BACKEND=reflection
 CORPUS_STORE=/mnt/project-files/fuzz-nightly/corpus
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -39,51 +46,62 @@ while [ $# -gt 0 ]; do
     --seconds) SECS=$2; shift 2 ;;
     --corpus-dir) CORPUS_STORE=$2; shift 2 ;;
     --targets) TARGETS=${2//,/ }; shift 2 ;;
+    --backend) BACKEND=$2; shift 2 ;;
     --inject) INJECT=ON; shift ;;
-    *) echo "usage: $0 --out DIR [--seconds N] [--corpus-dir DIR] [--targets a,b] [--inject]" >&2; exit 2 ;;
+    *) echo "usage: $0 --out DIR [--seconds N] [--corpus-dir DIR] [--targets a,b] [--backend reflection|fieldlist] [--inject]" >&2; exit 2 ;;
   esac
 done
 if [ -z "$OUT" ] || ! [[ "$SECS" =~ ^[0-9]+$ ]] || [ "$SECS" -lt 10 ]; then
-  echo "usage: $0 --out DIR [--seconds N>=10] [--corpus-dir DIR] [--targets a,b] [--inject]" >&2; exit 2
+  echo "usage: $0 --out DIR [--seconds N>=10] [--corpus-dir DIR] [--targets a,b] [--backend reflection|fieldlist] [--inject]" >&2; exit 2
 fi
+case "$BACKEND" in
+  reflection) KNOWN='v2_wire wire_schemas schema_evolution' JOB=libfuzzer STD=26 ;;
+  fieldlist) KNOWN='v2_wire wire_schemas' JOB=libfuzzer-fieldlist STD=20 ;;
+  *) echo "unknown backend '$BACKEND'" >&2; exit 2 ;;
+esac
+TARGETS=${TARGETS:-$KNOWN}
 for T in $TARGETS; do
-  case "$T" in v2_wire|wire_schemas|schema_evolution) ;; *) echo "unknown target '$T'" >&2; exit 2 ;; esac
+  case " $KNOWN " in *" $T "*) ;; *) echo "unknown target '$T' for the $BACKEND backend" >&2; exit 2 ;; esac
 done
+# Store and result names: <target> and libfuzzer-<target> for reflection,
+# fieldlist-<target> and libfuzzer-fieldlist-<target> for field lists.
+PREFIX=${JOB#libfuzzer}; PREFIX=${PREFIX#-}; PREFIX=${PREFIX:+$PREFIX-}
 
 ROOT=$(git -C "$(dirname "$0")" rev-parse --show-toplevel) || exit 2
 cd "$ROOT" || exit 2
 mkdir -p "$OUT" && OUT=$(cd "$OUT" && pwd) || exit 2
-WORK=build/libfuzzer-nightly
+WORK=build/$JOB-nightly
 rm -rf "$WORK" && mkdir -p "$WORK" build
 START=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 RESULT=failure
 
 finish() {
-  python3 - "$OUT" "$RESULT" "$START" "$SECS" "$INJECT" "$TARGETS" <<'PY'
+  python3 - "$OUT" "$RESULT" "$START" "$SECS" "$INJECT" "$TARGETS" "$JOB" "$BACKEND" <<'PY'
 import datetime, json, sys
 from pathlib import Path
-out, result, start, secs, inject, targets = sys.argv[1:]
+out, result, start, secs, inject, targets, job, backend = sys.argv[1:]
 out = Path(out)
 needs_path = out / 'needs.json'
 needs = json.loads(needs_path.read_text()) if needs_path.is_file() else {}
-needs['libfuzzer'] = {'result': result}
+needs[job] = {'result': result}
 needs_path.write_text(json.dumps(needs) + '\n')
 end = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-lines = ['', '## libFuzzer (P2996 Clang, ASan+UBSan)', '',
+title = 'P2996 Clang, ASan+UBSan' if backend == 'reflection' else 'P2996 Clang in C++20 with field lists, ASan+UBSan'
+lines = ['', '## libFuzzer (%s)' % title, '',
          '- %s to %s, %s s per target, -fork=4%s' % (start, end, secs, ', **inject drill**' if inject == 'ON' else '')]
 meta = {'start': start, 'end': end, 'seconds_per_target': int(secs), 'inject': inject == 'ON', 'result': result, 'targets': {}}
 for t in targets.split():
-    d = out / ('libfuzzer-' + t)
+    d = out / (job + '-' + t)
     found = json.loads((d / 'findings.json').read_text())['findings'] if (d / 'findings.json').is_file() else None
     stats = json.loads((d / 'stats.json').read_text()) if (d / 'stats.json').is_file() else {}
     meta['targets'][t] = {'findings': None if found is None else len(found),
                           **{k: stats.get(k) for k in ('fuzzer_exit', 'fuzz_execs', 'corpus_files', 'corpus_cov', 'corpus_ft')}}
-    lines.append('- libfuzzer-%s: %s, execs %s, corpus %s files, cov %s, exit %s' % (
-        t, 'no findings.json' if found is None else '%d finding(s)' % len(found), stats.get('fuzz_execs', '?'),
+    lines.append('- %s-%s: %s, execs %s, corpus %s files, cov %s, exit %s' % (
+        job, t, 'no findings.json' if found is None else '%d finding(s)' % len(found), stats.get('fuzz_execs', '?'),
         stats.get('corpus_files', '?'), stats.get('corpus_cov', '?'), stats.get('fuzzer_exit', '?')))
     for f in found or []:
         lines.append('  - `%s` %s: %s in `%s`' % (f['signature'], t, f['error_type'], f.get('top_function') or '?'))
-(out / 'libfuzzer-meta.json').write_text(json.dumps(meta, indent=2) + '\n')
+(out / (job + '-meta.json')).write_text(json.dumps(meta, indent=2) + '\n')
 with open(out / 'summary.md', 'a') as fh:
     fh.write('\n'.join(lines) + '\n')
 print('\n'.join(lines))
@@ -91,7 +109,7 @@ PY
 }
 trap finish EXIT
 
-echo "== libFuzzer nightly $START, $(git rev-parse --short HEAD), $SECS s per target, targets: $TARGETS, inject=$INJECT"
+echo "== libFuzzer nightly $START, $(git rev-parse --short HEAD), $BACKEND backend, $SECS s per target, targets: $TARGETS, inject=$INJECT"
 if [ ! -x "$P2996_ROOT/bin/clang++" ]; then
   { (cd "$(dirname "$P2996_TARBALL")" && sha256sum -c "$(basename "$P2996_TARBALL").sha256") &&
     mkdir -p "$(dirname "$P2996_ROOT")" && tar -xJf "$P2996_TARBALL" -C "$(dirname "$P2996_ROOT")"; } > "$OUT/toolchain.log" 2>&1 ||
@@ -123,18 +141,20 @@ exec "\$@"
 EOF
 chmod +x build/xo-native
 
-{ "$CMAKE" -S . -B build/libfuzzer -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER="$P2996_ROOT/bin/clang++" \
+BUILD=build/$JOB
+BUILD_TARGETS="test_v2_fuzz fuzz_v2_wire fuzz_wire_schemas fuzz_wire_schemas_seeds"
+[ "$BACKEND" = reflection ] && BUILD_TARGETS="$BUILD_TARGETS fuzz_schema_evolution fuzz_schema_evolution_seeds"
+{ "$CMAKE" -S . -B $BUILD -DCMAKE_BUILD_TYPE=Debug -DXOFFSET_CXX_STANDARD=$STD -DCMAKE_CXX_COMPILER="$P2996_ROOT/bin/clang++" \
     "-DCMAKE_CXX_FLAGS=-O1 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -ffile-prefix-map=$ROOT=/workspace" \
     -DCMAKE_BUILD_RPATH="$P2996_ROOT/lib/x86_64-unknown-linux-gnu" \
     -DXOFFSET_BUILD_FUZZERS=ON -DXOFFSET_BUILD_EXAMPLES=OFF -DXOFFSET_BUILD_TOOLS=OFF -DXOFFSET_FUZZ_INJECT_CRASH=$INJECT &&
-  "$CMAKE" --build build/libfuzzer --parallel "$(nproc)" \
-    --target test_v2_fuzz fuzz_v2_wire fuzz_wire_schemas fuzz_wire_schemas_seeds fuzz_schema_evolution fuzz_schema_evolution_seeds; } > "$OUT/libfuzzer-build.log" 2>&1 ||
-  { echo "libFuzzer build failed, see libfuzzer-build.log"; tail -n 20 "$OUT/libfuzzer-build.log"; exit 0; }
-BIN=build/libfuzzer/bin/Debug
+  "$CMAKE" --build $BUILD --parallel "$(nproc)" --target $BUILD_TARGETS; } > "$OUT/$JOB-build.log" 2>&1 ||
+  { echo "libFuzzer build failed, see $JOB-build.log"; tail -n 20 "$OUT/$JOB-build.log"; exit 0; }
+BIN=$BUILD/bin/Debug
 
 ALL_OK=1
 for T in $TARGETS; do
-  R="$OUT/libfuzzer-$T" W="$WORK/$T"
+  R="$OUT/$JOB-$T" W="$WORK/$T" STORE="$CORPUS_STORE/$PREFIX$T.tar.gz"
   FUZZER=$BIN/fuzz_$T CORPUS=$W/corpus ARTS=$W/artifacts
   mkdir -p "$R" "$W/seeds" "$W/work" "$CORPUS" "$ARTS"
   case "$T" in
@@ -142,9 +162,11 @@ for T in $TARGETS; do
     wire_schemas) $BIN/fuzz_wire_schemas_seeds "$W/seeds" > "$R/seeds.log" 2>&1 ;;
     schema_evolution) $BIN/fuzz_schema_evolution_seeds "$W/seeds" > "$R/seeds.log" 2>&1 ;;
   esac
-  SOURCE=none
-  if [ -f "$CORPUS_STORE/$T.tar.gz" ] && tar -xzf "$CORPUS_STORE/$T.tar.gz" -C "$CORPUS" 2>> "$R/corpus-restore.log"; then
-    SOURCE="store $(date -u -r "$CORPUS_STORE/$T.tar.gz" +%Y-%m-%dT%H:%MZ)"
+  SOURCE=none FROM=$STORE
+  # A new field-list corpus starts from the reflection one (same wires).
+  [ -f "$FROM" ] || FROM="$CORPUS_STORE/$T.tar.gz"
+  if [ -f "$FROM" ] && tar -xzf "$FROM" -C "$CORPUS" 2>> "$R/corpus-restore.log"; then
+    SOURCE="store $(basename "$FROM") $(date -u -r "$FROM" +%Y-%m-%dT%H:%MZ)"
   fi
   echo "$(find "$CORPUS" -type f | wc -l) $(find "$CORPUS" -type f -printf '%s\n' | awk '{s += $1} END {print s + 0}') $SOURCE" > "$R/before.txt"
   echo "== $T: corpus $(cat "$R/before.txt"), seeds $(find "$W/seeds" -type f | wc -l)"
@@ -174,21 +196,22 @@ for T in $TARGETS; do
     --wrapper build/xo-native --artifacts "$ARTS" --out "$R" > "$R/findings.log" 2>&1
   # Reproduce steps for this host (fuzz_report.py's default ones are for the
   # Actions artifacts and build/xo-docker).
-  python3 - "$R/findings.json" "$(git rev-parse HEAD)" "$T" "$FUZZER" "$FUZZ_FLAGS" <<'PY'
+  python3 - "$R/findings.json" "$(git rev-parse HEAD)" "$T" "$FUZZER" "$FUZZ_FLAGS" "$JOB" "$BACKEND" <<'PY'
 import json, sys
-path, sha, target, fuzzer, flags = sys.argv[1:]
+path, sha, target, fuzzer, flags, job, backend = sys.argv[1:]
 try:
     report = json.load(open(path))
 except (OSError, ValueError):
     sys.exit(0)
+report['job'], report['needs'] = job + '-' + target, job
 for f in report['findings']:
     name = f.get('input') or '<input>'
     f['reproduce'] = [
         f'# input: tests/fuzz/regressions/{target}/{f["signature"]} on branch fuzz-crash/{f["signature"]}, '
         f'or decode the base64 below into {name}',
         f'git checkout {sha} && git submodule update --init --recursive',
-        '# tools/fuzz_libfuzzer.sh --out /tmp/lf --seconds 10 builds build/libfuzzer and build/xo-native '
-        '(P2996 toolchain at /opt/p2996-toolchain), then:',
+        f'# tools/fuzz_libfuzzer.sh --out /tmp/lf --seconds 10 --backend {backend} builds build/{job} and '
+        'build/xo-native (P2996 toolchain at /opt/p2996-toolchain), then:',
         f'build/xo-native {fuzzer} {flags} {name}',
         f'# without libFuzzer, on any compiler: fuzz_{target}_replay {name}',
     ]
@@ -203,10 +226,10 @@ PY
   # Drill corpora never go back to the store.
   if [ "$INJECT" = OFF ] && [ -n "$(ls -A "$CORPUS")" ]; then
     mkdir -p "$CORPUS_STORE" && tar -czf "$WORK/$T.tar.gz" -C "$CORPUS" . &&
-      cp "$WORK/$T.tar.gz" "$CORPUS_STORE/$T.tar.gz.new" && mv "$CORPUS_STORE/$T.tar.gz.new" "$CORPUS_STORE/$T.tar.gz" ||
+      cp "$WORK/$T.tar.gz" "$STORE.new" && mv "$STORE.new" "$STORE" ||
       echo "== $T: could not store the corpus"
   fi
 done
 [ "$ALL_OK" = 1 ] && RESULT=success
-echo "== libfuzzer: $RESULT"
+echo "== $JOB: $RESULT"
 exit 0

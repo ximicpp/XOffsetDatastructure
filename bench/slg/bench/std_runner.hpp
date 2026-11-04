@@ -231,8 +231,15 @@ public:
     struct LoginOps {
         typename F::Reuse* rz = nullptr;
         std::vector<stdm::PlayerState> srv, hold;
+        std::vector<stdm::PlayerState> hw = std::vector<stdm::PlayerState>(kWarmDevices);   // warm single devices' players (LDW)
         stdm::PlayerPatch pm, pr;
         std::span<const uint8_t> lw, pw;
+        static std::string_view sv(std::span<const uint8_t> b) { return {reinterpret_cast<const char*>(b.data()), b.size()}; }
+        std::string_view login_wire() const { return sv(lw); }
+        std::string_view patch_wire() const { return sv(pw); }
+        void login_recv_w(int d, std::string_view w) { rz->decode(std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(w.data()), w.size()), hw[std::size_t(d)]); }
+        stdm::PlayerState& held_w(int d) { return hw[std::size_t(d)]; }
+        void patch_recv_from(const std::string& w) { rz->decode(std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(w.data()), w.size()), pr); }
         int online() const { return int(srv.size()); }
         stdm::PlayerState& server(int p) { return srv[std::size_t(p)]; }
         std::size_t login_encode(int p) { lw = rz->encode(kOut, srv[std::size_t(p)]); return lw.size(); }
@@ -262,7 +269,7 @@ public:
         void setup(typename F::Reuse* r, int clients) {
             rz = r;
             snaps.assign(1, {});
-            held_views.assign(std::size_t(clients) + 1, {});   // [clients]: the warm single-device view (EBW)
+            held_views.assign(std::size_t(clients + kWarmDevices), {});   // [clients + d]: warm single device d (EBW, U*W)
         }
         template <class Fill> std::size_t snap_encode(int b, Fill&& fill) {
             fill(ev);
@@ -281,8 +288,14 @@ public:
         template <class Fill> std::size_t delta_encode(Fill&& fill) { fill(ds); dw = rz->encode(kDelta, ds); return dw.size(); }
         std::string_view delta_wire() const { return {reinterpret_cast<const char*>(dw.data()), dw.size()}; }
         void delta_recv() { rz->decode(dw, dd); }
+        void delta_recv_from(const std::string& w) { rz->decode(std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(w.data()), w.size()), dd); }
         const stdm::ViewDelta& delta() const { return dd; }
     };
+
+    void memory(CycleStats& st) override {
+        if (!players_.empty()) st.bytes["MEM.player"] = std::size_t(heap_bytes(players_) / std::int64_t(players_.size()));
+        for (int i = 0; i < ViewCases::count; ++i) view_memory(bs_[i], ViewCases::keys(i), st);
+    }
 
     uint64_t world_digest() override {
         Digest g;
