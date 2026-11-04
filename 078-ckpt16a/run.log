@@ -1,0 +1,61 @@
+== 2026-11-04T07:20:21Z 0. tools
+selftest: 73 ok, 0 FAIL (cloud: 73 ok)
+cmake version 4.4.4
+1.13.2
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+anchor: next_cpp26 49ce3c68 (#212; PR #213 not merged)
+== 2026-11-04T07:20:39Z 1. export
+head 58779139f4330945fd2129c049eb0cd26c178c8a tree 5453a8de895ad8ce2e62de6ad06658f91931227a typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+anc 49ce3c68fa60ff9b531f1fa482fc4fb4b8e65479 tree 9b9544a872e52b29c154df3e2940c7ce93bef908 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+== 2026-11-04T07:20:51Z 2. build
+slg init cache /Volumes/XOffsetCS/perf-gate/slg-init-p2996-d77eff1.cmake sha ed916a0cf280cedf798d20f523b09c055e24ba4da58723df5d51d5558ebedde9
+slg head: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+slg anc: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+== 2026-11-04T07:21:51Z 3c. r3v3 reference
+r3v3 reference /Volumes/XOffsetCS/perf-gate/refs/R3V3-formal-mac-v1 ok
+r3v3: reusing /Volumes/XOffsetCS/perf-gate/refs/R3V3-formal-mac-v1
+== 2026-11-04T07:21:51Z 4. wires and prep
+point	commit	sc_xoffset	slg_bench	wire
+head	58779139f4330945fd2129c049eb0cd26c178c8a	6803b2635cb231027b2af085ecffecc94a4b14a0322725c6c56de5700bc684d9	d9a3331fcb569b263a7e6fbbe22802e4d426e337a17c6688cfe02b9407ce63ec	89fd02d2d36fce705cc519d1a6a6298ff23e595c01fb01211e360d6249d2edcc
+anc	49ce3c68fa60ff9b531f1fa482fc4fb4b8e65479	b325298ef9e33efe5ee1f2fd80f411997c7f5266c084a076af182d3157b022ca	4d8a2b8c6d246dc6efec880eed67c237ee93d5cbcc36546af8f7889f0a4236b9	89fd02d2d36fce705cc519d1a6a6298ff23e595c01fb01211e360d6249d2edcc
+reuse: cycle 0 xoffset      state=ddb6224bbbcecad3 reports=37196452043336
+default: cycle 0 xoffset      state=ddb6224bbbcecad3 reports=37196452043336
+reuse bytes head [1166 2358 12964 842240 712] anchor [1166 2358 12964 842240 712]
+default bytes head [1166 2358 12964 842240 712] anchor [1166 2358 12964 842240 712]
+== 2026-11-04T07:22:13Z 5. CKPT16A L2
+FREEZE.json written: /Volumes/XOffsetCS/perf-gate/runs/2026-11-04-ckpt16a-5877913-smoke
+  head         6803b2635cb231027b2af085ecffecc94a4b14a0322725c6c56de5700bc684d9
+  head_aa      6803b2635cb231027b2af085ecffecc94a4b14a0322725c6c56de5700bc684d9
+  anchor       b325298ef9e33efe5ee1f2fd80f411997c7f5266c084a076af182d3157b022ca
+  r3           328d8872af63eceee99c9f3c529dae5bce69eba67de6515ef1463a6f4fd883a9
+  cista        1cffe48e6c9b3cc961943a26ff8b361b2e63e9dcc779c138557686af922b4f9c
+  flatbuffers  51e053ddd6afe1652771ba49d3243fa25f367e8a959c90243e004e1ee37ec4b7
+  capnproto    e528cb3cbb42b49780398f164192ff41a1dbdfd983580c79ad5d3cb31e5639bc
+  cereal       4d65fc64843c0c469ca90c76e14e792ba5ccf3c01eb066bf6aff44eafbcf600f
+  bisect 6ec08cc6ba8e the CKPT14 head (with the cached-root carry, bench/slg b68e63e9; report only); the last range holds a8f12389 (carry dropped) and the merge: deferred (built when the bisection reaches it)
+== formal-1 start 2026-11-04T07:22:14+00:00 {'waited_s': 10.2, 'load1': 2.71, 'quiet_s': 10.1, 'screen': {'WindowServer': 5.5, 'UURemoteServer': 9.9, 'parsecd': 3.3}, 'remote_active': ['UURemoteServer'], 'screen_over': [], 'screen_gated': False}
+formal-1: this batch alone: max UB head/anchor 1.1151, A/A ok False, old 9/12, cpu {'samples': 20, 'other_busy_samples': 2, 'compile_samples': 0, 'other_busy_top': {'com.apple.geod': 1, 'Claude Helper': 1}, 'chrome_busy_mean': 0, 'chrome_busy_max': 0, 'load1_max': 2.71}  (the gate verdict needs the pooled batches: run analyze)
+== slg start 2026-11-04T07:23:04+00:00 {'waited_s': 10.2, 'load1': 2.24, 'quiet_s': 10.1, 'screen': {'WindowServer': 5.7, 'UURemoteServer': 9.9, 'parsecd': 0.0}, 'remote_active': ['UURemoteServer'], 'screen_over': [], 'screen_gated': False}
+run 1/12 head: 3.5 s rc=0
+run 2/12 anch: 0.5 s rc=0
+run 3/12 anch: 0.4 s rc=0
+run 4/12 head: 0.4 s rc=0
+run 5/12 head: 0.4 s rc=0
+run 6/12 anch: 0.4 s rc=0
+run 7/12 anch: 0.4 s rc=0
+run 8/12 head: 0.4 s rc=0
+run 9/12 head: 0.4 s rc=0
+run 10/12 anch: 0.4 s rc=0
+run 11/12 anch: 0.4 s rc=0
+run 12/12 head: 0.4 s rc=0
+slg: A 0.9858 [0.9271, 1.0482]  B 1.0000 [0.9767, 1.0239]  C 0.9996 [0.9472, 1.0547]  D 0.9912 [0.9519, 1.0321]  verdict fail (1 group(s) pooled)
+FREEZE.json written: /Volumes/XOffsetCS/perf-gate/runs/2026-11-04-ckpt16a-5877913
+  head         6803b2635cb231027b2af085ecffecc94a4b14a0322725c6c56de5700bc684d9
+  head_aa      6803b2635cb231027b2af085ecffecc94a4b14a0322725c6c56de5700bc684d9
+  anchor       b325298ef9e33efe5ee1f2fd80f411997c7f5266c084a076af182d3157b022ca
+  r3           328d8872af63eceee99c9f3c529dae5bce69eba67de6515ef1463a6f4fd883a9
+  cista        1cffe48e6c9b3cc961943a26ff8b361b2e63e9dcc779c138557686af922b4f9c
+  flatbuffers  51e053ddd6afe1652771ba49d3243fa25f367e8a959c90243e004e1ee37ec4b7
+  capnproto    e528cb3cbb42b49780398f164192ff41a1dbdfd983580c79ad5d3cb31e5639bc
+  cereal       4d65fc64843c0c469ca90c76e14e792ba5ccf3c01eb066bf6aff44eafbcf600f
+  bisect 6ec08cc6ba8e the CKPT14 head (with the cached-root carry, bench/slg b68e63e9; report only); the last range holds a8f12389 (carry dropped) and the merge: deferred (built when the bisection reaches it)
