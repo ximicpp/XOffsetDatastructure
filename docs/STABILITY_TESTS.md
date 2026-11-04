@@ -1,6 +1,6 @@
-# 稳定承诺与自动化测试对照（K0–K7）
+# 稳定承诺与自动化测试对照（K0–K8）
 
-K0–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。本表把每条承诺
+K0–K8 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。本表把每条承诺
 对应到会在 CI 里失败的测试。测试名就是 CTest 名称；"CI 作业"指
 `.github/workflows/ci.yml` 里的作业（GitHub CI 自 2026-10-23 停用，这些检查由本地验证
 `tools/local_validate.sh` 执行）。改动任何一条承诺的行为时，对应测试必须先失败。
@@ -27,9 +27,9 @@ K0–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 | | | `test_mutation_failures`、`test_allocator_failures` | 分配失败时单次修改是原子的 |
 | K3 | 独立输出：`save_verified` 发出调用方独占的副本，发完可以继续改 | `test_stability_contract`（K3 部分） | 保存后修改、扩容、清空、销毁源 buffer，已发出的 wire 不变且仍能加载出原内容 |
 | | | `test_verified_paths` | `save_verified_into` 与源存储不重叠、回调中换主人时拒绝 |
-| K4 | 接收时完整结构校验，截断、越界、重叠、未铺满、非法值、schema 不符一律拒绝 | `test_wire_validation`、`test_validation_granules` | 恶意偏移、容器头、空洞表、payload 元数据在解引用前被拒绝 |
+| K4 | 接收检查分三档；完整档的结构校验对截断、越界、重叠、未铺满、非法值、schema 不符一律拒绝（信任档、边界档的接口 3.4 加入，测试随接口一起加） | `test_wire_validation`、`test_validation_granules` | 恶意偏移、容器头、空洞表、payload 元数据在解引用前被拒绝 |
 | | | `test_v2_fuzz` | 独立规格 oracle 与 `load_verified`、`receive_raw::validate`、verified receive、`reload_verified`、直接接收复用槽（`begin_verified_reload`）对变异 wire 的接受/拒绝一致；直接接收中途中止、少报长度、声明长度与头不符一律拒绝 |
-| | | `fuzz_v2_wire_replay`、`fuzz_wire_schemas_replay`（含 `_corpus`） | 两个 libFuzzer harness 不带 libFuzzer 编译，回放 `tests/fuzz/regressions/` 的崩溃输入和各自的种子语料；ci.yml 的每个作业（P2996 Clang、GCC 16、两种 sanitizer、arm64、Windows）都包含它们，Actions 停用期间由全量 CTest 和每日长跑（GCC 16 ASan+UBSan）执行 |
+| | | `fuzz_v2_wire_replay`、`fuzz_wire_schemas_replay`（含 `_corpus`；关异常版本 `_replay_noexc`） | 两个 libFuzzer harness 不带 libFuzzer 编译，回放 `tests/fuzz/regressions/` 的崩溃输入和各自的种子语料；ci.yml 的每个作业（P2996 Clang、GCC 16、两种 sanitizer、arm64、Windows）都包含它们，Actions 停用期间由全量 CTest 和每日长跑（GCC 16 ASan+UBSan）执行 |
 | | | `test_receive_raw`、`test_verified_receive`、`test_reload_reset` | 原始接收、分段接收与直接接收复用槽路径 |
 | K5 | 接收后接着改、再发出，空闲空间随空洞表带过去，不退化 | `test_stability_contract`（K5 部分） | 重新加载后释放再分配复用空洞、尾部不增长；接收方的分配决定与发送方逐字节一致；第二跳同样成立 |
 | | | `test_free_table_policy`（`lifecycle_move_swap_reload`） | 空洞表写-读-写字节一致，重新加载后的分配决定与原 buffer 相同 |
@@ -39,7 +39,7 @@ K0–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 | | | CI 作业 `gcc16` | GCC 16 跑全量 CTest |
 | | | `test_schema_pin`、`schema_pin_mismatch` | 用户 schema 用 `XOFFSET_PIN_SCHEMA` 固定签名后，布局与固定值一致时编译通过；不一致时构建失败，报错含 `XOffset schema pin mismatch (K7)`。两种构建都跑，所以客户端原生编译器（NDK Clang、MSVC、clang-cl、MinGW GCC）上同样会构建失败 |
 
-## 目标 K8（尚未承诺，实现中）
+## K8（核心承诺，2026-11-04 起）
 
 客户端（iOS、Android、Windows，64 位小端）用字段表后端、各平台原生编译器构建，与服务端用同一套库、
 同一 wire。它不是 CTest 里的一项，而是每个客户端目标各跑一遍 `tools/native_targets.sh`：
@@ -50,7 +50,14 @@ K0–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 | 读参照语料 | 服务端 C++26 反射构建写出的 6 个语料，目标全部 `load_verified` 接受 | 上述目标全部接受 |
 | 写语料 `diff -r` | 目标写出的语料与参照逐字节一致 | 上述目标逐字节一致 |
 
-升为核心承诺的条件见 [USER_GUIDE.md](USER_GUIDE.md) 第 8 节，逐目标结果见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)。
+保证的范围见 [USER_GUIDE.md](USER_GUIDE.md) 第 8 节，逐目标结果见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)。
+发版前每个客户端目标都要跑一遍（[RELEASING.md](RELEASING.md)）。
+
+## 目标 K9（尚未承诺）：原生增量同步
+
+只发改过的字节，接收方合并后按链路的档检查（API 3.3 加入）。升为核心承诺前要有：增量 apply 的拒绝用例和随机流
+测试（`test_delta_sync`，含关异常构建）、增量 apply 的发版前 ASan fuzz、增量 wire 1.0 冻结的金标准测试。
+条件全文见 [USER_GUIDE.md](USER_GUIDE.md) 第 8 节。
 
 ## 不在 CTest 里的部分
 
@@ -64,10 +71,18 @@ K0–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
   wire 比较两个库版本的校验结果（含确切错误信息）。比较按 payload 进行：带 extent 表的 wire 先展开成
   等价的稠密 wire 再校验，因为各版本接受的稀疏写法可以不同（0.3.0-beta.2 起 gap 字节不必落在空洞里）。
   同一版本内"稀疏 wire 与其稠密等价物结果相同"由 `test_v2_fuzz` 检查。
-- K4 的每日长跑（威胁模型 F4）：`tools/fuzz_nightly.sh` 在云端 Docker 主机上每天运行 GCC 16
+- K4 的发版前 fuzz（2026-11-04 起；每晚长跑自 2026-10-28 停，不再恢复）：每次发版前在云端对每个接收入口
+  （信任、边界、完整三档，含增量 apply）跑一轮 ASan+UBSan fuzz，无发现才发版（[RELEASING.md](RELEASING.md)）。入口是 `tools/fuzz_prerelease.sh`（分阶段，出 `VERDICT.md`），调用下面这些脚本。
+- K4 的长跑工具（威胁模型 F4）：`tools/fuzz_nightly.sh` 在云端 Docker 主机上运行 GCC 16
   ASan+UBSan 差分 fuzz（`test_v2_fuzz`，4 个 seed，约 45 分钟）和回归语料回放；发现崩溃时
   `tools/fuzz_report.py` 按签名开 `fuzz-crash` issue 并推出 `fuzz-crash/<签名>` 分支。结果
   不在 CTest 里，记录在项目文件 `fuzz-nightly/`。2026-10-27 起，同一晚接着跑
   `tools/fuzz_libfuzzer.sh`：用云端的 P2996 工具链（自带 libFuzzer 运行库）原生构建两个
   libFuzzer 目标（ASan+UBSan，`-fork=4`，每个目标约 20 分钟），语料跨夜保存在项目文件
-  `fuzz-nightly/corpus/`，发现走同一个 `fuzz_report.py`。
+  `fuzz-nightly/corpus/`，发现走同一个 `fuzz_report.py`。2026-10-27 晚加入
+  `fuzz_schema_evolution`。2026-10-28 起再加两步，覆盖客户端的构建：
+  `tools/fuzz_libfuzzer.sh --backend fieldlist` 在 C++20 字段表构建上跑 `v2_wire`、
+  `wire_schemas`（语料单独保存为 `fieldlist-<target>.tar.gz`）；`tools/fuzz_outcome_diff.sh`
+  把两份语料、回归输入和种子分别交给 C++26 反射、C++20 字段表、关异常三种构建回放
+  （ASan+UBSan），每条输入的各入口结果和错误文字必须一致（关异常构建没有 raw 和接收入口，
+  比较时去掉这两列）。

@@ -16,7 +16,9 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     std::uint64_t seed = 0xcbf29ce484222325ull;
     for (std::size_t i = 0; i < size; ++i) seed = (seed ^ data[i]) * 0x100000001b3ull;
     std::mt19937_64 rng(seed);
+    outcome_begin(data, size);
     (void)check_case(wire, rng, "input");
+    outcome_end();
     return 0;
 }
 
