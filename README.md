@@ -156,7 +156,7 @@ validation (`tools/local_validate.sh`) and the local platform matrix
 | Environment | V2 result | Boundary |
 | --- | --- | --- |
 | 3.1.0 RC `e913d22` (format 2.1), local platform matrix: Linux x86_64 GCC 16 and P2996, Linux arm64 GCC 16 and P2996 (colima on Apple M4), Windows x64 MinGW-w64 GCC 16.2 (wine) | Full CTest 107/107 on each Linux column; Windows 105 pass, 2 skipped by design; 2.1 wire corpus byte-identical across all five | Functional only, no timing; MSVC, clang-cl, Android and iOS cannot build 3.1.0 (see the field-list row) |
-| Field-list backend, `next_cpp26` after #149 (since 3.2.0), `tools/native_targets.sh`: Android arm64 NDK r29/r30 (qemu), Windows x64 MSVC 19.44 C++20/C++23, clang-cl 19 and MinGW GCC 13.2 (wine) | Release CTest 106/106 on each; all 6 reference wires from the GCC 16 C++26 reflection build accepted, written corpus byte-identical | Functional only; iOS simulator (Xcode 27.1, iOS 27.0) 129/129 with the same corpus; an iPhone 15 Pro Max passed 138/138 and 3.2.0-rc.1 passed on one Android 11 phone ([records](docs/DEVICE_TESTING.md)); not yet a core guarantee (K8, [CLIENT_TARGETS.md](docs/CLIENT_TARGETS.md)) |
+| Field-list backend, `next_cpp26` after #149 (since 3.2.0), `tools/native_targets.sh`: Android arm64 NDK r29/r30 (qemu), Windows x64 MSVC 19.44 C++20/C++23, clang-cl 19 and MinGW GCC 13.2 (wine) | Release CTest 106/106 on each; all 6 reference wires from the GCC 16 C++26 reflection build accepted, written corpus byte-identical | Functional only; iOS simulator (Xcode 27.1, iOS 27.0) 129/129 with the same corpus; an iPhone 15 Pro Max passed 138/138 and 3.2.0-rc.1 passed on one Android 11 phone ([records](docs/DEVICE_TESTING.md)); core guarantee K8 since 2026-11-04 ([CLIENT_TARGETS.md](docs/CLIENT_TARGETS.md)) |
 | macOS 26.3 arm64 (Apple M4), clang-p2996 `d77eff1` | Debug 78/78; TSan 75/75; ASan+UBSan passes except 8 cases inside the 9 known platform-limit cases (Darwin ASan replaces `operator new`, so injected host allocation failures cannot fire) | Recorded on 2026-10-21 for the V2 merge |
 | Linux x86_64, pinned P2996 Docker image | Full build, CTest, signature check and package consumption run in CI ([ci.yml](.github/workflows/ci.yml)); a separate CI job runs ASan+UBSan on the allocator, wire and V2 tests | CI is the record; see the workflow runs |
 | Linux x86_64, GCC 16.2.0 (`gcc:16` image) | Debug build, CTest and ASan+UBSan in CI; cross-compiler wire corpus exchanged with P2996 Clang (byte-identical, mutually accepted) | No x86_64 performance comparison with P2996 Clang (cloud GCC timing is reference only) |
@@ -228,8 +228,18 @@ Both public headers are required for full consumers. Keep header versions,
 compile-time options and toolchain settings consistent across translation units.
 A release does not promise stable source API, ABI or arbitrary cross-toolchain
 wire compatibility; the [user guide](docs/USER_GUIDE.md#8-核心承诺与-api-稳定性) lists the
-core guarantees (K0–K7, starting with K0: the payload holds no absolute
+core guarantees (K0–K8, starting with K0: the payload holds no absolute
 address, so after any modification the whole region can still be copied to
 another address, process or machine) and which interfaces they cover. K8,
-native client builds sharing one library and one wire with the servers, is a
-target that is being implemented, not yet a guarantee.
+native client builds (iOS, Android, Windows) sharing one library and one wire
+with the servers, became a core guarantee on 2026-11-04. Schema evolution
+(different schema versions on the two ends, since 3.2.0) is provided, see
+[SCHEMA_EVOLUTION.md](docs/SCHEMA_EVOLUTION.md). K9, native delta sync (send
+only the bytes that changed; the receiver merges them into its copy), is a
+target: its API arrives in 3.3, and it becomes a guarantee once the conditions
+in the user guide are met. Receive checks come in three tiers (user guide
+section 8): today every receive entry point does the full check; 3.4 adds a
+trusted tier (default between servers and from server to client: header and
+hole-table bounds only, never for untrusted input) and a bounds tier (default
+for client uploads: reads stay in bounds, data is used read-only); modifying
+client data in place takes the full check.
