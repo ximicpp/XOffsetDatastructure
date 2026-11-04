@@ -85,6 +85,15 @@
   elsewhere. The scratch of applying a delta is shared by the cursors of
   a thread, and that of writing one by its baselines (one copy, warm in
   cache, for any number of replicas).
+- Wire validation off the cursor path: a live block within one bitmap word
+  that meets nothing is marked directly in the out-of-line registration
+  (no second call, no saved registers); the first block off the cursor,
+  longer blocks and every rejection keep the general path. The hole table
+  goes to the bitmaps in one loop (a valid entry implies the per-range
+  checks), and longer bitmap ranges are handled out of line. Accept/reject
+  and the first error are unchanged. Instructions, GCC 16: formal.reload
+  -7.0%; slg A.res_decode -11.3%, B.in_decode -6.1%, S.load_recv -7.6%,
+  L.recv -1.1%, C.restore -3.8% (memcpy included), A.req_decode +0.2%.
 - Allocation: a small block is bumped inline when the free table records
   no hole of its size or larger, not only when the table is empty, so
   appends after the first retirement skip the general path. Placement and
