@@ -22,6 +22,10 @@
   same limits as before. Hole tables, wire bytes and allocation decisions
   are unchanged. Instructions, GCC 16, bench/slg (M, steady state): LD.apply
   -7.0%.
+- A save stops at an empty free table (its count) and walks only the
+  nonempty index words of a nonempty one, so a save of a reloaded buffer
+  with no holes reads one line of its kept table, not four. Wire bytes are
+  unchanged. Instructions, GCC 16, bench/slg (S): A.res_encode -5.4%.
 - Fixed messages (`xoffset_fixed_message.hpp`, experimental): a record with
   no arena container and no implicit padding (`is_fixed_message_v<T>`) is
   sent as its own bytes and read where it lies, without an XBuffer, an arena
