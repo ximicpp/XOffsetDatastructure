@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- `bench/hft` (record only): the HFT demo, phase 1. A Nasdaq ITCH window
+  (2019-01-30 09:30-09:40, not committed) drives a feed handler, a ring of
+  fixed messages read by 4 strategies, a state service keeping the 64
+  busiest order books and a row per instrument in one XBuffer, and a client
+  joining from a snapshot; against raw structs, SBE, zpp_bits, FlatBuffers,
+  cista and a hand-written fixed-capacity pool, every one reaching the same
+  digest. Cloud instructions: the state 1.36x the pool's per update; the
+  late join 5-15x fewer than the encoding formats; the fixed message +8% on
+  read and +21% on write over a raw struct per real packet. `run.sh` builds
+  and runs it; the handshake case shows a reordered build refused.
 - Fixed messages (`xoffset_fixed_message.hpp`, experimental): a record with
   no arena container and no implicit padding (`is_fixed_message_v<T>`) is
   sent as its own bytes and read where it lies, without an XBuffer, an arena
