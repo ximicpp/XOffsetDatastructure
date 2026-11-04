@@ -23,12 +23,19 @@ namespace detail {
         static_assert(!has_implicit_padding_v<T>,
             "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");
 #endif
-        if (!source.typed_root_access_allowed_)
-            XOFFSET_THROW(XException(XErrc::no_root, "verified paths: typed source required"));
-        if (source.schema_bound_ &&
-            (source.bound_root_type_id_ != wire_root_type_id<T>() ||
-             source.bound_schema_hash_ != wire_schema_hash<T>()))
-            XOFFSET_THROW(XException(XErrc::schema_mismatch, "verified paths: schema mismatch"));
+        // A root cache hit is what root<T>() returns: make<T>() or a verified
+        // load of T admitted it at the current epoch, so typed access, the
+        // schema binding and the root offset are as the checks below find
+        // them. A miss runs those checks and the lookup.
+        T* root = source.template cached_root<T>();
+        if (!root) {
+            if (!source.typed_root_access_allowed_)
+                XOFFSET_THROW(XException(XErrc::no_root, "verified paths: typed source required"));
+            if (source.schema_bound_ &&
+                (source.bound_root_type_id_ != wire_root_type_id<T>() ||
+                 source.bound_schema_hash_ != wire_schema_hash<T>()))
+                XOFFSET_THROW(XException(XErrc::schema_mismatch, "verified paths: schema mismatch"));
+        }
         const auto* arena = source.arena();
         if (!arena || std::memcmp(arena->magic, XBufferCore::payload_magic_, 8) != 0 ||
             arena->header_size != sizeof(XBufferCore::arena_header))
@@ -36,8 +43,10 @@ namespace detail {
         if (arena->used_end < XBufferCore::min_payload_size() ||
             arena->used_end > source.segment_size() || arena->used_end > XBufferCore::MAX_PAYLOAD)
             XOFFSET_THROW(XException(XErrc::invalid_payload_header, "verified paths: payload used_end out of range"));
-        auto* root = find_root<T>(source);
-        if (!root) XOFFSET_THROW(XException(XErrc::root_mismatch, "verified paths: root not found"));
+        if (!root) {
+            root = find_root<T>(source);
+            if (!root) XOFFSET_THROW(XException(XErrc::root_mismatch, "verified paths: root not found"));
+        }
         // V2: the free table is the wire hole table; recompute it exactly if a
         // host allocation failure (or an unverified load) left it incomplete.
         if (!source.free_table_complete()) {
