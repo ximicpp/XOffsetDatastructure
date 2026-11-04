@@ -102,6 +102,10 @@ struct alignas(8) ViewSnapshot {
     XVector<Tile> tiles;
 };
 
+// D3 prototype: the view root's per-delivery fields (request_id, tick), sent
+// as one record-relative body.
+struct alignas(8) D3Root { int64_t request_id{}; int64_t tick{}; };
+
 // Scenario U (view.hpp).
 struct alignas(8) ViewDelta {
     int64_t request_id{}; int64_t tick{};
@@ -144,6 +148,7 @@ XOFFSET_RECORD(slg::xm::UnitHero, id, level, star, skin)
 XOFFSET_RECORD(slg::xm::ViewUnit, id, kind, owner, alliance, x, y, hp, max_hp, state, level, faction, flags, speed, attack, defense, morale, load, icon, skin, banner, title, vip, rank, slots, power, state_end, shield_end, cooldown_end, last_update, kills, in_battle, shielded, hidden, name, alliance_tag, owner_name, commander, heroes, troops, buffs)
 XOFFSET_RECORD(slg::xm::ViewMarch, id, owner, x0, y0, x1, y1, t0, t1)
 XOFFSET_RECORD(slg::xm::ViewSnapshot, request_id, tick, x0, y0, x1, y1, units, marches, tiles)
+XOFFSET_RECORD(slg::xm::D3Root, request_id, tick)
 XOFFSET_RECORD(slg::xm::ViewDelta, request_id, tick, x0, y0, x1, y1, upserts, removed, marches, removed_marches, tiles)
 XOFFSET_RECORD(slg::xm::PlayerPatch, player_id, seq, army_index, armies, items, city_changed, city)
 #elif defined(XOFFSET_ORDINARY_RECORDS)

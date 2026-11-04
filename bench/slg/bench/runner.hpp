@@ -86,6 +86,12 @@ template <class F> void untimed(CycleStats& st, const char* key, F&& f) {
 // stages: the formal runs take XOffset's application-level rows from such
 // processes and the native rows from processes with them on.
 inline bool native_on() { static const bool on = std::getenv("SLG_NATIVE_OFF") == nullptr; return on; }
+// D3 prototype (record-relative shared deltas, keys D*, EXPERIMENTAL):
+// SLG_D3=1 runs D* instead of N*, SLG_D3=2 runs both; unset or 0: N* only.
+inline int d3_mode() {
+    static const int m = [] { const char* e = std::getenv("SLG_D3"); return e ? std::atoi(e) : 0; }();
+    return m;
+}
 
 // The storage process checks a received player and keeps the bytes. A format
 // with a check that needs no application model (FlatBuffers' Verifier,

@@ -274,6 +274,7 @@ public:
 
     void tick() {
         ++tick_;
+        changed_.clear();
         Rng& r = tick_rng_;
         if (rate_ == Rate::Stress) {
             for (auto& u : units_) {
@@ -388,12 +389,15 @@ public:
     const WorldTile& tile(int32_t tx, int32_t ty) const { return tiles_[std::size_t(ty * kTiles + tx)]; }
     int64_t tick_no() const { return tick_; }
     const ViewScale& scale() const { return *vs_; }
+    // World unit indices changed in the current tick, first change order
+    // (server bookkeeping, as dirty(): a game server's dirty set). Untimed.
+    const std::vector<int32_t>& changed_units() const { return changed_; }
 
 private:
     // A change to u in this tick (the fields `bits`; last_update always).
     void touch(WorldUnit& u, uint64_t bits) const {
         ++u.ver; u.last_update = tick_;
-        if (u.dirty_tick != tick_) { u.dirty = 0; u.dirty_tick = tick_; }
+        if (u.dirty_tick != tick_) { u.dirty = 0; u.dirty_tick = tick_; changed_.push_back(int32_t(&u - units_.data())); }
         u.dirty |= bits | SLG_D(last_update);
     }
     static std::string owner_name_of(int32_t owner) {
@@ -499,6 +503,7 @@ private:
     int32_t zones_[2][2]{};
     int32_t next_march_ = 1;
     std::vector<ViewClient> clients_;
+    mutable std::vector<int32_t> changed_;
     std::vector<std::vector<int32_t>> ucell_, mcell_;
     mutable std::vector<uint32_t> mstamp_;
     mutable uint32_t mgen_ = 0;
@@ -568,6 +573,8 @@ struct DeltaPlan {
     std::vector<int32_t> marches;          // world march indices: new or changed
     std::vector<int32_t> removed_marches;  // march ids that left
     std::vector<int32_t> tiles;            // tiles changed this tick: ty * kTiles + tx
+    std::vector<uint8_t> unew, mnew;       // units[k] / marches[k] is new to the client's view (bookkeeping the
+                                           // server has anyway; only the D3 prototype uses it)
     bool empty() const { return units.empty() && removed.empty() && marches.empty() && removed_marches.empty() && tiles.empty(); }
 };
 
@@ -576,6 +583,7 @@ public:
     void setup(int clients) { u_.assign(std::size_t(clients), {}); m_.assign(std::size_t(clients), {}); }
     void plan(const MapWorld& w, int c, const ViewRect& r, DeltaPlan& p) {
         p.units.clear(); p.removed.clear(); p.marches.clear(); p.removed_marches.clear(); p.tiles.clear();
+        p.unew.clear(); p.mnew.clear();
         ++gen_;
         auto& lu = u_[std::size_t(c)];
         w.units_in(r, tmp_);
@@ -583,7 +591,7 @@ public:
             const WorldUnit& u = w.unit(i);
             auto [it, fresh] = lu.try_emplace(u.id);
             SentU& s = it->second;
-            if (fresh || s.ver != u.ver) { s.ver = u.ver; p.units.push_back(i); }
+            if (fresh || s.ver != u.ver) { s.ver = u.ver; p.units.push_back(i); p.unew.push_back(fresh ? 1 : 0); }
             s.gen = gen_;
         }
         for (auto it = lu.begin(); it != lu.end();) {
@@ -596,7 +604,7 @@ public:
             const WorldMarch& m = w.march(i);
             auto [it, fresh] = lm.try_emplace(m.id);
             SentM& s = it->second;
-            if (fresh || s.x1 != m.x1 || s.y1 != m.y1 || s.t1 != m.t1) { s.x1 = m.x1; s.y1 = m.y1; s.t1 = m.t1; p.marches.push_back(i); }
+            if (fresh || s.x1 != m.x1 || s.y1 != m.y1 || s.t1 != m.t1) { s.x1 = m.x1; s.y1 = m.y1; s.t1 = m.t1; p.marches.push_back(i); p.mnew.push_back(fresh ? 1 : 0); }
             s.gen = gen_;
         }
         for (auto it = lm.begin(); it != lm.end();) {
@@ -742,8 +750,14 @@ struct ViewKeys {
     std::string nsend, ndiff, nrecv, ndelta;
     std::string esendz, usendz, uwrecv, uwmsg, nsendz, nzstd, nwrecv;   // scoring V3 (2026-11-04)
     std::string uname, nname, eb_zs, u_zs, n_zs;   // streaming compression prefixes (EBZS, UPZS, NPZS)
-    ViewKeys(const char* e, const char* u, const char* n) : uname(u), nname(n) {
-        const std::string E(e), U(u), N(n);
+    // D3 shared deltas (EXPERIMENTAL, 2026-11-04): DP.pub once per tick; DP.send,
+    // DP.recv (full check), DPT.recv (trust tier), DP.delta; DPW.recv / DPTW.recv warm
+    // devices; DPZ.send + DP.delta_zstd; DPZS streaming.
+    std::string dname, dpub, dsend, drecv, dtrecv, ddelta, dsendz, dzstd, dwrecv, dtwrecv, d_zs;
+    ViewKeys(const char* e, const char* u, const char* n, const char* d) : uname(u), nname(n), dname(d) {
+        const std::string E(e), U(u), N(n), D(d);
+        dpub = D + ".pub"; dsend = D + ".send"; drecv = D + ".recv"; dtrecv = D + "T.recv"; ddelta = D + ".delta";
+        dsendz = D + "Z.send"; dzstd = D + ".delta_zstd"; dwrecv = D + "W.recv"; dtwrecv = D + "TW.recv"; d_zs = D + "ZS";
         esend = E + ".send"; erecv = E + ".recv"; ewrecv = E + "W.recv";
         ewin = E + ".window"; ereq = E + ".requests"; ezstd = E + ".window_zstd";
         ecomp = E + ".window_compact"; ecompz = E + ".window_compact_zstd";
@@ -822,7 +836,7 @@ struct ViewCases {
     static constexpr Rate rates[count] = {Rate::Peace, Rate::Peace, Rate::Combat, Rate::Stress};
     static bool browse(int i) { return i == 0; }
     static const ViewKeys& keys(int i) {
-        static const ViewKeys k[count] = {{"EB", "UB", "NB"}, {"EP", "UP", "NP"}, {"EC", "UC", "NC"}, {"ES", "US", "NS"}};
+        static const ViewKeys k[count] = {{"EB", "UB", "NB", "DB"}, {"EP", "UP", "NP", "DP"}, {"EC", "UC", "NC", "DC"}, {"ES", "US", "NS", "DS"}};
         return k[i];
     }
     static uint64_t seed(uint64_t s, int i) { return mix_seed(s, 0xb10c + uint64_t(i)); }
@@ -837,6 +851,7 @@ struct ViewSession {
     std::vector<HeldIndex> index;   // per client
     std::vector<std::size_t> wire_size;   // browse: this round's pull per client (bytes pass check)
     std::vector<HeldIndex> windex;        // static: the warm devices' indexes (U*W)
+    std::vector<std::string> dkey;        // D3: the warm devices' key messages (their client's first pull)
     void setup(uint64_t seed, const ViewScale& vs, int which) {
         browse = ViewCases::browse(which); primed = false;
         wire_size.assign(std::size_t(vs.clients), 0);
@@ -851,6 +866,11 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
     MapWorld& w = s.world;
     const ViewScale& vs = w.scale();
     constexpr bool native = requires { ops.n_diff(0); };
+    // D3 (SLG_D3): 0/unset off, 1 D3 only (no N*), 2 both. Off with SLG_NATIVE_OFF.
+    constexpr bool d3 = requires { ops.d_publish(w); };
+    const bool run_n = native_on() && d3_mode() != 1;
+    const bool run_d = native_on() && d3_mode() != 0;
+    (void)run_n; (void)run_d;
     if (s.browse) {
         // Class 2: every client moves its view and pulls the whole rectangle.
         for (int r = 0; r < vs.rounds; ++r) {
@@ -912,6 +932,7 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
     if (!s.primed) {
         // Class 3, before the first timed tick: every client pulls its view once
         // (untimed: that is a class 2 pull) and the server records what it holds.
+        if constexpr (d3) if (run_d) { ops.d_init(w); s.dkey.assign(std::size_t(warm_devices(vs.clients)), {}); }
         for (int c = 0; c < vs.clients; ++c) {
             const ViewRect rect = w.rect(c);
             s.tracker.plan(w, c, rect, s.plan);
@@ -924,7 +945,16 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
             h.units.reserve(h.units.size() * 3 / 2 + 16);
             h.marches.reserve(h.marches.size() * 3 / 2 + 16);
             build_index(h, s.index[std::size_t(c)]);
-            if constexpr (native) if (native_on()) {
+            if constexpr (d3) if (run_d) {
+                ops.d_view(c, rect);
+                ops.d_key(c, w, s.plan);
+                ops.d_recv(c);
+                if (query_view(ops.d_held(c)) != query_view(ops.held(c, 0))) throw std::runtime_error("D3 key: view differs from the snapshot");
+                ops.d_recv_trusted(c);
+                if (query_view(ops.d_held_trusted(c)) != query_view(ops.held(c, 0))) throw std::runtime_error("D3 key (trust tier): view differs from the snapshot");
+                if (c < warm_devices(vs.clients)) s.dkey[std::size_t(c)] = std::string(ops.d_wire());
+            }
+            if constexpr (native) if (run_n) {
                 ops.n_view(c, w, rect);
                 ops.n_plan(c, w, s.plan);
                 ops.n_update(c, w, s.plan, 0);
@@ -946,7 +976,14 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
             hw.marches.reserve(hw.marches.size() * 3 / 2 + 16);
             build_index(hw, s.windex[std::size_t(c)]);
             if (query_view(hw) != query_view(ops.held(c, 0))) throw std::runtime_error("warm view differs from the client's first pull");
-            if constexpr (native) if (native_on()) ops.n_key_recv(vs.clients + c, 0, c);
+            if constexpr (native) if (run_n) ops.n_key_recv(vs.clients + c, 0, c);
+            if constexpr (d3) if (run_d) {
+                ops.d_view(vs.clients + c, rect);
+                ops.d_recv_from(vs.clients + c, s.dkey[std::size_t(c)]);
+                ops.d_recv_trusted_from(vs.clients + c, s.dkey[std::size_t(c)]);
+                if (query_view(ops.d_held(vs.clients + c)) != query_view(ops.held(c, 0)) ||
+                    query_view(ops.d_held_trusted(vs.clients + c)) != query_view(ops.held(c, 0))) throw std::runtime_error("D3 warm view differs from the client's first pull");
+            }
         }
         s.primed = true;
     }
@@ -955,22 +992,28 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
     static thread_local std::string nzbuf;         // the same for the native deltas
     static thread_local std::vector<std::size_t> nzoff;
     const int nw_dev = warm_devices(vs.clients);
-    static thread_local std::vector<std::vector<std::string>> wq, nwq;   // warm devices' wires this cycle (U*W, N*W)
-    wq.assign(std::size_t(nw_dev), {}); nwq.assign(std::size_t(nw_dev), {});
+    static thread_local std::vector<std::vector<std::string>> wq, nwq, dwq;   // warm devices' wires this cycle (U*W, N*W, D*W)
+    wq.assign(std::size_t(nw_dev), {}); nwq.assign(std::size_t(nw_dev), {}); dwq.assign(std::size_t(nw_dev), {});
+    static thread_local std::string dzbuf;         // the same for D3
+    static thread_local std::vector<std::size_t> dzoff;
     for (int r = 0; r < vs.rounds; ++r) {
         w.tick();
+        // D3: every entity changed this tick is compared and encoded once, for
+        // every connection (shared work, charged to the server per tick).
+        if constexpr (d3) if (run_d) timed(st, k.dpub.c_str(), [&] { ops.d_publish(w); });
         const int64_t base = (int64_t(cycle) * vs.rounds + r) * (vs.clients + 1) + 1;
         for (int c = 0; c < vs.clients; ++c) {
             const ViewRect rect = w.rect(c);
             s.tracker.plan(w, c, rect, s.plan);
             if (s.plan.empty()) continue;   // nothing changed in this view: nothing sent
-            std::size_t nd = 0;
-            if constexpr (native) if (native_on()) {
+            std::size_t nd = 0, dd = 0;
+            if constexpr (native) if (run_n) {
                 // Slot bookkeeping is timed with the update, as the application-level
                 // client's id index is timed in U*.apply (fairness review 2026-11-03).
                 timed(st, k.nsend.c_str(), [&] { ops.n_plan(c, w, s.plan); ops.n_update(c, w, s.plan, base + c); });
                 timed(st, k.ndiff.c_str(), [&] { nd = ops.n_diff(c); });
             }
+            if constexpr (d3) if (run_d) timed(st, k.dsend.c_str(), [&] { dd = ops.d_send(c, w, s.plan, base + c); });
             std::size_t n = 0;
             timed(st, k.usend.c_str(), [&] { n = ops.delta_encode([&](auto& d) { fill_delta(d, w, rect, s.plan, base + c); }); });
             if (keep_delta && c == 0) *keep_delta = std::string(ops.delta_wire());
@@ -979,7 +1022,26 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
             timed(st, k.uapply.c_str(), [&] { apply_delta(ops.held(c, 0), at, ops.delta()); });
             const uint64_t q = query_view(ops.held(c, 0));
             st.report_sum += q;
-            if constexpr (native) if (native_on()) {
+            if constexpr (d3) if (run_d) {
+                // Trust tier (the main score column, susu 2026-11-04) and full
+                // checking, each into its own copy of the client's view. The
+                // first of the two pays for bringing the message and shared
+                // state back into cache, so the order alternates by delivery.
+                const auto trusted = [&] {
+                    timed(st, k.dtrecv.c_str(), [&] { ops.d_recv_trusted(c); });
+                    if (query_view(ops.d_held_trusted(c)) != q) throw std::runtime_error("D3 delta (trust tier): view differs from the application-level one");
+                };
+                const auto full = [&] {
+                    timed(st, k.drecv.c_str(), [&] { ops.d_recv(c); });
+                    if (query_view(ops.d_held(c)) != q) throw std::runtime_error("D3 delta: view differs from the application-level one");
+                };
+                if ((c + r) & 1) { full(); trusted(); } else { trusted(); full(); }
+                st.bytes[k.ddelta] += dd;
+                const auto dw = ops.d_wire();
+                dzoff.push_back(dzbuf.size()); dzbuf.append(dw.data(), dw.size());
+                if (c < nw_dev) dwq[std::size_t(c)].emplace_back(dw);
+            }
+            if constexpr (native) if (run_n) {
                 timed(st, k.nrecv.c_str(), [&] { ops.n_apply(c, 0); });
                 if (query_view(ops.n_held(c, 0)) != q) throw std::runtime_error("native delta: view differs from the application-level one");
                 st.bytes[k.ndelta] += nd;
@@ -1012,6 +1074,15 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
             }
         }
         nzbuf.clear(); nzoff.clear();
+        if (!dzoff.empty()) {
+            dzoff.push_back(dzbuf.size());
+            for (std::size_t i = 0; i + 1 < dzoff.size(); ++i) {
+                std::size_t z = 0;
+                timed(st, k.dsendz.c_str(), [&] { z = zstd_size(std::string_view(dzbuf).substr(dzoff[i], dzoff[i + 1] - dzoff[i])); });
+                st.bytes[k.dzstd] += z;
+            }
+        }
+        dzbuf.clear(); dzoff.clear();
     }
     // Warm single devices (U*W, N*W): each one's deliveries of this cycle, replayed
     // into its own view; the device reads its view before each one (untimed).
@@ -1026,7 +1097,29 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
         // The same connection's deliveries through its streaming compressor (report only).
         ZStream& zs = zstreams<Ops>(k.u_zs).at(std::size_t(d));
         for (const std::string& dw : wq[std::size_t(d)]) zstream_timed(st, zs, k.u_zs + ".send", k.uname + ".delta_zs", dw);
-        if constexpr (native) if (native_on()) {
+        if constexpr (d3) if (run_d) {
+            // D3 warm device: the same deliveries into its full-check view
+            // (DPW.recv) and its trust-tier view (DPTW.recv), each read first;
+            // the order of the two alternates, as for D*.recv / D*T.recv.
+            const int wv = vs.clients + d;
+            int m = 0;
+            for (const std::string& dw : dwq[std::size_t(d)]) {
+                const auto full = [&] {
+                    warm_sink = query_view(ops.d_held(wv));
+                    timed(st, k.dwrecv.c_str(), [&] { ops.d_recv_from(wv, dw); });
+                };
+                const auto trusted = [&] {
+                    warm_sink = query_view(ops.d_held_trusted(wv));
+                    timed(st, k.dtwrecv.c_str(), [&] { ops.d_recv_trusted_from(wv, dw); });
+                };
+                if (m++ & 1) { full(); trusted(); } else { trusted(); full(); }
+            }
+            if (query_view(ops.d_held(wv)) != query_view(ops.held(d, 0)) || query_view(ops.d_held_trusted(wv)) != query_view(ops.held(d, 0)))
+                throw std::runtime_error("D3 warm view differs from the client's view");
+            ZStream& dzs = zstreams<Ops>(k.d_zs).at(std::size_t(d));
+            for (const std::string& dw : dwq[std::size_t(d)]) zstream_timed(st, dzs, k.d_zs + ".send", k.dname + ".delta_zs", dw);
+        }
+        if constexpr (native) if (run_n) {
             for (const std::string& nw : nwq[std::size_t(d)]) {
                 warm_sink = query_view(ops.n_held(vs.clients + d, 0));
                 timed(st, k.nwrecv.c_str(), [&] { ops.n_apply_from(vs.clients + d, nw); });
@@ -1037,7 +1130,8 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
         }
     }
     st.bytes[k.u_zs + ".ctx"] = zstreams<Ops>(k.u_zs).ctx_bytes();
-    if constexpr (native) if (native_on()) st.bytes[k.n_zs + ".ctx"] = zstreams<Ops>(k.n_zs).ctx_bytes();
+    if constexpr (native) if (run_n) st.bytes[k.n_zs + ".ctx"] = zstreams<Ops>(k.n_zs).ctx_bytes();
+    if constexpr (d3) if (run_d) st.bytes[k.d_zs + ".ctx"] = zstreams<Ops>(k.d_zs).ctx_bytes();
 }
 
 // Memory (--mode mem, report only): the server's per-client state of the
