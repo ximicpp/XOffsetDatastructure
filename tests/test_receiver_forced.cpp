@@ -30,9 +30,9 @@ int main() {
     XWireHeaderV2 header;
     std::memcpy(&header, wire.data(), sizeof(header));
     std::string bad = wire;
-    const std::int32_t far = 0x40000000;
-    std::memcpy(bad.data() + sizeof(XWireHeaderV2) + (header.root_offset - XWIRE_PAYLOAD_BEGIN) + head, &far,
-                sizeof(far));
+    const std::int32_t outside = 0x40000000;  // not "far": a macro on Windows
+    std::memcpy(bad.data() + sizeof(XWireHeaderV2) + (header.root_offset - XWIRE_PAYLOAD_BEGIN) + head, &outside,
+                sizeof(outside));
 
     int failures = 0;
     XReceiver<XLink::server_peer> rx(cap);

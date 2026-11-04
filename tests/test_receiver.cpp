@@ -297,8 +297,8 @@ void admit_skips_graph() {
     std::string bad = wire;
     // The vector head's rel32 to its block: point it far outside the payload.
     const std::size_t at = sizeof(XWireHeaderV2) + (header.root_offset - XWIRE_PAYLOAD_BEGIN) + head;
-    const std::int32_t far = 0x40000000;
-    std::memcpy(bad.data() + at, &far, sizeof(far));
+    const std::int32_t outside = 0x40000000;  // not "far": a macro on Windows
+    std::memcpy(bad.data() + at, &outside, sizeof(outside));
 
     XReceiver<XLink::server_peer> peer(cap());
     XReceiver<XLink::from_client> client(cap());
