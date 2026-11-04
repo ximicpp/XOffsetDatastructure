@@ -153,9 +153,11 @@ for the rivals). FlatBuffers
 collects struct elements and table offsets in reused scratch vectors (no
 allocation per list once warm). The storage process runs only the
 format's own check where one exists without the application model
-(FlatBuffers' Verifier, protobuf's parse; the others decode). The std and
-cista runners prefetch the two armies before A.apply, the counterpart of
-XOffset's `prefetch_for_update()` hint. LK.recv includes the query, as
+(FlatBuffers' Verifier, protobuf's parse; the others decode). All three
+runners prefetch the two armies before A.apply with the same
+`prefetch_army_for_apply` (army, heroes, troops, buffs; 2026-11-04: XOffset's
+earlier `prefetch_for_update()` allocator-line hint was dropped, since the
+troop-only write-back does not allocate and the hint cost ~11% of A). LK.recv includes the query, as
 L.recv. The native slot bookkeeping (`n_plan`) is timed in N*.send. cereal
 reuses its input stream. Allocator: glibc malloc for every format.
 
