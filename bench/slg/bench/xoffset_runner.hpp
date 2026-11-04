@@ -4,6 +4,7 @@
 #pragma once
 #include <algorithm>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <functional>
@@ -458,6 +459,13 @@ public:
         std::vector<std::string> snaps;
         std::string dw, comp;
         std::vector<std::optional<XBuffer>> held_views;
+        // The client keeps its view's root reference, as a real client holds the
+        // object it reads (the zpp_bits/std and cista adapters hold the decoded
+        // object or its pointer). The root moves only when the view is reloaded,
+        // so snap_recv, the only epoch change point, refreshes it; U*.apply then
+        // starts at the root instead of looking it up in the arena on every delta.
+        // -DSLG_RP_CHECK checks every use against root<ViewSnapshot>() (off by default).
+        std::vector<xm::ViewSnapshot*> held_roots;
         void setup(int clients, int units, int marches) {
             es.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, cap()));
             ds.emplace(XBuffer::create<xm::ViewDelta>(kViewInitial, cap()));
@@ -465,6 +473,7 @@ public:
             snaps.assign(1, {});
             held_views.clear();
             held_views.resize(std::size_t(clients) + 1);   // [clients]: the warm single-device view (EBW)
+            held_roots.assign(std::size_t(clients) + 1, nullptr);
 #ifdef XOFFSET_DELTA_SYNC_API
             n_setup(clients, units, marches);
 #else
@@ -483,8 +492,18 @@ public:
             auto& h = held_views[std::size_t(c) + std::size_t(k)];
             if (!h) h.emplace(XBuffer::create<xm::ViewSnapshot>(4096, held_cap()));
             h->reload_verified<xm::ViewSnapshot>(snaps[std::size_t(b)]);
+            held_roots[std::size_t(c) + std::size_t(k)] = &h->root<xm::ViewSnapshot>();
         }
-        xm::ViewSnapshot& held(int c, int k) { return held_views[std::size_t(c) + std::size_t(k)]->root<xm::ViewSnapshot>(); }
+        xm::ViewSnapshot& held(int c, int k) {
+            const std::size_t i = std::size_t(c) + std::size_t(k);
+#ifdef SLG_RP_CHECK
+            if (held_roots[i] != &held_views[i]->root<xm::ViewSnapshot>()) {
+                std::fprintf(stderr, "SLG_RP_CHECK: held root of view %zu is stale\n", i);
+                std::abort();
+            }
+#endif
+            return *held_roots[i];
+        }
         template <class Fill> std::size_t delta_encode(Fill&& fill) {
             fill(ds->reset<xm::ViewDelta>());
             ds->save_verified_into<xm::ViewDelta>(dw);
