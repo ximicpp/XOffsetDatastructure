@@ -3504,7 +3504,7 @@ namespace XOffsetDatastructure {
 
                 // Committed. A new epoch: element pointers and XHandles of the
                 // previous content re-resolve.
-                ++core.m_epoch;
+                core.advance_epoch();
                 // A buffer that also sends deltas (touched_only) gets the
                 // blocks written as touches.
                 if (touch_log_current) {

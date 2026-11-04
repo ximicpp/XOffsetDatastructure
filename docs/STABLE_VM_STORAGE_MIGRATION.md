@@ -166,7 +166,8 @@ increased capacity. Move/swap transfer growth policy; moved-from objects reset t
 Explicit. Compaction produces an independent, default-configured buffer.
 
 `reclaim_tail_pages()` preserves logical size, base, epoch, and live contents.
-Call `shrink_to_fit()` or save first to reduce the logical end if desired. Only
+Call `shrink_to_fit()` (or raw `save()`, which shrinks) first to reduce the logical
+end if desired; verified saves leave it unchanged. Only
 whole pages beyond that end can be discarded; the last partial page stays intact.
 The result reports `NoOp`, `Reclaimed`, `Failed`, or `DiscardedButAccessible` and
 attempted/discarded/inaccessible byte counts. `complete()` is true for NoOp or
