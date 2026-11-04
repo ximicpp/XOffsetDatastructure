@@ -11,6 +11,22 @@
   order book event through `root<T>()` 173.8 -> 130.8 (a held root pointer
   125.8); bench/slg S A.req_encode -1.6%, A.apply -1.5%, D.read -2.5%,
   NP.send -4.7%.
+- `XMap::try_emplace` (and `operator[]`, `emplace`, `insert_or_assign` on a
+  new key) and `XSet::insert` append a key greater than the last one after
+  one compare instead of a binary search; any other key searches all but
+  the last element. Copying or rebuilding a map in key order is now linear.
+  Contents, layout and allocation are unchanged. Instructions, GCC 16,
+  bench/slg demo (M): LD.apply -24%, LD.send -20%, SD.save_encode -27%.
+- `bench/hft` (record only): the HFT demo, phase 1. A Nasdaq ITCH window
+  (2019-01-30 09:30-09:40, not committed) drives a feed handler, a ring of
+  fixed messages read by 4 strategies, a state service keeping the 64
+  busiest order books and a row per instrument in one XBuffer, and a client
+  joining from a snapshot; against raw structs, SBE, zpp_bits, FlatBuffers,
+  cista and a hand-written fixed-capacity pool, every one reaching the same
+  digest. Cloud instructions: the state 1.36x the pool's per update; the
+  late join 5-15x fewer than the encoding formats; the fixed message +8% on
+  read and +21% on write over a raw struct per real packet. `run.sh` builds
+  and runs it; the handshake case shows a reordered build refused.
 - An in-place reload (`reload_verified`) or `reset<T>()` keeps the buffer's
   free table, emptied, instead of releasing it to the per-thread cache of
   four tables. Its holes, or the first retires after it, refill that table,
@@ -21,6 +37,10 @@
   same limits as before. Hole tables, wire bytes and allocation decisions
   are unchanged. Instructions, GCC 16, bench/slg (M, steady state): LD.apply
   -7.0%.
+- A save stops at an empty free table (its count) and walks only the
+  nonempty index words of a nonempty one, so a save of a reloaded buffer
+  with no holes reads one line of its kept table, not four. Wire bytes are
+  unchanged. Instructions, GCC 16, bench/slg (S): A.res_encode -5.4%.
 - Fixed messages (`xoffset_fixed_message.hpp`, experimental): a record with
   no arena container and no implicit padding (`is_fixed_message_v<T>`) is
   sent as its own bytes and read where it lies, without an XBuffer, an arena
