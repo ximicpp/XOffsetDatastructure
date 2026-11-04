@@ -140,16 +140,22 @@ template <class Root>
 void check(const std::string& w, std::mt19937_64& rng) {
     std::string terr, rerr, verr;
     auto typed = typed_load<Root>(w, &terr);
+    outcome_add("T", bool(typed), terr);
     if (!framing_valid<Root>(w)) {
         if (typed) fail("typed load accepted a wire with invalid framing");
         return;
     }
-    const bool raw = raw_accepts<Root>(w, &rerr);
-    const bool recv = receive_accepts<Root>(w, &verr);
-    if (raw != bool(typed) || recv != bool(typed))
-        fail(std::string("acceptors disagree: typed=") + (typed ? "accept" : "reject(" + terr + ")") +
-             " raw=" + (raw ? "accept" : "reject(" + rerr + ")") +
-             " receive=" + (recv ? "accept" : "reject(" + verr + ")"));
+    // Builds without exceptions have no raw or receive acceptor.
+    if (kRawAcceptors) {
+        const bool raw = raw_accepts<Root>(w, &rerr);
+        const bool recv = receive_accepts<Root>(w, &verr);
+        outcome_add("R", raw, rerr);
+        outcome_add("V", recv, verr);
+        if (raw != bool(typed) || recv != bool(typed))
+            fail(std::string("acceptors disagree: typed=") + (typed ? "accept" : "reject(" + terr + ")") +
+                 " raw=" + (raw ? "accept" : "reject(" + rerr + ")") +
+                 " receive=" + (recv ? "accept" : "reject(" + verr + ")"));
+    }
     if (!typed) return;
     if (typed->save_verified() != w) fail("accepted wire does not re-save byte-identically");
     edit(typed->root(), rng);
@@ -202,7 +208,8 @@ int main(int argc, char** argv) {
 #else
 extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size) {
     inject_crash_drill(data, size);
-    if (size == 0) return 0;
+    outcome_begin(data, size);
+    if (size == 0) { outcome_end(); return 0; }
     const std::string wire(reinterpret_cast<const char*>(data) + 1, size - 1);
     std::uint64_t h = 0xcbf29ce484222325ull;
     for (std::size_t i = 0; i < size; ++i) h = (h ^ data[i]) * 0x100000001b3ull;
@@ -212,6 +219,7 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     case 1: check<ms::Maps>(wire, rng); break;
     default: check<ms::Deep>(wire, rng); break;
     }
+    outcome_end();
     return 0;
 }
 #endif
