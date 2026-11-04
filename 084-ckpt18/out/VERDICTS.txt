@@ -1,0 +1,8 @@
+CKPT18 0
+anchor next_cpp26 1c528d67 (#213 merged)
+screen watcher: 54 calls (dark.log)
+ABC: pass (max upper bound 1.0104; A 1.0104, B 1.0094, C 1.0058; 12 / 12 processes)
+GATE_D: head D÷flatbuffers 0.915 / 0.932 (O4 upper bound <= 1.0: met), D÷zpp_bits 1.032 / 1.041, D.read 68.0 µs; anc D÷flatbuffers 0.916 / 0.933, D÷zpp_bits 1.035 / 1.045, D.read 67.7 µs
+G8 met
+G9R not in this batch
+ctest 100% tests passed out of 173 (rc 0)
