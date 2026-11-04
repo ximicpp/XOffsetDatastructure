@@ -925,15 +925,17 @@ namespace XOffsetDatastructure {
             }
         }
 
-        // Replaces the free table with validated holes (wire order).
-        // `holes` need not be aligned (it may point into wire bytes). The new
-        // table is built off to the side (host allocation may run
-        // new_handler); the payload's current owner is re-resolved and the
-        // old table is destroyed only after publication.
+        // Replaces the free table's entries with validated holes (wire order).
+        // `holes` need not be aligned (it may point into wire bytes). The
+        // table is filled off to the side (host allocation may run
+        // new_handler): the owner's own table when it is empty, else a new
+        // one; the payload's current owner is re-resolved and the table
+        // published to it.
         XOFFSET_DETAIL_MOVE_INLINE detail::vstatus load_free_blocks(const void* holes, std::size_t count) {
-            // No holes, no table to replace, this owner current: the general
-            // path would only publish an absent table.
-            if (count == 0 && !free_table_ && (!owner_record_ || record_owner(owner_record_) == this)) [[likely]] {
+            // No holes, no entry to remove, this owner current: the general
+            // path would only publish the same empty table (or none).
+            if (count == 0 && (!free_table_ || free_table_->count == 0) &&
+                (!owner_record_ || record_owner(owner_record_) == this)) [[likely]] {
                 free_table_lost_ = false;
                 return detail::vok();
             }
@@ -942,9 +944,15 @@ namespace XOffsetDatastructure {
 
         XOFFSET_DETAIL_NOINLINE detail::vstatus load_free_blocks_general(const void* holes, std::size_t count) {
             const auto identity = owner_record_;
-            FreeTablePtr table; // no holes: an absent table is an exact, empty one
+            // An owner's table with no entries (a reload or reset emptied it)
+            // is refilled off to the side. A table with entries (an exact
+            // recomputation) is replaced only once the new one is complete,
+            // so a host allocation failure leaves it as it was. With no table
+            // and no holes, an absent table is an exact, empty one.
+            FreeTablePtr table;
+            if (free_table_ && free_table_->count == 0) table = std::move(free_table_);
             XOFFSET_TRY {
-                if (count != 0) table = make_free_table();
+                if (count != 0 && !table) table = make_free_table();
                 const auto* in = static_cast<const char*>(holes);
                 for (std::size_t i = 0; i < count;) {
                     WireHole hole;
@@ -1123,13 +1131,15 @@ namespace XOffsetDatastructure {
         // A table is ~12 KiB of bin headers. Constructing, zeroing and
         // releasing one per load dominated small-message loads, so released
         // tables are emptied (bin and map storage returned to the host
-        // allocator) and kept in a small per-thread cache. D2: a table
-        // released by an in-place reload/reset keeps the storage of its small
-        // bins (at most keep_bin_entries entries each, keep_bytes per table),
-        // so the first retires after the reload, which usually take the same
-        // table back, do not allocate it again. A cached table differs from a
-        // freshly constructed one only in bin capacity, which no allocation
-        // decision, hole table or wire byte depends on.
+        // allocator) and kept in a small per-thread cache. D2: an in-place
+        // reload/reset does not release its table at all; it empties it and
+        // keeps it (begin_reinit), with the storage of its small bins (a
+        // reload: at most keep_bin_entries entries each, keep_bytes per
+        // table), so the holes it loads and the first retires after it need
+        // no table and no bins, however many other owners this thread
+        // reloaded in between. A kept or cached table differs from a freshly
+        // constructed one only in bin capacity, which no allocation decision,
+        // hole table or wire byte depends on.
         static bool& free_table_cache_available() noexcept {
 #if XOFFSET_THREAD_CACHES
             static thread_local bool available = true; // trivial: outlives the cache
@@ -1155,9 +1165,8 @@ namespace XOffsetDatastructure {
         }
 
         struct FreeTableRecycler {
-            // Small-bin storage a table released by reload/reset keeps: at
-            // most 64 entries (256 B) per bin and 16 KiB per table, so at most
-            // 64 KiB per thread.
+            // Small-bin storage a table emptied by a reload keeps: at most 64
+            // entries (256 B) per bin and 16 KiB per table.
             static constexpr std::size_t keep_bin_entries = 64;
             static constexpr std::size_t keep_bytes = 16u * 1024u;
             // Kept out of line: every FreeTablePtr destructor on the mutate
@@ -1168,14 +1177,27 @@ namespace XOffsetDatastructure {
 #if defined(__clang__) || defined(__GNUC__)
             [[gnu::noinline, gnu::cold]]
 #endif
-            static void recycle(FreeTable* table, bool keep_bins = false) noexcept {
+            static void recycle(FreeTable* table) noexcept {
                 if (!free_table_cache_available()) { delete table; return; }
                 auto& cache = free_table_cache();
                 if (cache.count == FreeTableCache::capacity) { delete table; return; }
+                recycle_bins(*table, false);
+                cache.tables[cache.count++] = table;
+            }
+
+            // Removes every entry. keep_bins keeps the storage of small bins
+            // within the keep limits (all of it when no bin has grown since
+            // the last full empty); otherwise all bin storage is released.
+            // (Named recycle_*: the perf gate's allocator-recycling diagnostic
+            // matches FreeTableRecycler::recycle.)
+#if defined(__clang__) || defined(__GNUC__)
+            [[gnu::noinline, gnu::cold]]
+#endif
+            static void recycle_bins(FreeTable& table_ref, bool keep_bins) noexcept {
+                auto* table = &table_ref;
                 std::size_t kept = 0;
                 if (keep_bins && !table->grown) {
                     clear_entries(*table); // also clears the word summary
-                    cache.tables[cache.count++] = table;
                     return;
                 }
                 for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
@@ -1202,7 +1224,6 @@ namespace XOffsetDatastructure {
                 table->bytes = 0;
                 table->count = 0;
                 table->grown = false;
-                cache.tables[cache.count++] = table;
             }
 
             // Removes every entry but keeps the bins' storage (touched stays
@@ -1221,10 +1242,11 @@ namespace XOffsetDatastructure {
         };
         using FreeTablePtr = std::unique_ptr<FreeTable, FreeTableRecycler>;
 
-        // The first hole after a reload or reset (which released the table)
-        // takes a table from this thread's cache: no host allocation and no
-        // host callback, so the inline paths publish it directly, as they do
-        // a hole in a bin with room. Null when the cache is empty.
+        // The first hole of an owner without a table (a new buffer; a reload
+        // or reset keeps its own) takes a table from this thread's cache: no
+        // host allocation and no host callback, so the inline paths publish
+        // it directly, as they do a hole in a bin with room. Null when the
+        // cache is empty.
         XOFFSET_DETAIL_MOVE_INLINE FreeTable* adopt_cached_free_table() noexcept {
             if (!free_table_cache_available()) return nullptr;
             auto& cache = free_table_cache();
@@ -1272,7 +1294,8 @@ namespace XOffsetDatastructure {
                                                              bool allow_growth) {
             if (bytes == 0 || (bytes & 7u) != 0 || bytes > MAX_PAYLOAD || alignment == 0 ||
                 (alignment & (alignment - 1)) != 0 || alignment > MAX_PAYLOAD) XOFFSET_THROW(XBadAlloc());
-            if (alignment <= 8 && free_table_) {
+            // An empty table (kept by a reload) has nothing to take: bump.
+            if (alignment <= 8 && free_table_ && free_table_->count != 0) {
                 FreeSplit split;
                 if (void* reused = take_free_block(*free_table_, bytes, split)) {
                     finish_free_split(split);
@@ -2118,17 +2141,22 @@ namespace XOffsetDatastructure {
         // are kept; every typed pointer into the old content is invalidated
         // (epoch), and the owner is left without typed root access until the
         // caller finishes verification.
-        void begin_reinit(bool keep_table = false) noexcept {
+        //
+        // The free table stays with the owner, emptied: the holes of the new
+        // content (load_free_blocks) or the first retires after it refill it,
+        // so neither needs a fresh 12 KiB table, whatever else this thread
+        // reloaded in between. A reset keeps all its bin storage; a reload
+        // keeps it within FreeTableRecycler's keep limits.
+        void begin_reinit(bool reset = false) noexcept {
             advance_epoch();
-            if (keep_table && free_table_) {
-                // Emptied detached (releasing map nodes may reenter), then
-                // kept with its bin storage: the next holes need neither a
-                // fresh 12 KiB table nor fresh bins.
+            // An empty table whose bins are within the keep limits (not
+            // grown since the last empty) is already what a reload keeps.
+            if (const FreeTable* table = free_table_.get(); table && (table->count != 0 || table->grown)) {
+                // Emptied detached (releasing map nodes may reenter), then kept.
                 FreeTablePtr kept = std::move(free_table_);
-                FreeTableRecycler::clear_entries(*kept);
+                if (reset) FreeTableRecycler::clear_entries(*kept);
+                else FreeTableRecycler::recycle_bins(*kept, true);
                 if (!free_table_) free_table_ = std::move(kept);
-            } else {
-                if (auto* table = free_table_.release()) FreeTableRecycler::recycle(table, true);
             }
             free_table_lost_ = false;
             typed_root_access_allowed_ = false;
@@ -2296,7 +2324,9 @@ namespace XOffsetDatastructure {
                 XOFFSET_THROW(XBadAlloc());
             if (!src.free_table_lost_) {
                 XOFFSET_TRY {
-                    free_table_ = src.free_table_ ? copy_free_table(*src.free_table_) : FreeTablePtr{};
+                    // An empty source table (kept by a reload) copies as none.
+                    free_table_ = src.free_table_ && src.free_table_->count != 0
+                        ? copy_free_table(*src.free_table_) : FreeTablePtr{};
                 } XOFFSET_CATCH(const std::bad_alloc&) {
                     XOFFSET_THROW(XBadAlloc());
                 } XOFFSET_CATCH(const std::length_error&) {
