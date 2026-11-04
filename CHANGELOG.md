@@ -12,6 +12,10 @@
   same limits as before. Hole tables, wire bytes and allocation decisions
   are unchanged. Instructions, GCC 16, bench/slg (M, steady state): LD.apply
   -7.0%.
+- A save stops at an empty free table (its count) and walks only the
+  nonempty index words of a nonempty one, so a save of a reloaded buffer
+  with no holes reads one line of its kept table, not four. Wire bytes are
+  unchanged. Instructions, GCC 16, bench/slg (S): A.res_encode -5.4%.
 - Verified saves of a buffer whose root was admitted at the current epoch
   (`make<T>()`, `reset<T>()`, a verified load) take the root from the
   cache `root<T>()` uses and skip the typed-access and schema checks and
