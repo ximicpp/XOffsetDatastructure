@@ -103,33 +103,33 @@ Ir per update (callgrind); ns per update (median of 3 timed runs, noisy on a clo
 
 | model | Ir/update | Ir vs pool | ns/update | snapshot bytes | levels | orders | longest queue |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| pool | 263.0 | 1.00x | 61.2 | 14352112 | 57945 | 283285 | 2852 |
-| std | 319.3 | 1.21x | 44.5 |  | 57945 | 283285 | 2852 |
-| xo | 356.3 | 1.36x | 48.8 | 21230064 | 57945 | 283285 | 2852 |
-| cista | 636.0 | 2.42x | 72.5 | 12756888 | 57945 | 283285 | 2852 |
+| pool | 263.0 | 1.00x | 65.5 | 14352112 | 57945 | 283285 | 2852 |
+| std | 319.3 | 1.21x | 44.7 |  | 57945 | 283285 | 2852 |
+| xo | 356.3 | 1.36x | 51.0 | 13559928 | 57945 | 283285 | 2852 |
+| cista | 636.0 | 2.42x | 80.6 | 12756888 | 57945 | 283285 | 2852 |
 
 ### Hot path (claim A): publish each packet into a ring slot, 4 readers read every field
 
 | format | bytes/packet | encode Ir/packet | read Ir/packet/reader | encode ns/packet | read ns/packet/reader |
 |---|---:|---:|---:|---:|---:|
-| raw | 68.0 | 48.3 | 74.8 | 17.3 | 12.9 |
-| fixed | 68.0 | 58.3 | 80.8 | 18.3 | 14.8 |
-| sbe | 68.8 | 141.2 | 73.1 | 34.3 | 15.1 |
-| xo | 124.0 | 742.7 | 459.4 | 98.6 | 50.4 |
+| raw | 68.0 | 48.3 | 74.8 | 17.9 | 13.4 |
+| fixed | 68.0 | 58.3 | 80.8 | 16.9 | 14.2 |
+| sbe | 68.8 | 141.2 | 73.1 | 33.5 | 15.0 |
+| xo | 124.0 | 742.7 | 459.4 | 99.9 | 50.9 |
 
 ### Late join (claim B): snapshot at the middle of the window, client applies the rest
 
 | format | bytes | snapshot Ir | ready Ir | rest Ir/update | snapshot ms | ready ms | rest ns/update |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| xo | 20855336 | 1,799,853 | 1,806,844 | 164.4 | 14.31 | 14.34 | 36.5 |
-| xo_verified | 13460960 | 7,098,104 | 4,374,091 | 164.6 | 9.06 | 7.63 | 37.7 |
-| pool | 14237328 | 3,759,520 | 26,765,866 | 115.5 | 20.33 | 27.42 | 61.7 |
-| cista | 12664248 | 79,007,712 | 1,399,804 | 279.9 | 28.79 | 6.81 | 46.0 |
-| cista_checked | 12664248 | 79,007,712 | 301,538,322 | 279.9 | 27.65 | 27.34 | 47.2 |
-| zpp | 11511388 | 9,514,982 | 22,493,137 | 146.8 | 21.46 | 8.21 | 32.0 |
-| fb | 12432224 | 41,424,688 | 19,931,930 | 146.8 | 21.74 | 9.57 | 33.6 |
-| fb_verified | 12432224 | 41,424,688 | 30,332,072 | 146.8 | 20.90 | 11.35 | 33.5 |
-| sbe | 10437974 | 14,319,145 | 27,819,822 | 146.8 | 10.59 | 9.00 | 34.7 |
+| xo | 20855336 | 1,799,853 | 1,806,844 | 164.4 | 14.01 | 13.52 | 34.6 |
+| xo_verified | 13460960 | 7,098,104 | 4,374,091 | 164.6 | 9.63 | 7.76 | 37.9 |
+| pool | 14237328 | 3,759,520 | 26,765,866 | 115.5 | 19.42 | 27.02 | 51.4 |
+| cista | 12664248 | 79,007,712 | 1,399,804 | 279.9 | 27.96 | 6.90 | 47.0 |
+| cista_checked | 12664248 | 79,007,712 | 301,538,322 | 279.9 | 28.75 | 27.93 | 44.5 |
+| zpp | 11511388 | 9,514,982 | 22,493,137 | 146.8 | 22.08 | 8.39 | 38.7 |
+| fb | 12432224 | 41,424,688 | 19,931,930 | 146.8 | 22.31 | 10.45 | 37.0 |
+| fb_verified | 12432224 | 41,424,688 | 30,332,072 | 146.8 | 21.47 | 11.19 | 36.7 |
+| sbe | 10437974 | 14,319,145 | 27,819,822 | 146.8 | 10.22 | 8.92 | 32.2 |
 
 ### Handshake (claim A): a strategy from another build connects
 
@@ -146,7 +146,7 @@ The feed sends order id 1001.
 
 **C, the state service.** XOffset keeps the books and the table in its sending
 format at 1.36x the pool's instructions and 1.12x the std model's; in time it is
-between them (48.8 ns per update against 44.5 for std and 61.2 for the pool,
+between them (51.0 ns per update against 44.7 for std and 65.5 for the pool,
 whose order-id hash misses the cache). The suggested gate (at most 1.5x the
 pool) holds in both. Most of every model's cost is common: finding the price
 level by scanning from the best price and the order in its queue. cista pays
@@ -158,20 +158,22 @@ for zpp_bits, 14 M + 28 M for SBE and 41 M + 20 M for FlatBuffers (decode into
 a writable state included); verified, 7.1 M + 4.4 M. The pool takes 3.8 M but
 needs 26.8 M to rebuild its order index; cista needs 79 M to serialize, and
 302 M when it checks what it receives. In time on this VM it is not an order of
-magnitude: getting ready costs about the same everywhere (7-10 ms) because the
-receiver's first touch of fresh memory (about 2 us per 4 KiB page) costs more
-than the work, so the bytes touched decide. The trusted XOffset path sends the
-raw segment, 20.9 MB with capacity slack and holes, against 13.5 MB for the
-compact verified wire, and is the slowest to be ready (14.3 ms). A trusted load
-of the compact wire into memory the client has already touched (as HFT
-processes pre-fault) would keep the instruction advantage in time; that needs
-library work. After joining, the client applies updates at the same cost as the
-server (164 Ir per update in the second half, std 147).
+magnitude: XOffset verified, cista, zpp_bits, FlatBuffers and SBE all get ready
+in 7-11 ms, because the receiver's first touch of fresh memory (about 2 us per
+4 KiB page) costs more than the work, so the bytes touched decide. The trusted
+XOffset path sends the raw segment, 20.9 MB with capacity slack and holes,
+against 13.5 MB for the compact verified wire, and takes 13.5 ms to be ready,
+almost twice the verified path's 7.8 ms. A trusted load of the compact wire into
+memory the client has already touched (as HFT processes pre-fault) would keep
+the instruction advantage in time; that needs library work. After joining, the
+client applies updates at the same cost as the server (164 Ir per update in the
+second half, std 147).
 
 **A, the hot path.** Real packets are small (1.25 updates), so per-packet
 constants count: the fixed message reads with 6 more instructions per packet
 than a raw struct with a length check (+8%) and writes with 10 more (+21%),
-for its tag and size checks; in time +1.9 ns per read (noisy). SBE without
+for its tag and size checks; in time +0.8 ns per read here (+1.9 ns in an
+earlier run: noise of the same size). SBE without
 bounds checks reads like the raw struct and writes at 2.9x. The per-packet
 XBuffer (`xo`, before fixed messages) costs 6-15x. Whether the fixed message
 stays within 5% of the raw struct at P99 needs the Mac.
