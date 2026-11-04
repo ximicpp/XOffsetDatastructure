@@ -1,0 +1,5 @@
+CKPT17b L2 rc 0 at 2026-11-04T10:51:44Z (0 pass, 10 fail, 11 pending, 12 invalid, 13 incomplete, 14 n/a, 15 L2 failed and the bisection follows)
+ABC: pass (max upper bound 1.0169; A 1.0100, B 1.0116, C 1.0169; 12 / 12 processes)
+GATE_D: head D÷flatbuffers 0.916 / 0.937 (O4 upper bound <= 1.0: met), D÷zpp_bits 1.027 / 1.037, D.read 67.7 µs; anc D÷flatbuffers 0.923 / 0.939, D÷zpp_bits 1.025 / 1.037, D.read 67.7 µs
+G8 met
+G9R and ctest follow

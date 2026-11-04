@@ -1,0 +1,8 @@
+CKPT17b 0
+anchor 49ce3c68 (next_cpp26; mainline merged into PR #214)
+screen watcher: 37 calls (dark.log)
+ABC: pass (max upper bound 1.0169; A 1.0100, B 1.0116, C 1.0169; 12 / 12 processes)
+GATE_D: head D÷flatbuffers 0.916 / 0.937 (O4 upper bound <= 1.0: met), D÷zpp_bits 1.027 / 1.037, D.read 67.7 µs; anc D÷flatbuffers 0.923 / 0.939, D÷zpp_bits 1.025 / 1.037, D.read 67.7 µs
+G8 met
+G9R rc 0 (0 done, 2 prep check, 5 quiet gate); G9: 17 of 19 comparisons have UB <= 1.05; above: vec.push_back, set.erase.fresh
+ctest 100% tests passed out of 167 (rc 0)

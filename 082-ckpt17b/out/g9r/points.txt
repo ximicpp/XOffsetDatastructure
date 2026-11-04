@@ -1,0 +1,12 @@
+t0 49ce3c68fa60ff9b531f1fa482fc4fb4b8e65479 tree 9b9544a872e52b29c154df3e2940c7ce93bef908 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (next_cpp26 49ce3c68 (#212; mainline merged into PR #214))
+t1 8a4bca988938d32a1f84b46b82881b76c0f59bfe tree b6f775a3027fb6a0e847f0453b78edd00925089c typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (CKPT17 head (PR #214 XMap/XSet append fast path 8a4bca98))
+t1: diff over t0 sha256 35844f631697636d04ef7009212397faac4ecdb6aa9ca77e7e2e58fd69339a77 ( 3 files changed, 80 insertions(+), 6 deletions(-))
+t1: library header diff over t0:  1 file changed, 19 insertions(+), 6 deletions(-)
+t1: first-parent commits over t0:
+  8a4bca98 Merge next_cpp26 into claude/flatmap-append-20261104
+  8a9286c1 XMap/XSet: append a key past the last one without a search
+bench/reloc of t1: same tree as t0
+reloc_bench t0 sha256 cbdab37ce5213b313f9cbae2f81d6a569d1fe515171ead440165e3d8731521d1
+reloc_bench t1 sha256 2bb367047e211b1cf52715014b22b9a5bf492922f0ab6f122f4e32044655ed5d
+reloc_bench t0a sha256 997947e5a22513ed50575bc5e308ad08ee0c568181d4dee72419e74f025ee8bc
+reloc_bench t1a sha256 cf81197c8b979046cfb60ca97cffaa5aca0630b0f50c2c28ecdf7bea22f6e6f0
