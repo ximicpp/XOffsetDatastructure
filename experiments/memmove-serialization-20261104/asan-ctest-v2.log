@@ -1,0 +1,32 @@
+Test project /Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/asan-v2
+    Start  37: test_wire_validation
+1/8 Test  #37: test_wire_validation .............   Passed    0.87 sec
+    Start  64: test_v2_fuzz
+2/8 Test  #64: test_v2_fuzz .....................   Passed    6.29 sec
+    Start  71: test_clone
+3/8 Test  #71: test_clone .......................   Passed    1.14 sec
+    Start  95: test_verified_paths
+4/8 Test  #95: test_verified_paths ..............***Failed    1.11 sec
+new API output OOM changed value/source before normalization
+
+    Start  99: test_core_lifetime
+5/8 Test  #99: test_core_lifetime ...............   Passed    1.35 sec
+    Start 101: test_receive_raw
+6/8 Test #101: test_receive_raw .................   Passed    1.12 sec
+    Start 102: test_verified_receive
+7/8 Test #102: test_verified_receive ............   Passed    1.19 sec
+    Start 106: test_dense_image
+8/8 Test #106: test_dense_image .................   Passed    1.23 sec
+
+88% tests passed, 1 tests failed out of 8
+
+Label Time Summary:
+four-paths    =   1.11 sec*proc (1 test)
+memmove       =   1.23 sec*proc (1 test)
+reflection    =  14.30 sec*proc (8 tests)
+
+Total Test time (real) =  14.30 sec
+
+The following tests FAILED:
+	 95 - test_verified_paths (Failed)                      four-paths reflection
+Errors while running CTest

@@ -1,0 +1,557 @@
+[
+  {
+    "step": "release-final-build",
+    "returncode": 0,
+    "seconds": 2.2525241374969482,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "--build",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/release-v2",
+      "--target",
+      "test_dense_image",
+      "-j",
+      "4"
+    ]
+  },
+  {
+    "step": "release-ctest",
+    "returncode": 0,
+    "seconds": 87.13932919502258,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/ctest",
+      "--test-dir",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/release-v2",
+      "--output-on-failure",
+      "--output-junit",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/release.xml",
+      "-j",
+      "2"
+    ]
+  },
+  {
+    "step": "asan-config",
+    "returncode": 1,
+    "seconds": 1.2835478782653809,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "-S",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027",
+      "-B",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/asan-v1",
+      "-DCMAKE_BUILD_TYPE=Release",
+      "-DCMAKE_CXX_COMPILER=/Users/netease/XOffsetDatastructure-20261027/toolchain-v3/bin/clang++",
+      "-DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "-DXOFFSET_BUILD_TOOLS=OFF",
+      "-DXOFFSET_BUILD_EXAMPLES=OFF",
+      "-DCMAKE_BUILD_TYPE=Debug",
+      "-DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer",
+      "-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined"
+    ]
+  },
+  {
+    "step": "asan-config-v2",
+    "returncode": 0,
+    "seconds": 3.2771222591400146,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "-S",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027",
+      "-B",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/asan-v2",
+      "-DCMAKE_BUILD_TYPE=Release",
+      "-DCMAKE_CXX_COMPILER=/Users/netease/XOffsetDatastructure-20261027/toolchain-v3/bin/clang++",
+      "-DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "-DXOFFSET_BUILD_TOOLS=OFF",
+      "-DXOFFSET_BUILD_EXAMPLES=OFF",
+      "-DCMAKE_BUILD_TYPE=Debug",
+      "-DCMAKE_CXX_FLAGS=-isystem /Users/netease/XOffsetDatastructure-20261027/sanitizer-v3/include -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer",
+      "-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined"
+    ]
+  },
+  {
+    "step": "asan-build-v2",
+    "returncode": 0,
+    "seconds": 19.639091968536377,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "--build",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/asan-v2",
+      "--target",
+      "test_dense_image",
+      "test_verified_paths",
+      "test_verified_receive",
+      "test_receive_raw",
+      "test_core_lifetime",
+      "test_clone",
+      "test_wire_validation",
+      "test_v2_fuzz",
+      "-j",
+      "4"
+    ]
+  },
+  {
+    "step": "asan-ctest-v2",
+    "returncode": 8,
+    "seconds": 14.34822392463684,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/ctest",
+      "--test-dir",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/asan-v2",
+      "-R",
+      "^(test_dense_image|test_verified_paths|test_verified_receive|test_receive_raw|test_core_lifetime|test_clone|test_wire_validation|test_v2_fuzz)$",
+      "--output-on-failure",
+      "--output-junit",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/asan.xml"
+    ]
+  },
+  {
+    "step": "release-latest-build",
+    "returncode": 0,
+    "seconds": 2.438342809677124,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "--build",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/release-v2",
+      "--target",
+      "test_dense_image",
+      "-j",
+      "4"
+    ]
+  },
+  {
+    "step": "release-latest-test",
+    "returncode": 0,
+    "seconds": 0.8016822338104248,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/release-v2/bin/Release/test_dense_image"
+    ]
+  },
+  {
+    "step": "asan-latest-build",
+    "returncode": 0,
+    "seconds": 5.071614027023315,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "--build",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/asan-v2",
+      "--target",
+      "test_dense_image",
+      "-j",
+      "4"
+    ]
+  },
+  {
+    "step": "asan-latest-test",
+    "returncode": 0,
+    "seconds": 0.9165120124816895,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/asan-v2/bin/Debug/test_dense_image"
+    ]
+  },
+  {
+    "step": "install",
+    "returncode": 0,
+    "seconds": 0.18160510063171387,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "--install",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/release-v2",
+      "--prefix",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/install"
+    ]
+  },
+  {
+    "step": "consumer-config",
+    "returncode": 0,
+    "seconds": 0.4824361801147461,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "-S",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/consumer",
+      "-B",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/consumer-build",
+      "-DCMAKE_PREFIX_PATH=/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/install",
+      "-DCMAKE_CXX_COMPILER=/Users/netease/XOffsetDatastructure-20261027/toolchain-v3/bin/clang++",
+      "-DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "-DCMAKE_BUILD_TYPE=Release"
+    ]
+  },
+  {
+    "step": "consumer-build",
+    "returncode": 0,
+    "seconds": 2.3760271072387695,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "--build",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/consumer-build",
+      "-j",
+      "4"
+    ]
+  },
+  {
+    "step": "consumer-run",
+    "returncode": 0,
+    "seconds": 0.7302839756011963,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/consumer-build/consumer"
+    ]
+  },
+  {
+    "step": "perf-final-build",
+    "returncode": 0,
+    "seconds": 2.796035051345825,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "--build",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/perf",
+      "-j",
+      "4"
+    ]
+  },
+  {
+    "step": "llvm-ir",
+    "returncode": 0,
+    "seconds": 1.4708328247070312,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/toolchain-v3/bin/clang++",
+      "-I/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027",
+      "-isystem",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/container/include",
+      "-isystem",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/core/include",
+      "-isystem",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/config/include",
+      "-isystem",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/throw_exception/include",
+      "-isystem",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/static_assert/include",
+      "-isystem",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/container_hash/include",
+      "-isystem",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/type_traits/include",
+      "-isystem",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/winapi/include",
+      "-isystem",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/intrusive/include",
+      "-isystem",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/predef/include",
+      "-isystem",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/typelayout/include",
+      "-O3",
+      "-DNDEBUG",
+      "-std=gnu++26",
+      "-arch",
+      "arm64",
+      "-isysroot",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "-std=c++26",
+      "-freflection",
+      "-fexpansion-statements",
+      "-stdlib=libc++",
+      "-S",
+      "-emit-llvm",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/bench.cpp",
+      "-o",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/bench.ll"
+    ]
+  },
+  {
+    "step": "borrowed-release-latest-build",
+    "returncode": 0,
+    "seconds": 2.446668863296509,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "--build",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/release-v2",
+      "--target",
+      "test_dense_image",
+      "-j",
+      "4"
+    ]
+  },
+  {
+    "step": "borrowed-release-latest-test",
+    "returncode": 0,
+    "seconds": 0.8121459484100342,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/release-v2/bin/Release/test_dense_image"
+    ]
+  },
+  {
+    "step": "borrowed-asan-latest-build",
+    "returncode": 0,
+    "seconds": 2.329503059387207,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "--build",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/asan-v2",
+      "--target",
+      "test_dense_image",
+      "-j",
+      "4"
+    ]
+  },
+  {
+    "step": "borrowed-asan-latest-test",
+    "returncode": 0,
+    "seconds": 0.9256970882415771,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/asan-v2/bin/Debug/test_dense_image"
+    ]
+  },
+  {
+    "step": "borrowed-install",
+    "returncode": 0,
+    "seconds": 0.3003418445587158,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "--install",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/release-v2",
+      "--prefix",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/install-v2"
+    ]
+  },
+  {
+    "step": "borrowed-consumer-config",
+    "returncode": 0,
+    "seconds": 0.5089027881622314,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "-S",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/consumer-v2",
+      "-B",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/consumer-build-v2",
+      "-DCMAKE_PREFIX_PATH=/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/install-v2",
+      "-DCMAKE_CXX_COMPILER=/Users/netease/XOffsetDatastructure-20261027/toolchain-v3/bin/clang++",
+      "-DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "-DCMAKE_BUILD_TYPE=Release"
+    ]
+  },
+  {
+    "step": "borrowed-consumer-build",
+    "returncode": 0,
+    "seconds": 2.3757271766662598,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "--build",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/consumer-build-v2",
+      "-j",
+      "4"
+    ]
+  },
+  {
+    "step": "borrowed-consumer-run",
+    "returncode": 0,
+    "seconds": 0.7286739349365234,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/consumer-build-v2/consumer"
+    ]
+  },
+  {
+    "step": "borrowed-perf-borrowed-config",
+    "returncode": 0,
+    "seconds": 1.291513204574585,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "-S",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104",
+      "-B",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/perf-borrowed",
+      "-DCMAKE_BUILD_TYPE=Release",
+      "-DCMAKE_CXX_COMPILER=/Users/netease/XOffsetDatastructure-20261027/toolchain-v3/bin/clang++",
+      "-DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
+    ]
+  },
+  {
+    "step": "borrowed-perf-final-build",
+    "returncode": 2,
+    "seconds": 2.864802837371826,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "--build",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/perf-borrowed",
+      "--target",
+      "bench_borrowed",
+      "slg_image_smoke",
+      "-j",
+      "4"
+    ]
+  },
+  {
+    "step": "borrowed-final-release-latest-build",
+    "returncode": 0,
+    "seconds": 2.4160969257354736,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "--build",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/release-v2",
+      "--target",
+      "test_dense_image",
+      "-j",
+      "4"
+    ]
+  },
+  {
+    "step": "borrowed-final-release-latest-test",
+    "returncode": 0,
+    "seconds": 0.8087499141693115,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/release-v2/bin/Release/test_dense_image"
+    ]
+  },
+  {
+    "step": "borrowed-final-asan-latest-build",
+    "returncode": 0,
+    "seconds": 2.3188657760620117,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "--build",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/asan-v2",
+      "--target",
+      "test_dense_image",
+      "-j",
+      "4"
+    ]
+  },
+  {
+    "step": "borrowed-final-asan-latest-test",
+    "returncode": 0,
+    "seconds": 0.9299256801605225,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/asan-v2/bin/Debug/test_dense_image"
+    ]
+  },
+  {
+    "step": "borrowed-final-install",
+    "returncode": 0,
+    "seconds": 0.22905302047729492,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "--install",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/release-v2",
+      "--prefix",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/install-v3"
+    ]
+  },
+  {
+    "step": "borrowed-final-consumer-config",
+    "returncode": 0,
+    "seconds": 0.5099482536315918,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "-S",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/consumer-v3",
+      "-B",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/consumer-build-v3",
+      "-DCMAKE_PREFIX_PATH=/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/install-v3",
+      "-DCMAKE_CXX_COMPILER=/Users/netease/XOffsetDatastructure-20261027/toolchain-v3/bin/clang++",
+      "-DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "-DCMAKE_BUILD_TYPE=Release"
+    ]
+  },
+  {
+    "step": "borrowed-final-consumer-build",
+    "returncode": 0,
+    "seconds": 2.362607002258301,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "--build",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/consumer-build-v3",
+      "-j",
+      "4"
+    ]
+  },
+  {
+    "step": "borrowed-final-consumer-run",
+    "returncode": 0,
+    "seconds": 0.750481128692627,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/consumer-build-v3/consumer"
+    ]
+  },
+  {
+    "step": "borrowed-final-perf-borrowed-config",
+    "returncode": 0,
+    "seconds": 0.956636905670166,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "-S",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104",
+      "-B",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/perf-borrowed",
+      "-DCMAKE_BUILD_TYPE=Release",
+      "-DCMAKE_CXX_COMPILER=/Users/netease/XOffsetDatastructure-20261027/toolchain-v3/bin/clang++",
+      "-DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
+    ]
+  },
+  {
+    "step": "borrowed-final-perf-final-build",
+    "returncode": 0,
+    "seconds": 3.2740960121154785,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/.venv/bin/cmake",
+      "--build",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/perf-borrowed",
+      "--target",
+      "bench_borrowed",
+      "slg_image_smoke",
+      "-j",
+      "4"
+    ]
+  },
+  {
+    "step": "borrowed-final-slg-report",
+    "returncode": 0,
+    "seconds": 0.7064268589019775,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/perf-borrowed/bin/Release/slg_image_smoke"
+    ]
+  },
+  {
+    "step": "borrowed-final-llvm-ir",
+    "returncode": 0,
+    "seconds": 1.4632620811462402,
+    "argv": [
+      "/Users/netease/XOffsetDatastructure-20261027/toolchain-v3/bin/clang++",
+      "-I/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027",
+      "-isystem",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/container/include",
+      "-isystem",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/core/include",
+      "-isystem",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/config/include",
+      "-isystem",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/throw_exception/include",
+      "-isystem",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/static_assert/include",
+      "-isystem",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/container_hash/include",
+      "-isystem",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/type_traits/include",
+      "-isystem",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/winapi/include",
+      "-isystem",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/intrusive/include",
+      "-isystem",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/predef/include",
+      "-isystem",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/typelayout/include",
+      "-O3",
+      "-DNDEBUG",
+      "-std=gnu++26",
+      "-arch",
+      "arm64",
+      "-isysroot",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+      "-std=c++26",
+      "-freflection",
+      "-fexpansion-statements",
+      "-stdlib=libc++",
+      "-S",
+      "-emit-llvm",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/bench_borrowed.cpp",
+      "-o",
+      "/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/bench-borrowed.ll"
+    ]
+  }
+]

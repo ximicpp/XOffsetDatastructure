@@ -1,0 +1,8 @@
+{
+  "P0": "complete: baseline and two separate candidate identities preserved",
+  "P1": "complete: dense span and immutable packed emission implemented; v1 packed 8/8",
+  "P2": "existing verified/direct reload compared; checks preserved; no default change",
+  "P3": "complete within closed controlled-producer and trusted read-only contracts; borrowed 8/8; guarded v1 7/8",
+  "P4": "actual SLG Report correctness passed; full SLG trace and map/set mutable integration not implemented",
+  "result": "one-copy hot path verified within documented contract; generic untrusted/mutable owning decode not claimed"
+}

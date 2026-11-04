@@ -1,0 +1,14 @@
+[ 50%] Building CXX object CMakeFiles/bench_borrowed.dir/bench_borrowed.cpp.o
+clang++: warning: -Wl,-rpath,/Users/netease/XOffsetDatastructure-20261027/runtime-v2/lib: 'linker' input unused [-Wunused-command-line-argument]
+clang++: warning: argument unused during compilation: '-L/Users/netease/XOffsetDatastructure-20261027/runtime-v2/lib' [-Wunused-command-line-argument]
+[100%] Linking CXX executable bin/Release/bench_borrowed
+ld: warning: search path '/Users/netease/XOffsetDatastructure-20261027/toolchain-v3/lib' not found
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Users/netease/XOffsetDatastructure-20261027/runtime-v2/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[100%] Built target bench_borrowed
+[ 50%] Building CXX object CMakeFiles/slg_image_smoke.dir/slg_image_smoke.cpp.o
+clang++: warning: -Wl,-rpath,/Users/netease/XOffsetDatastructure-20261027/runtime-v2/lib: 'linker' input unused [-Wunused-command-line-argument]
+clang++: warning: argument unused during compilation: '-L/Users/netease/XOffsetDatastructure-20261027/runtime-v2/lib' [-Wunused-command-line-argument]
+[100%] Linking CXX executable bin/Release/slg_image_smoke
+ld: warning: search path '/Users/netease/XOffsetDatastructure-20261027/toolchain-v3/lib' not found
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Users/netease/XOffsetDatastructure-20261027/runtime-v2/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[100%] Built target slg_image_smoke

@@ -1,0 +1,21 @@
+{
+  "processes_per_phase": 12,
+  "blocks_per_process": 12,
+  "ordering": "forward/reverse alternates by block and process; all cases in fixed order",
+  "pages": "preallocated and touched; warmup 64 operations per mode; hot pages only",
+  "a_a_gate": "95% two-sided process CI within [0.97,1.03]; small-message absolute difference CI within +/-15ns",
+  "ratio_gate": "per-case process-paired one-sided95 upper <=1.10 for >=64KiB",
+  "small_gate": "one-sided95 upper of extra latency <=50ns for <=4KiB",
+  "comparison": "12 AA processes then 12 comparison processes; fixed budget. Comparisons for failed AA cases are diagnostic only; no retries or extra samples",
+  "image_baseline": "raw_slot writes the identical destination as image; packed/dense use raw_a destination",
+  "scope": "same-process immutable provenance; proxy contract differs from native mutable verified API; preparation and query costs reported separately",
+  "identity": {
+    "xoffsetdatastructure.hpp": "c4999e76010d419d231428dd262a329f7ea1d475f9cb4db602572fa8c0c75341",
+    "xoffset_dense_export.hpp": "362085f763021b3e22bc0da633bf9ee7feb455b7eee92d9c1b8648607410a7a8",
+    "xoffset_image_view.hpp": "dcccbc8b4623379db08426291e07934786ce4c28dfb9007d87d190511a3c7efe",
+    "xoffset_image_builder.hpp": "b7a0db9e5fe8b8f69ac4ff3848f6ccc13ab11623efab5e903ff21243a8c3e26f",
+    "experiments/memmove-serialization-20261104/bench.cpp": "971b78acf65b3d5b0b0148643133140e1ed7c71bb63f98125cf4bb611f36b6b4",
+    "experiments/memmove-serialization-20261104/campaign.py": "44d7aab192a678ba5a74cc9c1c409318296404d89a74b96085f430a6815d27d9",
+    "experiments/memmove-serialization-20261104/perf/bin/Release/bench_memmove": "5df58741dd8b7698c8865a9f6166b183345c1d18aaffa8b83f7a5ec8b35ee0ce"
+  }
+}

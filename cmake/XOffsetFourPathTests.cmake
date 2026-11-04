@@ -26,3 +26,5 @@ add_xoffset_test(test_canonical_cold_no_callback reflection)
 add_xoffset_test(test_canonical_zero_target reflection)
 # Exit 77: built without per-thread caches (XOFFSET_THREAD_CACHES=0, GCC on MinGW).
 set_tests_properties(test_canonical_cold_no_callback test_canonical_zero_target PROPERTIES SKIP_RETURN_CODE 77)
+
+add_xoffset_test(test_dense_image "reflection;memmove")

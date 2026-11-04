@@ -1,4 +1,7 @@
 set(XOFFSET_FULL_OWN_HEADERS
+    xoffset_dense_export.hpp
+    xoffset_image_view.hpp
+    xoffset_image_builder.hpp
     xoffsetdatastructure.hpp
     receive_future.hpp
     receive_raw.hpp
