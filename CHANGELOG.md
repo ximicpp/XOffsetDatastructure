@@ -12,7 +12,10 @@
   granule (128 MiB of address space; untouched pages stay free, committed at
   first registration on Windows) to hold the offset; the lookup costs the
   same instructions as before. A colored slot chunk holds one slot fewer.
-  Wire bytes, payload page alignment and touched pages are unchanged.
+  Wire bytes, payload page alignment, touched pages and the alignment of a
+  VM reservation are unchanged. Apple Silicon has 4 colors (16 KiB pages):
+  the Mac gate shows no HFT gain there yet (0.97 to 1.05); wider colors on
+  16 KiB pages are a follow-up.
 
 ## 3.3.0: native delta sync
 

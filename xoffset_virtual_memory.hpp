@@ -218,7 +218,13 @@ private:
                 XOFFSET_VFAIL_STD(std::length_error, XErrc::length_error, "VM reservation page rounding overflows");
             const std::size_t span =
                 (reserved + color + OwnerMap::granule_bytes - 1) & ~(OwnerMap::granule_bytes - 1);
-            const std::size_t shift = region_shift(span);
+            // k covers the reservation, not the color: a payload of at most
+            // 2^k bytes starting o < 64 KiB past a 2^k boundary still has
+            // (a - o) & ~(2^k - 1) == region for every byte, so the color
+            // costs no extra alignment; the mapping just runs into the next
+            // 2^k block's first granule, which no other mapping can share.
+            const std::size_t shift = region_shift(
+                (reserved + OwnerMap::granule_bytes - 1) & ~(OwnerMap::granule_bytes - 1));
             if (shift >= OwnerMap::address_bits || !OwnerMap::ready()) XOFFSET_VFAIL_BAD_ALLOC();
             const std::size_t align = std::size_t(1) << shift;
 #if defined(_WIN32)
@@ -786,7 +792,8 @@ private:
     }
     // A VM owner's region: base_ less its color offset.
     char* region_start() const noexcept {
-        const auto mask = ~((std::uintptr_t(1) << region_shift(mapped_bytes_)) - 1);
+        // The region is aligned to at least a granule and the color is below one.
+        const auto mask = ~std::uintptr_t(OwnerMap::granule_bytes - 1);
         return reinterpret_cast<char*>(reinterpret_cast<std::uintptr_t>(base_) & mask);
     }
 

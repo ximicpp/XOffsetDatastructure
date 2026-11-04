@@ -70,6 +70,17 @@ void vm_payload() {
     require_maps(base, b.reserved_bytes(), "VM payload granules");
     // The granules past the span, inside the alignment, are not this payload's.
     need(OwnerMap::payload_of(region + span) == nullptr, "granule past the VM span is mapped");
+    // A power-of-two reservation keeps its alignment: the color does not raise
+    // k, and the payload's last byte, in the granule past 2^k, maps back.
+    {
+        auto p = xo::XBuffer::create<OwnerRoot>(4096,
+            xo::XBuffer::maximum_capacity(32u << 20).with_storage(xo::XStorage::Pinned));
+        auto* pb = base_of(p);
+        const auto po = reinterpret_cast<std::uintptr_t>(pb) % (std::size_t(4) << 20);
+        need(p.reserved_bytes() == (32u << 20), "power-of-two fixture is not 32 MiB");
+        need((reinterpret_cast<std::uintptr_t>(pb) - po) % (32u << 20) == 0, "color raised the VM alignment");
+        need(OwnerMap::payload_of(pb + p.reserved_bytes() - 1) == pb, "last byte past 2^k maps elsewhere");
+    }
     auto& r = b.root<OwnerRoot>();
     need(r.name.binding().segment == b.arena() && r.values.binding().segment == b.arena(),
          "root heads do not bind to their payload");

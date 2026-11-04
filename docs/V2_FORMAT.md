@@ -67,8 +67,9 @@ granule of the 48-bit address space: 0 for no XOffset region, otherwise bits
 multiple of 64 below 64 KiB). The payload holding `address` starts at
 `((address - o) & ~(2^k - 1)) + o`. A slot chunk registers once, with k the
 slot size and o = 64 (the slot header) plus the chunk's color; a VM region is
-reserved as whole 4 MiB granules aligned to 2^k, starts its payload at its
-color o, and sets its entries while it is mapped (a pooled mapping keeps them,
+reserved as whole 4 MiB granules from a 2^k boundary, with 2^k the smallest
+power of two (at least 4 MiB) that holds the reservation, starts its payload
+at its color o, and sets its entries while it is mapped (a pooled mapping keeps them,
 and its color). On Windows the table is committed at the first registration.
 
 **Color.** Each new VM region and each new slot chunk takes the next color, a
@@ -80,7 +81,10 @@ share their low page-number bits and compete for the same TLB sets: 64 order
 books, one VM buffer each, applied events 1.8x slower than the same books in
 one buffer at equal instruction counts. The color changes no offset inside a
 payload, so wire bytes, page alignment and the pages a payload touches are
-unchanged.
+unchanged. Nor does it raise k: every byte of a payload of at most 2^k bytes
+that starts o past a 2^k boundary still maps back to that boundary, so a
+color only extends the mapping into the next block's first granule, which no
+other mapping can share (a 256 MiB reservation stays 256 MiB aligned).
 
 Lookups follow five rules:
 
