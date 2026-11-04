@@ -80,6 +80,8 @@ void check_transport(std::size_t length, const std::filesystem::path& fixture_di
     const auto* source_base = source.get_address();
     const auto epoch = source.epoch();
     const auto wire = source.save_verified<TransportRoot>();
+    // Saves keep the logical length; the payload the wire carries is [0, used_end).
+    source.shrink_to_fit();
     const auto payload = source.copy_bytes();
     // V2.1 wire: header, payload bytes [48, used_bytes), hole table. This
     // fixture never retires a block, so its hole table is empty and the wire
@@ -140,7 +142,7 @@ void check_transport(std::size_t length, const std::filesystem::path& fixture_di
         XWireHeaderV2 h{};
         std::memcpy(&h, holed_wire.data(), sizeof(h));
         const auto holes_at = sizeof(h) + h.used_bytes - XWIRE_PAYLOAD_BEGIN;
-        assert(h.hole_count == 1 && h.used_bytes == holed.get_size());
+        assert(h.hole_count == 1 && h.used_bytes == holed.arena()->used_end);
         assert(holed_wire.size() == holes_at + h.hole_count * sizeof(XBufferCore::WireHole));
         XBufferCore::WireHole hole{};
         std::memcpy(&hole, holed_wire.data() + holes_at, sizeof(hole));
@@ -210,7 +212,7 @@ void load_failures_preserve_target() {
     detail::clear_vm_failures();
 }
 
-void save_failure_keeps_normalized_source_usable() {
+void save_failure_keeps_source_usable() {
     auto source = make_transport(65537);
     auto handle = source.handle<TransportRoot>();
     auto* root = handle.get();
@@ -222,7 +224,7 @@ void save_failure_keeps_normalized_source_usable() {
     try { (void)source.save_verified<TransportRoot>(); }
     catch (const std::bad_alloc&) { rejected = true; }
     assert(rejected && !fail_next_allocation);
-    assert(source.get_size() < old_size);
+    assert(source.get_size() == old_size); // saves keep the logical length
     assert(source.get_address() == base && source.epoch() == epoch && handle.get() == root);
     check_root(*root, 65537);
     auto saved = source.save_verified<TransportRoot>();
@@ -241,5 +243,5 @@ int main(int argc, char** argv) {
     for (const auto length : {std::size_t(0), std::size_t(31), std::size_t(65537)})
         check_transport(length, fixtures);
     load_failures_preserve_target();
-    save_failure_keeps_normalized_source_usable();
+    save_failure_keeps_source_usable();
 }
