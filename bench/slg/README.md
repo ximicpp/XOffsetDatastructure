@@ -168,6 +168,54 @@ and march id -> slot maps are flat open-addressing tables (2026-11-04, were
 `std::unordered_map`; slot choice, bytes and states unchanged). cereal
 reuses its input stream. Allocator: glibc malloc for every format.
 
+Scoring V3 (2026-11-04, thread 确定下一阶段开发方向, doc GZH4QtBqBrDXKrH9uwTmsH):
+new keys only; no existing key or the time range of an existing stage changes,
+so earlier batches and the perf gate compare as before.
+
+- Send + compress: `EBZ.send`, `U*Z.send`, `N*Z.send`, `LZ.send`, `LKZ.send`,
+  `LDZ.send`, `LNZ.send` time zstd level 3 of each wire the server sent (one
+  frame per message, one reused context, no dictionary). They run after the
+  round (EB: in the untimed bytes pass) so the timed stages keep their working
+  set; send + compress = `*.send` + `*Z.send`. They take their own prefix so
+  tools that sum a case's stages by prefix keep their totals. Sizes:
+  `EB.window_zstd`, `U*.delta_zstd`, `N*.delta_zstd`, `L.player_zstd`,
+  `LK.player_zstd`, `LD.patch_zstd`, `LN.delta_zstd` (bytes, untimed).
+- Client, one device with one warm view: `U*W.recv`, `N*W.recv` (static views)
+  and `LDW.recv`, `LNW.recv` (self deltas). The first `kWarmDevices` (16)
+  clients / players each have a second copy of their view or player; after the
+  cycle their deliveries are replayed into it, receive + apply timed per
+  delivery as `U*.recv` + `U*.apply`, and before each one the device reads its
+  whole view (untimed: a client draws it every frame), so it is warm as on a
+  real device. Counts `U*W.deliveries`, `LDW.patches`; the copies are checked
+  equal to the clients' views. The copies are laid out after every client's
+  own view or player (the same pull again, untimed), so the clients' objects
+  keep the addresses they had without them. `EBW.recv` (browse) is unchanged.
+- Streaming compression, report only: the warm devices' connections also go
+  through one zstd level 3 context per connection, kept across messages, one
+  `ZSTD_e_flush` per message: `EBZS.send`, `U*ZS.send`, `N*ZS.send`,
+  `LZS.send` + `LDZS.send` (one context for the login and then the patches),
+  `LKZS.send` + `LNZS.send`; bytes `*_zs`, counts `*ZS.msgs`, per-connection
+  context memory `*ZS.ctx` (`ZSTD_sizeof_CCtx`).
+- Trust tier (susu 2026-11-04): server <-> server and server -> client links
+  are trusted, so the main columns use the rivals' no-check modes where they
+  have one: `flatbuffers_noverify` (no Verifier) and `cista_unchecked`
+  (`cista::mode::CAST`), run as formats of their own (`run_v5_split.sh` adds
+  them); the checked rows are report only. XOffset keeps its checked paths
+  (`reload_verified`, `try_apply_delta_verified`) until its trust-tier
+  interface lands.
+- Memory, report only: a `-DSLG_MEMCOUNT=1` build (CMake `SLG_MEMCOUNT=ON`)
+  counts the live bytes of every `operator new` (one counter for every format
+  and platform, malloc's own overhead not counted); `--mode mem --out m.jsonl`
+  runs 2 cycles and writes `MEM.*`: `MEM.player` per resident player (std
+  formats: what a deep copy allocates; cista: its buffer; XOffset: arena used,
+  plus `MEM.player_arena` and `MEM.player_reserved`), per client the
+  application-level delta's `MEM.U*.interest` (the tracker) and
+  `MEM.U*.held_index`, and the native delta's `MEM.N*.view`, `.baseline`,
+  `.slots` and `MEM.LN.baseline`. Never time with this build.
+
+Batches: `run_v5_split.sh` and `pool_v5.py` (project files,
+slg-cases-v3-20261102/).
+
 ## Instruction counts (CI performance gate)
 
 `-DSLG_IR_COUNT=ON` (or `-DSLG_IR_COUNT=1` on a direct compile) builds a

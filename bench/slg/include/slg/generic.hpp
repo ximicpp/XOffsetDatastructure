@@ -14,6 +14,12 @@
 
 namespace slg {
 
+// Warm single devices replayed per static case (U*W, N*W) and for self deltas (LDW, LNW).
+inline constexpr int kWarmDevices = 16;
+inline volatile uint64_t warm_sink = 0;   // the warm devices' untimed reads
+inline int warm_devices(int clients) { return clients < kWarmDevices ? clients : kWarmDevices; }
+
+
 // ---- helpers --------------------------------------------------------------
 
 inline std::string_view sv(const std::string& s) { return s; }
