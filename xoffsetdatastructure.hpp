@@ -622,8 +622,8 @@ namespace XOffsetDatastructure {
             std::swap(schema_bound_, other.schema_bound_);
             std::swap(bound_root_type_id_, other.bound_root_type_id_);
             std::swap(bound_schema_hash_, other.bound_schema_hash_);
-            ++m_epoch;
-            ++other.m_epoch;
+            advance_epoch();
+            other.advance_epoch();
             update_registry_owner();
             other.update_registry_owner();
         }
@@ -1842,8 +1842,8 @@ namespace XOffsetDatastructure {
                 schema_bound_ = std::exchange(other.schema_bound_, false);
                 bound_root_type_id_ = std::exchange(other.bound_root_type_id_, 0);
                 bound_schema_hash_ = std::exchange(other.bound_schema_hash_, 0);
-                ++m_epoch;
-                ++other.m_epoch;
+                advance_epoch();
+                other.advance_epoch();
                 update_registry_owner();
                 return;
             }
@@ -1859,6 +1859,8 @@ namespace XOffsetDatastructure {
             // Preserve the existing one-invalidation-per-Core epoch contract.
             m_epoch = target_epoch + 1u;
             other.m_epoch = source_epoch + 1u;
+            root_cache_type_ = nullptr;
+            other.root_cache_type_ = nullptr;
             // Only now destroy retired target resources. Any delete reentry
             // sees the fully published incoming payload, schema and free cache.
         }
@@ -1963,7 +1965,7 @@ namespace XOffsetDatastructure {
             insert_owner_keeping(prepared);
             buffer_.swap(next);
             publish_host_owner();
-            ++m_epoch;
+            advance_epoch();
             return true;
             // `next` (the old storage) is released here.
         }
@@ -2117,7 +2119,7 @@ namespace XOffsetDatastructure {
         // (epoch), and the owner is left without typed root access until the
         // caller finishes verification.
         void begin_reinit(bool keep_table = false) noexcept {
-            ++m_epoch;
+            advance_epoch();
             if (keep_table && free_table_) {
                 // Emptied detached (releasing map nodes may reenter), then
                 // kept with its bin storage: the next holes need neither a
@@ -2388,23 +2390,26 @@ namespace XOffsetDatastructure {
         std::uint64_t bound_schema_hash_ = 0;
 
         // The root that make<T>() or a verified load of T admitted, valid
-        // while the epoch it was admitted at is current. Typed access, the
-        // schema binding and the root offset change only with the epoch
-        // (reinit, reset, move, swap, storage move) or on a fresh owner, so
-        // a hit in root<T>() returns what its checked path would. Set only
-        // by those mutating calls, so root<T>() itself stays read-only. Not
-        // transferred: an owner whose epoch advanced misses.
+        // until the epoch advances. Typed access, the schema binding and the
+        // root offset change only with the epoch (reinit, reset, move, swap,
+        // storage move) or on a fresh owner, so a hit in root<T>() returns
+        // what its checked path would. Set only by those mutating calls, so
+        // root<T>() itself stays read-only. Not transferred: every epoch
+        // change (advance_epoch, the retiring move) clears it.
         template <typename T>
         T* cached_root() const noexcept {
-            return root_cache_epoch_ == m_epoch && root_cache_type_ == type_identity<T>()
-                ? static_cast<T*>(root_cache_) : nullptr;
+            return root_cache_type_ == type_identity<T>() ? static_cast<T*>(root_cache_) : nullptr;
         }
 
         template <typename T>
         void cache_root(T* root) noexcept {
-            root_cache_ = root;
             root_cache_type_ = type_identity<T>();
-            root_cache_epoch_ = m_epoch;
+            root_cache_ = root;
+        }
+
+        void advance_epoch() noexcept {
+            ++m_epoch;
+            root_cache_type_ = nullptr;
         }
 
     private:
@@ -2421,9 +2426,10 @@ namespace XOffsetDatastructure {
         bool free_table_lost_ = false;
         const void* root_type_identity_ = nullptr;
         std::uint64_t m_epoch = 0;
+        // root<T>() reads only these two words: 16-byte aligned, they never
+        // straddle a cache line (a cold buffer costs one line, not two).
+        alignas(16) const void* root_cache_type_ = nullptr;
         void* root_cache_ = nullptr;
-        const void* root_cache_type_ = nullptr;
-        std::uint64_t root_cache_epoch_ = 0;
     };
 
     // ========================================================================
