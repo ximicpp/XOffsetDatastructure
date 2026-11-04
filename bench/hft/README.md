@@ -85,4 +85,110 @@ v25.12.19 (headers and `flatc`) and SBE 1.41.0 (`sbe-all` jar, Java); paths
 are environment variables (see `run.sh`). The tables below are its
 `summary.md`.
 
-RESULTS_PLACEHOLDER
+## 2026-11-04, cloud x86_64 (4 vCPU Xeon 2.8 GHz), P2996 d77eff1 -O2 libc++, valgrind 3.22
+
+Whole window; times are medians of 3 runs pinned to one CPU. Instruction
+counts with the glibc setting of `tools/perf_gate`.
+
+### Digests
+
+- hot: equal (a3a5dbca36fbe79c ['fixed', 'raw', 'sbe', 'xo'])
+- join: equal (0302b7ed8d030a96 ['cista', 'cista_checked', 'fb', 'fb_verified', 'pool', 'sbe', 'xo', 'xo_verified', 'zpp'])
+- state: equal (0302b7ed8d030a96 ['cista', 'pool', 'std', 'xo'])
+- join clients end with the state service's digest: yes
+
+### State service (claim C): apply every update of the window in place
+
+Ir per update (callgrind); ns per update (median of 3 timed runs, noisy on a cloud VM).
+
+| model | Ir/update | Ir vs pool | ns/update | snapshot bytes | levels | orders | longest queue |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| pool | 263.0 | 1.00x | 61.2 | 14352112 | 57945 | 283285 | 2852 |
+| std | 319.3 | 1.21x | 44.5 |  | 57945 | 283285 | 2852 |
+| xo | 356.3 | 1.36x | 48.8 | 21230064 | 57945 | 283285 | 2852 |
+| cista | 636.0 | 2.42x | 72.5 | 12756888 | 57945 | 283285 | 2852 |
+
+### Hot path (claim A): publish each packet into a ring slot, 4 readers read every field
+
+| format | bytes/packet | encode Ir/packet | read Ir/packet/reader | encode ns/packet | read ns/packet/reader |
+|---|---:|---:|---:|---:|---:|
+| raw | 68.0 | 48.3 | 74.8 | 17.3 | 12.9 |
+| fixed | 68.0 | 58.3 | 80.8 | 18.3 | 14.8 |
+| sbe | 68.8 | 141.2 | 73.1 | 34.3 | 15.1 |
+| xo | 124.0 | 742.7 | 459.4 | 98.6 | 50.4 |
+
+### Late join (claim B): snapshot at the middle of the window, client applies the rest
+
+| format | bytes | snapshot Ir | ready Ir | rest Ir/update | snapshot ms | ready ms | rest ns/update |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| xo | 20855336 | 1,799,853 | 1,806,844 | 164.4 | 14.31 | 14.34 | 36.5 |
+| xo_verified | 13460960 | 7,098,104 | 4,374,091 | 164.6 | 9.06 | 7.63 | 37.7 |
+| pool | 14237328 | 3,759,520 | 26,765,866 | 115.5 | 20.33 | 27.42 | 61.7 |
+| cista | 12664248 | 79,007,712 | 1,399,804 | 279.9 | 28.79 | 6.81 | 46.0 |
+| cista_checked | 12664248 | 79,007,712 | 301,538,322 | 279.9 | 27.65 | 27.34 | 47.2 |
+| zpp | 11511388 | 9,514,982 | 22,493,137 | 146.8 | 21.46 | 8.21 | 32.0 |
+| fb | 12432224 | 41,424,688 | 19,931,930 | 146.8 | 21.74 | 9.57 | 33.6 |
+| fb_verified | 12432224 | 41,424,688 | 30,332,072 | 146.8 | 20.90 | 11.35 | 33.5 |
+| sbe | 10437974 | 14,319,145 | 27,819,822 | 146.8 | 10.59 | 9.00 | 34.7 |
+
+### Handshake (claim A): a strategy from another build connects
+
+The feed sends order id 1001.
+
+| strategy | verdict | same batch tag | view_fixed_batch | a raw cast reads order id | hello bytes |
+|---|---|---|---|---:|---:|
+| same | same | True | ok | 1001 | 120 |
+| swapped | reject_names | True | ok | 34200000000123 | 128 |
+| widened | reject_unknown | False | wrong_tag | 1001 | 128 |
+
+
+### Reading the results
+
+**C, the state service.** XOffset keeps the books and the table in its sending
+format at 1.36x the pool's instructions and 1.12x the std model's; in time it is
+between them (48.8 ns per update against 44.5 for std and 61.2 for the pool,
+whose order-id hash misses the cache). The suggested gate (at most 1.5x the
+pool) holds in both. Most of every model's cost is common: finding the price
+level by scanning from the best price and the order in its queue. cista pays
+2.4x for inserting into its vectors (a rotate of offset-pointer elements).
+
+**B, the late join.** In instructions XOffset needs no encoding: on the trusted
+link 1.8 M to take the snapshot and 1.8 M to be ready, against 9.5 M + 22.5 M
+for zpp_bits, 14 M + 28 M for SBE and 41 M + 20 M for FlatBuffers (decode into
+a writable state included); verified, 7.1 M + 4.4 M. The pool takes 3.8 M but
+needs 26.8 M to rebuild its order index; cista needs 79 M to serialize, and
+302 M when it checks what it receives. In time on this VM it is not an order of
+magnitude: getting ready costs about the same everywhere (7-10 ms) because the
+receiver's first touch of fresh memory (about 2 us per 4 KiB page) costs more
+than the work, so the bytes touched decide. The trusted XOffset path sends the
+raw segment, 20.9 MB with capacity slack and holes, against 13.5 MB for the
+compact verified wire, and is the slowest to be ready (14.3 ms). A trusted load
+of the compact wire into memory the client has already touched (as HFT
+processes pre-fault) would keep the instruction advantage in time; that needs
+library work. After joining, the client applies updates at the same cost as the
+server (164 Ir per update in the second half, std 147).
+
+**A, the hot path.** Real packets are small (1.25 updates), so per-packet
+constants count: the fixed message reads with 6 more instructions per packet
+than a raw struct with a length check (+8%) and writes with 10 more (+21%),
+for its tag and size checks; in time +1.9 ns per read (noisy). SBE without
+bounds checks reads like the raw struct and writes at 2.9x. The per-packet
+XBuffer (`xo`, before fixed messages) costs 6-15x. Whether the fixed message
+stays within 5% of the raw struct at P99 needs the Mac.
+
+**A, the handshake.** A strategy whose `Order` declares `ts` before `order_id`
+has the same layout, so the same wire fingerprint and batch tag: the fixed
+batch view accepts its packets and a raw cast reads the timestamp
+34200000000123 as the order id. The handshake rejects it before the first
+packet (`reject_names`). A changed layout is caught both by the batch tag and
+by the handshake (`reject_unknown`). The hello is 120-128 bytes once per
+connection.
+
+**D, one set of types.** `model.hpp` declares the records once; the hot path
+sends `Update` as it is, the book stores its `Order` as it arrived and the
+snapshot is the state's bytes, with no schema file and no conversion code.
+The others need: FlatBuffers and SBE a schema file each (52 and 82 lines),
+generated code and hand-written conversion both ways (about 80 and 95
+lines); cista a parallel model on its own containers; the pool its own
+structures, snapshot and restore code (`pool.hpp`, 260 lines) and no check of
+what it receives.
