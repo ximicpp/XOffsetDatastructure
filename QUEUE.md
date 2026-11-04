@@ -1,6 +1,6 @@
 # Mac queue
 
-Updated 2026-11-04T20:27:17Z after 089-slgv8: done 0 2026-11-04T20:27:14Z
+Updated 2026-11-04T20:27:27Z after 091-ckpt19b: running 2026-11-04T20:27:24Z
 
 ```
 runner: pid 4651 (version 2)
@@ -95,5 +95,5 @@ free: 20 GB on /Volumes/XOffsetCS, 20 GB on /Users/ximi
 088-apple330                             done 0 2026-11-04T19:24:50Z
 089-slgv8                                done 0 2026-11-04T20:27:14Z
 090-ckpt19b                              cancelled
-091-ckpt19b                              queued
+091-ckpt19b                              running 2026-11-04T20:27:24Z
 ```
