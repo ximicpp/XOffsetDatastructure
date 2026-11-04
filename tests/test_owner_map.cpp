@@ -91,15 +91,21 @@ void vm_colors() {
             xo::XBuffer::maximum_capacity(1u << 20).with_storage(xo::XStorage::Pinned)));
         auto* base = base_of(bufs.back());
         const auto offset = reinterpret_cast<std::uintptr_t>(base) % (std::size_t(4) << 20);
-        need(offset % 4096 == 0, "colored VM payload is not page-aligned");
+        need(offset % xo::detail::SlotSlab::page_size() == 0, "colored VM payload is not page-aligned");
         need(OwnerMap::payload_of(base) == base && OwnerMap::payload_of(base + (1u << 20) - 1) == base,
              "colored VM payload does not map to itself");
         bufs.back().root<OwnerRoot>().name = "a value longer than the inline storage";
         need(OwnerMap::payload_of(bufs.back().root<OwnerRoot>().name.data()) == base, "colored block maps elsewhere");
         offsets.push_back(offset);
     }
+    // OwnerMap::color_span / page colors: 16 on 4 KiB pages, 4 on 16 KiB
+    // pages (Apple Silicon), so 8 consecutive buffers take min(8, colors).
+    const std::size_t page = xo::detail::SlotSlab::page_size();
+    const std::size_t colors = (OwnerMap::color_span + page - 1) / page;
+    const std::ptrdiff_t expect = static_cast<std::ptrdiff_t>(colors < 8 ? colors : 8);
     std::sort(offsets.begin(), offsets.end());
-    need(std::unique(offsets.begin(), offsets.end()) - offsets.begin() == 8, "8 consecutive VM payloads share a color");
+    need(std::unique(offsets.begin(), offsets.end()) - offsets.begin() == expect,
+         "8 consecutive VM payloads do not take min(8, colors) colors");
     ++cases;
 }
 
