@@ -14,6 +14,9 @@ set(XOFFSET_ROOT "${_slg_default_root}" CACHE PATH "XOffsetDatastructure checkou
 # Instruction-count build for the CI performance gate (see bench/slg/README.md).
 # OFF leaves the timing path unchanged.
 option(SLG_IR_COUNT "Toggle callgrind collection around timed regions" OFF)
+# Memory build for --mode mem (scoring V3, report only): counts operator new bytes.
+# OFF leaves the timing path unchanged; never time with it ON.
+option(SLG_MEMCOUNT "Count live heap bytes for --mode mem" OFF)
 # Diagnostic programs (not part of any measurement).
 option(SLG_BUILD_PROBES "Build erase_probe and small_msg_probe" OFF)
 
@@ -33,6 +36,9 @@ if(SLG_IR_COUNT)
   find_path(VALGRIND_INCLUDE valgrind/callgrind.h REQUIRED)
   target_include_directories(slg_bench SYSTEM PRIVATE ${VALGRIND_INCLUDE})
   target_compile_definitions(slg_bench PRIVATE SLG_IR_COUNT=1)
+endif()
+if(SLG_MEMCOUNT)
+  target_compile_definitions(slg_bench PRIVATE SLG_MEMCOUNT=1)
 endif()
 
 find_path(CEREAL_INCLUDE cereal/cereal.hpp)
