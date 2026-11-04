@@ -34,6 +34,12 @@
   头选出链上的版本，再走上面的 `load_verified`）、`XPeerSchemas::accept` 和
   `read_schema_ack`（握手消息，同样走 `load_verified`，另有 64 KiB 和条目数上限）。
 
+- 重新加载进已有 buffer：`reload_verified` / `try_reload_verified`、`begin_verified_reload`
+  （直接收进已有 buffer 的存储），以及可搬槽位存储（R1）上的同样入口；
+- `load_verified_with_resource<T>` / `load_verified_with_scratch<T>`（校验用的位图来自调用方给的
+  内存资源，校验本身与 `load_verified` 相同）；
+- 客户端构建：以上入口在 C++20 字段表构建和关异常构建（`try_` 入口）里各是一份独立编译的代码。
+
 `load_unverified` 不校验，**不是**不可信输入的入口。
 
 ## 3. 威胁与现状
@@ -132,6 +138,21 @@ M1–M6 已在 0.3.0-beta.1 实施，行为变化见 CHANGELOG。M3 的修改路
 | M6 | 填充字节（P3）：编译期检查可选开关，schema 有隐式填充就报错，让用户改成显式字段；或在输出前按反射得到的填充位置清零 | 开关方式没有运行时开销；清零方式要实测 |
 
 ## 5. 持续 fuzz
+
+现状（2026-11-04 起，susu 11-04 06:15Z）：每晚长跑自 2026-10-28 停，不再恢复；改为**每次发版前**
+在云端跑一轮 `tools/fuzz_prerelease.sh`（[RELEASING.md](RELEASING.md) 第 3 节），覆盖第 2 节的
+每个入口，无发现才发版。入口与 harness 的对应：
+
+| 入口 | harness（ASan+UBSan） |
+| --- | --- |
+| `load_verified`、`TypedXBuffer<T>::load`、`try_load_verified`、`load_verified_with_resource` | `fuzz_v2_wire`、`fuzz_wire_schemas`（libFuzzer）；`test_v2_fuzz`（GCC 16 差分，带独立 oracle） |
+| `begin_verified_receive` / `finish_verified`、`receive_raw::validate` | 同上（`v2_fuzz_core.hpp` 的 receive、raw 两列，与 oracle 比较） |
+| `reload_verified`、`begin_verified_reload`、可搬槽位存储 | 同上（reload、direct、slot 各列，与新 buffer 的加载逐字节比较） |
+| schema 演进：`evolve_load_verified`、`XPeerSchemas` 握手、`read_schema_ack` | `fuzz_schema_evolution` |
+| 客户端字段表构建、关异常构建 | `fuzz_v2_wire`、`fuzz_wire_schemas` 的 C++20 字段表构建（libFuzzer），`tools/fuzz_outcome_diff.sh`（三种构建逐条比较结果和错误文字） |
+
+各阶段与预算见脚本开头的说明；一轮发版 fuzz 约 4 小时（GCC 45 分钟，每个 libFuzzer 目标每种构建
+25 分钟）。下面是更早的记录。
 
 现状（0.3.0-beta.1）：F1–F3 已实现，F4 的 PR 短跑已在 CI 运行；每日长跑的 workflow
 已写好，但 GitHub 定时任务只在默认分支触发，目前没有运行，发布前以一次 480 万例的

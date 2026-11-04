@@ -1284,6 +1284,25 @@ Outcome check_case(const std::string& w, std::mt19937_64& rng, const std::string
     check_direct(w, bool(typed), typed ? &*typed : nullptr, "case " + id);
 #endif
     compare_inflated(w, typed, terr, o, "case " + id);
+#if defined(XOFFSET_TRY_ENTRIES_API)
+    {
+        // load_verified_with_resource (what load_verified_with_scratch uses):
+        // the validation bitmaps come from another upstream (a monotonic
+        // resource over a small stack buffer, so large payloads spill), with
+        // the same verdict, message and payload.
+        alignas(std::max_align_t) unsigned char arena[2048];
+        std::pmr::monotonic_buffer_resource upstream(arena, sizeof arena);
+        auto viar = xo::XBuffer::try_load_verified_with_resource<fz::Root>(
+            std::span<const std::byte>(reinterpret_cast<const std::byte*>(w.data()), w.size()),
+            xo::XBuffer::maximum_capacity(kLimit), &upstream);
+        const std::string rmsg = viar ? std::string() : viar.error().message;
+        if (bool(viar) != bool(typed) || (!typed && rmsg != terr))
+            fail("case " + id + ": load_verified_with_resource=" + (viar ? "accept" : "reject(" + rmsg + ")") +
+                 " typed=" + (typed ? "accept" : "reject(" + terr + ")"));
+        if (typed && xo::TypedXBuffer<fz::Root>(std::move(*viar)).save_verified() != typed->save_verified())
+            fail("case " + id + ": load_verified_with_resource loaded a different payload");
+    }
+#endif
     if (kRawAcceptors && (o.ok || o.stage == Oracle::Stage::Payload)) {
         const bool raw = raw_accepts(w, &rerr);
         const bool recv = receive_accepts(w, &verr);
