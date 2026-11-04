@@ -213,6 +213,25 @@ so earlier batches and the perf gate compare as before.
   `MEM.U*.held_index`, and the native delta's `MEM.N*.view`, `.baseline`,
   `.slots` and `MEM.LN.baseline`. Never time with this build.
 
+D3 shared deltas (EXPERIMENTAL, 2026-11-04, thread 设计共享增量原型, doc
+X5MZPWya7DWFzdCughpZqL; `xoffset_shared_delta.hpp`). XOffset only, class 3 only;
+`SLG_D3=1` runs D3 alone (no N*), `SLG_D3=2` both, unset none (keys and stage
+ranges as before); `SLG_NATIVE_OFF` turns D3 off too. Needs no
+`XOFFSET_DELTA_SYNC_API`. The server keeps one entity store and one shared
+baseline: every unit the world changed in a tick is copied in, compared and
+encoded once (`D*.pub`, once per tick); a delivery copies the bodies of its
+entities into one message (`D*.send`). Server per delivery =
+(`D*.pub` + `D*.send`) / `U*.deliveries`. The client applies the message to
+its own view: `D*T.recv` trust tier (header admission, one pass), `D*.recv`
+full check then apply, each into its own copy of the view, the order
+alternating by delivery; both are compared with the application-level view
+after every delivery. Bytes `D*.delta`, `D*.delta_zstd` (`D*Z.send`); warm
+devices `D*W.recv` / `D*TW.recv` (count `U*W.deliveries`), streaming `D*ZS.send`,
+`D*.delta_zs`; memory `MEM.D*.conn` (per connection), `MEM.D*.shared` (the
+store, baseline and arenas, whole server) and `MEM.D*.shared_per_conn`.
+Bookkeeping added for it, untimed: the tracker's fresh flags
+(`DeltaPlan::unew`, `mnew`) and the world's changed-unit list.
+
 Batches: `run_v5_split.sh` and `pool_v5.py` (project files,
 slg-cases-v3-20261102/).
 
