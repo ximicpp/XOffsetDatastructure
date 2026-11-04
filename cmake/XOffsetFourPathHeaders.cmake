@@ -21,4 +21,5 @@ set(XOFFSET_FULL_OWN_HEADERS
     xoffset_evolution.hpp
     xoffset_schema_freeze.hpp
     xoffset_delta.hpp
+    xoffset_receiver.hpp
 )
