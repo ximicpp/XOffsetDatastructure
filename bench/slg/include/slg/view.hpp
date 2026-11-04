@@ -730,10 +730,10 @@ struct ViewKeys {
     std::string esend, erecv, ewrecv, usend, urecv, uapply;
     std::string ewin, ereq, ezstd, ecomp, ecompz, udelta, umsg, uzstd, uunits, umarch, utiles;
     std::string nsend, ndiff, nrecv, ndelta;
-    std::string dpub, dsend, drecv, ddelta;
+    std::string dpub, dsend, drecv, dtrecv, ddelta;
     ViewKeys(const char* e, const char* u, const char* n, const char* d) {
         const std::string E(e), U(u), N(n), D(d);
-        dpub = D + ".pub"; dsend = D + ".send"; drecv = D + ".recv"; ddelta = D + ".delta";
+        dpub = D + ".pub"; dsend = D + ".send"; drecv = D + ".recv"; dtrecv = D + "T.recv"; ddelta = D + ".delta";
         esend = E + ".send"; erecv = E + ".recv"; ewrecv = E + "W.recv";
         ewin = E + ".window"; ereq = E + ".requests"; ezstd = E + ".window_zstd";
         ecomp = E + ".window_compact"; ecompz = E + ".window_compact_zstd";
@@ -867,6 +867,8 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
                 ops.d_key(c, w, s.plan);
                 ops.d_recv(c);
                 if (query_view(ops.d_held(c)) != query_view(ops.held(c, 0))) throw std::runtime_error("D3 key: view differs from the snapshot");
+                ops.d_recv_trusted(c);
+                if (query_view(ops.d_held_trusted(c)) != query_view(ops.held(c, 0))) throw std::runtime_error("D3 key (trust tier): view differs from the snapshot");
             }
             if constexpr (native) if (run_n) {
                 ops.n_view(c, w, rect);
@@ -913,8 +915,19 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
                 st.bytes[k.ndelta] += nd;
             }
             if constexpr (d3) if (run_d) {
-                timed(st, k.drecv.c_str(), [&] { ops.d_recv(c); });
-                if (query_view(ops.d_held(c)) != q) throw std::runtime_error("D3 delta: view differs from the application-level one");
+                // Trust tier (the main score column, susu 2026-11-04) and full
+                // checking, each into its own copy of the client's view. The
+                // first of the two pays for bringing the message and shared
+                // state back into cache, so the order alternates by delivery.
+                const auto trusted = [&] {
+                    timed(st, k.dtrecv.c_str(), [&] { ops.d_recv_trusted(c); });
+                    if (query_view(ops.d_held_trusted(c)) != q) throw std::runtime_error("D3 delta (trust tier): view differs from the application-level one");
+                };
+                const auto full = [&] {
+                    timed(st, k.drecv.c_str(), [&] { ops.d_recv(c); });
+                    if (query_view(ops.d_held(c)) != q) throw std::runtime_error("D3 delta: view differs from the application-level one");
+                };
+                if ((c + r) & 1) { full(); trusted(); } else { trusted(); full(); }
                 st.bytes[k.ddelta] += dd;
             }
             st.bytes[k.udelta] += n;

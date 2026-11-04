@@ -802,6 +802,7 @@ public:
         int64_t dtick = -1;
         std::vector<D3Conn> dconn;
         std::vector<D3Client> dcli;
+        std::vector<D3Client> dclt;   // the same clients in the trust tier (d_recv_trusted)
         std::vector<D3Op> dops;
         template <class T> using RD = XOffsetDatastructure::xsync::XRecordDelta<T>;
 
@@ -822,22 +823,26 @@ public:
             dconn.assign(std::size_t(vs.clients), {});
             dcli.clear();
             dcli.resize(std::size_t(vs.clients));
+            dclt.clear();
+            dclt.resize(std::size_t(vs.clients));
             dtick = w.tick_no();
             darena.clear();
         }
         // The client's view: its rect, reserved slots, the tiles under it
         // (zero until its key message fills them). Untimed, as n_view.
         void d_view(int c, const ViewRect& r) {
-            auto& L = dcli[std::size_t(c)];
-            L.view.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, held_cap()));
-            auto& v = L.view->template root<xm::ViewSnapshot>();
-            v.x0 = r.x0; v.y0 = r.y0; v.x1 = r.x1; v.y1 = r.y1;
-            v.units.reserve(std::size_t(nucap));
-            v.marches.reserve(std::size_t(nmcap));
-            L.span = tile_span(r.x0, r.y0, r.x1, r.y1);
-            v.tiles.resize(std::size_t(L.span.cols * L.span.rows));
+            for (D3Client* L : {&dcli[std::size_t(c)], &dclt[std::size_t(c)]}) {
+                L->view.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, held_cap()));
+                auto& v = L->view->template root<xm::ViewSnapshot>();
+                v.x0 = r.x0; v.y0 = r.y0; v.x1 = r.x1; v.y1 = r.y1;
+                v.units.reserve(std::size_t(nucap));
+                v.marches.reserve(std::size_t(nmcap));
+                L->span = tile_span(r.x0, r.y0, r.x1, r.y1);
+                v.tiles.resize(std::size_t(L->span.cols * L->span.rows));
+            }
         }
         xm::ViewSnapshot& d_held(int c) { return dcli[std::size_t(c)].view->template root<xm::ViewSnapshot>(); }
+        xm::ViewSnapshot& d_held_trusted(int c) { return dclt[std::size_t(c)].view->template root<xm::ViewSnapshot>(); }
 
         // Server memory in bytes (SLG_MEM report, untimed): what NP keeps per
         // connection (its view buffer, baseline copy, slot maps; the touch log
@@ -1029,6 +1034,71 @@ public:
             dstat_msgs += 1; dstat_total += double(dmsg.size());
 #endif
             return dmsg.size();
+        }
+        // Trust tier (susu 2026-11-04: server -> client over a trusted
+        // transport): the message header is admitted (magic, format, flags,
+        // stream and version), then every op is applied in one pass, with no
+        // check of ids or bodies. Same view layout and id index as d_recv.
+        void d_recv_trusted(int c) {
+            namespace xs = XOffsetDatastructure::xsync;
+            D3Client& L = dclt[std::size_t(c)];
+            const char* p = dmsg.data();
+            const char* const end = p + dmsg.size();
+            xs::XSyncHeader h;
+            p = xs::get_header(p, end, h);
+            if (!p) throw std::runtime_error("D3: bad header");
+            if (h.flags & xs::kFlagKey) { L.stream = h.stream; }
+            else if (h.version != L.version + 1) throw std::runtime_error("D3: version gap");
+            L.version = h.version;
+            xm::ViewSnapshot* v = &L.view->template root<xm::ViewSnapshot>();
+            const void* base = L.view->get_address();
+            for (uint32_t n = 0; n < h.count; ++n) {
+                const unsigned code = static_cast<unsigned char>(*p++);
+                uint32_t uid;
+                xs::get_varint(p, end, uid);
+                const int32_t id = int32_t(uid);
+                const unsigned kind = code & 3u;
+                switch (code >> 2) {
+                case kTRoot: {
+                    xm::D3Root root{v->request_id, v->tick};
+                    p = RD<xm::D3Root>::apply(p, root);
+                    v->request_id = root.request_id; v->tick = root.tick;
+                    break;
+                }
+                case kTUnit:
+                    if (kind == xs::change) p = RD<xm::ViewUnit>::apply(p, v->units[std::size_t(*L.uidx.find(id))]);
+                    else if (kind == xs::leave) {
+                        const int32_t s = *L.uidx.find(id);
+                        RD<xm::ViewUnit>::clear(v->units[std::size_t(s)]); L.uidx.erase(id); L.ufree.push_back(s);
+                    } else {
+                        int32_t s;
+                        if (!L.ufree.empty()) { s = L.ufree.back(); L.ufree.pop_back(); }
+                        else { s = L.usize++; v->units.resize(std::size_t(L.usize)); }
+                        *L.uidx.try_emplace(id).first = s;
+                        p = RD<xm::ViewUnit>::apply(p, v->units[std::size_t(s)]);
+                    }
+                    break;
+                case kTMarch:
+                    if (kind == xs::change) p = RD<xm::ViewMarch>::apply(p, v->marches[std::size_t(*L.midx.find(id))]);
+                    else if (kind == xs::leave) {
+                        const int32_t s = *L.midx.find(id);
+                        RD<xm::ViewMarch>::clear(v->marches[std::size_t(s)]); L.midx.erase(id); L.mfree.push_back(s);
+                    } else {
+                        int32_t s;
+                        if (!L.mfree.empty()) { s = L.mfree.back(); L.mfree.pop_back(); }
+                        else { s = L.msize++; v->marches.resize(std::size_t(L.msize)); }
+                        *L.midx.try_emplace(id).first = s;
+                        p = RD<xm::ViewMarch>::apply(p, v->marches[std::size_t(s)]);
+                    }
+                    break;
+                default: {
+                    const int32_t tx = id % kTiles - L.span.tx0, ty = id / kTiles - L.span.ty0;
+                    p = RD<xm::Tile>::apply(p, v->tiles[std::size_t(ty * L.span.cols + tx)]);
+                    break;
+                }
+                }
+                if (L.view->get_address() != base) { base = L.view->get_address(); v = &L.view->template root<xm::ViewSnapshot>(); }
+            }
         }
         // The client: check every op against its view (ids held or not, bodies
         // against their records), then apply. A rejected message changes nothing.
