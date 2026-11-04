@@ -235,8 +235,11 @@ native client builds (iOS, Android, Windows) sharing one library and one wire
 with the servers, became a core guarantee on 2026-11-04. Schema evolution
 (different schema versions on the two ends, since 3.2.0) is provided, see
 [SCHEMA_EVOLUTION.md](docs/SCHEMA_EVOLUTION.md). K9, native delta sync (send
-only the bytes that changed; the receiver merges them and, by default,
-verifies them), is a target: its API arrives in 3.3, and it becomes a guarantee once the conditions
-in the user guide are met. Receivers verify in full by default; an explicit
-trusted tier for trusted links (servers, storage) that skips the graph walk
-is planned for 3.4 and is never an entry point for untrusted input.
+only the bytes that changed; the receiver merges them into its copy), is a
+target: its API arrives in 3.3, and it becomes a guarantee once the conditions
+in the user guide are met. Receive checks come in three tiers (user guide
+section 8): today every receive entry point does the full check; 3.4 adds a
+trusted tier (default between servers and from server to client: header and
+hole-table bounds only, never for untrusted input) and a bounds tier (default
+for client uploads: reads stay in bounds, data is used read-only); modifying
+client data in place takes the full check.
