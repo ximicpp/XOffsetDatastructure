@@ -864,11 +864,12 @@ namespace XOffsetDatastructure {
         // reproduces identical bytes.
         template <typename Fn>
         void for_each_free_block(Fn&& fn) const {
-            if (!free_table_) return;
+            if (!free_table_ || free_table_->count == 0) return;
             const auto& table = *free_table_;
-            // Empty bins emit nothing, so visiting only nonempty bins in
-            // ascending order keeps the canonical order.
-            for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
+            // Empty bins emit nothing, so visiting only nonempty bins (of
+            // nonempty words) in ascending order keeps the canonical order.
+            for (auto words = table.nonempty_words; words != 0; words &= words - 1u) {
+                const auto word = static_cast<std::uint32_t>(std::countr_zero(words));
                 for (auto bits = table.nonempty[word]; bits != 0; bits &= bits - 1u) {
                     const auto bin = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
                     const auto bytes = (bin + 1u) * 8u;
@@ -899,12 +900,17 @@ namespace XOffsetDatastructure {
 
         // Writes free_block_count() little-endian entries.
         void write_free_blocks(char* out) const noexcept {
-            if (!free_table_) return;
+            // A reload keeps its emptied table (begin_reinit), so a save of a
+            // buffer with no holes often finds an empty table: only its count
+            // is read, not its index words, map or bins (lines nothing has
+            // touched since the reload).
+            if (!free_table_ || free_table_->count == 0) return;
             const auto& table = *free_table_;
             // for_each_free_block's order. A hole is {offset, bytes}, so one
             // little-endian word per entry with the bin's size in the high
             // half; the loop over a bin's offsets vectorizes.
-            for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
+            for (auto words = table.nonempty_words; words != 0; words &= words - 1u) {
+                const auto word = static_cast<std::uint32_t>(std::countr_zero(words));
                 for (auto bits = table.nonempty[word]; bits != 0; bits &= bits - 1u) {
                     const auto bin = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
                     const FreeBin& entries = table.bins[bin];
