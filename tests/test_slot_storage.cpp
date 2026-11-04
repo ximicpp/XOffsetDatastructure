@@ -172,7 +172,8 @@ void movable_grow() {
     need(b.save_verified<SlotRoot>() == wire_before, "same wire after the move");
 
     // The moved owner keeps allocating: the owner word moved with it.
-    // (save_verified shrank the logical size to used_end.)
+    // (Saves keep the logical size: shrink it to used_end first.)
+    b.shrink_to_fit();
     need(b.grow(1024), "room after save");
     b.root<SlotRoot>().labels.emplace_back() = std::string(300, 'z');
     need(b.root<SlotRoot>().labels.back() == std::string(300, 'z'), "allocation after move");

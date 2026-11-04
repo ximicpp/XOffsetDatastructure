@@ -79,8 +79,8 @@ bool throws(F&& f) {
 std::size_t composed_cases = 0;
 
 void check(Buffer& draft, Buffer& a, Buffer& b, const std::string& where) {
-    // save_verified (used by the references) normalizes the logical length
-    // first; after that nothing here may change any of the three buffers.
+    // Nothing here, save_verified (used by the references) included, may
+    // change any of the three buffers.
     (void)draft.save_verified(); (void)a.save_verified(); (void)b.save_verified();
     const auto draft_before = draft.copy_bytes();
     const auto a_before = a.copy_bytes();
