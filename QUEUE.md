@@ -1,6 +1,6 @@
 # Mac queue
 
-Updated 2026-11-04T00:15:21Z after 070-ckpt12: done 10 2026-11-04T00:15:18Z
+Updated 2026-11-04T00:23:32Z after 071-ckpt12b: running 2026-11-04T00:23:29Z
 
 ```
 runner: pid 4651 (version 2)
@@ -75,4 +75,5 @@ free: 34 GB on /Volumes/XOffsetCS, 34 GB on /Users/ximi
 068-ckpt11                               done 10 2026-11-03T19:25:03Z
 069-ck11x                                done 0 2026-11-03T19:33:29Z
 070-ckpt12                               done 10 2026-11-04T00:15:18Z
+071-ckpt12b                              running 2026-11-04T00:23:29Z
 ```
