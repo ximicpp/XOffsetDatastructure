@@ -119,6 +119,7 @@ public:
             timed(st, "A.res_encode", [&] { res = m->save_verified<BattleMsg>(); });
             timed(st, "A.res_decode", [&] {
                 prefetch_army_for_apply(att); prefetch_army_for_apply(def);
+                if (battle_writes_buffs()) prefetch_for_apply(pr);  // DIAGNOSTIC (CK14L pf)
                 r.emplace(XBuffer::load_verified<BattleMsg>(res, cap()));
             });
             timed(st, "A.apply", [&] {
@@ -226,7 +227,10 @@ public:
             recv<BattleMsg>(st, "A.req_decode", req_, a_m_);
             untimed(st, "A.simulate", [&] { simulate_battle(a_m_->root<BattleMsg>()); });
             timed(st, "A.res_encode", [&] { a_m_->save_verified_into<BattleMsg>(res_); });
-            timed(st, "A.res_decode", [&] { prefetch_army_for_apply(att); prefetch_army_for_apply(def); });
+            timed(st, "A.res_decode", [&] {
+                prefetch_army_for_apply(att); prefetch_army_for_apply(def);
+                if (battle_writes_buffs()) prefetch_for_apply(pr);  // DIAGNOSTIC (CK14L pf)
+            });
             recv<BattleMsg>(st, "A.res_decode", res_, a_r_);
             timed(st, "A.apply", [&] {
                 const auto& out = a_r_->root<BattleMsg>();
@@ -714,6 +718,16 @@ private:
         return p;
     }
     PlayerState& player(int i) { return players_[std::size_t(i)].template root<PlayerState>(); }
+    // DIAGNOSTIC (CK14L pf, branch claude/ck14l-pf-diag-20261104, never merged): the adapter of
+    // c4925fa7, dropped by 78992a7a because the demo cases' troop-only write-back does not
+    // allocate. With SLG_CASES unset (the L2 gate) A.apply also writes the heroes' buffs and
+    // allocates in the players' buffers, so the hint is sent only then.
+    void prefetch_for_apply([[maybe_unused]] const Pairing& pr) const {
+#if defined(XOFFSET_PREFETCH_FOR_UPDATE_API)
+        players_[std::size_t(pr.ap)].prefetch_for_update();
+        players_[std::size_t(pr.dp)].prefetch_for_update();
+#endif
+    }
     // Receive in the reuse protocol. Default: reload_verified copies the wire into the
     // slot's long-lived buffer and verifies it there. Direct ("xoffset_direct", the
     // "direct receive" column): begin_verified_receive reserves the final arena (from the
