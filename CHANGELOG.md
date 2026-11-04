@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- An in-place reload (`reload_verified`) or `reset<T>()` keeps the buffer's
+  free table, emptied, instead of releasing it to the per-thread cache of
+  four tables. Its holes, or the first retires after it, refill that table,
+  so no reload needs a fresh
+  12 KiB table however many other buffers the thread reloaded in between
+  (bench/slg login: each player's buffer is reloaded in turn and every
+  reload allocated and zeroed a table). Small-bin storage is kept within the
+  same limits as before. Hole tables, wire bytes and allocation decisions
+  are unchanged. Instructions, GCC 16, bench/slg (M, steady state): LD.apply
+  -7.0%.
 - Fixed messages (`xoffset_fixed_message.hpp`, experimental): a record with
   no arena container and no implicit padding (`is_fixed_message_v<T>`) is
   sent as its own bytes and read where it lies, without an XBuffer, an arena
