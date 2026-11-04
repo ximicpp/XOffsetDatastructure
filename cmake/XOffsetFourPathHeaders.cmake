@@ -17,6 +17,7 @@ set(XOFFSET_FULL_OWN_HEADERS
     xoffset_verified_receive.hpp
     xoffset_schema_names.hpp
     xoffset_handshake.hpp
+    xoffset_fixed_message.hpp
     xoffset_evolution.hpp
     xoffset_schema_freeze.hpp
     xoffset_delta.hpp

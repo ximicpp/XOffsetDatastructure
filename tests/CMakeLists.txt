@@ -180,6 +180,10 @@ foreach(test_name ${EVOLUTION_TESTS})
     add_xoffset_test(${test_name} "reflection;evolution")
 endforeach()
 
+# Fixed messages (xoffset_fixed_message.hpp): records with no arena
+# container, sent as their own bytes and read in place.
+add_xoffset_test(test_fixed_message reflection)
+
 # Server side (xoffset_evolution.hpp, xoffset_schema_freeze.hpp): reflection
 # backend only.
 if(XOFFSET_TESTS_REFLECTION)
@@ -251,6 +255,7 @@ set(NO_EXCEPTIONS_TESTS
     test_xstring_direct_assign
     test_schema_handshake
     test_delta_sync
+    test_fixed_message
 )
 foreach(test_name ${NO_EXCEPTIONS_TESTS})
     if(NOT XOFFSET_TESTS_REFLECTION AND test_name IN_LIST XOFFSET_CXX26_ONLY_TESTS)
