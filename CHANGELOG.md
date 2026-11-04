@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Fixed messages (`xoffset_fixed_message.hpp`, experimental): a record with
+  no arena container and no implicit padding (`is_fixed_message_v<T>`) is
+  sent as its own bytes and read where it lies, without an XBuffer, an arena
+  or a wire header. The schema handshake binds the type once per connection;
+  a batch carries an 8-byte header {count, tag}. A view checks the size, the
+  alignment, the batch tag and the bytes of every bool. Nothing throws or
+  allocates. Instructions per packet (cloud, 40-byte records,
+  `bench/fixedmsg`): encode within 1 to 8 of a hand-written struct and read
+  within 5 to 8; against the same records in an XOffset root, encode 6 to 12
+  times fewer and read 1.7 to 6 times fewer.
 - Pre-release fuzz replaces nightly fuzz (K4; susu 2026-11-04):
   `tools/fuzz_prerelease.sh` runs one ASan+UBSan round over every receive
   entry point before each release, in phases (`gcc`, `libfuzzer`, `client`,
@@ -22,7 +32,6 @@
   `load_verified_with_resource` (validation bitmaps from a small monotonic
   resource) and require the verdict, message and payload of
   `load_verified`.
-
 - Verified saves of a buffer whose root was admitted at the current epoch
   (`make<T>()`, `reset<T>()`, a verified load) take the root from the
   cache `root<T>()` uses and skip the typed-access and schema checks and
