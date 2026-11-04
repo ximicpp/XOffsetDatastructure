@@ -773,7 +773,10 @@ private:
         page_size_ = reservation_granularity_ = 0;
     }
 
+    // data() and size() first: every access reads them together, and an
+    // owner that embeds this storage keeps its own hot fields next to them.
     char* base_{nullptr};
+    std::size_t logical_bytes_{0};
     std::byte* canonical_byte_origin_{nullptr};
     std::size_t reserved_bytes_{0};
     // Mapped payload span: reserved_bytes_ rounded up to whole owner-map
@@ -781,7 +784,6 @@ private:
     std::size_t mapped_bytes_{0};
     std::size_t maximum_capacity_{0};
     std::size_t accessible_bytes_{0};
-    std::size_t logical_bytes_{0};
     // Lowest offset from which every reserved byte is known to be OS-zero.
     // Invariant: zero_from_ >= logical_bytes_ while the mapping is owned.
     std::size_t zero_from_{0};
