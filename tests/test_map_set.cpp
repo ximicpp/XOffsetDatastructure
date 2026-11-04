@@ -5,6 +5,11 @@
 
 #include <iostream>
 #include <cassert>
+#include <cstdint>
+#include <cstdio>
+#include <map>
+#include <set>
+#include <string>
 #include "test_allocator_ctors.hpp"
 
 using namespace XOffsetDatastructure;
@@ -115,6 +120,56 @@ bool test_map_set_operations() {
     assert(loaded_obj.stringMap.size() == 15);
     std::cout << "[OK]\n";
     
+    // Test 9: inserts in every order against std::set / std::map. Keys in
+    // ascending order take the append path (one compare with the last key);
+    // a key equal to the last, below it, or in between takes the search.
+    std::cout << "Test 9: Insert order model... ";
+    {
+        XBuffer order_buf(1 << 20);
+        auto* o = order_buf.make<MapSetTest>();
+        std::set<int> model_set;
+        std::map<int, std::string> model_map;
+        std::set<std::string> model_strings;
+        std::uint32_t state = 12345u;
+        auto next = [&] { state = state * 1103515245u + 12345u; return int((state >> 8) % 600u); };
+        auto same = [&] {
+            if (o->intSet.size() != model_set.size() || o->intMap.size() != model_map.size() ||
+                o->stringSet.size() != model_strings.size()) return false;
+            auto s = model_set.begin();
+            for (int v : o->intSet) if (v != *s++) return false;
+            auto m = model_map.begin();
+            for (const auto& kv : o->intMap) { if (kv.first != m->first || kv.second != m->second.c_str()) return false; ++m; }
+            auto t = model_strings.begin();
+            for (const auto& v : o->stringSet) if (v != t->c_str()) return false; else ++t;
+            return true;
+        };
+        for (int step = 0; step < 900; ++step) {
+            int key;
+            switch (step % 6) {
+            case 0: key = model_set.empty() ? 0 : *model_set.rbegin() + 1 + next() % 3; break; // append
+            case 1: key = model_set.empty() ? 0 : *model_set.rbegin(); break;                 // equal to last
+            case 2: key = model_set.empty() ? 0 : *model_set.begin() - 1; break;              // below all
+            default: key = next(); break;                                                      // anywhere
+            }
+            const std::string value = "V" + std::to_string(key);
+            const bool set_new = o->intSet.insert(key).second;
+            if (set_new != model_set.insert(key).second) return false;
+            const bool map_new = o->intMap.try_emplace(key, value.c_str()).second;
+            if (map_new != model_map.try_emplace(key, value).second) return false;
+            char name[16];
+            std::snprintf(name, sizeof name, "k%06d", key + 1000);
+            if (o->stringSet.emplace(name).second != model_strings.insert(name).second) return false;
+            if (step % 50 == 0 && !same()) return false;
+        }
+        if (!same()) return false;
+        o->intMap[*model_set.rbegin() + 7] = "tail";
+        model_map[*model_set.rbegin() + 7] = "tail";
+        o->intMap[*model_set.begin()] = "head";
+        model_map[*model_set.begin()] = "head";
+        if (!same()) return false;
+    }
+    std::cout << "[OK]\n";
+
     std::cout << "[PASS] All map/set tests passed!\n";
     return true;
 }

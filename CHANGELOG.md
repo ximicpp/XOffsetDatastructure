@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- `XMap::try_emplace` (and `operator[]`, `emplace`, `insert_or_assign` on a
+  new key) and `XSet::insert` append a key greater than the last one after
+  one compare instead of a binary search; any other key searches all but
+  the last element. Copying or rebuilding a map in key order is now linear.
+  Contents, layout and allocation are unchanged. Instructions, GCC 16,
+  bench/slg demo (M): LD.apply -24%, LD.send -20%, SD.save_encode -27%.
 - `bench/hft` (record only): the HFT demo, phase 1. A Nasdaq ITCH window
   (2019-01-30 09:30-09:40, not committed) drives a feed handler, a ring of
   fixed messages read by 4 strategies, a state service keeping the 64
