@@ -1,0 +1,6 @@
+[ 50%] Building CXX object CMakeFiles/consumer.dir/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/tests/test_dense_image.cpp.o
+clang++: warning: -Wl,-rpath,/Users/netease/XOffsetDatastructure-20261027/runtime-v2/lib: 'linker' input unused [-Wunused-command-line-argument]
+clang++: warning: argument unused during compilation: '-L/Users/netease/XOffsetDatastructure-20261027/runtime-v2/lib' [-Wunused-command-line-argument]
+[100%] Linking CXX executable consumer
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Users/netease/XOffsetDatastructure-20261027/runtime-v2/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[100%] Built target consumer

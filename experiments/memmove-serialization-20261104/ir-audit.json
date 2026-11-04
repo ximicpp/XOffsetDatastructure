@@ -1,0 +1,35 @@
+{
+  "define noundef range(i64 0, 256) i64 @_Z11packed_copyRKN20XOffsetDatastructure10PackedWireI9BenchRootEENSt3__14spanISt4byteLm18446744073709551615EEE(ptr noundef nonnull align 1 %0, [2 x i64] %1) local_unnamed_addr #10 {": {
+    "lines": 10,
+    "memory_ops": [],
+    "calls": [
+      "tail call void @_ZN20XOffsetDatastructure16copy_packed_intoI9BenchRootEEvRKNS_10PackedWireIT_EENSt3__14spanISt4byteLm18446744073709551615EEE(ptr noundef nonnull align 1 %0, [2 x i64] %1)",
+      "tail call void asm sideeffect \"\", \"r,~{memory}\"(ptr %4) #26, !srcloc !110"
+    ]
+  },
+  "define noundef i64 @_Z10image_copyRKN20XOffsetDatastructure10PackedWireI9BenchRootEERNS_5image17PreparedImageSlotIS1_EE(ptr noundef nonnull align 1 %0, ptr noundef nonnull align 1 %1) local_unnamed_addr #10 personality ptr @__gxx_personality_v0 {": {
+    "lines": 80,
+    "memory_ops": [],
+    "calls": [
+      "call void @llvm.lifetime.start.p0(i64 32, ptr nonnull %3) #26",
+      "call void @_ZN20XOffsetDatastructure5image15copy_image_intoI9BenchRootEENS0_9ImageViewIT_EERKNS_10PackedWireIS4_EERNS0_17PreparedImageSlotIS4_EE(ptr dead_on_unwind nonnull writable sret(%\"class.XOffsetDatastructure::image::ImageView\") align 8 %3, ptr noundef nonnull align 1 %0, ptr noundef nonnull align 1 %1)",
+      "call void asm sideeffect \"\", \"r,~{memory}\"(ptr %9) #26, !srcloc !119",
+      "%13 = call ptr @__cxa_allocate_exception(i64 16) #26",
+      "%14 = invoke noundef ptr @_ZNSt13runtime_errorC2EPKc(ptr noundef nonnull align 8 dereferenceable(16) %13, ptr noundef nonnull @.str.52)",
+      "invoke void @__cxa_throw(ptr nonnull %13, ptr nonnull @_ZTIN20XOffsetDatastructure10XExceptionE, ptr nonnull @_ZN20XOffsetDatastructure10XExceptionD1Ev) #33",
+      "call void @__cxa_free_exception(ptr nonnull %13) #26",
+      "call void %37(ptr noundef nonnull align 8 dereferenceable(24) %28) #26",
+      "call void @_ZNSt3__119__shared_weak_count14__release_weakEv(ptr noundef nonnull align 8 dereferenceable(24) %28) #26",
+      "call void @llvm.lifetime.end.p0(i64 32, ptr nonnull %3) #26",
+      "%43 = call noundef ptr @_ZN20XOffsetDatastructure5image9ImageViewI9BenchRootED1Ev(ptr noundef nonnull align 8 dereferenceable(32) %3) #26",
+      "call void @llvm.lifetime.end.p0(i64 32, ptr nonnull %3) #26"
+    ]
+  },
+  "define void @_Z10seal_imageRN20XOffsetDatastructure5image12ImageBuilderI9BenchRootEE(ptr dead_on_unwind noalias writable sret(%\"class.XOffsetDatastructure::PackedWire\") align 8 %0, ptr noundef nonnull align 8 dereferenceable(32) %1) local_unnamed_addr #10 {": {
+    "lines": 4,
+    "memory_ops": [],
+    "calls": [
+      "tail call void @_ZNO20XOffsetDatastructure5image12ImageBuilderI9BenchRootE4sealEv(ptr dead_on_unwind writable sret(%\"class.XOffsetDatastructure::PackedWire\") align 8 %0, ptr noundef nonnull align 8 dereferenceable(32) %1)"
+    ]
+  }
+}

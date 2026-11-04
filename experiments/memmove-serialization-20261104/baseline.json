@@ -1,0 +1,17 @@
+{
+  "head": "631d6f85520dcd2f40f880a122de38c5dba1dace",
+  "status": "?? docs/MEMMOVE_SERIALIZATION_PLAN_20261104.md\n",
+  "platform": "macOS-26.4.1-arm64-arm-64bit",
+  "machine": "arm64",
+  "files": {
+    "xoffsetdatastructure.hpp": "c4999e76010d419d231428dd262a329f7ea1d475f9cb4db602572fa8c0c75341",
+    "xoffset_verified_paths.hpp": "7e7ebb0f47eb200e708403e1fa22011b368e156a163b5b1765f4e7c5b96349f9",
+    "xoffset_verified_receive.hpp": "af433508e9878d98b306da7485ecf7279f8a3b67d1b1fe66ab36dc3fafa9b30b",
+    "receive_raw.hpp": "cdb28a6a58c1ea701baa850537ea22da80495736756d73050c47cef39fe8386d",
+    "xoffset_core_lifetime.hpp": "d671cdee313027a1b794ee80b0ad320a93c33a712260ad929b68bc693ef1a5fd",
+    "cmake/XOffsetFourPathHeaders.cmake": "1888f03e76e1efbcfdd892e0ef36c7f78f0294f0dd3c311ca289354f2c7a10cc",
+    "cmake/XOffsetFourPathTests.cmake": "2a1acabceed58dfaf960767049db7c31a30f546db350752a38c2e319d5152e74"
+  },
+  "compiler": "clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git 9ffb96e3ce362289008e14ad2a79a249f58aa90a)\nTarget: arm64-apple-darwin25.4.0\nThread model: posix\nInstalledDir: /Users/netease/XOffsetDatastructure-20261027/toolchain-build/bin\n",
+  "sdk": "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
+}

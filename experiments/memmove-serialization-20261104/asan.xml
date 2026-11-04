@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="(empty)"
+	tests="8"
+	failures="1"
+	disabled="0"
+	skipped="0"
+	hostname=""
+	time="14"
+	timestamp="2026-11-04T22:14:45"
+	>
+	<testcase name="test_wire_validation" classname="test_wire_validation" time="0.87455" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>Wire mutation sweep: 237 rejected, 403 mutable; 147 targeted V2.1 rejections
+</system-out>
+	</testcase>
+	<testcase name="test_v2_fuzz" classname="test_v2_fuzz" time="6.28543" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>test_v2_fuzz: seed=20261021 golden=96 sparse=15 cases=4000 boundary_cases=1505 accepted=763 header_rejects=1966 payload_rejects=2776 sparse_vs_dense=1328 composed=763 cursor_off_compared=5505 small_reload_compared=5505 small_reload_eligible=3054 inconsistencies=0
+</system-out>
+	</testcase>
+	<testcase name="test_clone" classname="test_clone" time="1.1422" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>test_clone passed
+</system-out>
+	</testcase>
+	<testcase name="test_verified_paths" classname="test_verified_paths" time="1.11224" status="fail">
+		<failure message="Failed"/>
+		<properties>
+			<property name="cmake_labels" value="four-paths;reflection"/>
+		</properties>
+		<system-out>new API output OOM changed value/source before normalization
+</system-out>
+	</testcase>
+	<testcase name="test_core_lifetime" classname="test_core_lifetime" time="1.34727" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>core lifetime: six semantic groups passed; no timing claim
+</system-out>
+	</testcase>
+	<testcase name="test_receive_raw" classname="test_receive_raw" time="1.12385" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>receive raw: source tests completed
+</system-out>
+	</testcase>
+	<testcase name="test_verified_receive" classname="test_verified_receive" time="1.18568" status="run">
+		<properties>
+			<property name="cmake_labels" value="reflection"/>
+		</properties>
+		<system-out>verified receive: seven groups, token/canonical/raw/custom/lifetime/rollback/growth/cancel/newhandler/V2 hole table/sparse passed
+</system-out>
+	</testcase>
+	<testcase name="test_dense_image" classname="test_dense_image" time="1.22724" status="run">
+		<properties>
+			<property name="cmake_labels" value="memmove;reflection"/>
+		</properties>
+		<system-out>dense export / immutable image proxy contracts passed
+</system-out>
+	</testcase>
+</testsuite>

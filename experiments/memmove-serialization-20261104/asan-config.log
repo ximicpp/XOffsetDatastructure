@@ -1,0 +1,103 @@
+-- The CXX compiler identification is Clang 21.0.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /Users/netease/XOffsetDatastructure-20261027/toolchain-v3/bin/clang++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Using C++26 with reflection
+CMake Error at cmake/XOffsetBuildChecks.cmake:63 (message):
+  Full-library reflection compile/link probe failed.  Use a P2996 Clang
+  toolchain with matching libc++, Boost and TypeLayout, or configure
+  -DXOFFSET_STORAGE_ONLY=ON for the independent C++17 OS layer.
+
+  See
+  /Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/asan-v1/compile-checks/reflection.log
+
+  Change Dir:
+  '/Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/asan-v1/compile-checks/reflection/CMakeFiles/CMakeTmp'
+
+
+
+  Run Build Command(s):
+  /Users/netease/XOffsetDatastructure-20261027/.venv/lib/python3.11/site-packages/cmake/data/bin/cmake
+  -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_cc924/fast
+
+  /Applications/Xcode.app/Contents/Developer/usr/bin/make -f
+  CMakeFiles/cmTC_cc924.dir/build.make CMakeFiles/cmTC_cc924.dir/build
+
+  Building CXX object CMakeFiles/cmTC_cc924.dir/reflection_probe.cpp.o
+
+  /Users/netease/XOffsetDatastructure-20261027/toolchain-v3/bin/clang++
+  -isystem
+  /Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/container/include
+  -isystem
+  /Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/core/include
+  -isystem
+  /Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/config/include
+  -isystem
+  /Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/throw_exception/include
+  -isystem
+  /Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/static_assert/include
+  -isystem
+  /Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/container_hash/include
+  -isystem
+  /Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/type_traits/include
+  -isystem
+  /Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/winapi/include
+  -isystem
+  /Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/intrusive/include
+  -isystem
+  /Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/boost/libs/predef/include
+  -isystem
+  /Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/external/typelayout/include
+  -isystem
+  /Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027
+  -fsanitize=address,undefined -fno-sanitize-recover=undefined
+  -fno-omit-frame-pointer -std=gnu++26 -arch arm64 -isysroot
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+  -std=c++26 -freflection -fexpansion-statements -stdlib=libc++ -MD -MT
+  CMakeFiles/cmTC_cc924.dir/reflection_probe.cpp.o -MF
+  CMakeFiles/cmTC_cc924.dir/reflection_probe.cpp.o.d -o
+  CMakeFiles/cmTC_cc924.dir/reflection_probe.cpp.o -c
+  /Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/cmake/reflection_probe.cpp
+
+  clang++: warning:
+  -Wl,-rpath,/Users/netease/XOffsetDatastructure-20261027/runtime-v2/lib:
+  'linker' input unused [-Wunused-command-line-argument]
+
+  clang++: warning: argument unused during compilation:
+  '-L/Users/netease/XOffsetDatastructure-20261027/runtime-v2/lib'
+  [-Wunused-command-line-argument]
+
+  In file included from
+  /Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/cmake/reflection_probe.cpp:1:
+
+  In file included from
+  /Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/xoffsetdatastructure.hpp:58:
+
+  In file included from
+  /Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/xoffset_virtual_memory.hpp:28:
+
+  
+  /Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/xoffset_slot_storage.hpp:52:12:
+  fatal error: 'sanitizer/asan_interface.h' file not found
+
+     52 | #  include <sanitizer/asan_interface.h>
+        |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  1 error generated.
+
+  make[1]: *** [CMakeFiles/cmTC_cc924.dir/reflection_probe.cpp.o] Error 1
+
+  make: *** [cmTC_cc924/fast] Error 2
+
+
+
+Call Stack (most recent call first):
+  CMakeLists.txt:72 (xoffset_require_reflection)
+
+
+-- Configuring incomplete, errors occurred!

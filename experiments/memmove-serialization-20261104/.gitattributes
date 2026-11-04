@@ -1,0 +1,3 @@
+# Immutable captured output preserves its original whitespace.
+*.log -whitespace
+*.xml -whitespace

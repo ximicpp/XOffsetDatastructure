@@ -1,0 +1,7 @@
+[  0%] Building CXX object tests/CMakeFiles/test_dense_image.dir/test_dense_image.cpp.o
+clang++: warning: -Wl,-rpath,/Users/netease/XOffsetDatastructure-20261027/runtime-v2/lib: 'linker' input unused [-Wunused-command-line-argument]
+clang++: warning: argument unused during compilation: '-L/Users/netease/XOffsetDatastructure-20261027/runtime-v2/lib' [-Wunused-command-line-argument]
+[100%] Linking CXX executable ../bin/Release/test_dense_image
+ld: warning: search path '/Users/netease/XOffsetDatastructure-20261027/toolchain-v3/lib' not found
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Users/netease/XOffsetDatastructure-20261027/runtime-v2/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[100%] Built target test_dense_image

@@ -1,0 +1,17 @@
+-- The CXX compiler identification is Clang 21.0.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /Users/netease/XOffsetDatastructure-20261027/toolchain-v3/bin/clang++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Using C++26 with reflection
+-- Full-library reflection compile/link probe passed
+-- Polymorphic positive control passed; expected rejection diagnostic verified
+-- CTest inventory: 90 test programs + 16 subprocess scenarios + 0 tooling checks = 106; 3 configure checks listed separately
+-- Test inventory: /Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/asan-v2/test-inventory.json
+-- Configuring done (3.0s)
+-- Generating done (0.2s)
+-- Build files have been written to: /Users/netease/XOffsetDatastructure-20261027/development/next-cpp26-latest-20261027/experiments/memmove-serialization-20261104/asan-v2

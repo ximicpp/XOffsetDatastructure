@@ -1,0 +1,23 @@
+{
+  "processes_per_phase": 12,
+  "blocks_per_process": 12,
+  "ordering": "forward/reverse alternates by block and process; all cases in fixed order",
+  "pages": "preallocated and touched; warmup 64 operations per mode; hot pages only",
+  "a_a_gate": "95% two-sided process CI within [0.97,1.03]; small-message absolute difference CI within +/-15ns",
+  "ratio_gate": "per-case process-paired one-sided95 upper <=1.10 for >=64KiB",
+  "small_gate": "one-sided95 upper of extra latency <=50ns for <=4KiB",
+  "comparison": "12 AA processes then 12 comparison processes; fixed budget. Comparisons for failed AA cases are diagnostic only; no retries or extra samples",
+  "borrowed_baseline": "raw_borrowed writes the identical destination as BorrowedImageBuffer",
+  "image_baseline": "raw_slot writes the identical destination as image; packed/dense use raw_a destination",
+  "candidate_change": "BorrowedImageBuffer: exclusive owner, borrowed child views invalidated by reload/move/destruction; caller excludes concurrent access and stale borrows. The checked ImageView interface is retained. New window; no pooling with v1.",
+  "scope": "same-process immutable provenance; proxy contract differs from native mutable verified API; preparation and query costs reported separately",
+  "identity": {
+    "xoffsetdatastructure.hpp": "c4999e76010d419d231428dd262a329f7ea1d475f9cb4db602572fa8c0c75341",
+    "xoffset_dense_export.hpp": "362085f763021b3e22bc0da633bf9ee7feb455b7eee92d9c1b8648607410a7a8",
+    "xoffset_image_view.hpp": "06916e23742968292210b267805a72cc233ddef7693259763e3f31b1179d7d82",
+    "xoffset_image_builder.hpp": "f23c17d4346e93d22d1fb4c9256e6bf045d6cc2032c37b84c2d88e6d8bbcf19f",
+    "experiments/memmove-serialization-20261104/bench_borrowed.cpp": "cf913a83cf2e210db46bc6e862ee4fa6d1a329c06609055fb4c4dfeae26dc785",
+    "experiments/memmove-serialization-20261104/campaign_borrowed.py": "919f3c9c08650959f71b79c08dce8008d7fb0505248f570a4519ad452bf5762d",
+    "experiments/memmove-serialization-20261104/perf-borrowed/bin/Release/bench_borrowed": "33d3cf103336c03d15cabe66cc51ca62276682a8862024be06095e76fc006447"
+  }
+}
