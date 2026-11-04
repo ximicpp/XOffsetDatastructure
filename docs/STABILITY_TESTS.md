@@ -27,7 +27,7 @@ K0–K8 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 | | | `test_mutation_failures`、`test_allocator_failures` | 分配失败时单次修改是原子的 |
 | K3 | 独立输出：`save_verified` 发出调用方独占的副本，发完可以继续改 | `test_stability_contract`（K3 部分） | 保存后修改、扩容、清空、销毁源 buffer，已发出的 wire 不变且仍能加载出原内容 |
 | | | `test_verified_paths` | `save_verified_into` 与源存储不重叠、回调中换主人时拒绝 |
-| K4 | 接收时默认完整结构校验，截断、越界、重叠、未铺满、非法值、schema 不符一律拒绝（可信链路显式跳过校验的信任档是 3.4 计划，不是不可信输入的入口） | `test_wire_validation`、`test_validation_granules` | 恶意偏移、容器头、空洞表、payload 元数据在解引用前被拒绝 |
+| K4 | 接收检查分三档；完整档的结构校验对截断、越界、重叠、未铺满、非法值、schema 不符一律拒绝（信任档、边界档的接口 3.4 加入，测试随接口一起加） | `test_wire_validation`、`test_validation_granules` | 恶意偏移、容器头、空洞表、payload 元数据在解引用前被拒绝 |
 | | | `test_v2_fuzz` | 独立规格 oracle 与 `load_verified`、`receive_raw::validate`、verified receive、`reload_verified`、直接接收复用槽（`begin_verified_reload`）对变异 wire 的接受/拒绝一致；直接接收中途中止、少报长度、声明长度与头不符一律拒绝 |
 | | | `fuzz_v2_wire_replay`、`fuzz_wire_schemas_replay`（含 `_corpus`） | 两个 libFuzzer harness 不带 libFuzzer 编译，回放 `tests/fuzz/regressions/` 的崩溃输入和各自的种子语料；ci.yml 的每个作业（P2996 Clang、GCC 16、两种 sanitizer、arm64、Windows）都包含它们，Actions 停用期间由全量 CTest 和每日长跑（GCC 16 ASan+UBSan）执行 |
 | | | `test_receive_raw`、`test_verified_receive`、`test_reload_reset` | 原始接收、分段接收与直接接收复用槽路径 |
@@ -55,7 +55,7 @@ K0–K8 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 
 ## 目标 K9（尚未承诺）：原生增量同步
 
-只发改过的字节，接收方合并后默认完整校验（API 3.3 加入）。升为核心承诺前要有：增量 apply 的拒绝用例和随机流
+只发改过的字节，接收方合并后按链路的档检查（API 3.3 加入）。升为核心承诺前要有：增量 apply 的拒绝用例和随机流
 测试（`test_delta_sync`，含关异常构建）、增量 apply 的发版前 ASan fuzz、增量 wire 1.0 冻结的金标准测试。
 条件全文见 [USER_GUIDE.md](USER_GUIDE.md) 第 8 节。
 
@@ -72,7 +72,7 @@ K0–K8 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
   等价的稠密 wire 再校验，因为各版本接受的稀疏写法可以不同（0.3.0-beta.2 起 gap 字节不必落在空洞里）。
   同一版本内"稀疏 wire 与其稠密等价物结果相同"由 `test_v2_fuzz` 检查。
 - K4 的发版前 fuzz（2026-11-04 起；每晚长跑自 2026-10-28 停，不再恢复）：每次发版前在云端对每个接收入口
-  （含增量 apply；信任档入口落地后也包括它们）跑一轮 ASan+UBSan fuzz，无发现才发版（[RELEASING.md](RELEASING.md)）。用的是下面这些脚本。
+  （信任、边界、完整三档，含增量 apply）跑一轮 ASan+UBSan fuzz，无发现才发版（[RELEASING.md](RELEASING.md)）。用的是下面这些脚本。
 - K4 的长跑工具（威胁模型 F4）：`tools/fuzz_nightly.sh` 在云端 Docker 主机上运行 GCC 16
   ASan+UBSan 差分 fuzz（`test_v2_fuzz`，4 个 seed，约 45 分钟）和回归语料回放；发现崩溃时
   `tools/fuzz_report.py` 按签名开 `fuzz-crash` issue 并推出 `fuzz-crash/<签名>` 分支。结果
