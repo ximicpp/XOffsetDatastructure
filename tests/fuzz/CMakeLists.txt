@@ -59,6 +59,29 @@ add_test(NAME fuzz_wire_schemas_smoke
 set_tests_properties(fuzz_wire_schemas_smoke PROPERTIES
     LABELS "fuzz" FIXTURES_REQUIRED fuzz_wire_schemas_seeds)
 
+# Delta sync receiver (xoffset_delta.hpp): try_apply_delta_verified against
+# the full verification of a cloned replica; the first byte picks schema and
+# mode. Seeds come from the replay build (--write-seeds).
+add_executable(fuzz_delta_sync fuzz_delta_sync.cpp)
+configure_xoffset_target(fuzz_delta_sync)
+xoffset_enable_test_assertions(fuzz_delta_sync)
+target_compile_options(fuzz_delta_sync PRIVATE -fsanitize=fuzzer)
+target_link_options(fuzz_delta_sync PRIVATE -fsanitize=fuzzer)
+target_link_libraries(fuzz_delta_sync PRIVATE ${XOFFSET_FUZZER_LINK_LIBS})
+if(XOFFSET_FUZZ_INJECT_CRASH)
+    target_compile_definitions(fuzz_delta_sync PRIVATE XOFFSET_FUZZ_INJECT_CRASH)
+endif()
+set(XOFFSET_FUZZ_DELTA_SEEDS "${CMAKE_CURRENT_BINARY_DIR}/seeds/delta_sync")
+add_test(NAME fuzz_delta_sync_seeds
+    COMMAND $<TARGET_FILE:fuzz_delta_sync_replay> --write-seeds "${XOFFSET_FUZZ_DELTA_SEEDS}")
+set_tests_properties(fuzz_delta_sync_seeds PROPERTIES
+    LABELS "fuzz" FIXTURES_SETUP fuzz_delta_sync_seeds)
+add_test(NAME fuzz_delta_sync_smoke
+    COMMAND $<TARGET_FILE:fuzz_delta_sync> -seed=1 -runs=20000 -max_len=65536
+            -rss_limit_mb=2048 -timeout=30 "${XOFFSET_FUZZ_DELTA_SEEDS}")
+set_tests_properties(fuzz_delta_sync_smoke PROPERTIES
+    LABELS "fuzz" FIXTURES_REQUIRED fuzz_delta_sync_seeds)
+
 # Schema evolution (xoffset_evolution.hpp): receive of every lineage version,
 # send to every version, handshake; the first input byte picks the mode.
 # Server side: reflection backend only.
