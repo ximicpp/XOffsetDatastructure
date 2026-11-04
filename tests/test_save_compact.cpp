@@ -90,7 +90,7 @@ void check(Buffer& b, const std::string& where) {
     // The canonical wire is never larger than the dense one.
     need(wire.size() <= b.save_verified().size(), where + ": compact wire larger than dense");
 
-    // save_verified above may shrink the logical length (normalization).
+    // save_verified above leaves the source as it was.
     const auto before_slack = b.copy_bytes();
     const auto size_slack = b.get_size();
     const auto slack = b.save_compact();
