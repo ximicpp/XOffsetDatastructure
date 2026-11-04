@@ -106,12 +106,31 @@ template <class A> void prefetch_army_for_apply(const A& a) {
     if (!a.buffs.empty()) __builtin_prefetch(&a.buffs[0], 1);
 }
 
+// Memory (scoring V3, 2026-11-04, report only; --mode mem): a build with
+// -DSLG_MEMCOUNT=1 counts the live heap bytes of every operator new (the same
+// counter for every format, on every platform; malloc's own overhead is not
+// counted). Other builds return -1 and --mode mem refuses to run.
+#if SLG_MEMCOUNT
+std::int64_t mem_live();
+#else
+inline std::int64_t mem_live() { return -1; }
+#endif
+// Heap bytes a deep copy of v allocates (what v holds on the heap, plus the
+// elements of a container).
+template <class T> std::int64_t heap_bytes(const T& v) {
+    const std::int64_t a = mem_live();
+    const T copy(v);
+    return mem_live() - a;
+}
+
 struct Runner {
     virtual ~Runner() = default;
     virtual std::string name() const = 0;
     virtual void setup(const Scale& sc, uint64_t seed) = 0;
     virtual void run_cycle(int cycle, CycleStats& st, SampleWires* keep) = 0;
     virtual uint64_t world_digest() = 0;
+    // Memory keys (bytes, MEM.*), after the cycles of --mode mem; untimed.
+    virtual void memory(CycleStats&) {}
 };
 
 // SLG_REUSE=1 selects the reuse protocol for every format: one long-lived
