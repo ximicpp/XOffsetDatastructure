@@ -1,0 +1,11 @@
+t0 fe8c07437224d9462f407cd115eae18a3972a829 tree d4f4865f4f4c657f8dd768c95d25fcf983175471 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (next_cpp26 fe8c0743 (#191 merged; base of PR #222))
+t1 60288a20ca1adcb72ca0d829f65cdd65191d30f5 tree 603eb7583850e3ee001875ffd433ff37afe11fc3 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (CKPT19 head (PR #222 payload coloring 60288a20))
+t1: diff over t0 sha256 3adbb22cbfa41f477d6b4f11323f815257933642b32dfe1bc27199cedfe46acc ( 6 files changed, 234 insertions(+), 91 deletions(-))
+t1: library header diff over t0:  1 file changed, 45 insertions(+), 27 deletions(-)
+t1: first-parent commits over t0:
+  60288a20 Color payload starts so many buffers do not share TLB sets
+bench/reloc of t1: same tree as t0
+reloc_bench t0 sha256 5d3a5f4b2d326c7cbaa036b8c53d31a776b1a4fd674c8ecd20794add4813f531
+reloc_bench t1 sha256 7ac6d5cc6ed3871ef9304ad4c81b628167b9c72fa40c1f6a1c56e40f0f9e66f9
+reloc_bench t0a sha256 6fa9ff1605a6e8edffb26f903f8afb0b6da9714d55e303986704d466811888f6
+reloc_bench t1a sha256 721c57aee1ed290104285d7066e0a51553b051894f22553f76d2c317266d944a
