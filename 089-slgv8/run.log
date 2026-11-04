@@ -1,0 +1,81 @@
+== 2026-11-04T19:25:05Z 0. tools
+cmake version 4.4.4
+1.13.2
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+== 2026-11-04T19:25:05Z 1. source
+source: tree 3b7d35752cf8fe63f2cb8484336145d06fc6c461 (export of 059b6a5ffdc8da9c25424a0c932f780e97a43d18)
+/Volumes/XOffsetCS/perf-gate/src/slgv8/bench/slg/MANIFEST: 25 files match
+== 2026-11-04T19:25:10Z 2. build
+-- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+slg_bench sha256 e0773338871b29f0d1f4428bae4bd49f113c1930ce65be1fc353c07dd736fca4
+== 2026-11-04T19:25:41Z 3. verify
+default mode: cycle 2 xoffset      state=0439e37815b4d22a reports=2128166416352
+== 2026-11-04T19:26:16Z 4. timing
+2026-11-04T19:37:17Z process 1 app done: 1793820740..1793821037 (297 s) load 2.25
+2026-11-04T19:38:39Z process 1 native done: 1793821067..1793821119 (52 s) load 2.14
+merged 12769 app lines + 712 native lines
+2026-11-04T19:44:09Z process 2 app done: 1793821150..1793821449 (299 s) load 1.72
+2026-11-04T19:45:32Z process 2 native done: 1793821479..1793821532 (53 s) load 1.57
+merged 12769 app lines + 712 native lines
+2026-11-04T19:51:00Z process 3 app done: 1793821562..1793821860 (298 s) load 1.69
+2026-11-04T19:52:23Z process 3 native done: 1793821890..1793821943 (53 s) load 3.52
+merged 12769 app lines + 712 native lines
+2026-11-04T19:58:22Z process 4 app done: 1793822004..1793822302 (298 s) load 1.37
+2026-11-04T19:59:44Z process 4 native done: 1793822332..1793822384 (52 s) load 1.39
+merged 12769 app lines + 712 native lines
+2026-11-04T20:05:13Z process 5 app done: 1793822415..1793822713 (298 s) load 1.95
+2026-11-04T20:06:36Z process 5 native done: 1793822744..1793822796 (52 s) load 1.86
+merged 12769 app lines + 712 native lines
+2026-11-04T20:12:06Z process 6 app done: 1793822827..1793823126 (299 s) load 1.77
+2026-11-04T20:13:29Z process 6 native done: 1793823156..1793823209 (53 s) load 1.83
+merged 12769 app lines + 712 native lines
+2026-11-04T20:18:58Z process 7 app done: 1793823239..1793823538 (299 s) load 1.51
+2026-11-04T20:20:21Z process 7 native done: 1793823568..1793823621 (53 s) load 1.51
+merged 12769 app lines + 712 native lines
+2026-11-04T20:25:50Z process 8 app done: 1793823651..1793823950 (299 s) load 1.93
+2026-11-04T20:27:13Z process 8 native done: 1793823980..1793824033 (53 s) load 1.79
+merged 12769 app lines + 712 native lines
+screen watcher: 61 calls (dark.log)
+== 2026-11-04T20:27:13Z 5. pool
+# SLG demo cases v4 (viewport browse / static viewport deltas, login, dirty save)
+
+8 processes, M, 4 ticks per cycle; xoffset ÷ rival, geometric mean / one-sided 95% upper bound, Bonferroni k=85. Below 1: XOffset faster.
+
+| 用例 | zpp_bits | cista | flatbuffers | cereal | protobuf |
+| --- | --- | --- | --- | --- | --- |
+| 1 场景↔战斗 | 0.529 / 0.536 | 0.188 / 0.191 | 0.230 / 0.235 | 0.150 / 0.153 | 0.053 / 0.054 |
+| 1 场景↔场景 | 0.449 / 0.464 | 0.225 / 0.231 | 0.253 / 0.259 | 0.138 / 0.142 | 0.058 / 0.060 |
+| 1 场景↔存储（整份） | 0.387 / 0.392 | 0.171 / 0.173 | 0.307 / 0.311 | 0.113 / 0.115 | 0.058 / 0.059 |
+| 1 场景↔存储（只存脏模块） | 0.345 / 0.348 | 0.199 / 0.204 | 0.365 / 0.370 | 0.146 / 0.148 | 0.079 / 0.082 |
+| 2 登录全量 | 0.483 / 0.497 | 0.165 / 0.169 | 0.172 / 0.177 | 0.125 / 0.127 | 0.046 / 0.047 |
+| 2 浏览地图·视口全量 | 0.471 / 0.475 | 0.192 / 0.194 | 0.205 / 0.207 | 0.126 / 0.127 | 0.147 / 0.149 |
+| 2 浏览地图·视口全量（单设备热视图：EB.send + EBW.recv） | 0.449 / 0.453 | 0.183 / 0.184 | 0.202 / 0.203 | 0.118 / 0.118 | 0.143 / 0.146 |
+| 3 自身增量 | 0.706 / 0.720 | 0.489 / 0.509 | 0.562 / 0.574 | 0.357 / 0.366 | 0.141 / 0.144 |
+| 3 静止视口增量·和平 | 1.012 / 1.050 | 0.706 / 0.732 | 0.743 / 0.773 | 0.599 / 0.626 | 0.718 / 0.738 |
+| 3 静止视口增量·交战 | 0.514 / 0.521 | 0.330 / 0.339 | 0.332 / 0.337 | 0.212 / 0.215 | 0.269 / 0.276 |
+| 3 静止视口增量·压力（只报） | 0.602 / 0.611 | 0.310 / 0.317 | 0.323 / 0.328 | 0.217 / 0.221 | 0.242 / 0.248 |
+| 3 静止视口增量·和平（XOffset 原生） | 1.587 / 1.648 | 1.108 / 1.144 | 1.165 / 1.202 | 0.939 / 0.963 | 1.126 / 1.168 |
+| 3 静止视口增量·交战（XOffset 原生） | 0.783 / 0.789 | 0.502 / 0.512 | 0.505 / 0.511 | 0.323 / 0.326 | 0.409 / 0.418 |
+| 3 静止视口增量·压力（XOffset 原生，只报） | 0.707 / 0.716 | 0.365 / 0.373 | 0.380 / 0.384 | 0.255 / 0.257 | 0.285 / 0.289 |
+| 2 登录全量（XOffset 原生 key） | 1.845 / 1.881 | 0.630 / 0.645 | 0.656 / 0.674 | 0.476 / 0.483 | 0.175 / 0.178 |
+| 3 自身增量（XOffset 原生） | 0.471 / 0.482 | 0.326 / 0.340 | 0.375 / 0.381 | 0.238 / 0.243 | 0.094 / 0.096 |
+| 1 存储（XOffset 原生增量） | 1.895 / 1.927 | 1.095 / 1.120 | 2.008 / 2.054 | 0.803 / 0.816 | 0.434 / 0.449 |
+
+## Per message (µs; bytes)
+
+| | xoffset | zpp_bits | cista | flatbuffers | cereal | protobuf |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| A per battle µs | 0.74 | 1.44 | 3.96 | 3.31 | 4.96 | 14.22 |
+| B per player µs | 2.34 | 5.19 | 10.28 | 9.19 | 16.73 | 40.18 |
+| B 5,000 players, s | 0.012 | 0.026 | 0.051 | 0.046 | 0.084 | 0.201 |
+| S per player µs (save + store + load) | 2.85 | 7.39 | 16.61 | 9.31 | 25.12 | 49.47 |
+| SD per player µs | 1.15 | 3.36 | 5.81 | 3.17 | 7.91 | 14.69 |
+| SN per player µs (native) | 6.41 |  |  |  |  |  |
+| EB per pull µs (send + recv) | 14.7 | 31.5 | 76.6 | 71.9 | 116.7 | 100.5 |
+| EBW per pull µs (send + warm single-view recv) | 13.7 | 30.9 | 75.2 | 68.0 | 116.5 | 95.7 |
+| EB.recv / EBW.recv per pull µs (1,500 cold views / one warm view) | 5.03 / 4.02 | 10.28 / 9.62 | 42.05 / 40.61 | 26.88 / 22.93 | 47.98 / 47.79 | 48.76 / 43.93 |
+| EB bytes per pull (raw / zstd) | 53840 / 19977 | 46167 / 18039 | 55668 / 19891 | 55167 / 20547 | 48999 / 18530 | 30512 / 19735 |
+| UP per delivery µs (send + recv + apply) | 0.62 | 0.62 | 0.88 | 0.83 | 1.03 | 0.86 |
+| NP per delivery µs (native send + diff + recv) | 0.95 |  |  |  |  |  |
+== 2026-11-04T20:27:13Z finish rc=0
+result tarball: /Users/ximi/workspace/xo-queue/queue/089-slgv8/out/slgv8_result.tar.gz sha256 4de82352174026c1c30fd80032288c28bd47bd509e7cc6f976493fac89799471

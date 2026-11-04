@@ -1,10 +1,10 @@
 # Mac queue
 
-Updated 2026-11-04T19:25:01Z after 089-slgv8: running 2026-11-04T19:24:58Z
+Updated 2026-11-04T20:27:17Z after 089-slgv8: done 0 2026-11-04T20:27:14Z
 
 ```
 runner: pid 4651 (version 2)
-free: 19 GB on /Volumes/XOffsetCS, 19 GB on /Users/ximi
+free: 20 GB on /Volumes/XOffsetCS, 20 GB on /Users/ximi
 001-GATE_COMPOSED                        done 0 2026-10-26T09:59:24Z
 002-int1-r2                              done 0 2026-10-26T11:33:59Z
 003-d5-diag-pre                          done 21 2026-10-26T11:47:50Z
@@ -93,7 +93,7 @@ free: 19 GB on /Volumes/XOffsetCS, 19 GB on /Users/ximi
 086-cleanup1104                          done 0 2026-11-04T16:16:06Z
 087-rel330                               done 0 2026-11-04T19:21:45Z
 088-apple330                             done 0 2026-11-04T19:24:50Z
-089-slgv8                                running 2026-11-04T19:24:58Z
+089-slgv8                                done 0 2026-11-04T20:27:14Z
 090-ckpt19b                              cancelled
 091-ckpt19b                              queued
 ```
