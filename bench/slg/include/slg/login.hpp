@@ -21,8 +21,10 @@
 #include <cstdint>
 #include <stdexcept>
 #include <type_traits>
+#include <string>
 #include <vector>
 #include "generic.hpp"
+#include "view.hpp"   // zstd_size
 
 namespace slg {
 
@@ -117,6 +119,32 @@ template <class P> uint64_t query_self(const P& p) {
 //   void patch_recv()                      the client receives it into the reused receive object
 //   const auto& patch()
 // Optional native: n_login_key(p) -> size, n_login_recv(p), n_diff(p) -> size, n_recv(p), n_held(p).
+// Scoring V3 (2026-11-04): login_wire(), patch_wire(), n_wire() (the last wire each
+// wrote) for the zstd keys (LZ/LKZ/LDZ/LNZ.send timed, *_zstd bytes; compressed
+// after the logins and after the rounds, so the timed stages keep their working
+// set); warm single devices d < kWarmDevices (player d's client, its one player warm
+// in cache): login_recv_w(d, wire), held_w(d), patch_recv_from(wire), n_login_recv_w(d, wire),
+// n_recv_from_w(d, wire), n_held_w(d). LDW.recv / LNW.recv: each device's patches of
+// the cycle replayed into its copy after the rounds (receive + apply, timed per
+// patch like LD.recv + LD.apply; the device reads its player first, untimed);
+// count LDW.patches.
+// Wires kept for the zstd keys: one reused buffer and offsets (no allocation per
+// message once warm, so the untimed copy between timed stages stays small).
+struct WireLog {
+    std::string buf;
+    std::vector<std::size_t> off;
+    void clear() { buf.clear(); off.clear(); }
+    void add(std::string_view w) { off.push_back(buf.size()); buf.append(w.data(), w.size()); }
+    std::size_t size() const { return off.size(); }
+    std::string_view at(std::size_t i) const { return std::string_view(buf).substr(off[i], (i + 1 < off.size() ? off[i + 1] : buf.size()) - off[i]); }
+};
+inline void zstd_timed(CycleStats& st, const char* tkey, const char* bkey, const WireLog& ws) {
+    for (std::size_t i = 0; i < ws.size(); ++i) {
+        std::size_t z = 0;
+        timed(st, tkey, [&] { z = zstd_size(ws.at(i)); });
+        st.bytes[bkey] += z;
+    }
+}
 template <class Ops> void run_login(Ops& ops, uint64_t seed, int cycle, int rounds, CycleStats& st, std::vector<int64_t>& seq) {
     constexpr bool native = requires { ops.n_diff(0); };
     const int online = ops.online();
@@ -127,6 +155,12 @@ template <class Ops> void run_login(Ops& ops, uint64_t seed, int cycle, int roun
         Rng rng(mix_seed(seed, 0x1061 + uint64_t(cycle)));
         for (int i = 0; i < online / 4; ++i) logins.push_back(rng.below(online));
     }
+    const int nw_dev = warm_devices(online);
+    static thread_local WireLog lz, lkz, dz, nz;
+    static thread_local std::vector<std::vector<std::string>> wq, nwq;
+    static thread_local std::vector<std::pair<int, std::size_t>> wl, wk;   // warm logins: (player, wire)
+    lz.clear(); lkz.clear(); dz.clear(); nz.clear(); wl.clear(); wk.clear();
+    wq.assign(std::size_t(nw_dev), {}); nwq.assign(std::size_t(nw_dev), {});
     for (int p : logins) {
         std::size_t n = 0;
         timed(st, "L.send", [&] { n = ops.login_encode(p); });
@@ -135,6 +169,8 @@ template <class Ops> void run_login(Ops& ops, uint64_t seed, int cycle, int roun
         st.report_sum += q;
         st.bytes["L.player"] += n;
         st.bytes["L.logins"] += 1;
+        if (p < nw_dev) wl.push_back({p, lz.size()});   // the warm device logs in too, after the loop
+        lz.add(ops.login_wire());
         if constexpr (native) if (native_on()) {
             std::size_t k = 0;
             timed(st, "LK.send", [&] { k = ops.n_login_key(p); });
@@ -142,8 +178,16 @@ template <class Ops> void run_login(Ops& ops, uint64_t seed, int cycle, int roun
             timed(st, "LK.recv", [&] { ops.n_login_recv(p); qk = query_self(ops.n_held(p)); });   // as L.recv
             if (qk != q) throw std::runtime_error("native login: player differs");
             st.bytes["LK.player"] += k;
+            if (p < nw_dev) wk.push_back({p, lkz.size()});
+            lkz.add(ops.n_wire());
         }
     }
+    // Warm devices log in (untimed: an L, not an LD) after every client's player is
+    // received, so the clients' players keep the addresses they had without them.
+    for (const auto& [p, i] : wl) ops.login_recv_w(p, lz.at(i));
+    if constexpr (native) if (native_on()) for (const auto& [p, i] : wk) ops.n_login_recv_w(p, lkz.at(i));
+    zstd_timed(st, "LZ.send", "L.player_zstd", lz);
+    zstd_timed(st, "LKZ.send", "LK.player_zstd", lkz);
     SelfDirty dirty;
     for (int r = 0; r < rounds; ++r)
         for (int p = 0; p < online; ++p) {
@@ -162,6 +206,8 @@ template <class Ops> void run_login(Ops& ops, uint64_t seed, int cycle, int roun
             st.report_sum += q;
             st.bytes["LD.patch"] += n;
             st.bytes["LD.patches"] += 1;
+            dz.add(ops.patch_wire());
+            if (p < nw_dev) wq[std::size_t(p)].emplace_back(ops.patch_wire());
             if constexpr (native) if (native_on()) {
                 std::size_t k = 0;
                 if constexpr (requires { ops.n_diff_dirty(0, dirty); })
@@ -171,8 +217,43 @@ template <class Ops> void run_login(Ops& ops, uint64_t seed, int cycle, int roun
                 timed(st, "LN.recv", [&] { ops.n_recv(p); });
                 if (query_self(ops.n_held(p)) != q) throw std::runtime_error("native self delta: player differs");
                 st.bytes["LN.delta"] += k;
+                if (k) nz.add(ops.n_wire());
+                if (p < nw_dev) nwq[std::size_t(p)].emplace_back(ops.n_wire());
             }
         }
+    zstd_timed(st, "LDZ.send", "LD.patch_zstd", dz);
+    zstd_timed(st, "LNZ.send", "LN.delta_zstd", nz);
+    // Streaming compression (report only): each warm device's connection has one
+    // context for its login and then its patches (native: its key and deltas).
+    {
+        ZStreams& za = zstreams<Ops>("LZS");
+        for (const auto& [p, i] : wl) zstream_timed(st, za.at(std::size_t(p)), "LZS.send", "L.player_zs", lz.at(i));
+        for (int d = 0; d < nw_dev; ++d)
+            for (const std::string& w : wq[std::size_t(d)]) zstream_timed(st, za.at(std::size_t(d)), "LDZS.send", "LD.patch_zs", w);
+        st.bytes["LZS.ctx"] = za.ctx_bytes();
+        if constexpr (native) if (native_on()) {
+            ZStreams& zn = zstreams<Ops>("LNZS");
+            for (const auto& [p, i] : wk) zstream_timed(st, zn.at(std::size_t(p)), "LKZS.send", "LK.player_zs", lkz.at(i));
+            for (int d = 0; d < nw_dev; ++d)
+                for (const std::string& w : nwq[std::size_t(d)]) if (!w.empty()) zstream_timed(st, zn.at(std::size_t(d)), "LNZS.send", "LN.delta_zs", w);
+            st.bytes["LNZS.ctx"] = zn.ctx_bytes();
+        }
+    }
+    for (int d = 0; d < nw_dev; ++d) {
+        for (const std::string& w : wq[std::size_t(d)]) {
+            warm_sink = query_self(ops.held_w(d));
+            timed(st, "LDW.recv", [&] { ops.patch_recv_from(w); apply_patch(ops.held_w(d), ops.patch()); });
+            st.bytes["LDW.patches"] += 1;
+        }
+        if (query_self(ops.held_w(d)) != query_self(ops.held(d))) throw std::runtime_error("warm player differs from the client's");
+        if constexpr (native) if (native_on()) {
+            for (const std::string& w : nwq[std::size_t(d)]) {
+                warm_sink = query_self(ops.n_held_w(d));
+                timed(st, "LNW.recv", [&] { ops.n_recv_from_w(d, w); });
+            }
+            if (query_self(ops.n_held_w(d)) != query_self(ops.held(d))) throw std::runtime_error("warm native player differs from the client's");
+        }
+    }
 }
 
 // Ops for the dirty-module save:
