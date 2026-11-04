@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+- `root<T>()` on a cold buffer reads one cache line: its cache is two
+  words (root type, root pointer) aligned to 16 bytes, and every epoch
+  change clears it, instead of four words (with the root's epoch and the
+  buffer's) that straddled a line for 3 of 8 placements of an `XBuffer`
+  in a `std::vector`. `alignof(XBufferCore)` (and `XBuffer`) is now 16;
+  `sizeof` is unchanged. Last-level read misses (cache simulation), GCC 16:
+  slg UP.apply -1.9% (about one per three deliveries); instructions
+  A.apply -1.5%, UP.apply -0.5%.
+- Verified saves (`save_verified`, `save_verified_into`) no longer shrink the
+  source's logical length to `used_end`; the wire was always cut at
+  `used_end`, so its bytes are unchanged. A sender that resets and refills
+  the same buffer (`reset<T>()`, fill, save) now refills within the extent it
+  had instead of regrowing it every message. Raw `save()` still shrinks.
+  GCC 16 instructions, bench/slg (M): UP.send (fill one viewport delta and
+  save it) -10.5%, EB.send -0.9%.
+- `save_verified_into` writes a reused output in one pass when no host
+  allocation can run before the write: the output already holds the dense
+  size and no free-run list is built (free bytes below one 4 KiB run, or
+  `zero_runs`). It then reads the source once in place: no owner-record copy,
+  no second owner lookup or alias check, no free-run scan. Output bytes are
+  unchanged. GCC 16 instructions, bench/slg (M): UP.send a further -10.7%
+  (about 150 fewer per message).
 - Delta sync (`xoffset_delta.hpp`, `docs/DELTA_SYNC.md`): a sender keeps an
   `XDeltaBaseline` per receiver and `save_delta_into<T>` writes the 64-byte
   payload blocks that changed since, each by its byte mask (plus the hole
@@ -60,7 +82,11 @@
   same offset in the copied content), and so does an `XBuffer` that is
   moved or swapped (for example one built by `create` and then moved into
   a container), so `root<T>()` stays on its fast path afterwards instead
-  of re-checking typed access and the schema on every call.
+  of re-checking typed access and the schema on every call. The root
+  cache, the free table pointer and the storage's base and size now come
+  first in `XBufferCore`, in 40 bytes: the update that follows a
+  `root<T>()` (`prefetch_for_update()`, an allocation) finds them on the
+  line the root lookup brought in.
 - The receiver checks a container that moved, got its first block or lost
   it (heap strings, vectors of plain elements, sets and maps of plain
   elements, strings entering or leaving the inline form) on its own, against

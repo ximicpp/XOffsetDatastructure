@@ -78,9 +78,11 @@ The allocator sees only the logical length. It has no segment-manager reopen or
 post-growth throwing update: a successful storage growth publishes the new
 logical extent without changing root offsets, free lists, or `used_end`.
 `shrink_to_fit()` reduces logical length to `used_end`, retains the reservation,
-and does not change the epoch. Save remains a copying normalized transport API.
-Its wire reservation field describes the normalized logical payload, never the
-process-local VM reservation. Existing v1 layout and signatures remain unchanged.
+and does not change the epoch. Raw `save()` shrinks first, since its bytes are
+the logical payload. Verified saves (`save_verified`, `save_verified_into`)
+cut the wire at `used_end` and leave the logical length as it was: a sender
+that resets and refills the same buffer does not regrow (and re-zero) the
+extent it had. No wire field describes the process-local VM reservation.
 
 Every owner holds one identity record (the current owner, used to re-resolve
 the owner after a host callback). Only direct-receive owners, the ones that

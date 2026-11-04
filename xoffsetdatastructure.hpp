@@ -612,8 +612,6 @@ namespace XOffsetDatastructure {
         void swap(XBufferCore& other) noexcept {
             if (this == &other) return;
             // A cached root goes with its storage (the payload does not move).
-            const bool mine = root_cache_ && root_cache_epoch_ == m_epoch;
-            const bool theirs = other.root_cache_ && other.root_cache_epoch_ == other.m_epoch;
             std::swap(root_cache_, other.root_cache_);
             std::swap(root_cache_type_, other.root_cache_type_);
             buffer_.swap(other.buffer_);
@@ -628,10 +626,11 @@ namespace XOffsetDatastructure {
             std::swap(schema_bound_, other.schema_bound_);
             std::swap(bound_root_type_id_, other.bound_root_type_id_);
             std::swap(bound_schema_hash_, other.bound_schema_hash_);
+            // The cached roots were swapped with their storage (and the
+            // typed-access and schema state a hit stands for), so the epochs
+            // advance without advance_epoch()'s clear.
             ++m_epoch;
             ++other.m_epoch;
-            root_cache_epoch_ = theirs ? m_epoch : 0u;  // 0: stale (the epoch is past 0)
-            other.root_cache_epoch_ = mine ? other.m_epoch : 0u;
             update_registry_owner();
             other.update_registry_owner();
         }
@@ -1885,7 +1884,8 @@ namespace XOffsetDatastructure {
                 // and gets the default state the retired path below leaves
                 // it. Each epoch still advances by one.
                 // A cached root comes along (the payload does not move).
-                const bool cached = other.root_cache_ && other.root_cache_epoch_ == other.m_epoch;
+                const void* const cached_type = other.root_cache_type_;
+                void* const cached_root = other.root_cache_;
                 buffer_.swap(other.buffer_);
                 owner_record_.swap(other.owner_record_);
                 free_table_.swap(other.free_table_);
@@ -1897,13 +1897,10 @@ namespace XOffsetDatastructure {
                 schema_bound_ = std::exchange(other.schema_bound_, false);
                 bound_root_type_id_ = std::exchange(other.bound_root_type_id_, 0);
                 bound_schema_hash_ = std::exchange(other.bound_schema_hash_, 0);
-                ++m_epoch;
-                ++other.m_epoch;
-                if (cached) {
-                    root_cache_ = other.root_cache_;
-                    root_cache_type_ = other.root_cache_type_;
-                    root_cache_epoch_ = m_epoch;
-                }
+                advance_epoch();
+                other.advance_epoch();
+                root_cache_type_ = cached_type;
+                root_cache_ = cached_root;
                 update_registry_owner();
                 return;
             }
@@ -1916,12 +1913,11 @@ namespace XOffsetDatastructure {
             // operator delete halfway through the incoming owner's transfer.
             retired.swap(*this);
             swap(other);
-            const bool cached = root_cache_epoch_ == m_epoch;  // other's, carried by the swap
             // Preserve the existing one-invalidation-per-Core epoch contract.
             m_epoch = target_epoch + 1u;
             other.m_epoch = source_epoch + 1u;
-            root_cache_epoch_ = cached ? m_epoch : 0u;
-            other.root_cache_epoch_ = 0u;
+            // The swap above brought other's cached root with its storage.
+            other.root_cache_type_ = nullptr;
             // Only now destroy retired target resources. Any delete reentry
             // sees the fully published incoming payload, schema and free cache.
         }
@@ -2025,15 +2021,15 @@ namespace XOffsetDatastructure {
             }
             // With the content copied, a cached root is at the same offset:
             // it follows the move (root<T>() keeps its fast path).
-            const bool rebase_root = copy && root_cache_ && root_cache_epoch_ == m_epoch;
-            const auto root_at = rebase_root ? static_cast<char*>(root_cache_) - buffer_.data() : 0;
+            const void* const root_type = copy ? root_cache_type_ : nullptr;
+            const auto root_at = root_type ? static_cast<char*>(root_cache_) - buffer_.data() : 0;
             insert_owner_keeping(prepared);
             buffer_.swap(next);
             publish_host_owner();
-            ++m_epoch;
-            if (rebase_root) {
+            advance_epoch();
+            if (root_type) {
+                root_cache_type_ = root_type;
                 root_cache_ = buffer_.data() + root_at;
-                root_cache_epoch_ = m_epoch;
             }
             return true;
             // `next` (the old storage) is released here.
@@ -2188,7 +2184,7 @@ namespace XOffsetDatastructure {
         // (epoch), and the owner is left without typed root access until the
         // caller finishes verification.
         void begin_reinit(bool keep_table = false) noexcept {
-            ++m_epoch;
+            advance_epoch();
             if (keep_table && free_table_) {
                 // Emptied detached (releasing map nodes may reenter), then
                 // kept with its bin storage: the next holes need neither a
@@ -2451,33 +2447,29 @@ namespace XOffsetDatastructure {
             if (used < buffer_.size()) std::memset(buffer_.data() + used, 0, buffer_.size() - used);
         }
 
-        // Storage-associated access/schema state belongs to the owner so even
-        // transfers through XBufferCore cannot leave derived flags behind.
-        bool typed_root_access_allowed_ = true;
-        bool schema_bound_ = false;
-        std::uint64_t bound_root_type_id_ = 0;
-        std::uint64_t bound_schema_hash_ = 0;
-
         // The root that make<T>() or a verified load of T admitted, valid
-        // while the epoch it was admitted at is current. Typed access, the
-        // schema binding and the root offset change only with the epoch
-        // (reinit, reset, move, swap, storage move) or on a fresh owner, so
-        // a hit in root<T>() returns what its checked path would. Set only
-        // by those mutating calls, so root<T>() itself stays read-only. A
+        // until the epoch advances. Typed access, the schema binding and the
+        // root offset change only with the epoch (reinit, reset, move, swap,
+        // storage move) or on a fresh owner, so a hit in root<T>() returns
+        // what its checked path would. Set only by those mutating calls, so
+        // root<T>() itself stays read-only. advance_epoch() clears it; a
         // move, a swap and a storage move that copies the content carry it
-        // to the new epoch (the root stays where it was in the payload);
-        // any other epoch change drops it.
+        // (the root stays where it was in the payload), together with the
+        // typed-access and schema state that a hit stands for.
         template <typename T>
         T* cached_root() const noexcept {
-            return root_cache_epoch_ == m_epoch && root_cache_type_ == type_identity<T>()
-                ? static_cast<T*>(root_cache_) : nullptr;
+            return root_cache_type_ == type_identity<T>() ? static_cast<T*>(root_cache_) : nullptr;
         }
 
         template <typename T>
         void cache_root(T* root) noexcept {
-            root_cache_ = root;
             root_cache_type_ = type_identity<T>();
-            root_cache_epoch_ = m_epoch;
+            root_cache_ = root;
+        }
+
+        void advance_epoch() noexcept {
+            ++m_epoch;
+            root_cache_type_ = nullptr;
         }
 
     private:
@@ -2485,18 +2477,18 @@ namespace XOffsetDatastructure {
         friend struct detail::VerifiedReceiveAccess;
         friend struct detail::DeltaAccess;
         friend struct fixed_detail::StableEraseOwnerWitness;
-        // Hot fields first, in one run of 56 bytes: the free table, the epoch
-        // and the root cache (all root<T>()'s fast path reads), then the
+        // Hot fields first, in one run of 40 bytes at offset 0: the root
+        // cache (all that root<T>()'s fast path reads; 16-byte aligned, so
+        // its two words never straddle a line), the free table, then the
         // storage, whose first two fields are the payload base and size. A
         // root<T>() and the update that follows it (prefetch_for_update(), an
-        // allocation) then find base, size and free table on the line(s) the
-        // root lookup already brought in, instead of on two more lines.
-        FreeTablePtr free_table_;
-        std::uint64_t m_epoch = 0;
+        // allocation) find base, size and free table on the line the root
+        // lookup brought in.
+        alignas(16) const void* root_cache_type_ = nullptr;
         void* root_cache_ = nullptr;
-        const void* root_cache_type_ = nullptr;
-        std::uint64_t root_cache_epoch_ = 0;
+        FreeTablePtr free_table_;
         detail::VirtualMemoryStorage buffer_;
+        std::uint64_t m_epoch = 0;
         OwnerRecordPtr owner_record_;
         bool free_table_lost_ = false;
 
@@ -2505,6 +2497,12 @@ namespace XOffsetDatastructure {
         // kept here in padding so that XBuffer adds only its two pointers
         // (see the static_assert after XBuffer).
         bool direct_reload_open_ = false;
+        // Storage-associated access/schema state belongs to the owner so even
+        // transfers through XBufferCore cannot leave derived flags behind.
+        bool typed_root_access_allowed_ = true;
+        bool schema_bound_ = false;
+        std::uint64_t bound_root_type_id_ = 0;
+        std::uint64_t bound_schema_hash_ = 0;
 
     private:
         // Next D6 growth step below zero_from() (ensure_allocation_extent).
@@ -7920,7 +7918,12 @@ namespace XOffsetDatastructure {
             using Identity = XBufferCore::OwnerRecordPtr;
             static Identity identity(XBufferCore& source) noexcept { return source.owner_record_; }
             static XBufferCore& owner(const Identity& value) { return XBufferCore::require_record_owner(value); }
-            template<class T> static XWireHeaderV2 header(XBufferCore&, bool);
+            // The source is its record's owner (what owner(identity(source))
+            // resolves to on entry), without copying the record.
+            static bool owns_record(const XBufferCore& source) noexcept {
+                return XBufferCore::record_owner(source.owner_record_) == &source;
+            }
+            template<class T> static XWireHeaderV2 header(XBufferCore&);
             template<class T> static void save_into(XBufferCore&, std::string&, XSaveOptions);
             template<class T> static void save_compact_into(XBufferCore&, std::string&, XCompactOptions);
             template<class T, class... M> static void save_composed_into(XBufferCore&, std::string&, XCompactOptions,
@@ -8186,7 +8189,12 @@ namespace XOffsetDatastructure {
 
         template <typename T>
         XWireHeaderV2 wire_header_v2(const T& root) const {
-            return detail::make_wire_header<T>(this->segment_size(),
+            // The used extent (what the logical length was after the
+            // shrink_to_fit that saves no longer do): used_end, at least the
+            // header, at most the logical length.
+            const auto used = std::min<std::uint64_t>(
+                std::max<std::uint64_t>(this->arena()->used_end, sizeof(arena_header)), this->segment_size());
+            return detail::make_wire_header<T>(used,
                 reinterpret_cast<std::uintptr_t>(&root) - reinterpret_cast<std::uintptr_t>(this->get_address()),
                 this->free_block_count());
         }
@@ -8201,7 +8209,6 @@ namespace XOffsetDatastructure {
 #endif
             require_typed_root_access("save_verified<T>(): unverified payload cannot be relabeled as verified");
             require_schema_match<T>("save_verified<T>(): schema mismatch for requested root type");
-            this->shrink_to_fit();
             auto* root_ptr = detail::find_root<T>(*this);
             if (!root_ptr) {
                 XOFFSET_THROW(XException(XErrc::no_root, "save_verified<T>(): no root object of requested type"));
