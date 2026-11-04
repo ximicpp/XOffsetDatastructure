@@ -111,7 +111,12 @@ if(SLG_WITH_XOFFSET)
   target_compile_definitions(slg_bench PRIVATE SLG_WITH_XOFFSET=1)
 endif()
 
-message(STATUS "slg_bench formats: xoffset=${SLG_WITH_XOFFSET} ir_count=${SLG_IR_COUNT} cereal=${CEREAL_INCLUDE} protobuf=${Protobuf_FOUND} flatbuffers=${FLATC} zpp_bits=${ZPP_BITS_INCLUDE} cista=${CISTA_INCLUDE} compression=${ZSTD_LIB}")
+# Differential test of the held-view id index (include/slg/flat_held_index.hpp);
+# bench/ci_smoke.sh runs it. Asserts stay on in every build type.
+add_executable(flat_held_index_test tests/flat_held_index_test.cpp)
+target_include_directories(flat_held_index_test PRIVATE include/slg)
+
+message(STATUS "slg_bench formats:xoffset=${SLG_WITH_XOFFSET} ir_count=${SLG_IR_COUNT} cereal=${CEREAL_INCLUDE} protobuf=${Protobuf_FOUND} flatbuffers=${FLATC} zpp_bits=${ZPP_BITS_INCLUDE} cista=${CISTA_INCLUDE} compression=${ZSTD_LIB}")
 if(SLG_BUILD_PROBES)
   add_executable(erase_probe bench/erase_probe.cpp)
   target_include_directories(erase_probe PRIVATE include)
