@@ -1,0 +1,10 @@
+REL330 0
+anchor v3.2.1 23c6e206 (previous release checkpoint)
+screen watcher: 174 calls (dark.log)
+ABC: pass (max upper bound 0.9813; A 0.9747, B 0.9306, C 0.9813; 12 / 12 processes)
+GATE_D: head D÷flatbuffers 0.949 / 0.960 (O4 upper bound <= 1.0: met), D÷zpp_bits 1.046 / 1.056, D.read 68.9 µs; anc D÷flatbuffers 0.915 / 0.939, D÷zpp_bits 1.045 / 1.067, D.read 67.8 µs
+G8 met
+G9R rc 0 (0 done, 2 prep check, 5 quiet gate); G9: 17 of 19 comparisons have UB <= 1.05; above: vec.push_back, set.erase.fresh
+ctest 100% tests passed out of 178 (rc 0)
+demo SLG demo cases, six formats native off (xoffset rows) head/anc: A.apply 1.087, A.res_decode 0.946, A.req_encode 0.999, A.req_decode 0.997, UP.apply 1.094, UC.apply 1.028 | SLG demo cases, xoffset native on head/anc: UP.apply 1.053, UC.apply 1.073, UP.send 0.864, UC.send 0.911, UP.recv 1.075, UC.recv 1.030 (BYTES DIFFER)
+align64 align64 pair: fe8c0743 (as head) vs 1c528d67 (as anc), L2 SLG command head/anc: A.req_decode 1.005, A.res_decode 0.983, A.apply 0.971, A.req_encode 0.999, A.res_encode 1.003

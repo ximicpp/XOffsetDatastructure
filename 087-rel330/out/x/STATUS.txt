@@ -1,0 +1,2 @@
+demo SLG demo cases, six formats native off (xoffset rows) head/anc: A.apply 1.087, A.res_decode 0.946, A.req_encode 0.999, A.req_decode 0.997, UP.apply 1.094, UC.apply 1.028 | SLG demo cases, xoffset native on head/anc: UP.apply 1.053, UC.apply 1.073, UP.send 0.864, UC.send 0.911, UP.recv 1.075, UC.recv 1.030 (BYTES DIFFER)
+align64 align64 pair: fe8c0743 (as head) vs 1c528d67 (as anc), L2 SLG command head/anc: A.req_decode 1.005, A.res_decode 0.983, A.apply 0.971, A.req_encode 0.999, A.res_encode 1.003

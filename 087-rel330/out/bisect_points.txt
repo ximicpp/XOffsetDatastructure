@@ -1,0 +1,4 @@
+1c528d67739bc94d91205c9dd2bf4bf1260253bf|#213 merged (keep free table; report only, deferred)
+fe8c07437224d9462f407cd115eae18a3972a829|#191 merged (delta sync; deferred)
+e13245fa9463ee9ddf36c39ae9edc8bab099b985|#219 merged (save skips an empty kept free table; deferred)
+e7fd8cb060ed12e027a94eeb83bc4349f782fe2b|#214 merged (XMap/XSet append fast path; deferred)

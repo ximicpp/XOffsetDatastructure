@@ -1,6 +1,6 @@
 # Mac queue
 
-Updated 2026-11-04T16:21:24Z after 087-rel330: running 2026-11-04T16:21:19Z
+Updated 2026-11-04T19:21:48Z after 087-rel330: done 0 2026-11-04T19:21:45Z
 
 ```
 runner: pid 4651 (version 2)
@@ -91,5 +91,9 @@ free: 23 GB on /Volumes/XOffsetCS, 23 GB on /Users/ximi
 084-ckpt18                               done 0 2026-11-04T13:28:14Z
 085-ckpt19                               done 4 2026-11-04T16:15:40Z
 086-cleanup1104                          done 0 2026-11-04T16:16:06Z
-087-rel330                               running 2026-11-04T16:21:19Z
+087-rel330                               done 0 2026-11-04T19:21:45Z
+088-apple330                             queued
+089-slgv8                                queued
+090-ckpt19b                              cancelled
+091-ckpt19b                              queued
 ```

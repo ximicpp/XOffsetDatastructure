@@ -1,0 +1,42 @@
+t0 23c6e2065063bd656e9e04239e7918bf355a0588 tree 2628589ce492224a694435720d71b08dcf742117 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (v3.2.1 23c6e206 (3.3.0 release checkpoint anchor))
+t1 059b6a5ffdc8da9c25424a0c932f780e97a43d18 tree 3b7d35752cf8fe63f2cb8484336145d06fc6c461 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (REL330 head (3.3.0 candidate C))
+t1: diff over t0 sha256 a89f7006ee6406b6884e0ce6518e5fdcb026d8c9ffa74a6ad3348ba485bc2d7d ( 94 files changed, 14979 insertions(+), 420 deletions(-))
+t1: library header diff over t0:  2 files changed, 881 insertions(+), 192 deletions(-)
+t1: first-parent commits over t0:
+  059b6a5f Merge pull request #225 from ximicpp/claude/mingw-delta-test-20261104 (class 0)
+  691b036a Merge pull request #224 from ximicpp/claude/delta-fuzz-20261104
+  e7fd8cb0 Merge pull request #214 from ximicpp/claude/flatmap-append-20261104 (class L)
+  e13245fa Merge pull request #219 from ximicpp/claude/save-empty-table-20261104 (class L)
+  0d962e21 Merge pull request #220 from ximicpp/claude/hft-demo-p1-20261104 (class 0)
+  fe8c0743 Merge pull request #191 from ximicpp/claude/delta-sync-20261102 (class L)
+  1c528d67 Merge pull request #213 from ximicpp/claude/keep-free-table-20261104
+  b817ed36 Merge pull request #217 from ximicpp/claude/fixed-msg-20261104
+  2e105330 Merge pull request #216 from ximicpp/claude/prerelease-fuzz-20261104
+  a34d5622 Merge pull request #218 from ximicpp/claude/slg-v3-scoring-20261104
+  e682e468 Merge pull request #215 from ximicpp/claude/positioning-v3-docs-20261104
+  49ce3c68 Merge pull request #212 from ximicpp/claude/np-flat-slots-20261104
+  ea67054a Merge pull request #211 from ximicpp/claude/slg-held-root-20261104
+  eabb583b Merge pull request #210 from ximicpp/claude/save-header-cache-20261103
+  32ee1473 Merge pull request #208 from ximicpp/claude/root-cache-20261103
+  5fd869db Merge pull request #207 from ximicpp/claude/save-fast-20261103
+  9e14ece1 Merge pull request #209 from ximicpp/claude/slg-a-prefetch-parity-20261104
+  c2ec7ee3 Merge pull request #205 from ximicpp/claude/slg-nplan-shared-20261103
+  0bf0aa1f Merge pull request #206 from ximicpp/claude/validation-lean-20261103 (S class): lean validation registration
+  b6e06788 Merge pull request #204 from ximicpp/claude/slg-smap-nodeps-20261103
+  cc5b28ee Merge pull request #202 from ximicpp/claude/slg-fairness-20261103
+  d9db04d3 Merge pull request #201 from ximicpp/claude/slg-std-snap-direct-20261103
+  910b0223 Merge pull request #200 from ximicpp/claude/slg-native-split-20261103
+  b3d3106f Merge pull request #199 from ximicpp/claude/slg-rich-unit-20261103
+  7e24016a Merge pull request #198 from ximicpp/claude/view-fill-s-20261103 (class S): short string assign into a null head stays inline, GCC emplace_back() appends at the caller
+  c5a801a9 Merge pull request #193 from ximicpp/claude/class1-integration-20261102 (class L): inline free bins, prefetch_for_update, faster hole emission
+  87227259 Merge pull request #194 from ximicpp/claude/class1-migration-20261102 (class L): reload zero tail, adaptive D6 step, member swap in demo installs
+  670fcc75 Merge pull request #197 from ximicpp/claude/slg-view-newblocks-20261103
+  f04d6230 Merge pull request #196 from ximicpp/claude/container-grow-s-20261103 (class S): inline bump when no hole fits, append without the empty memmove
+  7c2dc4d3 Merge pull request #195 from ximicpp/claude/slg-a-troops-20261103 (class 0): demo A writes back troops only
+  cddcbbb2 Merge pull request #192 from ximicpp/claude/slg-cases-v3-20261102 (class 0): bench/slg game case classes 1-3 v3
+  c9fbaea2 Merge pull request #190 from ximicpp/claude/slg-cases-v2-20261102 (class 0): bench/slg game demo case set
+bench/reloc of t1: same tree as t0
+reloc_bench t0 sha256 8d7cf69da8f65111da5837039b75d16cf334d51cd6254d5cef1e9d6033665e20
+reloc_bench t1 sha256 25d9006a12d1b47b14d53a9469e60526ebc8412c01b190def92b93c2b983a797
+reloc_bench t0a sha256 6e809e648798c44452f1edefc4ea856bd6f3d6c152c8fc5480886d6ff2e74116
+reloc_bench t1a sha256 972c1725256dc635098dd57c1f6b270727f438c492d89778db8d403e8a292895
