@@ -276,9 +276,16 @@ public:
     // and changes it in place.
     struct LoginOps {
         std::vector<Held<cm::PlayerState>> srv, hold;
+        std::vector<Held<cm::PlayerState>> hw = std::vector<Held<cm::PlayerState>>(kWarmDevices);   // warm devices' players (LDW)
         cm::PlayerPatch pm;
         Held<cm::PlayerPatch> pr;
         Bytes lw, pw;
+        static std::string_view sv(const Bytes& b) { return {reinterpret_cast<const char*>(b.data()), b.size()}; }
+        std::string_view login_wire() const { return sv(lw); }
+        std::string_view patch_wire() const { return sv(pw); }
+        void login_recv_w(int d, std::string_view w) { hw[std::size_t(d)].receive({reinterpret_cast<const uint8_t*>(w.data()), w.size()}); }
+        cm::PlayerState& held_w(int d) { return *hw[std::size_t(d)]; }
+        void patch_recv_from(const std::string& w) { pr.receive({reinterpret_cast<const uint8_t*>(w.data()), w.size()}); }
         int online() const { return int(srv.size()); }
         cm::PlayerState& server(int p) { return *srv[std::size_t(p)]; }
         std::size_t login_encode(int p) { return save(lw, *srv[std::size_t(p)]).size(); }
@@ -307,7 +314,7 @@ public:
         Bytes dw;
         void setup(int clients) {
             snaps.assign(1, {});
-            held_views = std::vector<Held<cm::ViewSnapshot>>(std::size_t(clients) + 1);   // [clients]: warm view (EBW)
+            held_views = std::vector<Held<cm::ViewSnapshot>>(std::size_t(clients + kWarmDevices));   // [clients + d]: warm device d (EBW, U*W)
         }
         template <class Fill> std::size_t snap_encode(int b, Fill&& fill) { fill(ev); return save(snaps[std::size_t(b)], ev).size(); }
         std::string_view snap_wire(int b) const {
@@ -322,8 +329,17 @@ public:
         template <class Fill> std::size_t delta_encode(Fill&& fill) { fill(ds); return save(dw, ds).size(); }
         std::string_view delta_wire() const { return {reinterpret_cast<const char*>(dw.data()), dw.size()}; }
         void delta_recv() { dd.receive({dw.data(), dw.size()}); }
+        void delta_recv_from(const std::string& w) { dd.receive({reinterpret_cast<const uint8_t*>(w.data()), w.size()}); }
         const cm::ViewDelta& delta() const { return *dd; }
     };
+
+    // A cista player is its deserialized buffer (plus what a mutation moved to the heap).
+    void memory(CycleStats& st) override {
+        std::size_t b = 0;
+        for (const auto& p : players_) b += p.buf.capacity() + sizeof(p);
+        if (!players_.empty()) st.bytes["MEM.player"] = b / players_.size();
+        for (int i = 0; i < ViewCases::count; ++i) view_memory(bs_[i], ViewCases::keys(i), st);
+    }
 
     uint64_t world_digest() override {
         Digest g;

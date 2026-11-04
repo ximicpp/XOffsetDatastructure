@@ -158,6 +158,48 @@ void print_sizes(const std::vector<std::unique_ptr<Runner>>& rs, const std::vect
 
 } // namespace
 
+#if SLG_MEMCOUNT
+// --mode mem: every operator new counts its bytes (a header in front of the block
+// keeps the size for delete). Only this build pays for it.
+#include <atomic>
+#include <new>
+namespace {
+std::atomic<std::int64_t> g_live{0};
+constexpr std::size_t kHdr = 16;
+void* counted(std::size_t n, std::size_t align) {
+    const std::size_t h = align > kHdr ? align : kHdr;
+    void* raw = nullptr;
+    if (posix_memalign(&raw, h, n + h) != 0 || !raw) throw std::bad_alloc();
+    char* p = static_cast<char*>(raw) + h;
+    reinterpret_cast<std::size_t*>(p)[-1] = n;
+    reinterpret_cast<std::size_t*>(p)[-2] = h;
+    g_live.fetch_add(std::int64_t(n), std::memory_order_relaxed);
+    return p;
+}
+void uncounted(void* p) noexcept {
+    if (!p) return;
+    const std::size_t n = static_cast<std::size_t*>(p)[-1], h = static_cast<std::size_t*>(p)[-2];
+    g_live.fetch_sub(std::int64_t(n), std::memory_order_relaxed);
+    std::free(static_cast<char*>(p) - h);
+}
+} // namespace
+std::int64_t slg::mem_live() { return g_live.load(std::memory_order_relaxed); }
+void* operator new(std::size_t n) { return counted(n, kHdr); }
+void* operator new[](std::size_t n) { return counted(n, kHdr); }
+void* operator new(std::size_t n, std::align_val_t a) { return counted(n, std::size_t(a)); }
+void* operator new[](std::size_t n, std::align_val_t a) { return counted(n, std::size_t(a)); }
+void* operator new(std::size_t n, const std::nothrow_t&) noexcept { try { return counted(n, kHdr); } catch (...) { return nullptr; } }
+void* operator new[](std::size_t n, const std::nothrow_t&) noexcept { try { return counted(n, kHdr); } catch (...) { return nullptr; } }
+void operator delete(void* p) noexcept { uncounted(p); }
+void operator delete[](void* p) noexcept { uncounted(p); }
+void operator delete(void* p, std::size_t) noexcept { uncounted(p); }
+void operator delete[](void* p, std::size_t) noexcept { uncounted(p); }
+void operator delete(void* p, std::align_val_t) noexcept { uncounted(p); }
+void operator delete[](void* p, std::align_val_t) noexcept { uncounted(p); }
+void operator delete(void* p, std::size_t, std::align_val_t) noexcept { uncounted(p); }
+void operator delete[](void* p, std::size_t, std::align_val_t) noexcept { uncounted(p); }
+#endif
+
 int main(int argc, char** argv) {
     std::string mode = "verify", scale = "S", formats, out;
     int cycles = -1;
@@ -177,7 +219,7 @@ int main(int argc, char** argv) {
     if (!sc) { std::cerr << "unknown scale " << scale << "\n"; return 2; }
     if (demo_cases() && !reuse_mode()) { std::cerr << "SLG_CASES=demo needs SLG_REUSE=1\n"; return 2; }
     if (formats.empty()) formats = all_formats();
-    if (cycles < 0) cycles = mode == "verify" ? 2 : 41;
+    if (cycles < 0) cycles = mode == "verify" || mode == "mem" ? 2 : 41;
 
     std::vector<std::unique_ptr<Runner>> rs;
     for (const auto& n : split(formats)) {
@@ -196,6 +238,10 @@ int main(int argc, char** argv) {
               << ",\"formats\":\"" << formats << "\",\"cases\":\"" << (demo_cases() ? "demo" : "abcd")
               << "\",\"protocol\":\"" << (reuse_mode() ? "reuse" : "per_message")
               << "\",\"xoffset_pool\":" << (std::getenv("SLG_XOFFSET_POOL") || reuse_mode() ? "true" : "false") << "}}\n";
+    } else if (mode == "mem") {
+        if (out.empty()) { std::cerr << "--out is required in mem mode\n"; return 2; }
+        if (mem_live() < 0) { std::cerr << "--mode mem needs a -DSLG_MEMCOUNT=1 build\n"; return 2; }
+        jsonl.open(out);
     } else if (mode != "verify") {
         std::cerr << "unknown mode " << mode << "\n"; return 2;
     }
@@ -249,6 +295,14 @@ int main(int argc, char** argv) {
             std::cerr << "cycle " << c + 1 << "/" << cycles << "\r";
         }
         last = std::move(st);
+    }
+    if (mode == "mem") {
+        for (std::size_t i = 0; i < rs.size(); ++i) {
+            CycleStats m;
+            rs[i]->memory(m);
+            for (const auto& [k, v] : m.bytes)
+                jsonl << "{\"format\":\"" << rs[i]->name() << "\",\"metric\":\"" << k << "\",\"bytes\":" << v << "}\n";
+        }
     }
     if (mode == "verify") print_sizes(rs, last, keep, *sc);
     if (failures) { std::cerr << failures << " mismatches\n"; return 1; }
