@@ -8,6 +8,16 @@
   the last element. Copying or rebuilding a map in key order is now linear.
   Contents, layout and allocation are unchanged. Instructions, GCC 16,
   bench/slg demo (M): LD.apply -24%, LD.send -20%, SD.save_encode -27%.
+- `bench/hft` (record only): the HFT demo, phase 1. A Nasdaq ITCH window
+  (2019-01-30 09:30-09:40, not committed) drives a feed handler, a ring of
+  fixed messages read by 4 strategies, a state service keeping the 64
+  busiest order books and a row per instrument in one XBuffer, and a client
+  joining from a snapshot; against raw structs, SBE, zpp_bits, FlatBuffers,
+  cista and a hand-written fixed-capacity pool, every one reaching the same
+  digest. Cloud instructions: the state 1.36x the pool's per update; the
+  late join 5-15x fewer than the encoding formats; the fixed message +8% on
+  read and +21% on write over a raw struct per real packet. `run.sh` builds
+  and runs it; the handshake case shows a reordered build refused.
 - An in-place reload (`reload_verified`) or `reset<T>()` keeps the buffer's
   free table, emptied, instead of releasing it to the per-thread cache of
   four tables. Its holes, or the first retires after it, refill that table,
