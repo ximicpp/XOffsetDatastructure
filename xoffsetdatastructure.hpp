@@ -612,8 +612,8 @@ namespace XOffsetDatastructure {
         void swap(XBufferCore& other) noexcept {
             if (this == &other) return;
             // A cached root goes with its storage (the payload does not move).
-            const bool mine = root_cache_ && root_cache_epoch_ == m_epoch;
-            const bool theirs = other.root_cache_ && other.root_cache_epoch_ == other.m_epoch;
+            const bool mine = false;    // CK12 diagnostic: the root cache does not follow a swap
+            const bool theirs = false;
             std::swap(root_cache_, other.root_cache_);
             std::swap(root_cache_type_, other.root_cache_type_);
             buffer_.swap(other.buffer_);
@@ -1885,7 +1885,7 @@ namespace XOffsetDatastructure {
                 // and gets the default state the retired path below leaves
                 // it. Each epoch still advances by one.
                 // A cached root comes along (the payload does not move).
-                const bool cached = other.root_cache_ && other.root_cache_epoch_ == other.m_epoch;
+                const bool cached = false;  // CK12 diagnostic: the root cache does not follow a move
                 buffer_.swap(other.buffer_);
                 owner_record_.swap(other.owner_record_);
                 free_table_.swap(other.free_table_);
@@ -1916,7 +1916,7 @@ namespace XOffsetDatastructure {
             // operator delete halfway through the incoming owner's transfer.
             retired.swap(*this);
             swap(other);
-            const bool cached = root_cache_epoch_ == m_epoch;  // other's, carried by the swap
+            const bool cached = false;  // CK12 diagnostic: the root cache does not follow a move
             // Preserve the existing one-invalidation-per-Core epoch contract.
             m_epoch = target_epoch + 1u;
             other.m_epoch = source_epoch + 1u;
@@ -2025,7 +2025,7 @@ namespace XOffsetDatastructure {
             }
             // With the content copied, a cached root is at the same offset:
             // it follows the move (root<T>() keeps its fast path).
-            const bool rebase_root = copy && root_cache_ && root_cache_epoch_ == m_epoch;
+            const bool rebase_root = false;  // CK12 diagnostic: the root cache does not follow a storage move
             const auto root_at = rebase_root ? static_cast<char*>(root_cache_) - buffer_.data() : 0;
             insert_owner_keeping(prepared);
             buffer_.swap(next);
