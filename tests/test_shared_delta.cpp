@@ -9,7 +9,8 @@
 // record's content and the baseline equals the server. The client buffer
 // passes load_verified throughout. Key bodies rebuild a cleared record.
 // Corrupted bodies (flipped, truncated, extended) are either rejected by
-// check() or, when accepted, leave a buffer that still verifies. No try/catch:
+// check() or, when accepted, leave a buffer that still verifies; a vector
+// patch naming bytes past the vector's end is rejected. No try/catch:
 // also built as test_shared_delta_noexc.
 #include "xoffsetdatastructure.hpp"
 #include "xoffset_shared_delta.hpp"
@@ -179,6 +180,24 @@ int main() {
             ++keys;
         }
         if (step % 100 == 0 && !verifies(client)) fail("client buffer does not verify", step);
+    }
+    {
+        // A patch of a vector whose bytes end inside a word (one int32): mask
+        // bits past the end would write past the vector and are rejected.
+        sdt::Rec& r = client.root<sdt::Holder>().recs[0];   // a slot no server record maps to
+        r.nums.resize(1);
+        std::string bad;
+        bad.push_back(0);                     // no inline blocks
+        bad.push_back(1);                     // one container op
+        bad.push_back(char(2 << 2 | 2));      // container 2 (nums), VPATCH
+        bad.push_back(1); bad.push_back(0); bad.push_back(1);   // one block, skip 0, selector word 0
+        bad.push_back(char(0xf0));            // bytes 4..7: past the end
+        bad.append(4, 'x');
+        if (RD::check(bad.data(), bad.data() + bad.size(), &r)) fail("patch past a vector's end accepted", -1);
+        bad[6] = char(0x0f);                  // bytes 0..3: the element
+        if (RD::check(bad.data(), bad.data() + bad.size(), &r) != bad.data() + bad.size()) fail("patch inside a vector rejected", -1);
+        RD::apply(bad.data(), r);
+        if (r.nums.size() != 1 || r.nums[0] != 0x78787878) fail("patch inside a vector not applied", -1);
     }
     if (!verifies(client)) fail("client buffer does not verify at the end", -1);
     for (std::size_t i = 0; i < kRecs; ++i)
