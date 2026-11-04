@@ -1,0 +1,56 @@
+== 2026-11-04T01:54:49Z 0. tools
+cmake version 4.4.4
+1.13.2
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+init cache /Volumes/XOffsetCS/perf-gate/slg-init-p2996-d77eff1.cmake sha ed916a0cf280cedf798d20f523b09c055e24ba4da58723df5d51d5558ebedde9; CMAKE_CXX_FLAGS [-stdlib=libc++ -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk]; default builds only
+== 2026-11-04T01:54:49Z 1. export
+new 845c230badea9ece53997859def0f21068ea9349 tree 7cf74d043bb0afb2a7142c12597a95f1fea60d8f bench/slg cd85a32f9e7d88392b09f524f8c95410a82a77c4
+anc b6e06788102838dc1364a22aba146cc23d70a030 tree cc6991a670c7aa918c13f95c7e21c4834e73e6ed bench/slg cd85a32f9e7d88392b09f524f8c95410a82a77c4
+old 827943cfb9725aeb54b2ff93ac99ff1eaf9351e2 tree c01689129b306891a3ba1129b861b3a4087da659 bench/slg cd85a32f9e7d88392b09f524f8c95410a82a77c4
+nc f5120a985a34731e9cdebda3c19f281713ce99fd tree 88eef03d86ca6c0ea58168250c07ca6b4aa4fd7c bench/slg cd85a32f9e7d88392b09f524f8c95410a82a77c4
+== 2026-11-04T01:54:51Z 2. build
+slg new: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+slg anc: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+slg old: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+slg nc: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+new 8c62904466e76a2eea749218c63cb05a7b50f6258c235aacb3232213eb505a1f
+anc 09abcb48c09ce8be25a88627284b1a6ca7e959107f4ab7f710c58c3bb79be22f
+old d03d592c293e248a5f4ab5ca04cb681b6ad062bba251fe963cdcbf83e47048c1
+nc 8cedf1fde19c2d49240d783438a1cc53753431fb88650b8fe505b3a3d69e93eb
+== 2026-11-04T01:56:36Z 3. verify
+new xoffset byte row [1166 2358 12964 842240 712]
+anc xoffset byte row [1166 2358 12964 842240 712]
+old xoffset byte row [1166 2358 12964 842240 712]
+nc xoffset byte row [1166 2358 12964 842240 712]
+== 2026-11-04T01:56:38Z 4. sizes
+# CK12S sizes (arm64, P2996 d77eff1 + libc++, the slg_bench compile flags)
+
+| point | XBufferCore | XBuffer | optional<XBuffer> | XOffsetRunner | players_ (512 x XBuffer) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| new | 216 | 232 | 240 | 9560 | 118784 |
+| anc | 224 | 240 | 248 | 9096 | 122880 |
+| old | 224 | 248 | 256 | 9944 | 126976 |
+| nc | 216 | 232 | 240 | 9560 | 118784 |
+
+malloc_good_size (FreeTable: 12472 at anc, 12480 at old/new, from the cloud layout dump):
+
+```
+232 -> 256
+240 -> 256
+248 -> 256
+256 -> 256
+9096 -> 10240
+9560 -> 10240
+9944 -> 10240
+12472 -> 14336
+12480 -> 14336
+118784 -> 131072
+122880 -> 131072
+126976 -> 131072
+```
+== 2026-11-04T01:56:45Z 5. timing
+== 2026-11-04T02:10:23Z 6. analysis
+判读行 x（只报）：x new÷anc A.total 0.9876 [0.9266, 1.0525]；x new÷anc A.req_encode 0.9657 [0.8950, 1.0419]；x new÷anc A.res_decode 0.9873 [0.9347, 1.0428]；x old÷anc A.total 1.0113 [0.9472, 1.0796]；x old÷anc A.req_encode 1.0019 [0.9251, 1.0850]；x old÷anc A.res_decode 1.0359 [0.9796, 1.0954]；x new÷old A.total 0.9766 [0.9129, 1.0446]；x new÷old A.req_encode 0.9639 [0.8868, 1.0477]；x new÷old A.res_decode 0.9531 [0.9045, 1.0042]；x nc÷anc A.total 0.9913 [0.9333, 1.0529]；x nc÷anc A.req_encode 0.9791 [0.9140, 1.0488]；x nc÷anc A.res_decode 0.9898 [0.9357, 1.0469]；x new÷nc A.total 0.9962 [0.9358, 1.0606]；x new÷nc A.req_encode 0.9863 [0.9166, 1.0613]；x new÷nc A.res_decode 0.9975 [0.9464, 1.0514]
+判读行 f4（只报）：f4 new÷anc A÷rivals 1.0198 [1.0026, 1.0373]；f4 new÷anc A.total 1.0286 [0.9812, 1.0782]；f4 new÷anc A.req_encode 1.0843 [1.0299, 1.1416]；f4 new÷anc A.res_decode 0.9919 [0.9520, 1.0335]；f4 old÷anc A÷rivals 1.0269 [1.0122, 1.0417]；f4 old÷anc A.total 1.0306 [0.9887, 1.0742]；f4 old÷anc A.req_encode 1.0667 [1.0176, 1.1182]；f4 old÷anc A.res_decode 1.0536 [1.0145, 1.0941]；f4 new÷old A÷rivals 0.9931 [0.9766, 1.0099]；f4 new÷old A.total 0.9981 [0.9496, 1.0490]；f4 new÷old A.req_encode 1.0165 [0.9629, 1.0731]；f4 new÷old A.res_decode 0.9415 [0.8994, 0.9855]；f4 nc÷anc A÷rivals 0.9928 [0.9795, 1.0063]；f4 nc÷anc A.total 0.9924 [0.9529, 1.0335]；f4 nc÷anc A.req_encode 0.9931 [0.9498, 1.0383]；f4 nc÷anc A.res_decode 0.9934 [0.9566, 1.0317]；f4 new÷nc A÷rivals 1.0272 [1.0108, 1.0439]；f4 new÷nc A.total 1.0364 [0.9867, 1.0887]；f4 new÷nc A.req_encode 1.0919 [1.0364, 1.1503]；f4 new÷nc A.res_decode 0.9985 [0.9538, 1.0452]
+== 2026-11-04T02:10:24Z finish rc=0
+result tarball: /Users/ximi/workspace/xo-queue/queue/073-ck12x/out/ck12x_result.tar.gz sha256 2e485878d4747ccafee15b4a8ed7e2d7b53ed36bf338b3ad21be6419478f37e0

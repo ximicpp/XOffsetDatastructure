@@ -1,0 +1,7 @@
+/Volumes/XOffsetCS/perf-gate/prep-ck12x/sizes_probe.cpp:7:95: error: implicit instantiation of undefined template 'CK12S_SIZES<224, 248, 256, 9944>'
+    7 |             sizeof(std::optional<XOffsetDatastructure::XBuffer>), sizeof(slg::XOffsetRunner)> ck12s_sizes;
+      |                                                                                               ^
+/Volumes/XOffsetCS/perf-gate/prep-ck12x/sizes_probe.cpp:5:38: note: template is declared here
+    5 | template <unsigned long... N> struct CK12S_SIZES;
+      |                                      ^
+1 error generated.
