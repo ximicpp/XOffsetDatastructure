@@ -180,6 +180,19 @@ foreach(test_name ${EVOLUTION_TESTS})
     add_xoffset_test(${test_name} "reflection;evolution")
 endforeach()
 
+# Trust tiers by link type (xoffset_receiver.hpp): XReceiver admit against
+# the full check, the forced full check, and the client uplink refusing admit
+# at compile time.
+add_xoffset_test(test_receiver reflection)
+add_xoffset_test(test_receiver_forced reflection)
+add_executable(receiver_from_client_admit_fail EXCLUDE_FROM_ALL receiver/from_client_admit_fail.cpp)
+configure_xoffset_target(receiver_from_client_admit_fail)
+add_test(NAME receiver_from_client_admit_fail
+    COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target receiver_from_client_admit_fail --config $<CONFIG>)
+set_tests_properties(receiver_from_client_admit_fail PROPERTIES
+    LABELS reflection
+    PASS_REGULAR_EXPRESSION "data from a client is never admitted unchecked")
+
 # Fixed messages (xoffset_fixed_message.hpp): records with no arena
 # container, sent as their own bytes and read in place.
 add_xoffset_test(test_fixed_message reflection)
@@ -256,6 +269,8 @@ set(NO_EXCEPTIONS_TESTS
     test_schema_handshake
     test_delta_sync
     test_fixed_message
+    test_receiver
+    test_receiver_forced
 )
 foreach(test_name ${NO_EXCEPTIONS_TESTS})
     if(NOT XOFFSET_TESTS_REFLECTION AND test_name IN_LIST XOFFSET_CXX26_ONLY_TESTS)

@@ -561,7 +561,8 @@ buffer 地址固定（在 VM 预留内增长），只在显式时间点搬：输
 省掉校验，不可信输入走 K4。
 
 接收检查分三档（2026-11-04 定）。3.3.x 及以前只有完整档：`load_verified`、`reload_verified`、增量 apply
-等现有入口都做全图校验。信任档和边界档的接口在 3.4 加入，届时各链路的默认如下：
+等现有入口都做全图校验。3.4 起整块接收的信任档由 `XReceiver`（`xoffset_receiver.hpp`）提供，增量 apply 的
+信任档和边界档随后加入。各链路的默认如下：
 
 | 档 | 默认用在哪 | 查什么 | 收到后能做什么 |
 | --- | --- | --- | --- |
@@ -572,6 +573,23 @@ buffer 地址固定（在 VM 预留内增长），只在显式时间点搬：输
 信任档的前提是发送方是自己的同构建服务，链路有 TLS、mTLS 或在内网；它不是不可信输入的入口。调试和
 sanitizer 构建里信任档照样做完整校验。客户端发来的数据是不可信输入：边界档只保证读取不越界，数据只读
 使用；要原地修改时走完整档。
+
+```cpp
+#include "xoffset_receiver.hpp"
+
+// 接收器按连接类型建，档位由类型决定；没有全局开关，XBuffer 上也没有 trusted 成员。
+XReceiver<XLink::from_server> rx(XBuffer::maximum_capacity(16 << 20));   // 客户端收服务端
+XStatus st = rx.reload<Profile>(held, wire);        // 信任档：解析 wire 头和表、复制、装空闲表，不遍历对象图
+XStatus full = rx.reload<Profile, XCheck::full>(held, wire);   // 同一链路显式完整校验
+auto fresh = rx.load<Profile>(wire);                // 新建 buffer（每次新映射，热路径用 reload）
+
+XReceiver<XLink::from_client> up(XBuffer::maximum_capacity(64 << 10));   // 服务端收客户端
+(void)up.reload<Profile>(state, wire);              // 只能完整档；写 XCheck::admit 编译不过
+```
+
+信任档接受任何 V2 wire（`save_verified` 的各种 emission、`save_compact`），结果和完整档一样可以原地读写、
+再发。`XOFFSET_FORCE_FULL_CHECK=1` 让信任档改走完整校验：没有 `NDEBUG` 的构建和 ASan、TSan 构建默认如此，
+发布构建可以手动打开做压测或灰度。
 
 K7 的现状：
 
