@@ -106,6 +106,10 @@ private:
 
 namespace detail {
 inline constexpr const char* arena_failure_message = "XOffset arena allocation failed";
+// A maximum capacity (or a payload) above XBufferCore::MAX_PAYLOAD.
+inline constexpr const char* payload_limit_message =
+    "XOffset maximum capacity exceeds the payload limit of 2 GiB - 8 bytes "
+    "(XBufferCore::MAX_PAYLOAD; offsets inside a payload are 32-bit)";
 } // namespace detail
 
 class XBadAlloc : public XException {
