@@ -61,13 +61,26 @@ a string's, but a type that int and unsigned element stores cannot alias, so a
 - The byte after the last character and every unused inline byte are 0.
 
 **Owner by address.** A head does not name the payload it belongs to; that is
-the payload it lies in. `detail::OwnerMap` keeps one byte per 4 MiB granule of
-the 48-bit address space: 0 for no XOffset region, otherwise bits 0..5 give k,
-the region's alignment exponent (the payload base is `address & ~(2^k - 1)`),
-and bit 7 marks a slot, whose payload starts 64 bytes in. Slot chunks register
-once; a VM payload is reserved as whole 4 MiB granules aligned to 2^k and sets
-its entries while it is mapped (a pooled mapping keeps them). On Windows the
-table is committed at the first registration.
+the payload it lies in. `detail::OwnerMap` keeps one 16-bit entry per 4 MiB
+granule of the 48-bit address space: 0 for no XOffset region, otherwise bits
+0..5 give k and bits 6..15 give o, the payload's offset from a 2^k boundary (a
+multiple of 64 below 64 KiB). The payload holding `address` starts at
+`((address - o) & ~(2^k - 1)) + o`. A slot chunk registers once, with k the
+slot size and o = 64 (the slot header) plus the chunk's color; a VM region is
+reserved as whole 4 MiB granules aligned to 2^k, starts its payload at its
+color o, and sets its entries while it is mapped (a pooled mapping keeps them,
+and its color). On Windows the table is committed at the first registration.
+
+**Color.** Each new VM region and each new slot chunk takes the next color, a
+page-aligned offset below 64 KiB (below the slot size in a slot chunk, which
+then holds one slot fewer; classes of at most one page are not colored).
+Without it every VM payload starts on a 2^k >= 4 MiB boundary and every
+largest-class slot on a 256 KiB boundary, so the first pages of many payloads
+share their low page-number bits and compete for the same TLB sets: 64 order
+books, one VM buffer each, applied events 1.8x slower than the same books in
+one buffer at equal instruction counts. The color changes no offset inside a
+payload, so wire bytes, page alignment and the pages a payload touches are
+unchanged.
 
 Lookups follow five rules:
 
