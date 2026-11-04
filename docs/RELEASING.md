@@ -42,6 +42,24 @@ tools/local_validate.sh --release --base <上一个 tag 或上一个检查点>
 全量 CTest。每一步都要是 pass（Ir 门禁对发版只看是否完成，不判 S 类）。`REPORT.md`
 贴进发版 PR。
 
+### 3.1 发版前 fuzz（K4）
+
+同一个 C 上，对每个接收入口跑一轮 ASan+UBSan fuzz（susu 2026-11-04 定；不再每晚跑）。云端后台任务
+2 小时会被停，所以按阶段分开跑，每个阶段一个后台任务（GCC 阶段先按 `fuzz-nightly/README.md` 第 1 步
+启动 dockerd）：
+
+```sh
+OUT=/mnt/project-files/release-X.Y.Z/fuzz
+tools/fuzz_prerelease.sh --out $OUT --phase gcc        # GCC 16 Docker 差分 fuzz + 回放，约 50 分钟
+tools/fuzz_prerelease.sh --out $OUT --phase libfuzzer  # 服务端反射构建的全部 libFuzzer 目标
+tools/fuzz_prerelease.sh --out $OUT --phase client     # 客户端字段表构建 + 三种构建结果比较
+tools/fuzz_prerelease.sh --out $OUT --phase verdict    # 写 VERDICT.md，PASS 才往下走
+```
+
+VERDICT 只有在三个阶段都跑在 C 上（工作树干净）、预算是 `release`、每个作业成功且没有发现时才是
+PASS。有发现：`tools/fuzz_report.py` 开 issue（用法见 `tools/fuzz_nightly.sh` 开头），修复 PR 把最小化
+后的输入放进 `tests/fuzz/regressions/<target>/`，合入后在新的 C 上重跑。VERDICT.md 贴进发版 PR。
+
 ## 4. 发版 PR（0 类）
 
 一个只改版本和文档的 PR，标题 `Release X.Y.Z`，base 是 `next_cpp26`：
