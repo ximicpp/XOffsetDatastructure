@@ -1,0 +1,3 @@
+new CMAKE_CXX_FLAGS:STRING=-stdlib=libc++ -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk
+nc CMAKE_CXX_FLAGS:STRING=-stdlib=libc++ -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk
+pf CMAKE_CXX_FLAGS:STRING=-stdlib=libc++ -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk
