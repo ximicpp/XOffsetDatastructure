@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Pre-release fuzz covers delta sync: `fuzz_delta_sync` (libFuzzer, also
+  `fuzz_delta_sync_replay` and CTest `fuzz_delta_sync_replay*`) applies
+  input-driven deltas to a replica (raw block and hole sections behind a valid
+  header, corrupted real deltas in a stream, bare and key deltas) and requires
+  that the receiver's fast paths agree with full verification of a clone, that
+  a rejected delta leaves replica and cursor unchanged, and that an accepted
+  one verifies on reload. It runs in the reflection and field-list libFuzzer
+  phases and the GCC 16 replay; the release budget is 1200 s per target.
+
 - `XMap::try_emplace` (and `operator[]`, `emplace`, `insert_or_assign` on a
   new key) and `XSet::insert` append a key greater than the last one after
   one compare instead of a binary search; any other key searches all but

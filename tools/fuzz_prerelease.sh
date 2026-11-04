@@ -23,7 +23,7 @@
 #             background task is stopped after 2 h, so there run the phases
 #             one per task: gcc, libfuzzer, client, then verdict)
 #
-# --budget release (default): gcc 2700 s, libFuzzer 1500 s per target per
+# --budget release (default): gcc 2700 s, libFuzzer 1200 s per target per
 # backend. --budget quick: 300 s / 120 s, a dry run of the pipeline that does
 # not count for a release. The corpus store (default
 # /mnt/project-files/fuzz-nightly/corpus) is reused and updated, so each
@@ -50,7 +50,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 case "$BUDGET" in
-  release) GCC_SECS=2700 LF_SECS=1500 ;;
+  release) GCC_SECS=2700 LF_SECS=1200 ;;
   quick) GCC_SECS=300 LF_SECS=120 ;;
   *) echo "unknown budget '$BUDGET'" >&2; exit 2 ;;
 esac

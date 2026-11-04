@@ -154,10 +154,11 @@ M1–M6 已在 0.3.0-beta.1 实施，行为变化见 CHANGELOG。M3 的修改路
 | `begin_verified_receive` / `finish_verified`、`receive_raw::validate` | 同上（`v2_fuzz_core.hpp` 的 receive、raw 两列，与 oracle 比较） |
 | `reload_verified`、`begin_verified_reload`、可搬槽位存储 | 同上（reload、direct、slot 各列，与新 buffer 的加载逐字节比较） |
 | schema 演进：`evolve_load_verified`、`XPeerSchemas` 握手、`read_schema_ack` | `fuzz_schema_evolution` |
+| 增量 apply：`try_apply_delta_verified` / `apply_delta_verified`（3.3） | `fuzz_delta_sync`（反射和字段表两种构建）：快路径（none、in_place）与克隆副本上的全量校验比较结论、错误和结果；拒绝时副本和游标不变；接受的结果能再校验加载 |
 | 客户端字段表构建、关异常构建 | `fuzz_v2_wire`、`fuzz_wire_schemas` 的 C++20 字段表构建（libFuzzer），`tools/fuzz_outcome_diff.sh`（三种构建逐条比较结果和错误文字） |
 
 各阶段与预算见脚本开头的说明；一轮发版 fuzz 约 4 小时（GCC 45 分钟，每个 libFuzzer 目标每种构建
-25 分钟）。下面是更早的记录。
+20 分钟）。下面是更早的记录。
 
 现状（0.3.0-beta.1）：F1–F3 已实现，F4 的 PR 短跑已在 CI 运行；每日长跑的 workflow
 已写好，但 GitHub 定时任务只在默认分支触发，目前没有运行，发布前以一次 480 万例的
