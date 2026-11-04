@@ -1,0 +1,8 @@
+CKPT17 not run
+anchor 49ce3c68 (next_cpp26; mainline merged into PR #214)
+screen watcher not run
+GATED ABC not judged
+GATE_D not run
+G8 not run
+G9R not run
+ctest not run
