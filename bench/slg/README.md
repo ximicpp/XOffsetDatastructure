@@ -163,7 +163,9 @@ runners prefetch the two armies before A.apply with the same
 `prefetch_army_for_apply` (army, heroes, troops, buffs; 2026-11-04: XOffset's
 earlier `prefetch_for_update()` allocator-line hint was dropped, since the
 troop-only write-back does not allocate and the hint cost ~11% of A). LK.recv includes the query, as
-L.recv. The native slot bookkeeping (`n_plan`) is timed in N*.send. cereal
+L.recv. The native slot bookkeeping (`n_plan`) is timed in N*.send; its unit
+and march id -> slot maps are flat open-addressing tables (2026-11-04, were
+`std::unordered_map`; slot choice, bytes and states unchanged). cereal
 reuses its input stream. Allocator: glibc malloc for every format.
 
 ## Instruction counts (CI performance gate)
