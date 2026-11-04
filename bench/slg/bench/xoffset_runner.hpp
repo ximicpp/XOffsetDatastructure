@@ -351,7 +351,10 @@ public:
             hold.clear(); hold.resize(srv.size());
             pm.emplace(XBuffer::create<xm::PlayerPatch>(kViewInitial, cap()));
             pr.emplace(XBuffer::create<xm::PlayerPatch>(kViewInitial, cap()));
+            for (auto& h : hw) h.reset();
 #ifdef XOFFSET_DELTA_SYNC_API
+            for (auto& h : nhw) h.reset();
+            ncw.assign(kWarmDevices, {});
             nb.assign(srv.size(), {});
             nc.assign(srv.size(), {});
             nh.clear(); nh.resize(srv.size());
@@ -372,6 +375,17 @@ public:
             return pw.size();
         }
         void patch_recv() { pr->template reload_verified<xm::PlayerPatch>(pw); }
+        // Scoring V3: wires for the zstd keys; the warm single device's player (LDW, LNW).
+        std::vector<std::optional<XBuffer>> hw = std::vector<std::optional<XBuffer>>(kWarmDevices);
+        std::string_view login_wire() const { return lw; }
+        std::string_view patch_wire() const { return pw; }
+        void login_recv_w(int d, std::string_view w) {
+            auto& h = hw[std::size_t(d)];
+            if (!h) h.emplace(XBuffer::create<PlayerState>(kPlayerInitial, cap()));
+            h->template reload_verified<PlayerState>(std::as_bytes(std::span<const char>(w.data(), w.size())));
+        }
+        PlayerState& held_w(int d) { return hw[std::size_t(d)]->template root<PlayerState>(); }
+        void patch_recv_from(const std::string& w) { pr->template reload_verified<xm::PlayerPatch>(w); }
         const xm::PlayerPatch& patch() { return pr->template root<xm::PlayerPatch>(); }
 #ifdef XOFFSET_DELTA_SYNC_API
         std::vector<XOffsetDatastructure::XDeltaBaseline> nb;
@@ -408,6 +422,21 @@ public:
             if (!r) throw std::runtime_error("native self delta rejected: " + std::string(r.error().message));
         }
         PlayerState& n_held(int p) { return nh[std::size_t(p)]->template root<PlayerState>(); }
+        std::vector<std::optional<XBuffer>> nhw = std::vector<std::optional<XBuffer>>(kWarmDevices);
+        std::vector<XOffsetDatastructure::XDeltaCursor> ncw = std::vector<XOffsetDatastructure::XDeltaCursor>(kWarmDevices);
+        std::string_view n_wire() const { return nd; }
+        void n_login_recv_w(int d, std::string_view w) {
+            auto& h = nhw[std::size_t(d)];
+            if (!h) h.emplace(XBuffer::create<PlayerState>(kPlayerInitial, cap()));
+            const XOffsetDatastructure::XStatus r = h->template try_apply_delta_verified<PlayerState>(std::as_bytes(std::span<const char>(w.data(), w.size())), ncw[std::size_t(d)]);
+            if (!r) throw std::runtime_error("native login (warm) rejected: " + std::string(r.error().message));
+        }
+        void n_recv_from_w(int d, const std::string& w) {
+            if (w.empty()) return;
+            const XOffsetDatastructure::XStatus r = nhw[std::size_t(d)]->template try_apply_delta_verified<PlayerState>(w, ncw[std::size_t(d)]);
+            if (!r) throw std::runtime_error("native self delta (warm) rejected: " + std::string(r.error().message));
+        }
+        PlayerState& n_held_w(int d) { return nhw[std::size_t(d)]->template root<PlayerState>(); }
 #endif
     };
     // SD (login.hpp): dirty modules to storage. Native SN: a delta against what
@@ -472,8 +501,8 @@ public:
             dr.emplace(XBuffer::create<xm::ViewDelta>(kViewInitial, cap()));
             snaps.assign(1, {});
             held_views.clear();
-            held_views.resize(std::size_t(clients) + 1);   // [clients]: the warm single-device view (EBW)
-            held_roots.assign(std::size_t(clients) + 1, nullptr);
+            held_views.resize(std::size_t(clients + kWarmDevices));   // [clients + d]: warm single device d (EBW, U*W)
+            held_roots.assign(std::size_t(clients + kWarmDevices), nullptr);
 #ifdef XOFFSET_DELTA_SYNC_API
             n_setup(clients, units, marches);
 #else
@@ -511,6 +540,7 @@ public:
         }
         std::string_view delta_wire() const { return dw; }
         void delta_recv() { dr->reload_verified<xm::ViewDelta>(dw); }
+        void delta_recv_from(const std::string& w) { dr->reload_verified<xm::ViewDelta>(w); }
         const xm::ViewDelta& delta() { return dr->root<xm::ViewDelta>(); }
 
 #ifdef XOFFSET_DELTA_SYNC_API
@@ -604,8 +634,8 @@ public:
             nucap = int32_t(int64_t(3) * units * kViewW * kViewH / (int64_t(2) * kMapSize * kMapSize)) + 32;
             nmcap = marches / 4 + 32;
             nheld.clear();
-            nheld.resize(std::size_t(clients));
-            ncur.assign(std::size_t(clients), {});
+            nheld.resize(std::size_t(clients + kWarmDevices));   // [clients + d]: warm replica d (N*W)
+            ncur.assign(std::size_t(clients + kWarmDevices), {});
         }
         void n_view(int c, const MapWorld& w, const ViewRect& r) {
             auto& n = nb[std::size_t(c)];
@@ -744,8 +774,46 @@ public:
             if (!r) throw std::runtime_error("native delta rejected: " + std::string(r.error().message));
         }
         xm::ViewSnapshot& n_held(int c, int) { return nheld[std::size_t(c)]->template root<xm::ViewSnapshot>(); }
+        std::string_view n_wire() const { return ndelta; }
+        void n_apply_from(int c, const std::string& d) {
+            const XOffsetDatastructure::XStatus r = nheld[std::size_t(c)]->template try_apply_delta_verified<xm::ViewSnapshot>(d, ncur[std::size_t(c)]);
+            if (!r) throw std::runtime_error("native delta rejected: " + std::string(r.error().message));
+        }
 #endif
     };
+
+    // XOffset: a player is its buffer; used = arena size - free, arena = get_size,
+    // reserved = the address space its storage reserves.
+    void memory(CycleStats& st) override {
+        std::size_t used = 0, arena = 0, res = 0;
+        for (auto& b : players_) { used += b.get_size() - b.get_free_memory(); arena += b.get_size(); res += b.reserved_bytes(); }
+        if (const std::size_t n = players_.size()) {
+            st.bytes["MEM.player"] = used / n; st.bytes["MEM.player_arena"] = arena / n; st.bytes["MEM.player_reserved"] = res / n;
+        }
+        for (int i = 0; i < ViewCases::count; ++i) {
+            view_memory(bs_[i], ViewCases::keys(i), st);
+#ifdef XOFFSET_DELTA_SYNC_API
+            if (const std::size_t n = ops_[i].nb.size(); n && ops_[i].nb[0].buf) {
+                std::size_t v = 0, bl = 0, slots = 0;
+                for (auto& c : ops_[i].nb) {
+                    if (!c.buf) continue;
+                    v += c.buf->get_size(); bl += c.base.recorded_bytes();
+                    slots += (c.uslot.cells.capacity() + c.mslot.cells.capacity()) * sizeof(typename BlockOps::SlotMap::Cell)
+                           + (c.ufree.capacity() + c.mfree.capacity()) * sizeof(int32_t);
+                }
+                const std::string N = "MEM." + ViewCases::keys(i).nname;
+                st.bytes[N + ".view"] = v / n; st.bytes[N + ".baseline"] = bl / n; st.bytes[N + ".slots"] = slots / n;
+            }
+#endif
+        }
+#ifdef XOFFSET_DELTA_SYNC_API
+        if (const std::size_t n = lops_.nb.size()) {
+            std::size_t bl = 0;
+            for (const auto& b : lops_.nb) bl += b.recorded_bytes();
+            st.bytes["MEM.LN.baseline"] = bl / n;
+        }
+#endif
+    }
 
     uint64_t world_digest() override {
         Digest g;
