@@ -1,0 +1,12 @@
+t0 49ce3c68fa60ff9b531f1fa482fc4fb4b8e65479 tree 9b9544a872e52b29c154df3e2940c7ce93bef908 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (next_cpp26 49ce3c68 (#212; mainline merged into PR #213))
+t1 daf56e89cd4c4ec8a8d838e52846864e24bf82bd tree 585971e0ef7c8c9fbe851c4a9ff997451f120235 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (CKPT15 head (PR #213 keep free table daf56e89))
+t1: diff over t0 sha256 3e461319274ea3c0eb3f97b5d56f167da7841e6af564eb9adb1b0e40a48faab9 ( 3 files changed, 116 insertions(+), 50 deletions(-))
+t1: library header diff over t0:  1 file changed, 67 insertions(+), 37 deletions(-)
+t1: first-parent commits over t0:
+  daf56e89 Merge next_cpp26 into claude/keep-free-table-20261104
+  4a54734d Keep a reloaded buffer's free table instead of recycling it
+bench/reloc of t1: same tree as t0
+reloc_bench t0 sha256 cbdab37ce5213b313f9cbae2f81d6a569d1fe515171ead440165e3d8731521d1
+reloc_bench t1 sha256 bda36a5d999b89dce10307362d737ffe0ad36216ea0b0e06898a549563196d65
+reloc_bench t0a sha256 997947e5a22513ed50575bc5e308ad08ee0c568181d4dee72419e74f025ee8bc
+reloc_bench t1a sha256 c896031c33e1abe6059c1fbb5b546e01a1cc160794aeef9122cc4d3978e1a4b4
