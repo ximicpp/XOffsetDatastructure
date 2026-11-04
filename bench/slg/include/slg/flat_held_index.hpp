@@ -14,6 +14,8 @@ namespace slg {
 // Growth and erase may invalidate iterators. Updating an existing key does
 // not grow: apply_delta retains the removed key's iterator while updating
 // the last element's position, then erases the retained iterator.
+// emplace probes once when the table has room for one more key (the usual
+// case) and checks for an existing key before it would grow.
 class FlatHeldIndexMap {
     struct Cell {
         std::int32_t first = 0;
@@ -70,9 +72,13 @@ public:
     }
 
     std::pair<iterator, bool> emplace(std::int32_t key, std::int32_t val) {
-        if (auto* p = find(key)) return {p, false};
-        reserve(count_ + 1);
+        // Grow only for a new key, so updating an existing key never moves cells.
+        if (2 * (count_ + 1) > cells_.size()) {
+            if (auto* p = find(key)) return {p, false};
+            reserve(count_ + 1);
+        }
         const auto i = probe(key);
+        if (cells_[i].occupied) return {&cells_[i], false};
         cells_[i] = {key, val, true};
         ++count_;
         return {&cells_[i], true};
