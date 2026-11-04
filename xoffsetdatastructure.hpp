@@ -988,8 +988,12 @@ namespace XOffsetDatastructure {
                         ++i;
                     }
                 }
-                // No bump_gen: a table from make_free_table() is new or came
-                // from the cache through recycle(), so it is already stale.
+                // A table from make_free_table() is new or came from the
+                // cache through recycle(), so it is already stale. Marked
+                // anyway: a table this path fills that had its generation
+                // read since its last change (an owner's kept, emptied
+                // table) must not keep that value with new holes in it.
+                if (count != 0) table->bump_gen();
             } XOFFSET_CATCH(const std::bad_alloc&) {
                 XOFFSET_THROW(XBadAlloc());
             }
