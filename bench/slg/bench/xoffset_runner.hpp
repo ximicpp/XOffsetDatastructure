@@ -118,7 +118,7 @@ public:
             untimed(st, "A.simulate", [&] { simulate_battle(m->root<BattleMsg>()); });
             timed(st, "A.res_encode", [&] { res = m->save_verified<BattleMsg>(); });
             timed(st, "A.res_decode", [&] {
-                prefetch_for_apply(pr);
+                prefetch_army_for_apply(att); prefetch_army_for_apply(def);
                 r.emplace(XBuffer::load_verified<BattleMsg>(res, cap()));
             });
             timed(st, "A.apply", [&] {
@@ -225,7 +225,7 @@ public:
             recv<BattleMsg>(st, "A.req_decode", req_, a_m_);
             untimed(st, "A.simulate", [&] { simulate_battle(a_m_->root<BattleMsg>()); });
             timed(st, "A.res_encode", [&] { a_m_->save_verified_into<BattleMsg>(res_); });
-            timed(st, "A.res_decode", [&] { prefetch_for_apply(pr); });
+            timed(st, "A.res_decode", [&] { prefetch_army_for_apply(att); prefetch_army_for_apply(def); });
             recv<BattleMsg>(st, "A.res_decode", res_, a_r_);
             timed(st, "A.apply", [&] {
                 const auto& out = a_r_->root<BattleMsg>();
@@ -506,12 +506,16 @@ public:
             std::unordered_map<int32_t, int32_t> uslot, mslot;
             std::vector<int32_t> ufree, mfree;
             int32_t usize = 0, msize = 0;
-            std::vector<int32_t> urm, mrm;
-            std::vector<std::pair<int32_t, int32_t>> uup, mup;
-            std::vector<uint8_t> unew;   // uup[k] took a slot this tick: the unit is new to the view
             std::string key;
         };
         std::vector<NView> nb;
+        // This delivery's plan (n_plan, then n_update of the same client): one
+        // set of vectors for every client, warm, like the shared delta buffer.
+        struct NPlan {
+            std::vector<int32_t> urm, mrm;
+            std::vector<std::pair<int32_t, int32_t>> uup, mup;
+            std::vector<uint8_t> unew;   // uup[k] took a slot this tick: the unit is new to the view
+        } np;
         // Every client's delta is written into one buffer, as the application-
         // level path writes every message into one, and read by that client's
         // apply right after.
@@ -547,33 +551,38 @@ public:
         }
         void n_plan(int c, const MapWorld& w, const DeltaPlan& p) {
             auto& n = nb[std::size_t(c)];
-            n.urm.clear(); n.mrm.clear(); n.uup.clear(); n.mup.clear(); n.unew.clear();
-            auto take = [](std::unordered_map<int32_t, int32_t>& at, std::vector<int32_t>& fr, int32_t& size, int32_t id) {
-                const auto it = at.find(id);
-                if (it != at.end()) return it->second;
+            np.urm.clear(); np.mrm.clear(); np.uup.clear(); np.mup.clear(); np.unew.clear();
+            // The slot of id, taking the lowest free one (or a new one) for an
+            // id the view does not hold yet: one lookup either way.
+            auto take = [](std::unordered_map<int32_t, int32_t>& at, std::vector<int32_t>& fr, int32_t& size, int32_t id, bool& fresh) {
+                const auto [it, added] = at.try_emplace(id, 0);
+                fresh = added;
+                if (!added) return it->second;
                 int32_t pos;
                 if (fr.empty()) pos = size++;
                 else { std::pop_heap(fr.begin(), fr.end(), std::greater<>{}); pos = fr.back(); fr.pop_back(); }
-                at.emplace(id, pos);
+                it->second = pos;
                 return pos;
             };
             for (int32_t id : p.removed) {
                 const auto it = n.uslot.find(id);
                 if (it == n.uslot.end()) continue;
-                n.urm.push_back(it->second); n.ufree.push_back(it->second); n.uslot.erase(it);
+                np.urm.push_back(it->second); n.ufree.push_back(it->second); n.uslot.erase(it);
                 std::push_heap(n.ufree.begin(), n.ufree.end(), std::greater<>{});
             }
             for (int32_t id : p.removed_marches) {
                 const auto it = n.mslot.find(id);
                 if (it == n.mslot.end()) continue;
-                n.mrm.push_back(it->second); n.mfree.push_back(it->second); n.mslot.erase(it);
+                np.mrm.push_back(it->second); n.mfree.push_back(it->second); n.mslot.erase(it);
                 std::push_heap(n.mfree.begin(), n.mfree.end(), std::greater<>{});
             }
+            bool fresh = false;
             for (int32_t i : p.units) {
-                n.unew.push_back(n.uslot.find(w.unit(i).id) == n.uslot.end() ? 1 : 0);
-                n.uup.emplace_back(i, take(n.uslot, n.ufree, n.usize, w.unit(i).id));
+                const int32_t pos = take(n.uslot, n.ufree, n.usize, w.unit(i).id, fresh);
+                np.unew.push_back(fresh ? 1 : 0);
+                np.uup.emplace_back(i, pos);
             }
-            for (int32_t i : p.marches) n.mup.emplace_back(i, take(n.mslot, n.mfree, n.msize, w.march(i).id));
+            for (int32_t i : p.marches) np.mup.emplace_back(i, take(n.mslot, n.mfree, n.msize, w.march(i).id, fresh));
         }
         void n_update(int c, const MapWorld& w, const DeltaPlan& p, int64_t id) {
             auto& n = nb[std::size_t(c)];
@@ -587,22 +596,22 @@ public:
             b.touch(v.request_id); b.touch(v.tick);
             if (v.units.size() < std::size_t(n.usize)) { v.units.resize(std::size_t(n.usize)); b.touch(&v.units, sizeof(v.units)); }
             if (v.marches.size() < std::size_t(n.msize)) { v.marches.resize(std::size_t(n.msize)); b.touch(&v.marches, sizeof(v.marches)); }
-            for (int32_t pos : n.urm) {
+            for (int32_t pos : np.urm) {
                 static const WorldUnit empty{};
                 auto& u = v.units[std::size_t(pos)];
                 copy_unit(u, empty);
                 b.touch(u);
             }
-            for (int32_t pos : n.mrm) { v.marches[std::size_t(pos)] = xm::ViewMarch{}; b.touch(v.marches[std::size_t(pos)]); }
+            for (int32_t pos : np.mrm) { v.marches[std::size_t(pos)] = xm::ViewMarch{}; b.touch(v.marches[std::size_t(pos)]); }
             // A unit new to the view is copied whole; one the view holds gets
             // the fields the world changed this tick (its dirty flags, as a
             // game server keeps them), each written and touched where its
             // value differs (touch_set: the bytes that changed).
-            for (std::size_t k = 0; k < n.uup.size(); ++k) {
-                const auto [i, pos] = n.uup[k];
+            for (std::size_t k = 0; k < np.uup.size(); ++k) {
+                const auto [i, pos] = np.uup[k];
                 auto& d = v.units[std::size_t(pos)];
                 const WorldUnit& s = w.unit(i);
-                if (n.unew[k]) { copy_unit(d, s); b.touch(d); continue; }
+                if (np.unew[k]) { copy_unit(d, s); b.touch(d); continue; }
                 const uint64_t m = w.dirty(i);
 #define SLG_X(f) if (m & SLG_D(f)) b.touch_set(d.f, s.f);
                 SLG_VUNIT_SCALARS(SLG_X)
@@ -625,7 +634,7 @@ public:
                 if (m & SLG_D(buffs)) list(d.buffs, s.buffs, [&](auto& a, const auto& e) { b.touch_set(a.id, e.id); b.touch_set(a.stacks, e.stacks); b.touch_set(a.expire_ms, e.expire_ms); },
                                            [](auto& a, const auto& e) { a.id = e.id; a.stacks = e.stacks; a.expire_ms = e.expire_ms; });
             }
-            for (const auto& [i, pos] : n.mup) { copy_vmarch(v.marches[std::size_t(pos)], w.march(i)); b.touch(v.marches[std::size_t(pos)]); }
+            for (const auto& [i, pos] : np.mup) { copy_vmarch(v.marches[std::size_t(pos)], w.march(i)); b.touch(v.marches[std::size_t(pos)]); }
             for (int32_t t : p.tiles) {
                 const int32_t tx = t % kTiles, ty = t / kTiles;
                 auto& d = v.tiles[tile_pos(v, tx, ty)];
@@ -703,18 +712,6 @@ private:
         return p;
     }
     PlayerState& player(int i) { return players_[std::size_t(i)].template root<PlayerState>(); }
-    // Adapter (2026-11-02): the battle result for these two players is
-    // arriving, so the scene server starts loading their buffers' allocator
-    // lines (public cache hint, changes nothing) and A.apply does not wait on
-    // those misses one after another. Timed as part of A.res_decode; a no-op
-    // with libraries that do not have the hint.
-    void prefetch_for_apply([[maybe_unused]] const Pairing& pr) const {
-#if defined(XOFFSET_PREFETCH_FOR_UPDATE_API)
-        players_[std::size_t(pr.ap)].prefetch_for_update();
-        players_[std::size_t(pr.dp)].prefetch_for_update();
-#endif
-    }
-
     // Receive in the reuse protocol. Default: reload_verified copies the wire into the
     // slot's long-lived buffer and verifies it there. Direct ("xoffset_direct", the
     // "direct receive" column): begin_verified_receive reserves the final arena (from the
