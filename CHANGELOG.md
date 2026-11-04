@@ -2,6 +2,43 @@
 
 ## Unreleased
 
+## 3.3.0: native delta sync
+
+Delta sync arrives as an experimental API (`xoffset_delta.hpp`, delta
+format 1.0, docs/DELTA_SYNC.md): a sender writes only the 64-byte payload
+blocks that changed since a receiver's baseline, and the receiver patches
+its copy in place, checking only what the delta can affect. Wire format 2.1
+is unchanged. Fixed messages (`xoffset_fixed_message.hpp`) are new and also
+experimental; most other entries make saves, reloads, allocation and
+container appends faster on bench/slg, and `bench/hft` adds a second
+workload. Delta sync is not a core guarantee yet (K9 in
+docs/STABILITY_TESTS.md), the client path is still a target (K8), and
+server-to-client use is not announced.
+
+- Not in this release: keeping the root cache across a move or swap, tried
+  with delta sync, was dropped because it was slower on the Mac
+  (checkpoints CKPT14 and CK14L). A moved `XBuffer` takes the checked path
+  of `root<T>()` until a verified call fills its cache again; refilling it
+  there is PR #223, for 3.3.1 or 3.4.
+- Speed against 3.2.1 on the Mac (release checkpoint REL330, bench/slg M,
+  XOffset relative to the other formats, lower is faster): A 0.959, B 0.922,
+  C 0.959; docs/PERFORMANCE.md section 5. A.req_decode, 2.4% slower in the
+  gate that merged delta sync, is 0.997 of 3.2.1. Two report-only stages of
+  the demo cases are slower, A.apply 1.087 (every format on the same full
+  path) and UP.apply 1.053 (XOffset sending deltas). Both look like code
+  placement: the same step built with functions aligned to 64 bytes gives
+  A.apply 0.971. D is 1.007 of 3.2.1 (interval 0.976 to 1.039), report
+  only: D is judged against FlatBuffers, 0.949 (bound 0.960), which passes.
+- Planned for 3.4: buffers that evict each other from the cache when many
+  are read in turn (the HFT demo's 64 order books; placing each payload at
+  a different cache colour), the root cache refill after a move (#223) if
+  it is not in 3.3.1, and an inline fast path for `XHandle`.
+- No pre-release fuzz round ran for 3.3.0 (susu, 2026-11-04: it takes too
+  long). The delta harness below is in place for the next round.
+- `test_delta_sync`: where TLS is emulated (GCC on MinGW and Cygwin) the
+  thread-exit case applies its late delta at the end of the thread, because
+  a `thread_local`'s destructor can run on storage already freed there. The
+  library's per-thread delta scratch was already off on those targets.
 - Pre-release fuzz covers delta sync: `fuzz_delta_sync` (libFuzzer, also
   `fuzz_delta_sync_replay` and CTest `fuzz_delta_sync_replay*`) applies
   input-driven deltas to a replica (raw block and hole sections behind a valid
