@@ -259,6 +259,7 @@ public:
 
     void tick() {
         ++tick_;
+        changed_.clear();
         Rng& r = tick_rng_;
         if (rate_ == Rate::Stress) {
             for (auto& u : units_) {
@@ -373,12 +374,15 @@ public:
     const WorldTile& tile(int32_t tx, int32_t ty) const { return tiles_[std::size_t(ty * kTiles + tx)]; }
     int64_t tick_no() const { return tick_; }
     const ViewScale& scale() const { return *vs_; }
+    // World unit indices changed in the current tick, first change order
+    // (server bookkeeping, as dirty(): a game server's dirty set). Untimed.
+    const std::vector<int32_t>& changed_units() const { return changed_; }
 
 private:
     // A change to u in this tick (the fields `bits`; last_update always).
     void touch(WorldUnit& u, uint64_t bits) const {
         ++u.ver; u.last_update = tick_;
-        if (u.dirty_tick != tick_) { u.dirty = 0; u.dirty_tick = tick_; }
+        if (u.dirty_tick != tick_) { u.dirty = 0; u.dirty_tick = tick_; changed_.push_back(int32_t(&u - units_.data())); }
         u.dirty |= bits | SLG_D(last_update);
     }
     static std::string owner_name_of(int32_t owner) {
@@ -484,6 +488,7 @@ private:
     int32_t zones_[2][2]{};
     int32_t next_march_ = 1;
     std::vector<ViewClient> clients_;
+    mutable std::vector<int32_t> changed_;
     std::vector<std::vector<int32_t>> ucell_, mcell_;
     mutable std::vector<uint32_t> mstamp_;
     mutable uint32_t mgen_ = 0;
@@ -553,6 +558,8 @@ struct DeltaPlan {
     std::vector<int32_t> marches;          // world march indices: new or changed
     std::vector<int32_t> removed_marches;  // march ids that left
     std::vector<int32_t> tiles;            // tiles changed this tick: ty * kTiles + tx
+    std::vector<uint8_t> unew, mnew;       // units[k] / marches[k] is new to the client's view (bookkeeping the
+                                           // server has anyway; only the D3 prototype uses it)
     bool empty() const { return units.empty() && removed.empty() && marches.empty() && removed_marches.empty() && tiles.empty(); }
 };
 
@@ -561,6 +568,7 @@ public:
     void setup(int clients) { u_.assign(std::size_t(clients), {}); m_.assign(std::size_t(clients), {}); }
     void plan(const MapWorld& w, int c, const ViewRect& r, DeltaPlan& p) {
         p.units.clear(); p.removed.clear(); p.marches.clear(); p.removed_marches.clear(); p.tiles.clear();
+        p.unew.clear(); p.mnew.clear();
         ++gen_;
         auto& lu = u_[std::size_t(c)];
         w.units_in(r, tmp_);
@@ -568,7 +576,7 @@ public:
             const WorldUnit& u = w.unit(i);
             auto [it, fresh] = lu.try_emplace(u.id);
             SentU& s = it->second;
-            if (fresh || s.ver != u.ver) { s.ver = u.ver; p.units.push_back(i); }
+            if (fresh || s.ver != u.ver) { s.ver = u.ver; p.units.push_back(i); p.unew.push_back(fresh ? 1 : 0); }
             s.gen = gen_;
         }
         for (auto it = lu.begin(); it != lu.end();) {
@@ -581,7 +589,7 @@ public:
             const WorldMarch& m = w.march(i);
             auto [it, fresh] = lm.try_emplace(m.id);
             SentM& s = it->second;
-            if (fresh || s.x1 != m.x1 || s.y1 != m.y1 || s.t1 != m.t1) { s.x1 = m.x1; s.y1 = m.y1; s.t1 = m.t1; p.marches.push_back(i); }
+            if (fresh || s.x1 != m.x1 || s.y1 != m.y1 || s.t1 != m.t1) { s.x1 = m.x1; s.y1 = m.y1; s.t1 = m.t1; p.marches.push_back(i); p.mnew.push_back(fresh ? 1 : 0); }
             s.gen = gen_;
         }
         for (auto it = lm.begin(); it != lm.end();) {
@@ -722,8 +730,10 @@ struct ViewKeys {
     std::string esend, erecv, ewrecv, usend, urecv, uapply;
     std::string ewin, ereq, ezstd, ecomp, ecompz, udelta, umsg, uzstd, uunits, umarch, utiles;
     std::string nsend, ndiff, nrecv, ndelta;
-    ViewKeys(const char* e, const char* u, const char* n) {
-        const std::string E(e), U(u), N(n);
+    std::string dpub, dsend, drecv, ddelta;
+    ViewKeys(const char* e, const char* u, const char* n, const char* d) {
+        const std::string E(e), U(u), N(n), D(d);
+        dpub = D + ".pub"; dsend = D + ".send"; drecv = D + ".recv"; ddelta = D + ".delta";
         esend = E + ".send"; erecv = E + ".recv"; ewrecv = E + "W.recv";
         ewin = E + ".window"; ereq = E + ".requests"; ezstd = E + ".window_zstd";
         ecomp = E + ".window_compact"; ecompz = E + ".window_compact_zstd";
@@ -751,7 +761,7 @@ struct ViewCases {
     static constexpr Rate rates[count] = {Rate::Peace, Rate::Peace, Rate::Combat, Rate::Stress};
     static bool browse(int i) { return i == 0; }
     static const ViewKeys& keys(int i) {
-        static const ViewKeys k[count] = {{"EB", "UB", "NB"}, {"EP", "UP", "NP"}, {"EC", "UC", "NC"}, {"ES", "US", "NS"}};
+        static const ViewKeys k[count] = {{"EB", "UB", "NB", "DB"}, {"EP", "UP", "NP", "DP"}, {"EC", "UC", "NC", "DC"}, {"ES", "US", "NS", "DS"}};
         return k[i];
     }
     static uint64_t seed(uint64_t s, int i) { return mix_seed(s, 0xb10c + uint64_t(i)); }
@@ -778,6 +788,10 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
     MapWorld& w = s.world;
     const ViewScale& vs = w.scale();
     constexpr bool native = requires { ops.n_diff(0); };
+    constexpr bool d3 = requires { ops.d_publish(w); };
+    const bool run_n = native_on() && d3_mode() != 1;
+    const bool run_d = native_on() && d3_mode() != 0;
+    (void)run_n; (void)run_d;
     if (s.browse) {
         // Class 2: every client moves its view and pulls the whole rectangle.
         for (int r = 0; r < vs.rounds; ++r) {
@@ -835,6 +849,7 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
     if (!s.primed) {
         // Class 3, before the first timed tick: every client pulls its view once
         // (untimed: that is a class 2 pull) and the server records what it holds.
+        if constexpr (d3) if (run_d) ops.d_init(w);
         for (int c = 0; c < vs.clients; ++c) {
             const ViewRect rect = w.rect(c);
             s.tracker.plan(w, c, rect, s.plan);
@@ -847,7 +862,13 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
             h.units.reserve(h.units.size() * 3 / 2 + 16);
             h.marches.reserve(h.marches.size() * 3 / 2 + 16);
             build_index(h, s.index[std::size_t(c)]);
-            if constexpr (native) if (native_on()) {
+            if constexpr (d3) if (run_d) {
+                ops.d_view(c, rect);
+                ops.d_key(c, w, s.plan);
+                ops.d_recv(c);
+                if (query_view(ops.d_held(c)) != query_view(ops.held(c, 0))) throw std::runtime_error("D3 key: view differs from the snapshot");
+            }
+            if constexpr (native) if (run_n) {
                 ops.n_view(c, w, rect);
                 ops.n_plan(c, w, s.plan);
                 ops.n_update(c, w, s.plan, 0);
@@ -862,18 +883,22 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
     static thread_local std::vector<std::size_t> zoff;
     for (int r = 0; r < vs.rounds; ++r) {
         w.tick();
+        // D3: every entity changed this tick is compared and encoded once, for
+        // every connection (shared work, charged to the server per tick).
+        if constexpr (d3) if (run_d) timed(st, k.dpub.c_str(), [&] { ops.d_publish(w); });
         const int64_t base = (int64_t(cycle) * vs.rounds + r) * (vs.clients + 1) + 1;
         for (int c = 0; c < vs.clients; ++c) {
             const ViewRect rect = w.rect(c);
             s.tracker.plan(w, c, rect, s.plan);
             if (s.plan.empty()) continue;   // nothing changed in this view: nothing sent
-            std::size_t nd = 0;
-            if constexpr (native) if (native_on()) {
+            std::size_t nd = 0, dd = 0;
+            if constexpr (native) if (run_n) {
                 // Slot bookkeeping is timed with the update, as the application-level
                 // client's id index is timed in U*.apply (fairness review 2026-11-03).
                 timed(st, k.nsend.c_str(), [&] { ops.n_plan(c, w, s.plan); ops.n_update(c, w, s.plan, base + c); });
                 timed(st, k.ndiff.c_str(), [&] { nd = ops.n_diff(c); });
             }
+            if constexpr (d3) if (run_d) timed(st, k.dsend.c_str(), [&] { dd = ops.d_send(c, w, s.plan, base + c); });
             std::size_t n = 0;
             timed(st, k.usend.c_str(), [&] { n = ops.delta_encode([&](auto& d) { fill_delta(d, w, rect, s.plan, base + c); }); });
             if (keep_delta && c == 0) *keep_delta = std::string(ops.delta_wire());
@@ -882,10 +907,15 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
             timed(st, k.uapply.c_str(), [&] { apply_delta(ops.held(c, 0), at, ops.delta()); });
             const uint64_t q = query_view(ops.held(c, 0));
             st.report_sum += q;
-            if constexpr (native) if (native_on()) {
+            if constexpr (native) if (run_n) {
                 timed(st, k.nrecv.c_str(), [&] { ops.n_apply(c, 0); });
                 if (query_view(ops.n_held(c, 0)) != q) throw std::runtime_error("native delta: view differs from the application-level one");
                 st.bytes[k.ndelta] += nd;
+            }
+            if constexpr (d3) if (run_d) {
+                timed(st, k.drecv.c_str(), [&] { ops.d_recv(c); });
+                if (query_view(ops.d_held(c)) != q) throw std::runtime_error("D3 delta: view differs from the application-level one");
+                st.bytes[k.ddelta] += dd;
             }
             st.bytes[k.udelta] += n;
             // zstd size after the round (below): compressing here would evict
