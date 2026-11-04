@@ -1,0 +1,52 @@
+// HFT demo: the state snapshot (late join) as FlatBuffers. Order and Row are
+// structs with the same layout as hft::Order and hft::Row.
+namespace hft.fb;
+
+struct Order {
+  order_id: ulong;
+  ts: ulong;
+  price: long;
+  qty: uint;
+  side: ubyte;
+  pad1: ubyte;
+  pad2: ushort;
+}
+
+struct Row {
+  symbol: ulong;
+  instrument: uint;
+  live_orders: uint;
+  live_shares: ulong;
+  best_bid: long;
+  best_ask: long;
+  last_price: long;
+  volume: ulong;
+  trades: ulong;
+  adds: ulong;
+  removes: ulong;
+  high: long;
+  low: long;
+  last_ts: ulong;
+}
+
+table Level {
+  price: long;
+  qty: ulong;
+  count: uint;
+  orders: [Order];
+}
+
+table Book {
+  instrument: uint;
+  symbol: ulong;
+  bids: [Level];
+  asks: [Level];
+}
+
+table State {
+  seq: ulong;
+  books: [Book];
+  rows: [Row];
+}
+
+root_type State;
