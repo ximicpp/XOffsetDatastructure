@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- `root<T>()` on a cold buffer reads one cache line: its cache is two
+  words (root type, root pointer) aligned to 16 bytes, and every epoch
+  change clears it, instead of four words (with the root's epoch and the
+  buffer's) that straddled a line for 3 of 8 placements of an `XBuffer`
+  in a `std::vector`. `alignof(XBufferCore)` (and `XBuffer`) is now 16;
+  `sizeof` is unchanged. Last-level read misses (cache simulation), GCC 16:
+  slg UP.apply -1.9% (about one per three deliveries); instructions
+  A.apply -1.5%, UP.apply -0.5%.
 - Verified saves (`save_verified`, `save_verified_into`) no longer shrink the
   source's logical length to `used_end`; the wire was always cut at
   `used_end`, so its bytes are unchanged. A sender that resets and refills
