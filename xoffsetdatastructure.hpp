@@ -611,9 +611,6 @@ namespace XOffsetDatastructure {
 
         void swap(XBufferCore& other) noexcept {
             if (this == &other) return;
-            // A cached root goes with its storage (the payload does not move).
-            std::swap(root_cache_, other.root_cache_);
-            std::swap(root_cache_type_, other.root_cache_type_);
             buffer_.swap(other.buffer_);
             owner_record_.swap(other.owner_record_);
             free_table_.swap(other.free_table_);
@@ -626,11 +623,8 @@ namespace XOffsetDatastructure {
             std::swap(schema_bound_, other.schema_bound_);
             std::swap(bound_root_type_id_, other.bound_root_type_id_);
             std::swap(bound_schema_hash_, other.bound_schema_hash_);
-            // The cached roots were swapped with their storage (and the
-            // typed-access and schema state a hit stands for), so the epochs
-            // advance without advance_epoch()'s clear.
-            ++m_epoch;
-            ++other.m_epoch;
+            advance_epoch();
+            other.advance_epoch();
             update_registry_owner();
             other.update_registry_owner();
         }
@@ -1883,9 +1877,6 @@ namespace XOffsetDatastructure {
                 // free list and schema state; other keeps this empty storage
                 // and gets the default state the retired path below leaves
                 // it. Each epoch still advances by one.
-                // A cached root comes along (the payload does not move).
-                const void* const cached_type = other.root_cache_type_;
-                void* const cached_root = other.root_cache_;
                 buffer_.swap(other.buffer_);
                 owner_record_.swap(other.owner_record_);
                 free_table_.swap(other.free_table_);
@@ -1899,8 +1890,6 @@ namespace XOffsetDatastructure {
                 bound_schema_hash_ = std::exchange(other.bound_schema_hash_, 0);
                 advance_epoch();
                 other.advance_epoch();
-                root_cache_type_ = cached_type;
-                root_cache_ = cached_root;
                 update_registry_owner();
                 return;
             }
@@ -1916,7 +1905,7 @@ namespace XOffsetDatastructure {
             // Preserve the existing one-invalidation-per-Core epoch contract.
             m_epoch = target_epoch + 1u;
             other.m_epoch = source_epoch + 1u;
-            // The swap above brought other's cached root with its storage.
+            root_cache_type_ = nullptr;
             other.root_cache_type_ = nullptr;
             // Only now destroy retired target resources. Any delete reentry
             // sees the fully published incoming payload, schema and free cache.
@@ -2019,18 +2008,10 @@ namespace XOffsetDatastructure {
             } XOFFSET_CATCH(...) {
                 return false;
             }
-            // With the content copied, a cached root is at the same offset:
-            // it follows the move (root<T>() keeps its fast path).
-            const void* const root_type = copy ? root_cache_type_ : nullptr;
-            const auto root_at = root_type ? static_cast<char*>(root_cache_) - buffer_.data() : 0;
             insert_owner_keeping(prepared);
             buffer_.swap(next);
             publish_host_owner();
             advance_epoch();
-            if (root_type) {
-                root_cache_type_ = root_type;
-                root_cache_ = buffer_.data() + root_at;
-            }
             return true;
             // `next` (the old storage) is released here.
         }
@@ -2452,10 +2433,8 @@ namespace XOffsetDatastructure {
         // root offset change only with the epoch (reinit, reset, move, swap,
         // storage move) or on a fresh owner, so a hit in root<T>() returns
         // what its checked path would. Set only by those mutating calls, so
-        // root<T>() itself stays read-only. advance_epoch() clears it; a
-        // move, a swap and a storage move that copies the content carry it
-        // (the root stays where it was in the payload), together with the
-        // typed-access and schema state that a hit stands for.
+        // root<T>() itself stays read-only. Not transferred: every epoch
+        // change (advance_epoch, the retiring move) clears it.
         template <typename T>
         T* cached_root() const noexcept {
             return root_cache_type_ == type_identity<T>() ? static_cast<T*>(root_cache_) : nullptr;

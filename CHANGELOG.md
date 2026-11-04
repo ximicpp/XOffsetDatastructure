@@ -84,13 +84,8 @@
   baseline: 2,043 to 452 bytes per delta in the battle case, 7,440 to
   1,297 in the stress case, and the receiver's time in the stress case
   from 25.9 to 12.3 us.
-- A movable slot that outgrows its storage keeps its cached root (at the
-  same offset in the copied content), and so does an `XBuffer` that is
-  moved or swapped (for example one built by `create` and then moved into
-  a container), so `root<T>()` stays on its fast path afterwards instead
-  of re-checking typed access and the schema on every call. The root
-  cache, the free table pointer and the storage's base and size now come
-  first in `XBufferCore`, in 40 bytes: the update that follows a
+- The root cache, the free table pointer and the storage's base and size
+  now come first in `XBufferCore`, in 40 bytes: the update that follows a
   `root<T>()` (`prefetch_for_update()`, an allocation) finds them on the
   line the root lookup brought in.
 - The receiver checks a container that moved, got its first block or lost
