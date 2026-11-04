@@ -70,6 +70,88 @@
   no second owner lookup or alias check, no free-run scan. Output bytes are
   unchanged. GCC 16 instructions, bench/slg (M): UP.send a further -10.7%
   (about 150 fewer per message).
+- Delta sync (`xoffset_delta.hpp`, `docs/DELTA_SYNC.md`): a sender keeps an
+  `XDeltaBaseline` per receiver and `save_delta_into<T>` writes the 64-byte
+  payload blocks that changed since, each by its byte mask (plus the hole
+  table when it changed); the receiver's `apply_delta_verified<T>` /
+  `try_apply_delta_verified<T>` patches its copy in place, keeps an
+  `XDeltaCursor` (stream and version) and rolls the bytes back on
+  rejection. The first delta is a key delta (the full state);
+  `XDeltaBaseline::key_delta_into` serves a receiver that joins late.
+  Delta format 1.0 is new (14-byte header for a small delta); wire format
+  2.1 is unchanged. New error codes `delta_base_mismatch` and
+  `digest_mismatch`.
+- The result passes exactly what `load_verified<T>` checks, but only what a
+  delta can affect is checked: the receiver keeps a map of the bytes
+  verification reads; a delta that writes none of them is not checked, one
+  that writes bools, string heads, vector sizes or the keys of a set or map
+  is checked in place, anything else is verified in full
+  (`XDeltaCursor::last_check()`). Errors are those of the whole
+  verification.
+- `XBuffer::touch(value)` / `touch(p, n)` with
+  `XDeltaOptions::touched_only`: the sender compares only the blocks it
+  touched since the baseline's last delta instead of the whole payload
+  (`XDeltaStats::compared_bytes`). `XDeltaOptions::digest` carries a hash
+  of the result; `XDeltaOptions::whole_blocks` sends changed blocks whole
+  for a cheaper apply. The touch log is a list of the blocks touched since
+  the last delta while one baseline pairs (the baseline's lines of them are
+  prefetched as they are touched), and stamps each block (4 bytes per
+  block) only once a second baseline pairs or the list overflows.
+  `XBuffer::touch_set(field, value)` assigns and touches only on a change,
+  and of a scalar only the bytes that changed.
+  `XDeltaBaseline(XDeltaRecord::touches)` keeps no payload copy and sends
+  the touched bytes instead.
+- The free-block table carries a generation that changes whenever a block
+  comes or goes (`XBufferCore::free_block_gen()`); a delta whose baseline
+  saw the same generation does not list, sort and compare the hole table
+  again.
+- The baseline's copy is a 64-byte aligned buffer that a key delta sizes
+  a quarter larger than the payload and that grows by doubling, moved and
+  zero-filled with memcpy/memset (it was a vector with an aligned
+  allocator, filled and moved byte by byte, and reallocated at the first
+  growth after every key delta: on the game demo 1,863 copies of about
+  85 KB in two cycles).
+- The delta receiver's map of checked and live blocks starts with a quarter
+  more room than the payload and grows by half again at least, as do its
+  node ranges: a view that grew a little reallocated and copied the whole
+  map (32 KB on the game demo view) at its next growth.
+- A touch of a block the period has not listed yet skips the scan of the
+  list (a 16-bit filter of the listed blocks, in the log's first line).
+- A baseline without a copy (`XDeltaRecord::touches`) sends only the touched
+  bytes after a period that touched more than 24 blocks too (the log keeps
+  each block's touched bytes past its list, 8 bytes per block); it sent
+  those blocks whole. On the game demo's viewport deltas with such a
+  baseline: 2,043 to 452 bytes per delta in the battle case, 7,440 to
+  1,297 in the stress case, and the receiver's time in the stress case
+  from 25.9 to 12.3 us.
+- The root cache, the free table pointer and the storage's base and size
+  now come first in `XBufferCore`, in 40 bytes: the update that follows a
+  `root<T>()` (`prefetch_for_update()`, an allocation) finds them on the
+  line the root lookup brought in.
+- The receiver checks a container that moved, got its first block or lost
+  it (heap strings, vectors of plain elements, sets and maps of plain
+  elements, strings entering or leaving the inline form) on its own, against
+  a map of live blocks kept with the cursor (one bit per 8 bytes), and checks
+  the hole table's coverage against the same map, instead of verifying the
+  whole payload (`XDeltaCheck::in_place`). Deltas that change `used_end` or
+  the hole table take the same path. A vector of records (structs with
+  strings or containers) that grows within its capacity has only its new
+  records verified (each of their blocks claimed in the same map). On the
+  game demo's 40-field units, the share of deltas verified in full went
+  from 1.6% (peace), 7% (combat) and 16% (stress) to none. One that moved,
+  got its first block or shrank (an erase from the middle, growth past its
+  capacity) drops what its old records reached from both maps and has all
+  its records verified again from its new block, instead of the whole
+  payload: the game demo's storage saves of players whose hero list changed
+  (65 of 284 saves per cycle) no longer take the whole verification.
+- Delta blocks lie on 64-byte payload offsets (block `i` = offsets `64 i`
+  to `64 i + 63`, one cache line; block 0 never writes the arena header),
+  and the baseline's copy is 64-aligned.
+- Block bytes are gathered and scattered with one byte shuffle per 8-byte
+  word: SSSE3 (checked at run time) on x86-64, NEON on AArch64, plain code
+  elsewhere. The scratch of applying a delta is shared by the cursors of
+  a thread, and that of writing one by its baselines (one copy, warm in
+  cache, for any number of replicas).
 - Wire validation off the cursor path: a live block within one bitmap word
   that meets nothing is marked directly in the out-of-line registration
   (no second call, no saved registers); the first block off the cursor,
