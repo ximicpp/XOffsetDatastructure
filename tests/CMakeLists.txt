@@ -159,6 +159,7 @@ set(REFLECTION_TESTS
     test_reset_used_range
     test_clone
     test_delta_sync
+    test_shared_delta
 )
 
 foreach(test_name ${REFLECTION_TESTS})
@@ -271,6 +272,7 @@ set(NO_EXCEPTIONS_TESTS
     test_fixed_message
     test_receiver
     test_receiver_forced
+    test_shared_delta
 )
 foreach(test_name ${NO_EXCEPTIONS_TESTS})
     if(NOT XOFFSET_TESTS_REFLECTION AND test_name IN_LIST XOFFSET_CXX26_ONLY_TESTS)
