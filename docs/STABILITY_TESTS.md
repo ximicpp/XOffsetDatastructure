@@ -72,7 +72,7 @@ K0–K8 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
   等价的稠密 wire 再校验，因为各版本接受的稀疏写法可以不同（0.3.0-beta.2 起 gap 字节不必落在空洞里）。
   同一版本内"稀疏 wire 与其稠密等价物结果相同"由 `test_v2_fuzz` 检查。
 - K4 的发版前 fuzz（2026-11-04 起；每晚长跑自 2026-10-28 停，不再恢复）：每次发版前在云端对每个接收入口
-  （信任、边界、完整三档，含增量 apply）跑一轮 ASan+UBSan fuzz，无发现才发版（[RELEASING.md](RELEASING.md)）。用的是下面这些脚本。
+  （信任、边界、完整三档，含增量 apply）跑一轮 ASan+UBSan fuzz，无发现才发版（[RELEASING.md](RELEASING.md)）。入口是 `tools/fuzz_prerelease.sh`（分阶段，出 `VERDICT.md`），调用下面这些脚本。
 - K4 的长跑工具（威胁模型 F4）：`tools/fuzz_nightly.sh` 在云端 Docker 主机上运行 GCC 16
   ASan+UBSan 差分 fuzz（`test_v2_fuzz`，4 个 seed，约 45 分钟）和回归语料回放；发现崩溃时
   `tools/fuzz_report.py` 按签名开 `fuzz-crash` issue 并推出 `fuzz-crash/<签名>` 分支。结果
