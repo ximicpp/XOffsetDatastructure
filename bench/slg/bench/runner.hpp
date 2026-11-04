@@ -88,6 +88,12 @@ template <class F> void untimed(CycleStats& st, const char* key, F&& f) {
 inline bool native_on() { static const bool on = std::getenv("SLG_NATIVE_OFF") == nullptr; return on; }
 // NB (native browse delta, report only) alone: SLG_NB_OFF=1 drops it, for A/B runs of the other stages.
 inline bool nb_on() { static const bool on = native_on() && std::getenv("SLG_NB_OFF") == nullptr; return on; }
+// D3 prototype (record-relative shared deltas, keys D*, EXPERIMENTAL):
+// SLG_D3=1 runs D* instead of N*, SLG_D3=2 runs both; unset or 0: N* only.
+inline int d3_mode() {
+    static const int m = [] { const char* e = std::getenv("SLG_D3"); return e ? std::atoi(e) : 0; }();
+    return m;
+}
 
 // The storage process checks a received player and keeps the bytes. A format
 // with a check that needs no application model (FlatBuffers' Verifier,
