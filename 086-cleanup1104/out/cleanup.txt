@@ -1,0 +1,85 @@
+== 2026-11-04T16:16:04Z before
+Filesystem      Size    Used   Avail Capacity iused ifree %iused  Mounted on
+/dev/disk5s1   120Gi    40Gi    23Gi    63%    102k  246M    0%   /Volumes/XOffsetCS
+ 18G	runs
+keep runs/2026-11-04-ckpt19-60288a2
+== 74 paths to delete
+ 84M runs/2026-10-22-2d8ed1d
+ 79M runs/2026-10-22-2d8ed1d-smoke
+ 80M runs/2026-10-22-2d8ed1d-smoke2
+233M runs/2026-10-23-0199655
+225M runs/2026-10-23-0199655-smoke
+230M runs/2026-10-23-2d8ed1d-r2
+225M runs/2026-10-23-2d8ed1d-r2-smoke
+233M runs/2026-10-23-4ced9a9
+225M runs/2026-10-23-4ced9a9-smoke
+229M runs/2026-10-23-d2-5528a14
+223M runs/2026-10-23-w1split
+233M runs/2026-10-25-0199655-r2
+225M runs/2026-10-25-0199655-r2-smoke
+233M runs/2026-10-25-6373933
+225M runs/2026-10-25-6373933-smoke
+229M runs/2026-10-25-b5e9c38
+225M runs/2026-10-25-b5e9c38-smoke
+226M runs/2026-10-26-ckpt1-f8eebf4
+230M runs/2026-10-26-ckpt1r2-f8eebf4
+648K runs/2026-10-26-d5-diagpre-445f2a0
+229M runs/2026-10-26-d5full-8cb6221
+228M runs/2026-10-26-diagp4-737f43c
+228M runs/2026-10-26-f81b4ab
+226M runs/2026-10-26-f81b4ab-smoke
+282M runs/2026-10-26-int1-445f2a0
+472M runs/2026-10-26-int2-737f43c
+3.0M runs/2026-10-26-int2tail-737f43c
+233M runs/2026-10-26-int3fr-4e6944a
+234M runs/2026-10-26-int3p4m-235dcda
+719M runs/2026-10-27-ckpt2-b50fc8a
+229M runs/2026-10-27-ckpt2b-3549272
+230M runs/2026-10-27-ckpt3-30af216
+5.5M runs/2026-10-27-g8-3549272
+ 11M runs/2026-10-27-gated-93bd2ec
+676M runs/2026-10-27-int4-e913d22
+ 11M runs/2026-10-27-xmodes-012c4c6
+  0B runs/2026-10-27-xmodes-3e295e4
+932M runs/2026-10-28-ckpt4-af601ea
+2.6G runs/2026-10-28-ckpt5-70a07a0
+481M runs/2026-10-28-ckpt5b-70a07a0
+480M runs/2026-10-28-ckpt5c-70a07a0
+463M runs/2026-11-03-ckpt10-3e02607
+463M runs/2026-11-03-ckpt11-827943c
+225M runs/2026-11-03-ckpt12-33c3478
+467M runs/2026-11-03-ckpt7-c4925fa
+458M runs/2026-11-03-ckpt8-5433b4e
+223M runs/2026-11-03-ckpt9-50f96b0
+229M runs/2026-11-04-ckpt12b-33c3478
+225M runs/2026-11-04-ckpt13-845c230
+463M runs/2026-11-04-ckpt14-6ec08cc
+229M runs/2026-11-04-ckpt15-daf56e8
+229M runs/2026-11-04-ckpt15b-daf56e8
+225M runs/2026-11-04-ckpt16a-5877913
+463M runs/2026-11-04-ckpt16c-d540148
+227M runs/2026-11-04-ckpt16e-d438627
+220M runs/2026-11-04-ckpt17-8a4bca9-smoke
+224M runs/2026-11-04-ckpt17b-8a4bca9
+230M runs/2026-11-04-ckpt18-c7f2429
+8.8M runs/d1-20261027T162420Z
+ 18M runs/d2-20261027T165317Z
+ 10M runs/d3-20261027T175106Z
+3.0M runs/g9r-20261027T060220Z
+4.6M runs/g9r2-20261027T072842Z
+ 12M runs/g9r3-20261027T105909Z
+ 54M src/ckpt13
+963M build/ckpt13
+ 17M wire/ckpt13
+184K prep-ckpt13
+4.0K ckpt13-points.tsv
+ 54M src/ckpt16a
+963M build/ckpt16a
+ 17M wire/ckpt16a
+184K prep-ckpt16a
+4.0K ckpt16a-points.tsv
+== 2026-11-04T16:16:06Z after
+Filesystem      Size    Used   Avail Capacity iused ifree %iused  Mounted on
+/dev/disk5s1   120Gi    20Gi    23Gi    47%     85k  246M    0%   /Volumes/XOffsetCS
+227M	runs
+2026-11-04-ckpt19-60288a2

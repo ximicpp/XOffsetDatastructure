@@ -1,0 +1,12 @@
+184K prep-ckpt13
+4.0K ckpt13-points.tsv
+ 54M src/ckpt16a
+963M build/ckpt16a
+ 17M wire/ckpt16a
+184K prep-ckpt16a
+4.0K ckpt16a-points.tsv
+== 2026-11-04T16:16:06Z after
+Filesystem      Size    Used   Avail Capacity iused ifree %iused  Mounted on
+/dev/disk5s1   120Gi    20Gi    23Gi    47%     85k  246M    0%   /Volumes/XOffsetCS
+227M	runs
+2026-11-04-ckpt19-60288a2

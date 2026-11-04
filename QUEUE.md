@@ -1,6 +1,6 @@
 # Mac queue
 
-Updated 2026-11-04T16:15:58Z after 086-cleanup1104: running 2026-11-04T16:15:54Z
+Updated 2026-11-04T16:16:10Z after 086-cleanup1104: done 0 2026-11-04T16:16:06Z
 
 ```
 runner: pid 4651 (version 2)
@@ -90,5 +90,5 @@ free: 23 GB on /Volumes/XOffsetCS, 23 GB on /Users/ximi
 083-ckpt16e                              done 0 2026-11-04T12:26:22Z
 084-ckpt18                               done 0 2026-11-04T13:28:14Z
 085-ckpt19                               done 4 2026-11-04T16:15:40Z
-086-cleanup1104                          running 2026-11-04T16:15:54Z
+086-cleanup1104                          done 0 2026-11-04T16:16:06Z
 ```
