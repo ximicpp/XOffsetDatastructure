@@ -1,0 +1,1 @@
+6ec08cc6ba8e837925f008947aaa49b16e72c420|the CKPT14 head (with the cached-root carry, bench/slg b68e63e9; report only); the last range holds a8f12389 (carry dropped) and the merge
