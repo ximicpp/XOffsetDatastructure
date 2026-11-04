@@ -72,6 +72,7 @@
 #include <unordered_map>
 #include <vector>
 #include "generic.hpp"
+#include "flat_held_index.hpp"
 #if SLG_WITH_COMPRESSION
 #include <zstd.h>
 #endif
@@ -645,7 +646,7 @@ template <class D> void fill_delta(D& d, const MapWorld& w, const ViewRect& r, c
 }
 
 // Client side: id -> position of a held view's units and marches.
-struct HeldIndex { std::unordered_map<int32_t, int32_t> units, marches; };
+struct HeldIndex { FlatHeldIndexMap units, marches; };
 
 template <class V> void build_index(const V& v, HeldIndex& at) {
     at.units.clear(); at.marches.clear();
