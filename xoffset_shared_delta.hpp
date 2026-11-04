@@ -61,11 +61,29 @@ namespace XOffsetDatastructure::xsync {
 
     // ---- varints (unsigned LEB128, at most 5 bytes, below 2^32) -------------
 
+    // Writes v at b (at most 5 bytes); returns the length.
+    inline unsigned encode_varint(char* b, std::uint32_t v) noexcept {
+        unsigned n = 0;
+        while (v >= 0x80) { b[n++] = char(v | 0x80); v >>= 7; }
+        b[n++] = char(v);
+        return n;
+    }
+    // Appends at most max bytes to out: f(d) writes them at d and returns how
+    // many it wrote. One capacity check, no call per byte.
+    template <class F> inline void write_into(std::string& out, std::size_t max, F&& f) {
+        const std::size_t at = out.size();
+#if defined(__cpp_lib_string_resize_and_overwrite)
+        out.resize_and_overwrite(at + max, [&](char* d, std::size_t) { return at + std::size_t(f(d + at)); });
+#else
+        out.resize(at + max);
+        out.resize(at + std::size_t(f(out.data() + at)));
+#endif
+    }
     inline void put_varint(std::string& out, std::uint32_t v) {
-        while (v >= 0x80) { out.push_back(char(v | 0x80)); v >>= 7; }
-        out.push_back(char(v));
+        write_into(out, 5, [&](char* d) { return encode_varint(d, v); });
     }
     inline bool get_varint(const char*& p, const char* end, std::uint32_t& v) noexcept {
+        if (p != end && !(static_cast<unsigned char>(*p) & 0x80)) { v = static_cast<unsigned char>(*p++); return true; }
         std::uint32_t r = 0;
         for (unsigned s = 0; s < 35; s += 7) {
             if (p == end) return false;
@@ -270,16 +288,28 @@ namespace XOffsetDatastructure::xsync {
                     if (m) sel |= 1u << w;
                 }
                 if (!sel) continue;
-                put_varint(out, std::uint32_t(b - next));
-                out.push_back(char(sel));
-                for (unsigned w = 0; w < 8; ++w) if (sel >> w & 1) out.push_back(char(masks[w]));
-                for (unsigned w = 0; w < 8; ++w) {
+                // One block: varint skip, selector, masks, data; one write.
+                write_into(out, 5 + 1 + 8 + 64, [&](char* blk) {
+                unsigned len = encode_varint(blk, std::uint32_t(b - next));
+                blk[len++] = char(sel);
+                for (unsigned s = sel; s; s &= s - 1) blk[len++] = char(masks[std::countr_zero(s)]);
+                for (unsigned s = sel; s; s &= s - 1) {
+                    const unsigned w = unsigned(std::countr_zero(s));
+                    const std::size_t a0 = b * 64 + w * 8;
+                    if (masks[w] == 0xffu) {   // a whole word
+                        std::memcpy(blk + len, cur + a0, 8);
+                        if (sync) std::memcpy(old + a0, cur + a0, 8);
+                        len += 8;
+                        continue;
+                    }
                     for (unsigned m = masks[w]; m; m &= m - 1) {
-                        const std::size_t a = b * 64 + w * 8 + unsigned(std::countr_zero(m));
-                        out.push_back(char(cur[a]));
+                        const std::size_t a = a0 + unsigned(std::countr_zero(m));
+                        blk[len++] = char(cur[a]);
                         if (sync) old[a] = cur[a];
                     }
                 }
+                return len;
+                });
                 next = b + 1;
                 ++count;
             }
@@ -287,42 +317,62 @@ namespace XOffsetDatastructure::xsync {
             return count;
         }
 
-        // Checks a block section over [0, n): bounds, masks inside plain(),
-        // bool bytes 0 or 1. Returns its end or nullptr.
-        template <class Plain, class Bools>
+        // Bits set in an 8-bit value (a table: std::popcount is a library call on
+        // baseline x86-64 builds).
+        inline constexpr auto kPop8 = [] {
+            std::array<std::uint8_t, 256> t{};
+            for (unsigned i = 0; i < 256; ++i) t[i] = std::uint8_t(std::popcount(i));
+            return t;
+        }();
+        // The bytes of word a / 8 that lie inside [0, n) (a < n).
+        inline unsigned inside(std::size_t a, std::size_t n) noexcept {
+            return n - a >= 8 ? 0xffu : (1u << (n - a)) - 1u;
+        }
+
+        // Checks a block section over [0, n): bounds, masks inside plain() and
+        // inside [0, n), bool bytes 0 or 1 (only when AnyBool). Returns its end
+        // or nullptr.
+        template <bool AnyBool, class Plain, class Bools>
         const char* check_blocks(const char* p, const char* end, std::size_t n, Plain&& plain, Bools&& bools) noexcept {
             std::uint32_t count;
             if (!get_varint(p, end, count)) return nullptr;
+            const std::size_t blocks = (n + 63) / 64;
             std::size_t next = 0;
             for (std::uint32_t e = 0; e < count; ++e) {
                 std::uint32_t skip;
                 if (!get_varint(p, end, skip)) return nullptr;
                 const std::size_t b = next + skip;
-                if (b >= (n + 63) / 64) return nullptr;
-                if (p == end) return nullptr;
+                if (b >= blocks || p == end) return nullptr;
                 const unsigned sel = static_cast<unsigned char>(*p++);
                 if (!sel) return nullptr;
-                unsigned masks[8] = {};
-                for (unsigned w = 0; w < 8; ++w) {
-                    if (!(sel >> w & 1)) continue;
-                    const std::size_t a = b * 64 + w * 8;
-                    if (a >= n || p == end) return nullptr;
-                    const unsigned m = static_cast<unsigned char>(*p++);
-                    if (!m || (m & ~plain(a / 8))) return nullptr;
-                    masks[w] = m;
+                const unsigned nm = kPop8[sel];
+                if (std::size_t(end - p) < nm) return nullptr;
+                const char* const masks = p;
+                p += nm;
+                std::size_t k = 0;
+                unsigned i = 0;
+                for (unsigned s = sel; s; s &= s - 1, ++i) {
+                    const std::size_t a = b * 64 + unsigned(std::countr_zero(s)) * 8;
+                    if (a >= n) return nullptr;
+                    const unsigned m = static_cast<unsigned char>(masks[i]);
+                    if (!m || (m & ~(plain(a / 8) & inside(a, n)))) return nullptr;
+                    k += kPop8[m];
                 }
-                for (unsigned w = 0; w < 8; ++w) {
-                    const unsigned m = masks[w];
-                    if (!m) continue;
-                    const auto k = unsigned(std::popcount(m));
-                    if (std::size_t(end - p) < k) return nullptr;
-                    if (const unsigned bm = bools((b * 64 + w * 8) / 8) & m) {
-                        const char* q = p;
-                        for (unsigned mm = m; mm; mm &= mm - 1, ++q)
-                            if ((bm >> std::countr_zero(mm) & 1) && static_cast<unsigned char>(*q) > 1) return nullptr;
+                if (std::size_t(end - p) < k) return nullptr;
+                if constexpr (AnyBool) {
+                    const char* q = p;
+                    i = 0;
+                    for (unsigned s = sel; s; s &= s - 1, ++i) {
+                        const unsigned m = static_cast<unsigned char>(masks[i]);
+                        if (const unsigned bm = bools((b * 64 + unsigned(std::countr_zero(s)) * 8) / 8) & m) {
+                            const char* r = q;
+                            for (unsigned mm = m; mm; mm &= mm - 1, ++r)
+                                if ((bm >> std::countr_zero(mm) & 1) && static_cast<unsigned char>(*r) > 1) return nullptr;
+                        }
+                        q += kPop8[m];
                     }
-                    p += k;
                 }
+                p += k;
                 next = b + 1;
             }
             return p;
@@ -338,11 +388,13 @@ namespace XOffsetDatastructure::xsync {
                 get_varint(p, p + 5, skip);
                 const std::size_t b = next + skip;
                 const unsigned sel = static_cast<unsigned char>(*p++);
-                unsigned masks[8] = {};
-                for (unsigned w = 0; w < 8; ++w) if (sel >> w & 1) masks[w] = static_cast<unsigned char>(*p++);
-                for (unsigned w = 0; w < 8; ++w) {
-                    unsigned char* d = dst + b * 64 + w * 8;
-                    for (unsigned m = masks[w]; m; m &= m - 1) d[std::countr_zero(m)] = static_cast<unsigned char>(*p++);
+                const char* masks = p;
+                p += kPop8[sel];
+                for (unsigned s = sel; s; s &= s - 1) {
+                    unsigned char* d = dst + b * 64 + unsigned(std::countr_zero(s)) * 8;
+                    const unsigned m = static_cast<unsigned char>(*masks++);
+                    if (m == 0xffu) { std::memcpy(d, p, 8); p += 8; continue; }
+                    for (unsigned mm = m; mm; mm &= mm - 1) d[std::countr_zero(mm)] = static_cast<unsigned char>(*p++);
                 }
                 next = b + 1;
             }
@@ -439,7 +491,7 @@ namespace XOffsetDatastructure::xsync {
         // nullptr: a cleared record). Returns the body's end, or nullptr when it
         // is malformed or does not fit dst. Reads dst, never writes it.
         static const char* check(const char* p, const char* end, const T* dst) noexcept {
-            p = sd_detail::check_blocks(p, end, sizeof(T), [](std::size_t w) -> unsigned { return I::plain[w]; },
+            p = sd_detail::check_blocks<I::any_bool>(p, end, sizeof(T), [](std::size_t w) -> unsigned { return I::plain[w]; },
                                         [](std::size_t w) -> unsigned { return I::bools[w]; });
             if (!p) return nullptr;
             if constexpr (container_count > 0) {
@@ -479,7 +531,7 @@ namespace XOffsetDatastructure::xsync {
                             }
                             if (op == sd_detail::kVpatch) {
                                 const std::size_t n = dst ? sd_detail::at<C, Off>(*dst).size() : 0;
-                                p = sd_detail::check_blocks(p, end, n * sizeof(E),
+                                p = sd_detail::check_blocks<sd_detail::Info<E>::any_bool>(p, end, n * sizeof(E),
                                     [](std::size_t w) { return sd_detail::elem_mask<E>(w, sd_detail::kPlain | sd_detail::kBool); },
                                     [](std::size_t w) { return sd_detail::elem_mask<E>(w, sd_detail::kBool); });
                                 return p != nullptr;
@@ -600,14 +652,25 @@ namespace XOffsetDatastructure::xsync {
     };
 
     inline void put_header(std::string& out, const XSyncHeader& h) {
-        out.push_back('X'); out.push_back('S'); out.push_back(char(kFormat)); out.push_back(char(h.flags));
-        if (h.flags & kFlagKey) { char s[8]; std::memcpy(s, &h.stream, 8); out.append(s, 8); }
-        put_varint(out, h.version);
-        put_varint(out, h.count);
+        write_into(out, 4 + 8 + 5 + 5, [&](char* d) {
+            d[0] = 'X'; d[1] = 'S'; d[2] = char(kFormat); d[3] = char(h.flags);
+            unsigned n = 4;
+            if (h.flags & kFlagKey) { std::memcpy(d + n, &h.stream, 8); n += 8; }
+            n += encode_varint(d + n, h.version);
+            return n + encode_varint(d + n, h.count);
+        });
     }
     inline void put_op(std::string& out, unsigned table, XSyncKind kind, std::uint32_t id) {
-        out.push_back(char(table << 2 | unsigned(kind)));
-        put_varint(out, id);
+        write_into(out, 6, [&](char* d) { d[0] = char(table << 2 | unsigned(kind)); return 1 + encode_varint(d + 1, id); });
+    }
+    // An op and its body (len bytes at body, already encoded): one write.
+    inline void put_op(std::string& out, unsigned table, XSyncKind kind, std::uint32_t id, const char* body, std::size_t len) {
+        write_into(out, 6 + len, [&](char* d) {
+            d[0] = char(table << 2 | unsigned(kind));
+            const unsigned n = 1 + encode_varint(d + 1, id);
+            std::memcpy(d + n, body, len);
+            return n + len;
+        });
     }
     inline const char* get_header(const char* p, const char* end, XSyncHeader& h) noexcept {
         if (end - p < 4 || p[0] != 'X' || p[1] != 'S' || static_cast<unsigned char>(p[2]) != kFormat) return nullptr;

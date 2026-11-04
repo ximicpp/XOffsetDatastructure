@@ -336,6 +336,20 @@ public:
     void run_view(int cycle, CycleStats& st, SampleWires* keep) {
         for (int k = 0; k < ViewCases::count; ++k)
             run_view_case(bs_[k], ops_[k], ViewCases::keys(k), cycle, st, keep ? &keep->view : nullptr, keep ? &keep->delta : nullptr);
+#if defined(XOFFSET_DELTA_SYNC_API) && defined(SLG_D3_STATS)
+        for (int k = 0; k < ViewCases::count; ++k) {
+            const auto& o = ops_[k];
+            if (ViewCases::browse(k) || o.dstat_msgs == 0) continue;
+            std::fprintf(stderr, "d3bytes %s cycle %d: %.1f B/msg", ViewCases::keys(k).dpub.substr(0, 2).c_str(), cycle, o.dstat_total / o.dstat_msgs);
+            static const char* tn[4] = {"root", "unit", "march", "tile"};
+            static const char* kn[3] = {"enter", "change", "leave"};
+            for (int q = 0; q < 12; ++q)
+                if (o.dstat_ops[q] > 0)
+                    std::fprintf(stderr, "; %s.%s %.2f ops %.1f B (body %.1f)", tn[q / 3], kn[q % 3], o.dstat_ops[q] / o.dstat_msgs,
+                                 o.dstat_bytes[q] / o.dstat_msgs, o.dstat_body[q] / o.dstat_msgs);
+            std::fprintf(stderr, "\n");
+        }
+#endif
 #ifdef XOFFSET_DELTA_SYNC_API
         if (std::getenv("SLG_MEM") && cycle == 0)
             for (int k = 0; k < ViewCases::count; ++k) {
@@ -917,9 +931,20 @@ public:
             e.ktick = dtick;
         }
         void d_put(unsigned table, XOffsetDatastructure::xsync::XSyncKind kind, int32_t id, uint32_t off, uint32_t len) {
-            XOffsetDatastructure::xsync::put_op(dmsg, table, kind, uint32_t(id));
-            dmsg.append(darena.data() + off, len);
+#ifdef SLG_D3_STATS
+            const std::size_t before = dmsg.size();
+#endif
+            XOffsetDatastructure::xsync::put_op(dmsg, table, kind, uint32_t(id), darena.data() + off, len);
+#ifdef SLG_D3_STATS
+            dstat_bytes[table * 3 + kind] += double(dmsg.size() - before);
+            dstat_body[table * 3 + kind] += double(len);
+            dstat_ops[table * 3 + kind] += 1;
+#endif
         }
+#ifdef SLG_D3_STATS
+        // Diagnostic build only (-DSLG_D3_STATS): message bytes by table and kind.
+        double dstat_bytes[12] = {}, dstat_body[12] = {}, dstat_ops[12] = {}, dstat_msgs = 0, dstat_total = 0;
+#endif
         // The message count is written as a three-byte varint, patched at the end.
         std::size_t d_begin(D3Conn& k, bool key) {
             XOffsetDatastructure::xsync::XSyncHeader h;
@@ -927,12 +952,9 @@ public:
             h.stream = k.stream;
             h.version = ++k.version;
             dmsg.clear();
-            dmsg.push_back('X'); dmsg.push_back('S'); dmsg.push_back(char(XOffsetDatastructure::xsync::kFormat)); dmsg.push_back(char(h.flags));
-            if (key) { char sbuf[8]; std::memcpy(sbuf, &h.stream, 8); dmsg.append(sbuf, 8); }
-            XOffsetDatastructure::xsync::put_varint(dmsg, h.version);
-            const std::size_t at = dmsg.size();
-            dmsg.append(3, char(0));
-            return at;
+            h.count = 1u << 14;   // a three-byte varint, patched by d_end
+            XOffsetDatastructure::xsync::put_header(dmsg, h);
+            return dmsg.size() - 3;
         }
         void d_end(std::size_t at, uint32_t count) {
             dmsg[at] = char(0x80 | (count & 0x7f));
@@ -976,6 +998,9 @@ public:
         std::size_t d_send(int c, const MapWorld& w, const DeltaPlan& p, int64_t id) {
             namespace xs = XOffsetDatastructure::xsync;
             D3Conn& k = dconn[std::size_t(c)];
+#ifdef SLG_D3_STATS
+            if (dstat_msgs == 0) for (int q = 0; q < 12; ++q) dstat_bytes[q] = dstat_body[q] = dstat_ops[q] = 0;   // drop the key messages
+#endif
             const std::size_t at = d_begin(k, false);
             uint32_t count = 0;
             d_root(k, id, w.tick_no(), count);
@@ -1000,6 +1025,9 @@ public:
                 if (e.len) { d_put(kTTile, xs::change, t, e.off, e.len); ++count; }
             }
             d_end(at, count);
+#ifdef SLG_D3_STATS
+            dstat_msgs += 1; dstat_total += double(dmsg.size());
+#endif
             return dmsg.size();
         }
         // The client: check every op against its view (ids held or not, bodies
