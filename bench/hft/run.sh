@@ -109,6 +109,7 @@ if [ "$IR" = 1 ]; then
       [ -n "$ir" ] && [ -n "$p" ] && printf '{"ir_case":"%s","name":"%s","phase":"%s","ir":%s,"run":%s}\n' \
         "$c" "$n" "$p" "$ir" "$(cat "$f.json")"
     done
+    return 0
   }
   export -f cg
   export OUT FEED CUT
