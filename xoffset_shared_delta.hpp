@@ -1,0 +1,628 @@
+#ifndef X_OFFSET_SHARED_DELTA_HPP
+#define X_OFFSET_SHARED_DELTA_HPP
+
+// EXPERIMENTAL (D3 prototype, 2026-11-04): record-relative shared deltas.
+// Not part of the public API; names, format and behaviour may change or go.
+//
+// A delta of xoffset_delta.hpp carries bytes at payload offsets, so it only
+// applies to a replica with the sender's layout: one baseline per receiver.
+// Here a change is written per record instead, as bytes at offsets inside the
+// record, and applies to a copy of that record held anywhere (another buffer,
+// another slot). A server compares each changed entity once per tick against
+// one shared baseline of it and every connection that holds the entity gets
+// the same bytes; the receiver keeps its own layout.
+//
+// What a body may write:
+//   - the record's plain bytes: scalars, enums with a fixed underlying type,
+//     bools (0 or 1), the same in nested records and arrays. Container heads
+//     and padding are never written as bytes (their values depend on where
+//     the containers' blocks lie in a buffer);
+//   - its containers through container operations: a string is assigned whole
+//     (STR); a vector of plain elements is replaced whole (VSET: the elements'
+//     plain bytes) or, at the same length, patched (VPATCH: element bytes).
+// Every write is a plain byte checked against the record type's byte classes
+// or a library container operation in the receiver's own arena, so the
+// receiver's buffer stays one that load_verified<T> accepts, without a check
+// map or a whole verification.
+//
+// Body (record-relative):
+//   inline := varint n, n x {varint skip, u8 selector (nonzero), mask bytes,
+//             data bytes} -- the block section of delta format 1.0 with blocks
+//             of 64 bytes counted from the record's first byte; every masked
+//             byte is a plain byte of T
+//   conts  := varint m, m x {u8 field << 2 | op, payload}, fields ascending;
+//             present only when T has containers. field = the container's
+//             index in schema order (nested records walked in place).
+//             op 0 STR    varint len, len bytes
+//             op 1 VSET   varint n, n x (plain bytes of E, in order)
+//             op 2 VPATCH an inline section over the elements' bytes
+//                         [0, size * sizeof(E)) at the current size
+// Supported in the prototype: scalars, bools, fixed-underlying enums, nested
+// ordinary records and arrays of them, XString, and XVector of elements
+// without containers. Sets, maps and vectors of records with containers are
+// rejected at compile time.
+
+#include "xoffsetdatastructure.hpp"
+
+#include <array>
+#include <bit>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <new>
+#include <span>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+namespace XOffsetDatastructure::xsync {
+
+    // ---- varints (unsigned LEB128, at most 5 bytes, below 2^32) -------------
+
+    inline void put_varint(std::string& out, std::uint32_t v) {
+        while (v >= 0x80) { out.push_back(char(v | 0x80)); v >>= 7; }
+        out.push_back(char(v));
+    }
+    inline bool get_varint(const char*& p, const char* end, std::uint32_t& v) noexcept {
+        std::uint32_t r = 0;
+        for (unsigned s = 0; s < 35; s += 7) {
+            if (p == end) return false;
+            const auto b = static_cast<unsigned char>(*p++);
+            if (s == 28 && b > 0x0f) return false;
+            r |= std::uint32_t(b & 0x7f) << s;
+            if (!(b & 0x80)) { v = r; return true; }
+        }
+        return false;
+    }
+
+    namespace sd_detail {
+        using XOffsetDatastructure::detail::fixed_size_scalar;
+        using XOffsetDatastructure::detail::is_fixed_flat_map_v;
+        using XOffsetDatastructure::detail::is_fixed_flat_set_v;
+        using XOffsetDatastructure::detail::is_fixed_string_v;
+        using XOffsetDatastructure::detail::is_fixed_vector_v;
+
+        enum : std::uint8_t { kNone = 0, kPlain = 1, kBool = 2 };
+        enum : std::uint8_t { kStr = 0, kVset = 1, kVpatch = 2 };
+
+        template <class> inline constexpr bool always_false = false;
+
+        template <class E> consteval bool enum_fixed() {
+            if constexpr (!std::is_enum_v<E>) return false;
+            else return requires(std::underlying_type_t<E> v) { E{v}; };
+        }
+
+        template <class U> constexpr bool is_container() {
+            return is_fixed_string_v<U> || is_fixed_vector_v<U> || is_fixed_flat_set_v<U> || is_fixed_flat_map_v<U>;
+        }
+
+        // Byte classes of T at base: kPlain, kBool, or kNone (container heads, padding).
+        template <class T>
+        constexpr void classify(std::uint8_t* out, std::size_t base) {
+            using U = std::remove_cv_t<T>;
+            if constexpr (std::is_same_v<U, bool>) {
+                out[base] = kBool;
+            } else if constexpr (fixed_size_scalar<U>) {
+                for (std::size_t i = 0; i < sizeof(U); ++i) out[base + i] = kPlain;
+            } else if constexpr (std::is_enum_v<U>) {
+                static_assert(enum_fixed<U>() && !std::is_same_v<std::underlying_type_t<U>, bool>,
+                              "xsync prototype: enums need a fixed, non-bool underlying type");
+                for (std::size_t i = 0; i < sizeof(U); ++i) out[base + i] = kPlain;
+            } else if constexpr (is_container<U>()) {
+                // a head: written only through container operations
+            } else if constexpr (std::is_array_v<U>) {
+                using E = std::remove_extent_t<U>;
+                for (std::size_t i = 0; i < std::extent_v<U>; ++i) classify<E>(out, base + i * sizeof(E));
+            } else if constexpr (std::is_class_v<U>) {
+                static_assert(schema::is_described_v<U> && schema::base_count_v<U> == 0,
+                              "xsync prototype: records must be described and have no bases");
+                [&]<std::size_t... I>(std::index_sequence<I...>) {
+                    (classify<typename schema::member_t<U, I>::type>(out, base + schema::member_t<U, I>::offset), ...);
+                }(std::make_index_sequence<schema::member_count_v<U>>{});
+            } else {
+                static_assert(always_false<U>, "xsync prototype: unsupported field type");
+            }
+        }
+
+        // The containers of T, in schema order, with their offsets in T.
+        template <class C, std::size_t Off> struct Slot { using type = C; static constexpr std::size_t offset = Off; };
+        template <class... S> struct List { static constexpr std::size_t size = sizeof...(S); };
+        template <class... L> struct Concat;
+        template <> struct Concat<> { using type = List<>; };
+        template <class... A> struct Concat<List<A...>> { using type = List<A...>; };
+        template <class... A, class... B, class... R> struct Concat<List<A...>, List<B...>, R...> {
+            using type = typename Concat<List<A..., B...>, R...>::type;
+        };
+        template <class T, std::size_t Base, class = void> struct ContainersOf;
+        template <class U, std::size_t Base, class Seq> struct ArrayContainers;
+        template <class U, std::size_t Base, std::size_t... I> struct ArrayContainers<U, Base, std::index_sequence<I...>> {
+            using E = std::remove_extent_t<U>;
+            using type = typename Concat<typename ContainersOf<E, Base + I * sizeof(E)>::type...>::type;
+        };
+        template <class U, std::size_t Base, class Seq> struct RecordContainers;
+        template <class U, std::size_t Base, std::size_t... I> struct RecordContainers<U, Base, std::index_sequence<I...>> {
+            using type = typename Concat<typename ContainersOf<typename schema::member_t<U, I>::type,
+                                                               Base + schema::member_t<U, I>::offset>::type...>::type;
+        };
+        template <class T, std::size_t Base, class>
+        struct ContainersOf {
+            using U = std::remove_cv_t<T>;
+            static constexpr auto pick() {
+                if constexpr (is_fixed_string_v<U> || is_fixed_vector_v<U>) return List<Slot<U, Base>>{};
+                else if constexpr (std::is_array_v<U>)
+                    return typename ArrayContainers<U, Base, std::make_index_sequence<std::extent_v<U>>>::type{};
+                else if constexpr (std::is_class_v<U> && !is_container<U>())
+                    return typename RecordContainers<U, Base, std::make_index_sequence<schema::member_count_v<U>>>::type{};
+                else return List<>{};
+            }
+            using type = decltype(pick());
+        };
+
+        template <class T> struct Info;
+
+        template <class C> constexpr bool supported_container() {
+            if constexpr (is_fixed_flat_set_v<C> || is_fixed_flat_map_v<C>) return false;
+            else if constexpr (is_fixed_string_v<C>) return true;
+            else {
+                using E = typename C::value_type;
+                return std::is_trivially_copyable_v<E> && ContainersOf<E, 0>::type::size == 0;
+            }
+        }
+
+        template <class T> struct Info {
+            static constexpr std::size_t size = sizeof(T);
+            static constexpr std::size_t words = (size + 7) / 8;
+            static constexpr std::array<std::uint8_t, size> classes = [] {
+                std::array<std::uint8_t, size> a{};
+                classify<T>(a.data(), 0);
+                return a;
+            }();
+            static constexpr auto word_masks(std::uint8_t which) {
+                std::array<std::uint8_t, words> m{};
+                for (std::size_t i = 0; i < size; ++i)
+                    if (classes[i] & which) m[i / 8] = std::uint8_t(m[i / 8] | (1u << (i % 8)));
+                return m;
+            }
+            static constexpr std::array<std::uint8_t, words> plain = word_masks(kPlain | kBool);
+            static constexpr std::array<std::uint8_t, words> bools = word_masks(kBool);
+            static constexpr bool any_bool = [] { for (auto c : classes) if (c == kBool) return true; return false; }();
+            // Runs of plain bytes: the dense form of VSET.
+            static constexpr std::size_t run_count = [] {
+                std::size_t n = 0;
+                for (std::size_t i = 0; i < size; ++i) if (classes[i] && (i == 0 || !classes[i - 1])) ++n;
+                return n;
+            }();
+            struct Run { std::uint32_t at, len; };
+            static constexpr std::array<Run, run_count> runs = [] {
+                std::array<Run, run_count> r{};
+                std::size_t n = 0;
+                for (std::size_t i = 0; i < size; ++i) {
+                    if (!classes[i]) continue;
+                    if (i == 0 || !classes[i - 1]) r[n++] = Run{std::uint32_t(i), 0};
+                    ++r[n - 1].len;
+                }
+                return r;
+            }();
+            static constexpr std::size_t plain_bytes = [] { std::size_t n = 0; for (auto c : classes) n += c != 0; return n; }();
+            using containers = typename ContainersOf<T, 0>::type;
+            static constexpr std::size_t container_count = containers::size;
+            static_assert(container_count < 64, "xsync prototype: at most 63 containers per record");
+            static_assert((size + 63) / 64 < 128, "xsync prototype: records up to 8 KiB");
+        };
+
+        template <class S> constexpr bool slot_supported() { return supported_container<typename S::type>(); }
+        template <class... S> constexpr bool all_supported(List<S...>) { return (slot_supported<S>() && ...); }
+
+        template <class C, std::size_t Off, class T> C& at(T& rec) noexcept {
+            return *std::launder(reinterpret_cast<C*>(reinterpret_cast<unsigned char*>(&rec) + Off));
+        }
+        template <class C, std::size_t Off, class T> const C& at(const T& rec) noexcept {
+            return *std::launder(reinterpret_cast<const C*>(reinterpret_cast<const unsigned char*>(&rec) + Off));
+        }
+
+        // f.template operator()<C, Off>(index) for every container, in order.
+        template <class... S, class F> void each(List<S...>, F&& f) {
+            std::uint32_t k = 0;
+            (f.template operator()<typename S::type, S::offset>(k++), ...);
+        }
+        // f.template operator()<C, Off>() for container k; false when k is out of range.
+        template <class... S, class F> bool visit(List<S...>, std::uint32_t k, F&& f) {
+            std::uint32_t i = 0;
+            bool r = false;
+            (void)((i++ == k ? (r = f.template operator()<typename S::type, S::offset>(), true) : false) || ...);
+            return r;
+        }
+
+        // Bit b of the result: byte b of x is nonzero.
+        inline unsigned byte_mask(std::uint64_t x) noexcept {
+            x |= x >> 4; x |= x >> 2; x |= x >> 1;
+            x &= 0x0101010101010101ull;
+            return unsigned((x * 0x0102040810204080ull) >> 56);
+        }
+        inline std::uint64_t load(const unsigned char* p, std::size_t rem) noexcept {
+            std::uint64_t v = 0;
+            std::memcpy(&v, p, rem >= 8 ? 8 : rem);
+            return v;
+        }
+
+        // Writes the block section of [0, n) of cur against old (nullptr: all
+        // zero). plain(w) gives the sendable bytes of word w. With sync the
+        // sent bytes are copied into old. Returns the number of blocks.
+        template <class Plain>
+        std::uint32_t put_blocks(std::string& out, const unsigned char* cur, unsigned char* old, std::size_t n,
+                                 Plain&& plain, bool sync) {
+            const std::size_t count_at = out.size();
+            out.push_back(0);
+            std::uint32_t count = 0;
+            std::size_t next = 0;
+            for (std::size_t b = 0; b * 64 < n; ++b) {
+                unsigned masks[8] = {};
+                unsigned sel = 0;
+                for (unsigned w = 0; w < 8; ++w) {
+                    const std::size_t a = b * 64 + w * 8;
+                    if (a >= n) break;
+                    const std::uint64_t x = load(cur + a, n - a) ^ (old ? load(old + a, n - a) : 0);
+                    if (!x) continue;
+                    const unsigned m = byte_mask(x) & plain(a / 8);
+                    masks[w] = m;
+                    if (m) sel |= 1u << w;
+                }
+                if (!sel) continue;
+                put_varint(out, std::uint32_t(b - next));
+                out.push_back(char(sel));
+                for (unsigned w = 0; w < 8; ++w) if (sel >> w & 1) out.push_back(char(masks[w]));
+                for (unsigned w = 0; w < 8; ++w) {
+                    for (unsigned m = masks[w]; m; m &= m - 1) {
+                        const std::size_t a = b * 64 + w * 8 + unsigned(std::countr_zero(m));
+                        out.push_back(char(cur[a]));
+                        if (sync) old[a] = cur[a];
+                    }
+                }
+                next = b + 1;
+                ++count;
+            }
+            out[count_at] = char(count);   // < 128 blocks: one varint byte
+            return count;
+        }
+
+        // Checks a block section over [0, n): bounds, masks inside plain(),
+        // bool bytes 0 or 1. Returns its end or nullptr.
+        template <class Plain, class Bools>
+        const char* check_blocks(const char* p, const char* end, std::size_t n, Plain&& plain, Bools&& bools) noexcept {
+            std::uint32_t count;
+            if (!get_varint(p, end, count)) return nullptr;
+            std::size_t next = 0;
+            for (std::uint32_t e = 0; e < count; ++e) {
+                std::uint32_t skip;
+                if (!get_varint(p, end, skip)) return nullptr;
+                const std::size_t b = next + skip;
+                if (b >= (n + 63) / 64) return nullptr;
+                if (p == end) return nullptr;
+                const unsigned sel = static_cast<unsigned char>(*p++);
+                if (!sel) return nullptr;
+                unsigned masks[8] = {};
+                for (unsigned w = 0; w < 8; ++w) {
+                    if (!(sel >> w & 1)) continue;
+                    const std::size_t a = b * 64 + w * 8;
+                    if (a >= n || p == end) return nullptr;
+                    const unsigned m = static_cast<unsigned char>(*p++);
+                    if (!m || (m & ~plain(a / 8))) return nullptr;
+                    masks[w] = m;
+                }
+                for (unsigned w = 0; w < 8; ++w) {
+                    const unsigned m = masks[w];
+                    if (!m) continue;
+                    const auto k = unsigned(std::popcount(m));
+                    if (std::size_t(end - p) < k) return nullptr;
+                    if (const unsigned bm = bools((b * 64 + w * 8) / 8) & m) {
+                        const char* q = p;
+                        for (unsigned mm = m; mm; mm &= mm - 1, ++q)
+                            if ((bm >> std::countr_zero(mm) & 1) && static_cast<unsigned char>(*q) > 1) return nullptr;
+                    }
+                    p += k;
+                }
+                next = b + 1;
+            }
+            return p;
+        }
+
+        // Applies a checked block section to dst. Returns its end.
+        inline const char* apply_blocks(const char* p, unsigned char* dst) noexcept {
+            std::uint32_t count;   // the varints were checked: p + 5 bounds nothing
+            get_varint(p, p + 5, count);
+            std::size_t next = 0;
+            for (std::uint32_t e = 0; e < count; ++e) {
+                std::uint32_t skip;
+                get_varint(p, p + 5, skip);
+                const std::size_t b = next + skip;
+                const unsigned sel = static_cast<unsigned char>(*p++);
+                unsigned masks[8] = {};
+                for (unsigned w = 0; w < 8; ++w) if (sel >> w & 1) masks[w] = static_cast<unsigned char>(*p++);
+                for (unsigned w = 0; w < 8; ++w) {
+                    unsigned char* d = dst + b * 64 + w * 8;
+                    for (unsigned m = masks[w]; m; m &= m - 1) d[std::countr_zero(m)] = static_cast<unsigned char>(*p++);
+                }
+                next = b + 1;
+            }
+            return p;
+        }
+
+        // Plain / bool word masks of an element array of E (word w of the elements' bytes).
+        template <class E> unsigned elem_mask(std::size_t w, std::uint8_t which) noexcept {
+            constexpr std::size_t S = sizeof(E);
+            unsigned m = 0;
+            for (unsigned j = 0; j < 8; ++j)
+                if (Info<E>::classes[(w * 8 + j) % S] & which) m |= 1u << j;
+            return m;
+        }
+    } // namespace sd_detail
+
+    // Record codec for T (static functions).
+    template <class T>
+    struct XRecordDelta {
+        using I = sd_detail::Info<T>;
+        static_assert(sd_detail::all_supported(typename I::containers{}),
+                      "xsync prototype: containers must be strings or vectors of elements without containers");
+        static constexpr std::size_t container_count = I::container_count;
+
+        // Appends the change from before to now and copies it into before.
+        // Appends nothing and returns false when nothing changed.
+        static bool diff(const T& now, T& before, std::string& out) {
+            const std::size_t start = out.size();
+            const std::uint32_t nb = sd_detail::put_blocks(
+                out, reinterpret_cast<const unsigned char*>(&now), reinterpret_cast<unsigned char*>(&before), sizeof(T),
+                [](std::size_t w) -> unsigned { return I::plain[w]; }, true);
+            std::uint32_t nc = 0;
+            if constexpr (container_count > 0) {
+                const std::size_t count_at = out.size();
+                out.push_back(0);
+                sd_detail::each(typename I::containers{}, [&]<class C, std::size_t Off>(std::uint32_t k) {
+                    const C& cur = sd_detail::at<C, Off>(now);
+                    C& old = sd_detail::at<C, Off>(before);
+                    if constexpr (sd_detail::is_fixed_string_v<C>) {
+                        const std::string_view v = cur.view();
+                        if (v == old.view()) return;
+                        put_str(out, k, v);
+                        static_cast<XFixedString&>(old).assign(v);
+                        ++nc;
+                    } else {
+                        using E = typename C::value_type;
+                        const std::size_t n = cur.size();
+                        if (n != old.size() || n * sizeof(E) > 127 * 64) {
+                            put_vset(out, k, cur);
+                            old.assign_range(std::span<const E>(cur.data(), n));
+                            ++nc;
+                            return;
+                        }
+                        if (n == 0) return;
+                        const std::size_t code_at = out.size();
+                        out.push_back(char(k << 2 | sd_detail::kVpatch));
+                        const std::uint32_t blocks = sd_detail::put_blocks(
+                            out, reinterpret_cast<const unsigned char*>(cur.data()), reinterpret_cast<unsigned char*>(old.data()),
+                            n * sizeof(E), [](std::size_t w) { return sd_detail::elem_mask<E>(w, sd_detail::kPlain | sd_detail::kBool); }, true);
+                        if (blocks == 0) out.resize(code_at);
+                        else ++nc;
+                    }
+                });
+                out[count_at] = char(nc);
+            }
+            if (nb == 0 && nc == 0) { out.resize(start); return false; }
+            return true;
+        }
+
+        // Appends a body that turns a cleared record (clear()) into now.
+        static void key(const T& now, std::string& out) {
+            sd_detail::put_blocks(out, reinterpret_cast<const unsigned char*>(&now), nullptr, sizeof(T),
+                                  [](std::size_t w) -> unsigned { return I::plain[w]; }, false);
+            if constexpr (container_count > 0) {
+                const std::size_t count_at = out.size();
+                out.push_back(0);
+                std::uint32_t nc = 0;
+                sd_detail::each(typename I::containers{}, [&]<class C, std::size_t Off>(std::uint32_t k) {
+                    const C& cur = sd_detail::at<C, Off>(now);
+                    if constexpr (sd_detail::is_fixed_string_v<C>) {
+                        if (cur.view().empty()) return;
+                        put_str(out, k, cur.view());
+                    } else {
+                        if (cur.size() == 0) return;
+                        put_vset(out, k, cur);
+                    }
+                    ++nc;
+                });
+                out[count_at] = char(nc);
+            }
+        }
+
+        // Checks one body at p against the record it will apply to (dst ==
+        // nullptr: a cleared record). Returns the body's end, or nullptr when it
+        // is malformed or does not fit dst. Reads dst, never writes it.
+        static const char* check(const char* p, const char* end, const T* dst) noexcept {
+            p = sd_detail::check_blocks(p, end, sizeof(T), [](std::size_t w) -> unsigned { return I::plain[w]; },
+                                        [](std::size_t w) -> unsigned { return I::bools[w]; });
+            if (!p) return nullptr;
+            if constexpr (container_count > 0) {
+                std::uint32_t m;
+                if (!get_varint(p, end, m) || m > container_count) return nullptr;
+                int last = -1;
+                for (std::uint32_t i = 0; i < m; ++i) {
+                    if (p == end) return nullptr;
+                    const unsigned code = static_cast<unsigned char>(*p++);
+                    const unsigned field = code >> 2, op = code & 3u;
+                    if (int(field) <= last) return nullptr;
+                    last = int(field);
+                    const bool ok = sd_detail::visit(typename I::containers{}, field, [&]<class C, std::size_t Off>() -> bool {
+                        if constexpr (sd_detail::is_fixed_string_v<C>) {
+                            std::uint32_t len;
+                            if (op != sd_detail::kStr || !get_varint(p, end, len) || std::size_t(end - p) < len) return false;
+                            p += len;
+                            return true;
+                        } else {
+                            using E = typename C::value_type;
+                            if (op == sd_detail::kVset) {
+                                std::uint32_t n;
+                                if (!get_varint(p, end, n)) return false;
+                                constexpr std::size_t P = sd_detail::Info<E>::plain_bytes;
+                                if constexpr (P == 0) { if (n > (std::size_t(1) << 20)) return false; }
+                                else if (std::size_t(end - p) / P < n) return false;
+                                if constexpr (sd_detail::Info<E>::any_bool) {
+                                    const char* q = p;
+                                    for (std::uint32_t e = 0; e < n; ++e)
+                                        for (const auto& r : sd_detail::Info<E>::runs)
+                                            for (std::uint32_t j = 0; j < r.len; ++j, ++q)
+                                                if (sd_detail::Info<E>::classes[r.at + j] == sd_detail::kBool &&
+                                                    static_cast<unsigned char>(*q) > 1) return false;
+                                }
+                                p += std::size_t(n) * P;
+                                return true;
+                            }
+                            if (op == sd_detail::kVpatch) {
+                                const std::size_t n = dst ? sd_detail::at<C, Off>(*dst).size() : 0;
+                                p = sd_detail::check_blocks(p, end, n * sizeof(E),
+                                    [](std::size_t w) { return sd_detail::elem_mask<E>(w, sd_detail::kPlain | sd_detail::kBool); },
+                                    [](std::size_t w) { return sd_detail::elem_mask<E>(w, sd_detail::kBool); });
+                                return p != nullptr;
+                            }
+                            return false;
+                        }
+                    });
+                    if (!ok) return nullptr;
+                }
+            }
+            return p;
+        }
+
+        // Applies a body that check() accepted for dst. Returns its end.
+        static const char* apply(const char* p, T& dst) {
+            p = sd_detail::apply_blocks(p, reinterpret_cast<unsigned char*>(&dst));
+            if constexpr (container_count > 0) {
+                std::uint32_t m;
+                get_varint(p, p + 5, m);
+                for (std::uint32_t i = 0; i < m; ++i) {
+                    const unsigned code = static_cast<unsigned char>(*p++);
+                    sd_detail::visit(typename I::containers{}, code >> 2, [&]<class C, std::size_t Off>() -> bool {
+                        C& c = sd_detail::at<C, Off>(dst);
+                        if constexpr (sd_detail::is_fixed_string_v<C>) {
+                            std::uint32_t len;
+                            get_varint(p, p + 5, len);
+                            static_cast<XFixedString&>(c).assign(std::string_view(p, len));
+                            p += len;
+                        } else {
+                            using E = typename C::value_type;
+                            if ((code & 3u) == sd_detail::kVset) {
+                                std::uint32_t n;
+                                get_varint(p, p + 5, n);
+                                static thread_local std::vector<E> tmp;
+                                tmp.resize(n);
+                                if (n) std::memset(static_cast<void*>(tmp.data()), 0, std::size_t(n) * sizeof(E));
+                                auto* d = reinterpret_cast<unsigned char*>(tmp.data());
+                                for (std::uint32_t e = 0; e < n; ++e, d += sizeof(E))
+                                    for (const auto& r : sd_detail::Info<E>::runs) { std::memcpy(d + r.at, p, r.len); p += r.len; }
+                                c.assign_range(std::span<const E>(tmp.data(), n));
+                            } else {
+                                p = sd_detail::apply_blocks(p, reinterpret_cast<unsigned char*>(c.data()));
+                            }
+                        }
+                        return true;
+                    });
+                }
+            }
+            return p;
+        }
+
+        // Clears a record: plain bytes zero, strings empty, vectors empty.
+        static void clear(T& dst) {
+            auto* d = reinterpret_cast<unsigned char*>(&dst);
+            for (const auto& r : I::runs) std::memset(d + r.at, 0, r.len);
+            if constexpr (container_count > 0) {
+                sd_detail::each(typename I::containers{}, [&]<class C, std::size_t Off>(std::uint32_t) {
+                    C& c = sd_detail::at<C, Off>(dst);
+                    if constexpr (sd_detail::is_fixed_string_v<C>) { if (!c.view().empty()) c.clear(); }
+                    else c.clear();
+                });
+            }
+        }
+
+        // Whether two records hold the same content (plain bytes and containers).
+        static bool same(const T& a, const T& b) {
+            const auto* x = reinterpret_cast<const unsigned char*>(&a);
+            const auto* y = reinterpret_cast<const unsigned char*>(&b);
+            for (const auto& r : I::runs) if (std::memcmp(x + r.at, y + r.at, r.len) != 0) return false;
+            bool eq = true;
+            if constexpr (container_count > 0) {
+                sd_detail::each(typename I::containers{}, [&]<class C, std::size_t Off>(std::uint32_t) {
+                    const C& u = sd_detail::at<C, Off>(a);
+                    const C& v = sd_detail::at<C, Off>(b);
+                    if constexpr (sd_detail::is_fixed_string_v<C>) { eq = eq && u.view() == v.view(); }
+                    else {
+                        using E = typename C::value_type;
+                        if (u.size() != v.size()) { eq = false; return; }
+                        for (std::size_t e = 0; e < u.size() && eq; ++e)
+                            for (const auto& r : sd_detail::Info<E>::runs)
+                                if (std::memcmp(reinterpret_cast<const unsigned char*>(&u.data()[e]) + r.at,
+                                                reinterpret_cast<const unsigned char*>(&v.data()[e]) + r.at, r.len) != 0) { eq = false; break; }
+                    }
+                });
+            }
+            return eq;
+        }
+
+    private:
+        static void put_str(std::string& out, std::uint32_t k, std::string_view v) {
+            out.push_back(char(k << 2 | sd_detail::kStr));
+            put_varint(out, std::uint32_t(v.size()));
+            out.append(v.data(), v.size());
+        }
+        template <class C> static void put_vset(std::string& out, std::uint32_t k, const C& cur) {
+            using E = typename C::value_type;
+            out.push_back(char(k << 2 | sd_detail::kVset));
+            const std::size_t n = cur.size();
+            put_varint(out, std::uint32_t(n));
+            const auto* s = reinterpret_cast<const unsigned char*>(cur.data());
+            for (std::size_t e = 0; e < n; ++e, s += sizeof(E))
+                for (const auto& r : sd_detail::Info<E>::runs) out.append(reinterpret_cast<const char*>(s + r.at), r.len);
+        }
+    };
+
+    // ---- message framing (XS 0.1) ---------------------------------------------
+    //   'X' 'S' u8 format(0x01) u8 flags [u64 stream if KEY] varint version varint count
+    //   then count ops: u8 (table << 2 | kind), varint id, [body]
+    inline constexpr std::uint8_t kFormat = 0x01;
+    inline constexpr std::uint8_t kFlagKey = 0x01;
+    enum XSyncKind : std::uint8_t { enter = 0, change = 1, leave = 2 };
+
+    struct XSyncHeader {
+        std::uint8_t flags = 0;
+        std::uint64_t stream = 0;
+        std::uint32_t version = 0;
+        std::uint32_t count = 0;
+    };
+
+    inline void put_header(std::string& out, const XSyncHeader& h) {
+        out.push_back('X'); out.push_back('S'); out.push_back(char(kFormat)); out.push_back(char(h.flags));
+        if (h.flags & kFlagKey) { char s[8]; std::memcpy(s, &h.stream, 8); out.append(s, 8); }
+        put_varint(out, h.version);
+        put_varint(out, h.count);
+    }
+    inline void put_op(std::string& out, unsigned table, XSyncKind kind, std::uint32_t id) {
+        out.push_back(char(table << 2 | unsigned(kind)));
+        put_varint(out, id);
+    }
+    inline const char* get_header(const char* p, const char* end, XSyncHeader& h) noexcept {
+        if (end - p < 4 || p[0] != 'X' || p[1] != 'S' || static_cast<unsigned char>(p[2]) != kFormat) return nullptr;
+        h.flags = static_cast<std::uint8_t>(p[3]);
+        p += 4;
+        if (h.flags & ~kFlagKey) return nullptr;
+        if (h.flags & kFlagKey) {
+            if (end - p < 8) return nullptr;
+            std::memcpy(&h.stream, p, 8);
+            p += 8;
+        }
+        if (!get_varint(p, end, h.version) || !get_varint(p, end, h.count)) return nullptr;
+        return p;
+    }
+
+} // namespace XOffsetDatastructure::xsync
+
+#endif // X_OFFSET_SHARED_DELTA_HPP
