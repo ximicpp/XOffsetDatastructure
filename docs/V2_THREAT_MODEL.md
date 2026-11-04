@@ -34,7 +34,18 @@
   头选出链上的版本，再走上面的 `load_verified`）、`XPeerSchemas::accept` 和
   `read_schema_ack`（握手消息，同样走 `load_verified`，另有 64 KiB 和条目数上限）。
 
+- 重新加载进已有 buffer：`reload_verified` / `try_reload_verified`、`begin_verified_reload`
+  （直接收进已有 buffer 的存储），以及可搬槽位存储（R1）上的同样入口；
+- `load_verified_with_resource<T>` / `load_verified_with_scratch<T>`（校验用的位图来自调用方给的
+  内存资源，校验本身与 `load_verified` 相同）；
+- 客户端构建：以上入口在 C++20 字段表构建和关异常构建（`try_` 入口）里各是一份独立编译的代码。
+
 `load_unverified` 不校验，**不是**不可信输入的入口。
+
+接收检查分三档（2026-11-04 定，信任档和边界档的接口 3.4 加入）：信任档只查 wire 头准入和空洞表边界，
+用于服务端之间、服务端发往客户端和自己的存档，**不是**不可信输入的入口（调试和 sanitizer 构建里照样
+完整校验）；边界档用于客户端上行，只保证读取不越界，收到的数据只读使用；要原地修改客户端数据时走完整档，
+即上面这些入口。两档接口落地时，各自的 harness 加进第 5 节的表和发版前 fuzz。
 
 ## 3. 威胁与现状
 
@@ -133,6 +144,21 @@ M1–M6 已在 0.3.0-beta.1 实施，行为变化见 CHANGELOG。M3 的修改路
 
 ## 5. 持续 fuzz
 
+现状（2026-11-04 起，susu 11-04 06:15Z）：每晚长跑自 2026-10-28 停，不再恢复；改为**每次发版前**
+在云端跑一轮 `tools/fuzz_prerelease.sh`（[RELEASING.md](RELEASING.md) 第 3 节），覆盖第 2 节的
+每个入口，无发现才发版。入口与 harness 的对应：
+
+| 入口 | harness（ASan+UBSan） |
+| --- | --- |
+| `load_verified`、`TypedXBuffer<T>::load`、`try_load_verified`、`load_verified_with_resource` | `fuzz_v2_wire`、`fuzz_wire_schemas`（libFuzzer）；`test_v2_fuzz`（GCC 16 差分，带独立 oracle） |
+| `begin_verified_receive` / `finish_verified`、`receive_raw::validate` | 同上（`v2_fuzz_core.hpp` 的 receive、raw 两列，与 oracle 比较） |
+| `reload_verified`、`begin_verified_reload`、可搬槽位存储 | 同上（reload、direct、slot 各列，与新 buffer 的加载逐字节比较） |
+| schema 演进：`evolve_load_verified`、`XPeerSchemas` 握手、`read_schema_ack` | `fuzz_schema_evolution` |
+| 客户端字段表构建、关异常构建 | `fuzz_v2_wire`、`fuzz_wire_schemas` 的 C++20 字段表构建（libFuzzer），`tools/fuzz_outcome_diff.sh`（三种构建逐条比较结果和错误文字） |
+
+各阶段与预算见脚本开头的说明；一轮发版 fuzz 约 4 小时（GCC 45 分钟，每个 libFuzzer 目标每种构建
+25 分钟）。下面是更早的记录。
+
 现状（0.3.0-beta.1）：F1–F3 已实现，F4 的 PR 短跑已在 CI 运行；每日长跑的 workflow
 已写好，但 GitHub 定时任务只在默认分支触发，目前没有运行，发布前以一次 480 万例的
 GCC 16 ASan+UBSan 差分 fuzz 代替。
@@ -155,6 +181,9 @@ GCC 16 ASan+UBSan 差分 fuzz 代替。
   再 `-fork=4` 跑约 20 分钟，然后合并语料、复现并最小化发现。语料以 tar 包跨夜保存在
   项目文件里；调试信息里的路径映射为 `/workspace`，签名与 Docker 作业一致。首晚即发现
   #130（harness 对短于头部的输入检查过严，已修复，输入入回归目录）。
+- 客户端构建（2026-10-28 起）：同一晚在 C++20 字段表构建上跑 libFuzzer（`v2_wire`、
+  `wire_schemas`），再用 `tools/fuzz_outcome_diff.sh` 让反射、字段表、关异常三种构建回放
+  同一批语料，逐条比较各入口的结果和错误文字。
 - 仍有的缺口：没有 PR 短跑（PR 的合并证据是 `tools/local_validate.sh`）。
 
 - **F1 覆盖率引导 fuzz**：libFuzzer harness（`LLVMFuzzerTestOneInput`），入口为

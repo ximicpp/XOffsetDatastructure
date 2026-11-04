@@ -8,6 +8,46 @@
   the last element. Copying or rebuilding a map in key order is now linear.
   Contents, layout and allocation are unchanged. Instructions, GCC 16,
   bench/slg demo (M): LD.apply -24%, LD.send -20%, SD.save_encode -27%.
+- An in-place reload (`reload_verified`) or `reset<T>()` keeps the buffer's
+  free table, emptied, instead of releasing it to the per-thread cache of
+  four tables. Its holes, or the first retires after it, refill that table,
+  so no reload needs a fresh
+  12 KiB table however many other buffers the thread reloaded in between
+  (bench/slg login: each player's buffer is reloaded in turn and every
+  reload allocated and zeroed a table). Small-bin storage is kept within the
+  same limits as before. Hole tables, wire bytes and allocation decisions
+  are unchanged. Instructions, GCC 16, bench/slg (M, steady state): LD.apply
+  -7.0%.
+- Fixed messages (`xoffset_fixed_message.hpp`, experimental): a record with
+  no arena container and no implicit padding (`is_fixed_message_v<T>`) is
+  sent as its own bytes and read where it lies, without an XBuffer, an arena
+  or a wire header. The schema handshake binds the type once per connection;
+  a batch carries an 8-byte header {count, tag}. A view checks the size, the
+  alignment, the batch tag and the bytes of every bool. Nothing throws or
+  allocates. Instructions per packet (cloud, 40-byte records,
+  `bench/fixedmsg`): encode within 1 to 8 of a hand-written struct and read
+  within 5 to 8; against the same records in an XOffset root, encode 6 to 12
+  times fewer and read 1.7 to 6 times fewer.
+- Pre-release fuzz replaces nightly fuzz (K4; susu 2026-11-04):
+  `tools/fuzz_prerelease.sh` runs one ASan+UBSan round over every receive
+  entry point before each release, in phases (`gcc`, `libfuzzer`, `client`,
+  `verdict`) that fit cloud background tasks, and writes `VERDICT.md` (PASS
+  only when every job ran on the release commit with the release budget and
+  found nothing). docs/RELEASING.md section 3.1 makes it a release step;
+  docs/V2_THREAT_MODEL.md lists each entry point and its harness.
+- The fuzz runs cover the client builds: `tools/fuzz_libfuzzer.sh --backend
+  fieldlist` fuzzes `v2_wire` and `wire_schemas` on the C++20 field-list build,
+  and `tools/fuzz_outcome_diff.sh` replays the kept corpora, regressions and
+  seeds through the C++26 reflection, C++20 field-list and no-exceptions
+  builds (ASan+UBSan), requiring the same outcome and error text for every
+  input (no-exceptions builds without the raw and receive columns). The
+  harnesses print those outcome lines when `XOFFSET_FUZZ_OUTCOMES` is set.
+  New CTest cases `fuzz_v2_wire_replay_noexc` and
+  `fuzz_wire_schemas_replay_noexc` (with `_corpus`) replay without exceptions.
+- The V2 fuzz harnesses also load each input through
+  `load_verified_with_resource` (validation bitmaps from a small monotonic
+  resource) and require the verdict, message and payload of
+  `load_verified`.
 - Verified saves of a buffer whose root was admitted at the current epoch
   (`make<T>()`, `reset<T>()`, a verified load) take the root from the
   cache `root<T>()` uses and skip the typed-access and schema checks and

@@ -43,6 +43,19 @@
 //   U*.send   fill one client's viewport delta from the bookkeeping and encode it
 //   U*.recv   the client receives the delta
 //   U*.apply  it applies the delta to its held view (through its id index)
+//   U*W.recv  (2026-11-04, scoring V3) one device that holds one view, warm: the
+//             deliveries of clients 0..kWarmDevices-1 in this cycle, replayed after
+//             the cycle, each client's into its own copy of its view (receive +
+//             apply, as U*.recv + U*.apply, timed per delivery like them). Before
+//             each delivery the device reads its whole view (untimed: the client
+//             draws it every frame), so the view is warm as on a real device;
+//             count U*W.deliveries. N*W.recv the same for the native deltas.
+//   EBZ.send, U*Z.send, N*Z.send  (scoring V3) zstd level 3 of each wire the server
+//             sends (one frame per message, context reused, no dictionary), timed
+//             apart from *.send, after the round, so it does not evict the timed
+//             stages' working set; send + compress = *.send + *Z.send. Own prefix so
+//             per-case totals (pool_v4, the perf gate) are unchanged. Sizes in the
+//             *_zstd byte keys.
 // XOffset native (with XOFFSET_DELTA_SYNC_API), keys N*: the server keeps each
 // client's view as an XBuffer, mutates it in place (N*.send) and writes the
 // delta against that client's baseline (N*.diff); the client patches and
@@ -51,6 +64,8 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
+#include <map>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -705,6 +720,7 @@ template <class V, class D> void apply_delta(V& v, HeldIndex& at, const D& d) {
 //   std::size_t delta_encode(auto fill)        fill(model&) then encode the delta
 //   std::string_view delta_wire()
 //   void delta_recv()                          receive the delta into the reused receive object
+//   void delta_recv_from(const std::string&)  the same from a stored wire (U*W replay)
 //   const auto& delta()                        that object
 // Optional: std::string_view snap_compact(int b) (XOffset: the compact wire, for bytes only).
 // Optional native delta (XOffset with XOFFSET_DELTA_SYNC_API), keys N*; every
@@ -717,12 +733,16 @@ template <class V, class D> void apply_delta(V& v, HeldIndex& at, const D& d) {
 //   void n_key_recv(int c, int k, int b)       the client applies the key delta (b = c)
 //   void n_apply(int c, int k)                 the client applies its delta (patch + verify)
 //   auto& n_held(int c, int k)                 its view; must read the same as held(c, k)
+//   std::string_view n_wire()                  the delta n_diff wrote (bytes, N*W replay)
+//   void n_apply_from(int c, const std::string&)   n_apply of a stored delta (N*W; c = clients)
 
 struct ViewKeys {
     std::string esend, erecv, ewrecv, usend, urecv, uapply;
     std::string ewin, ereq, ezstd, ecomp, ecompz, udelta, umsg, uzstd, uunits, umarch, utiles;
     std::string nsend, ndiff, nrecv, ndelta;
-    ViewKeys(const char* e, const char* u, const char* n) {
+    std::string esendz, usendz, uwrecv, uwmsg, nsendz, nzstd, nwrecv;   // scoring V3 (2026-11-04)
+    std::string uname, nname, eb_zs, u_zs, n_zs;   // streaming compression prefixes (EBZS, UPZS, NPZS)
+    ViewKeys(const char* e, const char* u, const char* n) : uname(u), nname(n) {
         const std::string E(e), U(u), N(n);
         esend = E + ".send"; erecv = E + ".recv"; ewrecv = E + "W.recv";
         ewin = E + ".window"; ereq = E + ".requests"; ezstd = E + ".window_zstd";
@@ -731,6 +751,11 @@ struct ViewKeys {
         udelta = U + ".delta"; umsg = U + ".deliveries"; uzstd = U + ".delta_zstd";
         uunits = U + ".units"; umarch = U + ".marches"; utiles = U + ".tiles";
         nsend = N + ".send"; ndiff = N + ".diff"; nrecv = N + ".recv"; ndelta = N + ".delta";
+        // The compression keys take their own prefix (EBZ, UPZ, NPZ, ...): tools that sum a
+        // case's stages by prefix (pool_v4, the perf gate) keep their totals.
+        esendz = E + "Z.send"; usendz = U + "Z.send"; uwrecv = U + "W.recv"; uwmsg = U + "W.deliveries";
+        nsendz = N + "Z.send"; nzstd = N + ".delta_zstd"; nwrecv = N + "W.recv";
+        eb_zs = E + "ZS"; u_zs = U + "ZS"; n_zs = N + "ZS";
     }
 };
 
@@ -743,6 +768,52 @@ inline std::size_t zstd_size(std::string_view w) {
 #else
     return w.size();
 #endif
+}
+
+// Streaming compression (scoring V3, report only): one zstd level 3 context per
+// connection, kept across messages, one ZSTD_e_flush per message (every format the
+// same). Run for the warm devices' connections only (a context is ~1 MB);
+// *ZS.send timed, *_zs bytes, *ZS.ctx = ZSTD_sizeof_CCtx per connection.
+struct ZStream {
+#if SLG_WITH_COMPRESSION
+    ZSTD_CCtx* cx = ZSTD_createCCtx();
+    std::string out;
+    ZStream() { ZSTD_CCtx_setParameter(cx, ZSTD_c_compressionLevel, 3); }
+    ~ZStream() { ZSTD_freeCCtx(cx); }
+    ZStream(const ZStream&) = delete;
+    ZStream& operator=(const ZStream&) = delete;
+    std::size_t flush(std::string_view w) {
+        out.resize(ZSTD_compressBound(w.size()) + 64);
+        ZSTD_inBuffer in{w.data(), w.size(), 0};
+        ZSTD_outBuffer o{out.data(), out.size(), 0};
+        std::size_t r = 0;
+        do {
+            r = ZSTD_compressStream2(cx, &o, &in, ZSTD_e_flush);
+            if (ZSTD_isError(r)) throw std::runtime_error("zstd stream error");
+        } while (r != 0);
+        return o.pos;
+    }
+    std::size_t ctx_bytes() const { return ZSTD_sizeof_CCtx(cx); }
+#else
+    std::size_t flush(std::string_view w) { return w.size(); }
+    std::size_t ctx_bytes() const { return 0; }
+#endif
+};
+// The connections' streams of one case, for one format (one per Ops type and key).
+struct ZStreams {
+    std::vector<std::unique_ptr<ZStream>> s;
+    ZStream& at(std::size_t i) { while (s.size() <= i) s.push_back(std::make_unique<ZStream>()); return *s[i]; }
+    std::size_t ctx_bytes() const { std::size_t b = 0; for (const auto& z : s) b += z->ctx_bytes(); return s.empty() ? 0 : b / s.size(); }
+};
+template <class Ops> ZStreams& zstreams(const std::string& key) {
+    static thread_local std::map<std::string, ZStreams> m;
+    return m[key];
+}
+inline void zstream_timed(CycleStats& st, ZStream& z, const std::string& tkey, const std::string& bkey, std::string_view w) {
+    std::size_t n = 0;
+    timed(st, tkey.c_str(), [&] { n = z.flush(w); });
+    st.bytes[bkey] += n;
+    st.bytes[tkey.substr(0, tkey.find('.')) + ".msgs"] += 1;   // e.g. UPZS.msgs
 }
 
 // The demo cases: 0 browse (class 2), 1..3 static at peace / combat / stress (class 3).
@@ -765,12 +836,14 @@ struct ViewSession {
     bool browse = false, primed = false;
     std::vector<HeldIndex> index;   // per client
     std::vector<std::size_t> wire_size;   // browse: this round's pull per client (bytes pass check)
+    std::vector<HeldIndex> windex;        // static: the warm devices' indexes (U*W)
     void setup(uint64_t seed, const ViewScale& vs, int which) {
         browse = ViewCases::browse(which); primed = false;
         wire_size.assign(std::size_t(vs.clients), 0);
         world.setup(ViewCases::seed(seed, which), vs, ViewCases::rates[which]);
         tracker.setup(vs.clients);
         index.assign(std::size_t(vs.clients), {});
+        windex.assign(std::size_t(warm_devices(vs.clients)), {});
     }
 };
 
@@ -822,7 +895,10 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
                 s.query.run(w, rect);
                 ops.snap_encode(0, [&](auto& v) { fill_view(v, w, rect, s.query, base + c, w.tick_no()); });
                 if (ops.snap_wire(0).size() != s.wire_size[std::size_t(c)]) throw std::runtime_error("bytes pass: pull differs from the timed one");
-                st.bytes[k.ezstd] += zstd_size(ops.snap_wire(0));
+                std::size_t z = 0;
+                timed(st, k.esendz.c_str(), [&] { z = zstd_size(ops.snap_wire(0)); });
+                st.bytes[k.ezstd] += z;
+                if (c < warm_devices(vs.clients)) zstream_timed(st, zstreams<Ops>(k.eb_zs).at(std::size_t(c)), k.eb_zs + ".send", "EB.window_zs", ops.snap_wire(0));
                 if constexpr (requires { ops.snap_compact(0); }) {
                     const std::string_view cw = ops.snap_compact(0);
                     st.bytes[k.ecomp] += cw.size();
@@ -830,6 +906,7 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
                 }
             }
         }
+        st.bytes[k.eb_zs + ".ctx"] = zstreams<Ops>(k.eb_zs).ctx_bytes();
         return;
     }
     if (!s.primed) {
@@ -856,10 +933,30 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
                 if (query_view(ops.n_held(c, 0)) != query_view(ops.held(c, 0))) throw std::runtime_error("native key delta: view differs from the snapshot");
             }
         }
+        // Warm single devices (U*W, N*W): client c's view again (the same tick, so the
+        // same pull) into slot clients + c, after every client's own view is laid out,
+        // so the clients' views keep the addresses they had without the warm copies.
+        for (int c = 0; c < warm_devices(vs.clients); ++c) {
+            const ViewRect rect = w.rect(c);
+            s.query.run(w, rect);
+            ops.snap_encode(0, [&](auto& v) { fill_view(v, w, rect, s.query, 0, w.tick_no()); });
+            ops.snap_recv(vs.clients + c, 0, 0);
+            auto& hw = ops.held(vs.clients + c, 0);
+            hw.units.reserve(hw.units.size() * 3 / 2 + 16);
+            hw.marches.reserve(hw.marches.size() * 3 / 2 + 16);
+            build_index(hw, s.windex[std::size_t(c)]);
+            if (query_view(hw) != query_view(ops.held(c, 0))) throw std::runtime_error("warm view differs from the client's first pull");
+            if constexpr (native) if (native_on()) ops.n_key_recv(vs.clients + c, 0, c);
+        }
         s.primed = true;
     }
     static thread_local std::string zbuf;          // this round's delta wires, for the untimed zstd sizes
     static thread_local std::vector<std::size_t> zoff;
+    static thread_local std::string nzbuf;         // the same for the native deltas
+    static thread_local std::vector<std::size_t> nzoff;
+    const int nw_dev = warm_devices(vs.clients);
+    static thread_local std::vector<std::vector<std::string>> wq, nwq;   // warm devices' wires this cycle (U*W, N*W)
+    wq.assign(std::size_t(nw_dev), {}); nwq.assign(std::size_t(nw_dev), {});
     for (int r = 0; r < vs.rounds; ++r) {
         w.tick();
         const int64_t base = (int64_t(cycle) * vs.rounds + r) * (vs.clients + 1) + 1;
@@ -886,21 +983,72 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
                 timed(st, k.nrecv.c_str(), [&] { ops.n_apply(c, 0); });
                 if (query_view(ops.n_held(c, 0)) != q) throw std::runtime_error("native delta: view differs from the application-level one");
                 st.bytes[k.ndelta] += nd;
+                const auto nw = ops.n_wire();
+                nzoff.push_back(nzbuf.size()); nzbuf.append(nw.data(), nw.size());
+                if (c < nw_dev) nwq[std::size_t(c)].emplace_back(nw);
             }
             st.bytes[k.udelta] += n;
             // zstd size after the round (below): compressing here would evict
             // the server's working set and charge it to the next timed delivery.
-            { const auto dw = ops.delta_wire(); zoff.push_back(zbuf.size()); zbuf.append(dw.data(), dw.size()); }
+            { const auto dw = ops.delta_wire(); zoff.push_back(zbuf.size()); zbuf.append(dw.data(), dw.size()); if (c < nw_dev) wq[std::size_t(c)].emplace_back(dw); }
             st.bytes[k.umsg] += 1;
             st.bytes[k.uunits] += s.plan.units.size() + s.plan.removed.size();
             st.bytes[k.umarch] += s.plan.marches.size() + s.plan.removed_marches.size();
             st.bytes[k.utiles] += s.plan.tiles.size();
         }
         zoff.push_back(zbuf.size());
-        for (std::size_t i = 0; i + 1 < zoff.size(); ++i)
-            st.bytes[k.uzstd] += zstd_size(std::string_view(zbuf).substr(zoff[i], zoff[i + 1] - zoff[i]));
+        for (std::size_t i = 0; i + 1 < zoff.size(); ++i) {
+            std::size_t z = 0;
+            timed(st, k.usendz.c_str(), [&] { z = zstd_size(std::string_view(zbuf).substr(zoff[i], zoff[i + 1] - zoff[i])); });
+            st.bytes[k.uzstd] += z;
+        }
         zbuf.clear(); zoff.clear();
+        if (!nzoff.empty()) {
+            nzoff.push_back(nzbuf.size());
+            for (std::size_t i = 0; i + 1 < nzoff.size(); ++i) {
+                std::size_t z = 0;
+                timed(st, k.nsendz.c_str(), [&] { z = zstd_size(std::string_view(nzbuf).substr(nzoff[i], nzoff[i + 1] - nzoff[i])); });
+                st.bytes[k.nzstd] += z;
+            }
+        }
+        nzbuf.clear(); nzoff.clear();
     }
+    // Warm single devices (U*W, N*W): each one's deliveries of this cycle, replayed
+    // into its own view; the device reads its view before each one (untimed).
+    for (int d = 0; d < nw_dev; ++d) {
+        auto& hw = ops.held(vs.clients + d, 0);
+        for (const std::string& dw : wq[std::size_t(d)]) {
+            warm_sink = query_view(hw);
+            timed(st, k.uwrecv.c_str(), [&] { ops.delta_recv_from(dw); apply_delta(hw, s.windex[std::size_t(d)], ops.delta()); });
+            st.bytes[k.uwmsg] += 1;
+        }
+        if (query_view(ops.held(vs.clients + d, 0)) != query_view(ops.held(d, 0))) throw std::runtime_error("warm view differs from the client's view");
+        // The same connection's deliveries through its streaming compressor (report only).
+        ZStream& zs = zstreams<Ops>(k.u_zs).at(std::size_t(d));
+        for (const std::string& dw : wq[std::size_t(d)]) zstream_timed(st, zs, k.u_zs + ".send", k.uname + ".delta_zs", dw);
+        if constexpr (native) if (native_on()) {
+            for (const std::string& nw : nwq[std::size_t(d)]) {
+                warm_sink = query_view(ops.n_held(vs.clients + d, 0));
+                timed(st, k.nwrecv.c_str(), [&] { ops.n_apply_from(vs.clients + d, nw); });
+            }
+            if (query_view(ops.n_held(vs.clients + d, 0)) != query_view(ops.held(d, 0))) throw std::runtime_error("warm native view differs from the client's view");
+            ZStream& nzs = zstreams<Ops>(k.n_zs).at(std::size_t(d));
+            for (const std::string& nw : nwq[std::size_t(d)]) zstream_timed(st, nzs, k.n_zs + ".send", k.nname + ".delta_zs", nw);
+        }
+    }
+    st.bytes[k.u_zs + ".ctx"] = zstreams<Ops>(k.u_zs).ctx_bytes();
+    if constexpr (native) if (native_on()) st.bytes[k.n_zs + ".ctx"] = zstreams<Ops>(k.n_zs).ctx_bytes();
+}
+
+// Memory (--mode mem, report only): the server's per-client state of the
+// application-level delta, the same for every format: what it records each
+// client holds (the tracker, its interest set) and the client's id index
+// (HeldIndex). The shared world and send buffers are not per client.
+inline void view_memory(const ViewSession& s, const ViewKeys& k, CycleStats& st) {
+    if (s.browse || s.index.empty()) return;
+    const auto n = std::int64_t(s.index.size());
+    st.bytes["MEM." + k.uname + ".interest"] = std::size_t(heap_bytes(s.tracker) / n);
+    st.bytes["MEM." + k.uname + ".held_index"] = std::size_t(heap_bytes(s.index) / n);
 }
 
 // Demo case set, scene <-> storage: players saved to the storage process this cycle
