@@ -70,14 +70,12 @@ Outcome exercise(long n,bool cold) {
             "post-failure hole table does not cover every unreachable byte");
     return result;
 }
-// D2: an in-place reload releases the free table into the per-thread cache
-// with the storage of its small bins (<= 64 entries each) kept, so the first
-// retires after the reload, which take the same table back, make no host
-// allocation; a bin that grew past 64 entries returns its storage, and so does
-// every bin of a table released by destroying its buffer. The hole table is
-// the same as with freshly allocated bins.
-// Without per-thread caches (XOFFSET_THREAD_CACHES=0, GCC on MinGW/Cygwin)
-// every reload allocates its table and bins again; the hole table is the same.
+// D2: an in-place reload keeps the owner's free table, emptied, with the
+// storage of its small bins (<= 64 entries each), so the first retires after
+// the reload make no host allocation, with or without per-thread caches; a bin
+// that grew past 64 entries returns its storage, and so does every bin of a
+// table released by destroying its buffer (that table goes to the per-thread
+// cache). The hole table is the same as with freshly allocated bins.
 void reload_keeps_small_bin_storage() {
     XBufferCore::trim_free_table_cache();
     auto b=XBuffer::create<AllocatorFailureRoot>(1024*1024,XBuffer::maximum_capacity(1024*1024).with_growth(XGrowPolicy::Automatic));
@@ -102,11 +100,8 @@ void reload_keeps_small_bin_storage() {
     const auto second=round(s1,m1);
     const auto third=round(s2,m2);
     require(s0>=2 && m0>=1,"first round: table and bin storage were not host allocations");
-#if XOFFSET_THREAD_CACHES
-    require(s1==0 && s2==0,"reload did not keep the small bin's storage");
-#else
-    require(s1==s0 && s2==s0,"without thread caches a reload must allocate as the first load did");
-#endif
+    // The reload keeps the owner's table (no thread cache involved).
+    require(s1==0 && s2==0,"reload did not keep its table and the small bin's storage");
     require(m1>=1 && m2>=1,"bin storage above the keep limit was kept");
     require(same(first,second) && same(first,third),"kept bin storage changed the hole table");
     // A bin holds its first free_bin_inline_entries holes inline; the next
@@ -291,9 +286,40 @@ void inline_bin_transition() {
         require(b.arena()->allocate_aligned(40,8)==blocks[i],"bin did not hand out its newest hole first");
     require(b.free_block_count()==1,"exact takes left a 40-byte hole");
 }
+// More owners reload than the thread cache holds tables (4): each keeps its
+// own emptied table, so the first retire after its reload allocates nothing.
+void reloads_keep_their_tables() {
+    XBufferCore::trim_free_table_cache();
+    std::vector<XBuffer> owners;
+    std::vector<std::string> frames;
+    for(int i=0;i<8;++i) {
+        owners.push_back(XBuffer::create<AllocatorFailureRoot>(65536,XBuffer::maximum_capacity(65536).with_growth(XGrowPolicy::Automatic)));
+        auto& b=owners.back();
+        b.root<AllocatorFailureRoot>().values.push_back(std::uint32_t(i));
+        frames.push_back(b.save_verified<AllocatorFailureRoot>());
+        b.arena()->deallocate(b.arena()->allocate_aligned(64,8),64); // b now has a table
+        require(b.free_block_count()==1,"fixture retire");
+    }
+    for(int i=0;i<8;++i) {
+        owners[std::size_t(i)].reload_verified<AllocatorFailureRoot>(frames[std::size_t(i)]);
+        require(owners[std::size_t(i)].free_block_count()==0,"reload kept a hole of the old content");
+    }
+    XBufferCore::trim_free_table_cache();
+    for(int i=0;i<8;++i) {
+        auto& b=owners[std::size_t(i)];
+        auto* p=b.arena()->allocate_aligned(64,8);
+        attempts=hits=0;fail_after=-1;watch=true;
+        b.arena()->deallocate(p,64);
+        watch=false;
+        require(attempts==0,"the first retire after a reload allocated a table");
+        require(b.free_table_complete() && b.free_block_count()==1,"retire after reload lost its entry");
+        require(b.root<AllocatorFailureRoot>().values[0]==std::uint32_t(i),"reload changed the root");
+    }
+}
 int main() {try {
     std::size_t points=0,max_lost=0;
     reload_keeps_small_bin_storage();
+    reloads_keep_their_tables();
     for(bool cold:{true,false}) {
         auto normal=exercise(-1,cold); require(normal.attempts>0,"no real metadata allocations observed");
         if(!cold) (void)exercise(-1,false); // the previous run's table is now cached
