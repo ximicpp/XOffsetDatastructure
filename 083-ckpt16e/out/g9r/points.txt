@@ -1,0 +1,50 @@
+t0 1c528d67739bc94d91205c9dd2bf4bf1260253bf tree b57398995a974c757b82e4e84efa123bd609ef26 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (next_cpp26 1c528d67 (#213; mainline merged into PR #191))
+t1 d438627ad0a39523e9c7190a57b8376cb1d97d28 tree d4f4865f4f4c657f8dd768c95d25fcf983175471 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (CKPT16E head (PR #191 delta sync d438627a))
+t1: diff over t0 sha256 bef080f029c4152f57b3b0b261cba31e9b68c3cc8b1cc119a7371c75fc5f147c ( 11 files changed, 5904 insertions(+), 19 deletions(-))
+t1: library header diff over t0:  2 files changed, 249 insertions(+), 17 deletions(-)
+t1: first-parent commits over t0:
+  d438627a Merge next_cpp26 1c528d67 (#213) into delta sync
+  298d718f Merge next_cpp26 b817ed36 (#217) into delta sync
+  09aade20 Merge next_cpp26 2e105330 (#215, #216, #218) into delta sync
+  d5401486 Free table: loading holes always marks the generation stale
+  58779139 Merge next_cpp26 (49ce3c68, #211 #212) into delta sync
+  a8f12389 XBuffer: a move or swap clears the cached root again
+  6ec08cc6 Merge next_cpp26 (eabb583b, #210) into delta sync
+  374a8728 Merge next_cpp26 (32ee1473, #207 #208) into delta sync
+  153d5177 Merge next_cpp26 (9e14ece1, #209) into delta sync
+  7157488f Merge next_cpp26 (c2ec7ee3, #205 #206) into delta sync
+  845c230b XBufferCore: keep root cache, base, size and free table on one run
+  827943cf Free table: keep pre-generation field offsets, drop redundant bump_gen
+  0bbbaa07 Merge next_cpp26 (b6e0678, #204) into delta sync
+  3e026071 Merge next_cpp26 (cc5b28e) into delta sync
+  4889cdd4 Free table: a change marks the generation stale, a read counts it up
+  3278287d Merge next_cpp26 (d9db04d) into delta sync
+  20ae12ea Free table: inline the generation bump
+  a95bed62 Delta: a touches baseline sends touched bytes past the touch list
+  8045e6b4 Merge next_cpp26 910b0223 (#199, #200) into delta sync
+  4d117cf7 Delta receiver: re-verify only a vector of records that moved or shrank
+  a126a042 CHANGELOG: receiver map growth, touch list filter
+  9bd146c8 Merge next_cpp26 (7e24016a: #198) into the delta sync branch
+  67494349 Delta receiver maps grow by half again; touch list skips the scan for new blocks
+  ce1bed30 Merge next_cpp26 (c5a801a9: #193) into the delta sync branch
+  3e203f69 Cached root follows an XBuffer move and swap
+  e2697b51 Delta baseline copy: aligned buffer with room to grow, filled and moved with memset/memcpy
+  44e91402 Merge next_cpp26 (87227259: #194) into the delta sync branch
+  51c2f07b Delta: records growth checked on its own, byte-exact touch_set, hole table skipped when unchanged, cached root follows a storage move
+  8b3029b6 Delta receiver: moved containers checked on their own against a live-block map
+  522f2129 Merge next_cpp26 (670fcc75: #197) into the delta sync branch
+  65e98ce7 Delta touch log: a short list per period, stamps only when shared; touches baselines
+  ece7d87e Delta blocks on 64-byte payload offsets; baseline copy line-aligned
+  dffba8ad Merge next_cpp26 (f04d6230: #192, #195, #196) into the delta sync branch
+  98046a99 Merge next_cpp26 (c9fbaea2, bench/slg demo case set) into the delta sync branch
+  bc21be6d Delta sync: the baselines of a thread share the encode scratch
+  9640d118 Delta sync: test replicas fed on several threads and at thread exit
+  5446db55 Delta sync: the cursors of a thread share the apply scratch
+  5bb90b94 Delta sync: compare touched blocks by runs; never skip blocks past the baseline's used size
+  f39fe1fa Delta sync: key deltas pair with the touch log, node lookup by block, 24-byte map
+  fe1ebbd4 Delta sync: write a block's mask bytes in one shuffle; CHANGELOG for format 1.0
+bench/reloc of t1: same tree as t0
+reloc_bench t0 sha256 bda36a5d999b89dce10307362d737ffe0ad36216ea0b0e06898a549563196d65
+reloc_bench t1 sha256 5d3a5f4b2d326c7cbaa036b8c53d31a776b1a4fd674c8ecd20794add4813f531
+reloc_bench t0a sha256 c896031c33e1abe6059c1fbb5b546e01a1cc160794aeef9122cc4d3978e1a4b4
+reloc_bench t1a sha256 6fa9ff1605a6e8edffb26f903f8afb0b6da9714d55e303986704d466811888f6
