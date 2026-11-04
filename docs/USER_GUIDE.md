@@ -498,7 +498,7 @@ XStatus done = token ? token->try_finish() : XStatus(token.error());
 
 ## 8. 核心承诺与 API 稳定性
 
-版本之间不承诺源码 API 或 ABI 稳定。下面 K0–K7 是核心承诺，后续版本不得回退；
+版本之间不承诺源码 API 或 ABI 稳定。下面 K0–K8 是核心承诺（整块搬运），后续版本不得回退；
 相关接口如有改名或签名变化，会在 CHANGELOG 中单独列出并给出替代写法。
 
 | # | 承诺 | 接口 / 机制 |
@@ -507,10 +507,11 @@ XStatus done = token ? token->try_finish() : XStatus(token.error());
 | K1 | 用普通 C++ 聚合体定义 schema，不用 IDL：服务端（C++26）由反射自动得出布局和指纹，不写样板；客户端（C++20/C++23）每个记录加一行字段表，由编译器证明列全（偏移严格递增 + 聚合初始化元数相符），C++26 构建同时用反射核对字段表，两种构建的 wire 字节相同（第 2.1 节） | `XOFFSET_REGISTER_SCHEMA_NAME`、`XOFFSET_RECORD`、`XOFFSET_RECORD_DERIVED`、`XString`、`XVector`、`XFixedVector`、`XSet`、`XMap` |
 | K2 | 对象直接建在 arena 里，原地读、原地改（含变长修改），空闲块复用 | `XBuffer::create<T>`、`root<T>`、`has_root<T>`、容器的公开成员函数、`maximum_capacity`、`with_growth`、`XGrowPolicy` |
 | K3 | 独立输出：发出的是调用方独占的副本，发完可以继续改 | `save_verified<T>` |
-| K4 | 接收时完整结构校验：截断、越界、重叠、未铺满、非法值、schema 不符一律拒绝 | `load_verified<T>`、`XException` |
+| K4 | 接收时完整结构校验：截断、越界、重叠、未铺满、非法值、schema 不符一律拒绝；增量输入（K9）同样适用。每次发版前对每个接收入口（含增量 apply）跑一轮 ASan fuzz，无发现才发版 | `load_verified<T>`、`XException`、增量 apply |
 | K5 | 接收后接着改、再发出，空闲空间随空洞表带过去，不退化 | 同上 |
-| K6 | schema 指纹精确匹配，不同就拒绝 | wire 头 `schema_hash` |
+| K6 | schema 指纹精确匹配，不同就拒绝；版本不同的两端走演进握手和转换（E0） | wire 头 `schema_hash` |
 | K7 | 跨编译器、跨平台的对象表示一致 | 用户 schema：`XOFFSET_PIN_SCHEMA`；库自带类型：`tools/sigs/` 签名基线；跨编译器 wire 语料比对（`tools/platform_matrix.sh`） |
+| K8 | 客户端与服务端用同一套库、同一 wire：客户端（iOS、Android、Windows，64 位小端）用字段表后端，按 C++20 用各平台原生编译器构建，能接收、读写、校验、再发（3.2.0 交付，2026-11-04 升为核心承诺） | 字段表后端（`XOFFSET_RECORD`，第 2.1 节）；`tools/native_targets.sh` |
 
 K0 的边界：搬的单位是整个区域，不是其中单个对象（容器头禁止拷贝和移动）。正在使用的
 buffer 地址固定（在 VM 预留内增长），只在显式时间点搬：输出、接收、reload、`XCompactor`
@@ -545,23 +546,26 @@ K4 的前提：接收方必须设置 `maximum_capacity`。否则发送方可以�
 校验的承诺边界：对不可信输入保证内存安全和 schema 一致，**不保证内容完整性**。
 只改动某个标量字段值的数据会被接受，因此不能把校验当作防篡改手段。
 
-**目标（尚未承诺，实现中）K8**：客户端（Windows、Android、iOS，都是 64 位小端）与服务端用同一套
-库、同一份 schema 和同一 wire，客户端能接收、读写、校验、再发。客户端用字段表后端
-（第 2.1 节），按 C++20 用各平台原生编译器构建（Apple clang、Android NDK Clang、Windows
-编译器），服务端照旧用 C++26 反射。现状（3.2.1）：Android（NDK r29/r30）、Windows（MSVC 19.44、
-clang-cl 19、MinGW）、macOS 和 iOS 模拟器（Apple clang，部署目标 macOS 14.0 / iOS 17.0）的全量
-CTest 都通过，语料与服务端逐字节一致（逐目标的数字见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)）；
-真机：iPhone 15 Pro Max（iOS 26.6.2）CTest 138/138、语料逐字节一致、demo 通过，同机 SLG M 对 FlatBuffers
-A 0.305、D 0.858；3.2.0-rc.1 在一台 Android 11 手机上功能全部通过，没有计时。Android 手机上的速度测到之前，
-客户端用法不对外宣传。升为核心承诺的条件：三个客户端目标都原生构建、CTest 通过
-（iOS 含地址空间实测，并定下最低部署目标：系统 libc++ 的 `std::pmr` 在 macOS 14 / iOS 17
-以下加载失败），跨目标 wire 语料一致，签名与 `tools/sigs/` 基线一致。详见
-[CLIENT_TARGETS.md](CLIENT_TARGETS.md)。3.1.0 没有这条构建路径：Android、iOS 和 MSVC 编不了。
+K8 的现状（3.2.1）：客户端用字段表后端（第 2.1 节），按 C++20 用各平台原生编译器构建（Apple clang、
+Android NDK Clang、Windows 编译器），服务端照旧用 C++26 反射。Android（NDK r29/r30）、Windows（MSVC 19.44、
+clang-cl 19、MinGW）、macOS 和 iOS 模拟器（Apple clang，部署目标 macOS 14.0 / iOS 17.0）的全量 CTest 都通过，
+语料与服务端逐字节一致（逐目标的数字见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)）；真机：iPhone 15 Pro Max
+（iOS 26.6.2）CTest 138/138、语料逐字节一致、demo 通过；3.2.0-rc.1 在一台 Android 11 手机上功能全部通过。
+保证的范围：三个客户端目标都原生构建、CTest 通过，跨目标 wire 语料一致，签名与 `tools/sigs/` 基线一致；
+iOS 的地址空间和最低部署目标（系统 libc++ 的 `std::pmr` 在 macOS 14 / iOS 17 以下加载失败）见
+[DEPLOYMENT.md](DEPLOYMENT.md)。客户端在手机上的速度数字等真机复核后再对外宣传（Android 还没有计时）。
+3.1.0 没有这条构建路径：Android、iOS 和 MSVC 编不了。
+
+**目标（尚未承诺）K9 原生增量同步**：程序改完工作状态后只发改过的字节；接收方把增量合并进自己的副本，
+完整校验后接着读写，覆盖视口增量和玩家自身增量。API 在 3.3 加入。升为核心承诺的条件：增量 wire 1.0
+在 1.x 内冻结；增量 apply 进入发版前 ASan fuzz（K4）；有增量使用指南和示例；与演进握手衔接（schema
+版本变了就回落全量）；视口 demo 端到端用原生增量；字节、服务端、客户端的性能门槛达标。
 
 以下接口提供但属于可选或实验性质，可能在后续版本中改变：
 
 | # | 接口 | 说明 |
 | --- | --- | --- |
+| E0 | schema 演进：`xoffset_evolution.hpp`（版本链、`evolve_load_verified`、`XPeerSchemas` 握手）、freeze 工具 | 版本不同的两端互通（3.2.0 起，[SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)）；转换在服务端，客户端不含转换代码 |
 | E1 | `freeze_verified`、`begin_verified_receive` / `finish_verified` | 零拷贝分段发送、直接收进最终 arena |
 | E2 | `save_verified_into`、`TypedXBuffer<T>` | 便利接口 |
 | E3 | `XBufferPool`、预留与增长策略细节、`XStorage` / `storage_kind()`、`SLOT_MAX`、`trim_slot_storage` | 小 buffer 高频场景 |

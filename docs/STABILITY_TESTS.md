@@ -1,6 +1,6 @@
-# 稳定承诺与自动化测试对照（K0–K7）
+# 稳定承诺与自动化测试对照（K0–K8）
 
-K0–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。本表把每条承诺
+K0–K8 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。本表把每条承诺
 对应到会在 CI 里失败的测试。测试名就是 CTest 名称；"CI 作业"指
 `.github/workflows/ci.yml` 里的作业（GitHub CI 自 2026-10-23 停用，这些检查由本地验证
 `tools/local_validate.sh` 执行）。改动任何一条承诺的行为时，对应测试必须先失败。
@@ -39,7 +39,7 @@ K0–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 | | | CI 作业 `gcc16` | GCC 16 跑全量 CTest |
 | | | `test_schema_pin`、`schema_pin_mismatch` | 用户 schema 用 `XOFFSET_PIN_SCHEMA` 固定签名后，布局与固定值一致时编译通过；不一致时构建失败，报错含 `XOffset schema pin mismatch (K7)`。两种构建都跑，所以客户端原生编译器（NDK Clang、MSVC、clang-cl、MinGW GCC）上同样会构建失败 |
 
-## 目标 K8（尚未承诺，实现中）
+## K8（核心承诺，2026-11-04 起）
 
 客户端（iOS、Android、Windows，64 位小端）用字段表后端、各平台原生编译器构建，与服务端用同一套库、
 同一 wire。它不是 CTest 里的一项，而是每个客户端目标各跑一遍 `tools/native_targets.sh`：
@@ -50,7 +50,14 @@ K0–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 | 读参照语料 | 服务端 C++26 反射构建写出的 6 个语料，目标全部 `load_verified` 接受 | 上述目标全部接受 |
 | 写语料 `diff -r` | 目标写出的语料与参照逐字节一致 | 上述目标逐字节一致 |
 
-升为核心承诺的条件见 [USER_GUIDE.md](USER_GUIDE.md) 第 8 节，逐目标结果见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)。
+保证的范围见 [USER_GUIDE.md](USER_GUIDE.md) 第 8 节，逐目标结果见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)。
+发版前每个客户端目标都要跑一遍（[RELEASING.md](RELEASING.md)）。
+
+## 目标 K9（尚未承诺）：原生增量同步
+
+只发改过的字节，接收方合并后完整校验（API 3.3 加入）。升为核心承诺前要有：增量 apply 的拒绝用例和随机流
+测试（`test_delta_sync`，含关异常构建）、增量 apply 的发版前 ASan fuzz、增量 wire 1.0 冻结的金标准测试。
+条件全文见 [USER_GUIDE.md](USER_GUIDE.md) 第 8 节。
 
 ## 不在 CTest 里的部分
 
@@ -64,7 +71,9 @@ K0–K7 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
   wire 比较两个库版本的校验结果（含确切错误信息）。比较按 payload 进行：带 extent 表的 wire 先展开成
   等价的稠密 wire 再校验，因为各版本接受的稀疏写法可以不同（0.3.0-beta.2 起 gap 字节不必落在空洞里）。
   同一版本内"稀疏 wire 与其稠密等价物结果相同"由 `test_v2_fuzz` 检查。
-- K4 的每日长跑（威胁模型 F4）：`tools/fuzz_nightly.sh` 在云端 Docker 主机上每天运行 GCC 16
+- K4 的发版前 fuzz（2026-11-04 起；每晚长跑自 2026-10-28 停，不再恢复）：每次发版前在云端对每个接收入口
+  （含增量 apply）跑一轮 ASan+UBSan fuzz，无发现才发版（[RELEASING.md](RELEASING.md)）。用的是下面这些脚本。
+- K4 的长跑工具（威胁模型 F4）：`tools/fuzz_nightly.sh` 在云端 Docker 主机上运行 GCC 16
   ASan+UBSan 差分 fuzz（`test_v2_fuzz`，4 个 seed，约 45 分钟）和回归语料回放；发现崩溃时
   `tools/fuzz_report.py` 按签名开 `fuzz-crash` issue 并推出 `fuzz-crash/<签名>` 分支。结果
   不在 CTest 里，记录在项目文件 `fuzz-nightly/`。2026-10-27 起，同一晚接着跑
