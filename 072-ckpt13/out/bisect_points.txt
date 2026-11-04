@@ -1,0 +1,1 @@
+827943cfb9725aeb54b2ff93ac99ff1eaf9351e2|the CKPT11 head (free table fix); the last range holds 845c230b (XBufferCore hot fields together, XBuffer 232 bytes)
