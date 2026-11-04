@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- `XMap::try_emplace` (and `operator[]`, `emplace`, `insert_or_assign` on a
+  new key) and `XSet::insert` append a key greater than the last one after
+  one compare instead of a binary search; any other key searches all but
+  the last element. Copying or rebuilding a map in key order is now linear.
+  Contents, layout and allocation are unchanged. Instructions, GCC 16,
+  bench/slg demo (M): LD.apply -24%, LD.send -20%, SD.save_encode -27%.
 - Verified saves of a buffer whose root was admitted at the current epoch
   (`make<T>()`, `reset<T>()`, a verified load) take the root from the
   cache `root<T>()` uses and skip the typed-access and schema checks and
