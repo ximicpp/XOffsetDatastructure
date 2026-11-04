@@ -38,7 +38,12 @@
 // promises that T declares no special member function (destructor, copy/move
 // constructor or assignment): the library cannot check that part, a C++26
 // build checks all of it. XOFFSET_RECORD_DERIVED declares nothing; with an
-// empty base list it describes a record without the ordinary declaration.
+// empty base list it describes a record without the ordinary declaration, so
+// XVector<T> insert, erase and growth move such elements one at a time (an order
+// book measured about 1,000 instructions per inserted price level) instead of
+// by SHIFT. For a record that makes the promise, write XOFFSET_RECORD(T, ...)
+// (or add XOFFSET_ORDINARY_RECORDS(T)); keep XOFFSET_RECORD_DERIVED(T, (), ...)
+// for records that declare a destructor, copy/move constructor or assignment.
 //
 // Under C++26 reflection stays the backend: a record written with
 // XOFFSET_RECORD is checked against reflection (members, order, offsets,

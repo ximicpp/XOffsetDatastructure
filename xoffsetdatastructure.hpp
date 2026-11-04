@@ -7908,6 +7908,11 @@ namespace XOffsetDatastructure {
     }
 
     // XHandle<T> -- Epoch-cached handle. O(1) deref when address is stable.
+    // Each dereference compares the cached epoch with the buffer's (two loads
+    // and a compare, inlined); the re-resolution after a change is out of
+    // line. In a loop over many events, resolve once per packet or batch
+    // (`T& r = *handle;`) and use the reference: nothing in the loop body may
+    // then move or reload the buffer.
     // ========================================================================
     template <typename T>
     class XHandle {
@@ -7939,10 +7944,16 @@ namespace XOffsetDatastructure {
         }
 
     private:
-        T* resolve() const {
+        // A cached pointer was resolved through buffer_, which is then set:
+        // buffer_ is null only together with cached_ptr_.
+        XOFFSET_DETAIL_MOVE_INLINE T* resolve() const {
+            if (cached_ptr_ && cached_epoch_ == buffer_->epoch()) [[likely]] return cached_ptr_;
+            return refresh();
+        }
+        // First use, or the buffer changed (epoch) since the last resolution.
+        XOFFSET_DETAIL_MOVE_COLD T* refresh() const {
             if (!buffer_) return nullptr;
-            uint64_t current_epoch = buffer_->epoch();
-            if (cached_ptr_ && cached_epoch_ == current_epoch) return cached_ptr_;
+            const uint64_t current_epoch = buffer_->epoch();
             cached_ptr_ = resolver_ ? resolver_(*buffer_)
                 : (buffer_->root_type_known() && !buffer_->template root_type_matches<T>()
                     ? nullptr : detail::find_root<T>(*buffer_));
