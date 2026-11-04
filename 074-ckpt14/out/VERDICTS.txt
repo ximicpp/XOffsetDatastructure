@@ -1,0 +1,9 @@
+CKPT14 10
+anchor eabb583b (next_cpp26; current PR #191 base)
+screen watcher: 73 calls (dark.log)
+ABC: fail (max upper bound 1.0371; A 1.0371, B 1.0114, C 1.0137; 12 / 12 processes)
+GATE_D: head D÷flatbuffers 0.925 / 0.945 (O4 upper bound <= 1.0: met), D÷zpp_bits 1.027 / 1.037, D.read 67.4 µs; anc D÷flatbuffers 0.933 / 0.956, D÷zpp_bits 1.046 / 1.057, D.read 69.1 µs
+G8 met
+G9R rc 0 (0 done, 2 prep check, 5 quiet gate); G9: 17 of 19 comparisons have UB <= 1.05; above: vec.push_back, set.erase.fresh
+ctest 100% tests passed out of 169 (rc 0)
+nc 判读行 f4（只报）：f4 new÷anc A÷rivals 1.0102 [1.0019, 1.0186]；f4 new÷anc A.total 1.0068 [0.9949, 1.0188]；f4 new÷anc A.req_encode 1.0455 [1.0302, 1.0611]；f4 new÷anc A.res_decode 0.9781 [0.9667, 0.9896]；f4 nc÷anc A÷rivals 0.9920 [0.9828, 1.0012]；f4 nc÷anc A.total 0.9928 [0.9807, 1.0051]；f4 nc÷anc A.req_encode 0.9872 [0.9725, 1.0020]；f4 nc÷anc A.res_decode 0.9928 [0.9796, 1.0061]；f4 new÷nc A÷rivals 1.0184 [1.0090, 1.0279]；f4 new÷nc A.total 1.0141 [1.0030, 1.0253]；f4 new÷nc A.req_encode 1.0591 [1.0445, 1.0740]；f4 new÷nc A.res_decode 0.9852 [0.9729, 0.9976]

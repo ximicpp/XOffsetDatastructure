@@ -1,0 +1,2 @@
+c2512bf6 2512bf6ea56a5543d7ba9630854baa3cf2376077 tree 80b5993c714d6d236ffc283b061631a51570d597 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+slg c2512bf6ea56a5543d7ba9630854baa3cf2376077: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib

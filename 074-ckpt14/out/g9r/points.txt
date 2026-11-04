@@ -1,0 +1,50 @@
+t0 eabb583b033d9dba9b30fbdb1ffc66b4bc8f953a tree ee1e26a8fa88515f4197b59a1475fb552846f78d typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (next_cpp26 eabb583b (#210; current PR #191 base))
+t1 6ec08cc6ba8e837925f008947aaa49b16e72c420 tree 4fa0e6a06fa8c90b234f58d6c6c2ea8ff5f36ed7 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (CKPT14 head (PR #191 delta sync 6ec08cc6))
+t1: diff over t0 sha256 5810794fb05b683f086c0b52acccf1874fa1625ed529a754793062f8f1bedb0b ( 11 files changed, 5931 insertions(+), 24 deletions(-))
+t1: library header diff over t0:  2 files changed, 271 insertions(+), 22 deletions(-)
+t1: first-parent commits over t0:
+  6ec08cc6 Merge next_cpp26 (eabb583b, #210) into delta sync
+  374a8728 Merge next_cpp26 (32ee1473, #207 #208) into delta sync
+  153d5177 Merge next_cpp26 (9e14ece1, #209) into delta sync
+  7157488f Merge next_cpp26 (c2ec7ee3, #205 #206) into delta sync
+  845c230b XBufferCore: keep root cache, base, size and free table on one run
+  827943cf Free table: keep pre-generation field offsets, drop redundant bump_gen
+  0bbbaa07 Merge next_cpp26 (b6e0678, #204) into delta sync
+  3e026071 Merge next_cpp26 (cc5b28e) into delta sync
+  4889cdd4 Free table: a change marks the generation stale, a read counts it up
+  3278287d Merge next_cpp26 (d9db04d) into delta sync
+  20ae12ea Free table: inline the generation bump
+  a95bed62 Delta: a touches baseline sends touched bytes past the touch list
+  8045e6b4 Merge next_cpp26 910b0223 (#199, #200) into delta sync
+  4d117cf7 Delta receiver: re-verify only a vector of records that moved or shrank
+  a126a042 CHANGELOG: receiver map growth, touch list filter
+  9bd146c8 Merge next_cpp26 (7e24016a: #198) into the delta sync branch
+  67494349 Delta receiver maps grow by half again; touch list skips the scan for new blocks
+  ce1bed30 Merge next_cpp26 (c5a801a9: #193) into the delta sync branch
+  3e203f69 Cached root follows an XBuffer move and swap
+  e2697b51 Delta baseline copy: aligned buffer with room to grow, filled and moved with memset/memcpy
+  44e91402 Merge next_cpp26 (87227259: #194) into the delta sync branch
+  51c2f07b Delta: records growth checked on its own, byte-exact touch_set, hole table skipped when unchanged, cached root follows a storage move
+  8b3029b6 Delta receiver: moved containers checked on their own against a live-block map
+  522f2129 Merge next_cpp26 (670fcc75: #197) into the delta sync branch
+  65e98ce7 Delta touch log: a short list per period, stamps only when shared; touches baselines
+  ece7d87e Delta blocks on 64-byte payload offsets; baseline copy line-aligned
+  dffba8ad Merge next_cpp26 (f04d6230: #192, #195, #196) into the delta sync branch
+  98046a99 Merge next_cpp26 (c9fbaea2, bench/slg demo case set) into the delta sync branch
+  bc21be6d Delta sync: the baselines of a thread share the encode scratch
+  9640d118 Delta sync: test replicas fed on several threads and at thread exit
+  5446db55 Delta sync: the cursors of a thread share the apply scratch
+  5bb90b94 Delta sync: compare touched blocks by runs; never skip blocks past the baseline's used size
+  f39fe1fa Delta sync: key deltas pair with the touch log, node lookup by block, 24-byte map
+  fe1ebbd4 Delta sync: write a block's mask bytes in one shuffle; CHANGELOG for format 1.0
+  84b83a1e Delta sync: whole_blocks option, no popcount calls, lazy map after full
+  fa93cf72 Delta sync: touched-only diffs, SIMD block bytes, cheaper key apply
+  78ed179f Delta sync: re-check a changed container on its own
+  6ff26fc8 Delta sync: 64-byte change blocks, a 14-byte header, receiver checks only what changed
+  779eef11 Delta sync: faster sender diff; key delta for a receiver that joins late
+  44ec96e1 Delta sync: send only changed payload bytes to a receiver that holds a copy
+bench/reloc of t1: same tree as t0
+reloc_bench t0 sha256 cbdab37ce5213b313f9cbae2f81d6a569d1fe515171ead440165e3d8731521d1
+reloc_bench t1 sha256 0c1b4be0bd1421852eaa03fb20a6a95e040939dee772346abe1b4d3696e91cee
+reloc_bench t0a sha256 997947e5a22513ed50575bc5e308ad08ee0c568181d4dee72419e74f025ee8bc
+reloc_bench t1a sha256 244492bcaef187a8d1e59661b5a4e560b863821ccd6cf8b9735ac684dbdbc32d
