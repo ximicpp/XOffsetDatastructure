@@ -12,6 +12,9 @@ buffers no longer fault on install under memory pressure, and
 `xoffset_shared_delta.hpp` adds an experimental shared-delta prototype. The
 `root<T>()` cache refill of 3.3.1 is withdrawn. Judged in the cloud only:
 Ir gates against v3.3.1 and the full local validation (docs/RELEASING.md).
+Instructions against v3.3.1, GCC 16 and P2996: every total within 1.003
+except P2996 slg.D 1.016, which is the withdrawn refill (ledger entry
+pr240-revert-223-d); every phase within 1.018.
 The pre-release fuzz run was skipped for this release (susu, 2026-11-05),
 so native delta sync (K9 in docs/USER_GUIDE.md) stays a goal; the Mac stage
 review runs after the tag.
