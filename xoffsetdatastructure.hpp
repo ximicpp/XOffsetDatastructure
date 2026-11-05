@@ -2876,10 +2876,10 @@ namespace XOffsetDatastructure {
             if constexpr (Alignment > 8) {
                 return allocate_dynamic_bytes(alloc_ref, bytes, Alignment);
             } else {
-                auto* arena = alloc_ref.segment;
-                if (!arena || bytes > XBufferCore::MAX_PAYLOAD - 8u) [[unlikely]]
+                auto* owner = XBufferCore::owner_from_arena_noexcept(alloc_ref.segment);
+                if (!owner || bytes > XBufferCore::MAX_PAYLOAD - 8u) [[unlikely]]
                     return allocate_dynamic_bytes(alloc_ref, bytes, Alignment); // throws the usual error
-                return XBufferCore::owner_from_arena(arena).allocate_block(block_bytes_of(bytes), Alignment);
+                return owner->allocate_block(block_bytes_of(bytes), Alignment);
             }
         }
 
@@ -4023,21 +4023,35 @@ namespace XOffsetDatastructure {
         }
 
         // The no-op case inline at the caller (capacity_ <= max_size(), so
-        // checked_count would not throw for it); the growth where it was.
+        // checked_count would not throw for it). An empty vector's first
+        // storage (a vector filled anew, as after a reset) takes the
+        // allocation with its alignment checks folded; every other growth
+        // is reserve_grow, the body reserve had, unchanged.
         XOFFSET_DETAIL_MOVE_INLINE void reserve(std::size_t requested) {
             if (requested <= capacity_) return;
-            reserve_grow(requested);
+            reserve_first_or_grow(requested);
         }
 
     private:
+        void reserve_first_or_grow(std::size_t requested) {
+            if (capacity_ != 0 || requested > max_size()) return reserve_grow(requested);
+            const auto new_cap = static_cast<size_type>(requested);
+            const auto alloc = bound_binding();
+            // First storage: nothing to expand, move or retire.
+            auto* fresh = detail::begin_dynamic_array<T>(fixed_detail::allocate_dynamic_bytes_aligned<alignof(T)>(
+                alloc, static_cast<std::uint32_t>(new_cap * sizeof(T))), new_cap);
+            fixed_detail::set_rel32(data_delta, &data_delta, fresh);
+            capacity_ = new_cap;
+        }
+
         void reserve_grow(std::size_t requested) {
             auto new_cap = checked_count(requested);
             if (new_cap <= capacity_) return;
             const auto alloc = bound_binding();
             if (capacity_ == 0) {
                 // First storage: nothing to expand, move or retire.
-                auto* fresh = detail::begin_dynamic_array<T>(fixed_detail::allocate_dynamic_bytes_aligned<alignof(T)>(
-                    alloc, static_cast<std::uint32_t>(new_cap * sizeof(T))), new_cap);
+                auto* fresh = detail::begin_dynamic_array<T>(fixed_detail::allocate_dynamic_bytes(
+                    alloc, static_cast<std::uint32_t>(new_cap * sizeof(T)), alignof(T)), new_cap);
                 fixed_detail::set_rel32(data_delta, &data_delta, fresh);
                 capacity_ = new_cap;
                 return;
@@ -8798,7 +8812,7 @@ namespace XOffsetDatastructure {
         /// Invalidates references into the previous content like
         /// reload_verified.
         template <typename T>
-        T& reset() {
+        XOFFSET_DETAIL_MOVE_INLINE T& reset() {
             reset_arena(this->get_size());
             if (!this->arena()) XOFFSET_THROW(XException(XErrc::invalid_state, "reset<T>(): buffer has no arena"));
             return *this->template make_inline<T>();
