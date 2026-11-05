@@ -228,6 +228,16 @@ so earlier batches and the perf gate compare as before.
   them); the checked rows are report only. XOffset keeps its checked paths
   (`reload_verified`, `try_apply_delta_verified`) until its trust-tier
   interface lands.
+- XOffset trust tier, whole wires (3.4 P1, `xoffset_receiver.hpp`): format
+  `xoffset_trusted` is `xoffset` with every reuse-protocol whole-wire receive
+  (A, B, S, SD, L, EB, LD, U* and their warm-device stages, D) through
+  `XReceiver<XLink::server_peer>` (server <-> server) or
+  `XReceiver<XLink::from_server>` (a client) with `XCheck::admit`, instead of
+  `reload_verified`. The same keys and stages; delta and native receives are
+  unchanged until P2. Builds with `NDEBUG` (otherwise
+  `XOFFSET_FORCE_FULL_CHECK` makes admit the full check). Its rows are the
+  XOffset main column of the application-level cases and class 1
+  (`pool_v6.py`); `xoffset` (full check) is report only.
 - Memory, report only: a `-DSLG_MEMCOUNT=1` build (CMake `SLG_MEMCOUNT=ON`)
   counts the live bytes of every `operator new` (one counter for every format
   and platform, malloc's own overhead not counted); `--mode mem --out m.jsonl`
