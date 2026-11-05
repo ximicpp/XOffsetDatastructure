@@ -2,6 +2,42 @@
 
 ## Unreleased
 
+## 3.3.1: root cache refill and trusted receive
+
+A patch release on 3.3.0. `root<T>()` keeps its cache after a move,
+`XHandle` dereference is cheaper, and a new experimental receiver lets a
+trusted link take a wire without the structural walk. Existing receive entries
+(`load_verified`, `reload_verified`, delta apply) are unchanged. This is the
+first release judged in the cloud only (docs/RELEASING.md): Ir gates against
+v3.3.0 and the full local validation, with no Mac release batch; the Mac
+stage review runs after the tag.
+
+- `xoffset_receiver.hpp` (experimental, trust tier P1): `XReceiver<XLink>`
+  picks the receive check by connection type. `XLink::server_peer` and
+  `XLink::from_server` default to `XCheck::admit`: the same wire parse,
+  admission and copy as `reload_verified` (header, root type id and schema
+  hash, extent and hole tables, capacity), plus the root inside the used
+  payload and every hole aligned inside it, then the free table and the typed
+  root; the structural graph walk is skipped. `XLink::from_client` defaults
+  to `XCheck::full`, and `admit` on it does not compile. `XCheck::bounds` is
+  reserved for the read-only view. `XOFFSET_FORCE_FULL_CHECK` (on without
+  `NDEBUG` and under ASan/TSan) makes admit run the full check. Entries:
+  `reload`, `load`, `load_typed`, returning `XStatus` / `XResult`. Measured
+  with every whole-wire reload switched to admit (cloud, P2996, bench/slg demo
+  M): receive stages take 0.18 to 0.58 of the full check's time. The frozen
+  bench still calls `reload_verified`, so the gate numbers below do not
+  include it. docs/USER_GUIDE.md (K4), docs/V2_THREAT_MODEL.md section 2.
+- `XHandle` dereference inlines its fast path, which is one epoch compare
+  against the cached root, and the re-resolution moves out of line into a
+  cold function. In the HFT demo with 64 books dereferenced through handles
+  (cloud, P2996), instructions per applied event go from 148.86 to 134.78 for
+  the pool layout and from 185.12 to 184.12 for nested. docs/USER_GUIDE.md now
+  says to resolve a handle once per packet or batch rather than per field.
+  `XOFFSET_RECORD_DERIVED(T, (), ...)` keeps its meaning, since it is the form
+  for records with user-declared special members. Such a record is moved
+  element by element instead of by the SHIFT path (about 1,000 instructions
+  per inserted element in the HFT price levels), so the guide and
+  xoffset_schema_describe.hpp recommend `XOFFSET_RECORD` for hot records.
 - A maximum capacity above the 2 GiB payload limit (`XBufferCore::MAX_PAYLOAD`,
   2 GiB - 8 bytes) now fails at create with `capacity_exceeded` and a message
   that names the limit, instead of the generic "XOffset arena allocation
@@ -16,6 +52,33 @@
   order book event through `root<T>()` 173.8 -> 130.8 (a held root pointer
   125.8); bench/slg S A.req_encode -1.6%, A.apply -1.5%, D.read -2.5%,
   NP.send -4.7%.
+- Instructions against 3.3.0 (cloud release gate, bench/slg S and the formal
+  harness, head÷v3.3.0): GCC 16 A 0.9954, B 0.9996, C 1.0000, D 0.9970;
+  P2996 A 0.9946, B 0.9996, C 0.9999, D 0.9747; formal phases 1.0000 on both.
+  One warning: GCC 16 `reloc.reset` 1.0427, because GCC stops inlining
+  `make<T>()` into the bench's reset loop after the `root<T>()` change
+  (P2996 1.0000); recorded in the ledger (record only).
+- Known regression, Mac only: the post-merge Mac review of the `root<T>()`
+  refill (CKPT20, report only) found bench/slg A.req_encode 1.068 (interval
+  1.039 to 1.097, +17 µs per cycle) and A 1.021 against the six formats.
+  Instructions do not show it (A.req_encode -1.6%). It is fixed, or the
+  refill withdrawn, in the next patch release. In the same review
+  `XString` long assignment (G9R str.assign_long) was 1.081 with the same
+  instructions, a placement effect, report only.
+- Clients: Windows x64 (MSVC 19.44 C++20/C++23, clang-cl 19, MinGW GCC 13)
+  ran on 3.3.1; macOS and the iOS simulator (Apple clang) are 3.3.0 results,
+  Android NDK r29/r30 are 3.2.x results.
+- No pre-release fuzz round ran (as for 3.3.0, it takes about 4 hours);
+  the release validation's differential fuzz (two seeds, 200,000 cases each)
+  passed. `XCheck::admit` does not run the structural walk by design; the
+  client uplink keeps the full check.
+- Not in this release: the cache-conflict change for many buffers (#222)
+  moves to 3.4.
+- Process: from this release, merges and releases are judged in the cloud
+  only (docs/RELEASING.md, docs/PERF_GATE.md). `tools/perf_gate` gains
+  `--cache-sim`, a D1/LL miss comparison that L-class PRs attach as a
+  warning item. bench/slg adds a flat held index for the SLG views (#227)
+  and native browse delta rows NB, report only (#233).
 
 ## 3.3.0: native delta sync
 
