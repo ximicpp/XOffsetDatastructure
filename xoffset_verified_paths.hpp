@@ -6,6 +6,20 @@
 #include <tuple>
 #define XOFFSET_VERIFIED_PATHS_API 1
 
+#if defined(_MSC_VER)
+#define XOFFSET_DETAIL_WIRE_INLINE __forceinline
+#elif defined(__clang__) || defined(__GNUC__)
+#define XOFFSET_DETAIL_WIRE_INLINE inline __attribute__((always_inline))
+#else
+#define XOFFSET_DETAIL_WIRE_INLINE inline
+#endif
+// A lambda's call operator inlined (after its parameter list); GCC and Clang.
+#if (defined(__clang__) || defined(__GNUC__)) && !defined(_MSC_VER)
+#define XOFFSET_DETAIL_LAMBDA_INLINE __attribute__((always_inline))
+#else
+#define XOFFSET_DETAIL_LAMBDA_INLINE
+#endif
+
 namespace XOffsetDatastructure {
 namespace detail {
     inline bool verified_paths_intersect(const void* a, std::size_t an,
@@ -18,6 +32,11 @@ namespace detail {
 
     template<class T>
     XWireHeaderV2 VerifiedPathsAccess::header(XBufferCore& source) {
+        return header_inline<T>(source);
+    }
+
+    template<class T>
+    XOFFSET_DETAIL_WIRE_INLINE XWireHeaderV2 VerifiedPathsAccess::header_inline(XBufferCore& source) {
         static_assert(is_v1_wire_admitted_v<T>);
 #ifdef XOFFSET_REJECT_IMPLICIT_PADDING
         static_assert(!has_implicit_padding_v<T>,
@@ -63,7 +82,7 @@ namespace detail {
 
     template<class T>
     void VerifiedPathsAccess::save_into(XBufferCore& source, std::string& out, XSaveOptions options) {
-        auto check_alias = [&](XBufferCore& candidate) {
+        auto check_alias = [&](XBufferCore& candidate) XOFFSET_DETAIL_LAMBDA_INLINE {
             if (out.capacity() == (std::numeric_limits<std::size_t>::max)())
                 XOFFSET_THROW(std::length_error("save_verified_into: output capacity overflows alias range"));
             if (verified_paths_intersect(&out, sizeof(out), candidate.get_address(), candidate.segment_size()) ||
@@ -85,11 +104,26 @@ namespace detail {
             sizeof(XWireHeaderV2) + std::uint64_t(arena->used_end - XWIRE_PAYLOAD_BEGIN) +
                 std::uint64_t(source.free_block_count()) * sizeof(XBufferCore::WireHole) <= out.capacity()) [[likely]] {
             check_alias(source);
-            const auto final_header = header<T>(source);
+            const auto final_header = header_inline<T>(source);
             const auto final_size = wire_dense_size(final_header, "save_verified_into");
             const auto* base = static_cast<const char*>(source.get_address());
             const WireGaps none{};
 #if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
+            // Small payload (below wire_zero_scan_min_payload, far below the
+            // copier's prefault size): no emission elides a byte here, so the
+            // wire is the header (extent_count 0), the payload and the holes,
+            // as write_wire writes it; two plain copies, written inline.
+            if (final_header.used_bytes < wire_zero_scan_min_payload) [[likely]] {
+                out.resize_and_overwrite(final_size, [&](char* destination, std::size_t) noexcept {
+                    const std::size_t payload = final_header.used_bytes - XWIRE_PAYLOAD_BEGIN;
+                    std::memcpy(destination, &final_header, sizeof(XWireHeaderV2));
+                    std::memcpy(destination + sizeof(XWireHeaderV2), base + XWIRE_PAYLOAD_BEGIN, payload);
+                    if (final_header.hole_count != 0)
+                        source.write_free_blocks(destination + sizeof(XWireHeaderV2) + payload);
+                    return final_size;
+                });
+                return;
+            }
             out.resize_and_overwrite(final_size, [&](char* destination, std::size_t) noexcept {
                 return write_wire(destination, final_header, base, source, emission, none);
             });
@@ -170,13 +204,6 @@ namespace detail {
     }
 }
 
-#if defined(_MSC_VER)
-#define XOFFSET_DETAIL_WIRE_INLINE __forceinline
-#elif defined(__clang__) || defined(__GNUC__)
-#define XOFFSET_DETAIL_WIRE_INLINE inline __attribute__((always_inline))
-#else
-#define XOFFSET_DETAIL_WIRE_INLINE inline
-#endif
 namespace detail {
     // ---- save_compact: canonical wire by direct traversal ----------------
     // Canonical layout: arena header, root at offset 48, then every block in
