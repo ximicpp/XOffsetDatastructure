@@ -630,8 +630,12 @@ namespace XOffsetDatastructure {
             std::swap(bound_schema_hash_, other.bound_schema_hash_);
             advance_epoch();
             other.advance_epoch();
-            update_registry_owner();
-            other.update_registry_owner();
+            // No record is written: a record follows its payload, so after the
+            // two swaps above each record is again its payload's, and the
+            // owner it names is read from the host header (record_owner). A
+            // record lives on the heap and is touched by nothing else on the
+            // hot paths, so under memory pressure it is cold; writing it here
+            // cost a page fault per buffer (B.install, 2026-11-05).
         }
 
         friend void swap(XBufferCore& a, XBufferCore& b) noexcept { a.swap(b); }
@@ -711,7 +715,9 @@ namespace XOffsetDatastructure {
         }
 
         // Host owner of a payload base (the arena header address). V2 keeps it
-        // in the host page preceding the payload; no registry or TLS lookup.
+        // in the host header just before the payload (a slot's, or a VM
+        // region's first 64 bytes, on the payload's first page); no registry
+        // or TLS lookup.
         static XBufferCore& owner_from_arena(const void* arena) {
             auto* owner = owner_from_arena_noexcept(arena);
             if (!owner) XOFFSET_THROW(XException(XErrc::invalid_state, "arena owner lookup failed"));
@@ -952,10 +958,12 @@ namespace XOffsetDatastructure {
         // one; the payload's current owner is re-resolved and the table
         // published to it.
         XOFFSET_DETAIL_MOVE_INLINE detail::vstatus load_free_blocks(const void* holes, std::size_t count) {
-            // No holes, no entry to remove, this owner current: the general
-            // path would only publish the same empty table (or none).
-            if (count == 0 && (!free_table_ || free_table_->count == 0) &&
-                (!owner_record_ || record_owner(owner_record_) == this)) [[likely]] {
+            // No holes and no entry to remove: the general path would only
+            // publish the same empty table (or none). It would publish it to
+            // record_owner(owner_record_), the payload's host word, which is
+            // this owner while it holds the payload; neither the word nor
+            // the record (a cold heap object) needs to be read here.
+            if (count == 0 && (!free_table_ || free_table_->count == 0)) [[likely]] {
                 free_table_lost_ = false;
                 return detail::vok();
             }
@@ -1710,8 +1718,20 @@ namespace XOffsetDatastructure {
             return (value + alignment - 1u) & ~(alignment - 1u);
         }
 
+        // A record's owner field says whether its payload is still owned
+        // (null once released or before a receive publishes it); the owner
+        // itself is the payload's host word, which every ownership change
+        // (swap, move, replace_storage, publish) republishes. swap() does not
+        // write records, so the field may name an earlier owner.
         static XBufferCore* record_owner(const OwnerRecordPtr& record) noexcept {
-            return record ? record->owner.load(std::memory_order_acquire) : nullptr;
+            if (!record || !record->owner.load(std::memory_order_acquire)) return nullptr;
+            return owned_record_owner(*record);
+        }
+        // The owner of a record whose owner field is set: its payload is
+        // live, and the host word names the owner whose buffer starts there.
+        static XBufferCore* owned_record_owner(const OwnerRecord& record) noexcept {
+            return *reinterpret_cast<XBufferCore* const*>(
+                static_cast<const char*>(record.payload) - sizeof(void*));
         }
 
         static XBufferCore& require_record_owner(const OwnerRecordPtr& record) {
@@ -1985,7 +2005,7 @@ namespace XOffsetDatastructure {
         // which moves only movable slots) only; direct-receive owners are
         // indexed by VerifiedReceiveAccess. An ordinary record is not indexed:
         // canonical_bytes_at returns null for it anyway, and reservations
-        // never overlap (each payload follows its own host page or slot), so
+        // never overlap (each payload follows its own host header), so
         // leaving it out cannot change any canonical query result.
         struct PreparedOwner {
             OwnerRecordPtr record;
@@ -2666,12 +2686,15 @@ namespace XOffsetDatastructure {
             }
 
             void validate() const {
-                auto* owner = XBufferCore::record_owner(record);
-                if (!owner || owner->buffer_.data() != record->payload)
+                // A record stays owned while its payload is the owner's
+                // storage (a replaced storage gets a new record), so the
+                // owner field alone says the payload is live, and the host
+                // word names its owner.
+                if (!record->owner.load(std::memory_order_acquire))
                     XOFFSET_THROW(XException(XErrc::invalid_state, "stable_erase_if owner is no longer live"));
-                if (head_in_payload &&
-                    (head_offset > owner->buffer_.size() ||
-                     head_bytes > owner->buffer_.size() - head_offset))
+                if (!head_in_payload) return;
+                const auto size = XBufferCore::owned_record_owner(*record)->buffer_.size();
+                if (head_offset > size || head_bytes > size - head_offset)
                     XOFFSET_THROW(XException(XErrc::invalid_state, "stable_erase_if target is no longer in storage"));
             }
         };

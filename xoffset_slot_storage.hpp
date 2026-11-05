@@ -7,7 +7,7 @@
 // default), and is carved on demand, so only touched pages become resident.
 // A slot is aligned to its own size and starts with a 64-byte header whose
 // last pointer-sized word is the owner word: it sits at payload - 8, exactly
-// where a VM owner keeps it in its host page, so owner_from_arena and the
+// where a VM owner keeps it in its region's host header, so owner_from_arena and the
 // allocation fast paths do not change. The payload starts at slot + 64.
 //
 // Each thread keeps a bounded free list per class; a global list per class,
@@ -116,9 +116,13 @@ constexpr std::size_t slot_log2(std::size_t value) noexcept {
 
 // V2.1 owner lookup: the payload base of an address (a head names no owner).
 // One byte per 4 MiB granule of a 48-bit address space. 0: no XOffset region.
-// Otherwise bits 0..5 are k, the region's alignment exponent (the region, or
-// the slot, starts at address & ~(2^k - 1)), and bit 7 marks a slot, whose
-// payload starts 64 bytes in. Slot chunks set their entry once; a VM payload
+// Otherwise bit 7 is set and bits 0..5 are k: the region (a slot, or a VM
+// mapping) starts at a 2^k boundary with the 64-byte host header, and its
+// payload of at most 2^k bytes follows. For every payload byte a, a - 64 lies
+// in [region, region + 2^k), so masking it with ~(2^k - 1) finds the region
+// and the payload is 64 bytes past it. A VM payload whose maximum is 2^k (the
+// 64 MiB default) ends up to 64 bytes into the granule past 2^k; that granule
+// belongs to the mapping and carries the same entry. Slot chunks set their entry once; a VM payload
 // is aligned to 2^k and sets the entries of its granules while it is mapped.
 // Entries change only while no head lives in the region. One granule's entry
 // can still be written by two threads: one clears it and unmaps the range,
@@ -129,7 +133,12 @@ struct OwnerMap {
     static constexpr std::size_t granule_bytes = std::size_t(1) << granule_shift;
     static constexpr std::size_t address_bits = 48;
     static constexpr std::size_t entries = std::size_t(1) << (address_bits - granule_shift);
-    static constexpr std::uint8_t slot_bit = 0x80;
+    static constexpr std::uint8_t slot_bit = 0x80;   // a region: payload 64 bytes in
+    static constexpr std::uintptr_t header_bytes = 64;
+    // The payload base for a nonzero entry `e` read at payload address `a`.
+    XOFFSET_DETAIL_OWNER_INLINE static std::uintptr_t decode(std::uintptr_t a, std::uint8_t e) noexcept {
+        return ((a - header_bytes) & (~std::uintptr_t(0) << (e & 63u))) + header_bytes;
+    }
 
     static std::size_t index(std::uintptr_t address) noexcept {
         return (address >> granule_shift) & (entries - 1);
@@ -246,8 +255,7 @@ XOFFSET_DETAIL_OWNER_INLINE char* OwnerMap::payload_of(const void* p) noexcept {
     const auto a = reinterpret_cast<std::uintptr_t>(p);
     const std::uint8_t e = entry(a);
     if (e == 0) return nullptr;
-    const auto base = a & (~std::uintptr_t(0) << (e & 63u));
-    return reinterpret_cast<char*>(base + ((e & slot_bit) >> 1));
+    return reinterpret_cast<char*>(decode(a, e));
 }
 
 XOFFSET_DETAIL_OWNER_INLINE char* OwnerMap::same_payload(const void* a, const void* b) noexcept {
@@ -255,8 +263,10 @@ XOFFSET_DETAIL_OWNER_INLINE char* OwnerMap::same_payload(const void* a, const vo
     const auto ub = reinterpret_cast<std::uintptr_t>(b);
     const std::uint8_t e = entry(ua);
     if (e == 0) return nullptr;
-    char* const pa = reinterpret_cast<char*>(
-        (ua & (~std::uintptr_t(0) << (e & 63u))) + ((e & slot_bit) >> 1));
+    char* const pa = reinterpret_cast<char*>(decode(ua, e));
+    // In one granule, two payload bytes share a region exactly when they share
+    // a 2^k block: a payload byte is never in its region's first 64 bytes, and
+    // a 2^k boundary is a granule boundary when 2^k covers granules.
     if (index(ua) == index(ub)) return ((ua ^ ub) >> (e & 63u)) == 0 ? pa : nullptr;
     return payload_of(b) == pa ? pa : nullptr;
 }
@@ -306,6 +316,7 @@ struct SlotGeometry {
         return cls;
     }
 };
+static_assert(SlotGeometry::header_bytes == OwnerMap::header_bytes, "owner lookup assumes the 64-byte host header");
 
 struct SlotHeader {
     SlotHeader* next;       // free-list link, only while free

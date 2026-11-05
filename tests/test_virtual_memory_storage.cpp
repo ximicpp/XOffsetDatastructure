@@ -21,6 +21,7 @@ using XOffsetDatastructure::detail::VmOperation;
 using XOffsetDatastructure::detail::VmReclaimStatus;
 using XOffsetDatastructure::detail::VmStoragePool;
 using XOffsetDatastructure::detail::checked_vm_round_up;
+using XOffsetDatastructure::detail::checked_vm_payload_round_up;
 using XOffsetDatastructure::detail::clear_vm_failures;
 using XOffsetDatastructure::detail::fail_next_vm_operation;
 
@@ -134,34 +135,39 @@ void test_empty_and_geometry() {
 
     VirtualMemoryStorage geometry(0, 1);
     const auto page = geometry.page_size();
-    check(page > 1 && geometry.reserved_bytes() == page, "runtime page geometry");
+    constexpr auto H = VirtualMemoryStorage::host_header;
+    check(page > H && geometry.reserved_bytes() == page - H, "runtime page geometry");
     check(geometry.reservation_granularity() >= page, "reservation granularity recorded");
     check(geometry.data() != nullptr && geometry.empty(), "zero logical length may own reservation");
-    check(geometry.accessible_bytes() == 0, "zero initial length enables no pages");
-    check(query_page_access(geometry.data()) == PageAccess::Inaccessible,
-          "OS confirms initial reservation is inaccessible");
+    // The first page holds the host header: it is read/write from the start.
+    check(geometry.accessible_bytes() == page - H, "zero initial length enables only the header page");
+    check(query_page_access(geometry.data() - H) == PageAccess::ReadWrite,
+          "OS confirms the host header page is read/write");
+    check(query_page_access(geometry.data() + page - H) == PageAccess::Inaccessible,
+          "OS confirms the mapping past the header page is inaccessible");
     check(geometry.grow_to(1), "grow into first page");
     check(query_page_access(geometry.data()) == PageAccess::ReadWrite,
           "OS confirms enabled page is read/write");
 }
 
 void test_growth_and_hard_cap(std::size_t page) {
+    constexpr auto H = VirtualMemoryStorage::host_header;
     const auto maximum = page * 5 + 7;
     VirtualMemoryStorage storage(13, maximum);
     const char* original = storage.data();
-    check(storage.size() == 13 && storage.accessible_bytes() == page,
+    check(storage.size() == 13 && storage.accessible_bytes() == page - H,
           "small initial range enables one page");
-    check(storage.reserved_bytes() == page * 6 && storage.capacity() == maximum,
+    check(storage.reserved_bytes() == page * 6 - H && storage.capacity() == maximum,
           "page rounding does not expand logical hard cap");
-    check(query_page_access(storage.data() + page) == PageAccess::Inaccessible,
+    check(query_page_access(storage.data() + page - H) == PageAccess::Inaccessible,
           "OS confirms reservation tail remains inaccessible");
 
     std::memset(storage.data(), 'a', storage.size());
-    check(storage.grow_to(page - 1), "page-internal growth succeeds");
-    check(storage.data() == original && storage.accessible_bytes() == page,
+    check(storage.grow_to(page - H - 1), "page-internal growth succeeds");
+    check(storage.data() == original && storage.accessible_bytes() == page - H,
           "page-internal growth preserves base and permissions extent");
     check_bytes(storage.data(), 13, 'a', "old bytes survive page-internal growth");
-    check_bytes(storage.data() + 13, page - 14, 0, "new page-internal bytes are zero");
+    check_bytes(storage.data() + 13, page - H - 14, 0, "new page-internal bytes are zero");
 
     for (std::size_t new_size : {page, page + 1, page * 2, page * 3 + 1, maximum}) {
         const auto old_size = storage.size();
@@ -172,7 +178,7 @@ void test_growth_and_hard_cap(std::size_t page) {
         check_bytes(storage.data() + old_size, new_size - old_size, 0,
                     "only newly exposed range is zero initialized");
     }
-    check(storage.size() == maximum && storage.accessible_bytes() == page * 6,
+    check(storage.size() == maximum && storage.accessible_bytes() == page * 6 - H,
           "exact non-page-aligned cap remains exact");
     check(!storage.grow_to(maximum + 1), "rounded page slack is not usable capacity");
     check(!storage.grow_to((std::numeric_limits<std::size_t>::max)()),
@@ -216,12 +222,13 @@ void test_tail_reclaim(std::size_t page) {
           "reclaim never discards logical pages");
     for (const auto shortened : {page + 7, page, std::size_t(0)}) {
         std::memset(storage.data(), 'r', storage.size());
+        const auto enabled = storage.accessible_bytes();
         storage.resize_logical(shortened);
         std::size_t retained = 0;
-        check(checked_vm_round_up(shortened, page, retained), "round reclaim boundary");
+        check(checked_vm_payload_round_up(shortened, page, retained), "round reclaim boundary");
         const auto result = storage.reclaim_tail();
         check(result.status == VmReclaimStatus::Reclaimed && result.complete() &&
-                  result.attempted_bytes == page * 6 - retained &&
+                  result.attempted_bytes == enabled - retained &&
                   result.discarded_bytes == result.attempted_bytes &&
                   result.inaccessible_bytes == result.attempted_bytes,
               "reclaim reports exactly the complete unused pages");
@@ -236,7 +243,7 @@ void test_tail_reclaim(std::size_t page) {
         }
         check(query_page_access(base + retained) == PageAccess::Inaccessible,
               "OS confirms reclaimed tail has no access");
-        check_discarded_pages(base + retained, page * 6 - retained, page);
+        check_discarded_pages(base + retained, enabled - retained, page);
         check(query_page_access(base + page * 8) == PageAccess::Inaccessible,
               "never-enabled reservation tail remains mapped and inaccessible");
         const auto again = storage.reclaim_tail();
@@ -253,6 +260,7 @@ void test_tail_reclaim(std::size_t page) {
 }
 
 void test_reclaim_failures_and_move(std::size_t page) {
+    constexpr auto H = VirtualMemoryStorage::host_header;
     clear_vm_failures();
     VirtualMemoryStorage storage(page * 5, page * 7);
     char* const base = storage.data();
@@ -262,10 +270,10 @@ void test_reclaim_failures_and_move(std::size_t page) {
     fail_next_vm_operation(VmOperation::Reclaim);
     const auto rejected = storage.reclaim_tail();
     check(rejected.status == VmReclaimStatus::Failed && !rejected.complete() &&
-              rejected.attempted_bytes == page * 3 && rejected.discarded_bytes == 0 &&
+              rejected.attempted_bytes == page * 4 && rejected.discarded_bytes == 0 &&
               rejected.inaccessible_bytes == 0,
           "injected discard failure reports no completed operation");
-    check(storage.size() == shortened && storage.accessible_bytes() == page * 5 &&
+    check(storage.size() == shortened && storage.accessible_bytes() == page * 6 - H &&
               storage.data() == base,
           "injected discard failure leaves storage extents unchanged");
     check_bytes(base, page * 5, 's', "injected discard failure preserves all old bytes");
@@ -276,31 +284,31 @@ void test_reclaim_failures_and_move(std::size_t page) {
     fail_next_vm_operation(VmOperation::Protect);
     const auto partial = storage.reclaim_tail();
     check(partial.status == VmReclaimStatus::DiscardedButAccessible && !partial.complete() &&
-              partial.discarded_bytes == page * 3 && partial.inaccessible_bytes == 0,
+              partial.discarded_bytes == page * 4 && partial.inaccessible_bytes == 0,
           "Linux distinguishes completed discard from failed protection");
-    check(storage.accessible_bytes() == page * 5 && storage.size() == shortened,
+    check(storage.accessible_bytes() == page * 6 - H && storage.size() == shortened,
           "partial reclaim retains the accurate read/write extent");
     check(query_page_access(base + page * 4) == PageAccess::ReadWrite,
           "OS confirms partial reclaim retained page permissions");
-    check_discarded_pages(base + page * 2, page * 3, page);
+    check_discarded_pages(base + page * 2 - H, page * 4, page);
     check_bytes(base, shortened, 's', "partial reclaim preserves all live bytes");
 #endif
 
     VirtualMemoryStorage moved(std::move(storage));
     check(storage.reclaim_tail().status == VmReclaimStatus::NoOp && moved.data() == base &&
-              moved.size() == shortened && moved.accessible_bytes() == page * 5,
+              moved.size() == shortened && moved.accessible_bytes() == page * 6 - H,
           "move transfers a failed or partially completed reclaim state");
-    check(moved.reclaim_tail().complete() && moved.accessible_bytes() == page * 2,
+    check(moved.reclaim_tail().complete() && moved.accessible_bytes() == page * 2 - H,
           "retry after move completes reclamation of the same range");
     fail_next_vm_operation(VmOperation::Enable);
-    check(!moved.grow_to(page * 5) && moved.accessible_bytes() == page * 2 &&
+    check(!moved.grow_to(page * 5) && moved.accessible_bytes() == page * 2 - H &&
               moved.size() == shortened,
           "failed recommit retains logical and accessible extents");
     fail_next_vm_operation(VmOperation::Prepare);
-    check(!moved.grow_to(page * 5) && moved.accessible_bytes() == page * 5 &&
+    check(!moved.grow_to(page * 5) && moved.accessible_bytes() == page * 6 - H &&
               moved.size() == shortened,
           "failed preparation records recommitted pages without logical publication");
-    check(moved.reclaim_tail().complete() && moved.accessible_bytes() == page * 2,
+    check(moved.reclaim_tail().complete() && moved.accessible_bytes() == page * 2 - H,
           "reclaim can discard pages retained by failed preparation");
     check(moved.grow_to(page * 5), "regrowth remains possible after reclaim and growth failures");
     check_bytes(base, shortened, 's', "all retries preserve the live prefix");
@@ -318,17 +326,18 @@ void test_reclaim_failures_and_move(std::size_t page) {
 }
 
 void test_loaded_reclaim_and_transfer(std::size_t page) {
+    constexpr auto H = VirtualMemoryStorage::host_header;
     const std::string input(page * 4 + 7, 't');
     auto loaded = VirtualMemoryStorage::from_bytes(input.data(), input.size(), page * 8);
     char* const base = loaded.data();
     loaded.resize_logical(page + 3);
-    check(loaded.reclaim_tail().complete() && loaded.accessible_bytes() == page * 2,
+    check(loaded.reclaim_tail().complete() && loaded.accessible_bytes() == page * 2 - H,
           "fresh copied storage supports explicit reclamation");
     VirtualMemoryStorage other(17, page * 3);
     char* const other_base = other.data();
     swap(loaded, other);
     check(other.data() == base && other.size() == page + 3 &&
-              other.accessible_bytes() == page * 2 && other.capacity() == page * 8,
+              other.accessible_bytes() == page * 2 - H && other.capacity() == page * 8,
           "swap transfers all reclaimed storage geometry");
     loaded = std::move(other);
     check(loaded.data() == base && other.data() == nullptr &&
@@ -341,6 +350,7 @@ void test_loaded_reclaim_and_transfer(std::size_t page) {
 }
 
 void test_failure_paths(std::size_t page) {
+    constexpr auto H = VirtualMemoryStorage::host_header;
     clear_vm_failures();
     for (VmOperation operation : {VmOperation::Reserve, VmOperation::Enable, VmOperation::Prepare}) {
         fail_next_vm_operation(operation);
@@ -355,18 +365,18 @@ void test_failure_paths(std::size_t page) {
     std::memset(storage.data(), 'c', storage.size());
     fail_next_vm_operation(VmOperation::Enable);
     check(!storage.grow_to(page + 9), "injected enable failure is reported");
-    check(storage.data() == original && storage.size() == 17 && storage.accessible_bytes() == page,
+    check(storage.data() == original && storage.size() == 17 && storage.accessible_bytes() == page - H,
           "enable failure preserves logical range and enabled pages");
-    check(query_page_access(storage.data() + page) == PageAccess::Inaccessible,
+    check(query_page_access(storage.data() + page - H) == PageAccess::Inaccessible,
           "enable failure does not open new pages");
     check_bytes(storage.data(), 17, 'c', "enable failure preserves old bytes");
 
     fail_next_vm_operation(VmOperation::Prepare);
     check(!storage.grow_to(page + 9), "post-enable preparation failure is reported");
     check(storage.data() == original && storage.size() == 17 &&
-              storage.accessible_bytes() == page * 2,
+              storage.accessible_bytes() == page * 2 - H,
           "preparation failure records extra pages without publishing logical range");
-    check(query_page_access(storage.data() + page) == PageAccess::ReadWrite,
+    check(query_page_access(storage.data() + page - H) == PageAccess::ReadWrite,
           "OS confirms pages retained after preparation failure");
     check_bytes(storage.data(), 17, 'c', "preparation failure preserves old bytes");
     check(storage.grow_to(page + 9), "retry after preparation failure succeeds");
@@ -441,8 +451,9 @@ void test_fresh_from_bytes(std::size_t page) {
     auto empty = VirtualMemoryStorage::from_bytes(nullptr, 0, 0);
     check(empty.data() == nullptr && empty.size() == 0, "zero-length copy accepts null input");
     auto reserved = VirtualMemoryStorage::from_bytes(nullptr, 0, page);
-    check(reserved.data() != nullptr && reserved.size() == 0 && reserved.accessible_bytes() == 0,
-          "zero-length copy can reserve without publishing pages");
+    check(reserved.data() != nullptr && reserved.size() == 0 &&
+              reserved.accessible_bytes() == reserved.page_size() - VirtualMemoryStorage::host_header,
+          "zero-length copy can reserve, publishing only the header page");
     expect_exception<std::invalid_argument>([&] {
         (void)VirtualMemoryStorage::from_bytes(nullptr, 1, page);
     }, "non-empty copy rejects null input");
@@ -463,7 +474,7 @@ void test_full_capacity_from_bytes(std::size_t page) {
         auto storage = VirtualMemoryStorage::from_bytes(input.data(), length, length);
         const auto* base = storage.data();
         std::size_t rounded = 0;
-        check(checked_vm_round_up(length, page, rounded), "round full copied load");
+        check(checked_vm_payload_round_up(length, page, rounded), "round full copied load");
         check(storage.size() == length && storage.capacity() == length &&
                   storage.reserved_bytes() == rounded && storage.accessible_bytes() == rounded,
               "exact-capacity load exposes exactly the page-rounded reservation");
@@ -546,8 +557,11 @@ void test_from_bytes_failure_and_live_input(std::size_t page) {
 
     fail_next_vm_operation(VmOperation::Enable);
     fail_next_vm_operation(VmOperation::Prepare);
+    // The header page is enabled with the reservation, so even an empty copy
+    // consumes Enable; growth inside that page needs no further Enable.
+    expect_exception<std::bad_alloc>([&] { (void)VirtualMemoryStorage::from_bytes(nullptr, 0, page); },
+                                     "empty copy reports the header page's enable failure");
     auto zero = VirtualMemoryStorage::from_bytes(nullptr, 0, page);
-    check(!zero.grow_to(1), "empty copy leaves enable failure pending");
     check(!zero.grow_to(1), "empty copy leaves prepare failure pending");
     check(zero.grow_to(1), "empty copy remains usable after both failures");
     clear_vm_failures();
