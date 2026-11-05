@@ -1,0 +1,3510 @@
+== 2026-11-05T12:24:06Z before timing
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   345595.
+Pages active:                                  91017.
+Pages inactive:                               216860.
+Pages speculative:                               551.
+Pages throttled:                                   0.
+Pages wired down:                             122557.
+Pages purgeable:                                1733.
+"Translation faults":                     3682740860.
+Pages copy-on-write:                       473927682.
+Pages zero filled:                        1707123979.
+Pages reactivated:                         397732902.
+Pages purged:                               11767029.
+File-backed pages:                            209731.
+Anonymous pages:                               98697.
+Pages stored in compressor:                   546341.
+Pages occupied by compressor:                 238545.
+Decompressions:                            324478557.
+Compressions:                              354953915.
+Pageins:                                    59188523.
+Pageouts:                                      90060.
+Swapins:                                     1279662.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 64%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:27:08Z before process 1 app xoffset
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   281346.
+Pages active:                                 193934.
+Pages inactive:                               220192.
+Pages speculative:                              1479.
+Pages throttled:                                   0.
+Pages wired down:                             122645.
+Pages purgeable:                                2329.
+"Translation faults":                     3683642141.
+Pages copy-on-write:                       474091483.
+Pages zero filled:                        1707396437.
+Pages reactivated:                         397733579.
+Pages purged:                               11767798.
+File-backed pages:                            211352.
+Anonymous pages:                              204253.
+Pages stored in compressor:                   449168.
+Pages occupied by compressor:                 195529.
+Decompressions:                            324575796.
+Compressions:                              354953915.
+Pageins:                                    59191130.
+Pageouts:                                      90060.
+Swapins:                                     1279670.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 68%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:27:54Z after process 1 app xoffset
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   278805.
+Pages active:                                 194649.
+Pages inactive:                               224014.
+Pages speculative:                              1575.
+Pages throttled:                                   0.
+Pages wired down:                             122594.
+Pages purgeable:                                1446.
+"Translation faults":                     3683803201.
+Pages copy-on-write:                       474111196.
+Pages zero filled:                        1707495809.
+Pages reactivated:                         397733690.
+Pages purged:                               11768149.
+File-backed pages:                            211714.
+Anonymous pages:                              208524.
+Pages stored in compressor:                   444055.
+Pages occupied by compressor:                 193488.
+Decompressions:                            324580946.
+Compressions:                              354953915.
+Pageins:                                    59191527.
+Pageouts:                                      90060.
+Swapins:                                     1279670.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 68%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:28:04Z before process 1 app xoffset_trusted
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   274110.
+Pages active:                                 199504.
+Pages inactive:                               224049.
+Pages speculative:                              1579.
+Pages throttled:                                   0.
+Pages wired down:                             122591.
+Pages purgeable:                                4843.
+"Translation faults":                     3683911604.
+Pages copy-on-write:                       474137676.
+Pages zero filled:                        1707528405.
+Pages reactivated:                         397733791.
+Pages purged:                               11768159.
+File-backed pages:                            211749.
+Anonymous pages:                              213383.
+Pages stored in compressor:                   443674.
+Pages occupied by compressor:                 193292.
+Decompressions:                            324581354.
+Compressions:                              354953915.
+Pageins:                                    59191821.
+Pageouts:                                      90060.
+Swapins:                                     1279670.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 68%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:28:49Z after process 1 app xoffset_trusted
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   274302.
+Pages active:                                 196763.
+Pages inactive:                               225233.
+Pages speculative:                              3474.
+Pages throttled:                                   0.
+Pages wired down:                             122565.
+Pages purgeable:                                1462.
+"Translation faults":                     3684089330.
+Pages copy-on-write:                       474161658.
+Pages zero filled:                        1707630399.
+Pages reactivated:                         397733904.
+Pages purged:                               11768347.
+File-backed pages:                            213796.
+Anonymous pages:                              211674.
+Pages stored in compressor:                   442302.
+Pages occupied by compressor:                 192788.
+Decompressions:                            324582759.
+Compressions:                              354953915.
+Pageins:                                    59193977.
+Pageouts:                                      90060.
+Swapins:                                     1279670.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 68%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:28:59Z before process 1 app cereal
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   266319.
+Pages active:                                 205895.
+Pages inactive:                               225204.
+Pages speculative:                              3515.
+Pages throttled:                                   0.
+Pages wired down:                             122577.
+Pages purgeable:                                5175.
+"Translation faults":                     3684126956.
+Pages copy-on-write:                       474168801.
+Pages zero filled:                        1707654000.
+Pages reactivated:                         397734001.
+Pages purged:                               11768581.
+File-backed pages:                            213895.
+Anonymous pages:                              220719.
+Pages stored in compressor:                   439015.
+Pages occupied by compressor:                 191615.
+Decompressions:                            324586987.
+Compressions:                              354953915.
+Pageins:                                    59194044.
+Pageouts:                                      90060.
+Swapins:                                     1279670.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 68%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:30:00Z after process 1 app cereal
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   242870.
+Pages active:                                 215254.
+Pages inactive:                               236531.
+Pages speculative:                              5661.
+Pages throttled:                                   0.
+Pages wired down:                             127781.
+Pages purgeable:                                3446.
+"Translation faults":                     3684417986.
+Pages copy-on-write:                       474216973.
+Pages zero filled:                        1707795156.
+Pages reactivated:                         397734206.
+Pages purged:                               11769292.
+File-backed pages:                            217317.
+Anonymous pages:                              240129.
+Pages stored in compressor:                   428291.
+Pages occupied by compressor:                 187028.
+Decompressions:                            324597809.
+Compressions:                              354953915.
+Pageins:                                    59196731.
+Pageouts:                                      90060.
+Swapins:                                     1279674.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 68%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:30:10Z before process 1 app protobuf
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   245933.
+Pages active:                                 216803.
+Pages inactive:                               236799.
+Pages speculative:                              6047.
+Pages throttled:                                   0.
+Pages wired down:                             122716.
+Pages purgeable:                                3372.
+"Translation faults":                     3684532518.
+Pages copy-on-write:                       474244411.
+Pages zero filled:                        1707822782.
+Pages reactivated:                         397734210.
+Pages purged:                               11769384.
+File-backed pages:                            217886.
+Anonymous pages:                              241763.
+Pages stored in compressor:                   427532.
+Pages occupied by compressor:                 186827.
+Decompressions:                            324598596.
+Compressions:                              354953915.
+Pageins:                                    59197360.
+Pageouts:                                      90060.
+Swapins:                                     1279674.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 69%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:31:00Z after process 1 app protobuf
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   229069.
+Pages active:                                 223630.
+Pages inactive:                               246352.
+Pages speculative:                              6708.
+Pages throttled:                                   0.
+Pages wired down:                             127505.
+Pages purgeable:                                3555.
+"Translation faults":                     3684712462.
+Pages copy-on-write:                       474267801.
+Pages zero filled:                        1707919043.
+Pages reactivated:                         397734448.
+Pages purged:                               11769525.
+File-backed pages:                            219065.
+Anonymous pages:                              257625.
+Pages stored in compressor:                   413574.
+Pages occupied by compressor:                 181861.
+Decompressions:                            324612593.
+Compressions:                              354953915.
+Pageins:                                    59198051.
+Pageouts:                                      90060.
+Swapins:                                     1279674.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 69%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:31:10Z before process 1 app flatbuffers_noverify
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   233507.
+Pages active:                                 224266.
+Pages inactive:                               246161.
+Pages speculative:                              6706.
+Pages throttled:                                   0.
+Pages wired down:                             122684.
+Pages purgeable:                                3485.
+"Translation faults":                     3684822952.
+Pages copy-on-write:                       474295033.
+Pages zero filled:                        1707944895.
+Pages reactivated:                         397734448.
+Pages purged:                               11769615.
+File-backed pages:                            219078.
+Anonymous pages:                              258055.
+Pages stored in compressor:                   413417.
+Pages occupied by compressor:                 181801.
+Decompressions:                            324612779.
+Compressions:                              354953915.
+Pageins:                                    59198348.
+Pageouts:                                      90060.
+Swapins:                                     1279674.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 69%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:31:58Z after process 1 app flatbuffers_noverify
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   231653.
+Pages active:                                 224661.
+Pages inactive:                               247824.
+Pages speculative:                              6951.
+Pages throttled:                                   0.
+Pages wired down:                             122660.
+Pages purgeable:                                5053.
+"Translation faults":                     3684966080.
+Pages copy-on-write:                       474314882.
+Pages zero filled:                        1708034195.
+Pages reactivated:                         397734652.
+Pages purged:                               11769947.
+File-backed pages:                            219242.
+Anonymous pages:                              260194.
+Pages stored in compressor:                   412219.
+Pages occupied by compressor:                 181376.
+Decompressions:                            324613997.
+Compressions:                              354953915.
+Pageins:                                    59198693.
+Pageouts:                                      90060.
+Swapins:                                     1279674.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 69%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:32:08Z before process 1 app zpp_bits
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   232859.
+Pages active:                                 223633.
+Pages inactive:                               247633.
+Pages speculative:                              7083.
+Pages throttled:                                   0.
+Pages wired down:                             122647.
+Pages purgeable:                                3700.
+"Translation faults":                     3685076990.
+Pages copy-on-write:                       474342148.
+Pages zero filled:                        1708063912.
+Pages reactivated:                         397734654.
+Pages purged:                               11770041.
+File-backed pages:                            219445.
+Anonymous pages:                              258904.
+Pages stored in compressor:                   412016.
+Pages occupied by compressor:                 181270.
+Decompressions:                            324614214.
+Compressions:                              354953915.
+Pageins:                                    59199120.
+Pageouts:                                      90060.
+Swapins:                                     1279674.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 69%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:32:43Z after process 1 app zpp_bits
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   231819.
+Pages active:                                 224433.
+Pages inactive:                               248866.
+Pages speculative:                              7074.
+Pages throttled:                                   0.
+Pages wired down:                             122651.
+Pages purgeable:                                2738.
+"Translation faults":                     3685214053.
+Pages copy-on-write:                       474360157.
+Pages zero filled:                        1708144468.
+Pages reactivated:                         397734780.
+Pages purged:                               11770139.
+File-backed pages:                            219377.
+Anonymous pages:                              260996.
+Pages stored in compressor:                   409266.
+Pages occupied by compressor:                 180282.
+Decompressions:                            324617074.
+Compressions:                              354953915.
+Pageins:                                    59199317.
+Pageouts:                                      90060.
+Swapins:                                     1279674.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 69%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:32:53Z before process 1 app cista_unchecked
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   231264.
+Pages active:                                 225187.
+Pages inactive:                               248705.
+Pages speculative:                              7074.
+Pages throttled:                                   0.
+Pages wired down:                             122648.
+Pages purgeable:                                2780.
+"Translation faults":                     3685248268.
+Pages copy-on-write:                       474367312.
+Pages zero filled:                        1708160461.
+Pages reactivated:                         397734780.
+Pages purged:                               11770372.
+File-backed pages:                            219406.
+Anonymous pages:                              261560.
+Pages stored in compressor:                   409127.
+Pages occupied by compressor:                 180247.
+Decompressions:                            324617235.
+Compressions:                              354953915.
+Pageins:                                    59199384.
+Pageouts:                                      90060.
+Swapins:                                     1279674.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 69%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:33:32Z after process 1 app cista_unchecked
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   230105.
+Pages active:                                 225763.
+Pages inactive:                               249540.
+Pages speculative:                              7124.
+Pages throttled:                                   0.
+Pages wired down:                             122673.
+Pages purgeable:                                2795.
+"Translation faults":                     3685469291.
+Pages copy-on-write:                       474404741.
+Pages zero filled:                        1708272632.
+Pages reactivated:                         397734993.
+Pages purged:                               11770562.
+File-backed pages:                            219645.
+Anonymous pages:                              262782.
+Pages stored in compressor:                   408222.
+Pages occupied by compressor:                 179920.
+Decompressions:                            324618172.
+Compressions:                              354953915.
+Pageins:                                    59199877.
+Pageouts:                                      90060.
+Swapins:                                     1279674.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 69%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:34:03Z before process 1 d3
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   225374.
+Pages active:                                 230926.
+Pages inactive:                               249192.
+Pages speculative:                              7146.
+Pages throttled:                                   0.
+Pages wired down:                             122675.
+Pages purgeable:                                6190.
+"Translation faults":                     3685630068.
+Pages copy-on-write:                       474442442.
+Pages zero filled:                        1708325745.
+Pages reactivated:                         397735083.
+Pages purged:                               11770575.
+File-backed pages:                            219612.
+Anonymous pages:                              267652.
+Pages stored in compressor:                   407969.
+Pages occupied by compressor:                 179812.
+Decompressions:                            324618471.
+Compressions:                              354953915.
+Pageins:                                    59200315.
+Pageouts:                                      90060.
+Swapins:                                     1279674.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:35:01Z after process 1 d3
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   221333.
+Pages active:                                 230614.
+Pages inactive:                               255282.
+Pages speculative:                              7193.
+Pages throttled:                                   0.
+Pages wired down:                             122635.
+Pages purgeable:                                7870.
+"Translation faults":                     3685946727.
+Pages copy-on-write:                       474469249.
+Pages zero filled:                        1708569843.
+Pages reactivated:                         397735293.
+Pages purged:                               11771003.
+File-backed pages:                            219824.
+Anonymous pages:                              273265.
+Pages stored in compressor:                   403710.
+Pages occupied by compressor:                 178068.
+Decompressions:                            324622713.
+Compressions:                              354953915.
+Pageins:                                    59200666.
+Pageouts:                                      90060.
+Swapins:                                     1279678.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:35:32Z before process 2 app xoffset
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   218664.
+Pages active:                                 231029.
+Pages inactive:                               254300.
+Pages speculative:                              7417.
+Pages throttled:                                   0.
+Pages wired down:                             126172.
+Pages purgeable:                                2906.
+"Translation faults":                     3686129493.
+Pages copy-on-write:                       474508528.
+Pages zero filled:                        1708632381.
+Pages reactivated:                         397735425.
+Pages purged:                               11771697.
+File-backed pages:                            220181.
+Anonymous pages:                              272565.
+Pages stored in compressor:                   402018.
+Pages occupied by compressor:                 177543.
+Decompressions:                            324624488.
+Compressions:                              354953915.
+Pageins:                                    59201279.
+Pageouts:                                      90060.
+Swapins:                                     1279686.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 69%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:36:18Z after process 2 app xoffset
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   221010.
+Pages active:                                 230603.
+Pages inactive:                               256144.
+Pages speculative:                              7426.
+Pages throttled:                                   0.
+Pages wired down:                             122641.
+Pages purgeable:                                2903.
+"Translation faults":                     3686372939.
+Pages copy-on-write:                       474550832.
+Pages zero filled:                        1708753113.
+Pages reactivated:                         397735530.
+Pages purged:                               11771890.
+File-backed pages:                            220329.
+Anonymous pages:                              273844.
+Pages stored in compressor:                   401516.
+Pages occupied by compressor:                 177301.
+Decompressions:                            324625101.
+Compressions:                              354953915.
+Pageins:                                    59201755.
+Pageouts:                                      90060.
+Swapins:                                     1279694.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:36:28Z before process 2 app xoffset_trusted
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   220550.
+Pages active:                                 231156.
+Pages inactive:                               256109.
+Pages speculative:                              7426.
+Pages throttled:                                   0.
+Pages wired down:                             122784.
+Pages purgeable:                                3073.
+"Translation faults":                     3686406287.
+Pages copy-on-write:                       474557982.
+Pages zero filled:                        1708768351.
+Pages reactivated:                         397735639.
+Pages purged:                               11772122.
+File-backed pages:                            220340.
+Anonymous pages:                              274351.
+Pages stored in compressor:                   401081.
+Pages occupied by compressor:                 177100.
+Decompressions:                            324625568.
+Compressions:                              354953915.
+Pageins:                                    59201822.
+Pageouts:                                      90060.
+Swapins:                                     1279698.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:37:14Z after process 2 app xoffset_trusted
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   220180.
+Pages active:                                 230858.
+Pages inactive:                               257259.
+Pages speculative:                              7426.
+Pages throttled:                                   0.
+Pages wired down:                             122620.
+Pages purgeable:                                2945.
+"Translation faults":                     3686643612.
+Pages copy-on-write:                       474599625.
+Pages zero filled:                        1708886736.
+Pages reactivated:                         397735758.
+Pages purged:                               11772317.
+File-backed pages:                            220206.
+Anonymous pages:                              275337.
+Pages stored in compressor:                   400472.
+Pages occupied by compressor:                 176782.
+Decompressions:                            324626257.
+Compressions:                              354953915.
+Pageins:                                    59202274.
+Pageouts:                                      90060.
+Swapins:                                     1279698.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:37:24Z before process 2 app cereal
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   220163.
+Pages active:                                 231207.
+Pages inactive:                               256959.
+Pages speculative:                              7426.
+Pages throttled:                                   0.
+Pages wired down:                             122611.
+Pages purgeable:                                2945.
+"Translation faults":                     3686675407.
+Pages copy-on-write:                       474606799.
+Pages zero filled:                        1708898366.
+Pages reactivated:                         397735760.
+Pages purged:                               11772317.
+File-backed pages:                            220229.
+Anonymous pages:                              275363.
+Pages stored in compressor:                   400437.
+Pages occupied by compressor:                 176759.
+Decompressions:                            324626316.
+Compressions:                              354953915.
+Pageins:                                    59202341.
+Pageouts:                                      90060.
+Swapins:                                     1279698.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:38:26Z after process 2 app cereal
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   218457.
+Pages active:                                 231692.
+Pages inactive:                               258537.
+Pages speculative:                              7653.
+Pages throttled:                                   0.
+Pages wired down:                             122603.
+Pages purgeable:                                3176.
+"Translation faults":                     3686941845.
+Pages copy-on-write:                       474655117.
+Pages zero filled:                        1709031102.
+Pages reactivated:                         397735953.
+Pages purged:                               11772925.
+File-backed pages:                            220913.
+Anonymous pages:                              276969.
+Pages stored in compressor:                   398895.
+Pages occupied by compressor:                 176183.
+Decompressions:                            324627995.
+Compressions:                              354953915.
+Pageins:                                    59203298.
+Pageouts:                                      90060.
+Swapins:                                     1279698.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:38:36Z before process 2 app protobuf
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   218462.
+Pages active:                                 232026.
+Pages inactive:                               258248.
+Pages speculative:                              7651.
+Pages throttled:                                   0.
+Pages wired down:                             122595.
+Pages purgeable:                                3176.
+"Translation faults":                     3686973845.
+Pages copy-on-write:                       474662248.
+Pages zero filled:                        1709042842.
+Pages reactivated:                         397736053.
+Pages purged:                               11772929.
+File-backed pages:                            220931.
+Anonymous pages:                              276994.
+Pages stored in compressor:                   398843.
+Pages occupied by compressor:                 176143.
+Decompressions:                            324628065.
+Compressions:                              354953915.
+Pageins:                                    59203365.
+Pageouts:                                      90060.
+Swapins:                                     1279698.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:39:26Z after process 2 app protobuf
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   217382.
+Pages active:                                 232400.
+Pages inactive:                               259209.
+Pages speculative:                              7666.
+Pages throttled:                                   0.
+Pages wired down:                             122609.
+Pages purgeable:                                3259.
+"Translation faults":                     3687207235.
+Pages copy-on-write:                       474705717.
+Pages zero filled:                        1709152723.
+Pages reactivated:                         397736164.
+Pages purged:                               11773352.
+File-backed pages:                            221112.
+Anonymous pages:                              278163.
+Pages stored in compressor:                   398187.
+Pages occupied by compressor:                 175859.
+Decompressions:                            324628764.
+Compressions:                              354953915.
+Pageins:                                    59203873.
+Pageouts:                                      90060.
+Swapins:                                     1279702.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:39:36Z before process 2 app flatbuffers_noverify
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   216136.
+Pages active:                                 233943.
+Pages inactive:                               259257.
+Pages speculative:                              7715.
+Pages throttled:                                   0.
+Pages wired down:                             122605.
+Pages purgeable:                                3317.
+"Translation faults":                     3687241972.
+Pages copy-on-write:                       474712867.
+Pages zero filled:                        1709165083.
+Pages reactivated:                         397736255.
+Pages purged:                               11773352.
+File-backed pages:                            221320.
+Anonymous pages:                              279595.
+Pages stored in compressor:                   397011.
+Pages occupied by compressor:                 175469.
+Decompressions:                            324629948.
+Compressions:                              354953915.
+Pageins:                                    59204025.
+Pageouts:                                      90060.
+Swapins:                                     1279702.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:40:24Z after process 2 app flatbuffers_noverify
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   216417.
+Pages active:                                 233401.
+Pages inactive:                               259923.
+Pages speculative:                              7741.
+Pages throttled:                                   0.
+Pages wired down:                             122582.
+Pages purgeable:                                3385.
+"Translation faults":                     3687468148.
+Pages copy-on-write:                       474754359.
+Pages zero filled:                        1709273935.
+Pages reactivated:                         397736376.
+Pages purged:                               11773776.
+File-backed pages:                            220406.
+Anonymous pages:                              280659.
+Pages stored in compressor:                   396290.
+Pages occupied by compressor:                 175061.
+Decompressions:                            324630693.
+Compressions:                              354953915.
+Pageins:                                    59204524.
+Pageouts:                                      90060.
+Swapins:                                     1279702.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:40:34Z before process 2 app zpp_bits
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   210677.
+Pages active:                                 240519.
+Pages inactive:                               259909.
+Pages speculative:                              7746.
+Pages throttled:                                   0.
+Pages wired down:                             122589.
+Pages purgeable:                                3366.
+"Translation faults":                     3687511209.
+Pages copy-on-write:                       474761571.
+Pages zero filled:                        1709287586.
+Pages reactivated:                         397736507.
+Pages purged:                               11773778.
+File-backed pages:                            220445.
+Anonymous pages:                              287729.
+Pages stored in compressor:                   390956.
+Pages occupied by compressor:                 173685.
+Decompressions:                            324636279.
+Compressions:                              354953915.
+Pageins:                                    59204610.
+Pageouts:                                      90060.
+Swapins:                                     1279706.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:41:09Z after process 2 app zpp_bits
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   209952.
+Pages active:                                 241221.
+Pages inactive:                               260044.
+Pages speculative:                              7744.
+Pages throttled:                                   0.
+Pages wired down:                             122582.
+Pages purgeable:                                4202.
+"Translation faults":                     3687717001.
+Pages copy-on-write:                       474798938.
+Pages zero filled:                        1709391089.
+Pages reactivated:                         397736648.
+Pages purged:                               11774154.
+File-backed pages:                            220536.
+Anonymous pages:                              288473.
+Pages stored in compressor:                   390750.
+Pages occupied by compressor:                 173582.
+Decompressions:                            324636518.
+Compressions:                              354953915.
+Pageins:                                    59205015.
+Pageouts:                                      90060.
+Swapins:                                     1279706.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:41:19Z before process 2 app cista_unchecked
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   210611.
+Pages active:                                 240804.
+Pages inactive:                               259821.
+Pages speculative:                              7745.
+Pages throttled:                                   0.
+Pages wired down:                             122580.
+Pages purgeable:                                3362.
+"Translation faults":                     3687751317.
+Pages copy-on-write:                       474806156.
+Pages zero filled:                        1709404667.
+Pages reactivated:                         397736655.
+Pages purged:                               11774248.
+File-backed pages:                            220557.
+Anonymous pages:                              287813.
+Pages stored in compressor:                   390710.
+Pages occupied by compressor:                 173564.
+Decompressions:                            324636575.
+Compressions:                              354953915.
+Pageins:                                    59205083.
+Pageouts:                                      90060.
+Swapins:                                     1279706.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:41:59Z after process 2 app cista_unchecked
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   208752.
+Pages active:                                 241625.
+Pages inactive:                               261048.
+Pages speculative:                              7746.
+Pages throttled:                                   0.
+Pages wired down:                             122554.
+Pages purgeable:                                5195.
+"Translation faults":                     3687893288.
+Pages copy-on-write:                       474824124.
+Pages zero filled:                        1709500890.
+Pages reactivated:                         397736866.
+Pages purged:                               11774492.
+File-backed pages:                            220648.
+Anonymous pages:                              289771.
+Pages stored in compressor:                   390474.
+Pages occupied by compressor:                 173400.
+Decompressions:                            324636841.
+Compressions:                              354953915.
+Pageins:                                    59205279.
+Pageouts:                                      90060.
+Swapins:                                     1279706.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:42:30Z before process 2 d3
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   210690.
+Pages active:                                 240251.
+Pages inactive:                               260555.
+Pages speculative:                              7746.
+Pages throttled:                                   0.
+Pages wired down:                             122539.
+Pages purgeable:                                3403.
+"Translation faults":                     3688059809.
+Pages copy-on-write:                       474863436.
+Pages zero filled:                        1709551867.
+Pages reactivated:                         397736967.
+Pages purged:                               11774678.
+File-backed pages:                            220788.
+Anonymous pages:                              287764.
+Pages stored in compressor:                   390368.
+Pages occupied by compressor:                 173344.
+Decompressions:                            324636996.
+Compressions:                              354953915.
+Pageins:                                    59205710.
+Pageouts:                                      90060.
+Swapins:                                     1279706.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:43:28Z after process 2 d3
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   210292.
+Pages active:                                 239943.
+Pages inactive:                               261594.
+Pages speculative:                              7749.
+Pages throttled:                                   0.
+Pages wired down:                             122539.
+Pages purgeable:                                3457.
+"Translation faults":                     3688441007.
+Pages copy-on-write:                       474908634.
+Pages zero filled:                        1709804779.
+Pages reactivated:                         397737172.
+Pages purged:                               11775100.
+File-backed pages:                            220705.
+Anonymous pages:                              288581.
+Pages stored in compressor:                   389505.
+Pages occupied by compressor:                 173008.
+Decompressions:                            324637897.
+Compressions:                              354953915.
+Pageins:                                    59206207.
+Pageouts:                                      90060.
+Swapins:                                     1279706.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:43:59Z before process 3 app xoffset
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   206378.
+Pages active:                                 244533.
+Pages inactive:                               261067.
+Pages speculative:                              7750.
+Pages throttled:                                   0.
+Pages wired down:                             122544.
+Pages purgeable:                                5931.
+"Translation faults":                     3688528721.
+Pages copy-on-write:                       474927213.
+Pages zero filled:                        1709845064.
+Pages reactivated:                         397737280.
+Pages purged:                               11775342.
+File-backed pages:                            220792.
+Anonymous pages:                              292558.
+Pages stored in compressor:                   389173.
+Pages occupied by compressor:                 172853.
+Decompressions:                            324638278.
+Compressions:                              354953915.
+Pageins:                                    59206413.
+Pageouts:                                      90060.
+Swapins:                                     1279706.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:44:45Z after process 3 app xoffset
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   208596.
+Pages active:                                 242736.
+Pages inactive:                               260641.
+Pages speculative:                              7940.
+Pages throttled:                                   0.
+Pages wired down:                             122526.
+Pages purgeable:                                3497.
+"Translation faults":                     3688766412.
+Pages copy-on-write:                       474968811.
+Pages zero filled:                        1709958508.
+Pages reactivated:                         397737378.
+Pages purged:                               11775543.
+File-backed pages:                            221148.
+Anonymous pages:                              290169.
+Pages stored in compressor:                   388578.
+Pages occupied by compressor:                 172686.
+Decompressions:                            324638922.
+Compressions:                              354953915.
+Pageins:                                    59207043.
+Pageouts:                                      90060.
+Swapins:                                     1279706.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:44:55Z before process 3 app xoffset_trusted
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   208562.
+Pages active:                                 242718.
+Pages inactive:                               260693.
+Pages speculative:                              7970.
+Pages throttled:                                   0.
+Pages wired down:                             122521.
+Pages purgeable:                                3487.
+"Translation faults":                     3688797921.
+Pages copy-on-write:                       474975982.
+Pages zero filled:                        1709969835.
+Pages reactivated:                         397737382.
+Pages purged:                               11775543.
+File-backed pages:                            221209.
+Anonymous pages:                              290172.
+Pages stored in compressor:                   388539.
+Pages occupied by compressor:                 172661.
+Decompressions:                            324638974.
+Compressions:                              354953915.
+Pageins:                                    59207146.
+Pageouts:                                      90060.
+Swapins:                                     1279706.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:45:41Z after process 3 app xoffset_trusted
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   208357.
+Pages active:                                 242980.
+Pages inactive:                               260787.
+Pages speculative:                              7974.
+Pages throttled:                                   0.
+Pages wired down:                             122516.
+Pages purgeable:                                3550.
+"Translation faults":                     3689036568.
+Pages copy-on-write:                       475017720.
+Pages zero filled:                        1710092050.
+Pages reactivated:                         397737602.
+Pages purged:                               11775970.
+File-backed pages:                            221372.
+Anonymous pages:                              290369.
+Pages stored in compressor:                   388251.
+Pages occupied by compressor:                 172511.
+Decompressions:                            324639313.
+Compressions:                              354953915.
+Pageins:                                    59207599.
+Pageouts:                                      90060.
+Swapins:                                     1279706.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:45:52Z before process 3 app cereal
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   207460.
+Pages active:                                 243862.
+Pages inactive:                               260799.
+Pages speculative:                              7976.
+Pages throttled:                                   0.
+Pages wired down:                             122528.
+Pages purgeable:                                3550.
+"Translation faults":                     3689069589.
+Pages copy-on-write:                       475025007.
+Pages zero filled:                        1710104318.
+Pages reactivated:                         397737606.
+Pages purged:                               11775976.
+File-backed pages:                            221389.
+Anonymous pages:                              291248.
+Pages stored in compressor:                   388224.
+Pages occupied by compressor:                 172500.
+Decompressions:                            324639363.
+Compressions:                              354953915.
+Pageins:                                    59207672.
+Pageouts:                                      90060.
+Swapins:                                     1279706.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:46:53Z after process 3 app cereal
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   206535.
+Pages active:                                 243136.
+Pages inactive:                               262607.
+Pages speculative:                              8004.
+Pages throttled:                                   0.
+Pages wired down:                             122564.
+Pages purgeable:                                3589.
+"Translation faults":                     3689331694.
+Pages copy-on-write:                       475072763.
+Pages zero filled:                        1710228789.
+Pages reactivated:                         397737826.
+Pages purged:                               11776409.
+File-backed pages:                            221582.
+Anonymous pages:                              292165.
+Pages stored in compressor:                   387789.
+Pages occupied by compressor:                 172279.
+Decompressions:                            324639905.
+Compressions:                              354953915.
+Pageins:                                    59208220.
+Pageouts:                                      90060.
+Swapins:                                     1279706.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:47:03Z before process 3 app protobuf
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   200996.
+Pages active:                                 250666.
+Pages inactive:                               260647.
+Pages speculative:                              8004.
+Pages throttled:                                   0.
+Pages wired down:                             122574.
+Pages purgeable:                                7626.
+"Translation faults":                     3689365040.
+Pages copy-on-write:                       475079951.
+Pages zero filled:                        1710253148.
+Pages reactivated:                         397737924.
+Pages purged:                               11776413.
+File-backed pages:                            221616.
+Anonymous pages:                              297701.
+Pages stored in compressor:                   387693.
+Pages occupied by compressor:                 172238.
+Decompressions:                            324640039.
+Compressions:                              354953915.
+Pageins:                                    59208287.
+Pageouts:                                      90060.
+Swapins:                                     1279706.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:47:54Z after process 3 app protobuf
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   206758.
+Pages active:                                 244614.
+Pages inactive:                               261158.
+Pages speculative:                              8009.
+Pages throttled:                                   0.
+Pages wired down:                             122501.
+Pages purgeable:                                3632.
+"Translation faults":                     3689595179.
+Pages copy-on-write:                       475123253.
+Pages zero filled:                        1710354186.
+Pages reactivated:                         397738023.
+Pages purged:                               11777116.
+File-backed pages:                            221731.
+Anonymous pages:                              292050.
+Pages stored in compressor:                   387297.
+Pages occupied by compressor:                 172085.
+Decompressions:                            324640503.
+Compressions:                              354953915.
+Pageins:                                    59208768.
+Pageouts:                                      90060.
+Swapins:                                     1279706.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:48:04Z before process 3 app flatbuffers_noverify
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   202625.
+Pages active:                                 248921.
+Pages inactive:                               261011.
+Pages speculative:                              8009.
+Pages throttled:                                   0.
+Pages wired down:                             122505.
+Pages purgeable:                                7028.
+"Translation faults":                     3689627966.
+Pages copy-on-write:                       475130421.
+Pages zero filled:                        1710374606.
+Pages reactivated:                         397738116.
+Pages purged:                               11777116.
+File-backed pages:                            221763.
+Anonymous pages:                              296178.
+Pages stored in compressor:                   387243.
+Pages occupied by compressor:                 172054.
+Decompressions:                            324640580.
+Compressions:                              354953915.
+Pageins:                                    59208835.
+Pageouts:                                      90060.
+Swapins:                                     1279706.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:48:52Z after process 3 app flatbuffers_noverify
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   206293.
+Pages active:                                 245210.
+Pages inactive:                               261215.
+Pages speculative:                              8033.
+Pages throttled:                                   0.
+Pages wired down:                             122476.
+Pages purgeable:                                3673.
+"Translation faults":                     3689860186.
+Pages copy-on-write:                       475173705.
+Pages zero filled:                        1710476554.
+Pages reactivated:                         397738223.
+Pages purged:                               11777545.
+File-backed pages:                            221937.
+Anonymous pages:                              292521.
+Pages stored in compressor:                   386770.
+Pages occupied by compressor:                 171898.
+Decompressions:                            324641110.
+Compressions:                              354953915.
+Pageins:                                    59209338.
+Pageouts:                                      90060.
+Swapins:                                     1279706.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:49:02Z before process 3 app zpp_bits
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   200564.
+Pages active:                                 247324.
+Pages inactive:                               261134.
+Pages speculative:                              8036.
+Pages throttled:                                   0.
+Pages wired down:                             126205.
+Pages purgeable:                                4751.
+"Translation faults":                     3689894282.
+Pages copy-on-write:                       475180906.
+Pages zero filled:                        1710497961.
+Pages reactivated:                         397738324.
+Pages purged:                               11777547.
+File-backed pages:                            221976.
+Anonymous pages:                              294518.
+Pages stored in compressor:                   386707.
+Pages occupied by compressor:                 171862.
+Decompressions:                            324641195.
+Compressions:                              354953915.
+Pageins:                                    59209411.
+Pageouts:                                      90060.
+Swapins:                                     1279706.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:49:37Z after process 3 app zpp_bits
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   205927.
+Pages active:                                 245469.
+Pages inactive:                               261405.
+Pages speculative:                              8036.
+Pages throttled:                                   0.
+Pages wired down:                             122483.
+Pages purgeable:                                3681.
+"Translation faults":                     3690089956.
+Pages copy-on-write:                       475215657.
+Pages zero filled:                        1710586098.
+Pages reactivated:                         397738414.
+Pages purged:                               11777736.
+File-backed pages:                            221796.
+Anonymous pages:                              293114.
+Pages stored in compressor:                   386582.
+Pages occupied by compressor:                 171805.
+Decompressions:                            324641358.
+Compressions:                              354953915.
+Pageins:                                    59209799.
+Pageouts:                                      90060.
+Swapins:                                     1279706.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:49:47Z before process 3 app cista_unchecked
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   205736.
+Pages active:                                 245682.
+Pages inactive:                               261384.
+Pages speculative:                              8036.
+Pages throttled:                                   0.
+Pages wired down:                             122486.
+Pages purgeable:                                3681.
+"Translation faults":                     3690122166.
+Pages copy-on-write:                       475222821.
+Pages zero filled:                        1710598049.
+Pages reactivated:                         397738416.
+Pages purged:                               11777738.
+File-backed pages:                            221820.
+Anonymous pages:                              293282.
+Pages stored in compressor:                   386568.
+Pages occupied by compressor:                 171801.
+Decompressions:                            324641394.
+Compressions:                              354953915.
+Pageins:                                    59209866.
+Pageouts:                                      90060.
+Swapins:                                     1279706.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:50:27Z after process 3 app cista_unchecked
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   195906.
+Pages active:                                 251222.
+Pages inactive:                               266066.
+Pages speculative:                              9078.
+Pages throttled:                                   0.
+Pages wired down:                             122479.
+Pages purgeable:                                4340.
+"Translation faults":                     3690372029.
+Pages copy-on-write:                       475261800.
+Pages zero filled:                        1710722810.
+Pages reactivated:                         397738698.
+Pages purged:                               11778172.
+File-backed pages:                            223659.
+Anonymous pages:                              302707.
+Pages stored in compressor:                   382096.
+Pages occupied by compressor:                 170374.
+Decompressions:                            324645944.
+Compressions:                              354953915.
+Pageins:                                    59211494.
+Pageouts:                                      90060.
+Swapins:                                     1279714.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:50:57Z before process 3 d3
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   191760.
+Pages active:                                 255879.
+Pages inactive:                               265638.
+Pages speculative:                              9078.
+Pages throttled:                                   0.
+Pages wired down:                             122478.
+Pages purgeable:                                7142.
+"Translation faults":                     3690459371.
+Pages copy-on-write:                       475280179.
+Pages zero filled:                        1710760324.
+Pages reactivated:                         397738831.
+Pages purged:                               11778190.
+File-backed pages:                            223823.
+Anonymous pages:                              306772.
+Pages stored in compressor:                   381931.
+Pages occupied by compressor:                 170292.
+Decompressions:                            324646177.
+Compressions:                              354953915.
+Pageins:                                    59211712.
+Pageouts:                                      90060.
+Swapins:                                     1279714.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:51:56Z after process 3 d3
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   198091.
+Pages active:                                 250635.
+Pages inactive:                               266733.
+Pages speculative:                              8390.
+Pages throttled:                                   0.
+Pages wired down:                             126537.
+Pages purgeable:                                4207.
+"Translation faults":                     3690848147.
+Pages copy-on-write:                       475327795.
+Pages zero filled:                        1711014544.
+Pages reactivated:                         397739036.
+Pages purged:                               11778617.
+File-backed pages:                            223285.
+Anonymous pages:                              302473.
+Pages stored in compressor:                   381690.
+Pages occupied by compressor:                 164739.
+Decompressions:                            324646476.
+Compressions:                              354953915.
+Pageins:                                    59212257.
+Pageouts:                                      90060.
+Swapins:                                     1279714.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:52:27Z before process 4 app xoffset
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   201703.
+Pages active:                                 252180.
+Pages inactive:                               265646.
+Pages speculative:                              8459.
+Pages throttled:                                   0.
+Pages wired down:                             122406.
+Pages purgeable:                                4354.
+"Translation faults":                     3691011919.
+Pages copy-on-write:                       475366310.
+Pages zero filled:                        1711064896.
+Pages reactivated:                         397739145.
+Pages purged:                               11778806.
+File-backed pages:                            223413.
+Anonymous pages:                              302872.
+Pages stored in compressor:                   381625.
+Pages occupied by compressor:                 164731.
+Decompressions:                            324646597.
+Compressions:                              354953915.
+Pageins:                                    59212739.
+Pageouts:                                      90060.
+Swapins:                                     1279714.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:53:13Z after process 4 app xoffset
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   201550.
+Pages active:                                 250218.
+Pages inactive:                               267815.
+Pages speculative:                              8462.
+Pages throttled:                                   0.
+Pages wired down:                             122395.
+Pages purgeable:                                4396.
+"Translation faults":                     3691250461.
+Pages copy-on-write:                       475408167.
+Pages zero filled:                        1711190257.
+Pages reactivated:                         397739259.
+Pages purged:                               11779504.
+File-backed pages:                            223527.
+Anonymous pages:                              302968.
+Pages stored in compressor:                   381413.
+Pages occupied by compressor:                 164685.
+Decompressions:                            324646860.
+Compressions:                              354953915.
+Pageins:                                    59213207.
+Pageouts:                                      90060.
+Swapins:                                     1279714.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:53:23Z before process 4 app xoffset_trusted
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   201249.
+Pages active:                                 250666.
+Pages inactive:                               267654.
+Pages speculative:                              8483.
+Pages throttled:                                   0.
+Pages wired down:                             122395.
+Pages purgeable:                                4391.
+"Translation faults":                     3691287055.
+Pages copy-on-write:                       475415577.
+Pages zero filled:                        1711204361.
+Pages reactivated:                         397739265.
+Pages purged:                               11779506.
+File-backed pages:                            223641.
+Anonymous pages:                              303162.
+Pages stored in compressor:                   381378.
+Pages occupied by compressor:                 164678.
+Decompressions:                            324646918.
+Compressions:                              354953915.
+Pageins:                                    59213294.
+Pageouts:                                      90060.
+Swapins:                                     1279714.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:54:09Z after process 4 app xoffset_trusted
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   199785.
+Pages active:                                 251353.
+Pages inactive:                               268407.
+Pages speculative:                              8473.
+Pages throttled:                                   0.
+Pages wired down:                             122561.
+Pages purgeable:                                5397.
+"Translation faults":                     3691518865.
+Pages copy-on-write:                       475455930.
+Pages zero filled:                        1711322729.
+Pages reactivated:                         397739469.
+Pages purged:                               11779836.
+File-backed pages:                            223909.
+Anonymous pages:                              304324.
+Pages stored in compressor:                   380864.
+Pages occupied by compressor:                 164546.
+Decompressions:                            324647457.
+Compressions:                              354953915.
+Pageins:                                    59213744.
+Pageouts:                                      90060.
+Swapins:                                     1279714.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:54:20Z before process 4 app cereal
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   200940.
+Pages active:                                 250719.
+Pages inactive:                               268013.
+Pages speculative:                              8540.
+Pages throttled:                                   0.
+Pages wired down:                             122384.
+Pages purgeable:                                4436.
+"Translation faults":                     3691550818.
+Pages copy-on-write:                       475463100.
+Pages zero filled:                        1711334280.
+Pages reactivated:                         397739476.
+Pages purged:                               11779926.
+File-backed pages:                            224062.
+Anonymous pages:                              303210.
+Pages stored in compressor:                   380776.
+Pages occupied by compressor:                 164529.
+Decompressions:                            324647554.
+Compressions:                              354953915.
+Pageins:                                    59213902.
+Pageouts:                                      90060.
+Swapins:                                     1279714.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:55:21Z after process 4 app cereal
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   200165.
+Pages active:                                 251150.
+Pages inactive:                               268390.
+Pages speculative:                              8545.
+Pages throttled:                                   0.
+Pages wired down:                             122402.
+Pages purgeable:                                4473.
+"Translation faults":                     3691821075.
+Pages copy-on-write:                       475512678.
+Pages zero filled:                        1711461740.
+Pages reactivated:                         397739711.
+Pages purged:                               11780355.
+File-backed pages:                            223953.
+Anonymous pages:                              304132.
+Pages stored in compressor:                   380488.
+Pages occupied by compressor:                 164473.
+Decompressions:                            324647907.
+Compressions:                              354953915.
+Pageins:                                    59214494.
+Pageouts:                                      90060.
+Swapins:                                     1279714.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:55:31Z before process 4 app protobuf
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   199747.
+Pages active:                                 251553.
+Pages inactive:                               268409.
+Pages speculative:                              8545.
+Pages throttled:                                   0.
+Pages wired down:                             122399.
+Pages purgeable:                                4476.
+"Translation faults":                     3691853834.
+Pages copy-on-write:                       475519860.
+Pages zero filled:                        1711473928.
+Pages reactivated:                         397739832.
+Pages purged:                               11780357.
+File-backed pages:                            223981.
+Anonymous pages:                              304526.
+Pages stored in compressor:                   380472.
+Pages occupied by compressor:                 164472.
+Decompressions:                            324647946.
+Compressions:                              354953915.
+Pageins:                                    59214562.
+Pageouts:                                      90060.
+Swapins:                                     1279714.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:56:22Z after process 4 app protobuf
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   199333.
+Pages active:                                 251013.
+Pages inactive:                               269439.
+Pages speculative:                              8550.
+Pages throttled:                                   0.
+Pages wired down:                             122371.
+Pages purgeable:                                4483.
+"Translation faults":                     3692089046.
+Pages copy-on-write:                       475563155.
+Pages zero filled:                        1711580201.
+Pages reactivated:                         397739948.
+Pages purged:                               11780558.
+File-backed pages:                            224095.
+Anonymous pages:                              304907.
+Pages stored in compressor:                   380210.
+Pages occupied by compressor:                 164419.
+Decompressions:                            324648264.
+Compressions:                              354953915.
+Pageins:                                    59215044.
+Pageouts:                                      90060.
+Swapins:                                     1279714.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:56:32Z before process 4 app flatbuffers_noverify
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   200152.
+Pages active:                                 250699.
+Pages inactive:                               268979.
+Pages speculative:                              8546.
+Pages throttled:                                   0.
+Pages wired down:                             122335.
+Pages purgeable:                                4481.
+"Translation faults":                     3692122141.
+Pages copy-on-write:                       475570392.
+Pages zero filled:                        1711592808.
+Pages reactivated:                         397740041.
+Pages purged:                               11780560.
+File-backed pages:                            224111.
+Anonymous pages:                              304113.
+Pages stored in compressor:                   380197.
+Pages occupied by compressor:                 164414.
+Decompressions:                            324648302.
+Compressions:                              354953915.
+Pageins:                                    59215112.
+Pageouts:                                      90060.
+Swapins:                                     1279714.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:57:20Z after process 4 app flatbuffers_noverify
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   199513.
+Pages active:                                 251474.
+Pages inactive:                               268850.
+Pages speculative:                              8548.
+Pages throttled:                                   0.
+Pages wired down:                             122363.
+Pages purgeable:                                4523.
+"Translation faults":                     3692347177.
+Pages copy-on-write:                       475611331.
+Pages zero filled:                        1711702362.
+Pages reactivated:                         397740164.
+Pages purged:                               11780988.
+File-backed pages:                            224228.
+Anonymous pages:                              304644.
+Pages stored in compressor:                   380018.
+Pages occupied by compressor:                 164377.
+Decompressions:                            324648534.
+Compressions:                              354953915.
+Pageins:                                    59215563.
+Pageouts:                                      90060.
+Swapins:                                     1279714.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:57:30Z before process 4 app zpp_bits
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   199017.
+Pages active:                                 251986.
+Pages inactive:                               268850.
+Pages speculative:                              8548.
+Pages throttled:                                   0.
+Pages wired down:                             122352.
+Pages purgeable:                                4533.
+"Translation faults":                     3692379576.
+Pages copy-on-write:                       475618479.
+Pages zero filled:                        1711714226.
+Pages reactivated:                         397740256.
+Pages purged:                               11780990.
+File-backed pages:                            224253.
+Anonymous pages:                              305131.
+Pages stored in compressor:                   380001.
+Pages occupied by compressor:                 164372.
+Decompressions:                            324648573.
+Compressions:                              354953915.
+Pageins:                                    59215630.
+Pageouts:                                      90060.
+Swapins:                                     1279714.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:58:05Z after process 4 app zpp_bits
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   196364.
+Pages active:                                 254557.
+Pages inactive:                               268978.
+Pages speculative:                              8551.
+Pages throttled:                                   0.
+Pages wired down:                             122331.
+Pages purgeable:                                7318.
+"Translation faults":                     3692514689.
+Pages copy-on-write:                       475637374.
+Pages zero filled:                        1711812927.
+Pages reactivated:                         397740349.
+Pages purged:                               11781409.
+File-backed pages:                            224091.
+Anonymous pages:                              307995.
+Pages stored in compressor:                   379927.
+Pages occupied by compressor:                 164344.
+Decompressions:                            324648684.
+Compressions:                              354953915.
+Pageins:                                    59215834.
+Pageouts:                                      90060.
+Swapins:                                     1279714.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:58:15Z before process 4 app cista_unchecked
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   199233.
+Pages active:                                 251937.
+Pages inactive:                               268727.
+Pages speculative:                              8552.
+Pages throttled:                                   0.
+Pages wired down:                             122340.
+Pages purgeable:                                4561.
+"Translation faults":                     3692624252.
+Pages copy-on-write:                       475664599.
+Pages zero filled:                        1711837654.
+Pages reactivated:                         397740353.
+Pages purged:                               11781587.
+File-backed pages:                            224123.
+Anonymous pages:                              305093.
+Pages stored in compressor:                   379905.
+Pages occupied by compressor:                 164336.
+Decompressions:                            324648734.
+Compressions:                              354953915.
+Pageins:                                    59216130.
+Pageouts:                                      90060.
+Swapins:                                     1279714.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:58:55Z after process 4 app cista_unchecked
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   198588.
+Pages active:                                 251852.
+Pages inactive:                               269797.
+Pages speculative:                              8278.
+Pages throttled:                                   0.
+Pages wired down:                             122355.
+Pages purgeable:                                4636.
+"Translation faults":                     3692772205.
+Pages copy-on-write:                       475683506.
+Pages zero filled:                        1711929124.
+Pages reactivated:                         397740473.
+Pages purged:                               11781597.
+File-backed pages:                            224246.
+Anonymous pages:                              305681.
+Pages stored in compressor:                   379414.
+Pages occupied by compressor:                 164255.
+Decompressions:                            324649264.
+Compressions:                              354953915.
+Pageins:                                    59216353.
+Pageouts:                                      90060.
+Swapins:                                     1279714.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T12:59:25Z before process 4 d3
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   197771.
+Pages active:                                 261050.
+Pages inactive:                               262819.
+Pages speculative:                              8302.
+Pages throttled:                                   0.
+Pages wired down:                             122287.
+Pages purgeable:                                4701.
+"Translation faults":                     3692945124.
+Pages copy-on-write:                       475722046.
+Pages zero filled:                        1711997577.
+Pages reactivated:                         397740597.
+Pages purged:                               11782295.
+File-backed pages:                            224187.
+Anonymous pages:                              307984.
+Pages stored in compressor:                   376820.
+Pages occupied by compressor:                 162896.
+Decompressions:                            324650775.
+Compressions:                              354953915.
+Pageins:                                    59216806.
+Pageouts:                                      90060.
+Swapins:                                     1279714.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:00:24Z after process 4 d3
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   194901.
+Pages active:                                 260352.
+Pages inactive:                               268917.
+Pages speculative:                              5746.
+Pages throttled:                                   0.
+Pages wired down:                             123445.
+Pages purgeable:                                5301.
+"Translation faults":                     3693329441.
+Pages copy-on-write:                       475766322.
+Pages zero filled:                        1712266497.
+Pages reactivated:                         397740822.
+Pages purged:                               11782744.
+File-backed pages:                            222489.
+Anonymous pages:                              312526.
+Pages stored in compressor:                   374484.
+Pages occupied by compressor:                 161764.
+Decompressions:                            324653187.
+Compressions:                              354953915.
+Pageins:                                    59217960.
+Pageouts:                                      90060.
+Swapins:                                     1279718.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:00:55Z before process 5 app xoffset
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   195720.
+Pages active:                                 262192.
+Pages inactive:                               267497.
+Pages speculative:                              5795.
+Pages throttled:                                   0.
+Pages wired down:                             122189.
+Pages purgeable:                                5158.
+"Translation faults":                     3693419280.
+Pages copy-on-write:                       475784918.
+Pages zero filled:                        1712304864.
+Pages reactivated:                         397740977.
+Pages purged:                               11782780.
+File-backed pages:                            222376.
+Anonymous pages:                              313108.
+Pages stored in compressor:                   374395.
+Pages occupied by compressor:                 161732.
+Decompressions:                            324653325.
+Compressions:                              354953915.
+Pageins:                                    59218171.
+Pageouts:                                      90060.
+Swapins:                                     1279718.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:01:41Z after process 5 app xoffset
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   196524.
+Pages active:                                 262938.
+Pages inactive:                               266070.
+Pages speculative:                              5878.
+Pages throttled:                                   0.
+Pages wired down:                             122126.
+Pages purgeable:                                5322.
+"Translation faults":                     3693661423.
+Pages copy-on-write:                       475827243.
+Pages zero filled:                        1712428336.
+Pages reactivated:                         397741175.
+Pages purged:                               11783232.
+File-backed pages:                            222080.
+Anonymous pages:                              312806.
+Pages stored in compressor:                   373974.
+Pages occupied by compressor:                 161589.
+Decompressions:                            324653769.
+Compressions:                              354953915.
+Pageins:                                    59218713.
+Pageouts:                                      90060.
+Swapins:                                     1279718.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:01:51Z before process 5 app xoffset_trusted
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   196524.
+Pages active:                                 262923.
+Pages inactive:                               266092.
+Pages speculative:                              5878.
+Pages throttled:                                   0.
+Pages wired down:                             122122.
+Pages purgeable:                                5193.
+"Translation faults":                     3693693124.
+Pages copy-on-write:                       475834399.
+Pages zero filled:                        1712439856.
+Pages reactivated:                         397741177.
+Pages purged:                               11783234.
+File-backed pages:                            222123.
+Anonymous pages:                              312770.
+Pages stored in compressor:                   373959.
+Pages occupied by compressor:                 161586.
+Decompressions:                            324653807.
+Compressions:                              354953915.
+Pageins:                                    59218780.
+Pageouts:                                      90060.
+Swapins:                                     1279718.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:02:38Z after process 5 app xoffset_trusted
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   195518.
+Pages active:                                 263381.
+Pages inactive:                               266617.
+Pages speculative:                              5998.
+Pages throttled:                                   0.
+Pages wired down:                             122171.
+Pages purgeable:                                5218.
+"Translation faults":                     3693932666.
+Pages copy-on-write:                       475876040.
+Pages zero filled:                        1712559438.
+Pages reactivated:                         397741387.
+Pages purged:                               11783431.
+File-backed pages:                            222555.
+Anonymous pages:                              313441.
+Pages stored in compressor:                   373471.
+Pages occupied by compressor:                 161440.
+Decompressions:                            324654353.
+Compressions:                              354953915.
+Pageins:                                    59219389.
+Pageouts:                                      90060.
+Swapins:                                     1279718.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:02:48Z before process 5 app cereal
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   195465.
+Pages active:                                 263443.
+Pages inactive:                               266632.
+Pages speculative:                              5998.
+Pages throttled:                                   0.
+Pages wired down:                             122157.
+Pages purgeable:                                5218.
+"Translation faults":                     3693964291.
+Pages copy-on-write:                       475883183.
+Pages zero filled:                        1712570930.
+Pages reactivated:                         397741389.
+Pages purged:                               11783435.
+File-backed pages:                            222582.
+Anonymous pages:                              313491.
+Pages stored in compressor:                   373454.
+Pages occupied by compressor:                 161430.
+Decompressions:                            324654393.
+Compressions:                              354953915.
+Pageins:                                    59219462.
+Pageouts:                                      90060.
+Swapins:                                     1279718.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:03:49Z after process 5 app cereal
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   193164.
+Pages active:                                 265090.
+Pages inactive:                               269791.
+Pages speculative:                              6087.
+Pages throttled:                                   0.
+Pages wired down:                             122104.
+Pages purgeable:                                5292.
+"Translation faults":                     3694229816.
+Pages copy-on-write:                       475930806.
+Pages zero filled:                        1712696028.
+Pages reactivated:                         397741607.
+Pages purged:                               11783917.
+File-backed pages:                            222838.
+Anonymous pages:                              318130.
+Pages stored in compressor:                   369013.
+Pages occupied by compressor:                 158889.
+Decompressions:                            324658894.
+Compressions:                              354953915.
+Pageins:                                    59220120.
+Pageouts:                                      90060.
+Swapins:                                     1279718.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 72%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:04:00Z before process 5 app protobuf
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   186632.
+Pages active:                                 267264.
+Pages inactive:                               269378.
+Pages speculative:                              6097.
+Pages throttled:                                   0.
+Pages wired down:                             126878.
+Pages purgeable:                                6410.
+"Translation faults":                     3694261819.
+Pages copy-on-write:                       475937960.
+Pages zero filled:                        1712715512.
+Pages reactivated:                         397741694.
+Pages purged:                               11783951.
+File-backed pages:                            222881.
+Anonymous pages:                              319858.
+Pages stored in compressor:                   368970.
+Pages occupied by compressor:                 158876.
+Decompressions:                            324658959.
+Compressions:                              354953915.
+Pageins:                                    59220203.
+Pageouts:                                      90060.
+Swapins:                                     1279718.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:04:50Z after process 5 app protobuf
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   192567.
+Pages active:                                 265876.
+Pages inactive:                               269521.
+Pages speculative:                              6277.
+Pages throttled:                                   0.
+Pages wired down:                             122041.
+Pages purgeable:                                5334.
+"Translation faults":                     3694491950.
+Pages copy-on-write:                       475981406.
+Pages zero filled:                        1712816945.
+Pages reactivated:                         397741808.
+Pages purged:                               11784378.
+File-backed pages:                            223167.
+Anonymous pages:                              318507.
+Pages stored in compressor:                   368842.
+Pages occupied by compressor:                 158843.
+Decompressions:                            324659136.
+Compressions:                              354953915.
+Pageins:                                    59220687.
+Pageouts:                                      90060.
+Swapins:                                     1279718.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 72%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:05:00Z before process 5 app flatbuffers_noverify
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   184480.
+Pages active:                                 269529.
+Pages inactive:                               269179.
+Pages speculative:                              6335.
+Pages throttled:                                   0.
+Pages wired down:                             126847.
+Pages purgeable:                                7358.
+"Translation faults":                     3694527707.
+Pages copy-on-write:                       475988755.
+Pages zero filled:                        1712841814.
+Pages reactivated:                         397741889.
+Pages purged:                               11784378.
+File-backed pages:                            223287.
+Anonymous pages:                              321756.
+Pages stored in compressor:                   368568.
+Pages occupied by compressor:                 158755.
+Decompressions:                            324659432.
+Compressions:                              354953915.
+Pageins:                                    59220817.
+Pageouts:                                      90060.
+Swapins:                                     1279718.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 71%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:05:48Z after process 5 app flatbuffers_noverify
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   167850.
+Pages active:                                 269833.
+Pages inactive:                               273103.
+Pages speculative:                              7055.
+Pages throttled:                                   0.
+Pages wired down:                             138696.
+Pages purgeable:                                7450.
+"Translation faults":                     3694803251.
+Pages copy-on-write:                       476032331.
+Pages zero filled:                        1713041687.
+Pages reactivated:                         397742051.
+Pages purged:                               11785079.
+File-backed pages:                            221918.
+Anonymous pages:                              328073.
+Pages stored in compressor:                   367997.
+Pages occupied by compressor:                 158588.
+Decompressions:                            324660084.
+Compressions:                              354953915.
+Pageins:                                    59225434.
+Pageouts:                                      90060.
+Swapins:                                     1279718.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 70%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:05:58Z before process 5 app zpp_bits
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   167596.
+Pages active:                                 283089.
+Pages inactive:                               275434.
+Pages speculative:                              7057.
+Pages throttled:                                   0.
+Pages wired down:                             123377.
+Pages purgeable:                               15688.
+"Translation faults":                     3694836598.
+Pages copy-on-write:                       476039588.
+Pages zero filled:                        1713057913.
+Pages reactivated:                         397742160.
+Pages purged:                               11785087.
+File-backed pages:                            227850.
+Anonymous pages:                              337730.
+Pages stored in compressor:                   367916.
+Pages occupied by compressor:                 158572.
+Decompressions:                            324660187.
+Compressions:                              354953915.
+Pageins:                                    59225507.
+Pageouts:                                      90060.
+Swapins:                                     1279718.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 72%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:06:33Z after process 5 app zpp_bits
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   171434.
+Pages active:                                 280408.
+Pages inactive:                               275498.
+Pages speculative:                              7064.
+Pages throttled:                                   0.
+Pages wired down:                             122151.
+Pages purgeable:                               13384.
+"Translation faults":                     3695035000.
+Pages copy-on-write:                       476074950.
+Pages zero filled:                        1713151876.
+Pages reactivated:                         397742262.
+Pages purged:                               11785282.
+File-backed pages:                            227957.
+Anonymous pages:                              335013.
+Pages stored in compressor:                   367891.
+Pages occupied by compressor:                 158570.
+Decompressions:                            324660256.
+Compressions:                              354953915.
+Pageins:                                    59225905.
+Pageouts:                                      90060.
+Swapins:                                     1279722.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 72%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:06:44Z before process 5 app cista_unchecked
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   171328.
+Pages active:                                 280701.
+Pages inactive:                               275332.
+Pages speculative:                              7064.
+Pages throttled:                                   0.
+Pages wired down:                             122132.
+Pages purgeable:                               13385.
+"Translation faults":                     3695066502.
+Pages copy-on-write:                       476082076.
+Pages zero filled:                        1713163297.
+Pages reactivated:                         397742262.
+Pages purged:                               11785284.
+File-backed pages:                            227972.
+Anonymous pages:                              335125.
+Pages stored in compressor:                   367883.
+Pages occupied by compressor:                 158568.
+Decompressions:                            324660286.
+Compressions:                              354953915.
+Pageins:                                    59225972.
+Pageouts:                                      90060.
+Swapins:                                     1279722.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 72%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:07:23Z after process 5 app cista_unchecked
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   170837.
+Pages active:                                 279482.
+Pages inactive:                               277115.
+Pages speculative:                              7067.
+Pages throttled:                                   0.
+Pages wired down:                             122147.
+Pages purgeable:                               13447.
+"Translation faults":                     3695293833.
+Pages copy-on-write:                       476121083.
+Pages zero filled:                        1713280102.
+Pages reactivated:                         397742381.
+Pages purged:                               11785718.
+File-backed pages:                            227886.
+Anonymous pages:                              335778.
+Pages stored in compressor:                   367580.
+Pages occupied by compressor:                 158477.
+Decompressions:                            324660632.
+Compressions:                              354953915.
+Pageins:                                    59226406.
+Pageouts:                                      90060.
+Swapins:                                     1279722.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 72%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:07:54Z before process 5 d3
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   170267.
+Pages active:                                 281335.
+Pages inactive:                               276514.
+Pages speculative:                              7082.
+Pages throttled:                                   0.
+Pages wired down:                             122106.
+Pages purgeable:                               13447.
+"Translation faults":                     3695379719.
+Pages copy-on-write:                       476139333.
+Pages zero filled:                        1713312246.
+Pages reactivated:                         397742476.
+Pages purged:                               11785731.
+File-backed pages:                            228037.
+Anonymous pages:                              336894.
+Pages stored in compressor:                   366600.
+Pages occupied by compressor:                 157821.
+Decompressions:                            324661657.
+Compressions:                              354953915.
+Pageins:                                    59226626.
+Pageouts:                                      90060.
+Swapins:                                     1279722.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 72%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:08:53Z after process 5 d3
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   192852.
+Pages active:                                 270891.
+Pages inactive:                               276197.
+Pages speculative:                               391.
+Pages throttled:                                   0.
+Pages wired down:                             121200.
+Pages purgeable:                               13510.
+"Translation faults":                     3695781182.
+Pages copy-on-write:                       476186047.
+Pages zero filled:                        1713566301.
+Pages reactivated:                         397742691.
+Pages purged:                               11786238.
+File-backed pages:                            208729.
+Anonymous pages:                              338750.
+Pages stored in compressor:                   364294.
+Pages occupied by compressor:                 153594.
+Decompressions:                            324672974.
+Compressions:                              354962850.
+Pageins:                                    59228688.
+Pageouts:                                      90066.
+Swapins:                                     1279742.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 72%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:09:23Z before process 6 app xoffset
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   188964.
+Pages active:                                 275048.
+Pages inactive:                               276433.
+Pages speculative:                              1008.
+Pages throttled:                                   0.
+Pages wired down:                             121211.
+Pages purgeable:                               13512.
+"Translation faults":                     3695952346.
+Pages copy-on-write:                       476225065.
+Pages zero filled:                        1713621535.
+Pages reactivated:                         397742793.
+Pages purged:                               11786425.
+File-backed pages:                            209947.
+Anonymous pages:                              342542.
+Pages stored in compressor:                   361315.
+Pages occupied by compressor:                 152461.
+Decompressions:                            324676019.
+Compressions:                              354962850.
+Pageins:                                    59229829.
+Pageouts:                                      90066.
+Swapins:                                     1279742.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 72%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:10:10Z after process 6 app xoffset
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   181002.
+Pages active:                                 277240.
+Pages inactive:                               283343.
+Pages speculative:                              1211.
+Pages throttled:                                   0.
+Pages wired down:                             121180.
+Pages purgeable:                               14234.
+"Translation faults":                     3696117847.
+Pages copy-on-write:                       476246774.
+Pages zero filled:                        1713731599.
+Pages reactivated:                         397742995.
+Pages purged:                               11786828.
+File-backed pages:                            215993.
+Anonymous pages:                              345801.
+Pages stored in compressor:                   359305.
+Pages occupied by compressor:                 151149.
+Decompressions:                            324677993.
+Compressions:                              354962850.
+Pageins:                                    59235793.
+Pageouts:                                      90066.
+Swapins:                                     1279742.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 72%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:10:20Z before process 6 app xoffset_trusted
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   182372.
+Pages active:                                 276241.
+Pages inactive:                               282993.
+Pages speculative:                              1214.
+Pages throttled:                                   0.
+Pages wired down:                             121168.
+Pages purgeable:                               13554.
+"Translation faults":                     3696226374.
+Pages copy-on-write:                       476274005.
+Pages zero filled:                        1713755456.
+Pages reactivated:                         397743000.
+Pages purged:                               11786933.
+File-backed pages:                            216028.
+Anonymous pages:                              344420.
+Pages stored in compressor:                   359282.
+Pages occupied by compressor:                 151137.
+Decompressions:                            324678045.
+Compressions:                              354962850.
+Pageins:                                    59236089.
+Pageouts:                                      90066.
+Swapins:                                     1279742.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:11:06Z after process 6 app xoffset_trusted
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   180406.
+Pages active:                                 275970.
+Pages inactive:                               285385.
+Pages speculative:                              1244.
+Pages throttled:                                   0.
+Pages wired down:                             121060.
+Pages purgeable:                               14939.
+"Translation faults":                     3696385702.
+Pages copy-on-write:                       476295317.
+Pages zero filled:                        1713866954.
+Pages reactivated:                         397743256.
+Pages purged:                               11787587.
+File-backed pages:                            216042.
+Anonymous pages:                              346557.
+Pages stored in compressor:                   359110.
+Pages occupied by compressor:                 151060.
+Decompressions:                            324678274.
+Compressions:                              354962850.
+Pageins:                                    59236354.
+Pageouts:                                      90066.
+Swapins:                                     1279742.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 72%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:11:16Z before process 6 app cereal
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   181853.
+Pages active:                                 274819.
+Pages inactive:                               285097.
+Pages speculative:                              1321.
+Pages throttled:                                   0.
+Pages wired down:                             121058.
+Pages purgeable:                               13593.
+"Translation faults":                     3696496347.
+Pages copy-on-write:                       476322554.
+Pages zero filled:                        1713891753.
+Pages reactivated:                         397743259.
+Pages purged:                               11787683.
+File-backed pages:                            216176.
+Anonymous pages:                              345061.
+Pages stored in compressor:                   358893.
+Pages occupied by compressor:                 150977.
+Decompressions:                            324678518.
+Compressions:                              354962850.
+Pageins:                                    59236739.
+Pageouts:                                      90066.
+Swapins:                                     1279742.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:12:18Z after process 6 app cereal
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   181781.
+Pages active:                                 273876.
+Pages inactive:                               285916.
+Pages speculative:                              1611.
+Pages throttled:                                   0.
+Pages wired down:                             121005.
+Pages purgeable:                               13635.
+"Translation faults":                     3696752829.
+Pages copy-on-write:                       476370137.
+Pages zero filled:                        1714014468.
+Pages reactivated:                         397743451.
+Pages purged:                               11788122.
+File-backed pages:                            216695.
+Anonymous pages:                              344708.
+Pages stored in compressor:                   358724.
+Pages occupied by compressor:                 150936.
+Decompressions:                            324678782.
+Compressions:                              354962850.
+Pageins:                                    59237499.
+Pageouts:                                      90066.
+Swapins:                                     1279742.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:12:28Z before process 6 app protobuf
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   180586.
+Pages active:                                 275056.
+Pages inactive:                               285692.
+Pages speculative:                              1843.
+Pages throttled:                                   0.
+Pages wired down:                             121020.
+Pages purgeable:                               13640.
+"Translation faults":                     3696786030.
+Pages copy-on-write:                       476377386.
+Pages zero filled:                        1714026658.
+Pages reactivated:                         397743561.
+Pages purged:                               11788124.
+File-backed pages:                            217015.
+Anonymous pages:                              345576.
+Pages stored in compressor:                   358679.
+Pages occupied by compressor:                 150928.
+Decompressions:                            324678849.
+Compressions:                              354962850.
+Pageins:                                    59237771.
+Pageouts:                                      90066.
+Swapins:                                     1279742.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:13:19Z after process 6 app protobuf
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   180219.
+Pages active:                                 274919.
+Pages inactive:                               285997.
+Pages speculative:                              2079.
+Pages throttled:                                   0.
+Pages wired down:                             121008.
+Pages purgeable:                               13677.
+"Translation faults":                     3697017111.
+Pages copy-on-write:                       476420690.
+Pages zero filled:                        1714136565.
+Pages reactivated:                         397743687.
+Pages purged:                               11788543.
+File-backed pages:                            217127.
+Anonymous pages:                              345868.
+Pages stored in compressor:                   358524.
+Pages occupied by compressor:                 150903.
+Decompressions:                            324679055.
+Compressions:                              354962850.
+Pageins:                                    59238479.
+Pageouts:                                      90066.
+Swapins:                                     1279742.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:13:29Z before process 6 app flatbuffers_noverify
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   180284.
+Pages active:                                 274922.
+Pages inactive:                               285943.
+Pages speculative:                              2078.
+Pages throttled:                                   0.
+Pages wired down:                             120995.
+Pages purgeable:                               13679.
+"Translation faults":                     3697049971.
+Pages copy-on-write:                       476427888.
+Pages zero filled:                        1714149035.
+Pages reactivated:                         397743795.
+Pages purged:                               11788547.
+File-backed pages:                            217131.
+Anonymous pages:                              345812.
+Pages stored in compressor:                   358521.
+Pages occupied by compressor:                 150903.
+Decompressions:                            324679080.
+Compressions:                              354962850.
+Pageins:                                    59238547.
+Pageouts:                                      90066.
+Swapins:                                     1279742.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:14:17Z after process 6 app flatbuffers_noverify
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   180336.
+Pages active:                                 274558.
+Pages inactive:                               286283.
+Pages speculative:                              2100.
+Pages throttled:                                   0.
+Pages wired down:                             120961.
+Pages purgeable:                               13677.
+"Translation faults":                     3697273702.
+Pages copy-on-write:                       476469577.
+Pages zero filled:                        1714254065.
+Pages reactivated:                         397743894.
+Pages purged:                               11788742.
+File-backed pages:                            217286.
+Anonymous pages:                              345655.
+Pages stored in compressor:                   358471.
+Pages occupied by compressor:                 150887.
+Decompressions:                            324679179.
+Compressions:                              354962850.
+Pageins:                                    59239027.
+Pageouts:                                      90066.
+Swapins:                                     1279742.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:14:27Z before process 6 app zpp_bits
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   179659.
+Pages active:                                 275276.
+Pages inactive:                               286232.
+Pages speculative:                              2100.
+Pages throttled:                                   0.
+Pages wired down:                             120976.
+Pages purgeable:                               13720.
+"Translation faults":                     3697308423.
+Pages copy-on-write:                       476476930.
+Pages zero filled:                        1714270151.
+Pages reactivated:                         397744011.
+Pages purged:                               11788979.
+File-backed pages:                            217318.
+Anonymous pages:                              346290.
+Pages stored in compressor:                   358448.
+Pages occupied by compressor:                 150882.
+Decompressions:                            324679224.
+Compressions:                              354962850.
+Pageins:                                    59239100.
+Pageouts:                                      90066.
+Swapins:                                     1279742.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 72%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:15:02Z after process 6 app zpp_bits
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   172984.
+Pages active:                                 277316.
+Pages inactive:                               287049.
+Pages speculative:                              2100.
+Pages throttled:                                   0.
+Pages wired down:                             124957.
+Pages purgeable:                               15578.
+"Translation faults":                     3697442508.
+Pages copy-on-write:                       476494962.
+Pages zero filled:                        1714363733.
+Pages reactivated:                         397744100.
+Pages purged:                               11788992.
+File-backed pages:                            217390.
+Anonymous pages:                              349075.
+Pages stored in compressor:                   357959.
+Pages occupied by compressor:                 150719.
+Decompressions:                            324679760.
+Compressions:                              354962850.
+Pageins:                                    59239305.
+Pageouts:                                      90066.
+Swapins:                                     1279742.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 72%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:15:12Z before process 6 app cista_unchecked
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   178581.
+Pages active:                                 276178.
+Pages inactive:                               286277.
+Pages speculative:                              2116.
+Pages throttled:                                   0.
+Pages wired down:                             121254.
+Pages purgeable:                               13862.
+"Translation faults":                     3697477362.
+Pages copy-on-write:                       476502791.
+Pages zero filled:                        1714376651.
+Pages reactivated:                         397744100.
+Pages purged:                               11789450.
+File-backed pages:                            217438.
+Anonymous pages:                              347133.
+Pages stored in compressor:                   357957.
+Pages occupied by compressor:                 150719.
+Decompressions:                            324679786.
+Compressions:                              354962850.
+Pageins:                                    59239393.
+Pageouts:                                      90066.
+Swapins:                                     1279742.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:15:52Z after process 6 app cista_unchecked
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   178553.
+Pages active:                                 275752.
+Pages inactive:                               286778.
+Pages speculative:                              2124.
+Pages throttled:                                   0.
+Pages wired down:                             121228.
+Pages purgeable:                               13904.
+"Translation faults":                     3697693463.
+Pages copy-on-write:                       476539239.
+Pages zero filled:                        1714481824.
+Pages reactivated:                         397744202.
+Pages purged:                               11789783.
+File-backed pages:                            217552.
+Anonymous pages:                              347102.
+Pages stored in compressor:                   357879.
+Pages occupied by compressor:                 150690.
+Decompressions:                            324679898.
+Compressions:                              354962850.
+Pageins:                                    59239836.
+Pageouts:                                      90066.
+Swapins:                                     1279742.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:16:23Z before process 6 d3
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   176107.
+Pages active:                                 278383.
+Pages inactive:                               286499.
+Pages speculative:                              2133.
+Pages throttled:                                   0.
+Pages wired down:                             121313.
+Pages purgeable:                               13904.
+"Translation faults":                     3697867932.
+Pages copy-on-write:                       476579119.
+Pages zero filled:                        1714540094.
+Pages reactivated:                         397744307.
+Pages purged:                               11789974.
+File-backed pages:                            217711.
+Anonymous pages:                              349304.
+Pages stored in compressor:                   357833.
+Pages occupied by compressor:                 150690.
+Decompressions:                            324680008.
+Compressions:                              354962850.
+Pageins:                                    59240295.
+Pageouts:                                      90066.
+Swapins:                                     1279746.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 72%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:17:22Z after process 6 d3
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   193090.
+Pages active:                                 274850.
+Pages inactive:                               273704.
+Pages speculative:                                55.
+Pages throttled:                                   0.
+Pages wired down:                             120116.
+Pages purgeable:                               13837.
+"Translation faults":                     3698258929.
+Pages copy-on-write:                       476624098.
+Pages zero filled:                        1714795007.
+Pages reactivated:                         397757050.
+Pages purged:                               11790556.
+File-backed pages:                            209200.
+Anonymous pages:                              339409.
+Pages stored in compressor:                   363826.
+Pages occupied by compressor:                 153310.
+Decompressions:                            324686997.
+Compressions:                              354975853.
+Pageins:                                    59241415.
+Pageouts:                                      90066.
+Swapins:                                     1279746.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 72%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:17:52Z before process 7 app xoffset
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   188728.
+Pages active:                                 275399.
+Pages inactive:                               277526.
+Pages speculative:                               501.
+Pages throttled:                                   0.
+Pages wired down:                             120126.
+Pages purgeable:                               15036.
+"Translation faults":                     3698356816.
+Pages copy-on-write:                       476643469.
+Pages zero filled:                        1714839361.
+Pages reactivated:                         397757152.
+Pages purged:                               11790661.
+File-backed pages:                            210054.
+Anonymous pages:                              343372.
+Pages stored in compressor:                   362370.
+Pages occupied by compressor:                 152845.
+Decompressions:                            324688503.
+Compressions:                              354975853.
+Pageins:                                    59242165.
+Pageouts:                                      90066.
+Swapins:                                     1279746.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 72%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:18:39Z after process 7 app xoffset
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   187584.
+Pages active:                                 276346.
+Pages inactive:                               278298.
+Pages speculative:                              1042.
+Pages throttled:                                   0.
+Pages wired down:                             120138.
+Pages purgeable:                               13922.
+"Translation faults":                     3698607155.
+Pages copy-on-write:                       476686765.
+Pages zero filled:                        1714965024.
+Pages reactivated:                         397757372.
+Pages purged:                               11791430.
+File-backed pages:                            211134.
+Anonymous pages:                              344552.
+Pages stored in compressor:                   359613.
+Pages occupied by compressor:                 151717.
+Decompressions:                            324691307.
+Compressions:                              354975853.
+Pageins:                                    59243368.
+Pageouts:                                      90066.
+Swapins:                                     1279746.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:18:49Z before process 7 app xoffset_trusted
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   182717.
+Pages active:                                 280475.
+Pages inactive:                               277953.
+Pages speculative:                              2060.
+Pages throttled:                                   0.
+Pages wired down:                             120625.
+Pages purgeable:                               13973.
+"Translation faults":                     3698648542.
+Pages copy-on-write:                       476694440.
+Pages zero filled:                        1714979664.
+Pages reactivated:                         397757372.
+Pages purged:                               11791436.
+File-backed pages:                            212529.
+Anonymous pages:                              347959.
+Pages stored in compressor:                   357724.
+Pages occupied by compressor:                 151295.
+Decompressions:                            324693254.
+Compressions:                              354975853.
+Pageins:                                    59244174.
+Pageouts:                                      90066.
+Swapins:                                     1279750.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:19:35Z after process 7 app xoffset_trusted
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   183426.
+Pages active:                                 278686.
+Pages inactive:                               279152.
+Pages speculative:                              2092.
+Pages throttled:                                   0.
+Pages wired down:                             120595.
+Pages purgeable:                               13975.
+"Translation faults":                     3698896040.
+Pages copy-on-write:                       476737163.
+Pages zero filled:                        1715103140.
+Pages reactivated:                         397757592.
+Pages purged:                               11791714.
+File-backed pages:                            212465.
+Anonymous pages:                              347465.
+Pages stored in compressor:                   357416.
+Pages occupied by compressor:                 151174.
+Decompressions:                            324693609.
+Compressions:                              354975853.
+Pageins:                                    59244695.
+Pageouts:                                      90066.
+Swapins:                                     1279750.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:19:45Z before process 7 app cereal
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   182872.
+Pages active:                                 279520.
+Pages inactive:                               278883.
+Pages speculative:                              2095.
+Pages throttled:                                   0.
+Pages wired down:                             120593.
+Pages purgeable:                               14015.
+"Translation faults":                     3698930460.
+Pages copy-on-write:                       476744463.
+Pages zero filled:                        1715119520.
+Pages reactivated:                         397757596.
+Pages purged:                               11791950.
+File-backed pages:                            212505.
+Anonymous pages:                              347993.
+Pages stored in compressor:                   357373.
+Pages occupied by compressor:                 151162.
+Decompressions:                            324693674.
+Compressions:                              354975853.
+Pageins:                                    59244765.
+Pageouts:                                      90066.
+Swapins:                                     1279750.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:20:47Z after process 7 app cereal
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   182397.
+Pages active:                                 278592.
+Pages inactive:                               280055.
+Pages speculative:                              2125.
+Pages throttled:                                   0.
+Pages wired down:                             120870.
+Pages purgeable:                               14025.
+"Translation faults":                     3699191404.
+Pages copy-on-write:                       476792328.
+Pages zero filled:                        1715243600.
+Pages reactivated:                         397757787.
+Pages purged:                               11792236.
+File-backed pages:                            212567.
+Anonymous pages:                              348205.
+Pages stored in compressor:                   357188.
+Pages occupied by compressor:                 151086.
+Decompressions:                            324693934.
+Compressions:                              354975853.
+Pageins:                                    59245339.
+Pageouts:                                      90066.
+Swapins:                                     1279762.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 72%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:20:57Z before process 7 app protobuf
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   175562.
+Pages active:                                 283845.
+Pages inactive:                               281664.
+Pages speculative:                              2125.
+Pages throttled:                                   0.
+Pages wired down:                             120860.
+Pages purgeable:                               18880.
+"Translation faults":                     3699225941.
+Pages copy-on-write:                       476799424.
+Pages zero filled:                        1715264351.
+Pages reactivated:                         397757890.
+Pages purged:                               11792263.
+File-backed pages:                            212598.
+Anonymous pages:                              355036.
+Pages stored in compressor:                   357143.
+Pages occupied by compressor:                 151069.
+Decompressions:                            324693996.
+Compressions:                              354975853.
+Pageins:                                    59245406.
+Pageouts:                                      90066.
+Swapins:                                     1279762.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:21:48Z after process 7 app protobuf
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   181458.
+Pages active:                                 279612.
+Pages inactive:                               280112.
+Pages speculative:                              2198.
+Pages throttled:                                   0.
+Pages wired down:                             120861.
+Pages purgeable:                               14062.
+"Translation faults":                     3699459989.
+Pages copy-on-write:                       476842764.
+Pages zero filled:                        1715372990.
+Pages reactivated:                         397758003.
+Pages purged:                               11793051.
+File-backed pages:                            212918.
+Anonymous pages:                              349004.
+Pages stored in compressor:                   356653.
+Pages occupied by compressor:                 150884.
+Decompressions:                            324694510.
+Compressions:                              354975853.
+Pageins:                                    59245971.
+Pageouts:                                      90066.
+Swapins:                                     1279762.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:21:58Z before process 7 app flatbuffers_noverify
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   196825.
+Pages active:                                 269437.
+Pages inactive:                               275664.
+Pages speculative:                              2207.
+Pages throttled:                                   0.
+Pages wired down:                             120803.
+Pages purgeable:                               16878.
+"Translation faults":                     3699494625.
+Pages copy-on-write:                       476850003.
+Pages zero filled:                        1715389973.
+Pages reactivated:                         397758095.
+Pages purged:                               11793055.
+File-backed pages:                            212892.
+Anonymous pages:                              334416.
+Pages stored in compressor:                   355229.
+Pages occupied by compressor:                 150189.
+Decompressions:                            324694605.
+Compressions:                              354975853.
+Pageins:                                    59246055.
+Pageouts:                                      90066.
+Swapins:                                     1279762.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:22:46Z after process 7 app flatbuffers_noverify
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   200008.
+Pages active:                                 266322.
+Pages inactive:                               275486.
+Pages speculative:                              2351.
+Pages throttled:                                   0.
+Pages wired down:                             120818.
+Pages purgeable:                               14109.
+"Translation faults":                     3699654442.
+Pages copy-on-write:                       476874020.
+Pages zero filled:                        1715486805.
+Pages reactivated:                         397758214.
+Pages purged:                               11793473.
+File-backed pages:                            213186.
+Anonymous pages:                              330973.
+Pages stored in compressor:                   354985.
+Pages occupied by compressor:                 150140.
+Decompressions:                            324694900.
+Compressions:                              354975853.
+Pageins:                                    59246702.
+Pageouts:                                      90066.
+Swapins:                                     1279762.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:22:56Z before process 7 app zpp_bits
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   195309.
+Pages active:                                 266989.
+Pages inactive:                               275444.
+Pages speculative:                              2351.
+Pages throttled:                                   0.
+Pages wired down:                             124895.
+Pages purgeable:                               13966.
+"Translation faults":                     3699687685.
+Pages copy-on-write:                       476881178.
+Pages zero filled:                        1715503274.
+Pages reactivated:                         397758221.
+Pages purged:                               11793479.
+File-backed pages:                            213215.
+Anonymous pages:                              331569.
+Pages stored in compressor:                   354976.
+Pages occupied by compressor:                 150137.
+Decompressions:                            324694932.
+Compressions:                              354975853.
+Pageins:                                    59246769.
+Pageouts:                                      90066.
+Swapins:                                     1279762.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 72%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:23:31Z after process 7 app zpp_bits
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   199310.
+Pages active:                                 265977.
+Pages inactive:                               276569.
+Pages speculative:                              2344.
+Pages throttled:                                   0.
+Pages wired down:                             120798.
+Pages purgeable:                               14109.
+"Translation faults":                     3699811094.
+Pages copy-on-write:                       476896518.
+Pages zero filled:                        1715586129.
+Pages reactivated:                         397758398.
+Pages purged:                               11793662.
+File-backed pages:                            213292.
+Anonymous pages:                              331598.
+Pages stored in compressor:                   354937.
+Pages occupied by compressor:                 150127.
+Decompressions:                            324695002.
+Compressions:                              354975853.
+Pageins:                                    59246933.
+Pageouts:                                      90066.
+Swapins:                                     1279762.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:23:41Z before process 7 app cista_unchecked
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   198768.
+Pages active:                                 266667.
+Pages inactive:                               276407.
+Pages speculative:                              2354.
+Pages throttled:                                   0.
+Pages wired down:                             120807.
+Pages purgeable:                               14105.
+"Translation faults":                     3699844604.
+Pages copy-on-write:                       476903671.
+Pages zero filled:                        1715599359.
+Pages reactivated:                         397758407.
+Pages purged:                               11793664.
+File-backed pages:                            213316.
+Anonymous pages:                              332112.
+Pages stored in compressor:                   354918.
+Pages occupied by compressor:                 150122.
+Decompressions:                            324695043.
+Compressions:                              354975853.
+Pageins:                                    59247009.
+Pageouts:                                      90066.
+Swapins:                                     1279762.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:24:21Z after process 7 app cista_unchecked
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   199327.
+Pages active:                                 265403.
+Pages inactive:                               277091.
+Pages speculative:                              2437.
+Pages throttled:                                   0.
+Pages wired down:                             120829.
+Pages purgeable:                               14146.
+"Translation faults":                     3699993844.
+Pages copy-on-write:                       476923227.
+Pages zero filled:                        1715703469.
+Pages reactivated:                         397758509.
+Pages purged:                               11794084.
+File-backed pages:                            213309.
+Anonymous pages:                              331622.
+Pages stored in compressor:                   354657.
+Pages occupied by compressor:                 150038.
+Decompressions:                            324695359.
+Compressions:                              354975853.
+Pageins:                                    59247341.
+Pageouts:                                      90066.
+Swapins:                                     1279762.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:24:52Z before process 7 d3
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   198062.
+Pages active:                                 267048.
+Pages inactive:                               276498.
+Pages speculative:                              2651.
+Pages throttled:                                   0.
+Pages wired down:                             120858.
+Pages purgeable:                               14200.
+"Translation faults":                     3700091956.
+Pages copy-on-write:                       476942364.
+Pages zero filled:                        1715744987.
+Pages reactivated:                         397758620.
+Pages purged:                               11794416.
+File-backed pages:                            213675.
+Anonymous pages:                              332522.
+Pages stored in compressor:                   354577.
+Pages occupied by compressor:                 150008.
+Decompressions:                            324695501.
+Compressions:                              354975853.
+Pageins:                                    59247627.
+Pageouts:                                      90066.
+Swapins:                                     1279762.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:25:50Z after process 7 d3
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   199198.
+Pages active:                                 266162.
+Pages inactive:                               276303.
+Pages speculative:                              2659.
+Pages throttled:                                   0.
+Pages wired down:                             120808.
+Pages purgeable:                               14188.
+"Translation faults":                     3700405937.
+Pages copy-on-write:                       476970694.
+Pages zero filled:                        1715986165.
+Pages reactivated:                         397758829.
+Pages purged:                               11794622.
+File-backed pages:                            213558.
+Anonymous pages:                              331566.
+Pages stored in compressor:                   354524.
+Pages occupied by compressor:                 149995.
+Decompressions:                            324695606.
+Compressions:                              354975853.
+Pageins:                                    59247923.
+Pageouts:                                      90066.
+Swapins:                                     1279762.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:26:21Z before process 8 app xoffset
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   198626.
+Pages active:                                 267873.
+Pages inactive:                               275158.
+Pages speculative:                              2661.
+Pages throttled:                                   0.
+Pages wired down:                             120825.
+Pages purgeable:                               14230.
+"Translation faults":                     3700498794.
+Pages copy-on-write:                       476990017.
+Pages zero filled:                        1716033061.
+Pages reactivated:                         397758924.
+Pages purged:                               11795035.
+File-backed pages:                            213647.
+Anonymous pages:                              332045.
+Pages stored in compressor:                   354491.
+Pages occupied by compressor:                 149982.
+Decompressions:                            324695690.
+Compressions:                              354975853.
+Pageins:                                    59248134.
+Pageouts:                                      90066.
+Swapins:                                     1279762.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:27:07Z after process 8 app xoffset
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   196904.
+Pages active:                                 267783.
+Pages inactive:                               277091.
+Pages speculative:                              2659.
+Pages throttled:                                   0.
+Pages wired down:                             120814.
+Pages purgeable:                               15579.
+"Translation faults":                     3700653932.
+Pages copy-on-write:                       477009878.
+Pages zero filled:                        1716142497.
+Pages reactivated:                         397759152.
+Pages purged:                               11795505.
+File-backed pages:                            213755.
+Anonymous pages:                              333778.
+Pages stored in compressor:                   354330.
+Pages occupied by compressor:                 149874.
+Decompressions:                            324695898.
+Compressions:                              354975853.
+Pageins:                                    59248340.
+Pageouts:                                      90066.
+Swapins:                                     1279766.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:27:18Z before process 8 app xoffset_trusted
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   198604.
+Pages active:                                 266340.
+Pages inactive:                               276695.
+Pages speculative:                              2659.
+Pages throttled:                                   0.
+Pages wired down:                             120956.
+Pages purgeable:                               14087.
+"Translation faults":                     3700690214.
+Pages copy-on-write:                       477017779.
+Pages zero filled:                        1716155901.
+Pages reactivated:                         397759156.
+Pages purged:                               11795604.
+File-backed pages:                            213765.
+Anonymous pages:                              331929.
+Pages stored in compressor:                   354318.
+Pages occupied by compressor:                 149871.
+Decompressions:                            324695936.
+Compressions:                              354975853.
+Pageins:                                    59248418.
+Pageouts:                                      90066.
+Swapins:                                     1279766.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:28:04Z after process 8 app xoffset_trusted
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   194763.
+Pages active:                                 269632.
+Pages inactive:                               277500.
+Pages speculative:                              2659.
+Pages throttled:                                   0.
+Pages wired down:                             120813.
+Pages purgeable:                               17035.
+"Translation faults":                     3700856635.
+Pages copy-on-write:                       477040163.
+Pages zero filled:                        1716267818.
+Pages reactivated:                         397759377.
+Pages purged:                               11795938.
+File-backed pages:                            213873.
+Anonymous pages:                              335918.
+Pages stored in compressor:                   353860.
+Pages occupied by compressor:                 149758.
+Decompressions:                            324696438.
+Compressions:                              354975853.
+Pageins:                                    59248656.
+Pageouts:                                      90066.
+Swapins:                                     1279766.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:28:14Z before process 8 app cereal
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   197793.
+Pages active:                                 266766.
+Pages inactive:                               277332.
+Pages speculative:                              2659.
+Pages throttled:                                   0.
+Pages wired down:                             120820.
+Pages purgeable:                               14278.
+"Translation faults":                     3700891680.
+Pages copy-on-write:                       477048001.
+Pages zero filled:                        1716280713.
+Pages reactivated:                         397759377.
+Pages purged:                               11796116.
+File-backed pages:                            213899.
+Anonymous pages:                              332858.
+Pages stored in compressor:                   353852.
+Pages occupied by compressor:                 149755.
+Decompressions:                            324696470.
+Compressions:                              354975853.
+Pageins:                                    59248728.
+Pageouts:                                      90066.
+Swapins:                                     1279766.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:29:16Z after process 8 app cereal
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   193586.
+Pages active:                                 268922.
+Pages inactive:                               279000.
+Pages speculative:                              2832.
+Pages throttled:                                   0.
+Pages wired down:                             121082.
+Pages purgeable:                               14333.
+"Translation faults":                     3701096159.
+Pages copy-on-write:                       477077773.
+Pages zero filled:                        1716400270.
+Pages reactivated:                         397759590.
+Pages purged:                               11796548.
+File-backed pages:                            214783.
+Anonymous pages:                              335971.
+Pages stored in compressor:                   353502.
+Pages occupied by compressor:                 149703.
+Decompressions:                            324696874.
+Compressions:                              354975853.
+Pageins:                                    59249682.
+Pageouts:                                      90066.
+Swapins:                                     1279766.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:29:26Z before process 8 app protobuf
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   193561.
+Pages active:                                 269356.
+Pages inactive:                               278637.
+Pages speculative:                              2831.
+Pages throttled:                                   0.
+Pages wired down:                             121043.
+Pages purgeable:                               14333.
+"Translation faults":                     3701132157.
+Pages copy-on-write:                       477085137.
+Pages zero filled:                        1716413929.
+Pages reactivated:                         397759593.
+Pages purged:                               11796560.
+File-backed pages:                            214780.
+Anonymous pages:                              336044.
+Pages stored in compressor:                   353475.
+Pages occupied by compressor:                 149697.
+Decompressions:                            324696925.
+Compressions:                              354975853.
+Pageins:                                    59249755.
+Pageouts:                                      90066.
+Swapins:                                     1279766.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:30:16Z after process 8 app protobuf
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   195491.
+Pages active:                                 268702.
+Pages inactive:                               277426.
+Pages speculative:                              2881.
+Pages throttled:                                   0.
+Pages wired down:                             120983.
+Pages purgeable:                               14501.
+"Translation faults":                     3701293628.
+Pages copy-on-write:                       477110006.
+Pages zero filled:                        1716514414.
+Pages reactivated:                         397759784.
+Pages purged:                               11797155.
+File-backed pages:                            214783.
+Anonymous pages:                              334226.
+Pages stored in compressor:                   353327.
+Pages occupied by compressor:                 149642.
+Decompressions:                            324697125.
+Compressions:                              354975853.
+Pageins:                                    59250037.
+Pageouts:                                      90066.
+Swapins:                                     1279766.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:30:26Z before process 8 app flatbuffers_noverify
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   192897.
+Pages active:                                 273526.
+Pages inactive:                               277446.
+Pages speculative:                              2967.
+Pages throttled:                                   0.
+Pages wired down:                             120829.
+Pages purgeable:                               14405.
+"Translation faults":                     3701336395.
+Pages copy-on-write:                       477117257.
+Pages zero filled:                        1716527522.
+Pages reactivated:                         397759891.
+Pages purged:                               11797165.
+File-backed pages:                            214931.
+Anonymous pages:                              339008.
+Pages stored in compressor:                   349496.
+Pages occupied by compressor:                 147460.
+Decompressions:                            324701000.
+Compressions:                              354975853.
+Pageins:                                    59250131.
+Pageouts:                                      90066.
+Swapins:                                     1279770.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:31:14Z after process 8 app flatbuffers_noverify
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   191333.
+Pages active:                                 272732.
+Pages inactive:                               279407.
+Pages speculative:                              3405.
+Pages throttled:                                   0.
+Pages wired down:                             120846.
+Pages purgeable:                               14373.
+"Translation faults":                     3701496947.
+Pages copy-on-write:                       477140639.
+Pages zero filled:                        1716627645.
+Pages reactivated:                         397760015.
+Pages purged:                               11797396.
+File-backed pages:                            215606.
+Anonymous pages:                              339938.
+Pages stored in compressor:                   349339.
+Pages occupied by compressor:                 147402.
+Decompressions:                            324701202.
+Compressions:                              354975853.
+Pageins:                                    59250432.
+Pageouts:                                      90066.
+Swapins:                                     1279770.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:31:25Z before process 8 app zpp_bits
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   191165.
+Pages active:                                 272966.
+Pages inactive:                               279218.
+Pages speculative:                              3405.
+Pages throttled:                                   0.
+Pages wired down:                             120978.
+Pages purgeable:                               14242.
+"Translation faults":                     3701529895.
+Pages copy-on-write:                       477147783.
+Pages zero filled:                        1716640086.
+Pages reactivated:                         397760015.
+Pages purged:                               11797400.
+File-backed pages:                            215614.
+Anonymous pages:                              339975.
+Pages stored in compressor:                   349318.
+Pages occupied by compressor:                 147393.
+Decompressions:                            324701245.
+Compressions:                              354975853.
+Pageins:                                    59250499.
+Pageouts:                                      90066.
+Swapins:                                     1279770.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:32:00Z after process 8 app zpp_bits
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   184660.
+Pages active:                                 273771.
+Pages inactive:                               280099.
+Pages speculative:                              3576.
+Pages throttled:                                   0.
+Pages wired down:                             125631.
+Pages purgeable:                               15534.
+"Translation faults":                     3701655002.
+Pages copy-on-write:                       477163308.
+Pages zero filled:                        1716730453.
+Pages reactivated:                         397760198.
+Pages purged:                               11797738.
+File-backed pages:                            215728.
+Anonymous pages:                              341718.
+Pages stored in compressor:                   349298.
+Pages occupied by compressor:                 147388.
+Decompressions:                            324701296.
+Compressions:                              354975853.
+Pageins:                                    59250693.
+Pageouts:                                      90066.
+Swapins:                                     1279770.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 72%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:32:10Z before process 8 app cista_unchecked
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   189629.
+Pages active:                                 273745.
+Pages inactive:                               279770.
+Pages speculative:                              3624.
+Pages throttled:                                   0.
+Pages wired down:                             120972.
+Pages purgeable:                               14979.
+"Translation faults":                     3701687205.
+Pages copy-on-write:                       477170477.
+Pages zero filled:                        1716742864.
+Pages reactivated:                         397760201.
+Pages purged:                               11797828.
+File-backed pages:                            215809.
+Anonymous pages:                              341330.
+Pages stored in compressor:                   349285.
+Pages occupied by compressor:                 147385.
+Decompressions:                            324701332.
+Compressions:                              354975853.
+Pageins:                                    59250804.
+Pageouts:                                      90066.
+Swapins:                                     1279770.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:32:50Z after process 8 app cista_unchecked
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   190627.
+Pages active:                                 272108.
+Pages inactive:                               280542.
+Pages speculative:                              3628.
+Pages throttled:                                   0.
+Pages wired down:                             120847.
+Pages purgeable:                               14415.
+"Translation faults":                     3701839762.
+Pages copy-on-write:                       477190253.
+Pages zero filled:                        1716837523.
+Pages reactivated:                         397760306.
+Pages purged:                               11798019.
+File-backed pages:                            215649.
+Anonymous pages:                              340629.
+Pages stored in compressor:                   349247.
+Pages occupied by compressor:                 147373.
+Decompressions:                            324701407.
+Compressions:                              354975853.
+Pageins:                                    59251020.
+Pageouts:                                      90066.
+Swapins:                                     1279770.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:33:20Z before process 8 d3
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   190208.
+Pages active:                                 274997.
+Pages inactive:                               277928.
+Pages speculative:                              3629.
+Pages throttled:                                   0.
+Pages wired down:                             121005.
+Pages purgeable:                               14314.
+"Translation faults":                     3701929970.
+Pages copy-on-write:                       477209224.
+Pages zero filled:                        1716887738.
+Pages reactivated:                         397760402.
+Pages purged:                               11798801.
+File-backed pages:                            215750.
+Anonymous pages:                              340804.
+Pages stored in compressor:                   349216.
+Pages occupied by compressor:                 147358.
+Decompressions:                            324701488.
+Compressions:                              354975853.
+Pageins:                                    59251219.
+Pageouts:                                      90066.
+Swapins:                                     1279770.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:34:19Z after process 8 d3
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   195123.
+Pages active:                                 274142.
+Pages inactive:                               278132.
+Pages speculative:                                95.
+Pages throttled:                                   0.
+Pages wired down:                             120763.
+Pages purgeable:                               14706.
+"Translation faults":                     3702246989.
+Pages copy-on-write:                       477236988.
+Pages zero filled:                        1717132292.
+Pages reactivated:                         397760643.
+Pages purged:                               11799246.
+File-backed pages:                            210206.
+Anonymous pages:                              342163.
+Pages stored in compressor:                   347830.
+Pages occupied by compressor:                 146870.
+Decompressions:                            324702998.
+Compressions:                              354975853.
+Pageins:                                    59251600.
+Pageouts:                                      90066.
+Swapins:                                     1279770.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
+== 2026-11-05T13:34:19Z after timing
+Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                                   194474.
+Pages active:                                 274733.
+Pages inactive:                               278134.
+Pages speculative:                               121.
+Pages throttled:                                   0.
+Pages wired down:                             120793.
+Pages purgeable:                               14706.
+"Translation faults":                     3702258700.
+Pages copy-on-write:                       477239724.
+Pages zero filled:                        1717135233.
+Pages reactivated:                         397760643.
+Pages purged:                               11799246.
+File-backed pages:                            210238.
+Anonymous pages:                              342750.
+Pages stored in compressor:                   347830.
+Pages occupied by compressor:                 146870.
+Decompressions:                            324703014.
+Compressions:                              354975853.
+Pageins:                                    59251667.
+Pageouts:                                      90066.
+Swapins:                                     1279770.
+Swapouts:                                    2626345.
+The system has 17179869184 (1048576 pages with a page size of 16384).
+System-wide memory free percentage: 73%
+swap: total = 4096.00M  used = 2832.94M  free = 1263.06M  (encrypted)
