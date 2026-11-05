@@ -18,6 +18,18 @@
   cycles 2 to 5): LK.recv 0.32, LN.recv 0.43, NP.recv 0.58, NC.recv 0.41,
   NS.recv 0.36, NB.recv 0.39, SN.store_recv 0.12. docs/DELTA_SYNC.md section
   3, docs/USER_GUIDE.md (K4).
+- Delta format 1.0 is frozen for 3.x (docs/DELTA_SYNC.md section 2): a 3.x
+  sender writes 1.0, a 3.x receiver reads it, and an addition takes a new
+  format byte that a 1.0 receiver rejects. `test_delta_format` pins the bytes
+  of a key delta, a scalar delta and a digest delta of a plain root both ways
+  (written out field by field after the format table; sender, full check and
+  admit), on every compiler and schema backend. docs/USER_GUIDE.md section
+  4.5 is a guide to delta sync (baselines, receivers by link, recovery with a
+  key delta, the read-only replica, schema handshake first);
+  `examples/delta_sync.cpp` runs a server and a client through key delta,
+  small deltas, a lost delta and the recovery. docs/DELTA_SYNC.md section 5:
+  deltas only after the handshake answers `same`, whole wires after
+  `convert`.
 - `xoffset_shared_delta.hpp` (experimental, D3 prototype for 3.4): shared
   per-entity deltas. A change is written per record, as bytes at offsets
   inside the record (the block section of delta format 1.0 counted from the
