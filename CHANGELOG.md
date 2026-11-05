@@ -34,8 +34,9 @@
   Geometry: a VM buffer's `reserved_bytes()` and `accessible_bytes()` count
   from the payload, so they are whole pages minus 64 bytes, and the first page
   is read/write from creation. A maximum that is a multiple of 4 MiB (64 MiB,
-  256 MiB) now maps one more 4 MiB granule (PROT_NONE until used) and is
-  aligned to the next power of two; the alignment gap is not mapped. A pool
+  256 MiB) maps one more 4 MiB granule (PROT_NONE until used) but keeps its
+  2^k alignment: the owner map marks that granule as a tail that resolves one
+  granule back (entry bit 6; the lookup does the same work as before). A pool
   budget that was an exact multiple of such a maximum holds one idle owner
   fewer. docs/DEPLOYMENT.md section 5.
 

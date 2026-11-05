@@ -234,6 +234,20 @@ private:
                 XOFFSET_VFAIL_STD(std::length_error, XErrc::length_error, "VM reservation page rounding overflows");
             std::size_t shift = slot_log2(span);
             if (shift < OwnerMap::granule_shift) shift = OwnerMap::granule_shift;
+            // A maximum that is a multiple of 4 MiB (the 64 MiB default, 256
+            // MiB) plus the header spans 2^k + one granule. Keep the 2^k
+            // alignment: the last granule is a tail entry that resolves one
+            // granule back, instead of doubling the alignment.
+            bool tail = false;
+            if (span > OwnerMap::granule_bytes) {
+                const std::size_t body = span - OwnerMap::granule_bytes;
+                std::size_t body_shift = slot_log2(body);
+                if (body_shift < OwnerMap::granule_shift) body_shift = OwnerMap::granule_shift;
+                if ((std::size_t(1) << body_shift) == body && body_shift < shift) {
+                    shift = body_shift;
+                    tail = true;
+                }
+            }
             if (shift >= OwnerMap::address_bits || !OwnerMap::ready()) XOFFSET_VFAIL_BAD_ALLOC();
             const std::size_t align = std::size_t(1) << shift;
             if (span > (std::numeric_limits<std::size_t>::max)() - align) XOFFSET_VFAIL_BAD_ALLOC();
@@ -289,7 +303,14 @@ private:
             accessible_bytes_ = enabled - host_header;
 #endif
             mapped_bytes_ = span;
-            OwnerMap::set(region, span, static_cast<std::uint8_t>(OwnerMap::slot_bit | shift));
+            const auto entry = static_cast<std::uint8_t>(OwnerMap::slot_bit | shift);
+            if (tail) {
+                OwnerMap::set(region, span - OwnerMap::granule_bytes, entry);
+                OwnerMap::set(region + (span - OwnerMap::granule_bytes), OwnerMap::granule_bytes,
+                              static_cast<std::uint8_t>(entry | OwnerMap::tail_bit));
+            } else {
+                OwnerMap::set(region, span, entry);
+            }
             reserved_bytes_ = reserved;
         }
         set_host_owner(nullptr);
