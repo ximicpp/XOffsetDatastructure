@@ -16,6 +16,12 @@ Subcommands (run in this order, or use `run` for all of them):
   build    compile slg_bench and sc_xoffset for every tree     (needs the compiler)
   measure  correctness checks, then Ir of every phase           (needs valgrind)
   compare  thresholds, ledger, job summary and JSON             (python only)
+
+--cache-sim (measure, run): for the L-class warning item (MERGE_RULES, 2026-11-05), also run every phase of the
+base and the head once more under callgrind's cache simulation (CACHE_SIM_ARGS, fixed) and report D1 misses
+(D1mr + D1mw) and last-level misses (DLmr + DLmw) per phase, head/base. A judged phase above CACHE_WARN is a
+cache warning on the verdict line; it never fails the gate and leaves the Ir verdict and the exit code alone.
+The Ir that a cache-sim run reports differs a little from the plain run's and is not used.
 """
 from __future__ import annotations
 
@@ -57,6 +63,11 @@ DROP_NOTE = 0.97                               # a total below this gets the "Ir
 SLG_TOTALS = ("A", "B", "C", "D")
 FORMAL_TOTALS = ("read_sum", "mutate", "emit_after", "load", "reload")
 FORMAL_REPORT_ONLY = ("retire", "cleanup")
+
+# Cache simulation (--cache-sim): fixed parameters, base and head only, warnings only.
+CACHE_SIM_ARGS = ("--cache-sim=yes", "--D1=131072,8,128", "--LL=16777216,16,128")
+CACHE_WARN = 1.02                              # head/base of D1 or LL misses, totals and judged phases
+CACHE_EVENTS = {"D1": ("D1mr", "D1mw"), "LL": ("DLmr", "DLmw")}
 
 FIRST_LINE = "指令数只用于拦截回退，计时结论以 Mac 正式批次为准。"
 
@@ -326,6 +337,36 @@ def callgrind(valgrind, cmd, env, tmp: Path):
     return int(m.group(1)), fn_profile(tmp / "cg.out")
 
 
+def callgrind_cache(valgrind, cmd, env, tmp: Path):
+    """Run `cmd` under callgrind with CACHE_SIM_ARGS; return the collected events by name (Ir, D1mr, ... DLmw)."""
+    logf = tmp / "vg.log"
+    out = tmp / "cg.out"
+    full = shlex.split(valgrind) + ["--tool=callgrind", "--collect-atstart=no", *CACHE_SIM_ARGS,
+                                    f"--callgrind-out-file={out}", f"--log-file={logf}"] + cmd
+    r = subprocess.run(full, env={**env, **IR_ENV}, text=True, capture_output=True, cwd=tmp)
+    text = logf.read_text(encoding="utf-8", errors="replace") if logf.exists() else ""
+    m = COLLECTED_ALL.search(text)
+    if r.returncode != 0 or not m or not out.exists():
+        raise RuntimeError(f"callgrind cache-sim failed ({r.returncode}): {shlex.join(cmd)}\n{r.stderr[-2000:]}\n{text[-2000:]}")
+    return cache_events(out.read_text(encoding="utf-8", errors="replace"), m.group(1))
+
+
+COLLECTED_ALL = re.compile(r"Collected\s*:\s*([\d ]+)")
+
+
+def cache_events(cg_text, collected):
+    """Event name -> count, from the `events:` line of a callgrind out file and the log's Collected line."""
+    names = next((l.split(":", 1)[1].split() for l in cg_text.splitlines() if l.startswith("events:")), [])
+    counts = [int(x) for x in collected.split()]
+    if not names or len(names) != len(counts):
+        raise RuntimeError(f"cache-sim: events {names} do not match the collected counts {counts}")
+    ev = dict(zip(names, counts))
+    missing = [e for pair in CACHE_EVENTS.values() for e in pair if e not in ev]
+    if missing:
+        raise RuntimeError(f"cache-sim: no {', '.join(missing)} among the events {names}")
+    return ev
+
+
 CG_COMPRESSED = re.compile(r"^\((\d+)\)(?:\s(.*))?$")
 CG_CLONE = re.compile(r"(?: \[clone [^\]]+\])+$")
 
@@ -514,15 +555,18 @@ def cmd_measure(a):
         sha, kind, key, rep = task
         bdir = Path(usable[sha]["dir"])
         tmp = Path(tempfile.mkdtemp(prefix=f"{kind}-", dir=scratch))
+        run_cg = callgrind
+        if rep == "cache":
+            run_cg = lambda *x: (callgrind_cache(*x), None)  # noqa: E731
         try:
             if kind == "slg":
-                ir, prof = callgrind(a.valgrind, slg_bench_cmd(bdir / "slg_bench", tmp / "raw.jsonl"),
+                ir, prof = run_cg(a.valgrind, slg_bench_cmd(bdir / "slg_bench", tmp / "raw.jsonl"),
                                slg_env(SLG_IR_KEYS=key, SLG_IR_SKIP_CYCLES=SLG_SKIP_CYCLES), tmp)
             elif kind == "reloc":
-                ir, prof = callgrind(a.valgrind, reloc_cmd(bdir / "reloc_bench", key), reloc_env(key), tmp)
+                ir, prof = run_cg(a.valgrind, reloc_cmd(bdir / "reloc_bench", key), reloc_env(key), tmp)
             else:
                 env = dict(os.environ, SC_IR_PHASE=key)
-                ir, prof = callgrind(a.valgrind, [str(bdir / "sc_xoffset"), "run", "--wire", str(bdir / "M.wire"),
+                ir, prof = run_cg(a.valgrind, [str(bdir / "sc_xoffset"), "run", "--wire", str(bdir / "M.wire"),
                                             "--trace", str(fx / "M" / "trace.bin"), "--wire-out", str(tmp / "w"),
                                             "--canonical-out", str(tmp / "c"), "--queries-out", str(tmp / "q"),
                                             "--result", str(tmp / "r.json")], env, tmp)
@@ -532,6 +576,22 @@ def cmd_measure(a):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
+    cache_roles = ("base", "head") if getattr(a, "cache_sim", False) else ()
+    for role in cache_roles:
+        sha = plan["roles"][role]
+        tr = result["trees"].get(sha)
+        if not tr or not tr["checks"]["ok"]:
+            continue
+        tr["cache"] = {}
+        for k in tr["slg_keys"]:
+            tasks.append((sha, "slg", k, "cache"))
+        for ph in FORMAL_PHASES:
+            tasks.append((sha, "formal", ph, "cache"))
+        for k in tr["reloc_keys"]:
+            tasks.append((sha, "reloc", k, "cache"))
+    if cache_roles:
+        result["cache_sim"] = {"args": list(CACHE_SIM_ARGS), "roles": list(cache_roles)}
+
     log(f"{len(tasks)} callgrind runs on {a.jobs} workers")
     errors = []
     repeats = {}
@@ -540,7 +600,9 @@ def cmd_measure(a):
             if err:
                 errors.append(f"{short(sha)} {kind} {key}: {err}")
                 continue
-            if rep:
+            if rep == "cache":
+                result["trees"][sha]["cache"][f"{kind}.{key}"] = ir
+            elif rep:
                 repeats[f"{kind}.{key}"] = ir
             else:
                 result["trees"][sha][kind][key] = ir
@@ -560,6 +622,15 @@ def cmd_measure(a):
 
 
 # ---------------------------------------------------------------- compare
+
+def cache_counts(tree, level):
+    """One tree's cache-sim misses of one level (D1 or LL, read + write) in the shape metrics_of reads."""
+    t = {"slg": {}, "formal": {}, "reloc": {}}
+    for k, ev in (tree.get("cache") or {}).items():
+        kind, _, key = k.partition(".")
+        t[kind][key] = sum(ev[e] for e in CACHE_EVENTS[level])
+    return t
+
 
 def metrics_of(tree):
     """Flatten one tree's raw counts into gate metrics."""
@@ -888,6 +959,8 @@ def cmd_compare(a):
                          f"{ar['recycle']:+,}（该指标净增 {d['delta']:+,}）；{what}。校准时这两类在 Mac 上都是变快，"
                          "Ir 方向相反，判定不变，按 L 类由 Mac L2 下结论")
 
+    cache = cache_rows(ir, roles, bm, hm)  # its warnings stay in out["cache"]: they never touch the Ir verdict
+
     # Largest-changing phase per scenario (head/base), for the summary.
     biggest = {}
     for row in rows:
@@ -910,6 +983,8 @@ def cmd_compare(a):
            "determinism": ir.get("determinism", {}), "failures": failures, "warnings": warnings, "notes": notes,
            "ledger_applied": sorted({i for r in rows for i in r["ledger"]}), "rows": rows,
            "first_line": FIRST_LINE}
+    if cache["rows"] or cache["note"]:
+        out["cache"] = cache
     json_path = Path(a.json) if a.json else work / f"perf-gate-{a.compiler}-{short(head_sha)}.json"
     dump_json(json_path, out)
     md = render_summary(out, plan, biggest)
@@ -921,14 +996,79 @@ def cmd_compare(a):
     for row in rows:
         print(f"IR {a.compiler} {row['metric']} anchor={row['anchor']} base={row['base']} head={row['head']} "
               f"class={row['class']} verdict={row['verdict']}")
-    log(f"verdict {verdict}: {len(failures)} failures, {len(warnings)} warnings -> {json_path}")
+    for r in cache["rows"]:
+        print(f"CACHE {a.compiler} {r['metric']} D1 base={r['base_D1']} head={r['head_D1']} "
+              f"LL base={r['base_LL']} head={r['head_LL']} class={r['class']} verdict={r['verdict']}")
+    cache_part = (f"; cache {cache['verdict']}: {len(cache['warnings'])} warnings (警告项，不判 fail)"
+                  if cache["rows"] or cache["note"] else "")
+    log(f"verdict {verdict}: {len(failures)} failures, {len(warnings)} warnings{cache_part} -> {json_path}")
     return 1 if verdict == "fail" else 0
+
+
+def cache_rows(ir, roles, bm, hm):
+    """--cache-sim rows: D1 and LL misses per metric, head/base; a total or judged phase above CACHE_WARN warns.
+
+    Phases are classed by their Ir share (classify), as the Ir gate does. Never a failure.
+    """
+    res = {"verdict": "pass", "warnings": [], "rows": [], "note": "",
+           "args": list(ir.get("cache_sim", {}).get("args", []))}
+    if "cache_sim" not in ir:
+        return res
+    bt, ht = ir["trees"].get(roles["base"]), ir["trees"].get(roles["head"])
+    if not bt or not ht or "cache" not in bt or "cache" not in ht:
+        res["note"] = "base 或 head 没有缓存模拟数据（构建或正确性检查失败），不出缓存对比"
+        res["verdict"] = "warn"
+        res["warnings"].append(res["note"])
+        return res
+    mb = {lv: metrics_of(cache_counts(bt, lv)) for lv in CACHE_EVENTS}
+    mh = {lv: metrics_of(cache_counts(ht, lv)) for lv in CACHE_EVENTS}
+    names = sorted(set(mb["D1"]) | set(mh["D1"]), key=lambda k: (k.split(".")[0], k.count("."), k))
+    for metric in names:
+        if metric == "formal.total":
+            continue
+        cls, _ = classify(metric, bm, hm)
+        row = {"metric": metric, "class": cls, "verdict": "pass"}
+        over = []
+        for lv in CACHE_EVENTS:
+            b, h = mb[lv].get(metric), mh[lv].get(metric)
+            r = h / b if (b and h is not None) else None
+            row[f"base_{lv}"], row[f"head_{lv}"], row[f"ratio_{lv}"] = b, h, r
+            if r is not None and r > CACHE_WARN and cls != "report":
+                over.append(f"{lv} {r:.4f}")
+        if over:
+            row["verdict"] = "warn"
+            res["verdict"] = "warn"
+            res["warnings"].append(f"{metric} 缺失 head÷base {', '.join(over)} > {CACHE_WARN}")
+        res["rows"].append(row)
+    return res
+
+
+def render_cache(c):
+    L = ["", f"**缓存模拟**（警告项，不判 fail；`{' '.join(c['args'])}`，只跑 base 和 head）："
+         f"{'⚠️ 警告' if c['verdict'] == 'warn' else '✅ 无警告'}", ""]
+    if c["note"]:
+        L += [c["note"], ""]
+    L += [f"- {x}" for x in c["warnings"] if x != c["note"]]
+    if c["warnings"]:
+        L.append("")
+    if not c["rows"]:
+        return L
+    L += ["| 指标 | 类别 | D1 缺失 base | head | head÷base | LL 缺失 base | head | head÷base | 判定 |",
+          "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+    for r in c["rows"]:
+        if r["class"] == "report" and r["verdict"] == "pass":
+            continue
+        L.append(f"| `{r['metric']}` | {r['class']} | {r['base_D1']} | {r['head_D1']} | {fmt_ratio(r['ratio_D1'])} | "
+                 f"{r['base_LL']} | {r['head_LL']} | {fmt_ratio(r['ratio_LL'])} | {r['verdict']} |")
+    return L
 
 
 def render_summary(out, plan, biggest):
     r = out["roles"]
     icon = {"pass": "✅ 通过", "warn": "⚠️ 通过（有警告）", "fail": "❌ 失败"}[out["verdict"]]
-    L = [FIRST_LINE, "", f"## 指令数门禁（{out['compiler']}）：{icon}", ""]
+    c = out.get("cache")
+    cache_icon = (" · 缓存 ⚠️ 警告" if c["verdict"] == "warn" else " · 缓存 ✅") if c else ""
+    L = [FIRST_LINE, "", f"## 指令数门禁（{out['compiler']}）：{icon}{cache_icon}", ""]
     L.append(f"anchor `{short(r['anchor'])}` · base `{short(r['base'])}` · head `{short(r['head'])}` · "
              f"{out['compiler_version']} · {out['valgrind']}")
     L.append(f"SLG {out['slg']['scale']} 规模、{out['slg']['cycles']} 周期（跳过前 {out['slg']['skip_cycles']} 个）、"
@@ -973,6 +1113,8 @@ def render_summary(out, plan, biggest):
         for t in d["top"]:
             L.append(f"| `{short_fn(t['function'])}` | {t['ref']:,} | {t['head']:,} | {t['delta']:+,} |")
         L.append("")
+    if c:
+        L += render_cache(c)
     L += ["", "占比 < 5% 的阶段只在 JSON 里报。门槛和 ledger 见 `docs/PERF_GATE.md`。", ""]
     return "\n".join(L)
 
@@ -1016,6 +1158,8 @@ def main():
                                 help=f"flags for the {role} build only, e.g. -DXOFFSET_SCHEMA_BACKEND_DESCRIBE=1")
         if name in ("measure", "run"):
             sp.add_argument("--valgrind", default="valgrind")
+            sp.add_argument("--cache-sim", action="store_true",
+                            help="also run base and head under the cache simulation (fixed D1/LL); warnings only")
             sp.add_argument("--python", default=sys.executable)
         if name == "run":
             sp.add_argument("--json", default="")
