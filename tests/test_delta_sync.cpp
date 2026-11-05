@@ -1420,7 +1420,10 @@ void touched_growth_case() {
 // The cursors of a thread share its apply scratch: several threads at once
 // feed their replicas in turn, and a delta applied from a thread_local
 // destructor that runs after the thread's scratch is destroyed uses the
-// cursor's own.
+// cursor's own. Without thread caches (XOFFSET_THREAD_CACHES 0: GCC on MinGW
+// and Cygwin, emulated TLS) there is no thread scratch to outlive, and a
+// thread_local's destructor can run on storage already freed, so the late
+// delta is applied at the end of the thread instead.
 struct AtThreadExit {
     std::function<void()> run;
     ~AtThreadExit() {
@@ -1442,7 +1445,9 @@ void thread_scratch_case() {
     std::vector<std::thread> pool;
     for (int t = 0; t < threads; ++t)
         pool.emplace_back([&late, &errors, t] {
+#if XOFFSET_THREAD_CACHES
             static thread_local AtThreadExit at_exit;  // before any delta: destroyed after the scratch
+#endif
             const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
             std::mt19937_64 rng(20261104u + std::uint64_t(t));
             auto src = xo::TypedXBuffer<dz::View>::create(4096, cap);
@@ -1480,7 +1485,11 @@ void thread_scratch_case() {
             (void)src.save_delta_into(l.key, fresh);
             l.expect = payload_of(src);
             l.rep = std::make_unique<xo::TypedXBuffer<dz::View>>(4096, xo::XBuffer::maximum_capacity(kLimit));
+#if XOFFSET_THREAD_CACHES
             at_exit.run = [&l] { l.applied = bool(l.rep->try_apply_delta_verified(l.key, l.cur)); };
+#else
+            l.applied = bool(l.rep->try_apply_delta_verified(l.key, l.cur));
+#endif
         });
     for (auto& th : pool) th.join();
     for (int t = 0; t < threads; ++t) {

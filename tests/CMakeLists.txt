@@ -283,7 +283,7 @@ set_tests_properties(test_no_exceptions_fatal test_no_exceptions_noexc_fatal PRO
 #   fuzz_<target>_replay_corpus   replays the harness's own seed corpus, written
 #                                 by fuzz_<target>_replay_seeds
 # Names start with the target name so tools/validate_vm.py --targets selects all three.
-set(XOFFSET_REPLAY_TARGETS v2_wire wire_schemas)
+set(XOFFSET_REPLAY_TARGETS v2_wire wire_schemas delta_sync)
 if(XOFFSET_TESTS_REFLECTION)
     list(APPEND XOFFSET_REPLAY_TARGETS schema_evolution)  # server side, reflection only
 else()
