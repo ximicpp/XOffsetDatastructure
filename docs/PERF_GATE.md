@@ -92,14 +92,20 @@ SLG 只编 XOffset + cereal（cereal v1.3.2，`ebef1e92`，头文件）。M 规�
 - **分配器回收型**：被标的指标净增 Ir 里，`FreeTableRecycler::recycle` 的自身 Ir 增量至少占一半，就在表头和"说明"里标出，并按 malloc/free/realloc/calloc/new/delete（含 glibc 的 `_int_*`、`tcache*`）自身 Ir 的降幅分成两种：降幅至少是 recycle 增量的 10%，算"分配器调用换成原地回收"（D2 型，校准里是 28–55%）；否则算"要回收的 bin 变多"（COPS 型，校准里分配器只降了 recycle 增量的 1–3%，是噪声级）。2026-10-26 用 Mac L2 校准时这两例 Ir 都上升（D2 的 slg.B.in_decode GCC 1.059、P2996 1.052；COPS 的 slg.B GCC 1.014），Mac 上却都变快（0.989；0.977），缓存模拟也没把 D2 翻过来。**这个标记同样只是诊断，不放行**，判定不变：这类 PR 本来就因为 Ir 警告或失败进 L 类，要附 cache-sim 对比（第 5a 节），由「性能优化」判断；合并后的 Mac 复核只报。
 - 变红怎么办：先看是哪个阶段、哪些函数；是意外就修；标了疑似内联的，先试把新增的冷路径挪进 `[[gnu::noinline]]` 函数（见第 4 节）；是有意的取舍就写 ledger 条目（见上），> 1% 的放行在合并前还要附 cache-sim 对比（第 5a 节）。
 
-## 5a. cache-sim 对比（L 类，手工，警告项）
+## 5a. cache-sim 对比（L 类，警告项）
 
-Ir 看不到内存访问的变化（第 8 节），所以 L 类 PR 合并前另附一份缓存模拟对比。在 perf_gate 支持之前手工做，参数固定，每次一样：
+Ir 看不到内存访问的变化（第 8 节），所以 L 类 PR 合并前另附一份缓存模拟对比。由 `perf_gate.py measure`（或 `run`）加 `--cache-sim` 生成，`compare` 照常跑：
 
-- 用 Ir 门同一组二进制（`local_validate` 的 `ir-<编译器>/bin/<编译器>/<sha>/`）和同样的运行方式（S 规模、seed 20261021、8 个周期、只收集第 4–7 周期、`SLG_REUSE=1`、关掉 rep movsb/stosb），每个 SLG 阶段单独收集，与 Ir 门一样用 `SLG_IR_KEYS=<键>`。
-- callgrind 参数：`--cache-sim=yes --D1=131072,8,128 --LL=16777216,16,128`。
-- 对比 base 和 head 每个场景、每个阶段的 D1mr+D1mw 和 DLmr+DLmw；任一阶段 head÷base > 1.02 算警告。结果表写进 PR 正文，警告由「性能优化」决定。
-- 只作警告，不单独挡合并；模拟的缓存不是任何一台真机，结论仍以合并后的 Mac 复核为准。
+- **跑什么**：在 Ir 门的正常测量之外，base 和 head（不含 anchor）的每个 SLG 阶段、formal 阶段和 reloc 项各再跑一遍 callgrind。运行方式与 Ir 门相同：S 规模、seed 20261021、8 个周期、只收集第 4–7 周期、`SLG_REUSE=1`、关掉 rep movsb/stosb，每个键单独收集。
+- **参数**：固定为 `--cache-sim=yes --D1=131072,8,128 --LL=16777216,16,128`（`CACHE_SIM_ARGS`）。
+- **对比什么**：每个场景、每个阶段的 D1 缺失（D1mr+D1mw）和 LL 缺失（DLmr+DLmw），以及各自的 head÷base。
+- **什么时候警告**：场景合计，或者占本场景 Ir 至少 5% 的阶段（与 Ir 门的分类相同），某一级缺失同时满足下面两条才算警告（susu / 「性能优化」2026-11-05）：
+  - head÷base > 1.02；
+  - 缺失增量 ≥ 100 次，或者增量 ≥ 该指标 base Ir 的万分之一。
+
+  第二条用来避免几十次的计数多两三次就报警。占比 < 5% 的阶段只在 JSON 里列出，不警告。
+- **结果写在哪**：判定行末尾附 `cache warn|pass`；摘要表头显示「缓存 ⚠️ 警告」，附一张缓存表；JSON 写在 `cache` 字段。结果表要写进 PR 正文，警告由「性能优化」决定。
+- **不挡合并**：只作警告，不判 fail，也不改 Ir 判定和退出码。模拟的缓存不是任何一台真机，结论仍以合并后的 Mac 复核为准。cache-sim 运行报出的 Ir 和普通运行略有不同，不使用。
 
 ## 6. 手动触发与回放
 

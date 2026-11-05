@@ -323,6 +323,22 @@ def main():
            and abs(cr["ratio_D1"] - 1.05) < 1e-3 and not out["warnings"]
            and "缓存 ⚠️ 警告" in summary and "slg.B.in_decode" in summary)
 
+    bs = tree(); bs["cache"] = cache_of(); bs["cache"]["slg.C.restore"].update(D1mr=40, DLmr=10)
+    hs = tree(); hs["cache"] = cache_of(); hs["cache"]["slg.C.restore"].update(D1mr=43, DLmr=12)
+    rc, out = run_case(hs, base_tree=bs, cache_sim=True)
+    cr = next(r for r in out["cache"]["rows"] if r["metric"] == "slg.C.restore")
+    expect("a judged phase with 40 -> 43 D1 and 10 -> 12 LL misses does not warn (below the absolute floor)",
+           cr["class"] != "report" and cr["ratio_D1"] > 1.02 and cr["verdict"] == "pass")
+    hs["cache"]["slg.C.restore"].update(D1mr=40 + 100, DLmr=10)
+    rc, out = run_case(hs, base_tree=bs, cache_sim=True)
+    cr = next(r for r in out["cache"]["rows"] if r["metric"] == "slg.C.restore")
+    expect("+100 misses on a judged phase warns", cr["verdict"] == "warn" and out["cache"]["verdict"] == "warn")
+    bs["cache"]["slg.C.restore"].update(D1mr=500); hs["cache"]["slg.C.restore"].update(D1mr=500 + 50)
+    bs["slg"] = dict(BASE_SLG, **{"C.restore": 400_000}); hs["slg"] = dict(bs["slg"])
+    rc, out = run_case(hs, base_tree=bs, cache_sim=True)
+    cr = next(r for r in out["cache"]["rows"] if r["metric"] == "slg.C.restore")
+    expect("+50 misses on a 400k-Ir phase (>= 1 per 10,000 Ir) warns", cr["verdict"] == "warn")
+
     hb = tree(); hb["cache"] = cache_of(scale={"slg.A.res_encode": (2.0, 2.0)})
     rc, out = run_case(hb, base_tree=bb, cache_sim=True)
     cr = next(r for r in out["cache"]["rows"] if r["metric"] == "slg.A.res_encode")
