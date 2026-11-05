@@ -19,7 +19,8 @@ Subcommands (run in this order, or use `run` for all of them):
 
 --cache-sim (measure, run): for the L-class warning item (MERGE_RULES, 2026-11-05), also run every phase of the
 base and the head once more under callgrind's cache simulation (CACHE_SIM_ARGS, fixed) and report D1 misses
-(D1mr + D1mw) and last-level misses (DLmr + DLmw) per phase, head/base. A judged phase above CACHE_WARN is a
+(D1mr + D1mw) and last-level misses (DLmr + DLmw) per phase, head/base. A judged phase whose misses of a level
+are above CACHE_WARN and grew by at least CACHE_MIN_DELTA, or by at least CACHE_MIN_PER_IR of its Ir, is a
 cache warning on the verdict line; it never fails the gate and leaves the Ir verdict and the exit code alone.
 The Ir that a cache-sim run reports differs a little from the plain run's and is not used.
 """
@@ -67,6 +68,8 @@ FORMAL_REPORT_ONLY = ("retire", "cleanup")
 # Cache simulation (--cache-sim): fixed parameters, base and head only, warnings only.
 CACHE_SIM_ARGS = ("--cache-sim=yes", "--D1=131072,8,128", "--LL=16777216,16,128")
 CACHE_WARN = 1.02                              # head/base of D1 or LL misses, totals and judged phases
+CACHE_MIN_DELTA = 100                          # ... and the misses grew by at least this many
+CACHE_MIN_PER_IR = 1e-4                        # ... or by at least one per 10,000 Ir of the metric (base Ir)
 CACHE_EVENTS = {"D1": ("D1mr", "D1mw"), "LL": ("DLmr", "DLmw")}
 
 FIRST_LINE = "指令数只用于拦截回退，计时结论以 Mac 正式批次为准。"
@@ -1008,7 +1011,9 @@ def cmd_compare(a):
 
 
 def cache_rows(ir, roles, bm, hm):
-    """--cache-sim rows: D1 and LL misses per metric, head/base; a total or judged phase above CACHE_WARN warns.
+    """--cache-sim rows: D1 and LL misses per metric, head/base. A total or judged phase warns when a level's
+    head/base is above CACHE_WARN and its misses grew by at least CACHE_MIN_DELTA, or by at least
+    CACHE_MIN_PER_IR times the metric's base Ir (a few misses more on a phase with tens of misses do not warn).
 
     Phases are classed by their Ir share (classify), as the Ir gate does. Never a failure.
     """
@@ -1035,12 +1040,16 @@ def cache_rows(ir, roles, bm, hm):
             b, h = mb[lv].get(metric), mh[lv].get(metric)
             r = h / b if (b and h is not None) else None
             row[f"base_{lv}"], row[f"head_{lv}"], row[f"ratio_{lv}"] = b, h, r
-            if r is not None and r > CACHE_WARN and cls != "report":
-                over.append(f"{lv} {r:.4f}")
+            delta = (h - b) if (b is not None and h is not None) else None
+            ir_ref = bm.get(metric) or hm.get(metric) or 0
+            big = delta is not None and (delta >= CACHE_MIN_DELTA or delta >= ir_ref * CACHE_MIN_PER_IR)
+            if r is not None and r > CACHE_WARN and cls != "report" and big:
+                over.append(f"{lv} {r:.4f}（{delta:+,}）")
         if over:
             row["verdict"] = "warn"
             res["verdict"] = "warn"
-            res["warnings"].append(f"{metric} 缺失 head÷base {', '.join(over)} > {CACHE_WARN}")
+            res["warnings"].append(f"{metric} 缺失 head÷base {', '.join(over)} > {CACHE_WARN}，"
+                                   f"且增量 ≥ {CACHE_MIN_DELTA} 次或 ≥ 每 1 万 Ir 1 次")
         res["rows"].append(row)
     return res
 
