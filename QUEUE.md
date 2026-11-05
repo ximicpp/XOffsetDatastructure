@@ -1,6 +1,6 @@
 # Mac queue
 
-Updated 2026-11-05T07:12:43Z after 098-slgv9c: running 2026-11-05T07:12:38Z
+Updated 2026-11-05T09:02:10Z after 098-slgv9c: done 0 2026-11-05T09:02:05Z
 
 ```
 runner: pid 4651 (version 2)
@@ -102,5 +102,5 @@ free: 44 GB on /Volumes/XOffsetCS, 44 GB on /Users/ximi
 095-slgv9                                cancelled
 096-slgv9b                               done 0 2026-11-05T05:39:12Z
 097-stage331                             done 10 2026-11-05T07:12:20Z
-098-slgv9c                               running 2026-11-05T07:12:38Z
+098-slgv9c                               done 0 2026-11-05T09:02:05Z
 ```

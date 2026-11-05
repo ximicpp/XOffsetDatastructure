@@ -1,0 +1,173 @@
+== 2026-11-05T07:12:48Z 0. tools
+cmake version 4.4.4
+1.13.2
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+== 2026-11-05T07:12:48Z 1. source
+source: tree 0058bc940f06c338d2178127603deed1c0c1b609 (export of the next_cpp26 head 4d1ac7323979a8644ce232830726e30b2e0cb0f9, bench/slg ef74c8c809a61a1e31c2a0e87fd3e56b0823a7a3)
+/Volumes/XOffsetCS/perf-gate/src/slgv9c/bench/slg/MANIFEST: 27 files match
+/Volumes/XOffsetCS/perf-gate/src/slgv9c-d3/bench/slg/MANIFEST: 25 files match
+D3 source: tree 48a2878fc12879993b1ba9a1e3fb255c5dd4dee4 (export of 2616e721fafa7400a7bbcf0f7acdce5cb8d30d86)
+== 2026-11-05T07:12:52Z 2. build
+-- slg_bench formats:xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+slg_bench sha256 26905e0ef08bd02e0a57fcaddd24ccc22e89b24a51d811cfee72c1c911e1e055
+D3 slg_bench (2616e721fafa7400a7bbcf0f7acdce5cb8d30d86) sha256 ebd24e30d6ab84fc8cb9af4e901de84d7534750d5b7b7b942b5a6df5eb241309
+== 2026-11-05T07:13:48Z 3. verify
+default mode: cycle 2 xoffset      state=0439e37815b4d22a reports=2128166416352
+== 2026-11-05T07:14:27Z 4. timing
+2026-11-05T07:20:36Z process 1 app xoffset done: 1793863191..1793863236 (45 s) load 1.99
+2026-11-05T07:21:32Z process 1 app xoffset_trusted done: 1793863246..1793863292 (46 s) load 2.18
+2026-11-05T07:22:43Z process 1 app cereal done: 1793863302..1793863363 (61 s) load 1.74
+2026-11-05T07:23:43Z process 1 app protobuf done: 1793863373..1793863423 (50 s) load 2.06
+2026-11-05T07:24:43Z process 1 app flatbuffers done: 1793863433..1793863483 (50 s) load 2.58
+2026-11-05T07:25:40Z process 1 app flatbuffers_noverify done: 1793863493..1793863540 (47 s) load 2.26
+2026-11-05T07:26:25Z process 1 app zpp_bits done: 1793863551..1793863585 (34 s) load 2.22
+2026-11-05T07:27:26Z process 1 app cista done: 1793863596..1793863646 (50 s) load 2.12
+2026-11-05T07:28:16Z process 1 app cista_unchecked done: 1793863656..1793863696 (40 s) load 1.94
+joined process 1: xoffset=2163 xoffset_trusted=2163 cereal=2121 protobuf=2121 flatbuffers=2121 flatbuffers_noverify=2121 zpp_bits=2121 cista=2121 cista_unchecked=2121
+2026-11-05T07:29:45Z process 1 native done: 1793863726..1793863785 (59 s) load 1.54
+merged 19174 app lines + 901 native lines
+2026-11-05T07:31:07Z process 1 d3 done: 1793863815..1793863867 (52 s) load 1.56
+appended 819 D3 lines
+2026-11-05T07:32:24Z process 2 app xoffset done: 1793863898..1793863944 (46 s) load 1.65
+2026-11-05T07:33:20Z process 2 app xoffset_trusted done: 1793863954..1793864000 (46 s) load 1.98
+2026-11-05T07:34:32Z process 2 app cereal done: 1793864011..1793864072 (61 s) load 1.97
+2026-11-05T07:35:32Z process 2 app protobuf done: 1793864082..1793864132 (50 s) load 1.83
+2026-11-05T07:36:32Z process 2 app flatbuffers done: 1793864143..1793864192 (49 s) load 1.77
+2026-11-05T07:37:30Z process 2 app flatbuffers_noverify done: 1793864202..1793864250 (48 s) load 1.72
+2026-11-05T07:38:15Z process 2 app zpp_bits done: 1793864260..1793864295 (35 s) load 1.93
+2026-11-05T07:39:17Z process 2 app cista done: 1793864306..1793864357 (51 s) load 1.98
+2026-11-05T07:40:06Z process 2 app cista_unchecked done: 1793864367..1793864406 (39 s) load 1.69
+joined process 2: xoffset=2163 xoffset_trusted=2163 cereal=2121 protobuf=2121 flatbuffers=2121 flatbuffers_noverify=2121 zpp_bits=2121 cista=2121 cista_unchecked=2121
+2026-11-05T07:41:35Z process 2 native done: 1793864437..1793864495 (58 s) load 1.91
+merged 19174 app lines + 901 native lines
+2026-11-05T07:42:58Z process 2 d3 done: 1793864526..1793864578 (52 s) load 1.83
+appended 819 D3 lines
+2026-11-05T07:44:15Z process 3 app xoffset done: 1793864608..1793864655 (47 s) load 1.65
+2026-11-05T07:45:11Z process 3 app xoffset_trusted done: 1793864665..1793864711 (46 s) load 1.50
+2026-11-05T07:46:23Z process 3 app cereal done: 1793864721..1793864783 (62 s) load 1.53
+2026-11-05T07:47:23Z process 3 app protobuf done: 1793864793..1793864843 (50 s) load 1.56
+2026-11-05T07:48:23Z process 3 app flatbuffers done: 1793864853..1793864903 (50 s) load 1.55
+2026-11-05T07:49:21Z process 3 app flatbuffers_noverify done: 1793864913..1793864961 (48 s) load 1.56
+2026-11-05T07:50:06Z process 3 app zpp_bits done: 1793864971..1793865006 (35 s) load 1.51
+2026-11-05T07:51:07Z process 3 app cista done: 1793865016..1793865067 (51 s) load 1.68
+2026-11-05T07:51:57Z process 3 app cista_unchecked done: 1793865077..1793865117 (40 s) load 1.50
+joined process 3: xoffset=2163 xoffset_trusted=2163 cereal=2121 protobuf=2121 flatbuffers=2121 flatbuffers_noverify=2121 zpp_bits=2121 cista=2121 cista_unchecked=2121
+2026-11-05T07:53:26Z process 3 native done: 1793865148..1793865206 (58 s) load 1.69
+merged 19174 app lines + 901 native lines
+2026-11-05T07:54:49Z process 3 d3 done: 1793865236..1793865289 (53 s) load 1.87
+appended 819 D3 lines
+2026-11-05T07:56:06Z process 4 app xoffset done: 1793865319..1793865366 (47 s) load 1.70
+2026-11-05T07:57:02Z process 4 app xoffset_trusted done: 1793865376..1793865422 (46 s) load 1.82
+2026-11-05T07:58:14Z process 4 app cereal done: 1793865432..1793865494 (62 s) load 1.79
+2026-11-05T07:59:14Z process 4 app protobuf done: 1793865504..1793865554 (50 s) load 1.94
+2026-11-05T08:00:14Z process 4 app flatbuffers done: 1793865564..1793865614 (50 s) load 1.98
+2026-11-05T08:01:12Z process 4 app flatbuffers_noverify done: 1793865624..1793865672 (48 s) load 1.80
+2026-11-05T08:01:58Z process 4 app zpp_bits done: 1793865682..1793865718 (36 s) load 1.55
+2026-11-05T08:02:59Z process 4 app cista done: 1793865728..1793865779 (51 s) load 1.46
+2026-11-05T08:03:49Z process 4 app cista_unchecked done: 1793865789..1793865829 (40 s) load 1.62
+joined process 4: xoffset=2163 xoffset_trusted=2163 cereal=2121 protobuf=2121 flatbuffers=2121 flatbuffers_noverify=2121 zpp_bits=2121 cista=2121 cista_unchecked=2121
+2026-11-05T08:05:17Z process 4 native done: 1793865859..1793865917 (58 s) load 1.47
+merged 19174 app lines + 901 native lines
+2026-11-05T08:06:40Z process 4 d3 done: 1793865948..1793866000 (52 s) load 1.45
+appended 819 D3 lines
+2026-11-05T08:07:57Z process 5 app xoffset done: 1793866031..1793866077 (46 s) load 1.54
+2026-11-05T08:08:54Z process 5 app xoffset_trusted done: 1793866087..1793866134 (47 s) load 1.56
+2026-11-05T08:10:05Z process 5 app cereal done: 1793866144..1793866205 (61 s) load 1.85
+2026-11-05T08:11:06Z process 5 app protobuf done: 1793866215..1793866266 (51 s) load 1.99
+2026-11-05T08:12:06Z process 5 app flatbuffers done: 1793866276..1793866326 (50 s) load 1.79
+2026-11-05T08:13:04Z process 5 app flatbuffers_noverify done: 1793866336..1793866384 (48 s) load 1.85
+2026-11-05T08:13:49Z process 5 app zpp_bits done: 1793866394..1793866429 (35 s) load 1.61
+2026-11-05T08:14:50Z process 5 app cista done: 1793866439..1793866490 (51 s) load 1.67
+2026-11-05T08:15:40Z process 5 app cista_unchecked done: 1793866500..1793866540 (40 s) load 1.71
+joined process 5: xoffset=2163 xoffset_trusted=2163 cereal=2121 protobuf=2121 flatbuffers=2121 flatbuffers_noverify=2121 zpp_bits=2121 cista=2121 cista_unchecked=2121
+2026-11-05T08:17:09Z process 5 native done: 1793866570..1793866629 (59 s) load 1.74
+merged 19174 app lines + 901 native lines
+2026-11-05T08:18:31Z process 5 d3 done: 1793866659..1793866711 (52 s) load 1.86
+appended 819 D3 lines
+2026-11-05T08:19:48Z process 6 app xoffset done: 1793866742..1793866788 (46 s) load 1.64
+2026-11-05T08:20:45Z process 6 app xoffset_trusted done: 1793866798..1793866845 (47 s) load 2.01
+2026-11-05T08:21:56Z process 6 app cereal done: 1793866855..1793866916 (61 s) load 1.83
+2026-11-05T08:22:57Z process 6 app protobuf done: 1793866926..1793866977 (51 s) load 1.82
+2026-11-05T08:23:57Z process 6 app flatbuffers done: 1793866987..1793867037 (50 s) load 2.15
+2026-11-05T08:24:55Z process 6 app flatbuffers_noverify done: 1793867047..1793867095 (48 s) load 1.79
+2026-11-05T08:25:40Z process 6 app zpp_bits done: 1793867105..1793867140 (35 s) load 1.75
+2026-11-05T08:26:41Z process 6 app cista done: 1793867150..1793867201 (51 s) load 1.86
+2026-11-05T08:27:31Z process 6 app cista_unchecked done: 1793867211..1793867251 (40 s) load 1.93
+joined process 6: xoffset=2163 xoffset_trusted=2163 cereal=2121 protobuf=2121 flatbuffers=2121 flatbuffers_noverify=2121 zpp_bits=2121 cista=2121 cista_unchecked=2121
+2026-11-05T08:29:00Z process 6 native done: 1793867281..1793867340 (59 s) load 1.77
+merged 19174 app lines + 901 native lines
+2026-11-05T08:30:22Z process 6 d3 done: 1793867370..1793867422 (52 s) load 2.05
+appended 819 D3 lines
+2026-11-05T08:31:39Z process 7 app xoffset done: 1793867453..1793867499 (46 s) load 2.15
+2026-11-05T08:32:36Z process 7 app xoffset_trusted done: 1793867510..1793867556 (46 s) load 2.28
+2026-11-05T08:33:48Z process 7 app cereal done: 1793867566..1793867628 (62 s) load 2.09
+2026-11-05T08:34:48Z process 7 app protobuf done: 1793867638..1793867688 (50 s) load 1.88
+2026-11-05T08:35:48Z process 7 app flatbuffers done: 1793867698..1793867748 (50 s) load 1.75
+2026-11-05T08:36:46Z process 7 app flatbuffers_noverify done: 1793867758..1793867806 (48 s) load 1.67
+2026-11-05T08:37:31Z process 7 app zpp_bits done: 1793867816..1793867851 (35 s) load 1.60
+2026-11-05T08:38:32Z process 7 app cista done: 1793867861..1793867912 (51 s) load 1.85
+2026-11-05T08:39:22Z process 7 app cista_unchecked done: 1793867923..1793867962 (39 s) load 1.62
+joined process 7: xoffset=2163 xoffset_trusted=2163 cereal=2121 protobuf=2121 flatbuffers=2121 flatbuffers_noverify=2121 zpp_bits=2121 cista=2121 cista_unchecked=2121
+2026-11-05T08:40:51Z process 7 native done: 1793867993..1793868051 (58 s) load 2.27
+merged 19174 app lines + 901 native lines
+2026-11-05T08:42:14Z process 7 d3 done: 1793868082..1793868134 (52 s) load 1.73
+appended 819 D3 lines
+2026-11-05T08:43:31Z process 8 app xoffset done: 1793868164..1793868211 (47 s) load 1.73
+2026-11-05T08:44:27Z process 8 app xoffset_trusted done: 1793868221..1793868267 (46 s) load 2.05
+2026-11-05T08:45:39Z process 8 app cereal done: 1793868278..1793868339 (61 s) load 1.68
+2026-11-05T08:46:40Z process 8 app protobuf done: 1793868349..1793868400 (51 s) load 1.54
+2026-11-05T08:47:39Z process 8 app flatbuffers done: 1793868410..1793868459 (49 s) load 1.66
+2026-11-05T08:48:38Z process 8 app flatbuffers_noverify done: 1793868470..1793868518 (48 s) load 1.79
+2026-11-05T08:49:23Z process 8 app zpp_bits done: 1793868528..1793868563 (35 s) load 1.83
+2026-11-05T08:50:24Z process 8 app cista done: 1793868573..1793868624 (51 s) load 1.86
+2026-11-05T08:51:14Z process 8 app cista_unchecked done: 1793868634..1793868674 (40 s) load 1.89
+joined process 8: xoffset=2163 xoffset_trusted=2163 cereal=2121 protobuf=2121 flatbuffers=2121 flatbuffers_noverify=2121 zpp_bits=2121 cista=2121 cista_unchecked=2121
+2026-11-05T08:52:42Z process 8 native done: 1793868704..1793868762 (58 s) load 1.78
+merged 19174 app lines + 901 native lines
+2026-11-05T08:54:05Z process 8 d3 done: 1793868793..1793868845 (52 s) load 1.64
+appended 819 D3 lines
+2026-11-05T09:02:02Z control (nine formats, one process) done: 1793868876..1793869322 (446 s) load 2.23
+screen watcher: 108 calls (dark.log)
+== 2026-11-05T09:02:02Z 5. pool
+# SLG demo cases, scoring V3 (server / egress / client warm)
+
+8 processes. Ratios are XOffset ÷ rival, geometric mean / one-sided 95% upper bound (Bonferroni over each table). Below 1: XOffset faster or smaller. Native rows (XOffset's own delta) compare with the rival's application-level case. Rivals in their no-check mode where they have one (信任档). XOffset: 信任档 xoffset_trusted (XReceiver admit, #228) in the application-level rows and class 1; native and D3 rows: 完整校验 (delta trust tier comes with P2); xoffset with the full check is report only. All messages are compressed (zstd-3 per message) but compression is not in the compared time (susu 00:59Z 11-05): main columns = server *.send, bytes after zstd, client receive + merge.
+
+## 第 1 类主表（XOffset 信任档 admit）：两端合计（迁移 / 存储，每周期按阶段前缀求和） ÷ rival
+
+| 用例 | zpp_bits | cista_unchecked | flatbuffers_noverify | cereal | protobuf |
+| --- | --- | --- | --- | --- | --- |
+| 1 场景↔战斗 | 0.408 / 0.417 | 0.268 / 0.277 | 0.200 / 0.207 | 0.110 / 0.113 | 0.042 / 0.043 |
+| 1 场景↔场景 | 0.310 / 0.317 | 0.383 / 0.390 | 0.182 / 0.186 | 0.091 / 0.092 | 0.038 / 0.039 |
+| 1 场景↔存储（整份） | 0.199 / 0.203 | 0.356 / 0.364 | 0.179 / 0.183 | 0.057 / 0.058 | 0.030 / 0.030 |
+| 1 场景↔存储（只存脏模块） | 0.284 / 0.287 | 0.297 / 0.301 | 0.320 / 0.324 | 0.119 / 0.121 | 0.065 / 0.066 |
+| 1 存储（XOffset 原生增量，对对手 SD） | 1.956 / 2.056 | 2.047 / 2.154 | 2.207 / 2.316 | 0.821 / 0.858 | 0.451 / 0.470 |
+
+## 只报：第 1 类 ÷ 校验版对手
+
+| 用例 | cista | flatbuffers |
+| --- | --- | --- |
+| 1 场景↔战斗 | 0.131 / 0.134 | 0.184 / 0.188 |
+| 1 场景↔场景 | 0.142 / 0.145 | 0.170 / 0.173 |
+| 1 场景↔存储（整份） | 0.084 / 0.085 | 0.156 / 0.159 |
+| 1 场景↔存储（只存脏模块） | 0.163 / 0.165 | 0.299 / 0.301 |
+| 1 存储（XOffset 原生增量，对对手 SD） | 1.126 / 1.171 | 2.059 / 2.148 |
+
+## 只报：第 1 类，XOffset 完整校验 ÷ rival
+
+| 用例 | zpp_bits | cista_unchecked | flatbuffers_noverify | cereal | protobuf |
+| --- | --- | --- | --- | --- | --- |
+| 1 场景↔战斗 | 0.579 / 0.593 | 0.381 / 0.393 | 0.284 / 0.293 | 0.156 / 0.161 | 0.059 / 0.061 |
+| 1 场景↔场景 | 0.468 / 0.478 | 0.578 / 0.588 | 0.274 / 0.280 | 0.137 / 0.139 | 0.058 / 0.059 |
+| 1 场景↔存储（整份） | 0.392 / 0.398 | 0.704 / 0.713 | 0.353 / 0.357 | 0.112 / 0.114 | 0.059 / 0.060 |
+| 1 场景↔存储（只存脏模块） | 0.348 / 0.353 | 0.364 / 0.368 | 0.393 / 0.399 | 0.146 / 0.148 | 0.080 / 0.082 |
+| 1 存储（XOffset 原生增量，对对手 SD） | 1.956 / 2.056 | 2.047 / 2.154 | 2.207 / 2.316 | 0.821 / 0.858 | 0.451 / 0.470 |
+
+## 主列：服务端每条成本（*.send，不含压缩） ÷ rival
+
+| 用例 | zpp_bits | cista_unchecked | flatbuffers_noverify | cereal | protobuf |
+| --- | --- | --- | --- | --- | --- |
+| 2 登录全量 | 0.397 / 0.409 | 0.201 / 0.207 | 0.167 / 0.172 | 0.094 / 0.097 | 0.041 / 0.042 |
+| 2 浏览视口全量 | 0.447 / 0.454 | 0.271 / 0.276 | 0.209 / 0.212 | 0.136 / 0.137 | 0.183 / 0.186 |
+== 2026-11-05T09:02:03Z finish rc=0
+result tarball: /Users/ximi/workspace/xo-queue/queue/098-slgv9c/out/slgv9c_result.tar.gz sha256 1ec1889f9dcb460a43e808efc3156b88583650abcffb0df7b154f84366000672
