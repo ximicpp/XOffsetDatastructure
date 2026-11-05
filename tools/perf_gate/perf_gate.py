@@ -358,8 +358,10 @@ def cache_events(cg_text, collected):
     """Event name -> count, from the `events:` line of a callgrind out file and the log's Collected line."""
     names = next((l.split(":", 1)[1].split() for l in cg_text.splitlines() if l.startswith("events:")), [])
     counts = [int(x) for x in collected.split()]
-    if not names or len(names) != len(counts):
+    # valgrind drops trailing zero counts from the Collected line (a phase with no LL misses ends early)
+    if not names or not counts or len(counts) > len(names):
         raise RuntimeError(f"cache-sim: events {names} do not match the collected counts {counts}")
+    counts += [0] * (len(names) - len(counts))
     ev = dict(zip(names, counts))
     missing = [e for pair in CACHE_EVENTS.values() for e in pair if e not in ev]
     if missing:
