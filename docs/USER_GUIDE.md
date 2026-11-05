@@ -1,4 +1,4 @@
-# XOffsetDatastructure 用户指南（3.3.1，wire 格式 2.1）
+# XOffsetDatastructure 用户指南（3.4.0，wire 格式 2.1）
 
 本文面向使用者，说明怎么定义类型、构建、修改、保存、加载，以及必须遵守的约束。
 部署要求见 [DEPLOYMENT.md](DEPLOYMENT.md)，格式细节见 [V2_FORMAT.md](V2_FORMAT.md)，输入与兼容边界见
