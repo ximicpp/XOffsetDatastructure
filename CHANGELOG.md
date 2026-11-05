@@ -22,13 +22,23 @@ server-to-client use is not announced.
   there is PR #223, for 3.3.1 or 3.4.
 - Speed against 3.2.1 on the Mac (release checkpoint REL330, bench/slg M,
   XOffset relative to the other formats, lower is faster): A 0.959, B 0.922,
-  C 0.959; docs/PERFORMANCE.md section 5. A.req_decode, 2.4% slower in the
-  gate that merged delta sync, is 0.997 of 3.2.1. Two report-only stages of
-  the demo cases are slower, A.apply 1.087 (every format on the same full
-  path) and UP.apply 1.053 (XOffset sending deltas). Both look like code
-  placement: the same step built with functions aligned to 64 bytes gives
-  A.apply 0.971. D is 1.007 of 3.2.1 (interval 0.976 to 1.039), report
-  only: D is judged against FlatBuffers, 0.949 (bound 0.960), which passes.
+  C 0.959; docs/PERFORMANCE.md section 5. A.req_decode is 1.014 of 3.2.1
+  (interval 1.001 to 1.027, +0.8 µs per cycle), suspected code placement:
+  the delta sync step, 1.024 in the gate that merged it, gives 1.005
+  (interval 0.998 to 1.013) when built with functions aligned to 64 bytes.
+  In the report-only demo cases sending is faster and the receivers' apply
+  slower (UP.send 0.864, UP.apply 1.053, UC.apply 1.073, A.apply 1.038), so
+  a whole delivery is 2.0% (UP) and 1.1% (UC) slower; also suspected
+  placement, since the aligned build gives A.apply 0.971 and the gated runs
+  A.apply 0.928. D is 1.007 of 3.2.1 (interval 0.976 to 1.039), report only:
+  D is judged against FlatBuffers, 0.949 (bound 0.960), which passes.
+  The demo delivery totals are followed up in 3.4.
+- In the relocation tax micro-benchmarks (G9R) four XOffset cases are about
+  2.5% slower than in 3.2.1, in the default and in the aligned build:
+  map.find fresh and reused (1.028), map.insert.reused (1.023),
+  set.insert.reused (1.022). G9 still holds (17 of 19, as in 3.2.x). The
+  cause is being looked for; #214 (append after the last key) is a
+  suspect, not verified.
 - Planned for 3.4: buffers that evict each other from the cache when many
   are read in turn (the HFT demo's 64 order books; placing each payload at
   a different cache colour), the root cache refill after a move (#223) if

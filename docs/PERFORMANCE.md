@@ -169,8 +169,8 @@ SLG M 规模，xoffset÷FlatBuffers：A 0.305、B 0.179、C 0.252、D 0.858。�
 
 发布检查点 REL330：`next_cpp26` `059b6a5f`（候选 C）对 `v3.2.1`（`23c6e206`，库与 3.2.0 的检查点相同），
 2026-11-04，同时作为阶段复核（备好了 #213、#191、#219、#214 的二分点，判定通过，没有用到）。所有点都用
-C 的 `bench/slg`（冻结树 `23e86624`）编译。Mac 这时是 macOS 27.2。结果在 project files 的
-`perf-gate/mac/2026-11-04-rel330-059b6a5/RESULT.md`（原始数据在 `mac-results` 分支的 `087-rel330`）。
+C 的 `bench/slg`（冻结树 `23e86624`）编译。Mac 这时是 macOS 27.2。判定书在 project files 的
+`perf-gate/mac/2026-11-04-rel330-059b6a5/VERDICT.md`（原始数据在 `mac-results` 分支的 `087-rel330`）。
 
 ### 对 3.2.1
 
@@ -181,9 +181,11 @@ C 的 `bench/slg`（冻结树 `23e86624`）编译。Mac 这时是 macOS 27.2。�
 | SLG A / B / C（六家 GATED 口径，12+12 个进程），最大上界 | 0.975 / 0.931 / 0.981，0.9813 |
 | 正式 harness read_sum / mutate / emit_after（两批合并） | 1.001 / 0.974 / 0.977，最大上界 1.010 |
 
-只报的阶段（对 3.2.1）：demo 场景里六家走同一条完整路径时 A.req_decode 0.997、A.res_decode 0.946、
-A.apply 1.087；XOffset 发增量时 UP.send 0.864、UP.apply 1.053。A.apply 和 UP.apply 疑似代码摆放：
-#191 这一步在对齐构建（`-falign-functions=64`）下 A.apply 0.971、A.req_decode 1.005。
+单列的 A 阶段（L2 SLG，3.3.0 ÷ 3.2.1，µs/周期）：A.req_decode 1.014 [1.001, 1.027]（+0.8 µs）、
+A.res_decode 0.967、A.apply 0.928、A.req_encode 0.997。A.req_decode 疑似代码摆放：#191 这一步合入时的门禁
+是 1.024，在对齐构建（`-falign-functions=64`）下是 1.005 [0.998, 1.013]。demo 场景（只报）发送变快、
+接收方的 apply 变慢：UP.send 0.864、UP.apply 1.053、UC.apply 1.073、A.apply 1.038，每次交付的 send + recv
++ apply 合计 UP +2.0%、UC +1.1%；对齐构建下 A.apply 0.971，同样疑似摆放。
 
 ### D 对 FlatBuffers（GATE_D）和 G8
 
@@ -193,6 +195,8 @@ A.apply 1.087；XOffset 发增量时 UP.send 0.864、UP.apply 1.053。A.apply �
 ### 重定位税（G9R3，同批 `v3.2.1` 对 C）：19 项里 17 项满足
 
 没过的两项和 3.2.x 相同：vec.push_back、set.erase.fresh（`perf-gate/mac/2026-11-04-rel330-059b6a5/g9r/`）。
+XOffset 自身有四项比 3.2.1 慢约 2.5%，默认和对齐构建都一样：map.find.fresh 1.028、map.find.reused 1.028、
+map.insert.reused 1.023、set.insert.reused 1.022（G9 仍满足）；原因在查，可能和 #214 有关，未验证。
 
 ### 客户端
 
