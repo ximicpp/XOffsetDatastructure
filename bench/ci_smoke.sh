@@ -2,7 +2,8 @@
 # Smoke test of the frozen benchmark trees (bench/slg, bench/formal, bench/reloc) with one
 # compiler. Runs inside the compiler's container from the repository root.
 #   bench/ci_smoke.sh <c++ compiler> <cereal include dir> <valgrind include parent> <out dir>
-# Checks: MANIFESTs; slg_bench builds (default and SLG_IR_COUNT) and
+# Checks: MANIFESTs; the SLG held-view index differential test passes; slg_bench
+# builds (default and SLG_IR_COUNT) and
 # --mode verify --scale S agrees across formats under both protocols; reloc_bench
 # builds (default and RELOC_IR_COUNT) and --mode verify agrees across sides; the formal
 # driver builds (default and SC_IR_COUNT), its contracts pass, fixtures S and M
@@ -21,7 +22,8 @@ python3 bench/check_manifest.py
 echo "== slg_bench"
 cmake -S bench/slg -B "$OUT/slg" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER="$CXX" \
   -DSLG_WITH_XOFFSET=ON -DCEREAL_INCLUDE="$CEREAL"
-cmake --build "$OUT/slg" --target slg_bench --parallel "$JOBS"
+cmake --build "$OUT/slg" --target slg_bench flat_held_index_test --parallel "$JOBS"
+"$OUT/slg/flat_held_index_test"
 "$OUT/slg/slg_bench" --mode verify --scale S --formats xoffset,cereal
 SLG_REUSE=1 "$OUT/slg/slg_bench" --mode verify --scale S --formats xoffset,cereal
 cmake -S bench/slg -B "$OUT/slg-ir" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER="$CXX" \
