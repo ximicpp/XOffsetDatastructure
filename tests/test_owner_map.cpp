@@ -51,18 +51,21 @@ void require_maps(const char* base, std::size_t bytes, const char* what) {
 
 void vm_payload() {
     auto b = xo::XBuffer::create<OwnerRoot>(1u << 20,
-        xo::XBuffer::maximum_capacity(24u << 20).with_storage(xo::XStorage::Pinned));
+        xo::XBuffer::maximum_capacity((24u << 20) - xo::detail::SlotGeometry::header_bytes).with_storage(xo::XStorage::Pinned));
     need(b.storage_kind() == xo::XStorageKind::Vm, "fixture is not VM storage");
     auto* base = base_of(b);
-    // The span is the reservation rounded up to 4 MiB; the payload is aligned
-    // to the span's next power of two (here 32 MiB), never less than 4 MiB.
-    const auto span = (b.reserved_bytes() + OwnerMap::granule_bytes - 1) & ~(OwnerMap::granule_bytes - 1);
+    // The region (64-byte host header, then the payload) spans the
+    // reservation plus the header rounded up to 4 MiB; it is aligned to the
+    // span's next power of two (here 32 MiB), never less than 4 MiB, and the
+    // payload starts 64 bytes past that boundary, as in a slot.
+    constexpr std::size_t header = xo::detail::SlotGeometry::header_bytes;
+    const auto span = (b.reserved_bytes() + header + OwnerMap::granule_bytes - 1) & ~(OwnerMap::granule_bytes - 1);
     const auto align = std::bit_ceil(span);
     need(span == (24u << 20) && align == (32u << 20), "VM fixture span is not 24 MiB");
-    need(reinterpret_cast<std::uintptr_t>(base) % align == 0, "VM payload not aligned to 2^k");
-    require_maps(base, span, "VM payload granules");
+    need(reinterpret_cast<std::uintptr_t>(base) % align == header, "VM region not aligned to 2^k");
+    require_maps(base, span - header, "VM payload granules");
     // The granules past the span, inside the alignment, are not this payload's.
-    need(OwnerMap::payload_of(base + span) == nullptr, "granule past the VM span is mapped");
+    need(OwnerMap::payload_of(base - header + span) == nullptr, "granule past the VM span is mapped");
     auto& r = b.root<OwnerRoot>();
     need(r.name.binding().segment == b.arena() && r.values.binding().segment == b.arena(),
          "root heads do not bind to their payload");

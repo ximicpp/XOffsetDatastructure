@@ -7,7 +7,7 @@
 // default), and is carved on demand, so only touched pages become resident.
 // A slot is aligned to its own size and starts with a 64-byte header whose
 // last pointer-sized word is the owner word: it sits at payload - 8, exactly
-// where a VM owner keeps it in its host page, so owner_from_arena and the
+// where a VM owner keeps it in its region's host header, so owner_from_arena and the
 // allocation fast paths do not change. The payload starts at slot + 64.
 //
 // Each thread keeps a bounded free list per class; a global list per class,

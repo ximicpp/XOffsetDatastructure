@@ -261,7 +261,9 @@ void transfers_and_deterministic_reused_payload_base() {
     need(owner_of(ref) == &first, "owner slot does not name the final owner");
     auto* p = fd::allocate_dynamic_bytes(ref, 24, 8); fd::retire_dynamic_bytes(ref, p, 24);
     need(first.free_block_count() == 1, "retirement reached a stale owner");
-    xo::XBufferPool pool({1, 4u << 20, 4u << 20});
+    // Budgets above 4 MiB: a 4 MiB maximum reserves 4 MiB plus the rest of the
+    // host header's page.
+    xo::XBufferPool pool({1, 8u << 20, 8u << 20});
     const auto cap = policy().with_pool(pool);
     auto reused = xo::XBuffer::create<OwnerRoot>(4096, cap);
     const auto address = reused.data(); need(owner_of(binding(reused)) == &reused, "pooled owner not published");
@@ -444,7 +446,9 @@ void delete_callbacks_observe_complete_move() {
         xo::XBuffer to;
         begin_capture(sizeof(dt::VirtualMemoryStorage));
         {
-            xo::XBufferPool pool({1, 4u << 20, 4u << 20});
+            // Budgets above 4 MiB: a 4 MiB maximum reserves 4 MiB plus the rest of the
+    // host header's page.
+    xo::XBufferPool pool({1, 8u << 20, 8u << 20});
             to = xo::XBuffer::create<OtherOwnerRoot>(4096, policy().with_pool(pool));
         }
         need(!host::capture_next, "pool's reserved owner-vector not captured");

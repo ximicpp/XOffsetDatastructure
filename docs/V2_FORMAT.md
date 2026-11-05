@@ -192,9 +192,12 @@ the payload.
   published.
 
 **Owner lookup.** A head's payload is found from its address (section 2); the
-current `XBufferCore*` is stored in a host page placed just before the payload,
-so allocation and retirement need no registry or thread-local lookup. That page
-is never part of the payload.
+current `XBufferCore*` is stored in the last word of a 64-byte host header just
+before the payload (a slot's header, or the first 64 bytes of a VM region, on
+the payload's first page), so allocation and retirement need no registry or
+thread-local lookup. The header is never part of the payload. A registry record
+only says whether its payload is still owned; the owner it resolves to is the
+host word, so `swap` writes no record.
 
 ## 5. Validation
 
