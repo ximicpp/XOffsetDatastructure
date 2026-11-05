@@ -116,9 +116,12 @@ constexpr std::size_t slot_log2(std::size_t value) noexcept {
 
 // V2.1 owner lookup: the payload base of an address (a head names no owner).
 // One byte per 4 MiB granule of a 48-bit address space. 0: no XOffset region.
-// Otherwise bits 0..5 are k, the region's alignment exponent (the region, or
-// the slot, starts at address & ~(2^k - 1)), and bit 7 marks a slot, whose
-// payload starts 64 bytes in. Slot chunks set their entry once; a VM payload
+// Otherwise bit 7 is set, bits 0..5 are k, the region's alignment exponent
+// (the region, or the slot, starts at address & ~(2^k - 1)), and the payload
+// starts 64 bytes in, after the host header. Bit 6 marks a tail granule: a VM
+// region of 2^k + 4 MiB (a maximum that is a multiple of 4 MiB, plus the
+// header) keeps its 2^k alignment, and its last granule, past the 2^k
+// boundary, resolves one granule back. Slot chunks set their entry once; a VM payload
 // is aligned to 2^k and sets the entries of its granules while it is mapped.
 // Entries change only while no head lives in the region. One granule's entry
 // can still be written by two threads: one clears it and unmaps the range,
@@ -129,7 +132,14 @@ struct OwnerMap {
     static constexpr std::size_t granule_bytes = std::size_t(1) << granule_shift;
     static constexpr std::size_t address_bits = 48;
     static constexpr std::size_t entries = std::size_t(1) << (address_bits - granule_shift);
-    static constexpr std::uint8_t slot_bit = 0x80;
+    static constexpr std::uint8_t slot_bit = 0x80;   // a region: payload 64 bytes in
+    static constexpr std::uint8_t tail_bit = 0x40;   // granule past the region's 2^k
+    // The payload base for a nonzero entry `e` read at address `a`.
+    XOFFSET_DETAIL_OWNER_INLINE static std::uintptr_t decode(std::uintptr_t a, std::uint8_t e) noexcept {
+        // (e & tail_bit) << 16 is one granule (2^22) for a tail entry, else 0.
+        return ((a - (std::uintptr_t(e & tail_bit) << 16)) & (~std::uintptr_t(0) << (e & 63u))) +
+               ((e & slot_bit) >> 1);
+    }
 
     static std::size_t index(std::uintptr_t address) noexcept {
         return (address >> granule_shift) & (entries - 1);
@@ -246,8 +256,7 @@ XOFFSET_DETAIL_OWNER_INLINE char* OwnerMap::payload_of(const void* p) noexcept {
     const auto a = reinterpret_cast<std::uintptr_t>(p);
     const std::uint8_t e = entry(a);
     if (e == 0) return nullptr;
-    const auto base = a & (~std::uintptr_t(0) << (e & 63u));
-    return reinterpret_cast<char*>(base + ((e & slot_bit) >> 1));
+    return reinterpret_cast<char*>(decode(a, e));
 }
 
 XOFFSET_DETAIL_OWNER_INLINE char* OwnerMap::same_payload(const void* a, const void* b) noexcept {
@@ -255,8 +264,7 @@ XOFFSET_DETAIL_OWNER_INLINE char* OwnerMap::same_payload(const void* a, const vo
     const auto ub = reinterpret_cast<std::uintptr_t>(b);
     const std::uint8_t e = entry(ua);
     if (e == 0) return nullptr;
-    char* const pa = reinterpret_cast<char*>(
-        (ua & (~std::uintptr_t(0) << (e & 63u))) + ((e & slot_bit) >> 1));
+    char* const pa = reinterpret_cast<char*>(decode(ua, e));
     if (index(ua) == index(ub)) return ((ua ^ ub) >> (e & 63u)) == 0 ? pa : nullptr;
     return payload_of(b) == pa ? pa : nullptr;
 }
