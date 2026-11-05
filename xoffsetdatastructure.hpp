@@ -363,6 +363,9 @@ namespace XOffsetDatastructure {
         static constexpr std::size_t GROWTH_HEADROOM = 16;
         static constexpr std::size_t MIN_RESERVE = 64ULL * 1024;
         static constexpr std::size_t MAX_RESERVE = 256ULL * 1024 * 1024;
+        // The largest payload and maximum capacity: offsets and relative
+        // heads inside a payload are 32-bit. Creating or loading a buffer
+        // with a larger maximum fails at once (capacity_exceeded).
         static constexpr std::size_t MAX_PAYLOAD = 0x7ffffff8u;
 
 #ifdef XOFFSET_DEFAULT_MAXIMUM_CAPACITY
@@ -520,7 +523,8 @@ namespace XOffsetDatastructure {
 
         // Numeric reservation parameters are legacy minimum hints, not hard limits.
         static size_type capacity_from_hint(size_type size, size_type hint = 0) {
-            if (size > MAX_PAYLOAD || hint > MAX_PAYLOAD) XOFFSET_THROW(XBadAlloc());
+            if (size > MAX_PAYLOAD || hint > MAX_PAYLOAD)
+                XOFFSET_THROW(XBadAlloc(XErrc::capacity_exceeded, detail::payload_limit_message));
             return std::max({size, hint, DEFAULT_MAXIMUM_CAPACITY});
         }
 
@@ -1797,7 +1801,7 @@ namespace XOffsetDatastructure {
         detail::vstatus init_fresh(size_type size, size_type max_reserved, const XBufferPool& pool = {},
                                    XStorage request = XStorage::Auto) {
             if (size > MAX_PAYLOAD || max_reserved > MAX_PAYLOAD)
-                XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, detail::arena_failure_message);
+                XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, detail::payload_limit_message);
             size = std::max(size, min_payload_size());
             if (size > max_reserved) XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, detail::arena_failure_message);
             StoragePlan plan;
@@ -1873,7 +1877,7 @@ namespace XOffsetDatastructure {
         template <typename Make>
         detail::vstatus init_from_storage(const char* data, size_type size, size_type max_reserved, Make&& make) {
             if (size > MAX_PAYLOAD || max_reserved > MAX_PAYLOAD)
-                XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, detail::arena_failure_message);
+                XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, detail::payload_limit_message);
             if (!data || size < sizeof(arena_header)) {
                 XOFFSET_VFAIL(XException, XErrc::invalid_payload_header, "XBufferCore: payload too small");
             }
@@ -7908,6 +7912,11 @@ namespace XOffsetDatastructure {
     }
 
     // XHandle<T> -- Epoch-cached handle. O(1) deref when address is stable.
+    // Each dereference compares the cached epoch with the buffer's (two loads
+    // and a compare, inlined); the re-resolution after a change is out of
+    // line. In a loop over many events, resolve once per packet or batch
+    // (`T& r = *handle;`) and use the reference: nothing in the loop body may
+    // then move or reload the buffer.
     // ========================================================================
     template <typename T>
     class XHandle {
@@ -7939,10 +7948,16 @@ namespace XOffsetDatastructure {
         }
 
     private:
-        T* resolve() const {
+        // A cached pointer was resolved through buffer_, which is then set:
+        // buffer_ is null only together with cached_ptr_.
+        XOFFSET_DETAIL_MOVE_INLINE T* resolve() const {
+            if (cached_ptr_ && cached_epoch_ == buffer_->epoch()) [[likely]] return cached_ptr_;
+            return refresh();
+        }
+        // First use, or the buffer changed (epoch) since the last resolution.
+        XOFFSET_DETAIL_MOVE_COLD T* refresh() const {
             if (!buffer_) return nullptr;
-            uint64_t current_epoch = buffer_->epoch();
-            if (cached_ptr_ && cached_epoch_ == current_epoch) return cached_ptr_;
+            const uint64_t current_epoch = buffer_->epoch();
             cached_ptr_ = resolver_ ? resolver_(*buffer_)
                 : (buffer_->root_type_known() && !buffer_->template root_type_matches<T>()
                     ? nullptr : detail::find_root<T>(*buffer_));

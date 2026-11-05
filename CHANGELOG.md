@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- A maximum capacity above the 2 GiB payload limit (`XBufferCore::MAX_PAYLOAD`,
+  2 GiB - 8 bytes) now fails at create with `capacity_exceeded` and a message
+  that names the limit, instead of the generic "XOffset arena allocation
+  failed"; docs/USER_GUIDE.md states the limit. Regression cases (2 GiB,
+  4 GiB, MAX_PAYLOAD + 1, and MAX_PAYLOAD accepted) in test_error_paths.
 - `root<T>()` fills its cache when it takes the checked path, so an `XBuffer`
   that was moved (into a `std::vector`, by a swap) pays the checks once
   instead of on every call. The cache hit is now inlined (one compare and one

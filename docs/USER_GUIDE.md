@@ -66,6 +66,9 @@ XOFFSET_RECORD_DERIVED(Player, (Entity), level, items)   // 基类按声明顺�
   所有基类和成员的析构（或赋值）都平凡、记录本身却不平凡，就是用户提供的，判为不普通；有成员
   本身不平凡（例如 `XString`）时查不出来，仍是承诺。C++26 构建会完整检查。
   不能作这个承诺的记录用 `XOFFSET_RECORD_DERIVED(T, (), 成员...)`：只给字段表，不声明普通记录。
+  **注意：这样写的记录不走 SHIFT。** 它作为 `XVector` 元素时，中间插入、删除和扩容逐个元素
+  搬移（订单簿实测：每插入一个价位约 1,000 条指令，SHIFT 是一次 memmove）。没有用户声明的特殊成员函数的记录，写 `XOFFSET_RECORD`（或另加
+  `XOFFSET_ORDINARY_RECORDS(T)`），不要为了“不带基类”而用 `XOFFSET_RECORD_DERIVED(T, (), ...)`。
 - wire 里的枚举必须有固定底层类型（`enum class`，或 `enum E : std::uint8_t {...}`），否则编译报错
   并给出改法（第 2.2 节）。
 - `XString`、`XVector`、`XSet`、`XMap`、`XKeyValue` 和 `std::array` 由库自带字段表。
@@ -107,6 +110,9 @@ p.scores.assign(v.begin(), v.end());   // 连续且平凡可复制：一次精�
 
 - 默认增长策略是 `XGrowPolicy::Explicit`，空间不够时抛 `XBadAlloc`；需要自动增长时
   显式选择 `XGrowPolicy::Automatic`。`maximum_capacity` 始终是硬上限。
+- 一个 payload 最大 2 GiB - 8 字节（`XBufferCore::MAX_PAYLOAD`，payload 内的偏移是 32 位）。
+  `maximum_capacity` 超过它时，建立 buffer 当场失败：`XBadAlloc`，错误码
+  `capacity_exceeded`，消息写明这个上限。更大的数据请分到多个 buffer。
 - 自动增长通常把逻辑长度翻倍；`reload_verified` 之后，在以前用过的范围内
   每次只增长 4 KiB（重新露出的字节要清零，按需清零更省），越过以前的最高位置后恢复
   翻倍。逻辑长度只影响 `get_size()`，不影响 wire。
@@ -214,6 +220,10 @@ marches.stable_erase_if([](const March& m) { return m.eta <= 0; });
 | `XBuffer` 的移动构造、移动赋值、`swap` | 不变，存储随对象转移 | 仍然有效，但现在属于另一个对象 | 两边都加一 |
 | 析构 | 释放 | 全部失效 | 不涉及 |
 
+- `XHandle` 每次解引用比较一次 epoch（两次读加一次比较，内联）；epoch 变了才重新解析
+  （不内联）。处理一个包里的多条事件时，**每个包解析一次**：`auto& book = *handle;`，
+  包内都用这个引用（包内不能有移动、重载 buffer 的操作）。逐事件解引用在订单簿测试里
+  每个事件多约 7 条指令，还会妨碍编译器内联调用方的循环。
 - `XHandle` 绑在 buffer 对象上，不跟着 payload 走：移动之后原对象为空，绑在它上面的
   `XHandle` 解析为空指针；`swap` 之后解析到这个对象现在的内容。要跟着数据走，在新
   对象上重新建 `XHandle`。
