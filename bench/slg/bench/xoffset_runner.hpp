@@ -608,6 +608,8 @@ public:
             std::vector<int32_t> ufree, mfree;
             int32_t usize = 0, msize = 0;
             std::string key;
+            std::vector<int32_t> tring;   // browse (NB): the tile each ring slot holds (ty * kTiles + tx), -1 none
+            bool tring_empty = true;      // browse: no tile placed yet (n_bview)
         };
         std::vector<NView> nb;
         // This delivery's plan (n_plan, then n_update of the same client): one
@@ -649,6 +651,65 @@ public:
             v.tiles.resize(std::size_t(sp.cols * sp.rows));
             for (int32_t ty = 0; ty < sp.rows; ++ty)
                 for (int32_t tx = 0; tx < sp.cols; ++tx) copy_vtile(v.tiles[std::size_t(ty * sp.cols + tx)], w, sp.tx0 + tx, sp.ty0 + ty);
+        }
+        // Browse (NB, report only): the view moves, so its tiles live in a ring of
+        // kRingC x kRingR slots, tile (tx, ty) at slot (tx mod kRingC, ty mod kRingR):
+        // a viewport covers at most 17 x 13 tiles, so the tiles of one span never
+        // share a slot, and a tile that stays in view keeps its slot while the view
+        // pans. A slot outside the span is zero (adds nothing to query_view).
+        static constexpr int32_t kRingC = kViewW / kTile + 1, kRingR = kViewH / kTile + 1;
+        void n_bview(int c) {
+            auto& n = nb[std::size_t(c)];
+            n.buf.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, XBuffer::maximum_capacity(XBuffer::SLOT_MAX).with_growth(XOffsetDatastructure::XGrowPolicy::Automatic)));
+            auto& v = n.buf->template root<xm::ViewSnapshot>();
+            v.units.reserve(std::size_t(nucap));
+            v.marches.reserve(std::size_t(nmcap));
+            v.tiles.resize(std::size_t(kRingC * kRingR));
+            n.tring.assign(std::size_t(kRingC * kRingR), -1);
+            n.tring_empty = true;
+        }
+        // The view's new rectangle and the tiles under it: a tile that entered the
+        // span is copied into its slot, a slot whose tile left (and that no
+        // entering tile took) is cleared, a tile that stayed and whose owner changed
+        // this tick (changed: the tracker's p.tiles, untimed as for N*) gets its owner;
+        // each written slot is touched. Only the span's difference is visited: a pan
+        // of at most 48 px moves two columns and two rows.
+        static std::size_t ring_slot(int32_t tx, int32_t ty) { return std::size_t((ty % kRingR) * kRingC + tx % kRingC); }
+        void n_move(int c, const MapWorld& w, const ViewRect& r, const std::vector<int32_t>& changed) {
+            auto& n = nb[std::size_t(c)];
+            auto& v = n.buf->template root<xm::ViewSnapshot>();
+            XBuffer& b = *n.buf;
+            const TileSpan os = n.tring_empty ? TileSpan{0, 0, 0, 0} : tile_span(v.x0, v.y0, v.x1, v.y1);
+            const TileSpan ns = tile_span(r.x0, r.y0, r.x1, r.y1);
+            b.touch_set(v.x0, r.x0); b.touch_set(v.y0, r.y0); b.touch_set(v.x1, r.x1); b.touch_set(v.y1, r.y1);
+            n.tring_empty = false;
+            // Every tile of span a that is not in span b: rows outside b's whole, the
+            // rest the columns left and right of b's.
+            const auto outside = [](const TileSpan& a, const TileSpan& o, auto&& f) {
+                const int32_t ox1 = o.tx0 + o.cols, oy1 = o.ty0 + o.rows;
+                for (int32_t ty = a.ty0; ty < a.ty0 + a.rows; ++ty) {
+                    if (ty < o.ty0 || ty >= oy1) { for (int32_t tx = a.tx0; tx < a.tx0 + a.cols; ++tx) f(tx, ty); continue; }
+                    for (int32_t tx = a.tx0; tx < std::min(a.tx0 + a.cols, o.tx0); ++tx) f(tx, ty);
+                    for (int32_t tx = std::max(a.tx0, ox1); tx < a.tx0 + a.cols; ++tx) f(tx, ty);
+                }
+            };
+            outside(ns, os, [&](int32_t tx, int32_t ty) {
+                const std::size_t s = ring_slot(tx, ty);
+                copy_vtile(v.tiles[s], w, tx, ty); b.touch(v.tiles[s]);
+                n.tring[s] = ty * kTiles + tx;
+            });
+            outside(os, ns, [&](int32_t tx, int32_t ty) {
+                const std::size_t s = ring_slot(tx, ty);
+                if (n.tring[s] != ty * kTiles + tx) return;   // an entering tile took the slot
+                v.tiles[s] = xm::Tile{}; b.touch(v.tiles[s]);
+                n.tring[s] = -1;
+            });
+            for (int32_t t : changed) {
+                const int32_t tx = t % kTiles, ty = t / kTiles;
+                auto& d = v.tiles[ring_slot(tx, ty)];
+                const WorldTile& s = w.tile(tx, ty);
+                if (d.owner != s.owner) { d.owner = s.owner; b.touch(d); }
+            }
         }
         void n_plan(int c, const MapWorld& w, const DeltaPlan& p) {
             auto& n = nb[std::size_t(c)];
@@ -774,6 +835,8 @@ public:
             if (!r) throw std::runtime_error("native delta rejected: " + std::string(r.error().message));
         }
         xm::ViewSnapshot& n_held(int c, int) { return nheld[std::size_t(c)]->template root<xm::ViewSnapshot>(); }
+        // How the client's last apply was checked (report only): 0 key, 1 none, 2 in place, 3 full.
+        int n_check(int c) const { return int(ncur[std::size_t(c)].last_check()); }
         std::string_view n_wire() const { return ndelta; }
         void n_apply_from(int c, const std::string& d) {
             const XOffsetDatastructure::XStatus r = nheld[std::size_t(c)]->template try_apply_delta_verified<xm::ViewSnapshot>(d, ncur[std::size_t(c)]);

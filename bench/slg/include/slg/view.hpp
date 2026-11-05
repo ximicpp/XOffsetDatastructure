@@ -60,6 +60,15 @@
 // client's view as an XBuffer, mutates it in place (N*.send) and writes the
 // delta against that client's baseline (N*.diff); the client patches and
 // verifies (N*.recv) and reads in place.
+// XOffset native browse (2026-11-05, report only), keys NB: the same for the
+// browse case. The server keeps each client's view, moves it with the client's
+// rectangle every tick (units and marches that entered, changed or left; tiles
+// that entered or left, tile owners that changed; tiles sit in a ring of slots
+// so a tile keeps its slot while the view pans) and writes the delta: NB.send
+// (slots + mutation) + NB.diff, NB.recv (patch + verify), NBW.recv (warm single
+// devices, as N*W), NBZ.send / NB.delta_zstd (zstd 3 per message), NBZS
+// (streaming), NB.deliveries. Run in a pass of its own after EB's, so EB's
+// stages keep their range; SLG_NATIVE_OFF=1 drops it.
 #pragma once
 #include <algorithm>
 #include <cstdint>
@@ -736,6 +745,10 @@ template <class V, class D> void apply_delta(V& v, HeldIndex& at, const D& d) {
 //   auto& n_held(int c, int k)                 its view; must read the same as held(c, k)
 //   std::string_view n_wire()                  the delta n_diff wrote (bytes, N*W replay)
 //   void n_apply_from(int c, const std::string&)   n_apply of a stored delta (N*W; c = clients)
+//   void n_bview(int c)                        browse (NB): lay out the view, tiles in a ring of slots (untimed)
+//   int n_check(int c)                         optional: how client c's last apply was checked (NB.check_*, report only)
+//   void n_move(int c, const MapWorld&, const ViewRect&, const std::vector<int32_t>& changed)   browse: the new
+//                                              rectangle, the tiles that entered or left, owner changes; timed in NB.send
 
 struct ViewKeys {
     std::string esend, erecv, ewrecv, usend, urecv, uapply;
@@ -743,6 +756,7 @@ struct ViewKeys {
     std::string nsend, ndiff, nrecv, ndelta;
     std::string esendz, usendz, uwrecv, uwmsg, nsendz, nzstd, nwrecv;   // scoring V3 (2026-11-04)
     std::string uname, nname, eb_zs, u_zs, n_zs;   // streaming compression prefixes (EBZS, UPZS, NPZS)
+    std::string nmsg, nwmsg;   // NB.deliveries, NBW.deliveries (browse native, 2026-11-05)
     ViewKeys(const char* e, const char* u, const char* n) : uname(u), nname(n) {
         const std::string E(e), U(u), N(n);
         esend = E + ".send"; erecv = E + ".recv"; ewrecv = E + "W.recv";
@@ -757,6 +771,7 @@ struct ViewKeys {
         esendz = E + "Z.send"; usendz = U + "Z.send"; uwrecv = U + "W.recv"; uwmsg = U + "W.deliveries";
         nsendz = N + "Z.send"; nzstd = N + ".delta_zstd"; nwrecv = N + "W.recv";
         eb_zs = E + "ZS"; u_zs = U + "ZS"; n_zs = N + "ZS";
+        nmsg = N + ".deliveries"; nwmsg = N + "W.deliveries";
     }
 };
 
@@ -853,6 +868,30 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
     const ViewScale& vs = w.scale();
     constexpr bool native = requires { ops.n_diff(0); };
     if (s.browse) {
+        // NB (XOffset native, report only): before the first round, every client's
+        // server-side view is laid out at its current rectangle and sent once as a
+        // key delta (untimed, as N*'s first pull), and the warm devices take theirs.
+        const int nb_dev = warm_devices(vs.clients);
+        static thread_local std::vector<int32_t> nbtiles;   // NB: the tiles in view whose owner changed this tick
+        if constexpr (native) if (nb_on() && !s.primed) {
+            for (int c = 0; c < vs.clients; ++c) {
+                const ViewRect rect = w.rect(c);
+                s.tracker.plan(w, c, rect, s.plan);
+                s.plan.tiles.swap(nbtiles); s.plan.tiles.clear();   // the tiles are n_move's (n_update's sit in place)
+                ops.n_bview(c);
+                ops.n_plan(c, w, s.plan);
+                ops.n_update(c, w, s.plan, 0);
+                ops.n_move(c, w, rect, nbtiles);
+                ops.n_key(c);
+                ops.n_key_recv(c, 0, c);
+            }
+            for (int c = 0; c < nb_dev; ++c) ops.n_key_recv(vs.clients + c, 0, c);
+            s.primed = true;
+        }
+        static thread_local std::string nbzbuf;   // this round's NB wires, for the untimed zstd sizes
+        static thread_local std::vector<std::size_t> nbzoff;
+        static thread_local std::vector<std::vector<std::string>> nbwq;   // warm devices' NB wires this cycle (NBW)
+        nbwq.assign(std::size_t(nb_dev), {});
         // Class 2: every client moves its view and pulls the whole rectangle.
         for (int r = 0; r < vs.rounds; ++r) {
             w.tick();
@@ -906,8 +945,61 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
                     st.bytes[k.ecompz] += zstd_size(cw);
                 }
             }
+            // NB (XOffset native, report only), in a third pass after EB's two, so
+            // EB's stages keep their range and working set: the server's view of
+            // each client follows its new rectangle (units and marches that entered,
+            // changed or left, from the same tracker as U*; tiles that entered or
+            // left, tile owners that changed) and writes the delta against the
+            // client's baseline; the client patches and verifies. The view must read
+            // as the client's EB pull of this round (same request id and tick).
+            if constexpr (native) if (nb_on()) {
+                for (int c = 0; c < vs.clients; ++c) {
+                    const ViewRect rect = w.rect(c);
+                    s.tracker.plan(w, c, rect, s.plan);
+                    s.plan.tiles.swap(nbtiles); s.plan.tiles.clear();
+                    std::size_t nd = 0;
+                    timed(st, k.nsend.c_str(), [&] { ops.n_plan(c, w, s.plan); ops.n_update(c, w, s.plan, base + c); ops.n_move(c, w, rect, nbtiles); });
+                    timed(st, k.ndiff.c_str(), [&] { nd = ops.n_diff(c); });
+                    timed(st, k.nrecv.c_str(), [&] { ops.n_apply(c, 0); });
+                    if (query_view(ops.n_held(c, 0)) != query_view(ops.held(c, 0))) throw std::runtime_error("native browse delta: view differs from the client's pull");
+                    if constexpr (requires { ops.n_check(0); }) {
+                        // How the apply was checked (report only): a delta that moves records'
+                        // blocks takes the whole verification.
+                        static const char* const kCheck[] = {".check_key", ".check_none", ".check_in_place", ".check_full"};
+                        const int ck = ops.n_check(c);
+                        if (ck >= 0 && ck < 4) st.bytes[k.nname + kCheck[ck]] += 1;
+                    }
+                    st.bytes[k.ndelta] += nd;
+                    st.bytes[k.nmsg] += 1;
+                    const auto nw = ops.n_wire();
+                    nbzoff.push_back(nbzbuf.size()); nbzbuf.append(nw.data(), nw.size());
+                    if (c < nb_dev) nbwq[std::size_t(c)].emplace_back(nw);
+                }
+                nbzoff.push_back(nbzbuf.size());
+                for (std::size_t i = 0; i + 1 < nbzoff.size(); ++i) {
+                    std::size_t z = 0;
+                    timed(st, k.nsendz.c_str(), [&] { z = zstd_size(std::string_view(nbzbuf).substr(nbzoff[i], nbzoff[i + 1] - nbzoff[i])); });
+                    st.bytes[k.nzstd] += z;
+                }
+                nbzbuf.clear(); nbzoff.clear();
+            }
         }
         st.bytes[k.eb_zs + ".ctx"] = zstreams<Ops>(k.eb_zs).ctx_bytes();
+        // NBW: each warm device's NB deliveries of this cycle, replayed into its own
+        // view; the device reads its view before each one (untimed), as N*W.
+        if constexpr (native) if (nb_on()) {
+            for (int d = 0; d < nb_dev; ++d) {
+                for (const std::string& nw : nbwq[std::size_t(d)]) {
+                    warm_sink = query_view(ops.n_held(vs.clients + d, 0));
+                    timed(st, k.nwrecv.c_str(), [&] { ops.n_apply_from(vs.clients + d, nw); });
+                    st.bytes[k.nwmsg] += 1;
+                }
+                if (query_view(ops.n_held(vs.clients + d, 0)) != query_view(ops.held(d, 0))) throw std::runtime_error("warm native browse view differs from the client's pull");
+                ZStream& nzs = zstreams<Ops>(k.n_zs).at(std::size_t(d));
+                for (const std::string& nw : nbwq[std::size_t(d)]) zstream_timed(st, nzs, k.n_zs + ".send", k.nname + ".delta_zs", nw);
+            }
+            st.bytes[k.n_zs + ".ctx"] = zstreams<Ops>(k.n_zs).ctx_bytes();
+        }
         return;
     }
     if (!s.primed) {
