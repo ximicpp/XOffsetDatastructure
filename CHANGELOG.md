@@ -33,12 +33,15 @@ server-to-client use is not announced.
   A.apply 0.928. D is 1.007 of 3.2.1 (interval 0.976 to 1.039), report only:
   D is judged against FlatBuffers, 0.949 (bound 0.960), which passes.
   The demo delivery totals are followed up in 3.4.
-- In the relocation tax micro-benchmarks (G9R) four XOffset cases are about
-  2.5% slower than in 3.2.1, in the default and in the aligned build:
-  map.find fresh and reused (1.028), map.insert.reused (1.023),
-  set.insert.reused (1.022). G9 still holds (17 of 19, as in 3.2.x). The
-  cause is being looked for; #214 (append after the last key) is a
-  suspect, not verified.
+- Known small regression: an `XMap` or `XSet` insert in random key order
+  makes one more compare, with the last element (the append fast path
+  above, #214), so the insert micro-benchmarks (map.insert, set.insert,
+  fresh and reused) take 3 to 5% more instructions (GCC 16 and P2996 agree)
+  and XOffset's own time on the Mac is about 2.5% longer. Inserts in
+  ascending order (copy, decode, rebuild) are faster. Map lookups
+  (map.find fresh and reused) are about 2.8% slower on the Mac with no more
+  instructions; the cause is not known, report only. G9 still holds
+  (17 of 19, as in 3.2.x).
 - Planned for 3.4: buffers that evict each other from the cache when many
   are read in turn (the HFT demo's 64 order books; placing each payload at
   a different cache colour), the root cache refill after a move (#223) if
