@@ -675,7 +675,7 @@ namespace XOffsetDatastructure {
         }
 
         template <typename T, typename... Args>
-        T* construct_root_storage(Args&&... args) {
+        XOFFSET_DETAIL_MOVE_INLINE T* construct_root_storage(Args&&... args) {
             T* result = construct_object_at_slot<T>(root_offset_slot(), std::forward<Args>(args)...);
             bind_root_type<T>();
             return result;
@@ -2152,8 +2152,9 @@ namespace XOffsetDatastructure {
             return std::launder(reinterpret_cast<const T*>(raw));
         }
 
+        // Inlined into make<T>() (its one caller, through construct_root).
         template <typename T, typename... Args>
-        T* construct_object_at_slot(std::uint64_t& slot, Args&&... args) {
+        XOFFSET_DETAIL_MOVE_INLINE T* construct_object_at_slot(std::uint64_t& slot, Args&&... args) {
             if constexpr (sizeof(T) > MAX_PAYLOAD) XOFFSET_THROW(XBadAlloc());
             if (slot != 0) {
                 XOFFSET_THROW(XException(XErrc::invalid_state, "XBufferCore: object slot already populated"));
@@ -2861,6 +2862,25 @@ namespace XOffsetDatastructure {
                 XOFFSET_THROW(XBadAlloc());
             }
             return XBufferCore::owner_from_arena(arena).allocate_block(block_bytes_of(bytes), alignment);
+        }
+
+        // allocate_dynamic_bytes for an alignment known at compile time, of
+        // at most 8 (every element type that takes the first-storage path of
+        // XFixedVector::reserve): the same checks, errors and placement, with
+        // the alignment tests folded away and allocate_block inlined at the
+        // caller. Anything else takes allocate_dynamic_bytes.
+        template <std::size_t Alignment>
+        XOFFSET_DETAIL_MOVE_INLINE void* allocate_dynamic_bytes_aligned(const allocator_ref& alloc_ref,
+                                                                        std::uint32_t bytes) {
+            static_assert(Alignment != 0 && (Alignment & (Alignment - 1)) == 0);
+            if constexpr (Alignment > 8) {
+                return allocate_dynamic_bytes(alloc_ref, bytes, Alignment);
+            } else {
+                auto* owner = XBufferCore::owner_from_arena_noexcept(alloc_ref.segment);
+                if (!owner || bytes > XBufferCore::MAX_PAYLOAD - 8u) [[unlikely]]
+                    return allocate_dynamic_bytes(alloc_ref, bytes, Alignment); // throws the usual error
+                return owner->allocate_block(block_bytes_of(bytes), Alignment);
+            }
         }
 
         // Live block of old_bytes grows in place to new_bytes (tail only).
@@ -4002,7 +4022,29 @@ namespace XOffsetDatastructure {
             scrub(count, old_size);
         }
 
-        void reserve(std::size_t requested) {
+        // The no-op case inline at the caller (capacity_ <= max_size(), so
+        // checked_count would not throw for it). An empty vector's first
+        // storage (a vector filled anew, as after a reset) takes the
+        // allocation with its alignment checks folded; every other growth
+        // is reserve_grow, the body reserve had, unchanged.
+        XOFFSET_DETAIL_MOVE_INLINE void reserve(std::size_t requested) {
+            if (requested <= capacity_) return;
+            reserve_first_or_grow(requested);
+        }
+
+    private:
+        void reserve_first_or_grow(std::size_t requested) {
+            if (capacity_ != 0 || requested > max_size()) return reserve_grow(requested);
+            const auto new_cap = static_cast<size_type>(requested);
+            const auto alloc = bound_binding();
+            // First storage: nothing to expand, move or retire.
+            auto* fresh = detail::begin_dynamic_array<T>(fixed_detail::allocate_dynamic_bytes_aligned<alignof(T)>(
+                alloc, static_cast<std::uint32_t>(new_cap * sizeof(T))), new_cap);
+            fixed_detail::set_rel32(data_delta, &data_delta, fresh);
+            capacity_ = new_cap;
+        }
+
+        void reserve_grow(std::size_t requested) {
             auto new_cap = checked_count(requested);
             if (new_cap <= capacity_) return;
             const auto alloc = bound_binding();
@@ -4304,9 +4346,9 @@ namespace XOffsetDatastructure {
         template <bool OutOfLine>
         void grow_for_insert() {
             if constexpr (OutOfLine) reserve_for_insert(grown_capacity());
-            else reserve(grown_capacity());
+            else reserve_grow(grown_capacity());
         }
-        XOFFSET_DETAIL_NOINLINE void reserve_for_insert(size_type new_cap) { reserve(new_cap); }
+        XOFFSET_DETAIL_NOINLINE void reserve_for_insert(size_type new_cap) { reserve_grow(new_cap); }
 
         // Build in arena storage and publish only after all potentially throwing work.
         template <typename Construct>
@@ -4423,7 +4465,7 @@ namespace XOffsetDatastructure {
                 alignas(T) std::byte storage[sizeof(T)];
                 auto* staged = reinterpret_cast<T*>(storage);
                 construct(staged);
-                reserve(grown_capacity());
+                reserve_grow(grown_capacity());
                 const size_type n = size_;
                 T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + n;
                 std::memcpy(slot, staged, sizeof(T));
@@ -7719,7 +7761,7 @@ namespace XOffsetDatastructure {
         };
 
         template <typename T>
-        T* construct_root(XBufferCore& xbuf) {
+        XOFFSET_DETAIL_MOVE_INLINE T* construct_root(XBufferCore& xbuf) {
             auto alloc = allocator_binding_for(xbuf);
             if constexpr (has_wire_allocator_ctor<T>) {
                 return xbuf.template construct_root_storage<T>(alloc);
@@ -8071,6 +8113,8 @@ namespace XOffsetDatastructure {
                 return XBufferCore::record_owner(source.owner_record_) == &source;
             }
             template<class T> static XWireHeaderV2 header(XBufferCore&);
+            // header<T>'s body, inlined into save_into's fast path.
+            template<class T> XOFFSET_DETAIL_MOVE_INLINE static XWireHeaderV2 header_inline(XBufferCore&);
             template<class T> static void save_into(XBufferCore&, std::string&, XSaveOptions);
             template<class T> static void save_compact_into(XBufferCore&, std::string&, XCompactOptions);
             template<class T, class... M> static void save_composed_into(XBufferCore&, std::string&, XCompactOptions,
@@ -8158,7 +8202,12 @@ namespace XOffsetDatastructure {
         /// Create the root object. Growth/shrink/save retain its address;
         /// replacing this buffer's storage or destroying it invalidates the pointer.
         template<typename T>
-        T* make() {
+        T* make() { return make_inline<T>(); }
+
+    private:
+        // make<T>()'s body; reset<T>() inlines it after its reset_arena.
+        template<typename T>
+        XOFFSET_DETAIL_MOVE_INLINE T* make_inline() {
             static_assert(is_byte_copy_safe_v<T>,
                 "Type is not byte-copy safe. "
                 "Allowed: primitives, XString, XVector<T>, XMap<K,V>, XSet<T>, "
@@ -8175,7 +8224,8 @@ namespace XOffsetDatastructure {
             this->cache_root(result);
             return result;
         }
-        
+
+    public:
         template<typename T>
         T& root() {
             if (T* cached = this->template cached_root<T>()) [[likely]] return *cached;
@@ -8762,10 +8812,10 @@ namespace XOffsetDatastructure {
         /// Invalidates references into the previous content like
         /// reload_verified.
         template <typename T>
-        T& reset() {
+        XOFFSET_DETAIL_MOVE_INLINE T& reset() {
             reset_arena(this->get_size());
             if (!this->arena()) XOFFSET_THROW(XException(XErrc::invalid_state, "reset<T>(): buffer has no arena"));
-            return *this->template make<T>();
+            return *this->template make_inline<T>();
         }
 
         /// An independent copy of this buffer in the same process: one copy of
