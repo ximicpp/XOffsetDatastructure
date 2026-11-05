@@ -2,6 +2,56 @@
 
 ## Unreleased
 
+## 3.3.0: native delta sync
+
+Delta sync arrives as an experimental API (`xoffset_delta.hpp`, delta
+format 1.0, docs/DELTA_SYNC.md): a sender writes only the 64-byte payload
+blocks that changed since a receiver's baseline, and the receiver patches
+its copy in place, checking only what the delta can affect. Wire format 2.1
+is unchanged. Fixed messages (`xoffset_fixed_message.hpp`) are new and also
+experimental; most other entries make saves, reloads, allocation and
+container appends faster on bench/slg, and `bench/hft` adds a second
+workload. Delta sync is not a core guarantee yet (K9 in
+docs/STABILITY_TESTS.md), the client path is still a target (K8), and
+server-to-client use is not announced.
+
+- Not in this release: keeping the root cache across a move or swap, tried
+  with delta sync, was dropped because it was slower on the Mac
+  (checkpoints CKPT14 and CK14L). A moved `XBuffer` takes the checked path
+  of `root<T>()` until a verified call fills its cache again; refilling it
+  there is PR #223, for 3.3.1 or 3.4.
+- Speed against 3.2.1 on the Mac (release checkpoint REL330, bench/slg M,
+  XOffset relative to the other formats, lower is faster): A 0.959, B 0.922,
+  C 0.959; docs/PERFORMANCE.md section 5. A.req_decode is 1.014 of 3.2.1
+  (interval 1.001 to 1.027, +0.8 µs per cycle), suspected code placement:
+  the delta sync step, 1.024 in the gate that merged it, gives 1.005
+  (interval 0.998 to 1.013) when built with functions aligned to 64 bytes.
+  In the report-only demo cases sending is faster and the receivers' apply
+  slower (UP.send 0.864, UP.apply 1.053, UC.apply 1.073, A.apply 1.038), so
+  a whole delivery is 2.0% (UP) and 1.1% (UC) slower; also suspected
+  placement, since the aligned build gives A.apply 0.971 and the gated runs
+  A.apply 0.928. D is 1.007 of 3.2.1 (interval 0.976 to 1.039), report only:
+  D is judged against FlatBuffers, 0.949 (bound 0.960), which passes.
+  The demo delivery totals are followed up in 3.4.
+- Known small regression: an `XMap` or `XSet` insert in random key order
+  makes one more compare, with the last element (the append fast path
+  below, #214), so the insert micro-benchmarks (map.insert, set.insert,
+  fresh and reused) take 3 to 5% more instructions (GCC 16 and P2996 agree)
+  and XOffset's own time on the Mac is about 2.5% longer. Inserts in
+  ascending order (copy, decode, rebuild) are faster. Map lookups
+  (map.find fresh and reused) are about 2.8% slower on the Mac with no more
+  instructions; the cause is not known, report only. G9 still holds
+  (17 of 19, as in 3.2.x).
+- Planned for 3.4: buffers that evict each other from the cache when many
+  are read in turn (the HFT demo's 64 order books; placing each payload at
+  a different cache colour), the root cache refill after a move (#223) if
+  it is not in 3.3.1, and an inline fast path for `XHandle`.
+- No pre-release fuzz round ran for 3.3.0 (susu, 2026-11-04: it takes too
+  long). The delta harness below is in place for the next round.
+- `test_delta_sync`: where TLS is emulated (GCC on MinGW and Cygwin) the
+  thread-exit case applies its late delta at the end of the thread, because
+  a `thread_local`'s destructor can run on storage already freed there. The
+  library's per-thread delta scratch was already off on those targets.
 - Pre-release fuzz covers delta sync: `fuzz_delta_sync` (libFuzzer, also
   `fuzz_delta_sync_replay` and CTest `fuzz_delta_sync_replay*`) applies
   input-driven deltas to a replica (raw block and hole sections behind a valid
