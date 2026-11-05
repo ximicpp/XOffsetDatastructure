@@ -86,6 +86,8 @@ template <class F> void untimed(CycleStats& st, const char* key, F&& f) {
 // stages: the formal runs take XOffset's application-level rows from such
 // processes and the native rows from processes with them on.
 inline bool native_on() { static const bool on = std::getenv("SLG_NATIVE_OFF") == nullptr; return on; }
+// NB (native browse delta, report only) alone: SLG_NB_OFF=1 drops it, for A/B runs of the other stages.
+inline bool nb_on() { static const bool on = native_on() && std::getenv("SLG_NB_OFF") == nullptr; return on; }
 
 // The storage process checks a received player and keeps the bytes. A format
 // with a check that needs no application model (FlatBuffers' Verifier,

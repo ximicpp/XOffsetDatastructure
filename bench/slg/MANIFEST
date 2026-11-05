@@ -162,6 +162,14 @@
 #                        of std::unordered_map, for all formats together; apply_delta unchanged.
 #                        tests/flat_held_index_test.cpp checks it against std::unordered_map. Cases, bytes,
 #                        states and reports unchanged.
+#   2026-11-05 native browse delta (3.4 line C item P3, assigned by thread 3.4 主线; report only): new keys
+#                        NB.* / NBW.* / NBZ.* / NBZS.* for the browse case, XOffset only. The server keeps
+#                        each browsing client's view (units and marches from the U* tracker, tiles in a
+#                        17 x 13 ring of slots), moves it with the client's rectangle and sends the delta;
+#                        each delivery is checked equal to that client's EB pull. Runs in a third pass after
+#                        EB's timed and bytes passes; existing keys, stage ranges, states and reports
+#                        unchanged. NB.check_* counts how each apply was checked; SLG_NB_OFF=1 drops NB alone.
+#                        slg_bench's text table prints the native delta's zstd size too.
 # Contents: slg-reuse adapters (FlatBuffers verified_root runs the Verifier),
 # reuse protocol (c) (SLG_REUSE=1), ordinary-record declarations for every xm
 # record type in include/slg/model_xoffset.hpp, T4 adapter v2 (whole-container
@@ -172,18 +180,18 @@
 #   them (guarded; older trees keep the previous declarations). Same machine code under GCC 16
 #   and P2996 (asm_equal), the lines are tools/describe_dump output (describe_dump_slg).
 ea55baa3f59a1719135b2b3187e2bc9fc91abe171d6cfebf8216780676960eb0  CMakeLists.txt
-237c30ba64462794f2b6a193d00ac3aba592be76ef7bc45244d161803b76d15a  README.md
+08abbc76291dfd4cff9f05410f45fb4d5eb644181106b7e66ecac0e855d1d083  README.md
 ea141af841831b376028f48ab0d4c22e66ce2671f01d9e14c9f66814f5ebaa6e  adapters/cereal_format.hpp
 6a4e08d8a8e02d8df667c9c9b9576f6b2f783eec810c50e39ccaa83070309064  adapters/flatbuffers_format.hpp
 b79ac73b09369288d013200b93f627aa7eb2cc59a8b1f02bcc392cc5731b43bd  adapters/protobuf_format.hpp
 61fce58cd26e87f1c003b9cf55b690a9e553a7bde47b7e0e287e85c813ede0c9  adapters/zpp_bits_format.hpp
 7d19a065e7153d4673740c58cd2c5a74a0b143ec6002c5bb911e484c76b283f4  bench/cista_runner.hpp
 f5e58fceecd0c7b22503a4b0652b4164aea055ee31fc24b859efa48496cd245f  bench/erase_probe.cpp
-127f23f4cfe609798b67d2420f187ede893d1aa2efda9bc4e6ace9ed71d0cc89  bench/runner.hpp
-0c9caebd780c719513038dd9761273a41acdd658c3c71aafbe66a2776d62ebd9  bench/slg_bench.cpp
+d0fabfc8a86127dba542c85a01a87f6683cc47b9e157381c3a22649520f1dec5  bench/runner.hpp
+a17a8e81cb1a787618e84d7282607d3cc6b27201c386dc1045e35a02d900819f  bench/slg_bench.cpp
 730a66f677d9d20077175f629cf0b13919e66ccedaf880e4eb414c6bc94c0610  bench/small_msg_probe.cpp
 6307d6a7b8419565143cecbe2d7ade4feb250e5dfa5a147f3db99286724e9737  bench/std_runner.hpp
-a9225db5f01578d0af7b27de1d9dfaf6df4d36641690b07ff8c12ad5447ce24c  bench/xoffset_runner.hpp
+5a91af3a359e8d95cad73719aad566fbabf524060fc016cf13171ef71778395d  bench/xoffset_runner.hpp
 12cab27be9331a4a09ae66f444cf5852dd81e363df562748a4ea854932e35e44  include/slg/cista_free.hpp
 f901dd6b3534240a5038157eaf601d756c07557bcd7fad74b80f8615513b6ab8  include/slg/flat_held_index.hpp
 341ba037a01f807258b0a7527aa0ba0a763f60a32bab00f78f75834f0330cffe  include/slg/generic.hpp
@@ -193,7 +201,7 @@ f901dd6b3534240a5038157eaf601d756c07557bcd7fad74b80f8615513b6ab8  include/slg/fl
 ffdf3ec14df638268b6b11dfc39836666a62aa82ba2e5594d71804700b35bee1  include/slg/model_xoffset.hpp
 3259eef215f98da7328da68bb5e7dd1f33141cdeb894511a039af075114c3391  include/slg/model_xoffset_optin.hpp
 36d5761eb46998e5040f7a19fb99f5ac1df5e31ee129a864e3872ba734e4a5db  include/slg/trace.hpp
-b15fa09a79fc36b7f0b64bb33ad854b7eaf131165b85b3b00a52f47010b738ff  include/slg/view.hpp
+8ea5e08cde608d4c88766dcd0d17bf023285dc522c449b20cc5f7e9e977b2d8a  include/slg/view.hpp
 bf2ab42341c4db797200c2302cbcf3c62fc08030c98210e3270deb6d2d072605  schema/slg.fbs
 e7b20776bf0f93be063a8228ded1e15b00f50fd3be507e957a0033afd9f79761  schema/slg.proto
 cf948f2cf37c276e5f9d0734188fdc8ae9d4b0242cb676cfc4148573cec704a4  tests/flat_held_index_test.cpp
