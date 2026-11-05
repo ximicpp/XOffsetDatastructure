@@ -2473,18 +2473,31 @@ namespace XOffsetDatastructure {
         // until the epoch advances. Typed access, the schema binding and the
         // root offset change only with the epoch (reinit, reset, move, swap,
         // storage move) or on a fresh owner, so a hit in root<T>() returns
-        // what its checked path would. Set only by those mutating calls, so
-        // root<T>() itself stays read-only. Not transferred: every epoch
-        // change (advance_epoch, the retiring move) clears it.
+        // what its checked path would. Set by those calls and by root<T>()'s
+        // checked path, which runs the same checks (root<T>() is non-const:
+        // concurrent calls on one buffer need the caller's lock, as for every
+        // other non-const member; a const accessor must not fill it). Not
+        // transferred: every epoch change (advance_epoch, the retiring move)
+        // clears it.
         template <typename T>
         T* cached_root() const noexcept {
-            return root_cache_type_ == type_identity<T>() ? static_cast<T*>(root_cache_) : nullptr;
+            return root_cached_as<T>() ? static_cast<T*>(root_cache_) : nullptr;
         }
 
+        // The type test of cached_root<T>() alone: a hit has a root, since
+        // cache_root() is only given one. root<T>() tests just this and then
+        // reads the root, one branch instead of two.
+        template <typename T>
+        bool root_cached_as() const noexcept { return root_cache_type_ == type_identity<T>(); }
+        template <typename T>
+        T* cached_root_hit() const noexcept { return static_cast<T*>(root_cache_); }
+
+        // root is not null (every caller has found or built it). T may be
+        // const (root<const T>()), cached under its own identity.
         template <typename T>
         void cache_root(T* root) noexcept {
             root_cache_type_ = type_identity<T>();
-            root_cache_ = root;
+            root_cache_ = const_cast<std::remove_cv_t<T>*>(root);
         }
 
         void advance_epoch() noexcept {
@@ -8064,7 +8077,15 @@ namespace XOffsetDatastructure {
         
         template<typename T>
         T& root() {
-            if (T* cached = this->template cached_root<T>()) [[likely]] return *cached;
+            if (this->template root_cached_as<T>()) [[likely]] return *this->template cached_root_hit<T>();
+            return root_checked<T>();
+        }
+
+    private:
+        // root<T>()'s checked path, out of line so the cache hit above stays
+        // a compare and a load where it is inlined.
+        template<typename T>
+        XOFFSET_DETAIL_NOINLINE T& root_checked() {
             require_typed_root_access(
                 "root<T>(): typed root access requires local construction or load_verified<T>(); "
                 "use unsafe_root<T>() only for trusted raw payloads");
@@ -8074,8 +8095,14 @@ namespace XOffsetDatastructure {
                 XOFFSET_THROW(XException(XErrc::no_root, "root<T>(): no root object in buffer. "
                     "Call make<T>() first or check with has_root<T>()."));
             }
+            // Passed the checks make<T>() and a verified load pass, so the
+            // next call takes the fast path (a buffer moved into a container
+            // pays this path once, not on every call).
+            this->cache_root(ptr);
             return *ptr;
         }
+
+    public:
 
         template<typename T>
         bool has_root() {
