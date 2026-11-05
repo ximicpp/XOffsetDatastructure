@@ -290,6 +290,14 @@ def main():
     ev = pg.cache_events("version: 1\nevents: Ir Dr Dw I1mr D1mr D1mw ILmr DLmr DLmw\n", "100 40 20 3 7 5 2 1 4")
     expect("cache_events maps the collected counts to the event names",
            ev["Ir"] == 100 and ev["D1mr"] + ev["D1mw"] == 12 and ev["DLmr"] + ev["DLmw"] == 5)
+    ev = pg.cache_events("events: Ir Dr Dw I1mr D1mr D1mw ILmr DLmr DLmw\n", "836997 172359 49275")
+    expect("cache_events: trailing zero counts left out of the Collected line count as 0",
+           ev["Ir"] == 836997 and ev["D1mr"] == 0 and ev["DLmw"] == 0 and len(ev) == 9)
+    try:
+        pg.cache_events("events: Ir Dr\n", "1 2 3")
+        expect("cache_events refuses more counts than events", False)
+    except RuntimeError:
+        expect("cache_events refuses more counts than events", True)
     try:
         pg.cache_events("events: Ir\n", "100")
         expect("cache_events refuses a run without cache events", False)
