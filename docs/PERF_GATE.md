@@ -2,6 +2,8 @@
 
 **指令数只用于拦截回退，计时结论以 Mac 正式批次为准。** 任何"变快"或达标（G1–G4）的说法都不能拿这里的数字作证据。
 
+**合并规则（susu 2026-11-05 01:26Z）**：性能判定全部在云端。S 类和 L 类 PR 合并前都只过 GCC 16 和 P2996 两个 Ir 门（第 3 节的阈值），再在合并结果上跑 `tools/local_validate.sh`；L 类另附 cache-sim 的 D1/LL 缺失对比（第 5a 节），只作警告。Mac 批次只做合并后和发版后的复核，只报，不挡合并；复核发现的回退开修复 PR，进下一个补丁版本。下文凡是写“合并前跑 Mac L2”的地方，都按这条换成：带上函数差异表和 cache-sim 对比，由「性能优化」判断，结论写进 PR 正文。
+
 设计依据：H3 设计 `beta2-20261022/H3_PERF_GATE_DESIGN_20261022.md` 第 5 节。本页是实现说明。
 
 **运行状态（2026-10-26）**：GitHub CI 已停用（susu 10-23 决定），`perf-gate.yml` 保留但不再自动运行，门禁改由本地验证脚本运行（命令见第 6 节）。实现验收：1（历史回放）、2（人为回归被拦）已通过；3（一周稳定）作废：GitHub CI 停用，门禁改由本地验证脚本运行。
@@ -11,7 +13,7 @@
 `.github/workflows/perf-gate.yml` 在 PR 指向 `next_cpp26`（忽略只改 `docs/**`、`*.md` 的 PR）、push 到 `next_cpp26` 和手动触发时运行，GCC 16 和 P2996 Clang 各一个作业，两个都判定：
 
 1. 在同一个作业里导出三份库代码：**anchor**（`bench/perf/ANCHOR`）、**base**（PR 是 merge-base，push 是第一父提交）、**head**。
-2. 三份都用 **head 里的基准代码**（手动回放时用所选分支的基准代码）（`bench/slg/`、`bench/formal/`、`bench/reloc/`）编译 `slg_bench`、`sc_xoffset` 和 `reloc_bench`。base 或 anchor 用 head 的基准编不过（公开 API 改了）时，改用它自己那一版的基准，标"基准不同"并警告；仍编不过就标"不可比"，作业不失败，但这个 PR 合并前要跑一次 Mac L2。`reloc_bench` 是可选的：base 或 anchor 编不过它时只少 `reloc.*` 的比较（警告），head 编不过就是构建失败。
+2. 三份都用 **head 里的基准代码**（手动回放时用所选分支的基准代码）（`bench/slg/`、`bench/formal/`、`bench/reloc/`）编译 `slg_bench`、`sc_xoffset` 和 `reloc_bench`。base 或 anchor 用 head 的基准编不过（公开 API 改了）时，改用它自己那一版的基准，标"基准不同"并警告；仍编不过就标"不可比"，作业不失败；这个 PR 合并前要在 PR 正文里说明，并附 cache-sim 对比（第 5a 节），合并后的 Mac 复核要覆盖它。`reloc_bench` 是可选的：base 或 anchor 编不过它时只少 `reloc.*` 的比较（警告），head 编不过就是构建失败。
 3. 计数前先查正确性：SLG `--mode verify --scale S`（xoffset 与 cereal 一致，复用协议和逐条协议各一次）；正式 harness 用各自的 `encode` 生成 S、M 输入 wire，`validate` S 和 M；`reloc_bench --mode verify`（每轮各方结果摘要一致，同时给出项名）。head 任何一项失败，门禁直接失败，不出数字。
 4. 在 valgrind callgrind 下数每个阶段的指令数（Ir），`--collect-atstart=no`，只在被测阶段里打开收集。各阶段一个进程，`nproc` 个并行。
    - 每个进程都带 `GLIBC_TUNABLES=glibc.cpu.x86_rep_movsb_threshold=0x7fffffffffffffff:glibc.cpu.x86_rep_stosb_threshold=0x7fffffffffffffff`，关掉 glibc memcpy 的 rep movsb 路径和 memset 的 rep stosb 路径。
@@ -75,7 +77,7 @@ SLG 只编 XOffset + cereal（cereal v1.3.2，`ebef1e92`，头文件）。M 规�
 - **head÷anchor**：head 的 ledger 里所有匹配条目的 `max_ratio` 连乘，作为已放行的部分扣除后再比门槛。
 - **批准**：场景合计（`slg.A`–`slg.D`、`formal.*`）≤ 2% 的条目由「性能优化」批准并写进 `approved_by`；超过 2% 或涉及安全与性能取舍的，要 susu 确认，`approved_by` 必须写明 susu，否则门禁直接失败。
 - **内联变化**：函数差异表标了"疑似内联变化"的回退，先试把新增的冷路径（错误分支、抛异常、少见情形）挪进一个 `[[gnu::noinline]]` 函数，让热函数保持原来的内联状态；挪了仍回退才写条目，`evidence` 里附上这张函数差异表（摘要里的表或 JSON 的 `functions`）和试过的改法。
-- **anchor 前移**：tag 候选的 Mac L2 通过后，开一个只改 `bench/perf/ANCHOR` 的 PR，同时把旧条目移到 `bench/perf/ledger_archive.json`（门禁不读它；条目失效时也移过去，例如 `reloc-bench-added` 在门禁开始测 `reloc.*` 时移入）。
+- **anchor 前移**：发版（tag 推上去）后，开一个只改 `bench/perf/ANCHOR`（改成 tag 的提交）的 PR，同时把旧条目移到 `bench/perf/ledger_archive.json`（门禁不读它；条目失效时也移过去，例如 `reloc-bench-added` 在门禁开始测 `reloc.*` 时移入）。
 
 ## 5. 看结果
 
@@ -87,8 +89,17 @@ SLG 只编 XOffset + cereal（cereal v1.3.2，`ebef1e92`，头文件）。M 规�
   - 一对调用者与被调用者自身 Ir 一升一降，两者之和的变化不到两者变化幅度之和的一半。
 
   两条都只算变化量至少占该指标总变化 10% 的函数。只在一边出现、却没有反向变化的伙伴，是新增或删除的代码；同名不同参数的是签名改了，都不标。**这个标记只是诊断，不放行**，也不改变判定：真回退里同样可能有内联移动（旧 M3 的 formal.mutate、slg.C、S.ticks_middle 都会被标），看到标记不能当成误报，放行仍然只靠 ledger。
-- **分配器回收型**：被标的指标净增 Ir 里，`FreeTableRecycler::recycle` 的自身 Ir 增量至少占一半，就在表头和"说明"里标出，并按 malloc/free/realloc/calloc/new/delete（含 glibc 的 `_int_*`、`tcache*`）自身 Ir 的降幅分成两种：降幅至少是 recycle 增量的 10%，算"分配器调用换成原地回收"（D2 型，校准里是 28–55%）；否则算"要回收的 bin 变多"（COPS 型，校准里分配器只降了 recycle 增量的 1–3%，是噪声级）。2026-10-26 用 Mac L2 校准时这两例 Ir 都上升（D2 的 slg.B.in_decode GCC 1.059、P2996 1.052；COPS 的 slg.B GCC 1.014），Mac 上却都变快（0.989；0.977），缓存模拟也没把 D2 翻过来。**这个标记同样只是诊断，不放行**，判定不变：这类 PR 本来就因为 Ir 警告或失败进 L 类，由 Mac L2 下结论。
-- 变红怎么办：先看是哪个阶段、哪些函数；是意外就修；标了疑似内联的，先试把新增的冷路径挪进 `[[gnu::noinline]]` 函数（见第 4 节）；是有意的取舍就写 ledger 条目（见上），> 1% 的放行在合并前还要跑一次 Mac L2。
+- **分配器回收型**：被标的指标净增 Ir 里，`FreeTableRecycler::recycle` 的自身 Ir 增量至少占一半，就在表头和"说明"里标出，并按 malloc/free/realloc/calloc/new/delete（含 glibc 的 `_int_*`、`tcache*`）自身 Ir 的降幅分成两种：降幅至少是 recycle 增量的 10%，算"分配器调用换成原地回收"（D2 型，校准里是 28–55%）；否则算"要回收的 bin 变多"（COPS 型，校准里分配器只降了 recycle 增量的 1–3%，是噪声级）。2026-10-26 用 Mac L2 校准时这两例 Ir 都上升（D2 的 slg.B.in_decode GCC 1.059、P2996 1.052；COPS 的 slg.B GCC 1.014），Mac 上却都变快（0.989；0.977），缓存模拟也没把 D2 翻过来。**这个标记同样只是诊断，不放行**，判定不变：这类 PR 本来就因为 Ir 警告或失败进 L 类，要附 cache-sim 对比（第 5a 节），由「性能优化」判断；合并后的 Mac 复核只报。
+- 变红怎么办：先看是哪个阶段、哪些函数；是意外就修；标了疑似内联的，先试把新增的冷路径挪进 `[[gnu::noinline]]` 函数（见第 4 节）；是有意的取舍就写 ledger 条目（见上），> 1% 的放行在合并前还要附 cache-sim 对比（第 5a 节）。
+
+## 5a. cache-sim 对比（L 类，手工，警告项）
+
+Ir 看不到内存访问的变化（第 8 节），所以 L 类 PR 合并前另附一份缓存模拟对比。在 perf_gate 支持之前手工做，参数固定，每次一样：
+
+- 用 Ir 门同一组二进制（`local_validate` 的 `ir-<编译器>/bin/<编译器>/<sha>/`）和同样的运行方式（S 规模、seed 20261021、8 个周期、只收集第 4–7 周期、`SLG_REUSE=1`、关掉 rep movsb/stosb），每个 SLG 阶段单独收集，与 Ir 门一样用 `SLG_IR_KEYS=<键>`。
+- callgrind 参数：`--cache-sim=yes --D1=131072,8,128 --LL=16777216,16,128`。
+- 对比 base 和 head 每个场景、每个阶段的 D1mr+D1mw 和 DLmr+DLmw；任一阶段 head÷base > 1.02 算警告。结果表写进 PR 正文，警告由「性能优化」决定。
+- 只作警告，不单独挡合并；模拟的缓存不是任何一台真机，结论仍以合并后的 Mac 复核为准。
 
 ## 6. 手动触发与回放
 
@@ -124,7 +135,7 @@ python3 tools/perf_gate/test_perf_gate.py   # 判定逻辑自测，不需要编�
 
 ## 8. 它抓不到什么
 
-只改内存访问、不改指令数的变化：#27 让 Mac 上的正式修改快 3.0%，Ir 只变 −0.1%；新 M3 在 Mac 上让 B.season_edits 慢 2–3%，x86 Ir 却是 −5%。x86 与 Mac 的方向可能相反。2026-10-26 用 GCC 16 和 P2996 两种 Ir 重放 Mac L2 门禁对：分配器回收型改动（D2、COPS）两种 Ir 都与 Mac 反向；GCC 的内联决定翻转会让 GCC Ir 与 Mac 反向（W0b 的 formal.mutate：GCC 0.955、P2996 1.005、Mac 1.011）；方向一致时 Ir 与 Mac 的幅度也差 0.3–5 倍。所以 L0 只是合并前的过滤器，Mac L2（tag 前必跑、每周一次、ledger 放行 > 1% 的 PR 合并前）才出结论。
+只改内存访问、不改指令数的变化：#27 让 Mac 上的正式修改快 3.0%，Ir 只变 −0.1%；新 M3 在 Mac 上让 B.season_edits 慢 2–3%，x86 Ir 却是 −5%。x86 与 Mac 的方向可能相反。2026-10-26 用 GCC 16 和 P2996 两种 Ir 重放 Mac L2 门禁对：分配器回收型改动（D2、COPS）两种 Ir 都与 Mac 反向；GCC 的内联决定翻转会让 GCC Ir 与 Mac 反向（W0b 的 formal.mutate：GCC 0.955、P2996 1.005、Mac 1.011）；方向一致时 Ir 与 Mac 的幅度也差 0.3–5 倍。所以 L0 只是合并前的过滤器。2026-11-05 起合并和发版都只用云端判定（见页首），这类变化靠 L 类的 cache-sim 对比（第 5a 节）提示，Mac 合并后和发版后的复核（只报）兜底，回退进下一个补丁版本。
 
 ## 8a. 机器码比对（0 类证据）
 
