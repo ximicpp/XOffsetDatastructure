@@ -1,9 +1,10 @@
 # 发版流程
 
 本页是 `next_cpp26` 打正式版和预发布版的固定流程。GitHub CI 永久停用（2026-10-23），
-每一步的证据都来自 Mac 检查点和云端本地验证，不等任何 GitHub 作业。
+每一步的证据都来自云端本地验证，不等任何 GitHub 作业，也不等 Mac（susu 2026-11-05 定：发版前一律
+只用云端；Mac 阶段复核在发版后跑，第 7 节）。
 
-分工：Mac 检查点、本地验证和发版 PR 由开发线程做；tag 由 susu 在自己的机器上打
+分工：云端判定、本地验证和发版 PR 由开发线程做；tag 由 susu 在自己的机器上打，或请 Mac 会话代推
 （云端推 tag 会被拒绝，403）。susu 每次发版只需要执行第 5 步的 3 条命令。
 
 ## 1. 版本号
@@ -19,28 +20,31 @@
   消费方用 `XOffsetDatastructure_VERSION STREQUAL "<版本>"` 自己核对（README「Build and consume」）。
   任何两个版本之间都不承诺 API、ABI 或 wire 兼容；1.x 内 wire 的冻结范围以 CHANGELOG 为准。
 
-## 2. 发版前：Mac 检查点
+## 2. 发版前：云端性能判定
 
-按 MERGE_RULES_V2 第 2 节，每次打 tag 之前必须跑一次 Mac 阶段复核（检查点）：
+从 3.3.1 起，发版前的性能判定只用云端（MERGE_RULES_V2 补充，2026-11-05），不再跑 Mac 发布批：
 
-- head 是候选提交（`next_cpp26` 上准备发版的那个提交，下称 C），anchor 是上一个检查点；
-  同时编好上次检查点以来每个 S 类合并提交的二进制，失败时当场二分。
-- 结果写在 project files 的 `perf-gate/mac/<日期>-<批次名>/VERDICT.md`。只有 VERDICT 判通过才往下走。
-- 没通过：定位到具体 PR 后撤回或修复，再跑一次；赶不上时 tag 打在最后一个通过的检查点上，
+- 候选提交（`next_cpp26` 上准备发版的那个提交，下称 C）对上一个发版 tag 跑 GCC 16 和 P2996 两个 Ir 门。
+  它们就是第 3 步 `local_validate --release --base <上一个 tag>` 里的 `ir` 和 `p2996-ir` 两步：base 是上一个
+  tag，第 7 步又把 `bench/perf/ANCHOR` 移到了上一个 tag，所以 head÷base 和 head÷anchor 都是 C 对上一个 tag。
+- 判定：两个编译器都不能有 fail（门槛见 [PERF_GATE.md](PERF_GATE.md) 第 3 节，场景合计 head÷anchor 扣除
+  ledger 后 > 1.020 即 fail）。warn 的指标连同函数差异表写进发版 PR，交「性能优化」决定，并写进发布说明。
+- 没通过：定位到具体 PR 后撤回或修复，再跑一次；赶不上时 tag 打在最后一个通过的提交上，
   没过的改动挪到下一个版本（第 6 节）。
+- 不变的部分：每个 L 类 PR 合并前仍要过 Mac L2，这是合并规则，不是发版规则。
 
 ## 3. 发版前：云端本地验证
 
 在 C 上跑全套本地验证，含 TSan：
 
 ```sh
-tools/local_validate.sh --release --base <上一个 tag 或上一个检查点>
+tools/local_validate.sh --release --base <上一个 tag>
 ```
 
 `--release` 在默认步骤（GCC 16 Release 全量 CTest、ASan+UBSan、`test_v2_fuzz`、
 校验差分、bench smoke、两种编译器的 Ir 门禁、P2996 构建与签名核对）之外加上 GCC 16 TSan
-全量 CTest。每一步都要是 pass（Ir 门禁对发版只看是否完成，不判 S 类）。`REPORT.md`
-贴进发版 PR。
+全量 CTest。每一步都要是 pass，两个 Ir 门按第 2 节判（不判 S 类）。客户端列里容器没有工具链、报
+「not run」的（例如 Android NDK），在发版 PR 和文档里写明这一版没有重跑。`REPORT.md` 贴进发版 PR。
 
 ### 3.1 发版前 fuzz（K4）
 
@@ -96,12 +100,13 @@ PASS。有发现：`tools/fuzz_report.py` 开 issue（用法见 `tools/fuzz_nigh
    ```
 
 合并条件：第 2、3 步对 C 都通过，并且 C 之后 `next_cpp26` 上除这个 PR 以外没有别的合并。
-发版 PR 不改库代码，所以 C 的检查点和本地验证结果原样适用于它的合并提交。期间有别的 PR
-合进来，就把 C 换成新的头，第 2、3 步重做（只改文档、tools 的 0 类 PR 可以只重做第 3 步）。
+发版 PR 不改库代码，所以 C 的云端判定和本地验证结果原样适用于它的合并提交。期间有别的 PR
+合进来，就把 C 换成新的头，重跑第 3 步（第 2 步的两个 Ir 门在同一次运行里）。
 
 ## 5. 打 tag（susu 本地，3 条命令）
 
-发版 PR 合并后，在本地仓库执行（`<提交>` 是发版 PR 的合并提交，开发线程会在线程里给出完整哈希）：
+发版 PR 合并后，在本地仓库执行（`<提交>` 是发版 PR 的合并提交，开发线程会在线程里给出完整哈希）；
+也可以在 Mac 线程里请 Mac 会话代为执行（3.2.1、3.3.0 都是这样推的）。推好后开发线程用 `git ls-remote` 核对：
 
 ```sh
 git fetch origin next_cpp26
@@ -113,9 +118,9 @@ git push origin vX.Y.Z
 正文贴 CHANGELOG 里这一版的整段；需要的话附上第 4 步生成的源码包和 `SHA256SUMS`。
 预发布版勾选 "Set as a pre-release"。
 
-## 6. 检查点没过时
+## 6. 云端判定没过时
 
-- tag 打在最后一个通过检查点的提交上；那个提交上的 `XOFFSET_VERSION` 和 CHANGELOG 不是新版本号，
+- tag 打在最后一个通过第 2、3 步的提交上；那个提交上的 `XOFFSET_VERSION` 和 CHANGELOG 不是新版本号，
   所以要从那个提交拉一个分支做发版 PR（只改第 4 步的内容），合并后对它的合并提交打 tag，
   或者推迟发版。两种做法在线程里写明选了哪个。
 - 没过的改动记进下一个版本的计划，CHANGELOG 里留在 `## Unreleased`。
@@ -125,4 +130,7 @@ git push origin vX.Y.Z
 - 下一个版本所有「不回退」判定以这个 tag 的提交为基线。
 - Ir 门禁的 anchor 前移：开一个只改 `bench/perf/ANCHOR`（改成 tag 的提交）的 0 类 PR，
   同时把失效的 ledger 条目移到 `bench/perf/ledger_archive.json`（[PERF_GATE.md](PERF_GATE.md) 第 4 节）。
-- 在 project files 里记下 tag、提交和检查点 VERDICT 的路径。
+- Mac 阶段复核：发版后跑一次（head 是这个 tag 的提交，anchor 是上一个 tag），作为跟进；按 L2 规则判，
+  结果写在 project files 的 `perf-gate/mac/<日期>-<批次名>/VERDICT.md`。发现回退就开修复 PR，进下一个补丁
+  版本，并写进下一版的发布说明。
+- 在 project files 里记下 tag、提交、云端判定（`local_validate` 的 `REPORT.md`）和之后 Mac 复核 VERDICT 的路径。
