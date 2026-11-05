@@ -669,11 +669,11 @@ K4 的前提：接收方必须设置 `maximum_capacity`。否则发送方可以�
 任何档都**不保证内容完整性**。
 只改动某个标量字段值的数据会被接受，因此不能把校验当作防篡改手段。
 
-K8 的现状（3.3.1）：客户端用字段表后端（第 2.1 节），按 C++20 用各平台原生编译器构建（Apple clang、
+K8 的现状（3.4.0）：客户端用字段表后端（第 2.1 节），按 C++20 用各平台原生编译器构建（Apple clang、
 Android NDK Clang、Windows 编译器），服务端照旧用 C++26 反射。Windows（MSVC 19.44、clang-cl 19、MinGW）
-在 3.3.1 上全量 CTest 都通过，语料与服务端逐字节一致；macOS 和 iOS 模拟器（Apple clang，部署目标 macOS 14.0 /
-iOS 17.0）的同样结果来自 3.3.0，Android（NDK r29/r30）的来自 3.2.x，3.3.1 都没有重跑（逐目标的数字见
-[CLIENT_TARGETS.md](CLIENT_TARGETS.md)）。真机（3.2.x，3.3.1 没有重跑）：iPhone 15 Pro Max（iOS 26.6.2）
+在 3.4.0 上全量 CTest 都通过，语料与服务端逐字节一致；macOS 和 iOS 模拟器（Apple clang，部署目标 macOS 14.0 /
+iOS 17.0）的同样结果来自 3.3.0，Android（NDK r29/r30）的来自 3.2.x，3.4.0 都没有重跑（逐目标的数字见
+[CLIENT_TARGETS.md](CLIENT_TARGETS.md)）。真机（3.2.x，3.4.0 没有重跑）：iPhone 15 Pro Max（iOS 26.6.2）
 CTest 138/138、语料逐字节一致、demo 通过；3.2.0-rc.1 在一台 Android 11 手机上功能全部通过。
 保证的范围：三个客户端目标都原生构建、CTest 通过，跨目标 wire 语料一致，签名与 `tools/sigs/` 基线一致；
 iOS 的地址空间和最低部署目标（系统 libc++ 的 `std::pmr` 在 macOS 14 / iOS 17 以下加载失败）见
