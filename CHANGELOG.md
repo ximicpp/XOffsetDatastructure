@@ -33,12 +33,13 @@
   12 KiB: page tables 33 to 17 MB, RSS 116 to 100 MB.
   Geometry: a VM buffer's `reserved_bytes()` and `accessible_bytes()` count
   from the payload, so they are whole pages minus 64 bytes, and the first page
-  is read/write from creation. A maximum that is a multiple of 4 MiB (64 MiB,
-  256 MiB) maps one more 4 MiB granule (PROT_NONE until used) but keeps its
-  2^k alignment: the owner map marks that granule as a tail that resolves one
-  granule back (entry bit 6; the lookup does the same work as before). A pool
-  budget that was an exact multiple of such a maximum holds one idle owner
-  fewer. docs/DEPLOYMENT.md section 5.
+  is read/write from creation. The region is aligned to the maximum's next
+  power of two (at least 4 MiB); a maximum of exactly 2^k (64 MiB, 256 MiB)
+  keeps 2^k and maps one more 4 MiB granule (PROT_NONE until used) for its
+  last 64 bytes and page rounding. The owner lookup masks the address minus 64
+  and adds 64, no more work than before. A pool budget that was an
+  exact multiple of such a maximum holds one idle owner fewer.
+  docs/DEPLOYMENT.md section 5.
 
 ## 3.3.1: root cache refill and trusted receive
 

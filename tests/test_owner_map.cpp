@@ -56,11 +56,11 @@ void vm_payload() {
     auto* base = base_of(b);
     // The region (64-byte host header, then the payload) spans the
     // reservation plus the header rounded up to 4 MiB; it is aligned to the
-    // span's next power of two (here 32 MiB), never less than 4 MiB, and the
-    // payload starts 64 bytes past that boundary, as in a slot.
+    // maximum's next power of two (here 32 MiB), never less than 4 MiB, and
+    // the payload starts 64 bytes past that boundary, as in a slot.
     constexpr std::size_t header = xo::detail::SlotGeometry::header_bytes;
     const auto span = (b.reserved_bytes() + header + OwnerMap::granule_bytes - 1) & ~(OwnerMap::granule_bytes - 1);
-    const auto align = std::bit_ceil(span);
+    const auto align = std::bit_ceil(std::size_t((24u << 20) - header));
     need(span == (24u << 20) && align == (32u << 20), "VM fixture span is not 24 MiB");
     need(reinterpret_cast<std::uintptr_t>(base) % align == header, "VM region not aligned to 2^k");
     require_maps(base, span - header, "VM payload granules");
@@ -77,29 +77,29 @@ void vm_payload() {
     ++cases;
 }
 
-// A maximum that is a multiple of 4 MiB: header plus payload span 2^k + one
-// granule. The region keeps the 2^k alignment (here 32 MiB, not 64); the
-// last granule is a tail entry that resolves one granule back.
-void vm_tail_granule() {
+// A maximum of exactly 2^k (here 32 MiB): the region keeps the 2^k
+// alignment (not 64 MiB). The header pushes the last 64 payload bytes into
+// one more granule, which carries the same entry; every payload byte
+// resolves, and nothing past that granule is mapped.
+void vm_power_of_two_maximum() {
     constexpr std::size_t header = xo::detail::SlotGeometry::header_bytes;
     constexpr std::size_t maximum = 32u << 20;
     auto b = xo::XBuffer::create<OwnerRoot>(1u << 20,
         xo::XBuffer::maximum_capacity(maximum).with_storage(xo::XStorage::Pinned));
-    need(b.storage_kind() == xo::XStorageKind::Vm, "tail fixture is not VM storage");
+    need(b.storage_kind() == xo::XStorageKind::Vm, "2^k fixture is not VM storage");
     auto* base = base_of(b);
     const auto region = reinterpret_cast<std::uintptr_t>(base) - header;
-    need(region % maximum == 0,
-         "tail region not aligned to 2^k");
-    need(b.reserved_bytes() >= maximum, "tail fixture reserves less than its maximum");
-    require_maps(base, maximum + OwnerMap::granule_bytes - header, "tail region granules");
-    const auto* tail = reinterpret_cast<const char*>(region + maximum);
-    need(OwnerMap::payload_of(tail) == base && OwnerMap::payload_of(tail - 1) == base,
-         "tail granule does not resolve to its payload");
-    need(OwnerMap::same_payload(tail, tail + 4096) == base && OwnerMap::same_payload(tail - 8, tail + 8) == base,
-         "tail granule heads do not share their payload");
-    need(OwnerMap::payload_of(tail + OwnerMap::granule_bytes) == nullptr, "granule past the tail is mapped");
-    // Grow to the very end: blocks in the tail granule bind to the payload.
-    need(b.grow(maximum - b.get_size()), "tail fixture did not grow to its maximum");
+    need(region % maximum == 0, "2^k region not aligned to 2^k");
+    need(b.reserved_bytes() >= maximum, "2^k fixture reserves less than its maximum");
+    require_maps(base, maximum, "2^k payload granules");
+    const auto* past = reinterpret_cast<const char*>(region + maximum);  // last 64 payload bytes
+    need(OwnerMap::payload_of(past) == base && OwnerMap::payload_of(past + header - 1) == base,
+         "payload bytes past 2^k do not resolve");
+    need(OwnerMap::same_payload(past, past + 32) == base && OwnerMap::same_payload(past - 8, past + 8) == base,
+         "heads past 2^k do not share their payload");
+    need(OwnerMap::payload_of(past + OwnerMap::granule_bytes) == nullptr, "granule past the mapping is mapped");
+    // Grow to the very end: the last payload bytes bind to the payload.
+    need(b.grow(maximum - b.get_size()), "2^k fixture did not grow to its maximum");
     auto& r = b.root<OwnerRoot>();
     r.values.resize(1000, 9u);
     need(OwnerMap::payload_of(base + maximum - 8) == base, "last payload byte does not resolve");
@@ -189,7 +189,7 @@ void heads_outside() {
 
 int main() {
     vm_payload();
-    vm_tail_granule();
+    vm_power_of_two_maximum();
     slot_payloads();
     reuse_and_unmap();
     heads_outside();
