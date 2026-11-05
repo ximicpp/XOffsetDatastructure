@@ -41,6 +41,10 @@
 // ordinary records and arrays of them, XString, and XVector of elements
 // without containers. Sets, maps and vectors of records with containers are
 // rejected at compile time.
+//
+// Encoding writes into an XSyncOut (storage that only grows, never zero
+// filled); a server builds each message with an XSyncWriter, whose cursor
+// stays in registers: one capacity check per op.
 
 #include "xoffsetdatastructure.hpp"
 
@@ -49,6 +53,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <new>
 #include <span>
 #include <string>
@@ -63,23 +68,84 @@ namespace XOffsetDatastructure::xsync {
 
     // Writes v at b (at most 5 bytes); returns the length.
     inline unsigned encode_varint(char* b, std::uint32_t v) noexcept {
+        if (v < 0x80) { b[0] = char(v); return 1; }
+        if (v < 0x4000) { b[0] = char(v | 0x80); b[1] = char(v >> 7); return 2; }
         unsigned n = 0;
         while (v >= 0x80) { b[n++] = char(v | 0x80); v >>= 7; }
         b[n++] = char(v);
         return n;
     }
+    // ---- output buffer ---------------------------------------------------------
+
+    class XSyncWriter;
+
+    // The bytes an encoder appends to. Storage only grows and is never zero
+    // filled; clear() keeps it for the next message, so a server that reuses
+    // one buffer per message pays one capacity check per write and no
+    // allocation once it has grown.
+    class XSyncOut {
+    public:
+        XSyncOut() = default;
+        XSyncOut(const XSyncOut& o) { append(o.data(), o.size()); }
+        XSyncOut& operator=(const XSyncOut& o) {
+            if (this != &o) { len_ = 0; append(o.data(), o.size()); }
+            return *this;
+        }
+        XSyncOut(XSyncOut&& o) noexcept : buf_(std::move(o.buf_)), len_(o.len_), cap_(o.cap_) { o.len_ = o.cap_ = 0; }
+        XSyncOut& operator=(XSyncOut&& o) noexcept {
+            buf_ = std::move(o.buf_); len_ = o.len_; cap_ = o.cap_; o.len_ = o.cap_ = 0;
+            return *this;
+        }
+
+        void clear() noexcept { len_ = 0; }
+        bool empty() const noexcept { return len_ == 0; }
+        std::size_t size() const noexcept { return len_; }
+        std::size_t capacity() const noexcept { return cap_; }
+        char* data() noexcept { return buf_.get(); }
+        const char* data() const noexcept { return buf_.get(); }
+        std::string_view view() const noexcept { return {buf_.get(), len_}; }
+        char& operator[](std::size_t i) noexcept { return buf_[i]; }
+        char operator[](std::size_t i) const noexcept { return buf_[i]; }
+
+        // At least n writable bytes after the end; returns where they start.
+        // commit(k) then keeps the first k of them.
+        char* tail(std::size_t n) {
+            if (cap_ - len_ < n) grow(n);
+            return buf_.get() + len_;
+        }
+        void commit(std::size_t k) noexcept { len_ += k; }
+        void push_back(char c) { *tail(1) = c; ++len_; }
+        void append(const char* p, std::size_t n) {
+            if (n == 0) return;
+            std::memcpy(tail(n), p, n);
+            len_ += n;
+        }
+        // Drops the bytes from n on (n <= size()).
+        void truncate(std::size_t n) noexcept { len_ = n; }
+        void reserve(std::size_t n) { if (n > cap_) grow(n - len_); }
+
+    private:
+        friend class XSyncWriter;
+        XOFFSET_DETAIL_NOINLINE void grow(std::size_t n) {
+            std::size_t c = cap_ * 2;
+            if (c < len_ + n) c = len_ + n;
+            if (c < 256) c = 256;
+            std::unique_ptr<char[]> b(new char[c]);
+            if (len_) std::memcpy(b.get(), buf_.get(), len_);
+            buf_ = std::move(b);
+            cap_ = c;
+        }
+        std::unique_ptr<char[]> buf_;
+        std::size_t len_ = 0, cap_ = 0;
+    };
+
     // Appends at most max bytes to out: f(d) writes them at d and returns how
     // many it wrote. One capacity check, no call per byte.
-    template <class F> inline void write_into(std::string& out, std::size_t max, F&& f) {
-        const std::size_t at = out.size();
-#if defined(__cpp_lib_string_resize_and_overwrite)
-        out.resize_and_overwrite(at + max, [&](char* d, std::size_t) { return at + std::size_t(f(d + at)); });
-#else
-        out.resize(at + max);
-        out.resize(at + std::size_t(f(out.data() + at)));
-#endif
+    template <class F> inline void write_into(XSyncOut& out, std::size_t max, F&& f) {
+        char* d = out.tail(max);
+        out.commit(std::size_t(f(d)));
     }
-    inline void put_varint(std::string& out, std::uint32_t v) {
+    inline void put_varint(XSyncOut& out, std::uint32_t v) {
         write_into(out, 5, [&](char* d) { return encode_varint(d, v); });
     }
     inline bool get_varint(const char*& p, const char* end, std::uint32_t& v) noexcept {
@@ -259,61 +325,82 @@ namespace XOffsetDatastructure::xsync {
             x &= 0x0101010101010101ull;
             return unsigned((x * 0x0102040810204080ull) >> 56);
         }
+        // Word a / 8 of p: rem = bytes left from a (zero fill past them).
         inline std::uint64_t load(const unsigned char* p, std::size_t rem) noexcept {
             std::uint64_t v = 0;
-            std::memcpy(&v, p, rem >= 8 ? 8 : rem);
+            if (rem >= 8) std::memcpy(&v, p, 8);
+            else std::memcpy(&v, p, rem);
             return v;
         }
+        // Byte b of kSpread[m] is 0xff when bit b of m is set.
+        inline constexpr auto kSpread = [] {
+            std::array<std::uint64_t, 256> t{};
+            for (unsigned m = 0; m < 256; ++m)
+                for (unsigned b = 0; b < 8; ++b)
+                    if (m >> b & 1u) t[m] |= std::uint64_t(0xff) << (8 * b);
+            return t;
+        }();
 
         // Writes the block section of [0, n) of cur against old (nullptr: all
         // zero). plain(w) gives the sendable bytes of word w. With sync the
         // sent bytes are copied into old. Returns the number of blocks.
-        template <class Plain>
-        std::uint32_t put_blocks(std::string& out, const unsigned char* cur, unsigned char* old, std::size_t n,
+        // N != 0: n is N, known at compile time (a record); whole words are
+        // loaded and stored when N is a multiple of 8. One capacity check for
+        // the whole section, then plain stores.
+        template <std::size_t N = 0, class Plain>
+        std::uint32_t put_blocks(XSyncOut& out, const unsigned char* cur, unsigned char* old, std::size_t n,
                                  Plain&& plain, bool sync) {
-            const std::size_t count_at = out.size();
-            out.push_back(0);
+            if constexpr (N != 0) n = N;
+            constexpr bool whole = N != 0 && N % 8 == 0;
+            const auto word = [n](const unsigned char* p, std::size_t a) noexcept -> std::uint64_t {
+                if constexpr (whole) { std::uint64_t v; std::memcpy(&v, p + a, 8); return v; }
+                else return load(p + a, n - a);
+            };
+            const std::size_t blocks = (n + 63) / 64;
+            char* const d = out.tail(1 + blocks * (5 + 1 + 8 + 64));
+            char* q = d + 1;
             std::uint32_t count = 0;
             std::size_t next = 0;
-            for (std::size_t b = 0; b * 64 < n; ++b) {
-                unsigned masks[8] = {};
+            for (std::size_t b = 0; b < blocks; ++b) {
+                unsigned masks[8];
                 unsigned sel = 0;
-                for (unsigned w = 0; w < 8; ++w) {
+                const std::size_t words = n - b * 64 >= 64 ? 8 : (n - b * 64 + 7) / 8;
+                for (unsigned w = 0; w < words; ++w) {
                     const std::size_t a = b * 64 + w * 8;
-                    if (a >= n) break;
-                    const std::uint64_t x = load(cur + a, n - a) ^ (old ? load(old + a, n - a) : 0);
+                    const std::uint64_t x = word(cur, a) ^ (old ? word(old, a) : 0);
                     if (!x) continue;
                     const unsigned m = byte_mask(x) & plain(a / 8);
                     masks[w] = m;
-                    if (m) sel |= 1u << w;
+                    sel |= unsigned(m != 0) << w;
                 }
                 if (!sel) continue;
-                // One block: varint skip, selector, masks, data; one write.
-                write_into(out, 5 + 1 + 8 + 64, [&](char* blk) {
-                unsigned len = encode_varint(blk, std::uint32_t(b - next));
-                blk[len++] = char(sel);
-                for (unsigned s = sel; s; s &= s - 1) blk[len++] = char(masks[std::countr_zero(s)]);
+                // One block: varint skip, selector, masks, data.
+                q += encode_varint(q, std::uint32_t(b - next));
+                *q++ = char(sel);
+                for (unsigned s = sel; s; s &= s - 1) *q++ = char(masks[std::countr_zero(s)]);
                 for (unsigned s = sel; s; s &= s - 1) {
                     const unsigned w = unsigned(std::countr_zero(s));
-                    const std::size_t a0 = b * 64 + w * 8;
-                    if (masks[w] == 0xffu) {   // a whole word
-                        std::memcpy(blk + len, cur + a0, 8);
-                        if (sync) std::memcpy(old + a0, cur + a0, 8);
-                        len += 8;
+                    const std::size_t a = b * 64 + w * 8;
+                    const unsigned m = masks[w];
+                    const std::uint64_t c = word(cur, a);
+                    if (m == 0xffu) {   // a whole word
+                        std::memcpy(q, &c, 8);
+                        q += 8;
+                        if (sync) std::memcpy(old + a, &c, 8);
                         continue;
                     }
-                    for (unsigned m = masks[w]; m; m &= m - 1) {
-                        const std::size_t a = a0 + unsigned(std::countr_zero(m));
-                        blk[len++] = char(cur[a]);
-                        if (sync) old[a] = cur[a];
+                    for (unsigned r = m; r; r &= r - 1) *q++ = char(c >> (8 * std::countr_zero(r)));
+                    if (sync) {   // the sent bytes into old, the others kept
+                        const std::uint64_t keep = kSpread[m];
+                        const std::uint64_t o = (word(old, a) & ~keep) | (c & keep);
+                        std::memcpy(old + a, &o, whole || n - a >= 8 ? 8 : n - a);
                     }
                 }
-                return len;
-                });
                 next = b + 1;
                 ++count;
             }
-            out[count_at] = char(count);   // < 128 blocks: one varint byte
+            d[0] = char(count);   // < 128 blocks: one varint byte
+            out.commit(std::size_t(q - d));
             return count;
         }
 
@@ -421,9 +508,9 @@ namespace XOffsetDatastructure::xsync {
 
         // Appends the change from before to now and copies it into before.
         // Appends nothing and returns false when nothing changed.
-        static bool diff(const T& now, T& before, std::string& out) {
+        static bool diff(const T& now, T& before, XSyncOut& out) {
             const std::size_t start = out.size();
-            const std::uint32_t nb = sd_detail::put_blocks(
+            const std::uint32_t nb = sd_detail::put_blocks<sizeof(T)>(
                 out, reinterpret_cast<const unsigned char*>(&now), reinterpret_cast<unsigned char*>(&before), sizeof(T),
                 [](std::size_t w) -> unsigned { return I::plain[w]; }, true);
             std::uint32_t nc = 0;
@@ -454,19 +541,19 @@ namespace XOffsetDatastructure::xsync {
                         const std::uint32_t blocks = sd_detail::put_blocks(
                             out, reinterpret_cast<const unsigned char*>(cur.data()), reinterpret_cast<unsigned char*>(old.data()),
                             n * sizeof(E), [](std::size_t w) { return sd_detail::elem_mask<E>(w, sd_detail::kPlain | sd_detail::kBool); }, true);
-                        if (blocks == 0) out.resize(code_at);
+                        if (blocks == 0) out.truncate(code_at);
                         else ++nc;
                     }
                 });
                 out[count_at] = char(nc);
             }
-            if (nb == 0 && nc == 0) { out.resize(start); return false; }
+            if (nb == 0 && nc == 0) { out.truncate(start); return false; }
             return true;
         }
 
         // Appends a body that turns a cleared record (clear()) into now.
-        static void key(const T& now, std::string& out) {
-            sd_detail::put_blocks(out, reinterpret_cast<const unsigned char*>(&now), nullptr, sizeof(T),
+        static void key(const T& now, XSyncOut& out) {
+            sd_detail::put_blocks<sizeof(T)>(out, reinterpret_cast<const unsigned char*>(&now), nullptr, sizeof(T),
                                   [](std::size_t w) -> unsigned { return I::plain[w]; }, false);
             if constexpr (container_count > 0) {
                 const std::size_t count_at = out.size();
@@ -621,12 +708,12 @@ namespace XOffsetDatastructure::xsync {
         }
 
     private:
-        static void put_str(std::string& out, std::uint32_t k, std::string_view v) {
+        static void put_str(XSyncOut& out, std::uint32_t k, std::string_view v) {
             out.push_back(char(k << 2 | sd_detail::kStr));
             put_varint(out, std::uint32_t(v.size()));
             out.append(v.data(), v.size());
         }
-        template <class C> static void put_vset(std::string& out, std::uint32_t k, const C& cur) {
+        template <class C> static void put_vset(XSyncOut& out, std::uint32_t k, const C& cur) {
             using E = typename C::value_type;
             out.push_back(char(k << 2 | sd_detail::kVset));
             const std::size_t n = cur.size();
@@ -651,7 +738,7 @@ namespace XOffsetDatastructure::xsync {
         std::uint32_t count = 0;
     };
 
-    inline void put_header(std::string& out, const XSyncHeader& h) {
+    inline void put_header(XSyncOut& out, const XSyncHeader& h) {
         write_into(out, 4 + 8 + 5 + 5, [&](char* d) {
             d[0] = 'X'; d[1] = 'S'; d[2] = char(kFormat); d[3] = char(h.flags);
             unsigned n = 4;
@@ -660,11 +747,11 @@ namespace XOffsetDatastructure::xsync {
             return n + encode_varint(d + n, h.count);
         });
     }
-    inline void put_op(std::string& out, unsigned table, XSyncKind kind, std::uint32_t id) {
+    inline void put_op(XSyncOut& out, unsigned table, XSyncKind kind, std::uint32_t id) {
         write_into(out, 6, [&](char* d) { d[0] = char(table << 2 | unsigned(kind)); return 1 + encode_varint(d + 1, id); });
     }
     // An op and its body (len bytes at body, already encoded): one write.
-    inline void put_op(std::string& out, unsigned table, XSyncKind kind, std::uint32_t id, const char* body, std::size_t len) {
+    inline void put_op(XSyncOut& out, unsigned table, XSyncKind kind, std::uint32_t id, const char* body, std::size_t len) {
         write_into(out, 6 + len, [&](char* d) {
             d[0] = char(table << 2 | unsigned(kind));
             const unsigned n = 1 + encode_varint(d + 1, id);
@@ -672,6 +759,91 @@ namespace XOffsetDatastructure::xsync {
             return n + len;
         });
     }
+    // Builds one message in out: the header, then ops; finish() writes the op
+    // count. The write cursor stays in the writer (a local of the encoding
+    // function), so each op costs one capacity check and plain stores. The
+    // count is a three-byte varint, so the header's length does not depend
+    // on it.
+    class XSyncWriter {
+    public:
+        XSyncWriter(XSyncOut& out, std::uint8_t flags, std::uint64_t stream, std::uint32_t version) : out_(&out) {
+            out.clear();
+            char* d = out.tail(4 + 8 + 5 + 3);
+            d[0] = 'X'; d[1] = 'S'; d[2] = char(kFormat); d[3] = char(flags);
+            std::size_t n = 4;
+            if (flags & kFlagKey) { std::memcpy(d + n, &stream, 8); n += 8; }
+            n += encode_varint(d + n, version);
+            count_at_ = n;
+            q_ = d + n + 3;
+            end_ = out.data() + out.capacity();
+        }
+        XSyncWriter(const XSyncWriter&) = delete;
+        XSyncWriter& operator=(const XSyncWriter&) = delete;
+
+        // An op without a body (leave).
+        void op(unsigned table, XSyncKind kind, std::uint32_t id) {
+            char* d = need(6);
+            d[0] = char(table << 2 | unsigned(kind));
+            q_ = d + 1 + encode_varint(d + 1, id);
+            ++count_;
+        }
+        // An op and its body (len bytes at body, already encoded).
+        void op(unsigned table, XSyncKind kind, std::uint32_t id, const char* body, std::size_t len) {
+            char* d = need(6 + len);
+            d[0] = char(table << 2 | unsigned(kind));
+            d += 1 + encode_varint(d + 1, id);
+            std::memcpy(d, body, len);
+            q_ = d + len;
+            ++count_;
+        }
+        // A change op of a record diffed here (now against before, which it
+        // syncs); nothing when they are equal. Returns whether it wrote one.
+        template <class T> bool change(unsigned table, std::uint32_t id, const T& now, T& before) {
+            char* d = need(6);
+            d[0] = char(table << 2 | unsigned(XSyncKind::change));
+            const std::size_t at = std::size_t(d - out_->data());
+            out_->len_ = at + 1 + encode_varint(d + 1, id);
+            const bool any = XRecordDelta<T>::diff(now, before, *out_);
+            q_ = out_->data() + (any ? out_->len_ : at);
+            end_ = out_->data() + out_->cap_;
+            count_ += any;
+            return any;
+        }
+        std::uint32_t count() const noexcept { return count_; }
+        // Writes the count; out holds the message. Returns its length.
+        std::size_t finish() noexcept {
+            char* c = out_->data() + count_at_;
+            c[0] = char(0x80 | (count_ & 0x7f));
+            c[1] = char(0x80 | ((count_ >> 7) & 0x7f));
+            c[2] = char((count_ >> 14) & 0x7f);
+            out_->len_ = std::size_t(q_ - out_->data());
+            return out_->len_;
+        }
+
+    private:
+        struct Span { char* q; char* end; };
+        // Room for n more bytes after used; the writer's own address never
+        // leaves it, so its cursor can live in registers.
+        XOFFSET_DETAIL_NOINLINE static Span grow(XSyncOut& out, std::size_t used, std::size_t n) {
+            out.len_ = used;
+            char* q = out.tail(n);
+            return {q, out.data() + out.cap_};
+        }
+        char* need(std::size_t n) {
+            if (std::size_t(end_ - q_) < n) {
+                const Span s = grow(*out_, std::size_t(q_ - out_->data()), n);
+                q_ = s.q;
+                end_ = s.end;
+            }
+            return q_;
+        }
+        XSyncOut* out_;
+        char* q_;
+        char* end_;
+        std::size_t count_at_;
+        std::uint32_t count_ = 0;
+    };
+
     inline const char* get_header(const char* p, const char* end, XSyncHeader& h) noexcept {
         if (end - p < 4 || p[0] != 'X' || p[1] != 'S' || static_cast<unsigned char>(p[2]) != kFormat) return nullptr;
         h.flags = static_cast<std::uint8_t>(p[3]);
