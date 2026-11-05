@@ -1,0 +1,5 @@
+STAGE331 L2 rc 15 at 2026-11-05T06:51:27Z (0 pass, 10 fail, 11 pending, 12 invalid, 13 incomplete, 14 n/a, 15 L2 failed and the bisection follows)
+ABC: fail (max upper bound 1.0239; A 1.0239, B 1.0028, C 0.9915; 24 / 24 processes)
+GATE_D: head D÷flatbuffers 0.920 / 0.930 (O4 upper bound <= 1.0: met), D÷zpp_bits 1.024 / 1.030, D.read 67.5 µs; anc D÷flatbuffers 0.944 / 0.949, D÷zpp_bits 1.029 / 1.033, D.read 68.1 µs
+G8 met
+G9R and ctest follow

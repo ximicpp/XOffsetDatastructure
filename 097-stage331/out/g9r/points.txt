@@ -1,0 +1,22 @@
+t0 51a4815b7802ec125e2752847b69fd2a87ab7259 tree 254473076fde1ce98ca5529e307417cd8c0b5b3a typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (v3.3.0 51a4815b (previous release tag))
+t1 ee506d3f54a979ededdd71cdc5cca5857ff38f11 tree becbab81e91384527bc313392fb407f61f690d36 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (STAGE331 head (v3.3.1 ee506d3f))
+t1: diff over t0 sha256 c551f5740d9c40af08e7c413286635e3547490a2e037238f6631d2c7d10c6de6 ( 42 files changed, 1805 insertions(+), 128 deletions(-))
+t1: library header diff over t0:  1 file changed, 133 insertions(+), 12 deletions(-)
+t1: first-parent commits over t0:
+  ee506d3f Merge pull request #238 from ximicpp/claude/release-3.3.1 (class 0): release 3.3.1
+  eb4f0468 Merge pull request #226 from ximicpp/claude/max-capacity-limit-20261104 (class S)
+  0723bc0b Merge pull request #221 from ximicpp/claude/handle-derived-fastpath-20261104 (class S)
+  522f6dfb Merge pull request #233 from ximicpp/claude/slg-eb-native-20261105 (class 0): native browse delta rows NB (report only)
+  84243ba5 Merge pull request #223 from ximicpp/claude/root-refill-20261104 (class L): root<T>() refills its cache on the checked path
+  d9eb9559 Merge pull request #228 from ximicpp/claude/trust-admit-p1-20261104 (class L)
+  7601372d Merge pull request #235 from ximicpp/claude/perf-gate-cache-floor-20261105
+  9b214e19 Merge pull request #234 from ximicpp/claude/perf-gate-cache-sim-zeros-20261105 (class 0): cache-sim trailing zero counts
+  fb4b96c9 Merge pull request #232 from ximicpp/claude/perf-gate-cache-sim-20261105 (class 0): perf_gate --cache-sim warning item
+  62c0269e Merge pull request #231 from ximicpp/claude/cloud-only-merge-rules (class 0): merges judged in the cloud
+  9f39390e Merge pull request #230 from ximicpp/claude/anchor-3.3.0 (class 0): anchor at v3.3.0, releases judged in the cloud
+  c9fae222 Merge pull request #227 from ximicpp/claude/slg-flat-held-index-20261104 (class 0)
+bench/reloc of t1: same tree as t0
+reloc_bench t0 sha256 25d9006a12d1b47b14d53a9469e60526ebc8412c01b190def92b93c2b983a797
+reloc_bench t1 sha256 70ef4974d92872cec20fcdc0207e6af7aca7ed4abc17338d8e001729a41b3762
+reloc_bench t0a sha256 972c1725256dc635098dd57c1f6b270727f438c492d89778db8d403e8a292895
+reloc_bench t1a sha256 d8e183035a70417d0de3f5b4430ad52d986d54b8761d9eff018bee33f8ca2159

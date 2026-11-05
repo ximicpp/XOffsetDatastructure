@@ -1,0 +1,12 @@
+2026-11-05T06:13:52Z block 1 start: waited 180s load 1.81 WindowServer 3.9% (gated 0) remote 5
+2026-11-05T06:17:14Z block 2 start: waited 180s load 2.07 WindowServer 5% (gated 0) remote 5
+2026-11-05T06:20:37Z block 3 start: waited 180s load 2.04 WindowServer 4.3% (gated 0) remote 5
+2026-11-05T06:24:00Z block 4 start: waited 180s load 1.85 WindowServer 4.3% (gated 0) remote 5
+2026-11-05T06:27:22Z block 5 start: waited 180s load 1.25 WindowServer 1% (gated 0) remote 5
+2026-11-05T06:30:45Z block 6 start: waited 180s load 1.37 WindowServer 1.3% (gated 0) remote 5
+2026-11-05T06:34:10Z block 7 start: waited 180s load 1.43 WindowServer 4.3% (gated 0) remote 5
+2026-11-05T06:37:33Z block 8 start: waited 180s load 1.18 WindowServer 1.2% (gated 0) remote 5
+2026-11-05T06:40:55Z block 9 start: waited 180s load 1.01 WindowServer 3% (gated 0) remote 5
+2026-11-05T06:44:18Z block 10 start: waited 180s load 1.15 WindowServer 1.2% (gated 0) remote 5
+2026-11-05T06:47:40Z block 11 start: waited 180s load 1.27 WindowServer 1.2% (gated 0) remote 5
+2026-11-05T06:51:02Z block 12 start: waited 180s load 1.56 WindowServer 1.3% (gated 0) remote 5
