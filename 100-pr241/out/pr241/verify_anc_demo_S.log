@@ -1,0 +1,61 @@
+cycle 0 xoffset      state=35699041b2746d60 reports=7495224734708421512
+cycle 0 cereal       state=35699041b2746d60 reports=7495224734708421512
+cycle 0 protobuf     state=35699041b2746d60 reports=7495224734708421512
+cycle 0 flatbuffers  state=35699041b2746d60 reports=7495224734708421512
+cycle 0 zpp_bits     state=35699041b2746d60 reports=7495224734708421512
+cycle 0 cista        state=35699041b2746d60 reports=7495224734708421512
+cycle 1 xoffset      state=3d59228c28360566 reports=3607855481305230368
+cycle 1 cereal       state=3d59228c28360566 reports=3607855481305230368
+cycle 1 protobuf     state=3d59228c28360566 reports=3607855481305230368
+cycle 1 flatbuffers  state=3d59228c28360566 reports=3607855481305230368
+cycle 1 zpp_bits     state=3d59228c28360566 reports=3607855481305230368
+cycle 1 cista        state=3d59228c28360566 reports=3607855481305230368
+cycle 2 xoffset      state=e50250503718d912 reports=17903500564452099173
+cycle 2 cereal       state=e50250503718d912 reports=17903500564452099173
+cycle 2 protobuf     state=e50250503718d912 reports=17903500564452099173
+cycle 2 flatbuffers  state=e50250503718d912 reports=17903500564452099173
+cycle 2 zpp_bits     state=e50250503718d912 reports=17903500564452099173
+cycle 2 cista        state=e50250503718d912 reports=17903500564452099173
+
+wire bytes per message, demo case set (average over the last cycle)
+format            A.req      A.res   B.player   S.player
+xoffset            1168       2084      11299      11502
+cereal             1002       1405       7098       7285
+protobuf            559        836       4320       4436
+flatbuffers        1202       1611       8228       8440
+zpp_bits            875       1278       6368       6526
+cista              1411       1814       9660       9929
+
+server -> client, bytes: EB = one viewport pull while browsing (raw / zstd-3),
+U = one viewport delta to a static client (raw / zstd-3), rate P/C/S
+format       case       pull  pull.zstd    U.delta     U.zstd      pulls deliveries
+xoffset      B         15074       5276          0          0        256          0
+                       16641       5261   (save_compact pull / zstd-3)
+                                              1160        844   (native delta / zstd-3)
+xoffset      P             0          0        190        114          0        171
+                                                49         52   (native delta / zstd-3)
+xoffset      C             0          0        713        340          0        202
+                                                86         86   (native delta / zstd-3)
+xoffset      S             0          0       3488       1501          0        256
+                                               200        185   (native delta / zstd-3)
+cereal       B         14048       4983          0          0        256          0
+cereal       P             0          0        122         75          0        171
+cereal       C             0          0        596        287          0        202
+cereal       S             0          0       3093       1365          0        256
+protobuf     B          8011       5209          0          0        256          0
+protobuf     P             0          0         47         56          0        171
+protobuf     C             0          0        358        287          0        202
+protobuf     S             0          0       1966       1457          0        256
+flatbuffers  B         15797       5540          0          0        256          0
+flatbuffers  P             0          0        178        110          0        171
+flatbuffers  C             0          0        769        364          0        202
+flatbuffers  S             0          0       3812       1649          0        256
+zpp_bits     B         13473       4913          0          0        256          0
+zpp_bits     P             0          0        101         77          0        171
+zpp_bits     C             0          0        546        283          0        202
+zpp_bits     S             0          0       2879       1334          0        256
+cista        B         15432       5230          0          0        256          0
+cista        P             0          0        205         92          0        171
+cista        C             0          0        748        322          0        202
+cista        S             0          0       3634       1477          0        256
+verify: all formats agree

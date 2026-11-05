@@ -1,0 +1,135 @@
+== 2026-11-05T15:50:37Z 0. tools
+cmake version 4.4.4
+1.13.2
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+hw.memsize 17179869184 pagesize 16384
+hog.py sha256 3c241d443acaa9ee4d67c8eb96141b270be5104d921af094c471baa70583b421
+== 2026-11-05T15:50:37Z 1. source
+/Volumes/XOffsetCS/perf-gate/src/pr241-head/bench/slg/MANIFEST: 27 files match
+head: fd0dc58cfbf7c7a49119148a7e6c21b92917922b tree afd1feed85e16519e55ccf56188acbc1df296423 bench/slg bd7b674e8351b045fea483aa6383f40ee80b2ba1
+/Volumes/XOffsetCS/perf-gate/src/pr241-anc/bench/slg/MANIFEST: 27 files match
+anc: d10ede94033f0a985f1e00463e2674a1e03486c5 tree c2003a8dc22ac06c2b0a667a973972f6a549e6d3 bench/slg bd7b674e8351b045fea483aa6383f40ee80b2ba1
+== 2026-11-05T15:50:44Z 2. build
+head -- slg_bench formats:xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+head slg_bench sha256 33280198ada43ed7c30e71e7064f22f33dedaf1a61fb4c88c226766a2b80c00d
+anc -- slg_bench formats:xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+anc slg_bench sha256 884d4709e2f198cfc2a44bc47619cd4f570877b7b3264f001ede57ebb76de1af
+== 2026-11-05T15:51:47Z 3. verify
+head default mode: cycle 2 xoffset      state=0439e37815b4d22a reports=2128166416352
+anc default mode: cycle 2 xoffset      state=0439e37815b4d22a reports=2128166416352
+== 2026-11-05T15:53:02Z 4. timing
+2026-11-05T15:56:51Z p1 M anc 1 xoffset done rc 0: 1793894164..1793894211 (47 s) load 1.59
+2026-11-05T15:57:49Z p1 M anc 1 xoffset_trusted done rc 0: 1793894221..1793894269 (48 s) load 2.77
+2026-11-05T15:58:35Z p1 M anc 1 zpp_bits done rc 0: 1793894279..1793894315 (36 s) load 2.79
+2026-11-05T15:59:28Z p1 M anc 1 cista_unchecked done rc 0: 1793894326..1793894368 (42 s) load 3.96
+2026-11-05T16:01:17Z p1 M head 1 xoffset done rc 0: 1793894429..1793894477 (48 s) load 2.29
+2026-11-05T16:02:15Z p1 M head 1 xoffset_trusted done rc 0: 1793894487..1793894535 (48 s) load 2.80
+2026-11-05T16:03:02Z p1 M head 1 zpp_bits done rc 0: 1793894546..1793894582 (36 s) load 2.36
+2026-11-05T16:03:52Z p1 M head 1 cista_unchecked done rc 0: 1793894592..1793894632 (40 s) load 2.32
+2026-11-05T16:05:11Z p1 M head 2 xoffset done rc 0: 1793894663..1793894711 (48 s) load 2.13
+2026-11-05T16:06:10Z p1 M head 2 xoffset_trusted done rc 0: 1793894721..1793894770 (49 s) load 2.02
+2026-11-05T16:06:56Z p1 M head 2 zpp_bits done rc 0: 1793894780..1793894816 (36 s) load 2.40
+2026-11-05T16:07:46Z p1 M head 2 cista_unchecked done rc 0: 1793894826..1793894866 (40 s) load 2.37
+2026-11-05T16:09:05Z p1 M anc 2 xoffset done rc 0: 1793894897..1793894945 (48 s) load 2.30
+2026-11-05T16:10:04Z p1 M anc 2 xoffset_trusted done rc 0: 1793894955..1793895004 (49 s) load 2.01
+2026-11-05T16:10:50Z p1 M anc 2 zpp_bits done rc 0: 1793895014..1793895050 (36 s) load 2.09
+2026-11-05T16:11:41Z p1 M anc 2 cista_unchecked done rc 0: 1793895060..1793895101 (41 s) load 2.43
+2026-11-05T16:12:59Z p1 M anc 3 xoffset done rc 0: 1793895131..1793895179 (48 s) load 2.58
+2026-11-05T16:13:58Z p1 M anc 3 xoffset_trusted done rc 0: 1793895190..1793895238 (48 s) load 1.94
+2026-11-05T16:14:44Z p1 M anc 3 zpp_bits done rc 0: 1793895248..1793895284 (36 s) load 2.12
+2026-11-05T16:15:35Z p1 M anc 3 cista_unchecked done rc 0: 1793895295..1793895335 (40 s) load 2.24
+2026-11-05T16:16:54Z p1 M head 3 xoffset done rc 0: 1793895365..1793895414 (49 s) load 2.46
+2026-11-05T16:17:52Z p1 M head 3 xoffset_trusted done rc 0: 1793895424..1793895472 (48 s) load 2.02
+2026-11-05T16:18:39Z p1 M head 3 zpp_bits done rc 0: 1793895482..1793895519 (37 s) load 2.19
+2026-11-05T16:19:29Z p1 M head 3 cista_unchecked done rc 0: 1793895529..1793895569 (40 s) load 2.45
+2026-11-05T16:20:48Z p1 M head 4 xoffset done rc 0: 1793895600..1793895648 (48 s) load 1.99
+2026-11-05T16:21:46Z p1 M head 4 xoffset_trusted done rc 0: 1793895658..1793895706 (48 s) load 2.31
+2026-11-05T16:22:33Z p1 M head 4 zpp_bits done rc 0: 1793895717..1793895753 (36 s) load 2.00
+2026-11-05T16:23:26Z p1 M head 4 cista_unchecked done rc 0: 1793895763..1793895805 (42 s) load 3.77
+2026-11-05T16:25:04Z p1 M anc 4 xoffset done rc 0: 1793895856..1793895904 (48 s) load 2.70
+2026-11-05T16:26:03Z p1 M anc 4 xoffset_trusted done rc 0: 1793895915..1793895963 (48 s) load 2.30
+2026-11-05T16:26:49Z p1 M anc 4 zpp_bits done rc 0: 1793895973..1793896009 (36 s) load 2.25
+2026-11-05T16:27:40Z p1 M anc 4 cista_unchecked done rc 0: 1793896020..1793896060 (40 s) load 2.13
+2026-11-05T16:28:59Z p1 M anc 5 xoffset done rc 0: 1793896090..1793896139 (49 s) load 2.09
+2026-11-05T16:29:57Z p1 M anc 5 xoffset_trusted done rc 0: 1793896149..1793896197 (48 s) load 2.12
+2026-11-05T16:30:43Z p1 M anc 5 zpp_bits done rc 0: 1793896207..1793896243 (36 s) load 2.62
+2026-11-05T16:31:34Z p1 M anc 5 cista_unchecked done rc 0: 1793896254..1793896294 (40 s) load 2.46
+2026-11-05T16:32:53Z p1 M head 5 xoffset done rc 0: 1793896324..1793896372 (48 s) load 2.59
+2026-11-05T16:33:51Z p1 M head 5 xoffset_trusted done rc 0: 1793896383..1793896431 (48 s) load 2.66
+2026-11-05T16:34:38Z p1 M head 5 zpp_bits done rc 0: 1793896441..1793896478 (37 s) load 2.35
+2026-11-05T16:35:28Z p1 M head 5 cista_unchecked done rc 0: 1793896488..1793896528 (40 s) load 2.28
+2026-11-05T16:36:47Z p1 M head 6 xoffset done rc 0: 1793896558..1793896607 (49 s) load 2.30
+2026-11-05T16:37:45Z p1 M head 6 xoffset_trusted done rc 0: 1793896617..1793896665 (48 s) load 2.00
+2026-11-05T16:38:32Z p1 M head 6 zpp_bits done rc 0: 1793896675..1793896712 (37 s) load 2.58
+2026-11-05T16:39:24Z p1 M head 6 cista_unchecked done rc 0: 1793896722..1793896764 (42 s) load 2.33
+2026-11-05T16:40:43Z p1 M anc 6 xoffset done rc 0: 1793896795..1793896843 (48 s) load 2.74
+2026-11-05T16:41:41Z p1 M anc 6 xoffset_trusted done rc 0: 1793896853..1793896901 (48 s) load 3.10
+2026-11-05T16:42:38Z p1 M anc 6 zpp_bits done rc 0: 1793896922..1793896958 (36 s) load 2.56
+2026-11-05T16:43:28Z p1 M anc 6 cista_unchecked done rc 0: 1793896968..1793897008 (40 s) load 2.23
+2026-11-05T16:44:01Z p1 S anc 1 xoffset done rc 0: 1793897039..1793897041 (2 s) load 2.05
+2026-11-05T16:44:13Z p1 S anc 1 xoffset_trusted done rc 0: 1793897051..1793897053 (2 s) load 1.74
+2026-11-05T16:44:25Z p1 S anc 1 zpp_bits done rc 0: 1793897063..1793897065 (2 s) load 1.78
+2026-11-05T16:44:37Z p1 S anc 1 cista_unchecked done rc 0: 1793897075..1793897077 (2 s) load 1.68
+2026-11-05T16:45:10Z p1 S head 1 xoffset done rc 0: 1793897108..1793897110 (2 s) load 1.88
+2026-11-05T16:45:22Z p1 S head 1 xoffset_trusted done rc 0: 1793897120..1793897122 (2 s) load 1.75
+2026-11-05T16:45:34Z p1 S head 1 zpp_bits done rc 0: 1793897132..1793897134 (2 s) load 1.65
+2026-11-05T16:45:47Z p1 S head 1 cista_unchecked done rc 0: 1793897145..1793897147 (2 s) load 1.86
+2026-11-05T16:46:19Z p1 S head 2 xoffset done rc 0: 1793897177..1793897179 (2 s) load 1.81
+2026-11-05T16:46:31Z p1 S head 2 xoffset_trusted done rc 0: 1793897189..1793897191 (2 s) load 1.84
+2026-11-05T16:46:44Z p1 S head 2 zpp_bits done rc 0: 1793897202..1793897204 (2 s) load 1.96
+2026-11-05T16:46:56Z p1 S head 2 cista_unchecked done rc 0: 1793897214..1793897216 (2 s) load 1.74
+2026-11-05T16:47:28Z p1 S anc 2 xoffset done rc 0: 1793897246..1793897248 (2 s) load 1.52
+2026-11-05T16:47:41Z p1 S anc 2 xoffset_trusted done rc 0: 1793897259..1793897261 (2 s) load 1.68
+2026-11-05T16:47:53Z p1 S anc 2 zpp_bits done rc 0: 1793897271..1793897273 (2 s) load 1.57
+2026-11-05T16:48:05Z p1 S anc 2 cista_unchecked done rc 0: 1793897283..1793897285 (2 s) load 1.59
+2026-11-05T16:48:38Z p1 S anc 3 xoffset done rc 0: 1793897316..1793897318 (2 s) load 1.44
+2026-11-05T16:48:50Z p1 S anc 3 xoffset_trusted done rc 0: 1793897328..1793897330 (2 s) load 1.48
+2026-11-05T16:49:02Z p1 S anc 3 zpp_bits done rc 0: 1793897340..1793897342 (2 s) load 1.48
+2026-11-05T16:49:14Z p1 S anc 3 cista_unchecked done rc 0: 1793897352..1793897354 (2 s) load 1.76
+2026-11-05T16:49:47Z p1 S head 3 xoffset done rc 0: 1793897385..1793897387 (2 s) load 1.64
+2026-11-05T16:49:59Z p1 S head 3 xoffset_trusted done rc 0: 1793897397..1793897399 (2 s) load 2.01
+2026-11-05T16:50:11Z p1 S head 3 zpp_bits done rc 0: 1793897409..1793897411 (2 s) load 2.18
+2026-11-05T16:50:24Z p1 S head 3 cista_unchecked done rc 0: 1793897422..1793897424 (2 s) load 2.06
+2026-11-05T16:50:56Z p1 S head 4 xoffset done rc 0: 1793897454..1793897456 (2 s) load 1.79
+2026-11-05T16:51:08Z p1 S head 4 xoffset_trusted done rc 0: 1793897466..1793897468 (2 s) load 1.75
+2026-11-05T16:51:21Z p1 S head 4 zpp_bits done rc 0: 1793897479..1793897481 (2 s) load 1.65
+2026-11-05T16:51:33Z p1 S head 4 cista_unchecked done rc 0: 1793897491..1793897493 (2 s) load 1.70
+2026-11-05T16:52:05Z p1 S anc 4 xoffset done rc 0: 1793897523..1793897525 (2 s) load 2.02
+2026-11-05T16:52:18Z p1 S anc 4 xoffset_trusted done rc 0: 1793897536..1793897538 (2 s) load 2.02
+2026-11-05T16:52:30Z p1 S anc 4 zpp_bits done rc 0: 1793897548..1793897550 (2 s) load 2.09
+2026-11-05T16:52:42Z p1 S anc 4 cista_unchecked done rc 0: 1793897560..1793897562 (2 s) load 1.93
+2026-11-05T16:53:15Z p1 S anc 5 xoffset done rc 0: 1793897593..1793897595 (2 s) load 2.01
+2026-11-05T16:53:27Z p1 S anc 5 xoffset_trusted done rc 0: 1793897605..1793897607 (2 s) load 2.23
+2026-11-05T16:53:39Z p1 S anc 5 zpp_bits done rc 0: 1793897617..1793897619 (2 s) load 2.20
+2026-11-05T16:53:52Z p1 S anc 5 cista_unchecked done rc 0: 1793897629..1793897632 (3 s) load 2.09
+2026-11-05T16:54:24Z p1 S head 5 xoffset done rc 0: 1793897662..1793897664 (2 s) load 2.19
+2026-11-05T16:54:36Z p1 S head 5 xoffset_trusted done rc 0: 1793897674..1793897676 (2 s) load 2.06
+2026-11-05T16:54:49Z p1 S head 5 zpp_bits done rc 0: 1793897687..1793897689 (2 s) load 1.90
+2026-11-05T16:55:01Z p1 S head 5 cista_unchecked done rc 0: 1793897699..1793897701 (2 s) load 1.79
+2026-11-05T16:55:33Z p1 S head 6 xoffset done rc 0: 1793897731..1793897733 (2 s) load 1.47
+2026-11-05T16:55:46Z p1 S head 6 xoffset_trusted done rc 0: 1793897744..1793897746 (2 s) load 1.39
+2026-11-05T16:55:58Z p1 S head 6 zpp_bits done rc 0: 1793897756..1793897758 (2 s) load 1.24
+2026-11-05T16:56:10Z p1 S head 6 cista_unchecked done rc 0: 1793897768..1793897770 (2 s) load 1.49
+2026-11-05T16:56:43Z p1 S anc 6 xoffset done rc 0: 1793897801..1793897803 (2 s) load 1.57
+2026-11-05T16:56:55Z p1 S anc 6 xoffset_trusted done rc 0: 1793897813..1793897815 (2 s) load 1.41
+2026-11-05T16:57:07Z p1 S anc 6 zpp_bits done rc 0: 1793897825..1793897827 (2 s) load 1.47
+2026-11-05T16:57:20Z p1 S anc 6 cista_unchecked done rc 0: 1793897838..1793897840 (2 s) load 1.32
+2026-11-05T16:58:38Z p2 anc xoffset nohog done rc 0: 1793897870..1793897918 (48 s) load 2.55
+2026-11-05T17:00:19Z p2 anc xoffset hog done rc 0: 1793897969..1793898019 (50 s) load 3.51
+2026-11-05T17:02:35Z p2 head xoffset hog done rc 0: 1793898105..1793898155 (50 s) load 3.04
+2026-11-05T17:04:04Z p2 head xoffset nohog done rc 0: 1793898196..1793898244 (48 s) load 3.08
+2026-11-05T17:07:53Z p2 anc xoffset_trusted nohog done rc 0: 1793898426..1793898473 (47 s) load 2.34
+2026-11-05T17:09:28Z p2 anc xoffset_trusted hog done rc 0: 1793898518..1793898568 (50 s) load 2.85
+2026-11-05T17:11:05Z p2 head xoffset_trusted hog done rc 0: 1793898614..1793898665 (51 s) load 2.84
+2026-11-05T17:12:24Z p2 head xoffset_trusted nohog done rc 0: 1793898695..1793898744 (49 s) load 2.10
+2026-11-05T17:13:30Z p2 anc zpp_bits nohog done rc 0: 1793898774..1793898810 (36 s) load 2.28
+2026-11-05T17:14:54Z p2 anc zpp_bits hog done rc 0: 1793898856..1793898894 (38 s) load 2.31
+2026-11-05T17:16:18Z p2 head zpp_bits hog done rc 0: 1793898940..1793898978 (38 s) load 4.06
+2026-11-05T17:18:05Z p2 head zpp_bits nohog done rc 0: 1793899049..1793899085 (36 s) load 2.52
+2026-11-05T17:19:16Z p2 anc cista_unchecked nohog done rc 0: 1793899116..1793899156 (40 s) load 2.28
+2026-11-05T17:20:49Z p2 anc cista_unchecked hog done rc 0: 1793899206..1793899249 (43 s) load 2.70
+2026-11-05T17:22:17Z p2 head cista_unchecked hog done rc 0: 1793899294..1793899337 (43 s) load 2.34
+2026-11-05T17:23:28Z p2 head cista_unchecked nohog done rc 0: 1793899367..1793899408 (41 s) load 2.22
+screen watcher: 64 calls (dark.log)
+== 2026-11-05T17:23:28Z finish rc=0
+result tarball: /Users/ximi/workspace/xo-queue/queue/100-pr241/out/pr241_result.tar.gz sha256 85be1eb59e563e4f31138e3f5979fb42bd8727b8edda51c4e637ffacaf4ad7ba

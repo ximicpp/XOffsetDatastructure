@@ -1,0 +1,32 @@
+2026-11-05T16:59:09Z p2 anc xoffset hog hog start: hw.memsize 17179869184, hog 13958643712 bytes
+2026-11-05T16:59:15Z filled 13958643712 bytes in 6.2 s
+2026-11-05T16:59:19Z p2 anc xoffset hog hog ready: 13958643712 bytes in 6.2 s
+2026-11-05T17:00:19Z hog stopped
+2026-11-05T17:01:30Z p2 head xoffset hog hog start: hw.memsize 17179869184, hog 13958643712 bytes
+2026-11-05T17:01:34Z filled 13958643712 bytes in 4.3 s
+2026-11-05T17:01:35Z p2 head xoffset hog hog ready: 13958643712 bytes in 4.3 s
+2026-11-05T17:02:36Z hog stopped
+2026-11-05T17:08:23Z p2 anc xoffset_trusted hog hog start: hw.memsize 17179869184, hog 13958643712 bytes
+2026-11-05T17:08:28Z filled 13958643712 bytes in 4.5 s
+2026-11-05T17:08:28Z p2 anc xoffset_trusted hog hog ready: 13958643712 bytes in 4.5 s
+2026-11-05T17:09:29Z hog stopped
+2026-11-05T17:09:59Z p2 head xoffset_trusted hog hog start: hw.memsize 17179869184, hog 13958643712 bytes
+2026-11-05T17:10:03Z filled 13958643712 bytes in 3.7 s
+2026-11-05T17:10:04Z p2 head xoffset_trusted hog hog ready: 13958643712 bytes in 3.7 s
+2026-11-05T17:11:05Z hog stopped
+2026-11-05T17:14:01Z p2 anc zpp_bits hog hog start: hw.memsize 17179869184, hog 13958643712 bytes
+2026-11-05T17:14:05Z filled 13958643712 bytes in 4.4 s
+2026-11-05T17:14:06Z p2 anc zpp_bits hog hog ready: 13958643712 bytes in 4.4 s
+2026-11-05T17:14:54Z hog stopped
+2026-11-05T17:15:25Z p2 head zpp_bits hog hog start: hw.memsize 17179869184, hog 13958643712 bytes
+2026-11-05T17:15:29Z filled 13958643712 bytes in 3.8 s
+2026-11-05T17:15:30Z p2 head zpp_bits hog hog ready: 13958643712 bytes in 3.8 s
+2026-11-05T17:16:18Z hog stopped
+2026-11-05T17:19:46Z p2 anc cista_unchecked hog hog start: hw.memsize 17179869184, hog 13958643712 bytes
+2026-11-05T17:19:52Z filled 13958643712 bytes in 5.4 s
+2026-11-05T17:19:56Z p2 anc cista_unchecked hog hog ready: 13958643712 bytes in 5.4 s
+2026-11-05T17:20:49Z hog stopped
+2026-11-05T17:21:19Z p2 head cista_unchecked hog hog start: hw.memsize 17179869184, hog 13958643712 bytes
+2026-11-05T17:21:24Z filled 13958643712 bytes in 4.7 s
+2026-11-05T17:21:24Z p2 head cista_unchecked hog hog ready: 13958643712 bytes in 4.7 s
+2026-11-05T17:22:17Z hog stopped

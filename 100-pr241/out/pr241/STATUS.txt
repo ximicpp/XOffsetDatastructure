@@ -1,0 +1,2 @@
+PR241 done: part 1 M S x 6 pairs (ABBA), part 2 hog / no-hog, xoffset,xoffset_trusted,zpp_bits,cista_unchecked one process each, 21 cycles; head fd0dc58cfbf7c7a49119148a7e6c21b92917922b slg_bench 33280198ada43ed7c30e71e7064f22f33dedaf1a61fb4c88c226766a2b80c00d, anchor d10ede94033f0a985f1e00463e2674a1e03486c5 slg_bench 884d4709e2f198cfc2a44bc47619cd4f570877b7b3264f001ede57ebb76de1af
+screen watcher: 64 calls (dark.log)

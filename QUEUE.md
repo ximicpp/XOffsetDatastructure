@@ -1,10 +1,10 @@
 # Mac queue
 
-Updated 2026-11-05T15:50:32Z after 100-pr241: running 2026-11-05T15:50:28Z
+Updated 2026-11-05T17:23:35Z after 100-pr241: done 0 2026-11-05T17:23:30Z
 
 ```
 runner: pid 4651 (version 2)
-free: 44 GB on /Volumes/XOffsetCS, 44 GB on /Users/ximi
+free: 42 GB on /Volumes/XOffsetCS, 42 GB on /Users/ximi
 001-GATE_COMPOSED                        done 0 2026-10-26T09:59:24Z
 002-int1-r2                              done 0 2026-10-26T11:33:59Z
 003-d5-diag-pre                          done 21 2026-10-26T11:47:50Z
@@ -104,5 +104,5 @@ free: 44 GB on /Volumes/XOffsetCS, 44 GB on /Users/ximi
 097-stage331                             done 10 2026-11-05T07:12:20Z
 098-slgv9c                               done 0 2026-11-05T09:02:05Z
 099-slgv9d                               done 0 2026-11-05T13:34:21Z
-100-pr241                                running 2026-11-05T15:50:28Z
+100-pr241                                done 0 2026-11-05T17:23:30Z
 ```
