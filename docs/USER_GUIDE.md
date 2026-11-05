@@ -657,6 +657,7 @@ iOS 的地址空间和最低部署目标（系统 libc++ 的 `std::pmr` 在 macO
 | E4 | `load_unverified` | 只用于调用方已信任的数据 |
 | E5 | `XCompactor` | 同类型压缩整理 |
 | E6 | `xoffset_fixed_message.hpp`（定长消息，4.4 节） | 不经 XBuffer 收发定长记录 |
+| E7 | `xoffset_shared_delta.hpp`（D3 共享增量原型，XS 0.1） | 服务端每个实体每 tick 只比较、编码一次，同一段以记录为坐标的字节发给所有看得到它的连接；客户端按 id 找到自己的槽位就地写入。`XRecordDelta<T>`：`diff`、`key`、`check`（完整档）、`apply`；`XSyncOut`、`XSyncWriter` 组消息。还没接入 `XReceiver`：完整档 = 每段先 `check` 再 `apply`，信任档 = 只认消息头后直接 `apply`，由调用方按链路选；只用于服务端发往客户端 |
 
 `XHandle`、诊断与统计接口、`XBufferCore` 的底层成员不属于承诺范围。
 

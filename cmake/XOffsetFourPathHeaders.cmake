@@ -22,4 +22,5 @@ set(XOFFSET_FULL_OWN_HEADERS
     xoffset_schema_freeze.hpp
     xoffset_delta.hpp
     xoffset_receiver.hpp
+    xoffset_shared_delta.hpp
 )
