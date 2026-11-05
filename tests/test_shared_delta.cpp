@@ -125,7 +125,7 @@ int main() {
     std::shuffle(slot.begin(), slot.end(), rng);
     for (auto& s : slot) s += 3;
 
-    std::string body;
+    xs::XSyncOut body;
     std::size_t bodies = 0, empties = 0, keys = 0, rejected = 0, accepted_corrupt = 0, bytes = 0;
     for (int step = 0; step < 3000; ++step) {
         const std::size_t i = rng() % kRecs;
@@ -146,7 +146,7 @@ int main() {
         const char* end = body.data() + body.size();
         if (rng() % 3 == 0) {
             // A corrupted copy: rejected, or applied to a clone that still verifies.
-            std::string bad = body;
+            std::string bad(body.view());
             switch (rng() % 3) {
             case 0: bad[rng() % bad.size()] ^= char(1u << (rng() % 8)); break;
             case 1: bad.resize(rng() % bad.size()); break;
@@ -198,6 +198,30 @@ int main() {
         if (RD::check(bad.data(), bad.data() + bad.size(), &r) != bad.data() + bad.size()) fail("patch inside a vector rejected", -1);
         RD::apply(bad.data(), r);
         if (r.nums.size() != 1 || r.nums[0] != 0x78787878) fail("patch inside a vector not applied", -1);
+    }
+    {
+        // A message built with XSyncWriter: header, a leave, an op with a body
+        // and a root change; the count is patched in by finish().
+        sdt::Inner now{}, before{};
+        now.a = 7;
+        xs::XSyncOut msg;
+        xs::XSyncWriter m(msg, 0, 0, 42);
+        m.op(1, xs::leave, 300);
+        const char body[3] = {1, 2, 3};
+        m.op(2, xs::enter, 5, body, sizeof body);
+        if (!m.change(0, 0, now, before)) fail("writer change wrote nothing", -1);
+        if (m.change(0, 0, now, before)) fail("writer change of equal records wrote an op", -1);
+        const std::size_t n = m.finish();
+        if (n != msg.size()) fail("writer length", -1);
+        xs::XSyncHeader h;
+        const char* p = xs::get_header(msg.data(), msg.data() + n, h);
+        if (!p || h.version != 42 || h.count != 3 || h.flags != 0) fail("writer header", -1);
+        if (p[0] != char(1 << 2 | xs::leave) || static_cast<unsigned char>(p[1]) != ((300 & 0x7f) | 0x80) || p[2] != char(300 >> 7))
+            fail("writer leave op", -1);
+        if (p[3] != char(2 << 2 | xs::enter) || p[4] != 5 || p[5] != 1 || p[6] != 2 || p[7] != 3) fail("writer body op", -1);
+        if (p[8] != char(0 << 2 | xs::change) || p[9] != 0) fail("writer change op", -1);
+        const char* bend = msg.data() + n;
+        if (xs::XRecordDelta<sdt::Inner>::check(p + 10, bend, &before) != bend) fail("writer change body", -1);
     }
     if (!verifies(client)) fail("client buffer does not verify at the end", -1);
     for (std::size_t i = 0; i < kRecs; ++i)

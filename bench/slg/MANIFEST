@@ -174,6 +174,8 @@
 #                        (D*.pub/.send/.recv, D*T.recv, D*W/D*TW.recv, D*Z/D*ZS, MEM.D*); untimed bookkeeping
 #                        for them (tracker fresh flags, world changed-unit list); SlotMap declared outside the
 #                        XOFFSET_DELTA_SYNC_API block. SLG_D3 unset: keys, stage ranges, states, reports unchanged.
+#   2026-11-05 D3 server path (thread 设计共享增量原型, after SLGV9c): messages built with xsync::XSyncWriter
+#                        into XSyncOut buffers; same bytes, keys and stage ranges. SLG_D3 unset: unchanged.
 # Contents: slg-reuse adapters (FlatBuffers verified_root runs the Verifier),
 # Contents: slg-reuse adapters (FlatBuffers verified_root runs the Verifier),
 # reuse protocol (c) (SLG_REUSE=1), ordinary-record declarations for every xm
@@ -196,7 +198,7 @@ fef3f268315b7383a8fe8ee2b45d9db70ba50ec201301ed8d58dd5ebc0ab9805  bench/runner.h
 8cf5eb70a33ec375a68580bc213b99f0b7c038acfe84e6662e4d342711863ba7  bench/slg_bench.cpp
 730a66f677d9d20077175f629cf0b13919e66ccedaf880e4eb414c6bc94c0610  bench/small_msg_probe.cpp
 6307d6a7b8419565143cecbe2d7ade4feb250e5dfa5a147f3db99286724e9737  bench/std_runner.hpp
-ce76dd2aa2f2fe9d59b3bc66eda3fbf1bd9952068809a498ce763c5b5c345496  bench/xoffset_runner.hpp
+e47deeeda94fae62b25972e887568b4402f445f84de7252817ebc8e19339cfc5  bench/xoffset_runner.hpp
 12cab27be9331a4a09ae66f444cf5852dd81e363df562748a4ea854932e35e44  include/slg/cista_free.hpp
 f901dd6b3534240a5038157eaf601d756c07557bcd7fad74b80f8615513b6ab8  include/slg/flat_held_index.hpp
 341ba037a01f807258b0a7527aa0ba0a763f60a32bab00f78f75834f0330cffe  include/slg/generic.hpp

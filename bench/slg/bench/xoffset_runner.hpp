@@ -915,7 +915,7 @@ public:
         std::vector<D3Ent> due, dte, dme;
         std::vector<xm::ViewMarch> dmprev;
         std::vector<xm::Tile> dtprev;
-        std::string darena, dmsg;
+        XOffsetDatastructure::xsync::XSyncOut darena, dmsg;   // this tick's bodies; the message being built
         int64_t dtick = -1;
         int32_t ducap = 0, dmcap = 0;   // view capacity, as NP's (n_setup)
         std::vector<D3Conn> dconn;
@@ -965,7 +965,7 @@ public:
         }
         xm::ViewSnapshot& d_held(int c) { return dcli[std::size_t(c)].view->template root<xm::ViewSnapshot>(); }
         xm::ViewSnapshot& d_held_trusted(int c) { return dclt[std::size_t(c)].view->template root<xm::ViewSnapshot>(); }
-        std::string_view d_wire() const { return dmsg; }
+        std::string_view d_wire() const { return dmsg.view(); }
 
         // Server memory (--mode mem, MEM.D*): per connection, and the store,
         // baseline and arenas every connection shares.
@@ -1041,13 +1041,11 @@ public:
             e.klen = uint32_t(darena.size() - e.koff);
             e.ktick = dtick;
         }
-        void d_put(unsigned table, XOffsetDatastructure::xsync::XSyncKind kind, int32_t id, uint32_t off, uint32_t len) {
+        using D3Writer = XOffsetDatastructure::xsync::XSyncWriter;
+        void d_put(D3Writer& m, unsigned table, XOffsetDatastructure::xsync::XSyncKind kind, int32_t id, uint32_t off, uint32_t len) {
+            m.op(table, kind, uint32_t(id), darena.data() + off, len);
 #ifdef SLG_D3_STATS
-            const std::size_t before = dmsg.size();
-#endif
-            XOffsetDatastructure::xsync::put_op(dmsg, table, kind, uint32_t(id), darena.data() + off, len);
-#ifdef SLG_D3_STATS
-            dstat_bytes[table * 3 + kind] += double(dmsg.size() - before);
+            dstat_bytes[table * 3 + kind] += double(len + 1 + (uint32_t(id) < 0x80 ? 1 : uint32_t(id) < 0x4000 ? 2 : 3));
             dstat_body[table * 3 + kind] += double(len);
             dstat_ops[table * 3 + kind] += 1;
 #endif
@@ -1056,43 +1054,25 @@ public:
         // Diagnostic build only (-DSLG_D3_STATS): message bytes by table and kind.
         double dstat_bytes[12] = {}, dstat_body[12] = {}, dstat_ops[12] = {}, dstat_msgs = 0, dstat_total = 0;
 #endif
-        // The message count is written as a three-byte varint, patched at the end.
-        std::size_t d_begin(D3Conn& k, bool key) {
-            XOffsetDatastructure::xsync::XSyncHeader h;
-            h.flags = key ? XOffsetDatastructure::xsync::kFlagKey : 0;
-            h.stream = k.stream;
-            h.version = ++k.version;
-            dmsg.clear();
-            h.count = 1u << 14;   // a three-byte varint, patched by d_end
-            XOffsetDatastructure::xsync::put_header(dmsg, h);
-            return dmsg.size() - 3;
-        }
-        void d_end(std::size_t at, uint32_t count) {
-            dmsg[at] = char(0x80 | (count & 0x7f));
-            dmsg[at + 1] = char(0x80 | ((count >> 7) & 0x7f));
-            dmsg[at + 2] = char((count >> 14) & 0x7f);
-        }
-        void d_root(D3Conn& k, int64_t id, int64_t tick, uint32_t& count) {
+        // The message's root op: the root fields this connection has not seen.
+        void d_root(D3Writer& m, D3Conn& k, int64_t id, int64_t tick) {
             const xm::D3Root now{id, tick};
-            const std::size_t at = dmsg.size();
-            XOffsetDatastructure::xsync::put_op(dmsg, kTRoot, XOffsetDatastructure::xsync::change, 0);
-            if (RD<xm::D3Root>::diff(now, k.root, dmsg)) ++count;
-            else dmsg.resize(at);
+            m.change(kTRoot, 0, now, k.root);
         }
         // The key message of client c's first pull (untimed): every unit,
         // march and tile in its view.
         void d_key(int c, const MapWorld& w, const DeltaPlan& p) {
+            namespace xs = XOffsetDatastructure::xsync;
             D3Conn& k = dconn[std::size_t(c)];
             k = D3Conn{};
             k.stream = 0x5d3000000ull + uint64_t(c);
-            const std::size_t at = d_begin(k, true);
-            uint32_t count = 0;
-            d_root(k, 0, w.tick_no(), count);
-            for (int32_t i : p.units) { d_unit_key(i); const D3Ent& e = due[std::size_t(i)]; d_put(kTUnit, XOffsetDatastructure::xsync::enter, w.unit(i).id, e.koff, e.klen); ++count; }
+            D3Writer m(dmsg, xs::kFlagKey, k.stream, ++k.version);
+            d_root(m, k, 0, w.tick_no());
+            for (int32_t i : p.units) { d_unit_key(i); const D3Ent& e = due[std::size_t(i)]; d_put(m, kTUnit, xs::enter, w.unit(i).id, e.koff, e.klen); }
             for (int32_t i : p.marches) {
                 D3Ent& e = d_march(w, i);
                 if (e.ktick != dtick) { e.koff = uint32_t(darena.size()); RD<xm::ViewMarch>::key(dmprev[std::size_t(w.march(i).id)], darena); e.klen = uint32_t(darena.size() - e.koff); e.ktick = dtick; }
-                d_put(kTMarch, XOffsetDatastructure::xsync::enter, w.march(i).id, e.koff, e.klen); ++count;
+                d_put(m, kTMarch, xs::enter, w.march(i).id, e.koff, e.klen);
             }
             const TileSpan sp = dcli[std::size_t(c)].span;
             for (int32_t ty = sp.ty0; ty < sp.ty0 + sp.rows; ++ty)
@@ -1100,9 +1080,9 @@ public:
                     const int32_t t = ty * kTiles + tx;
                     D3Ent& e = dte[std::size_t(t)];
                     if (e.ktick != dtick) { e.koff = uint32_t(darena.size()); RD<xm::Tile>::key(dtprev[std::size_t(t)], darena); e.klen = uint32_t(darena.size() - e.koff); e.ktick = dtick; }
-                    d_put(kTTile, XOffsetDatastructure::xsync::enter, t, e.koff, e.klen); ++count;
+                    d_put(m, kTTile, xs::enter, t, e.koff, e.klen);
                 }
-            d_end(at, count);
+            m.finish();
         }
         // One delivery: leaves, then units, marches and tiles, each a copy of
         // the entity's body (or key body) of this tick.
@@ -1112,40 +1092,39 @@ public:
 #ifdef SLG_D3_STATS
             if (dstat_msgs == 0) for (int q = 0; q < 12; ++q) dstat_bytes[q] = dstat_body[q] = dstat_ops[q] = 0;   // drop the key messages
 #endif
-            const std::size_t at = d_begin(k, false);
-            uint32_t count = 0;
-            d_root(k, id, w.tick_no(), count);
-            for (int32_t uid : p.removed) { xs::put_op(dmsg, kTUnit, xs::leave, uint32_t(uid)); ++count; }
-            for (int32_t mid : p.removed_marches) { xs::put_op(dmsg, kTMarch, xs::leave, uint32_t(mid)); ++count; }
+            D3Writer m(dmsg, 0, k.stream, ++k.version);
+            d_root(m, k, id, w.tick_no());
+            for (int32_t uid : p.removed) m.op(kTUnit, xs::leave, uint32_t(uid));
+            for (int32_t mid : p.removed_marches) m.op(kTMarch, xs::leave, uint32_t(mid));
             for (std::size_t q = 0; q < p.units.size(); ++q) {
                 const int32_t i = p.units[q];
                 D3Ent& e = due[std::size_t(i)];
-                if (p.unew[q]) { d_unit_key(i); d_put(kTUnit, xs::enter, w.unit(i).id, e.koff, e.klen); ++count; }
-                else if (e.tick == dtick) { d_put(kTUnit, xs::change, w.unit(i).id, e.off, e.len); ++count; }
+                if (p.unew[q]) { d_unit_key(i); d_put(m, kTUnit, xs::enter, w.unit(i).id, e.koff, e.klen); }
+                else if (e.tick == dtick) d_put(m, kTUnit, xs::change, w.unit(i).id, e.off, e.len);
             }
             for (std::size_t q = 0; q < p.marches.size(); ++q) {
                 const int32_t i = p.marches[q];
                 D3Ent& e = d_march(w, i);
                 if (p.mnew[q]) {
                     if (e.ktick != dtick) { e.koff = uint32_t(darena.size()); RD<xm::ViewMarch>::key(dmprev[std::size_t(w.march(i).id)], darena); e.klen = uint32_t(darena.size() - e.koff); e.ktick = dtick; }
-                    d_put(kTMarch, xs::enter, w.march(i).id, e.koff, e.klen); ++count;
-                } else if (e.len) { d_put(kTMarch, xs::change, w.march(i).id, e.off, e.len); ++count; }
+                    d_put(m, kTMarch, xs::enter, w.march(i).id, e.koff, e.klen);
+                } else if (e.len) d_put(m, kTMarch, xs::change, w.march(i).id, e.off, e.len);
             }
             for (int32_t t : p.tiles) {
                 const D3Ent& e = d_tile(w, t);
-                if (e.len) { d_put(kTTile, xs::change, t, e.off, e.len); ++count; }
+                if (e.len) d_put(m, kTTile, xs::change, t, e.off, e.len);
             }
-            d_end(at, count);
+            const std::size_t n = m.finish();
 #ifdef SLG_D3_STATS
-            dstat_msgs += 1; dstat_total += double(dmsg.size());
+            dstat_msgs += 1; dstat_total += double(n);
 #endif
-            return dmsg.size();
+            return n;
         }
         // Trust tier (susu 2026-11-04: server -> client over a trusted
         // transport): the message header is admitted (magic, format, flags,
         // stream and version), then every op is applied in one pass, with no
         // check of ids or bodies. Same view layout and id index as d_recv.
-        void d_recv_trusted(int c) { d_recv_trusted_from(c, dmsg); }
+        void d_recv_trusted(int c) { d_recv_trusted_from(c, dmsg.view()); }
         void d_recv_trusted_from(int c, std::string_view msg) {
             namespace xs = XOffsetDatastructure::xsync;
             D3Client& L = dclt[std::size_t(c)];
@@ -1209,7 +1188,7 @@ public:
         }
         // The client: check every op against its view (ids held or not, bodies
         // against their records), then apply. A rejected message changes nothing.
-        void d_recv(int c) { d_recv_from(c, dmsg); }
+        void d_recv(int c) { d_recv_from(c, dmsg.view()); }
         void d_recv_from(int c, std::string_view msg) {
             namespace xs = XOffsetDatastructure::xsync;
             D3Client& L = dcli[std::size_t(c)];
