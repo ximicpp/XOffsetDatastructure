@@ -20,6 +20,7 @@
 #include "slg/trace.hpp"
 #include "slg/login.hpp"
 #include "slg/view.hpp"
+#include "xoffset_receiver.hpp"
 
 namespace slg {
 
@@ -27,6 +28,14 @@ struct XoModel {
     static constexpr const char* name = "xoffset";
     using PlayerState = xm::PlayerState; using BattleMsg = xm::BattleMsg;
     using ShardState = xm::ShardState; using Report = xm::Report;
+};
+// Trust tier (3.4 P1, #228; susu 07:17Z 11-04): the same model, every reuse-protocol
+// receive of a whole wire through XReceiver with XCheck::admit (server <-> server:
+// XLink::server_peer; server -> client: XLink::from_server) instead of
+// reload_verified. Delta and native receives are unchanged until P2.
+struct XoTrustedModel : XoModel {
+    static constexpr const char* name = "xoffset_trusted";
+    static constexpr bool trusted = true;
 };
 struct XoOptinModel {
     static constexpr const char* name = "xoffset_optin";
@@ -41,6 +50,23 @@ template <class M, bool Direct> class XOffsetRunnerT final : public Runner {
     using BattleMsg = typename M::BattleMsg;
     using ShardState = typename M::ShardState;
     using Report = typename M::Report;
+
+    static constexpr bool Trusted = requires { M::trusted; };
+    // A whole-wire receive into a reused buffer: reload_verified, or (Trusted) the
+    // receiver for link L with its default check (admit for server_peer / from_server).
+    template <class T, XOffsetDatastructure::XLink L, class W>
+    static void reload_wire(XOffsetDatastructure::XBuffer& b, const W& w) {
+        using namespace XOffsetDatastructure;
+        if constexpr (Trusted) {
+            static XReceiver<L> rx(XBuffer::maximum_capacity(XBuffer::DEFAULT_MAXIMUM_CAPACITY));
+            const XStatus r = rx.template reload<T>(b, w);
+            if (!r) throw std::runtime_error("trusted receive rejected: " + std::string(r.error().message));
+        } else {
+            b.template reload_verified<T>(w);
+        }
+    }
+    static constexpr auto kPeer = XOffsetDatastructure::XLink::server_peer;
+    static constexpr auto kClient = XOffsetDatastructure::XLink::from_server;
 
 public:
     std::string name() const override { return Direct ? "xoffset_direct" : M::name; }
@@ -317,7 +343,7 @@ public:
             // in between, so it times the two parts separately.
             if constexpr (!Direct) {
                 timed(st, "D.read", [&] {
-                    d_->reload_verified<Report>(w);
+                    reload_wire<Report, kClient>(*d_, w);
                     st.report_sum += query_report(d_->root<Report>());
                 });
             } else {
@@ -366,7 +392,7 @@ public:
         void login_recv(int p) {
             auto& h = hold[std::size_t(p)];
             if (!h) h.emplace(XBuffer::create<PlayerState>(kPlayerInitial, cap()));
-            h->template reload_verified<PlayerState>(lw);
+            reload_wire<PlayerState, kClient>(*h, lw);
         }
         PlayerState& held(int p) { return hold[std::size_t(p)]->template root<PlayerState>(); }
         template <class Fill> std::size_t patch_encode(Fill&& fill) {
@@ -374,7 +400,7 @@ public:
             pm->template save_verified_into<xm::PlayerPatch>(pw);
             return pw.size();
         }
-        void patch_recv() { pr->template reload_verified<xm::PlayerPatch>(pw); }
+        void patch_recv() { reload_wire<xm::PlayerPatch, kClient>(*pr, pw); }
         // Scoring V3: wires for the zstd keys; the warm single device's player (LDW, LNW).
         std::vector<std::optional<XBuffer>> hw = std::vector<std::optional<XBuffer>>(kWarmDevices);
         std::string_view login_wire() const { return lw; }
@@ -382,10 +408,10 @@ public:
         void login_recv_w(int d, std::string_view w) {
             auto& h = hw[std::size_t(d)];
             if (!h) h.emplace(XBuffer::create<PlayerState>(kPlayerInitial, cap()));
-            h->template reload_verified<PlayerState>(std::as_bytes(std::span<const char>(w.data(), w.size())));
+            reload_wire<PlayerState, kClient>(*h, std::as_bytes(std::span<const char>(w.data(), w.size())));
         }
         PlayerState& held_w(int d) { return hw[std::size_t(d)]->template root<PlayerState>(); }
-        void patch_recv_from(const std::string& w) { pr->template reload_verified<xm::PlayerPatch>(w); }
+        void patch_recv_from(const std::string& w) { reload_wire<xm::PlayerPatch, kClient>(*pr, w); }
         const xm::PlayerPatch& patch() { return pr->template root<xm::PlayerPatch>(); }
 #ifdef XOFFSET_DELTA_SYNC_API
         std::vector<XOffsetDatastructure::XDeltaBaseline> nb;
@@ -453,7 +479,7 @@ public:
             pm->template save_verified_into<xm::PlayerPatch>(w);
             return w.size();
         }
-        void modules_recv() { pr->template reload_verified<xm::PlayerPatch>(w); }
+        void modules_recv() { reload_wire<xm::PlayerPatch, kPeer>(*pr, w); }
 #ifdef XOFFSET_DELTA_SYNC_API
         std::unordered_map<int, XOffsetDatastructure::XDeltaBaseline> nb;
         std::unordered_map<int, XOffsetDatastructure::XDeltaCursor> nc;
@@ -520,7 +546,7 @@ public:
         void snap_recv(int c, int k, int b) {
             auto& h = held_views[std::size_t(c) + std::size_t(k)];
             if (!h) h.emplace(XBuffer::create<xm::ViewSnapshot>(4096, held_cap()));
-            h->reload_verified<xm::ViewSnapshot>(snaps[std::size_t(b)]);
+            reload_wire<xm::ViewSnapshot, kClient>(*h, snaps[std::size_t(b)]);
             held_roots[std::size_t(c) + std::size_t(k)] = &h->root<xm::ViewSnapshot>();
         }
         xm::ViewSnapshot& held(int c, int k) {
@@ -539,8 +565,8 @@ public:
             return dw.size();
         }
         std::string_view delta_wire() const { return dw; }
-        void delta_recv() { dr->reload_verified<xm::ViewDelta>(dw); }
-        void delta_recv_from(const std::string& w) { dr->reload_verified<xm::ViewDelta>(w); }
+        void delta_recv() { reload_wire<xm::ViewDelta, kClient>(*dr, dw); }
+        void delta_recv_from(const std::string& w) { reload_wire<xm::ViewDelta, kClient>(*dr, w); }
         const xm::ViewDelta& delta() { return dr->root<xm::ViewDelta>(); }
 
 #ifdef XOFFSET_DELTA_SYNC_API
@@ -927,7 +953,7 @@ private:
     template <class T>
     void recv(CycleStats& st, const char* key, const std::string& wire, std::optional<XOffsetDatastructure::XBuffer>& dst) {
         using namespace XOffsetDatastructure;
-        if constexpr (!Direct) { timed(st, key, [&] { dst->reload_verified<T>(wire); }); return; }
+        if constexpr (!Direct) { timed(st, key, [&] { reload_wire<T, kPeer>(*dst, wire); }); return; }
         else {
         XWireHeaderV2 h{};
         if (wire.size() < sizeof(h)) throw std::runtime_error("direct receive: short wire");
@@ -984,5 +1010,6 @@ private:
 };
 
 using XOffsetRunner = XOffsetRunnerT<XoModel, false>;
+using XOffsetTrustedRunner = XOffsetRunnerT<XoTrustedModel, false>;
 
 } // namespace slg
