@@ -204,17 +204,27 @@ private:
             if (reserved > static_cast<std::size_t>(
                     (std::numeric_limits<std::ptrdiff_t>::max)()) - prefix)
                 XOFFSET_VFAIL_STD(std::length_error, XErrc::length_error, "VM reservation page rounding overflows");
-            // V2.1 owner lookup: the payload starts at a 2^k boundary,
+            // V2.1 owner lookup: the region starts at a 2^k boundary,
             // k = max(22, ceil(log2 span)), and the mapping covers whole 4 MiB
-            // granules, so OwnerMap finds the payload from any address inside
-            // and no other mapping shares a granule with it. The host page sits
-            // just below the payload, in the granule before it.
-            const std::size_t span =
-                (reserved + OwnerMap::granule_bytes - 1) & ~(OwnerMap::granule_bytes - 1);
-            if (span < reserved)
+            // granules, so OwnerMap finds the region from any address inside
+            // and no other mapping shares a granule with it. The payload
+            // starts `color` bytes into the region (OwnerMap, Color), a page
+            // multiple below 64 KiB, so its pages and page alignment are those
+            // of an uncolored payload. The host page sits just below the
+            // payload: in the color gap, or in the granule before the region.
+            const std::size_t color = OwnerMap::next_color_offset(page_size_, OwnerMap::color_span);
+            if (reserved > static_cast<std::size_t>(
+                    (std::numeric_limits<std::ptrdiff_t>::max)()) - OwnerMap::granule_bytes - color)
                 XOFFSET_VFAIL_STD(std::length_error, XErrc::length_error, "VM reservation page rounding overflows");
-            std::size_t shift = slot_log2(span);
-            if (shift < OwnerMap::granule_shift) shift = OwnerMap::granule_shift;
+            const std::size_t span =
+                (reserved + color + OwnerMap::granule_bytes - 1) & ~(OwnerMap::granule_bytes - 1);
+            // k covers the reservation, not the color: a payload of at most
+            // 2^k bytes starting o < 64 KiB past a 2^k boundary still has
+            // (a - o) & ~(2^k - 1) == region for every byte, so the color
+            // costs no extra alignment; the mapping just runs into the next
+            // 2^k block's first granule, which no other mapping can share.
+            const std::size_t shift = region_shift(
+                (reserved + OwnerMap::granule_bytes - 1) & ~(OwnerMap::granule_bytes - 1));
             if (shift >= OwnerMap::address_bits || !OwnerMap::ready()) XOFFSET_VFAIL_BAD_ALLOC();
             const std::size_t align = std::size_t(1) << shift;
 #if defined(_WIN32)
@@ -228,10 +238,10 @@ private:
                 auto* probe = static_cast<char*>(::VirtualAlloc(
                     nullptr, win_prefix + span + align, MEM_RESERVE, PAGE_NOACCESS));
                 if (!probe) XOFFSET_VFAIL_BAD_ALLOC();
-                const auto payload = (reinterpret_cast<std::uintptr_t>(probe) + win_prefix + align - 1) &
-                                     ~std::uintptr_t(align - 1);
+                const auto region = (reinterpret_cast<std::uintptr_t>(probe) + win_prefix + align - 1) &
+                                    ~std::uintptr_t(align - 1);
                 ::VirtualFree(probe, 0, MEM_RELEASE);
-                auto* want = reinterpret_cast<char*>(payload - win_prefix);
+                auto* want = reinterpret_cast<char*>(region - win_prefix);
                 mapping = static_cast<char*>(::VirtualAlloc(want, win_prefix + span, MEM_RESERVE, PAGE_NOACCESS));
                 if (mapping && mapping != want) {
                     ::VirtualFree(mapping, 0, MEM_RELEASE);
@@ -239,12 +249,13 @@ private:
                 }
             }
             if (!mapping) XOFFSET_VFAIL_BAD_ALLOC();
+            char* const region = mapping + win_prefix;
             if (!OwnerMap::reachable(mapping, win_prefix + span) ||
-                !::VirtualAlloc(mapping + win_prefix - prefix, prefix, MEM_COMMIT, PAGE_READWRITE)) {
+                !::VirtualAlloc(region + color - prefix, prefix, MEM_COMMIT, PAGE_READWRITE)) {
                 ::VirtualFree(mapping, 0, MEM_RELEASE);
                 XOFFSET_VFAIL_BAD_ALLOC();
             }
-            base_ = mapping + win_prefix;
+            base_ = region + color;
 #else
             if (full_copy && consume_vm_failure(VmOperation::Enable)) XOFFSET_VFAIL_BAD_ALLOC();
             // Over-map PROT_NONE, then trim both ends.
@@ -252,21 +263,21 @@ private:
             void* raw = ::mmap(nullptr, total, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
             if (raw == MAP_FAILED) XOFFSET_VFAIL_BAD_ALLOC();
             const auto start = reinterpret_cast<std::uintptr_t>(raw);
-            const auto payload = (start + prefix + align - 1) & ~std::uintptr_t(align - 1);
-            if (payload - prefix != start) ::munmap(raw, payload - prefix - start);
-            if (start + total != payload + span)
-                ::munmap(reinterpret_cast<void*>(payload + span), start + total - (payload + span));
-            char* mapping = reinterpret_cast<char*>(payload - prefix);
+            const auto region = (start + prefix + align - 1) & ~std::uintptr_t(align - 1);
+            if (region - prefix != start) ::munmap(raw, region - prefix - start);
+            if (start + total != region + span)
+                ::munmap(reinterpret_cast<void*>(region + span), start + total - (region + span));
+            char* mapping = reinterpret_cast<char*>(region - prefix);
             if (!OwnerMap::reachable(mapping, span + prefix) ||
-                ::mprotect(mapping, prefix + (full_copy ? reserved : 0), PROT_READ | PROT_WRITE) != 0) {
+                ::mprotect(mapping + color, prefix + (full_copy ? reserved : 0), PROT_READ | PROT_WRITE) != 0) {
                 ::munmap(mapping, span + prefix);
                 XOFFSET_VFAIL_BAD_ALLOC();
             }
-            base_ = mapping + prefix;
+            base_ = mapping + prefix + color;
             if (full_copy) accessible_bytes_ = reserved;
 #endif
             mapped_bytes_ = span;
-            OwnerMap::set(base_, span, static_cast<std::uint8_t>(shift));
+            OwnerMap::set(base_ - color, span, OwnerMap::make_entry(shift, color));
             reserved_bytes_ = reserved;
         }
         set_host_owner(nullptr);
@@ -759,11 +770,12 @@ private:
         if (base_) {
             // No head of this payload is live; clear its granules before the
             // range can be mapped again.
-            OwnerMap::set(base_, mapped_bytes_, 0);
+            char* const region = region_start();
+            OwnerMap::set(region, mapped_bytes_, 0);
 #if defined(_WIN32)
-            ::VirtualFree(base_ - reservation_granularity_, 0, MEM_RELEASE);
+            ::VirtualFree(region - reservation_granularity_, 0, MEM_RELEASE);
 #else
-            ::munmap(base_ - page_size_, mapped_bytes_ + page_size_);
+            ::munmap(region - page_size_, mapped_bytes_ + page_size_);
 #endif
         }
         base_ = nullptr;
@@ -773,14 +785,27 @@ private:
         page_size_ = reservation_granularity_ = 0;
     }
 
+    // The 2^k alignment of a mapped region of `span` bytes.
+    static std::size_t region_shift(std::size_t span) noexcept {
+        const std::size_t shift = slot_log2(span);
+        return shift < OwnerMap::granule_shift ? OwnerMap::granule_shift : shift;
+    }
+    // A VM owner's region: base_ less its color offset.
+    char* region_start() const noexcept {
+        // The region is aligned to at least a granule and the color is below one.
+        const auto mask = ~std::uintptr_t(OwnerMap::granule_bytes - 1);
+        return reinterpret_cast<char*>(reinterpret_cast<std::uintptr_t>(base_) & mask);
+    }
+
     // data() and size() first: every access reads them together, and an
     // owner that embeds this storage keeps its own hot fields next to them.
     char* base_{nullptr};
     std::size_t logical_bytes_{0};
     std::byte* canonical_byte_origin_{nullptr};
     std::size_t reserved_bytes_{0};
-    // Mapped payload span: reserved_bytes_ rounded up to whole owner-map
-    // granules (4 MiB). 0 for a slot owner.
+    // Mapped region span: reserved_bytes_ plus the payload's color offset,
+    // rounded up to whole owner-map granules (4 MiB); the region starts at
+    // the 2^region_shift boundary at or below base_. 0 for a slot owner.
     std::size_t mapped_bytes_{0};
     std::size_t maximum_capacity_{0};
     std::size_t accessible_bytes_{0};

@@ -5,6 +5,7 @@
 // every payload.
 #include "xoffsetdatastructure.hpp"
 
+#include <algorithm>
 #include <bit>
 #include <cstdint>
 #include <cstdlib>
@@ -54,15 +55,32 @@ void vm_payload() {
         xo::XBuffer::maximum_capacity(24u << 20).with_storage(xo::XStorage::Pinned));
     need(b.storage_kind() == xo::XStorageKind::Vm, "fixture is not VM storage");
     auto* base = base_of(b);
-    // The span is the reservation rounded up to 4 MiB; the payload is aligned
-    // to the span's next power of two (here 32 MiB), never less than 4 MiB.
-    const auto span = (b.reserved_bytes() + OwnerMap::granule_bytes - 1) & ~(OwnerMap::granule_bytes - 1);
+    // The region is the reservation plus the payload's color offset, rounded
+    // up to 4 MiB; it is aligned to the span's next power of two (here 32
+    // MiB), never less than 4 MiB, and the payload starts a page-aligned
+    // color offset (below 64 KiB) in.
+    const auto offset = reinterpret_cast<std::uintptr_t>(base) % (std::size_t(4) << 20);
+    const auto span = (b.reserved_bytes() + offset + OwnerMap::granule_bytes - 1) & ~(OwnerMap::granule_bytes - 1);
     const auto align = std::bit_ceil(span);
-    need(span == (24u << 20) && align == (32u << 20), "VM fixture span is not 24 MiB");
-    need(reinterpret_cast<std::uintptr_t>(base) % align == 0, "VM payload not aligned to 2^k");
-    require_maps(base, span, "VM payload granules");
+    need(span == (28u << 20) || (offset == 0 && span == (24u << 20)), "VM fixture span is not 24 or 28 MiB");
+    need(align == (32u << 20), "VM fixture alignment is not 32 MiB");
+    need(offset % 4096 == 0 && offset < OwnerMap::color_span, "VM payload offset is not a color");
+    auto* region = base - offset;
+    need(reinterpret_cast<std::uintptr_t>(region) % align == 0, "VM region not aligned to 2^k");
+    require_maps(base, b.reserved_bytes(), "VM payload granules");
     // The granules past the span, inside the alignment, are not this payload's.
-    need(OwnerMap::payload_of(base + span) == nullptr, "granule past the VM span is mapped");
+    need(OwnerMap::payload_of(region + span) == nullptr, "granule past the VM span is mapped");
+    // A power-of-two reservation keeps its alignment: the color does not raise
+    // k, and the payload's last byte, in the granule past 2^k, maps back.
+    {
+        auto p = xo::XBuffer::create<OwnerRoot>(4096,
+            xo::XBuffer::maximum_capacity(32u << 20).with_storage(xo::XStorage::Pinned));
+        auto* pb = base_of(p);
+        const auto po = reinterpret_cast<std::uintptr_t>(pb) % (std::size_t(4) << 20);
+        need(p.reserved_bytes() == (32u << 20), "power-of-two fixture is not 32 MiB");
+        need((reinterpret_cast<std::uintptr_t>(pb) - po) % (32u << 20) == 0, "color raised the VM alignment");
+        need(OwnerMap::payload_of(pb + p.reserved_bytes() - 1) == pb, "last byte past 2^k maps elsewhere");
+    }
     auto& r = b.root<OwnerRoot>();
     need(r.name.binding().segment == b.arena() && r.values.binding().segment == b.arena(),
          "root heads do not bind to their payload");
@@ -71,6 +89,65 @@ void vm_payload() {
     need(OwnerMap::payload_of(r.name.data()) == base && OwnerMap::payload_of(r.values.data()) == base,
          "blocks do not map to their payload");
     need(OwnerMap::same_payload(&r.name, &r.values) == base, "two heads in one payload differ");
+    ++cases;
+}
+
+// Consecutive VM payloads start at different page offsets in their regions,
+// so their first pages do not share the low page-number bits.
+void vm_colors() {
+    std::vector<xo::XBuffer> bufs;
+    std::vector<std::uintptr_t> offsets;
+    for (int i = 0; i < 8; ++i) {
+        bufs.push_back(xo::XBuffer::create<OwnerRoot>(4096,
+            xo::XBuffer::maximum_capacity(1u << 20).with_storage(xo::XStorage::Pinned)));
+        auto* base = base_of(bufs.back());
+        const auto offset = reinterpret_cast<std::uintptr_t>(base) % (std::size_t(4) << 20);
+        need(offset % xo::detail::SlotSlab::page_size() == 0, "colored VM payload is not page-aligned");
+        need(OwnerMap::payload_of(base) == base && OwnerMap::payload_of(base + (1u << 20) - 1) == base,
+             "colored VM payload does not map to itself");
+        bufs.back().root<OwnerRoot>().name = "a value longer than the inline storage";
+        need(OwnerMap::payload_of(bufs.back().root<OwnerRoot>().name.data()) == base, "colored block maps elsewhere");
+        offsets.push_back(offset);
+    }
+    // OwnerMap::color_span / page colors: 16 on 4 KiB pages, 4 on 16 KiB
+    // pages (Apple Silicon), so 8 consecutive buffers take min(8, colors).
+    const std::size_t page = xo::detail::SlotSlab::page_size();
+    const std::size_t colors = (OwnerMap::color_span + page - 1) / page;
+    const std::ptrdiff_t expect = static_cast<std::ptrdiff_t>(colors < 8 ? colors : 8);
+    std::sort(offsets.begin(), offsets.end());
+    need(std::unique(offsets.begin(), offsets.end()) - offsets.begin() == expect,
+         "8 consecutive VM payloads do not take min(8, colors) colors");
+    ++cases;
+}
+
+// Slots of the largest class in different chunks start at different page
+// offsets (each chunk carves from its color); every slot maps to itself.
+void slot_colors() {
+    if constexpr (!xo::detail::SlotGeometry::enabled) return;
+    constexpr std::size_t slot = xo::detail::SlotGeometry::max_slot_bytes;
+    if (slot <= 2 * 4096) return;
+    std::vector<xo::XBuffer> bufs;
+    std::vector<std::uintptr_t> offsets;
+    for (int i = 0; i < 48; ++i) {
+        bufs.push_back(xo::XBuffer::create<OwnerRoot>(4096,
+            xo::XBuffer::maximum_capacity(xo::detail::SlotGeometry::max_payload)));
+        need(bufs.back().storage_kind() == xo::XStorageKind::PinnedSlot, "slot color fixture is not a slot");
+        auto* base = base_of(bufs.back());
+        need(OwnerMap::payload_of(base) == base &&
+             OwnerMap::payload_of(base + bufs.back().accessible_bytes() - 1) == base &&
+             OwnerMap::payload_of(base + bufs.back().accessible_bytes() + 64) != base,
+             "colored slot does not map to itself");
+        bufs.back().root<OwnerRoot>().name = "a slot value longer than the inline storage";
+        need(OwnerMap::payload_of(bufs.back().root<OwnerRoot>().name.data()) == base, "colored slot block maps elsewhere");
+        const auto offset = (reinterpret_cast<std::uintptr_t>(base) - 64) % slot;
+        need(offset % 4096 == 0, "colored slot is not page-aligned");
+        offsets.push_back(offset);
+    }
+    for (std::size_t i = 1; i < bufs.size(); ++i)
+        need(OwnerMap::same_payload(&bufs[i - 1].root<OwnerRoot>().name, &bufs[i].root<OwnerRoot>().name) == nullptr,
+             "heads in two colored slots report one payload");
+    std::sort(offsets.begin(), offsets.end());
+    need(std::unique(offsets.begin(), offsets.end()) - offsets.begin() >= 2, "48 slots of 3+ chunks share one color");
     ++cases;
 }
 
@@ -157,6 +234,8 @@ void heads_outside() {
 
 int main() {
     vm_payload();
+    vm_colors();
+    slot_colors();
     slot_payloads();
     reuse_and_unmap();
     heads_outside();

@@ -115,11 +115,23 @@ constexpr std::size_t slot_log2(std::size_t value) noexcept {
 }
 
 // V2.1 owner lookup: the payload base of an address (a head names no owner).
-// One byte per 4 MiB granule of a 48-bit address space. 0: no XOffset region.
-// Otherwise bits 0..5 are k, the region's alignment exponent (the region, or
-// the slot, starts at address & ~(2^k - 1)), and bit 7 marks a slot, whose
-// payload starts 64 bytes in. Slot chunks set their entry once; a VM payload
-// is aligned to 2^k and sets the entries of its granules while it is mapped.
+// One 16-bit entry per 4 MiB granule of a 48-bit address space. 0: no XOffset
+// region. Otherwise bits 0..5 are k and bits 6..15 are o, the payload's offset
+// from a 2^k boundary (a multiple of 64 below 64 KiB): the payload holding
+// address a starts at ((a - o) & ~(2^k - 1)) + o. A slot chunk sets its entry
+// once, with k = log2(slot size) and o = 64 (the slot header) plus the chunk's
+// color; a VM region is aligned to 2^k, starts its payload at its color o, and
+// sets the entries of its granules while it is mapped.
+//
+// Color: payloads that all start on 2^k boundaries (VM: k >= 22; slots of 256
+// KiB: k = 18) share their low virtual page-number bits, so the pages a
+// program touches first in each (arena header, root, first blocks) compete for
+// the same TLB sets, and for the same cache sets wherever pages are large. A
+// program that walks many buffers in turn then misses on every switch (64
+// order books, one buffer each: 1.8x the time of one shared buffer). So each
+// new VM region and each new slot chunk takes the next color: a page-aligned
+// offset below 64 KiB (and below the slot size in a slot chunk, which then
+// holds one slot fewer). See next_color_offset().
 // Entries change only while no head lives in the region. One granule's entry
 // can still be written by two threads: one clears it and unmaps the range,
 // another maps the range again and sets it. The kernel orders the two, C++
@@ -129,7 +141,26 @@ struct OwnerMap {
     static constexpr std::size_t granule_bytes = std::size_t(1) << granule_shift;
     static constexpr std::size_t address_bits = 48;
     static constexpr std::size_t entries = std::size_t(1) << (address_bits - granule_shift);
-    static constexpr std::uint8_t slot_bit = 0x80;
+    using entry_type = std::uint16_t;
+    static constexpr std::size_t offset_mask = 0xffc0;   // entry bits 6..15: o
+    static constexpr std::size_t color_span = std::size_t(1) << 16;  // colors: offsets below 64 KiB
+
+    static constexpr entry_type make_entry(std::size_t shift, std::size_t offset) noexcept {
+        return static_cast<entry_type>(shift | offset);
+    }
+    // The payload base of address a under entry e (nonzero).
+    XOFFSET_DETAIL_OWNER_INLINE static std::uintptr_t base_of(std::uintptr_t a, entry_type e) noexcept {
+        const std::uintptr_t o = e & offset_mask;
+        return ((a - o) & (~std::uintptr_t(0) << (e & 63u))) + o;
+    }
+    // The next color: a round robin over the page-aligned offsets at or above
+    // 0 and below `period` (0 when period <= page).
+    static std::size_t next_color_offset(std::size_t page, std::size_t period) noexcept {
+        static std::atomic<std::size_t> counter{0};
+        if (page == 0 || period <= page) return 0;
+        const std::size_t n = counter.fetch_add(1, std::memory_order_relaxed);
+        return (n % ((period + page - 1) / page)) * page;
+    }
 
     static std::size_t index(std::uintptr_t address) noexcept {
         return (address >> granule_shift) & (entries - 1);
@@ -137,23 +168,23 @@ struct OwnerMap {
     // Makes the table usable before a region registers; false when it cannot
     // be allocated (only on Windows, where it is allocated at run time).
     static bool ready() noexcept;
-    static std::uint8_t entry(std::uintptr_t address) noexcept;
+    static entry_type entry(std::uintptr_t address) noexcept;
     // Where entry(address) is read from, or null while no table exists; for
     // a prefetch hint only (it is not an atomic access).
-    static const std::uint8_t* entry_address(std::uintptr_t address) noexcept;
-    // Relaxed atomic byte access; this header is C++17, without std::atomic_ref.
-    XOFFSET_DETAIL_OWNER_INLINE static std::uint8_t load(const std::uint8_t& e) noexcept {
+    static const entry_type* entry_address(std::uintptr_t address) noexcept;
+    // Relaxed atomic entry access; this header is C++17, without std::atomic_ref.
+    XOFFSET_DETAIL_OWNER_INLINE static entry_type load(const entry_type& e) noexcept {
 #if defined(__GNUC__) || defined(__clang__)
         return __atomic_load_n(&e, __ATOMIC_RELAXED);
 #else
-        return *static_cast<const volatile std::uint8_t*>(&e);
+        return *static_cast<const volatile entry_type*>(&e);
 #endif
     }
-    XOFFSET_DETAIL_OWNER_INLINE static void store(std::uint8_t& e, std::uint8_t value) noexcept {
+    XOFFSET_DETAIL_OWNER_INLINE static void store(entry_type& e, entry_type value) noexcept {
 #if defined(__GNUC__) || defined(__clang__)
         __atomic_store_n(&e, value, __ATOMIC_RELAXED);
 #else
-        *static_cast<volatile std::uint8_t*>(&e) = value;
+        *static_cast<volatile entry_type*>(&e) = value;
 #endif
     }
     static char* payload_of(const void* p) noexcept;
@@ -161,7 +192,7 @@ struct OwnerMap {
     // read when both are in one granule (granules are never shared).
     static char* same_payload(const void* a, const void* b) noexcept;
     // Sets (or with entry 0 clears) the entries of [begin, begin + bytes).
-    static void set(const void* begin, std::size_t bytes, std::uint8_t value) noexcept;
+    static void set(const void* begin, std::size_t bytes, entry_type value) noexcept;
     static bool reachable(const void* begin, std::size_t bytes) noexcept {
         const auto a = reinterpret_cast<std::uintptr_t>(begin);
         return bytes != 0 && (a >> address_bits) == 0 &&
@@ -171,7 +202,7 @@ struct OwnerMap {
 
 #if defined(_WIN32) || defined(XOFFSET_OWNER_MAP_SHARED)
 // A PE image stores zero-initialized COMDAT data in the file (MinGW GCC puts
-// this table in .data: a 64 MiB executable), so on Windows the table is
+// this table in .data: a 128 MiB executable), so on Windows the table is
 // committed at the first registration. While it is null no region exists and
 // every lookup finds no owner. The pointer is set once and never changes; a
 // thread that holds a head in a region has synchronized with the region's
@@ -179,95 +210,98 @@ struct OwnerMap {
 //
 // XOFFSET_OWNER_MAP_SHARED (Linux, Apple): the same, for a process that loads
 // many shared libraries built with this header (the phone test host,
-// tools/test_host). Each library would map its own 64 MiB table, and about 50
+// tools/test_host). Each library would map its own 128 MiB table, and about 25
 // fill an iPhone process's address space; with it they take the one table the
 // executable exports as xoffset_owner_map_shared(bytes), or else map their own.
-inline std::atomic<std::uint8_t*> owner_map_table{nullptr};
+inline std::atomic<OwnerMap::entry_type*> owner_map_table{nullptr};
 
 inline bool OwnerMap::ready() noexcept {
     if (owner_map_table.load(std::memory_order_acquire)) return true;
 #if defined(_WIN32)
-    auto* fresh = static_cast<std::uint8_t*>(
-        ::VirtualAlloc(nullptr, entries, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+    auto* fresh = static_cast<entry_type*>(
+        ::VirtualAlloc(nullptr, entries * sizeof(entry_type), MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
     if (!fresh) return false;
-    std::uint8_t* expected = nullptr;
+    entry_type* expected = nullptr;
     if (!owner_map_table.compare_exchange_strong(expected, fresh, std::memory_order_acq_rel))
         ::VirtualFree(fresh, 0, MEM_RELEASE);
 #else
+    // The host's table is page-aligned (mmap), so it holds 16-bit entries.
     using Shared = std::uint8_t* (*)(std::size_t);
-    std::uint8_t* fresh = nullptr;
+    constexpr std::size_t table_bytes = entries * sizeof(entry_type);
+    entry_type* fresh = nullptr;
     bool mapped = false;
     if (auto shared = reinterpret_cast<Shared>(::dlsym(RTLD_DEFAULT, "xoffset_owner_map_shared"))) {
-        fresh = shared(entries);
+        fresh = reinterpret_cast<entry_type*>(shared(table_bytes));
     } else {
-        void* p = ::mmap(nullptr, entries, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
-        fresh = p == MAP_FAILED ? nullptr : static_cast<std::uint8_t*>(p);
+        void* p = ::mmap(nullptr, table_bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+        fresh = p == MAP_FAILED ? nullptr : static_cast<entry_type*>(p);
         mapped = fresh != nullptr;
     }
     if (!fresh) return false;
-    std::uint8_t* expected = nullptr;
+    entry_type* expected = nullptr;
     if (!owner_map_table.compare_exchange_strong(expected, fresh, std::memory_order_acq_rel) && mapped)
-        ::munmap(fresh, entries);
+        ::munmap(fresh, table_bytes);
 #endif
     return true;
 }
 
-XOFFSET_DETAIL_OWNER_INLINE std::uint8_t OwnerMap::entry(std::uintptr_t address) noexcept {
-    const std::uint8_t* table = owner_map_table.load(std::memory_order_relaxed);
-    return table ? load(table[index(address)]) : std::uint8_t(0);
+XOFFSET_DETAIL_OWNER_INLINE OwnerMap::entry_type OwnerMap::entry(std::uintptr_t address) noexcept {
+    const entry_type* table = owner_map_table.load(std::memory_order_relaxed);
+    return table ? load(table[index(address)]) : entry_type(0);
 }
 
-XOFFSET_DETAIL_OWNER_INLINE const std::uint8_t* OwnerMap::entry_address(std::uintptr_t address) noexcept {
-    const std::uint8_t* table = owner_map_table.load(std::memory_order_relaxed);
+XOFFSET_DETAIL_OWNER_INLINE const OwnerMap::entry_type* OwnerMap::entry_address(std::uintptr_t address) noexcept {
+    const entry_type* table = owner_map_table.load(std::memory_order_relaxed);
     return table ? table + index(address) : nullptr;
 }
 #else
 // Zero-initialized (BSS): pages the program never touches cost no memory.
 // Mach-O compilers put a weak (inline) zero-initialized variable in
-// __DATA,__data, which stores all 64 MiB in the executable; the zero-fill
+// __DATA,__data, which stores all 128 MiB in the executable; the zero-fill
 // section keeps it out of the file (the linker still merges the copies).
 #if defined(__APPLE__)
 __attribute__((section("__DATA,__bss")))
 #endif
-inline std::uint8_t owner_map_table[OwnerMap::entries];
+inline OwnerMap::entry_type owner_map_table[OwnerMap::entries];
 
 inline bool OwnerMap::ready() noexcept { return true; }
 
-XOFFSET_DETAIL_OWNER_INLINE std::uint8_t OwnerMap::entry(std::uintptr_t address) noexcept {
+XOFFSET_DETAIL_OWNER_INLINE OwnerMap::entry_type OwnerMap::entry(std::uintptr_t address) noexcept {
     return load(owner_map_table[index(address)]);
 }
 
-XOFFSET_DETAIL_OWNER_INLINE const std::uint8_t* OwnerMap::entry_address(std::uintptr_t address) noexcept {
+XOFFSET_DETAIL_OWNER_INLINE const OwnerMap::entry_type* OwnerMap::entry_address(std::uintptr_t address) noexcept {
     return owner_map_table + index(address);
 }
 #endif
 
 XOFFSET_DETAIL_OWNER_INLINE char* OwnerMap::payload_of(const void* p) noexcept {
     const auto a = reinterpret_cast<std::uintptr_t>(p);
-    const std::uint8_t e = entry(a);
+    const entry_type e = entry(a);
     if (e == 0) return nullptr;
-    const auto base = a & (~std::uintptr_t(0) << (e & 63u));
-    return reinterpret_cast<char*>(base + ((e & slot_bit) >> 1));
+    return reinterpret_cast<char*>(base_of(a, e));
 }
 
 XOFFSET_DETAIL_OWNER_INLINE char* OwnerMap::same_payload(const void* a, const void* b) noexcept {
     const auto ua = reinterpret_cast<std::uintptr_t>(a);
     const auto ub = reinterpret_cast<std::uintptr_t>(b);
-    const std::uint8_t e = entry(ua);
+    const entry_type e = entry(ua);
     if (e == 0) return nullptr;
-    char* const pa = reinterpret_cast<char*>(
-        (ua & (~std::uintptr_t(0) << (e & 63u))) + ((e & slot_bit) >> 1));
-    if (index(ua) == index(ub)) return ((ua ^ ub) >> (e & 63u)) == 0 ? pa : nullptr;
+    const std::uintptr_t o = e & offset_mask;
+    const std::uintptr_t mask = ~std::uintptr_t(0) << (e & 63u);
+    const std::uintptr_t region = (ua - o) & mask;
+    char* const pa = reinterpret_cast<char*>(region + o);
+    if (index(ua) == index(ub)) return ((ub - o) & mask) == region ? pa : nullptr;
     return payload_of(b) == pa ? pa : nullptr;
 }
 
-inline void OwnerMap::set(const void* begin, std::size_t bytes, std::uint8_t value) noexcept {
+inline void OwnerMap::set(const void* begin, std::size_t bytes, entry_type value) noexcept {
     if (bytes == 0) return;
 #if defined(_WIN32) || defined(XOFFSET_OWNER_MAP_SHARED)
-    std::uint8_t* const table = owner_map_table.load(std::memory_order_acquire);
+    entry_type* const table = owner_map_table.load(std::memory_order_acquire);
     if (!table) return;  // entry 0 before any registration: nothing to clear
 #else
-    std::uint8_t* const table = owner_map_table;
+    entry_type* const table = owner_map_table;
 #endif
     const auto a = reinterpret_cast<std::uintptr_t>(begin);
     for (std::size_t i = index(a), last = index(a + bytes - 1); ; ++i) {
@@ -504,10 +538,15 @@ private:
             char* chunk = map_chunk();
             if (!chunk) return nullptr;
             if (!OwnerMap::reachable(chunk, SlotGeometry::chunk_bytes)) return nullptr;
-            OwnerMap::set(chunk, SlotGeometry::chunk_bytes, static_cast<std::uint8_t>(
-                OwnerMap::slot_bit | (SlotGeometry::min_shift + cls)));
-            state.carve[cls] = chunk;
-            state.carve_end[cls] = chunk + SlotGeometry::chunk_bytes;
+            // A colored chunk carves from its color offset and holds one
+            // slot fewer (OwnerMap, Color); the entry's offset adds the header.
+            constexpr std::size_t color_limit = OwnerMap::color_span - SlotGeometry::header_bytes;
+            const std::size_t color = OwnerMap::next_color_offset(
+                page_size(), bytes < color_limit ? bytes : color_limit);
+            OwnerMap::set(chunk, SlotGeometry::chunk_bytes,
+                          OwnerMap::make_entry(SlotGeometry::min_shift + cls, color + SlotGeometry::header_bytes));
+            state.carve[cls] = chunk + color;
+            state.carve_end[cls] = chunk + color + (SlotGeometry::chunk_bytes - color) / bytes * bytes;
             ++state.stats.chunks;
         }
         auto* slot = reinterpret_cast<SlotHeader*>(state.carve[cls]);

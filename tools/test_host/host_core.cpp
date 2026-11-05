@@ -44,7 +44,7 @@
 
 // The owner map of every program library (xoffset_slot_storage.hpp, built with
 // XOFFSET_OWNER_MAP_SHARED by cmake/XOffsetTestHost.cmake): one table for the
-// process instead of 64 MiB of address space in each loaded library.
+// process instead of 128 MiB of address space in each loaded library.
 extern "C" __attribute__((visibility("default"), used)) std::uint8_t* xoffset_owner_map_shared(std::size_t bytes) {
     static const std::size_t size = bytes;
     static std::uint8_t* const table = [] {

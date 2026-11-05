@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- Payload coloring (docs/V2_FORMAT.md, Owner by address): each new VM region
+  and each new slot chunk starts its payloads at the next page-aligned color
+  offset below 64 KiB instead of on a 2^k boundary, so the first pages of many
+  buffers no longer share TLB sets. 64 order books with one VM XBuffer each
+  (cloud x86, P2996 + libc++, ns per applied event, median of 9): pool layout
+  66.0 -> 40.4 (hand-written pool 37.1), nested 89.6 -> 54.9; Ir per event
+  125.78 -> 125.78 and 169.60 -> 169.62. The owner map grows to 16 bits per
+  granule (128 MiB of address space; untouched pages stay free, committed at
+  first registration on Windows) to hold the offset; the lookup costs the
+  same instructions as before. A colored slot chunk holds one slot fewer.
+  Wire bytes, payload page alignment, touched pages and the alignment of a
+  VM reservation are unchanged. Apple Silicon has 4 colors (16 KiB pages):
+  the Mac gate shows no HFT gain there yet (0.97 to 1.05); wider colors on
+  16 KiB pages are a follow-up.
+
 ## 3.3.0: native delta sync
 
 Delta sync arrives as an experimental API (`xoffset_delta.hpp`, delta
