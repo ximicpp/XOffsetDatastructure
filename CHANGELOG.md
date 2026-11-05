@@ -33,6 +33,29 @@
   P2996 map 0.97, set 0.97 (3.3.0 and 3.3.1: 1.03 to 1.05). Inserts in
   ascending key order keep the 3.3.0 gain. Contents, layout and allocation
   are unchanged.
+- VM storage keeps its host header (the owner word) in the first 64 bytes of
+  the payload's own region instead of a separate page in front of it, as slots
+  already did: the payload starts 64 bytes past the region's 2^k boundary.
+  Each VM XBuffer saves that page and the page table it needed in the previous
+  granule. `XBuffer::swap` no longer writes the registry records: a record only
+  says whether its payload is still owned, and the owner comes from the host
+  word. Both were pages that only swap and allocation touched, so under memory
+  pressure they were the first to be compressed or swapped out, and every
+  install paid a fault for them (SLGV9c on the Mac: B.install 7.2x and
+  S.load_install 9.9x slower with nine formats in one process, rivals 1.0 to
+  1.4x). Cloud, bench/slg demo M, xoffset and cereal in one process limited to
+  800 MiB with swap: B.install 107 major faults per cycle to 0 (7874 to 160 us;
+  cereal 135 us), S.load_install 58 to 0 (3125 to 149 us). 4000 VM buffers of
+  12 KiB: page tables 33 to 17 MB, RSS 116 to 100 MB.
+  Geometry: a VM buffer's `reserved_bytes()` and `accessible_bytes()` count
+  from the payload, so they are whole pages minus 64 bytes, and the first page
+  is read/write from creation. The region is aligned to the maximum's next
+  power of two (at least 4 MiB); a maximum of exactly 2^k (64 MiB, 256 MiB)
+  keeps 2^k and maps one more 4 MiB granule (PROT_NONE until used) for its
+  last 64 bytes and page rounding. The owner lookup masks the address minus 64
+  and adds 64, no more work than before. A pool budget that was an
+  exact multiple of such a maximum holds one idle owner fewer.
+  docs/DEPLOYMENT.md section 5.
 
 ## 3.3.1: root cache refill and trusted receive
 

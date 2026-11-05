@@ -201,7 +201,9 @@ void page_boundaries_and_capacity() {
     assert(buffer.reserved_capacity() == maximum);
     assert(reservation >= maximum);
     assert(accessible < reservation);
-    assert(accessible % page == 0);
+    // Accessible bytes count from the payload, which starts 64 bytes into
+    // its first page (after the host header).
+    assert((accessible + XOffsetDatastructure::detail::SlotGeometry::header_bytes) % page == 0);
 
     const auto original_size = buffer.get_size();
     assert(buffer.grow(0));
