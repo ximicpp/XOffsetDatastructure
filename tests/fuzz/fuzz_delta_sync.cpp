@@ -13,7 +13,15 @@
 //     cursor exactly as they were (a key delta rejected after its header
 //     checks may instead leave the replica empty and the cursor cleared);
 //   - an accepted delta leaves a payload whose save_verified() wire loads
-//     with load_verified and re-saves byte-identically.
+//     with load_verified and re-saves byte-identically;
+//   - XReceiver<from_server>::apply_delta with XCheck::admit (trust tier P2),
+//     on another clone with a copy of the cursor: it accepts every delta the
+//     full check accepts, with the same payload, holes and cursor; it rejects
+//     with the same error every delta the parse rejects (any code but the
+//     ones the checks of section 3 give); a rejected admit leaves its clone
+//     and cursor as they were, or (key delta) empty; a delta it accepts
+//     beyond the full check is not read. Its own parse and patch must stay
+//     in bounds on any input (ASan).
 //
 // The first input byte picks the schema (bit 0: the fuzz model fz::Root of
 // v2_fuzz_core.hpp, or a viewport-like vector of unit records) and the mode
@@ -118,12 +126,13 @@ std::string dump_of(xo::TypedXBuffer<Root>& b) { return has_state(b) ? dump(b.ro
 // XOFFSET_FUZZ_STATS=1: at exit, applies by outcome and receiver check
 // (key, none, in_place, full), to see that a corpus reaches the fast paths.
 struct Stats {
-    std::size_t rejected = 0, accepted[4] = {};
+    std::size_t rejected = 0, accepted[4] = {}, admitted = 0, admit_rejected = 0;
     ~Stats() {
         const char* e = std::getenv("XOFFSET_FUZZ_STATS");
         if (!e || !*e) return;
-        std::fprintf(stderr, "fuzz_delta_sync: rejected %zu, accepted key %zu none %zu in_place %zu full %zu\n",
-                     rejected, accepted[0], accepted[1], accepted[2], accepted[3]);
+        std::fprintf(stderr, "fuzz_delta_sync: rejected %zu, accepted key %zu none %zu in_place %zu full %zu; "
+                     "admit accepted %zu rejected %zu\n",
+                     rejected, accepted[0], accepted[1], accepted[2], accepted[3], admitted, admit_rejected);
     }
 } g_stats;
 
@@ -151,6 +160,15 @@ xo::XStatus apply_checked(xo::TypedXBuffer<Root>& rep, const std::string& d, xo:
         thrown = xo::XError{e.code(), e.what()};
     }
 
+    // Trust tier admit on another clone, before the replica changes.
+    std::optional<xo::TypedXBuffer<Root>> admitted;
+    if (had) admitted.emplace(rep.clone());
+    else admitted.emplace(xo::TypedXBuffer<Root>(4096, xo::XBuffer::maximum_capacity(kLimit)));
+    auto admit_cursor = cur;
+    static xo::XReceiver<xo::XLink::from_server> rx(xo::XBuffer::maximum_capacity(kLimit));
+    static_assert(!xo::detail::force_full_check, "the harness needs the real admit");
+    const xo::XStatus a = rx.apply_delta(*admitted, d, admit_cursor);
+
     auto r = rep.try_apply_delta_verified(d, cur);
     if (r) ++g_stats.accepted[std::size_t(cur.last_check()) & 3];
     else ++g_stats.rejected;
@@ -174,6 +192,38 @@ xo::XStatus apply_checked(xo::TypedXBuffer<Root>& rep, const std::string& d, xo:
         need(twin_cursor.version() == cur.version() && twin_cursor.stream() == cur.stream(),
              where + ": full verification moved the cursor differently");
     }
+
+    if (r) {
+        need(bool(a), where + ": admit rejected a delta the full check accepts (" +
+             (a ? std::string() : a.error().message) + ")");
+        if (a) {
+            need(admit_cursor.last_check() == xo::XDeltaCheck::admit, where + ": admit not reported as admit");
+            need(payload_of(*admitted) == payload_of(rep), where + ": admit produced a different payload");
+            need(holes_of(*admitted) == holes_of(rep), where + ": admit produced a different hole set");
+            need(admit_cursor.version() == cur.version() && admit_cursor.stream() == cur.stream(),
+                 where + ": admit moved the cursor differently");
+        }
+    } else {
+        // Codes only the checks after the parse give (section 3: the
+        // verification, the in-place checks, the root binding).
+        // The whole verification also needs the replica's free table.
+        const auto c = r.code();
+        const bool checks_only = c == xo::XErrc::invalid_payload || c == xo::XErrc::root_mismatch ||
+                                 c == xo::XErrc::invalid_payload_header || c == xo::XErrc::capacity_exceeded ||
+                                 c == xo::XErrc::out_of_storage || c == xo::XErrc::host_allocation_failed ||
+                                 r.error().message.find("free table incomplete") != std::string::npos;
+        if (!checks_only)
+            need(!a && a.code() == r.code(), where + ": admit and the full check disagree on a parse error: " +
+                 r.error().message + " / " + (a ? std::string("accepted") : a.error().message));
+    }
+    if (!a) {
+        const bool unchanged = payload_of(*admitted) == before && holes_of(*admitted) == before_holes &&
+                               admit_cursor.version() == before_version && admit_cursor.stream() == before_stream;
+        const bool cleared = key && !has_state(*admitted) && admit_cursor.version() == 0;
+        need(unchanged || cleared, where + ": a rejected admit changed the replica or the cursor (" +
+             a.error().message + ")");
+    }
+    if (a) ++g_stats.admitted; else ++g_stats.admit_rejected;
 
     if (!r) {
         const bool unchanged = payload_of(rep) == before && holes_of(rep) == before_holes &&
