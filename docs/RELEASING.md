@@ -27,8 +27,9 @@
 - 候选提交（`next_cpp26` 上准备发版的那个提交，下称 C）对上一个发版 tag 跑 GCC 16 和 P2996 两个 Ir 门。
   它们就是第 3 步 `local_validate --release --base <上一个 tag>` 里的 `ir` 和 `p2996-ir` 两步：base 是上一个
   tag，第 7 步又把 `bench/perf/ANCHOR` 移到了上一个 tag，所以 head÷base 和 head÷anchor 都是 C 对上一个 tag。
-- 判定：两个编译器都不能有 fail（门槛见 [PERF_GATE.md](PERF_GATE.md) 第 3 节，场景合计 head÷anchor 扣除
-  ledger 后 > 1.020 即 fail）。warn 的指标连同函数差异表写进发版 PR，交「性能优化」决定，并写进发布说明。
+- 判定（两个编译器各自判，扣除 ledger 已放行的部分）：任何一个场景合计 head÷anchor > 1.020 是 fail；
+  任何一个合计 > 1.003，或任何一个阶段 > 1.02，是警告（和 S 类门禁同一套阈值，[PERF_GATE.md](PERF_GATE.md)
+  第 3 节）。fail 不能发版；警告的指标连同函数差异表写进发版 PR，由「性能优化」决定，并写进发布说明。
 - 没通过：定位到具体 PR 后撤回或修复，再跑一次；赶不上时 tag 打在最后一个通过的提交上，
   没过的改动挪到下一个版本（第 6 节）。
 - 不变的部分：每个 L 类 PR 合并前仍要过 Mac L2，这是合并规则，不是发版规则。
@@ -130,7 +131,8 @@ git push origin vX.Y.Z
 - 下一个版本所有「不回退」判定以这个 tag 的提交为基线。
 - Ir 门禁的 anchor 前移：开一个只改 `bench/perf/ANCHOR`（改成 tag 的提交）的 0 类 PR，
   同时把失效的 ledger 条目移到 `bench/perf/ledger_archive.json`（[PERF_GATE.md](PERF_GATE.md) 第 4 节）。
-- Mac 阶段复核：发版后跑一次（head 是这个 tag 的提交，anchor 是上一个 tag），作为跟进；按 L2 规则判，
+- Mac 阶段复核：发版后跑一次（head 是这个 tag 的提交，anchor 是上一个 tag），排在发版后的第一个 Mac 空档，
+  不能无限期往后推；按 L2 规则判，
   结果写在 project files 的 `perf-gate/mac/<日期>-<批次名>/VERDICT.md`。发现回退就开修复 PR，进下一个补丁
   版本，并写进下一版的发布说明。
 - 在 project files 里记下 tag、提交、云端判定（`local_validate` 的 `REPORT.md`）和之后 Mac 复核 VERDICT 的路径。
