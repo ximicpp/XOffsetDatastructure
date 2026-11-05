@@ -341,6 +341,13 @@ namespace XOffsetDatastructure::xsync {
             return t;
         }();
 
+        // Word a / 8 of the n bytes at p: whole words when N (n known at compile
+        // time) is a multiple of 8, else zero filled past n.
+        template <std::size_t N> inline std::uint64_t word_at(const unsigned char* p, std::size_t a, std::size_t n) noexcept {
+            if constexpr (N != 0 && N % 8 == 0) { std::uint64_t v; std::memcpy(&v, p + a, 8); return v; }
+            else return load(p + a, n - a);
+        }
+
         // Writes the block section of [0, n) of cur against old (nullptr: all
         // zero). plain(w) gives the sendable bytes of word w. With sync the
         // sent bytes are copied into old. Returns the number of blocks.
@@ -352,10 +359,6 @@ namespace XOffsetDatastructure::xsync {
                                  Plain&& plain, bool sync) {
             if constexpr (N != 0) n = N;
             constexpr bool whole = N != 0 && N % 8 == 0;
-            const auto word = [n](const unsigned char* p, std::size_t a) noexcept -> std::uint64_t {
-                if constexpr (whole) { std::uint64_t v; std::memcpy(&v, p + a, 8); return v; }
-                else return load(p + a, n - a);
-            };
             const std::size_t blocks = (n + 63) / 64;
             char* const d = out.tail(1 + blocks * (5 + 1 + 8 + 64));
             char* q = d + 1;
@@ -367,7 +370,7 @@ namespace XOffsetDatastructure::xsync {
                 const std::size_t words = n - b * 64 >= 64 ? 8 : (n - b * 64 + 7) / 8;
                 for (unsigned w = 0; w < words; ++w) {
                     const std::size_t a = b * 64 + w * 8;
-                    const std::uint64_t x = word(cur, a) ^ (old ? word(old, a) : 0);
+                    const std::uint64_t x = word_at<N>(cur, a, n) ^ (old ? word_at<N>(old, a, n) : 0);
                     if (!x) continue;
                     const unsigned m = byte_mask(x) & plain(a / 8);
                     masks[w] = m;
@@ -382,7 +385,7 @@ namespace XOffsetDatastructure::xsync {
                     const unsigned w = unsigned(std::countr_zero(s));
                     const std::size_t a = b * 64 + w * 8;
                     const unsigned m = masks[w];
-                    const std::uint64_t c = word(cur, a);
+                    const std::uint64_t c = word_at<N>(cur, a, n);
                     if (m == 0xffu) {   // a whole word
                         std::memcpy(q, &c, 8);
                         q += 8;
@@ -392,7 +395,7 @@ namespace XOffsetDatastructure::xsync {
                     for (unsigned r = m; r; r &= r - 1) *q++ = char(c >> (8 * std::countr_zero(r)));
                     if (sync) {   // the sent bytes into old, the others kept
                         const std::uint64_t keep = kSpread[m];
-                        const std::uint64_t o = (word(old, a) & ~keep) | (c & keep);
+                        const std::uint64_t o = (word_at<N>(old, a, n) & ~keep) | (c & keep);
                         std::memcpy(old + a, &o, whole || n - a >= 8 ? 8 : n - a);
                     }
                 }
