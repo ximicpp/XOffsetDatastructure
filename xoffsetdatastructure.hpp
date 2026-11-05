@@ -958,12 +958,12 @@ namespace XOffsetDatastructure {
         // one; the payload's current owner is re-resolved and the table
         // published to it.
         XOFFSET_DETAIL_MOVE_INLINE detail::vstatus load_free_blocks(const void* holes, std::size_t count) {
-            // No holes, no entry to remove, this owner current: the general
-            // path would only publish the same empty table (or none).
-            // The host word, not the record: it shares the payload's first
-            // page (just written by the load), the record is a cold heap object.
-            if (count == 0 && (!free_table_ || free_table_->count == 0) &&
-                (!owner_record_ || buffer_.host_owner() == this)) [[likely]] {
+            // No holes and no entry to remove: the general path would only
+            // publish the same empty table (or none). It would publish it to
+            // record_owner(owner_record_), the payload's host word, which is
+            // this owner while it holds the payload; neither the word nor
+            // the record (a cold heap object) needs to be read here.
+            if (count == 0 && (!free_table_ || free_table_->count == 0)) [[likely]] {
                 free_table_lost_ = false;
                 return detail::vok();
             }
