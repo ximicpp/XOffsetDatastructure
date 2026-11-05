@@ -195,8 +195,10 @@ A.res_decode 0.967、A.apply 0.928、A.req_encode 0.997。A.req_decode 疑似代
 ### 重定位税（G9R3，同批 `v3.2.1` 对 C）：19 项里 17 项满足
 
 没过的两项和 3.2.x 相同：vec.push_back、set.erase.fresh（`perf-gate/mac/2026-11-04-rel330-059b6a5/g9r/`）。
-XOffset 自身有四项比 3.2.1 慢约 2.5%，默认和对齐构建都一样：map.find.fresh 1.028、map.find.reused 1.028、
-map.insert.reused 1.023、set.insert.reused 1.022（G9 仍满足）；原因在查，可能和 #214 有关，未验证。
+XOffset 自身有几项比 3.2.1 慢（G9 仍满足）：map.insert.reused 1.023、set.insert.reused 1.022，来自 #214 为
+升序追加加的快路径（随机顺序插入时每次多一次和末元素的比较，云端指令数多 3–5%，升序插入反而更快）；
+map.find.fresh、map.find.reused 1.028，默认和对齐构建都一样，但指令数没有增加，原因未查明，只报
+（`perf-gate/cloud/g9r-map-ir-20261105/REPORT.md`）。
 
 ### 客户端
 
