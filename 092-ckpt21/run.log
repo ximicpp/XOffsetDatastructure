@@ -1,0 +1,41 @@
+== 2026-11-05T01:07:51Z 0. tools
+selftest: 73 ok, 0 FAIL (cloud: 73 ok)
+cmake version 4.4.4
+1.13.2
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+anchor: next_cpp26 51a4815b (3.3.0 release merged)
+== 2026-11-05T01:08:09Z 1. export
+head bf70e9986e54d927686ac372e65c706b071a86b7 tree 90e6b1074e49c36790ace0c64694f83861b887d9 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+anc 51a4815b7802ec125e2752847b69fd2a87ab7259 tree 254473076fde1ce98ca5529e307417cd8c0b5b3a typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+== 2026-11-05T01:08:16Z 2. build
+slg init cache /Volumes/XOffsetCS/perf-gate/slg-init-p2996-d77eff1.cmake sha ed916a0cf280cedf798d20f523b09c055e24ba4da58723df5d51d5558ebedde9
+slg head: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+slg anc: -- slg_bench formats: xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+== 2026-11-05T01:09:24Z 3c. r3v3 reference
+r3v3 reference /Volumes/XOffsetCS/perf-gate/refs/R3V3-formal-mac-v1 ok
+r3v3: reusing /Volumes/XOffsetCS/perf-gate/refs/R3V3-formal-mac-v1
+== 2026-11-05T01:09:24Z 4. wires and prep
+point	commit	sc_xoffset	slg_bench	wire
+head	bf70e9986e54d927686ac372e65c706b071a86b7	8cd9767c692ea0bbf3c111f9f174909534b4f35aaa5a7324f0bca4d16cc8ca5a	e0773338871b29f0d1f4428bae4bd49f113c1930ce65be1fc353c07dd736fca4	89fd02d2d36fce705cc519d1a6a6298ff23e595c01fb01211e360d6249d2edcc
+anc	51a4815b7802ec125e2752847b69fd2a87ab7259	8cd9767c692ea0bbf3c111f9f174909534b4f35aaa5a7324f0bca4d16cc8ca5a	e0773338871b29f0d1f4428bae4bd49f113c1930ce65be1fc353c07dd736fca4	89fd02d2d36fce705cc519d1a6a6298ff23e595c01fb01211e360d6249d2edcc
+reuse: cycle 0 xoffset      state=ddb6224bbbcecad3 reports=37196452043336
+default: cycle 0 xoffset      state=ddb6224bbbcecad3 reports=37196452043336
+reuse bytes head [1166 2358 12964 842240 712] anchor [1166 2358 12964 842240 712]
+default bytes head [1166 2358 12964 842240 712] anchor [1166 2358 12964 842240 712]
+== 2026-11-05T01:09:50Z 5. CKPT21 L2
+FREEZE.json written: /Volumes/XOffsetCS/perf-gate/runs/2026-11-05-ckpt21-bf70e99-smoke
+  head         8cd9767c692ea0bbf3c111f9f174909534b4f35aaa5a7324f0bca4d16cc8ca5a
+  head_aa      8cd9767c692ea0bbf3c111f9f174909534b4f35aaa5a7324f0bca4d16cc8ca5a
+  anchor       8cd9767c692ea0bbf3c111f9f174909534b4f35aaa5a7324f0bca4d16cc8ca5a
+  r3           328d8872af63eceee99c9f3c529dae5bce69eba67de6515ef1463a6f4fd883a9
+  cista        1cffe48e6c9b3cc961943a26ff8b361b2e63e9dcc779c138557686af922b4f9c
+  flatbuffers  51e053ddd6afe1652771ba49d3243fa25f367e8a959c90243e004e1ee37ec4b7
+  capnproto    e528cb3cbb42b49780398f164192ff41a1dbdfd983580c79ad5d3cb31e5639bc
+  cereal       4d65fc64843c0c469ca90c76e14e792ba5ccf3c01eb066bf6aff44eafbcf600f
+  bisect 1ae7aedd5050 PR #228 before the merge of next_cpp26 (base 059b6a5f, bench/slg 23e86624; report only); the last range holds the merge of 51a4815b: deferred (built when the bisection reaches it)
+  formal: NOT APPLICABLE, head and anchor binaries are identical (8cd9767c692ea0bbf3c111f9f174909534b4f35aaa5a7324f0bca4d16cc8ca5a); skip its timing
+  slg: NOT APPLICABLE, head and anchor binaries are identical (e0773338871b29f0d1f4428bae4bd49f113c1930ce65be1fc353c07dd736fca4); skip its timing
+smoke formal: not applicable (head and anchor sc_xoffset are the same binary); the gate judges L2 on SLG alone
+SLG not applicable: slg_head and slg_anch are the same binary (e0773338871b29f0d1f4428bae4bd49f113c1930ce65be1fc353c07dd736fca4); nothing to time
+STOP: smoke slg failed
+== 2026-11-05T01:09:50Z finish rc=2
