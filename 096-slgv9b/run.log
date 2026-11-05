@@ -1,0 +1,100 @@
+== 2026-11-05T04:06:30Z 0. tools
+cmake version 4.4.4
+1.13.2
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+== 2026-11-05T04:06:30Z 1. source
+source: tree d6e4883f9b4a6be814b02ffaff30bac34433eebb (export of the PR #236 head b87beab8cc82cdc77338e52a7d75cd7c3847aa34 (not merged on next_cpp26 at the start))
+/Volumes/XOffsetCS/perf-gate/src/slgv9b/bench/slg/MANIFEST: 27 files match
+/Volumes/XOffsetCS/perf-gate/src/slgv9b-d3/bench/slg/MANIFEST: 25 files match
+D3 source: tree 48a2878fc12879993b1ba9a1e3fb255c5dd4dee4 (export of 2616e721fafa7400a7bbcf0f7acdce5cb8d30d86)
+== 2026-11-05T04:06:37Z 2. build
+-- slg_bench formats:xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+slg_bench sha256 942be5b5ab3e1cf804702a712828ae1c69ef8736a599beef803b24cb565b3c89
+D3 slg_bench (2616e721fafa7400a7bbcf0f7acdce5cb8d30d86) sha256 ebd24e30d6ab84fc8cb9af4e901de84d7534750d5b7b7b942b5a6df5eb241309
+== 2026-11-05T04:07:34Z 3. verify
+default mode: cycle 2 xoffset      state=0439e37815b4d22a reports=2128166416352
+== 2026-11-05T04:08:14Z 4. timing
+2026-11-05T04:18:40Z process 1 app done: 1793851876..1793852320 (444 s) load 1.85
+2026-11-05T04:20:09Z process 1 native done: 1793852351..1793852409 (58 s) load 2.10
+merged 19174 app lines + 901 native lines
+2026-11-05T04:21:32Z process 1 d3 done: 1793852440..1793852492 (52 s) load 1.96
+appended 819 D3 lines
+2026-11-05T04:29:29Z process 2 app done: 1793852522..1793852969 (447 s) load 2.89
+2026-11-05T04:30:58Z process 2 native done: 1793853000..1793853058 (58 s) load 2.91
+merged 19174 app lines + 901 native lines
+2026-11-05T04:32:21Z process 2 d3 done: 1793853089..1793853141 (52 s) load 2.48
+appended 819 D3 lines
+2026-11-05T04:40:20Z process 3 app done: 1793853172..1793853620 (448 s) load 2.48
+2026-11-05T04:41:49Z process 3 native done: 1793853650..1793853709 (59 s) load 1.86
+merged 19174 app lines + 901 native lines
+2026-11-05T04:43:12Z process 3 d3 done: 1793853739..1793853792 (53 s) load 1.63
+appended 819 D3 lines
+2026-11-05T04:51:10Z process 4 app done: 1793853822..1793854270 (448 s) load 2.87
+2026-11-05T04:52:40Z process 4 native done: 1793854301..1793854360 (59 s) load 2.29
+merged 19174 app lines + 901 native lines
+2026-11-05T04:54:03Z process 4 d3 done: 1793854390..1793854443 (53 s) load 2.31
+appended 819 D3 lines
+2026-11-05T05:02:12Z process 5 app done: 1793854473..1793854932 (459 s) load 3.83
+2026-11-05T05:05:12Z process 5 native done: 1793855054..1793855112 (58 s) load 2.36
+merged 19174 app lines + 901 native lines
+2026-11-05T05:06:35Z process 5 d3 done: 1793855142..1793855195 (53 s) load 2.06
+appended 819 D3 lines
+2026-11-05T05:14:33Z process 6 app done: 1793855225..1793855673 (448 s) load 2.22
+2026-11-05T05:16:03Z process 6 native done: 1793855704..1793855763 (59 s) load 2.07
+merged 19174 app lines + 901 native lines
+2026-11-05T05:17:26Z process 6 d3 done: 1793855793..1793855846 (53 s) load 2.55
+appended 819 D3 lines
+2026-11-05T05:25:25Z process 7 app done: 1793855876..1793856325 (449 s) load 2.40
+2026-11-05T05:26:54Z process 7 native done: 1793856355..1793856414 (59 s) load 2.04
+merged 19174 app lines + 901 native lines
+2026-11-05T05:28:17Z process 7 d3 done: 1793856444..1793856497 (53 s) load 1.80
+appended 819 D3 lines
+2026-11-05T05:36:16Z process 8 app done: 1793856527..1793856976 (449 s) load 2.88
+2026-11-05T05:37:45Z process 8 native done: 1793857006..1793857065 (59 s) load 2.28
+merged 19174 app lines + 901 native lines
+2026-11-05T05:39:10Z process 8 d3 done: 1793857095..1793857150 (55 s) load 2.93
+appended 819 D3 lines
+screen watcher: 84 calls (dark.log)
+== 2026-11-05T05:39:10Z 5. pool
+# SLG demo cases, scoring V3 (server / egress / client warm)
+
+8 processes. Ratios are XOffset ÷ rival, geometric mean / one-sided 95% upper bound (Bonferroni over each table). Below 1: XOffset faster or smaller. Native rows (XOffset's own delta) compare with the rival's application-level case. Rivals in their no-check mode where they have one (信任档). XOffset: 信任档 xoffset_trusted (XReceiver admit, #228) in the application-level rows and class 1; native and D3 rows: 完整校验 (delta trust tier comes with P2); xoffset with the full check is report only. All messages are compressed (zstd-3 per message) but compression is not in the compared time (susu 00:59Z 11-05): main columns = server *.send, bytes after zstd, client receive + merge.
+
+## 第 1 类主表（XOffset 信任档 admit）：两端合计（迁移 / 存储，每周期按阶段前缀求和） ÷ rival
+
+| 用例 | zpp_bits | cista_unchecked | flatbuffers_noverify | cereal | protobuf |
+| --- | --- | --- | --- | --- | --- |
+| 1 场景↔战斗 | 0.432 / 0.501 | 0.394 / 0.438 | 0.256 / 0.295 | 0.163 / 0.182 | 0.065 / 0.075 |
+| 1 场景↔场景 | 0.803 / 0.871 | 1.341 / 1.457 | 0.585 / 0.609 | 0.325 / 0.358 | 0.154 / 0.168 |
+| 1 场景↔存储（整份） | 0.527 / 0.578 | 0.996 / 1.115 | 0.497 / 0.548 | 0.169 / 0.189 | 0.089 / 0.100 |
+| 1 场景↔存储（只存脏模块） | 0.291 / 0.298 | 0.310 / 0.318 | 0.334 / 0.341 | 0.124 / 0.126 | 0.067 / 0.069 |
+| 1 存储（XOffset 原生增量，对对手 SD） | 1.872 / 1.913 | 1.991 / 2.045 | 2.149 / 2.198 | 0.799 / 0.814 | 0.433 / 0.445 |
+
+## 只报：第 1 类 ÷ 校验版对手
+
+| 用例 | cista | flatbuffers |
+| --- | --- | --- |
+| 1 场景↔战斗 | 0.213 / 0.235 | 0.238 / 0.259 |
+| 1 场景↔场景 | 0.574 / 0.622 | 0.544 / 0.571 |
+| 1 场景↔存储（整份） | 0.256 / 0.283 | 0.435 / 0.470 |
+| 1 场景↔存储（只存脏模块） | 0.171 / 0.175 | 0.306 / 0.323 |
+| 1 存储（XOffset 原生增量，对对手 SD） | 1.097 / 1.136 | 1.967 / 2.058 |
+
+## 只报：第 1 类，XOffset 完整校验 ÷ rival
+
+| 用例 | zpp_bits | cista_unchecked | flatbuffers_noverify | cereal | protobuf |
+| --- | --- | --- | --- | --- | --- |
+| 1 场景↔战斗 | 0.508 / 0.599 | 0.463 / 0.518 | 0.301 / 0.346 | 0.192 / 0.217 | 0.077 / 0.089 |
+| 1 场景↔场景 | 0.857 / 0.968 | 1.432 / 1.548 | 0.625 / 0.685 | 0.347 / 0.383 | 0.164 / 0.178 |
+| 1 场景↔存储（整份） | 0.692 / 0.743 | 1.309 / 1.402 | 0.652 / 0.694 | 0.222 / 0.238 | 0.117 / 0.127 |
+| 1 场景↔存储（只存脏模块） | 0.354 / 0.361 | 0.376 / 0.386 | 0.406 / 0.416 | 0.151 / 0.154 | 0.082 / 0.084 |
+| 1 存储（XOffset 原生增量，对对手 SD） | 1.872 / 1.913 | 1.991 / 2.045 | 2.149 / 2.198 | 0.799 / 0.814 | 0.433 / 0.445 |
+
+## 主列：服务端每条成本（*.send，不含压缩） ÷ rival
+
+| 用例 | zpp_bits | cista_unchecked | flatbuffers_noverify | cereal | protobuf |
+| --- | --- | --- | --- | --- | --- |
+| 2 登录全量 | 0.379 / 0.487 | 0.384 / 0.505 | 0.243 / 0.301 | 0.197 / 0.259 | 0.102 / 0.122 |
+| 2 浏览视口全量 | 0.439 / 0.451 | 0.276 / 0.287 | 0.209 / 0.216 | 0.137 / 0.142 | 0.183 / 0.189 |
+== 2026-11-05T05:39:11Z finish rc=0
+result tarball: /Users/ximi/workspace/xo-queue/queue/096-slgv9b/out/slgv9b_result.tar.gz sha256 3db57f15b4f7b842b0ba3f8973baefdfb6487bdf530665a3d9e555313a8e900b

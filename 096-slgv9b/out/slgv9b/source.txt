@@ -1,0 +1,2 @@
+source: tree d6e4883f9b4a6be814b02ffaff30bac34433eebb (export of the PR #236 head b87beab8cc82cdc77338e52a7d75cd7c3847aa34 (not merged on next_cpp26 at the start))
+D3 source: tree 48a2878fc12879993b1ba9a1e3fb255c5dd4dee4 (export of 2616e721fafa7400a7bbcf0f7acdce5cb8d30d86)

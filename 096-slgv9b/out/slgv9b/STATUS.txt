@@ -1,0 +1,2 @@
+SLGV9b done: 8 processes x 21 cycles, slg_bench 942be5b5ab3e1cf804702a712828ae1c69ef8736a599beef803b24cb565b3c89, source tree d6e4883f9b4a6be814b02ffaff30bac34433eebb (export of the PR #236 head b87beab8cc82cdc77338e52a7d75cd7c3847aa34 (not merged on next_cpp26 at the start)); D3 slg_bench ebd24e30d6ab84fc8cb9af4e901de84d7534750d5b7b7b942b5a6df5eb241309 (2616e721fafa7400a7bbcf0f7acdce5cb8d30d86)
+screen watcher: 84 calls (dark.log)
