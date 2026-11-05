@@ -3207,17 +3207,30 @@ namespace XOffsetDatastructure {
             return first;
         }
 
-        // Where a sorted insert of `key` goes. Keys arriving in ascending
-        // order (a copy, a decode, a rebuild) append after one compare with
-        // the last element instead of a search; otherwise key <= last, so the
-        // bound lies in [0, size - 1] and the search skips the last element.
-        // The inserts that use it are always inlined: with the extra compare
-        // Clang stopped inlining XSet::insert at its callers.
+        // Where a sorted insert of `key` goes when key <= the last of `size`
+        // (>= 1) elements: in [0, size - 1]. Its inserts append a key greater
+        // than the last (ascending keys: a copy, a decode) after one compare,
+        // so the found check needs no bound and the insert no append check.
+        // Scalar keys halve over all `size` elements (the final compare is
+        // false at the last); other keys search the first size - 1. The
+        // inserts are always inlined: else Clang stops inlining XSet::insert.
         template <typename Elem, typename KeyLike, typename KeyFn>
-        std::uint32_t insert_index(const Elem* data, std::uint32_t size,
-                                   const KeyLike& key, KeyFn&& key_fn) {
-            if (size == 0 || ordered_less(key_fn(data[size - 1]), key)) return size;
-            return lower_bound_index(data, size - 1, key, key_fn);
+        std::uint32_t insert_index_below_last(const Elem* data, std::uint32_t size,
+                                              const KeyLike& key, KeyFn&& key_fn) {
+            if constexpr (std::is_scalar_v<std::remove_cvref_t<decltype(key_fn(*data))>> &&
+                          std::is_scalar_v<KeyLike>) {
+                const Elem* base = data;
+                std::uint32_t n = size;
+                while (n > 1) {
+                    const std::uint32_t half = n / 2;
+                    base = ordered_less(key_fn(base[half - 1]), key) ? base + half : base;
+                    n -= half;
+                }
+                return static_cast<std::uint32_t>(base - data) +
+                       static_cast<std::uint32_t>(ordered_less(key_fn(*base), key));
+            } else {
+                return lower_bound_index(data, size - 1, key, key_fn);
+            }
         }
     } // namespace fixed_detail
 
@@ -4377,14 +4390,73 @@ namespace XOffsetDatastructure {
 #endif
         }
 
+        // insert_construct at size_ (a sorted insert after the last element),
+        // all compilers. Only the spare-capacity path is inline: with more
+        // here GCC stops inlining XMap::operator[] or zero_implicit_padding.
+        template <typename Construct>
+        iterator append_after_last_construct(Construct&& construct) {
+            const size_type n = size_;
+            if (n < capacity_) [[likely]] {
+                T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + n;
+                construct(slot);
+                size_ = n + 1u;
+                return slot;
+            }
+            return append_full_construct(construct);
+        }
+
+        // append_after_last_construct into a full vector. Trivially copyable
+        // elements: stage, grow (reserve inline: one call per growth), copy.
+        template <typename Construct>
+        XOFFSET_DETAIL_NOINLINE iterator append_full_construct(Construct& construct) {
+            if constexpr (std::is_trivially_copyable_v<T>) {
+                alignas(T) std::byte storage[sizeof(T)];
+                auto* staged = reinterpret_cast<T*>(storage);
+                construct(staged);
+                reserve(grown_capacity());
+                const size_type n = size_;
+                T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + n;
+                std::memcpy(slot, staged, sizeof(T));
+                size_ = n + 1u;
+                return slot;
+            } else {
+                return insert_body<false>(size_, construct);
+            }
+        }
+
+        // insert_construct for an index below size_, without its append
+        // check: into spare capacity inline on every compiler (the checks of
+        // insert_body are implied); only a full vector calls out to grow.
+        template <bool GrowOutOfLine = false, typename Construct>
+        iterator insert_before_end_construct(size_type index, Construct&& construct) {
+            if constexpr (std::is_trivially_copyable_v<T>) {
+                const size_type n = size_;
+                if (n < capacity_) [[likely]] {
+                    alignas(T) std::byte storage[sizeof(T)];
+                    auto* staged = reinterpret_cast<T*>(storage);
+                    construct(staged);
+                    T* const items = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta);
+                    size_ = n + 1u;
+                    std::memmove(items + index + 1, items + index, std::size_t(n - index) * sizeof(T));
+                    std::memcpy(items + index, staged, sizeof(T));
+                    return items + index;
+                }
+                return insert_general<GrowOutOfLine>(index, construct);
+            } else {
 #if defined(__clang__)
+                return insert_general<GrowOutOfLine>(index, construct);
+#else
+                return insert_body<GrowOutOfLine>(index, construct);
+#endif
+            }
+        }
+
         // insert_construct off its fast paths. Clang inlines the fast paths
         // at the caller only with this part in a separate function.
         template <bool GrowOutOfLine, typename Construct>
         iterator insert_general(size_type index, Construct& construct) {
             return insert_body<GrowOutOfLine>(index, construct);
         }
-#endif
 
         template <bool GrowOutOfLine, typename Construct>
         XOFFSET_DETAIL_MOVE_INLINE iterator insert_body(size_type index, Construct& construct) {
@@ -4796,28 +4868,32 @@ namespace XOffsetDatastructure {
 
         XOFFSET_DETAIL_MOVE_INLINE std::pair<iterator, bool> insert(const T& value) {
             auto* items = Base::data();
-            auto index = fixed_detail::insert_index(
-                items, Base::size(), value, [](const T& item) -> const T& { return item; });
-            if (index < Base::size() && fixed_detail::ordered_equal(items[index], value)) {
-                return {items + index, false};
-            }
-            return {Base::template insert_construct<true>(index, [&](T* dst) {
+            const std::uint32_t size = Base::size();
+            auto construct = [&](T* dst) {
                 fixed_detail::transfer_construct(dst, value, Base::element_binding());
-            }), true};
+            };
+            if (size == 0 || fixed_detail::ordered_less(items[size - 1], value))
+                return {Base::append_after_last_construct(construct), true};
+            const auto index = fixed_detail::insert_index_below_last(
+                items, size, value, [](const T& item) -> const T& { return item; });
+            if (fixed_detail::ordered_equal(items[index], value)) return {items + index, false};
+            return {Base::template insert_before_end_construct<true>(index, construct), true};
         }
 
         template <typename Arg>
             requires alloc_aware_convertible<T, Arg>
         XOFFSET_DETAIL_MOVE_INLINE std::pair<iterator, bool> insert(Arg&& arg) {
             auto* items = Base::data();
-            auto index = fixed_detail::insert_index(
-                items, Base::size(), arg, [](const T& item) -> const T& { return item; });
-            if (index < Base::size() && fixed_detail::ordered_equal(items[index], arg)) {
-                return {items + index, false};
-            }
-            return {Base::template insert_construct<true>(index, [&](T* dst) {
+            const std::uint32_t size = Base::size();
+            auto construct = [&](T* dst) {
                 fixed_detail::construct_bound(dst, Base::element_binding(), std::forward<Arg>(arg));
-            }), true};
+            };
+            if (size == 0 || fixed_detail::ordered_less(items[size - 1], arg))
+                return {Base::append_after_last_construct(construct), true};
+            const auto index = fixed_detail::insert_index_below_last(
+                items, size, arg, [](const T& item) -> const T& { return item; });
+            if (fixed_detail::ordered_equal(items[index], arg)) return {items + index, false};
+            return {Base::template insert_before_end_construct<true>(index, construct), true};
         }
 
         template <typename... Args>
@@ -4899,16 +4975,16 @@ namespace XOffsetDatastructure {
         template <typename KeyArg, typename... Args>
         XOFFSET_DETAIL_MOVE_INLINE std::pair<iterator, bool> try_emplace(KeyArg&& key, Args&&... args) {
             auto* items = value_base::data();
-            auto index = fixed_detail::insert_index(
-                items, value_base::size(), key,
-                [](const value_type& item) -> const K& { return item.first; });
-            if (index < value_base::size() && fixed_detail::ordered_equal(items[index].first, key)) {
-                return {items + index, false};
-            }
-
-            return {value_base::template insert_construct<true>(index, [&](value_type* dst) {
+            const std::uint32_t size = value_base::size();
+            auto construct = [&](value_type* dst) {
                 construct_entry(dst, std::forward<KeyArg>(key), std::forward<Args>(args)...);
-            }), true};
+            };
+            if (size == 0 || fixed_detail::ordered_less(items[size - 1].first, key))
+                return {value_base::append_after_last_construct(construct), true};
+            const auto index = fixed_detail::insert_index_below_last(
+                items, size, key, [](const value_type& item) -> const K& { return item.first; });
+            if (fixed_detail::ordered_equal(items[index].first, key)) return {items + index, false};
+            return {value_base::template insert_before_end_construct<true>(index, construct), true};
         }
 
         template <typename KeyArg, typename ValueArg>

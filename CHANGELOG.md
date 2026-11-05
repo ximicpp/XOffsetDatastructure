@@ -16,6 +16,14 @@
   order book event through `root<T>()` 173.8 -> 130.8 (a held root pointer
   125.8); bench/slg S A.req_encode -1.6%, A.apply -1.5%, D.read -2.5%,
   NP.send -4.7%.
+- `XMap::try_emplace` (and `operator[]`, `emplace`, `insert_or_assign` on a
+  new key) and `XSet::insert` no longer run more instructions on a random
+  insert than 3.2.1 did: the compare with the last key now decides between
+  two paths, an append and an insert before the end, so the insert needs no
+  bound check after the search and no append check. Instructions on
+  bench/reloc random inserts, against 3.2.1: GCC 16 map 0.96, set 0.97;
+  P2996 map 0.97, set 0.97 (3.3.0: 1.03 to 1.05). Inserts in ascending key
+  order keep the 3.3.0 gain. Contents, layout and allocation are unchanged.
 
 ## 3.3.0: native delta sync
 
