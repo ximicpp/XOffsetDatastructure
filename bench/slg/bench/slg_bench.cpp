@@ -127,8 +127,11 @@ void print_sizes(const std::vector<std::unique_ptr<Runner>>& rs, const std::vect
                 if (get(E + ".window_compact") > 0)
                     std::printf("%-12s %-4s %10.0f %10.0f   (save_compact pull / zstd-3)\n", "", "", get(E + ".window_compact") / req,
                                 get(E + ".window_compact_zstd") / req);
-                if (get(N + ".delta") > 0)
-                    std::printf("%-12s %-4s %10s %10s %10.0f %10s   (native delta)\n", "", "", "", "", get(N + ".delta") / del, "");
+                // Native delta per message: per static delivery, or per NB (browse) delivery.
+                const double nmsg = get(N + ".deliveries") > 0 ? get(N + ".deliveries") : del;
+                if (get(N + ".delta") > 0 && nmsg > 0)
+                    std::printf("%-12s %-4s %10s %10s %10.0f %10.0f   (native delta / zstd-3)\n", "", "", "", "", get(N + ".delta") / nmsg,
+                                get(N + ".delta_zstd") / nmsg);
             }
         (void)keep;
         return;

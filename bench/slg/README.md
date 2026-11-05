@@ -109,6 +109,31 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   (untimed, like the other formats' first pull). Each view reserves 1.5x the
   average units in a viewport plus 32 and a quarter of all marches plus 32.
   `tools/analyze.py` compares N* with the other formats' U*.
+- native browse delta (XOffset only, report only, 2026-11-05, 3.4 line C item
+  P3), keys NB beside EB: the server keeps each browsing client's view as for
+  N* and moves it with the client's rectangle every tick, so a pan sends only
+  what entered or left it. Units and marches come from the same tracker as U*
+  (entered, changed, left; slots as for N*); tiles sit in a ring of 17 x 13
+  slots, tile (tx, ty) at (tx mod 17, ty mod 13), so a tile keeps its slot
+  while it stays in view: a tile that entered is copied into its slot, a slot
+  whose tile left is zeroed, a kept tile whose owner changed this tick gets
+  its owner (only the spans' difference is visited). `NB.send` (slots +
+  mutation) + `NB.diff` (`save_delta_into`, `touched_only`) is the server;
+  `NB.recv` the client (patch + full verification, one cold view per client);
+  `NBW.recv` one warm device as `N*W.recv` (the first 16 clients' deliveries
+  replayed after the cycle, the view read before each, count
+  `NBW.deliveries`). Bytes `NB.delta`, `NB.delta_zstd` (zstd 3 per message,
+  `NBZ.send` timed after the round), streaming `NBZS.*`, count
+  `NB.deliveries`; `NB.check_none` / `NB.check_in_place` / `NB.check_full`
+  count how the client's apply was checked (`XDeltaCursor::last_check()`).
+  Every delivery is checked equal to the client's EB pull of
+  that round (same request id and tick). NB runs in a third pass of each
+  round after EB's timed and bytes passes, so no EB stage changes its range;
+  the first view is a key delta before the first round (untimed).
+  `SLG_NATIVE_OFF=1` drops NB with the other native rows, `SLG_NB_OFF=1` NB alone
+  (for A/B runs of the other stages). Under valgrind the
+  demo set with native rows now needs `SLG_XOFFSET_CAP_MIB=16` (the extra
+  views pass valgrind's address-space limit at 256 MiB per buffer).
 - the player's own data (`include/slg/login.hpp`): L, a client logs in and
   gets its whole player once (256 online players at M, a quarter log in again
   each cycle); LD, the server then changes the player every tick (troops,
