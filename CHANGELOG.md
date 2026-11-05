@@ -35,7 +35,7 @@ server-to-client use is not announced.
   The demo delivery totals are followed up in 3.4.
 - Known small regression: an `XMap` or `XSet` insert in random key order
   makes one more compare, with the last element (the append fast path
-  above, #214), so the insert micro-benchmarks (map.insert, set.insert,
+  below, #214), so the insert micro-benchmarks (map.insert, set.insert,
   fresh and reused) take 3 to 5% more instructions (GCC 16 and P2996 agree)
   and XOffset's own time on the Mac is about 2.5% longer. Inserts in
   ascending order (copy, decode, rebuild) are faster. Map lookups
