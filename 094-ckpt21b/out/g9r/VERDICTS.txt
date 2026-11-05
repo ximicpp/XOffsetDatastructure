@@ -1,0 +1,4 @@
+t1 bf70e9986e54d927686ac372e65c706b071a86b7
+reloc done
+disasm done (/Volumes/XOffsetCS/toolchain/p2996-d77eff1/bin/llvm-objdump)
+rc 0

@@ -1,0 +1,13 @@
+t0 51a4815b7802ec125e2752847b69fd2a87ab7259 tree 254473076fde1ce98ca5529e307417cd8c0b5b3a typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (next_cpp26 51a4815b (3.3.0; merged into PR #228))
+t1 bf70e9986e54d927686ac372e65c706b071a86b7 tree 90e6b1074e49c36790ace0c64694f83861b887d9 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (CKPT21b head (PR #228 trust tier P1 bf70e998))
+t1: diff over t0 sha256 d364a5353ef8efab2a3ef00f79c78bdacb6ede32bf671b4f425715daeff62a6e ( 11 files changed, 739 insertions(+), 4 deletions(-))
+t1: library header diff over t0:  1 file changed, 79 insertions(+)
+t1: first-parent commits over t0:
+  bf70e998 Merge next_cpp26 51a4815b (3.3.0) into trust-admit-p1
+  1ae7aedd test_receiver: do not name a variable far (a macro in Windows headers)
+  cd19776e Trust tier P1: XReceiver admit for whole-wire reload and load
+bench/reloc of t1: same tree as t0
+reloc_bench t0 sha256 25d9006a12d1b47b14d53a9469e60526ebc8412c01b190def92b93c2b983a797
+reloc_bench t1 sha256 25d9006a12d1b47b14d53a9469e60526ebc8412c01b190def92b93c2b983a797
+reloc_bench t0a sha256 972c1725256dc635098dd57c1f6b270727f438c492d89778db8d403e8a292895
+reloc_bench t1a sha256 972c1725256dc635098dd57c1f6b270727f438c492d89778db8d403e8a292895

@@ -1,0 +1,27 @@
+{
+ "schema": "xoffset-perf-gate-l2-v1",
+ "name": "2026-11-05-ckpt21b-bf70e99",
+ "head": {
+  "commit": "bf70e9986e54d927686ac372e65c706b071a86b7",
+  "desc": "CKPT21b head = PR #228 bf70e998 (trust tier P1: XReceiver admit, xoffset_receiver.hpp + XBuffer private admit loads; cd19776 + 1ae7aed merged with next_cpp26 51a4815b), build-r3d params"
+ },
+ "anchor": {
+  "commit": "51a4815b7802ec125e2752847b69fd2a87ab7259",
+  "desc": "next_cpp26 51a4815b (3.3.0 release merged), build-r3d params"
+ },
+ "verdict": "n/a (identical binaries)",
+ "formal_overall": {
+  "verdict": "n/a",
+  "batches": 0,
+  "identical_sha256": "8cd9767c692ea0bbf3c111f9f174909534b4f35aaa5a7324f0bca4d16cc8ca5a"
+ },
+ "formal_batches": [],
+ "slg": {
+  "verdict": "n/a",
+  "identical_sha256": "e0773338871b29f0d1f4428bae4bd49f113c1930ce65be1fc353c07dd736fca4"
+ },
+ "freeze_sha256": "8d9c8c6bee78e46efd3fd584ef855ab34231ffae92ea3ca9647f0b0334e7182c",
+ "rules_amend": null,
+ "rules_amend_sha256": null,
+ "quiet": []
+}
