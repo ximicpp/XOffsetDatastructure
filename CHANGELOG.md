@@ -13,7 +13,10 @@
   and builds the map again, so the map never describes a payload that was only
   admitted. `XLink::from_client` applies with the full check only, and
   `XOFFSET_FORCE_FULL_CHECK` makes admit the full check, as for whole wires.
-  `apply_delta_verified` is unchanged. Receive time with the bench's
+  `apply_delta_verified` is unchanged. `xoffset_receiver.hpp` is no longer
+  experimental (it was in 3.3.1): `XReceiver`, `XLink`, `XCheck` and
+  `default_mutable_check` are public API (`XCheck::bounds`, the client
+  uplink check, is still to come). Receive time with the bench's
   `xoffset_trusted` row against `xoffset` (cloud x86, P2996, bench/slg demo M,
   cycles 2 to 5): LK.recv 0.32, LN.recv 0.43, NP.recv 0.58, NC.recv 0.41,
   NS.recv 0.36, NB.recv 0.39, SN.store_recv 0.12. docs/DELTA_SYNC.md section
@@ -29,7 +32,11 @@
   `examples/delta_sync.cpp` runs a server and a client through key delta,
   small deltas, a lost delta and the recovery. docs/DELTA_SYNC.md section 5:
   deltas only after the handshake answers `same`, whole wires after
-  `convert`.
+  `convert`. The map demo sends view snapshots as deltas end to end with
+  `--encoding delta` (one baseline per connection on A, `XReceiver
+  <XLink::from_server>::apply_delta` on the client, a KEY flag after a
+  write-back changed the client's copy; the client self-check gains
+  `delta_round_trip`); demo/mapstate/README.md.
 - Fuzzing covers the trust tier: `v2_fuzz_core.hpp` gains acceptor 8,
   `XReceiver<server_peer>::reload` with admit into one long-lived buffer (it
   must accept every wire `load_verified` accepts with the same payload, free
@@ -61,7 +68,8 @@
   interval 1.065 to 1.086; A 1.016), and the HFT demo showed no gain there,
   although instructions went down. `root<T>()` is read-only again: a moved
   `XBuffer` takes the checked path until a call that sets the cache (make,
-  a verified load or reload) runs. Redone in 3.4 once the cause is known.
+  a verified load or reload) runs. To be redone once the cause of the Mac
+  slowdown is known.
 - `XMap::try_emplace` (and `operator[]`, `emplace`, `insert_or_assign` on a
   new key) and `XSet::insert` no longer run more instructions on a random
   insert than 3.2.1 did: the compare with the last key now decides between

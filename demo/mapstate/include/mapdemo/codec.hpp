@@ -3,9 +3,12 @@
 // Bodies in src/codec.cpp.
 //
 // The client names an encoding in its ViewReq flags; A writes the snapshot
-// that way and echoes the flags. Every encoding ends in the same check on
-// the client: the XOffset wire goes through load_verified / reload_verified
-// in full. zstd only carries the bytes; it never replaces validation.
+// that way and echoes the flags. Every whole-wire encoding ends in the same
+// check on the client: the XOffset wire goes through load_verified /
+// reload_verified in full. zstd only carries the bytes; it never replaces
+// validation. Delta patches the client's copy in place through
+// XReceiver<XLink::from_server> (a trusted link: the delta's framing is
+// checked, docs/DELTA_SYNC.md section 3).
 // Nothing here throws (result.hpp).
 #pragma once
 #include <cstddef>
@@ -25,21 +28,32 @@ enum class Encoding : std::uint8_t {
     Compact = 1,   // save_compact, slack_div 0: live bytes only, capacity == size
     Zstd = 2,      // the Compact wire as one zstd frame, level 3
     // 3 is reserved for lz4 (M2)
+    Delta = 4,     // a delta (xoffset_delta.hpp, format 1.0) against what this
+                   // connection's client holds; the first one is a key delta
 };
+// The whole-wire encodings, 0 to 2: what --encoding cycle goes through.
 inline constexpr int kEncodingCount = 3;
+// Counters indexed by Encoding (0 to 4; 3 stays unused).
+inline constexpr int kEncodingSlots = 5;
 
-// Frame flags: bits 0-7 ViewCategory, bits 8-11 Encoding, bits 12-15 zero.
-constexpr std::uint16_t view_flags(net::ViewCategory c, Encoding e) noexcept {
-    return static_cast<std::uint16_t>(static_cast<std::uint16_t>(c) | (static_cast<std::uint16_t>(e) << 8));
+// Frame flags: bits 0-7 ViewCategory, bits 8-11 Encoding, bit 12 KEY (Delta
+// only: the client holds nothing usable and asks for a key delta), bits 13-15
+// zero. A echoes the flags of the request.
+inline constexpr std::uint16_t kViewKeyFlag = 1u << 12;
+constexpr std::uint16_t view_flags(net::ViewCategory c, Encoding e, bool key = false) noexcept {
+    return static_cast<std::uint16_t>(static_cast<std::uint16_t>(c) | (static_cast<std::uint16_t>(e) << 8) |
+                                      (key ? kViewKeyFlag : 0u));
 }
 struct ViewFlags {
     net::ViewCategory category;
     Encoding encoding;
+    bool key = false;
 };
-// nullopt for an unknown category or encoding, or a reserved bit set.
+// nullopt for an unknown category or encoding, KEY without Delta, or a
+// reserved bit set.
 std::optional<ViewFlags> parse_view_flags(std::uint16_t flags) noexcept;
 
-const char* encoding_name(Encoding e) noexcept;   // "dense", "compact", "zstd"
+const char* encoding_name(Encoding e) noexcept;   // "dense", "compact", "zstd", "delta"
 std::optional<Encoding> parse_encoding(std::string_view text) noexcept;
 
 // True when built with zstd (MAPDEMO_WITH_ZSTD).
