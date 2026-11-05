@@ -1725,7 +1725,13 @@ namespace XOffsetDatastructure {
         // write records, so the field may name an earlier owner.
         static XBufferCore* record_owner(const OwnerRecordPtr& record) noexcept {
             if (!record || !record->owner.load(std::memory_order_acquire)) return nullptr;
-            return owner_from_arena_noexcept(record->payload);
+            return owned_record_owner(*record);
+        }
+        // The owner of a record whose owner field is set: its payload is
+        // live, and the host word names the owner whose buffer starts there.
+        static XBufferCore* owned_record_owner(const OwnerRecord& record) noexcept {
+            return *reinterpret_cast<XBufferCore* const*>(
+                static_cast<const char*>(record.payload) - sizeof(void*));
         }
 
         static XBufferCore& require_record_owner(const OwnerRecordPtr& record) {
@@ -2680,12 +2686,15 @@ namespace XOffsetDatastructure {
             }
 
             void validate() const {
-                auto* owner = XBufferCore::record_owner(record);
-                if (!owner || owner->buffer_.data() != record->payload)
+                // A record stays owned while its payload is the owner's
+                // storage (a replaced storage gets a new record), so the
+                // owner field alone says the payload is live, and the host
+                // word names its owner.
+                if (!record->owner.load(std::memory_order_acquire))
                     XOFFSET_THROW(XException(XErrc::invalid_state, "stable_erase_if owner is no longer live"));
-                if (head_in_payload &&
-                    (head_offset > owner->buffer_.size() ||
-                     head_bytes > owner->buffer_.size() - head_offset))
+                if (!head_in_payload) return;
+                const auto size = XBufferCore::owned_record_owner(*record)->buffer_.size();
+                if (head_offset > size || head_bytes > size - head_offset)
                     XOFFSET_THROW(XException(XErrc::invalid_state, "stable_erase_if target is no longer in storage"));
             }
         };

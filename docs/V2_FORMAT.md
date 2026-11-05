@@ -62,12 +62,15 @@ a string's, but a type that int and unsigned element stores cannot alias, so a
 
 **Owner by address.** A head does not name the payload it belongs to; that is
 the payload it lies in. `detail::OwnerMap` keeps one byte per 4 MiB granule of
-the 48-bit address space: 0 for no XOffset region, otherwise bits 0..5 give k,
-the region's alignment exponent (the payload base is `address & ~(2^k - 1)`),
-and bit 7 marks a slot, whose payload starts 64 bytes in. Slot chunks register
-once; a VM payload is reserved as whole 4 MiB granules aligned to 2^k and sets
-its entries while it is mapped (a pooled mapping keeps them). On Windows the
-table is committed at the first registration.
+the 48-bit address space: 0 for no XOffset region, otherwise bit 7 is set and
+bits 0..5 give k, the region's alignment exponent. Every region (a slot, or a
+VM mapping) starts at a 2^k boundary with the 64-byte host header, and its
+payload of at most 2^k bytes follows, so the payload base of a payload address
+is `((address - 64) & ~(2^k - 1)) + 64`. Slot chunks register once; a VM
+mapping is reserved as whole 4 MiB granules aligned to 2^k, k from its maximum
+capacity (a 2^k maximum maps one more granule for its last 64 bytes and page
+rounding), and sets its entries while it is mapped (a pooled mapping keeps
+them). On Windows the table is committed at the first registration.
 
 Lookups follow five rules:
 

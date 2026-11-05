@@ -223,31 +223,21 @@ private:
         pool_ = pool;
         if (!acquire_from_pool()) {
             // V2.1 owner lookup: the region (host header, then payload) starts
-            // at a 2^k boundary, k = max(22, ceil(log2 span)), and the mapping
-            // covers whole 4 MiB granules, so OwnerMap finds the payload from
-            // any address inside (64 bytes past the boundary, as for a slot)
-            // and no other mapping shares a granule with it.
+            // at a 2^k boundary, k = max(22, ceil(log2 maximum)), and the
+            // mapping covers whole 4 MiB granules, so OwnerMap finds the
+            // payload (64 bytes past the boundary, as for a slot) from any
+            // payload byte and no other mapping shares a granule with it. A
+            // maximum of exactly 2^k (the 64 MiB default) keeps 2^k: its last
+            // payload bytes and page rounding take one granule past 2^k,
+            // mapped with the same entry, and no payload byte reaches past
+            // region + 64 + 2^k.
             const std::size_t region_bytes = reserved + host_header;
             const std::size_t span =
                 (region_bytes + OwnerMap::granule_bytes - 1) & ~(OwnerMap::granule_bytes - 1);
             if (span < region_bytes)
                 XOFFSET_VFAIL_STD(std::length_error, XErrc::length_error, "VM reservation page rounding overflows");
-            std::size_t shift = slot_log2(span);
+            std::size_t shift = slot_log2(maximum_capacity);
             if (shift < OwnerMap::granule_shift) shift = OwnerMap::granule_shift;
-            // A maximum that is a multiple of 4 MiB (the 64 MiB default, 256
-            // MiB) plus the header spans 2^k + one granule. Keep the 2^k
-            // alignment: the last granule is a tail entry that resolves one
-            // granule back, instead of doubling the alignment.
-            bool tail = false;
-            if (span > OwnerMap::granule_bytes) {
-                const std::size_t body = span - OwnerMap::granule_bytes;
-                std::size_t body_shift = slot_log2(body);
-                if (body_shift < OwnerMap::granule_shift) body_shift = OwnerMap::granule_shift;
-                if ((std::size_t(1) << body_shift) == body && body_shift < shift) {
-                    shift = body_shift;
-                    tail = true;
-                }
-            }
             if (shift >= OwnerMap::address_bits || !OwnerMap::ready()) XOFFSET_VFAIL_BAD_ALLOC();
             const std::size_t align = std::size_t(1) << shift;
             if (span > (std::numeric_limits<std::size_t>::max)() - align) XOFFSET_VFAIL_BAD_ALLOC();
@@ -303,14 +293,7 @@ private:
             accessible_bytes_ = enabled - host_header;
 #endif
             mapped_bytes_ = span;
-            const auto entry = static_cast<std::uint8_t>(OwnerMap::slot_bit | shift);
-            if (tail) {
-                OwnerMap::set(region, span - OwnerMap::granule_bytes, entry);
-                OwnerMap::set(region + (span - OwnerMap::granule_bytes), OwnerMap::granule_bytes,
-                              static_cast<std::uint8_t>(entry | OwnerMap::tail_bit));
-            } else {
-                OwnerMap::set(region, span, entry);
-            }
+            OwnerMap::set(region, span, static_cast<std::uint8_t>(OwnerMap::slot_bit | shift));
             reserved_bytes_ = reserved;
         }
         set_host_owner(nullptr);
