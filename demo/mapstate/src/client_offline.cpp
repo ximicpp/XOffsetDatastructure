@@ -516,6 +516,59 @@ Result<int> run_self_check(const Options& opt) {
             log.fail("edit_round_trip", why);
         }
     }
+    {   // Encoding delta: A's side (one XDeltaBaseline) and the holder's
+        // apply_delta (XReceiver<XLink::from_server>). A key delta, a small
+        // one (one hp and the tick), one that grows the vector; then a delta
+        // after a lost one is refused and empties the holder, and the key
+        // delta A sends after the KEY request applies again.
+        XBuffer src = build_sample(200);
+        ViewSnapshot& s = src.root<ViewSnapshot>();
+        XDeltaBaseline base;
+        XDeltaCursor cursor;
+        SnapshotHolder h;
+        std::string d, lost, why;
+        std::size_t key_bytes = 0, small_bytes = 0;
+        auto deliver = [&](const char* what) {
+            if (!why.empty()) return;
+            src.save_delta_into<ViewSnapshot>(d, base);
+            if (Result<double> a = h.apply_delta(d, cursor); !a)
+                why = std::string(what) + " refused: " + a.error().message;
+            else if (checks::snapshot_digest(h.view()) != checks::snapshot_digest(s))
+                why = std::string(what) + ": digest differs from the sender's";
+        };
+        deliver("key delta");
+        key_bytes = d.size();
+        s.units[3].hp -= 7;
+        ++s.tick;
+        deliver("small delta");
+        small_bytes = d.size();
+        {
+            VisibleUnit& v = s.units.emplace_back();
+            v.id = 900001;
+            v.hp = 60;
+            v.pos = s.units[0].pos;
+            v.name = std::string_view("added-unit-with-a-name-longer-than-sso");
+        }
+        deliver("growing delta");
+        if (why.empty()) {
+            ++s.tick;
+            src.save_delta_into<ViewSnapshot>(lost, base);   // never delivered
+            ++s.tick;
+            src.save_delta_into<ViewSnapshot>(d, base);
+            if (h.apply_delta(d, cursor)) why = "a delta after a lost one applied";
+            else if (!h.empty() || !cursor.empty()) why = "holder or cursor kept after a refused delta";
+            base.reset();   // A, on the KEY request
+            deliver("key delta after the refusal");
+        }
+        if (why.empty()) {
+            log.pass("delta_round_trip");
+            log.note("delta_round_trip", "key " + std::to_string(key_bytes) + " B, one hp + tick " +
+                                             std::to_string(small_bytes) + " B, compact wire " +
+                                             std::to_string(compact.size()) + " B");
+        } else {
+            log.fail("delta_round_trip", why);
+        }
+    }
 
     // The XOffset wire: truncation, every header byte, the wrong schema.
     expect_refused(log, unzstd, "dense_truncated", drop_last(dense), false);

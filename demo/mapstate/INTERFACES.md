@@ -134,7 +134,7 @@ mapdemo_a      [--units 10000] [--seed 1] [--steps 0] [--duration-s 0]
                [--check | --no-check] [--buffers reuse|fresh] [--csv-dir DIR]
                [--corpus-dir DIR [--corpus-max 60]] [--events-dict FILE] [--events-dump DIR]
 mapdemo_client [--host 127.0.0.1] [--port 47701] [--headless] [--check]
-               [--buffers reuse|fresh] [--encoding zstd|compact|dense|cycle]
+               [--buffers reuse|fresh] [--encoding zstd|compact|dense|delta|cycle]
                [--events off|raw|zstd|zdict|batch|cycle] [--events-dict FILE]
                [--csv-dir DIR] [--auto-drag] [--screenshot-at F1,F2,...] [--evil]
                [--first-request-id 1] [--edits 0]
@@ -163,10 +163,20 @@ mapdemo_schema_freeze freeze VERSION NAMESPACE HEADER LOCK | check LOCK
 - A `--host`: the address A listens on for clients (`0.0.0.0` when the client
   is in an emulator or another machine; B stays on 127.0.0.1).
 - A `--corpus-dir`: keeps the first `--corpus-max` snapshot payloads exactly
-  as sent (`snap_<request_id>.<encoding>`) and `corpus.csv` with A's digests.
+  as sent (`snap_<request_id>.<encoding>`) and `corpus.csv` with A's digests
+  (whole wires only: a `delta` snapshot is not kept).
 - Client `--encoding` (default `zstd`, or `compact` without zstd): the
   snapshot encoding asked for in every `ViewReq`; `cycle` takes
   `request_id % 3` (dense, compact, zstd), so one run covers all three.
+  `delta` (added 11-05, 3.4): A sends only the bytes that differ from the
+  snapshot this client holds (`xoffset_delta.hpp`, docs/DELTA_SYNC.md), and
+  the client patches its buffer in place through
+  `XReceiver<XLink::from_server>` (a trusted link: the delta's framing and
+  the root are checked, not every offset). The first delta is a key delta;
+  after a write-back (`--edits`) changed its copy, the client sets the KEY
+  flag and A starts over with a key delta. Needs the same schema version on
+  both ends: A refuses `delta` from a version-1 client, so give
+  `mapdemo_client_v1` a whole-wire encoding (`MAPDEMO_CLIENT2_ARGS`).
 - A `--events-dict FILE` / client `--events-dict FILE`: use this `.xozd`
   file instead of the built-in dictionary (it must be bound to `UnitEvent`).
   A `--events-dump DIR`: appends every event wire A builds to
@@ -182,7 +192,11 @@ mapdemo_schema_freeze freeze VERSION NAMESPACE HEADER LOCK | check LOCK
   and bit-flipped wires, wrong schema, malformed zstd frames, over-cap
   sizes). `edit_round_trip`: a compact snapshot changed with
   `apply_client_edit`, saved with `save_verified`, verified at the Edit
-  limit and rebuilt with `save_compact` keeps its content digest. The event cases: the built-in dictionary parses; every event
+  limit and rebuilt with `save_compact` keeps its content digest.
+  `delta_round_trip` (11-05): a key delta, a small one and one that grows
+  the vector, applied through `SnapshotHolder::apply_delta`, each give the
+  sender's content digest; a delta after a lost one is refused and empties
+  the holder; the key delta that follows applies. The event cases: the built-in dictionary parses; every event
   encoding round trips 20 events to the same wires and shrinks them; and
   these are refused: a count of 0, a truncated or trailing event, the wrong
   schema, a truncated wire inside a dictionary frame, a zstd frame without
@@ -266,15 +280,19 @@ mapdemo_schema_freeze freeze VERSION NAMESPACE HEADER LOCK | check LOCK
   are still checked against the per-type limit before any allocation.
 
 `ViewReq` flags (`codec.hpp`): bits 0-7 the `ViewCategory`, bits 8-11 the
-snapshot encoding, bits 12-15 zero. A refuses an unknown category, an
-unknown encoding (3 is reserved for lz4), a set reserved bit, or zstd when it
-was built without it. Encodings of the `ViewSnapshot` payload:
+snapshot encoding, bit 12 KEY (encoding `delta` only: the client holds
+nothing A's deltas apply to, so A resets that client's baseline and sends a
+key delta), bits 13-15 zero. A refuses an unknown category, an unknown
+encoding (3 is reserved for lz4), KEY with another encoding, a set reserved
+bit, zstd when it was built without it, or `delta` for a client of another
+schema version. Encodings of the `ViewSnapshot` payload:
 
 | Encoding | Payload |
 | --- | --- |
 | 0 `dense` | `save_verified` wire |
 | 1 `compact` | `save_compact` wire (`XCompactOptions{0}`: no spare capacity) |
 | 2 `zstd` | the compact wire as one zstd frame, level 3 |
+| 4 `delta` | a delta (format 1.0) against what this connection's client holds: `save_delta_into` with one `XDeltaBaseline` per client; a key delta first and after KEY |
 
 `Events` payload encodings (`codec::EventEncoding`, the frame's flags):
 
@@ -351,7 +369,7 @@ wires are unchanged.
   declaring a 1 GiB `ViewReq`; (4) on one connection: a valid request, a
   truncated one, another valid one (a rejected wire on a kept receive buffer
   must not break the next request on that connection); (5) a `ViewReq` asking
-  for encoding 3; (6) a `ViewReq` with reserved flag bit 12 set. Expects
+  for encoding 3; (6) a `ViewReq` with flag bit 12 (KEY) set on encoding `compact`. Expects
   `Error` or a close for each bad request; (7) a `Subscribe` holding
   dictionary version 2, (8) a `Subscribe` with another `UnitEvent` schema
   hash, (9) a `Subscribe` asking for event encoding 7, each answered by

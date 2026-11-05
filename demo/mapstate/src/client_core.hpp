@@ -25,6 +25,7 @@
 #include "mapdemo/result.hpp"
 #include "mapdemo/rules.hpp"
 #include "mapdemo/schema.hpp"
+#include "xoffset_receiver.hpp"
 
 namespace mapdemo::client {
 
@@ -90,6 +91,14 @@ public:
     // (fresh: *destroy_us gets the old buffer's destroy time). A rejected
     // wire leaves a fresh holder as it was.
     Result<double> install(const std::string& wire, BufferMode mode, double* destroy_us);
+    // Encoding delta (either buffer mode): patches the held buffer in place
+    // with a delta from A through XReceiver<XLink::from_server>, a trusted
+    // link (the delta's framing and the root are checked, not every offset:
+    // docs/DELTA_SYNC.md section 3). The first delta, and the one answering a
+    // KEY request, is a key delta; it applies to any buffer (an empty one is
+    // made the first time). Returns the apply time in us. A rejected delta
+    // empties the holder and clears `cursor`: only a key delta applies next.
+    Result<double> apply_delta(const std::string& delta, XDeltaCursor& cursor);
     double clear();
     // Write-back (--edits): the held snapshot, writable in place. A change
     // may grow the buffer (up to cap_snapshot()); call edited() after it,
@@ -101,6 +110,7 @@ public:
 private:
     std::optional<XBuffer> buf_;
     const ViewSnapshot* root_ = nullptr;
+    XReceiver<XLink::from_server> rx_{cap_snapshot()};
 };
 
 // Presentation data only: screen position and colour. No ids, names or hp.
@@ -272,6 +282,14 @@ private:
     std::uint64_t sent_request_id_ = 0;
     net::ViewCategory sent_category_ = net::ViewCategory::Normal;
     codec::Encoding sent_encoding_ = codec::Encoding::Dense;
+    std::uint16_t sent_flags_ = 0;     // the ViewReq flags; A echoes them
+    // Encoding delta: which state the held snapshot is (the cursor), and
+    // whether the next request asks for a key delta (the held snapshot no
+    // longer is what A last sent: a write-back changed it, or it came as a
+    // whole wire).
+    XDeltaCursor delta_cursor_;
+    bool need_key_ = false;
+    std::uint64_t delta_keys_ = 0;
     Rect sent_rect_{};
     std::uint64_t sent_ns_ = 0;
 
@@ -291,7 +309,7 @@ private:
     double last_rtt_us_ = 0, last_load_us_ = 0;
     std::uint64_t snapshots_ = 0;
     std::uint64_t net_bytes_total_ = 0;
-    std::uint64_t by_encoding_[codec::kEncodingCount] = {};
+    std::uint64_t by_encoding_[codec::kEncodingSlots] = {};
     std::optional<std::size_t> full_scene_visible_;
     std::uint64_t direct_units_ = 0, direct_names_ = 0;
 

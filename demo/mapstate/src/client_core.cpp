@@ -166,6 +166,19 @@ Result<double> SnapshotHolder::install(const std::string& wire, BufferMode mode,
     return load_us;
 }
 
+Result<double> SnapshotHolder::apply_delta(const std::string& delta, XDeltaCursor& cursor) {
+    metrics::Stopwatch sw;
+    root_ = nullptr;
+    if (!buf_) buf_.emplace(4096, cap_snapshot());
+    XStatus applied = rx_.apply_delta<ViewSnapshot>(*buf_, delta, cursor);
+    if (!applied) {
+        buf_.reset();
+        cursor.clear();
+        return xoffset_error(applied.error());
+    }
+    root_ = &buf_->root<ViewSnapshot>();
+    return sw.us();
+}
 double SnapshotHolder::clear() {
     root_ = nullptr;
     if (!buf_) return 0;
@@ -520,10 +533,12 @@ Status Session::send_view(const Rect& rect, net::ViewCategory category) {
     sent_encoding_ = opt_.cycle_encodings ? static_cast<codec::Encoding>(r.request_id % codec::kEncodingCount)
                                           : opt_.encoding;
     sent_rect_ = rect;
+    const bool key = sent_encoding_ == codec::Encoding::Delta && need_key_;
+    sent_flags_ = codec::view_flags(category, sent_encoding_, key);
+    if (key) need_key_ = false;
     inflight_ = true;
     sent_ns_ = net::now_ns();
-    MAPDEMO_TRY(conn_.try_enqueue(net::MsgType::ViewReq, sent_request_id_, std::move(wire),
-                                  codec::view_flags(category, sent_encoding_)));
+    MAPDEMO_TRY(conn_.try_enqueue(net::MsgType::ViewReq, sent_request_id_, std::move(wire), sent_flags_));
     MAPDEMO_TRY(conn_.try_flush());
     return {};
 }
@@ -561,7 +576,7 @@ Status Session::pump(int timeout_ms) {
         } else {
             double rtt = double(net::now_ns() - sent_ns_) / 1000.0;
             if (!inflight_) return Error{"ViewSnapshot without an outstanding request"};
-            if (f->correlation != sent_request_id_ || f->flags != codec::view_flags(sent_category_, sent_encoding_)) {
+            if (f->correlation != sent_request_id_ || f->flags != sent_flags_) {
                 checks_.fail("correlation", "frame corr " + std::to_string(f->correlation) + " flags " +
                                                 std::to_string(f->flags) + " for request " + std::to_string(sent_request_id_));
             } else {
@@ -593,8 +608,23 @@ Result<bool> Session::install_pending() {
         decompress_us = zw.us();
         wire = &plain_;
     }
-    double destroy_us = -1;   // reuse: nothing is destroyed per snapshot
-    Result<double> loaded = holder_.install(*wire, opt_.buffers, &destroy_us);
+    double destroy_us = -1;   // reuse, and delta: nothing is destroyed per snapshot
+    Result<double> loaded = Error{""};
+    if (p.encoding == codec::Encoding::Delta) {
+        // An empty cursor takes only a key delta (A sends one first, and
+        // after a KEY request).
+        const bool key = delta_cursor_.empty();
+        loaded = holder_.apply_delta(*wire, delta_cursor_);
+        if (!loaded) {
+            need_key_ = true;
+            return Error{"delta rejected: " + loaded.error().message};
+        }
+        if (key) ++delta_keys_;
+    } else {
+        loaded = holder_.install(*wire, opt_.buffers, &destroy_us);
+        need_key_ = true;   // a delta from A would not apply to this content
+        delta_cursor_.clear();
+    }
     if (!loaded) return std::move(loaded).error();
     const double load_us = *loaded;
     if (cur_.live) retire_current(destroy_us);
@@ -676,6 +706,10 @@ Status Session::maybe_edit() {
     metrics::Stopwatch sw;
     r.what = apply_client_edit(holder_.edit(), edits_sent_ + 1);
     holder_.edited();
+    // The held snapshot is no longer what A last sent: a delta against that
+    // would patch the wrong bytes. The next request asks for a key delta.
+    need_key_ = true;
+    delta_cursor_.clear();
     r.edit_us = sw.us();
     const bool reuse = opt_.buffers == BufferMode::Reuse;
     std::string wire = reuse ? conn_.take_tx_buffer() : std::string();
@@ -850,7 +884,9 @@ Result<bool> Session::finish() {
             checks_.note("snapshots_received", "count=" + std::to_string(snapshots_) +
                                                    " dense=" + std::to_string(by_encoding_[0]) +
                                                    " compact=" + std::to_string(by_encoding_[1]) +
-                                                   " zstd=" + std::to_string(by_encoding_[2]));
+                                                   " zstd=" + std::to_string(by_encoding_[2]) +
+                                                   " delta=" + std::to_string(by_encoding_[int(codec::Encoding::Delta)]) +
+                                                   " delta_keys=" + std::to_string(delta_keys_));
         }
         if (opt_.edits != 0) {
             const std::string detail = "sent=" + std::to_string(edits_sent_) + " acked=" + std::to_string(edits_acked_) +
