@@ -63,8 +63,19 @@ fn=(4) leaf()
 """
 
 
+def cache_of(slg=None, formal=None, reloc=None, scale=None):
+    """Synthetic --cache-sim counts: D1 misses = Ir / 100, LL misses = Ir / 1000, times scale[metric key]."""
+    scale = scale or {}
+    c = {}
+    for kind, d in (("slg", slg or BASE_SLG), ("formal", formal or BASE_FORMAL), ("reloc", BASE_RELOC if reloc is None else reloc)):
+        for k, v in d.items():
+            f = scale.get(f"{kind}.{k}", (1.0, 1.0))
+            c[f"{kind}.{k}"] = {"Ir": v, "D1mr": int(v / 100 * f[0]), "D1mw": 0, "DLmr": int(v / 1000 * f[1]), "DLmw": 0}
+    return c
+
+
 def run_case(head_tree, anchor_tree=None, ledger_head=(), ledger_base=(), determinism=None, anchor_status="ok",
-             base_tree=None):
+             base_tree=None, cache_sim=False):
     with tempfile.TemporaryDirectory() as d:
         w = Path(d)
         trees = {A: anchor_tree or base_tree or tree(), B: base_tree or tree(), H: head_tree}
@@ -75,7 +86,9 @@ def run_case(head_tree, anchor_tree=None, ledger_head=(), ledger_base=(), determ
                                               "trees": {A: {"status": anchor_status}, B: {"status": "ok"}, H: {"status": "ok"}}})
         pg.dump_json(w / "ir-gcc16.json", {"compiler": "gcc16", "compiler_version": "test", "valgrind": "test",
                                            "fixture_input_digest": {}, "trees": trees, "errors": [],
-                                           "determinism": determinism or {}})
+                                           "determinism": determinism or {},
+                                           **({"cache_sim": {"args": list(pg.CACHE_SIM_ARGS), "roles": ["base", "head"]}}
+                                              if cache_sim else {})})
         ns = argparse.Namespace(work=str(w), compiler="gcc16", json=str(w / "out.json"), summary=str(w / "summary.md"))
         rc = pg.cmd_compare(ns)
         out = json.loads((w / "out.json").read_text())
@@ -272,6 +285,77 @@ def main():
 
     rc, out = run_case(tree(), base_tree=tree(reloc={}, reloc_status="failed"))
     expect("base that cannot build reloc_bench warns", rc == 0 and any("reloc_bench" in x for x in out["warnings"]))
+
+    # --cache-sim: misses per phase, head/base; warnings only, never a failure, the Ir verdict and rc unchanged.
+    ev = pg.cache_events("version: 1\nevents: Ir Dr Dw I1mr D1mr D1mw ILmr DLmr DLmw\n", "100 40 20 3 7 5 2 1 4")
+    expect("cache_events maps the collected counts to the event names",
+           ev["Ir"] == 100 and ev["D1mr"] + ev["D1mw"] == 12 and ev["DLmr"] + ev["DLmw"] == 5)
+    ev = pg.cache_events("events: Ir Dr Dw I1mr D1mr D1mw ILmr DLmr DLmw\n", "836997 172359 49275")
+    expect("cache_events: trailing zero counts left out of the Collected line count as 0",
+           ev["Ir"] == 836997 and ev["D1mr"] == 0 and ev["DLmw"] == 0 and len(ev) == 9)
+    try:
+        pg.cache_events("events: Ir Dr\n", "1 2 3")
+        expect("cache_events refuses more counts than events", False)
+    except RuntimeError:
+        expect("cache_events refuses more counts than events", True)
+    try:
+        pg.cache_events("events: Ir\n", "100")
+        expect("cache_events refuses a run without cache events", False)
+    except RuntimeError:
+        expect("cache_events refuses a run without cache events", True)
+    expect("cache simulation parameters are fixed",
+           pg.CACHE_SIM_ARGS == ("--cache-sim=yes", "--D1=131072,8,128", "--LL=16777216,16,128"))
+
+    rc, out = run_case(tree())
+    expect("without --cache-sim there is no cache section", "cache" not in out)
+
+    hb = tree(); hb["cache"] = cache_of()
+    bb = tree(); bb["cache"] = cache_of()
+    rc, out = run_case(hb, base_tree=bb, cache_sim=True)
+    expect("equal misses: cache pass", rc == 0 and out["cache"]["verdict"] == "pass" and out["verdict"] == "pass")
+
+    hb = tree(); hb["cache"] = cache_of(scale={"slg.B.in_decode": (1.05, 1.0)})
+    rc, out = run_case(hb, base_tree=bb, cache_sim=True)
+    cr = next(r for r in out["cache"]["rows"] if r["metric"] == "slg.B.in_decode")
+    summary = pg.render_summary(out, {}, {})
+    expect("a judged phase with D1 misses +5% is a cache warning, the Ir verdict and rc stay pass",
+           rc == 0 and out["verdict"] == "pass" and out["cache"]["verdict"] == "warn" and cr["verdict"] == "warn"
+           and abs(cr["ratio_D1"] - 1.05) < 1e-3 and not out["warnings"]
+           and "缓存 ⚠️ 警告" in summary and "slg.B.in_decode" in summary)
+
+    bs = tree(); bs["cache"] = cache_of(); bs["cache"]["slg.C.restore"].update(D1mr=40, DLmr=10)
+    hs = tree(); hs["cache"] = cache_of(); hs["cache"]["slg.C.restore"].update(D1mr=43, DLmr=12)
+    rc, out = run_case(hs, base_tree=bs, cache_sim=True)
+    cr = next(r for r in out["cache"]["rows"] if r["metric"] == "slg.C.restore")
+    expect("a judged phase with 40 -> 43 D1 and 10 -> 12 LL misses does not warn (below the absolute floor)",
+           cr["class"] != "report" and cr["ratio_D1"] > 1.02 and cr["verdict"] == "pass")
+    hs["cache"]["slg.C.restore"].update(D1mr=40 + 100, DLmr=10)
+    rc, out = run_case(hs, base_tree=bs, cache_sim=True)
+    cr = next(r for r in out["cache"]["rows"] if r["metric"] == "slg.C.restore")
+    expect("+100 misses on a judged phase warns", cr["verdict"] == "warn" and out["cache"]["verdict"] == "warn")
+    bs["cache"]["slg.C.restore"].update(D1mr=500); hs["cache"]["slg.C.restore"].update(D1mr=500 + 50)
+    bs["slg"] = dict(BASE_SLG, **{"C.restore": 400_000}); hs["slg"] = dict(bs["slg"])
+    rc, out = run_case(hs, base_tree=bs, cache_sim=True)
+    cr = next(r for r in out["cache"]["rows"] if r["metric"] == "slg.C.restore")
+    expect("+50 misses on a 400k-Ir phase (>= 1 per 10,000 Ir) warns", cr["verdict"] == "warn")
+
+    hb = tree(); hb["cache"] = cache_of(scale={"slg.A.res_encode": (2.0, 2.0)})
+    rc, out = run_case(hb, base_tree=bb, cache_sim=True)
+    cr = next(r for r in out["cache"]["rows"] if r["metric"] == "slg.A.res_encode")
+    expect("a report-only phase (< 5% of its scenario's Ir) does not warn on misses",
+           cr["class"] == "report" and cr["verdict"] == "pass")
+
+    hb = tree(); hb["cache"] = cache_of(scale={"formal.mutate": (1.0, 1.03)})
+    s4 = dict(BASE_FORMAL, mutate=int(43_000_000 * 1.02))
+    hb["formal"] = s4; hb["cache"] = cache_of(formal=s4, scale={"formal.mutate": (1.0, 1.03)})
+    rc, out = run_case(hb, base_tree=bb, cache_sim=True)
+    expect("an Ir failure still fails with cache warnings beside it", rc == 1 and out["verdict"] == "fail"
+           and out["cache"]["verdict"] == "warn")
+
+    hb = tree()
+    rc, out = run_case(hb, base_tree=bb, cache_sim=True)
+    expect("cache-sim asked but the head has no cache data: a cache warning, not a failure",
+           rc == 0 and out["cache"]["verdict"] == "warn" and out["cache"]["note"])
 
     print(f"{len(failures)} failures")
     return 1 if failures else 0

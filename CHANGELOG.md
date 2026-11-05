@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- `root<T>()` fills its cache when it takes the checked path, so an `XBuffer`
+  that was moved (into a `std::vector`, by a swap) pays the checks once
+  instead of on every call. The cache hit is now inlined (one compare and one
+  load; the checked path is out of line). `root<T>()` is a non-const
+  member: concurrent calls on one buffer need the caller's lock, as for
+  every other non-const member. P2996 Clang, instructions: an
+  order book event through `root<T>()` 173.8 -> 130.8 (a held root pointer
+  125.8); bench/slg S A.req_encode -1.6%, A.apply -1.5%, D.read -2.5%,
+  NP.send -4.7%.
+
 ## 3.3.0: native delta sync
 
 Delta sync arrives as an experimental API (`xoffset_delta.hpp`, delta
