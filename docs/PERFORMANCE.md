@@ -1,4 +1,4 @@
-# 性能数字（3.2.1）
+# 性能数字（3.3.0）
 
 本页记录每个正式版在 Mac 检查点上测得的数字、测法和局限。所有数字来自同一台
 Apple M4 和同一个游戏服务器负载（SLG），不要拿来推断别的机器、别的负载或别的适配写法。
@@ -165,7 +165,48 @@ A / B / C 0.9988 / 1.0005 / 1.0051，C 上界 1.0216，略高于 1.02，规则�
 SLG M 规模，xoffset÷FlatBuffers：A 0.305、B 0.179、C 0.252、D 0.858。只和同一台手机上的 FlatBuffers 比，
 不和 Mac 的数字比；Android 手机没有计时。测法和 wire 字节见 [DEVICE_TESTING.md](DEVICE_TESTING.md) 第 9 节。
 
-## 5. 局限
+## 5. 3.3.0
+
+发布检查点 REL330：`next_cpp26` `059b6a5f`（候选 C）对 `v3.2.1`（`23c6e206`，库与 3.2.0 的检查点相同），
+2026-11-04，同时作为阶段复核（备好了 #213、#191、#219、#214 的二分点，判定通过，没有用到）。所有点都用
+C 的 `bench/slg`（冻结树 `23e86624`）编译。Mac 这时是 macOS 27.2。判定书在 project files 的
+`perf-gate/mac/2026-11-04-rel330-059b6a5/VERDICT.md`（原始数据在 `mac-results` 分支的 `087-rel330`）。
+
+### 对 3.2.1
+
+| 项 | 3.3.0 ÷ 3.2.1 |
+| --- | --- |
+| SLG A / B / C（四家 L2 口径，6+6 个进程） | 0.959 [0.941, 0.977] / 0.922 [0.908, 0.937] / 0.959 [0.935, 0.984] |
+| SLG D（只报） | 1.007 [0.976, 1.039] |
+| SLG A / B / C（六家 GATED 口径，12+12 个进程），最大上界 | 0.975 / 0.931 / 0.981，0.9813 |
+| 正式 harness read_sum / mutate / emit_after（两批合并） | 1.001 / 0.974 / 0.977，最大上界 1.010 |
+
+单列的 A 阶段（L2 SLG，3.3.0 ÷ 3.2.1，µs/周期）：A.req_decode 1.014 [1.001, 1.027]（+0.8 µs）、
+A.res_decode 0.967、A.apply 0.928、A.req_encode 0.997。A.req_decode 疑似代码摆放：#191 这一步合入时的门禁
+是 1.024，在对齐构建（`-falign-functions=64`）下是 1.005 [0.998, 1.013]。demo 场景（只报）发送变快、
+接收方的 apply 变慢：UP.send 0.864、UP.apply 1.053、UC.apply 1.073、A.apply 1.038，每次交付的 send + recv
++ apply 合计 UP +2.0%、UC +1.1%；对齐构建下 A.apply 0.971，同样疑似摆放。
+
+### D 对 FlatBuffers（GATE_D）和 G8
+
+- D÷FlatBuffers 0.949，上界 0.960（3.2.1 同批 0.915 / 0.939）：仍 ≤1.0。D.read 67.8 → 68.9 µs。
+- G8：÷zpp_bits 上界 A 0.778、B 0.506、C 0.787；÷cista 上界 0.289、0.234、0.223，满足。
+
+### 重定位税（G9R3，同批 `v3.2.1` 对 C）：19 项里 17 项满足
+
+没过的两项和 3.2.x 相同：vec.push_back、set.erase.fresh（`perf-gate/mac/2026-11-04-rel330-059b6a5/g9r/`）。
+XOffset 自身有几项比 3.2.1 慢（G9 仍满足）：map.insert.reused 1.023、set.insert.reused 1.022，来自 #214 为
+升序追加加的快路径（随机顺序插入时每次多一次和末元素的比较，云端指令数多 3–5%，升序插入反而更快）；
+map.find.fresh、map.find.reused 1.028，默认和对齐构建都一样，但指令数没有增加，原因未查明，只报
+（`perf-gate/cloud/g9r-map-ir-20261105/REPORT.md`）。
+
+### 客户端
+
+Apple clang 21.0.0，C++20：macOS arm64 和 iOS 模拟器（iPhone 17，iOS 27.0）全量 CTest 148/148（含 24 个
+关异常程序），读入 Linux GCC 16 写出的 24 个参照语料，写出的字节相同
+（`perf-gate/mac/2026-11-04-apple330-059b6a5/`）。手机真机没有重跑，第 4 节的 iPhone 数字是 3.2.x 的。
+
+## 6. 局限
 
 - 只有一台 M4。别的 arm64 核（存储转发、分支预测不同）和 x86-64 上的快慢关系可能不一样；
   云端 GCC 16 + libstdc++ 的重定位税数字和 Mac 差得很多（libstdc++ 的 `flat_set`/`flat_map`
