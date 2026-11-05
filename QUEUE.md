@@ -1,6 +1,6 @@
 # Mac queue
 
-Updated 2026-11-05T04:06:15Z after 094-ckpt21b: done 14 2026-11-05T04:06:11Z
+Updated 2026-11-05T04:06:26Z after 096-slgv9b: running 2026-11-05T04:06:23Z
 
 ```
 runner: pid 4651 (version 2)
@@ -100,5 +100,5 @@ free: 45 GB on /Volumes/XOffsetCS, 45 GB on /Users/ximi
 093-ckpt20                               done 10 2026-11-05T02:55:50Z
 094-ckpt21b                              done 14 2026-11-05T04:06:11Z
 095-slgv9                                cancelled
-096-slgv9b                               queued
+096-slgv9b                               running 2026-11-05T04:06:23Z
 ```
