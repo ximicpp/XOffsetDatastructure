@@ -457,6 +457,18 @@
       "evidence": "/mnt/project-files/d-vs-fb-20261027/LOCAL_VALIDATE_51b3db9f.md（Ir gate gcc16 函数差异表，base 92404a27 head 51b3db9f）；/mnt/project-files/d-vs-fb-20261027/ITERATOR_DECISION.md（GATE_D4，Mac 正式批次 A/B/C 上界 1.0197 通过）",
       "approved_by": "「性能优化」（2026-10-28 01:31Z，只作记录）",
       "archived": "2026-11-05：anchor 前移到 v3.3.0（51a4815b），条目针对的是旧 anchor，按 PERF_GATE.md 第 4 节移入存档"
+    },
+    {
+      "id": "pr223-reloc-reset-gcc-inline",
+      "pr": 223,
+      "metric": "reloc.reset",
+      "compiler": "gcc16",
+      "max_ratio": 1.0427,
+      "record_only": true,
+      "reason": "只作记录，不放行任何指标。#223 让 root<T>() 在检查路径上回填缓存，命中路径内联、检查路径挪成 noinline 的 root_checked<T>()。GCC 16 Ir 的 reloc.reset head÷base 是 1.0427（51k Ir 里 +2,106，阶段警告，没到失败门槛）：GCC 不再把 make<ArmyOrd>() 内联进 bench 的 reset lambda（make<ArmyOrd>() 只在 head 出现 +10,368，lambda 自身 -8,262）。#223 没有改 make<T>()，试过 cold 属性也没用。P2996 Ir（Mac 和客户端用的编译器）的 reloc.reset 是 1.0000。cache-sim 的 11 项 D1/LL 警告按摆放噪声处理（那些阶段 Ir 1.0000、指令相同，绝对差几次到几十次）。合并后第一次 Mac 复核把 #223 列为二分点，单独看 reloc.reset 和 A.res_decode。",
+      "evidence": "/mnt/project-files/perf-gate/cloud/root-refill/2026-11-05-01012ad0/（ir-gcc16-summary.md 函数差异表，base fb4b96c9 head 01012ad0；cachesim-*-summary.md）",
+      "approved_by": "「性能优化」（2026-11-05 02:36Z，只作记录）",
+      "archived": "2026-11-05：anchor 前移到 v3.3.1（ee506d3f），条目针对的是旧 anchor，按 PERF_GATE.md 第 4 节移入存档"
     }
   ]
 }
