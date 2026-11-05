@@ -1,0 +1,10 @@
+CKPT20 10
+anchor next_cpp26 c9fae222 (3.3.0 and #227 merged)
+screen watcher: 58 calls (dark.log)
+ABC: fail (max upper bound 1.0379; A 1.0371, B 1.0116, C 1.0379; 12 / 12 processes)
+GATE_D: head D÷flatbuffers 0.926 / 0.941 (O4 upper bound <= 1.0: met), D÷zpp_bits 1.042 / 1.051, D.read 68.7 µs; anc D÷flatbuffers 0.917 / 0.935, D÷zpp_bits 1.039 / 1.053, D.read 68.5 µs
+G8 met
+G9R rc 0 (0 done, 2 prep check, 5 quiet gate); G9: 17 of 19 comparisons have UB <= 1.05; above: vec.push_back, set.erase.fresh
+ctest 100% tests passed out of 178 (rc 0)
+HFT HFT head/anc: xo_nest/ptr 0.979, xo_nest/root 0.997, xo_pool/ptr 0.951, xo_pool/root 1.007
+demo not run (not requested for CKPT20)

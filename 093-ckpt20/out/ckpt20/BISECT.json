@@ -1,0 +1,110 @@
+{
+ "checkpoint": "2026-11-05-ckpt20-9313428",
+ "failed_metrics": {
+  "slg:A": 1.0111856802418098
+ },
+ "points": [
+  {
+   "commit": "c9fae222bb86ef829f9cf5b7a7c241e6978e93f6",
+   "label": "anchor",
+   "role": "anchor"
+  },
+  {
+   "commit": "16de37a521a9148045ce3dcb9c518759859129fd",
+   "label": "PR #223 merged with e7fd8cb0 (CKPT20 v1 head, bench/slg 23e86624; report only); the last range holds the merge of c9fae222 (3.3.0 release, #227 bench/slg only)",
+   "role": "commit"
+  },
+  {
+   "commit": "9313428e633aac1e9c2e0a57ab03a17cc718f244",
+   "label": "head",
+   "role": "head"
+  }
+ ],
+ "steps": [
+  {
+   "step": 1,
+   "dir": "bisect-1",
+   "point": "16de37a521a9148045ce3dcb9c518759859129fd",
+   "label": "PR #223 merged with e7fd8cb0 (CKPT20 v1 head, bench/slg 23e86624; report only); the last range holds the merge of c9fae222 (3.3.0 release, #227 bench/slg only)",
+   "lo": "c9fae222bb86ef829f9cf5b7a7c241e6978e93f6",
+   "hi": "9313428e633aac1e9c2e0a57ab03a17cc718f244",
+   "f": 1.1041140363835082,
+   "own": {
+    "slg:A": 1.104114036383508
+   },
+   "spread": [],
+   "side": "lo-mid",
+   "timed": true,
+   "_slg": {
+    "groups": [
+     "slg"
+    ],
+    "new": {
+     "A": {
+      "geo": 1.0123574341416084,
+      "low": 0.992255337208195,
+      "high": 1.0328667793769126,
+      "df": 8.027017503837884,
+      "n": [
+       6,
+       6
+      ]
+     },
+     "B": {
+      "geo": 1.004930535020895,
+      "low": 0.9642568485768933,
+      "high": 1.0473198937687924,
+      "df": 6.41787944144857,
+      "n": [
+       6,
+       6
+      ]
+     },
+     "C": {
+      "geo": 1.001259949622074,
+      "low": 0.9761845758067063,
+      "high": 1.026979437662931,
+      "df": 9.729854595064607,
+      "n": [
+       6,
+       6
+      ]
+     },
+     "D": {
+      "geo": 1.023666765187848,
+      "low": 1.0132139985898083,
+      "high": 1.034227367178712,
+      "df": 9.738917032720229,
+      "n": [
+       6,
+       6
+      ]
+     }
+    }
+   }
+  }
+ ],
+ "range": {
+  "lo": "c9fae222bb86ef829f9cf5b7a7c241e6978e93f6",
+  "hi": "16de37a521a9148045ce3dcb9c518759859129fd",
+  "lo_label": "anchor",
+  "hi_label": "PR #223 merged with e7fd8cb0 (CKPT20 v1 head, bench/slg 23e86624; report only); the last range holds the merge of c9fae222 (3.3.0 release, #227 bench/slg only)"
+ },
+ "status": "culprit",
+ "rules": {
+  "rule": "merge rules v2 (\u6027\u80fd\u4f18\u5316 2026-10-26 07:30Z, susu 07:26Z): a checkpoint is a cumulative gate run, head = next_cpp26, anchor = the previous checkpoint; it is judged by the ordinary formal and SLG rules. At freeze the binaries of every first-parent commit between them are built and stored (--bisect), so a failing checkpoint is bisected in the same session",
+  "points": "anchor, the listed commits oldest first, head; consecutive points whose binaries of the failed part(s) are identical collapse into the earliest one (a point identical to the anchor or the head takes its value without timing)",
+  "step": "the middle point between lo and hi (culprit in (lo, hi]) is frozen as a full gate directory bisect-<k> (head = that point, anchor = the checkpoint anchor); only the failed part(s) are timed: one formal batch and/or one SLG group, under the same start, environment and replacement rules",
+  "decision": "failed metrics = gate phases (formal) or scenarios A-C (SLG) whose checkpoint pooled upper bound is above pass_le and whose geometric mean is above 1; r = log geo of the checkpoint, m = log geo of the step; f = sum(m*r) / sum(r*r); f >= 0.5 -> the culprit is in (lo, mid], otherwise in (mid, hi]",
+  "spread": "a failed metric with its own m/r in (0.25, 0.75) is reported as possibly spread over several merges",
+  "deferred": "\u6027\u80fd\u4f18\u5316 2026-10-26 12:10Z: a point listed as COMMIT|LABEL is deferred: its binaries are built only when the bisection picks it as the middle point (bisect-supply), so a passing checkpoint builds nothing. A deferred point never collapses with its neighbours; once supplied, binaries identical to the anchor or the head still give its value without timing, so a build costs no timed step",
+  "max_steps": 1,
+  "result": "hi = lo + 1 -> the culprit is the earliest commit of point hi; after max_steps the remaining range is reported",
+  "non_monotone": "\u6027\u80fd\u4f18\u5316 2026-10-26 19:31Z (INT2: D5 regressed B, P4 recovered B and added C; f followed C and named P4): a step is non-monotone when a failed metric has its own m/r above 1.5 or below -0.5, or when the failed metrics fall on both sides of 0.5 and their m/r differ by 1 or more. The bisection still follows f, but a bisection with a non-monotone step names no single culprit: status non_monotone, every failed metric with its own side at the first such step, and the point f ends at; \u6027\u80fd\u4f18\u5316 decides"
+ },
+ "culprit": {
+  "commit": "16de37a521a9148045ce3dcb9c518759859129fd",
+  "label": "PR #223 merged with e7fd8cb0 (CKPT20 v1 head, bench/slg 23e86624; report only); the last range holds the merge of c9fae222 (3.3.0 release, #227 bench/slg only)",
+  "same_binaries": []
+ }
+}

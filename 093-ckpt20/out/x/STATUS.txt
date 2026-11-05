@@ -1,0 +1,2 @@
+HFT HFT head/anc: xo_nest/ptr 0.979, xo_nest/root 0.997, xo_pool/ptr 0.951, xo_pool/root 1.007
+demo not run (not requested for CKPT20)

@@ -1,0 +1,13 @@
+t0 c9fae222bb86ef829f9cf5b7a7c241e6978e93f6 tree d9cb2e8d37d8211a0ddadcbe533688782a7faaff typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (next_cpp26 c9fae222 (3.3.0, #227; merged into PR #223))
+t1 9313428e633aac1e9c2e0a57ab03a17cc718f244 tree c5a99eebc2faa59760926c5a6c981fc1d2587609 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (CKPT20 head (PR #223 root cache refill 9313428e))
+t1: diff over t0 sha256 431ee370a21da1527bcb0dbb0eeb50e92ed8424a4082b0930d2a7e5c0016d214 ( 4 files changed, 72 insertions(+), 7 deletions(-))
+t1: library header diff over t0:  1 file changed, 33 insertions(+), 6 deletions(-)
+t1: first-parent commits over t0:
+  9313428e Merge next_cpp26 c9fae222 (3.3.0, #227) into root refill
+  16de37a5 Merge next_cpp26 e7fd8cb0 (#214, #219, #220) into root refill
+  937d833d root<T>(): fill the cache on the checked path, inline the hit
+bench/reloc of t1: same tree as t0
+reloc_bench t0 sha256 25d9006a12d1b47b14d53a9469e60526ebc8412c01b190def92b93c2b983a797
+reloc_bench t1 sha256 9484e95dca8b55bb72b9f4031703346b000db68357aa41b66cec50b04baa5b9b
+reloc_bench t0a sha256 972c1725256dc635098dd57c1f6b270727f438c492d89778db8d403e8a292895
+reloc_bench t1a sha256 fe67d0d985d7dea7d13bdc7569539adeaff5c999e0c977ae1b454c6afa2c5f61

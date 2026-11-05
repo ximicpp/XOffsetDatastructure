@@ -1,0 +1,12 @@
+2026-11-05T02:35:22Z hft block 1 start: need 180s waited 180s load 2.53 WindowServer 42.2% remote 4
+2026-11-05T02:35:32Z hft block 1 done (32 runs)
+2026-11-05T02:36:02Z hft block 2 start: need 30s waited 30s load 2.34 WindowServer 5.4% remote 4
+2026-11-05T02:36:08Z hft block 2 done (64 runs)
+2026-11-05T02:39:20Z hft block 3 start: need 30s waited 190s load 2.36 WindowServer 13.7% remote 4
+2026-11-05T02:39:26Z hft block 3 done (96 runs)
+2026-11-05T02:39:57Z hft block 4 start: need 30s waited 30s load 2.13 WindowServer 1.6% remote 4
+2026-11-05T02:40:03Z hft block 4 done (128 runs)
+2026-11-05T02:40:34Z hft block 5 start: need 30s waited 30s load 2.20 WindowServer 12.6% remote 4
+2026-11-05T02:40:40Z hft block 5 done (160 runs)
+2026-11-05T02:41:10Z hft block 6 start: need 30s waited 30s load 2.06 WindowServer 14.2% remote 4
+2026-11-05T02:41:17Z hft block 6 done (192 runs)
