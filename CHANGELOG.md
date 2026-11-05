@@ -18,6 +18,12 @@
   accepts. `XSyncOut` and `XSyncWriter` build messages without per-write
   string growth. Not part of the public API yet.
 
+- Withdrawn: the `root<T>()` cache refill of 3.3.1 (#223). On the Mac it
+  made bench/slg A.req_encode 7.5% slower (release review STAGE331: 1.075,
+  interval 1.065 to 1.086; A 1.016), and the HFT demo showed no gain there,
+  although instructions went down. `root<T>()` is read-only again: a moved
+  `XBuffer` takes the checked path until a call that sets the cache (make,
+  a verified load or reload) runs. Redone in 3.4 once the cause is known.
 - `XMap::try_emplace` (and `operator[]`, `emplace`, `insert_or_assign` on a
   new key) and `XSet::insert` no longer run more instructions on a random
   insert than 3.2.1 did: the compare with the last key now decides between
