@@ -17,6 +17,13 @@
 //   7. (R1) the same on slot storage: a fresh load, a reload and a direct
 //      reload on movable slots must equal the VM load byte for byte, and the
 //      same mutations on a pinned slot must re-save the same wire.
+//   8. (trust tier P1) XReceiver<server_peer>::reload with XCheck::admit into
+//      ONE long-lived buffer. It skips the graph walk, so it is not one more
+//      vote: it must accept every wire load_verified accepts, with the same
+//      payload, free table and re-save (as acceptor 5), and reject every wire
+//      the oracle rejects at the header stage; a wire it accepts beyond those
+//      is not read (the payload is the sender's on a trusted link). Its own
+//      parse must stay in bounds on any input (ASan).
 // Every acceptor must agree on accept/reject (raw/receive only see inputs whose
 // wire header is well formed). Acceptors 2, 5, 6 and 7 go through the
 // non-throwing entries (try_load_verified, try_reload_verified,
@@ -30,7 +37,13 @@
 // ONE long-lived buffer: both copies must hold its bytes and free table,
 // re-save identically and stay identical to it under the same next mutation.
 #pragma once
+// Acceptor 8 runs the real admit, also under ASan and without NDEBUG, where
+// XOFFSET_FORCE_FULL_CHECK would otherwise make it the full check.
+#ifndef XOFFSET_FORCE_FULL_CHECK
+#define XOFFSET_FORCE_FULL_CHECK 0
+#endif
 #include "xoffsetdatastructure.hpp"
+#include "xoffset_receiver.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -504,6 +517,23 @@ void compare_reload(Buffer& fresh, Buffer& again, const char* who) {
         fail(std::string(who) + " re-save differs from load_verified re-save");
 }
 void compare_reload(Buffer& fresh) { compare_reload(fresh, reloader(), "reload_verified"); }
+
+// Acceptor 8: admit into one buffer reused for every case (same maximum as typed_load).
+void check_admit(const std::string& w, const Oracle& o, Buffer* typed, const std::string& id) {
+    static Buffer target = Buffer::create(
+        4096, xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic));
+    static xo::XReceiver<xo::XLink::server_peer> rx(xo::XBuffer::maximum_capacity(kLimit));
+    static_assert(!xo::detail::force_full_check, "acceptor 8 needs the real admit");
+    const xo::XStatus st = rx.reload(target, w);
+    if (typed) {
+        if (!st) fail(id + ": admit rejected a wire load_verified accepts (" + st.error().message + ")");
+        compare_reload(*typed, target, "XReceiver admit");
+        return;
+    }
+    if (st && !o.ok && o.stage == Oracle::Stage::Header)
+        fail(id + ": admit accepted a wire the oracle rejects at the header (" + o.why + ")");
+    if (!st) require_no_root(target, "XReceiver admit");
+}
 
 #if defined(XOFFSET_VERIFIED_RELOAD_API)
 // Acceptor 6: direct reload (XBuffer::begin_verified_reload) into ONE
@@ -1283,6 +1313,7 @@ Outcome check_case(const std::string& w, std::mt19937_64& rng, const std::string
 #if defined(XOFFSET_VERIFIED_RELOAD_API)
     check_direct(w, bool(typed), typed ? &*typed : nullptr, "case " + id);
 #endif
+    check_admit(w, o, typed ? &*typed : nullptr, "case " + id);
     compare_inflated(w, typed, terr, o, "case " + id);
 #if defined(XOFFSET_TRY_ENTRIES_API)
     {

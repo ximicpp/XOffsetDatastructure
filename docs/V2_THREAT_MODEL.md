@@ -46,9 +46,10 @@
 用于服务端之间、服务端发往客户端和自己的存档，**不是**不可信输入的入口（调试和 sanitizer 构建里照样
 完整校验）。整块接收和增量的信任档是 `XReceiver<XLink::server_peer / from_server>::reload / load /
 apply_delta`（`xoffset_receiver.hpp`），`XReceiver<XLink::from_client>` 在编译期拒绝信任档；把客户端连接误建成可信
-链路的接收器靠代码审查发现。信任档按定义不接不可信输入，不进 fuzz，由 `test_receiver` 的差分测试保证
-它对完整档接受的输入给出相同结果；边界档用于客户端上行，只保证读取不越界，收到的数据只读使用；要原地修改客户端数据时走完整档，
-即上面这些入口。两档接口落地时，各自的 harness 加进第 5 节的表和发版前 fuzz。
+链路的接收器靠代码审查发现。信任档按定义不接不可信输入，不保证对任意输入给出可用的结果；fuzz 和
+`test_receiver` 的差分测试只要求两件事：它自己的解析和写入对任何输入都不越界（ASan），对完整档接受的
+输入给出相同结果（第 5 节表中的 admit 一行）。边界档用于客户端上行，只保证读取不越界，收到的数据只读使用；
+要原地修改客户端数据时走完整档，即上面这些入口。边界档接口落地时，它的 harness 加进第 5 节的表和发版前 fuzz。
 
 ## 3. 威胁与现状
 
@@ -158,6 +159,7 @@ M1–M6 已在 0.3.0-beta.1 实施，行为变化见 CHANGELOG。M3 的修改路
 | `reload_verified`、`begin_verified_reload`、可搬槽位存储 | 同上（reload、direct、slot 各列，与新 buffer 的加载逐字节比较） |
 | schema 演进：`evolve_load_verified`、`XPeerSchemas` 握手、`read_schema_ack` | `fuzz_schema_evolution` |
 | 增量 apply：`try_apply_delta_verified` / `apply_delta_verified`（3.3） | `fuzz_delta_sync`（反射和字段表两种构建）：快路径（none、in_place）与克隆副本上的全量校验比较结论、错误和结果；拒绝时副本和游标不变；接受的结果能再校验加载 |
+| 信任档（3.4）：`XReceiver<server_peer / from_server>` 的 `reload`、`load`、`apply_delta`（admit） | 整块：`v2_fuzz_core.hpp` 第 8 列（`fuzz_v2_wire`、`test_v2_fuzz`），完整档接受的必须接受且结果逐字节相同，oracle 在线头阶段拒绝的必须拒绝；增量：`fuzz_delta_sync` 在另一份克隆上走 admit，完整档接受的必须接受且结果相同，解析阶段的错误必须相同，拒绝时副本和游标不变。admit 多接受的输入不读 |
 | 客户端字段表构建、关异常构建 | `fuzz_v2_wire`、`fuzz_wire_schemas` 的 C++20 字段表构建（libFuzzer），`tools/fuzz_outcome_diff.sh`（三种构建逐条比较结果和错误文字） |
 
 各阶段与预算见脚本开头的说明；一轮发版 fuzz 约 4 小时（GCC 45 分钟，每个 libFuzzer 目标每种构建

@@ -30,6 +30,16 @@
   small deltas, a lost delta and the recovery. docs/DELTA_SYNC.md section 5:
   deltas only after the handshake answers `same`, whole wires after
   `convert`.
+- Fuzzing covers the trust tier: `v2_fuzz_core.hpp` gains acceptor 8,
+  `XReceiver<server_peer>::reload` with admit into one long-lived buffer (it
+  must accept every wire `load_verified` accepts with the same payload, free
+  table and re-save, and reject every wire the oracle rejects at the header
+  stage), so `fuzz_v2_wire` and `test_v2_fuzz` run it; `fuzz_delta_sync`
+  applies every input with admit on another clone too (it must accept what the
+  full check accepts with the same result, give the same error for anything
+  the parse rejects, and leave its clone and cursor as they were when it
+  rejects). Inputs admit accepts beyond the full check are not read.
+  docs/V2_THREAT_MODEL.md sections 2 and 5.
 - `xoffset_shared_delta.hpp` (experimental, D3 prototype for 3.4): shared
   per-entity deltas. A change is written per record, as bytes at offsets
   inside the record (the block section of delta format 1.0 counted from the
