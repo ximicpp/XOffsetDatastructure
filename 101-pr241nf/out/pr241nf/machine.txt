@@ -1,0 +1,1 @@
+hw.memsize 17179869184 pagesize 16384

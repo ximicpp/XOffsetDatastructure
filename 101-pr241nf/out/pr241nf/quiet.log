@@ -1,0 +1,80 @@
+2026-11-05T18:37:43Z single anc 1 xoffset start: need 180s waited 180s load 1.94 WindowServer 4% remote 4
+2026-11-05T18:38:29Z single anc 1 xoffset done rc 0: 1793903863..1793903909 (46 s) load 1.78
+2026-11-05T18:38:39Z single anc 1 xoffset_trusted start: need 10s waited 10s load 1.78 WindowServer 4.2% remote 4
+2026-11-05T18:39:26Z single anc 1 xoffset_trusted done rc 0: 1793903919..1793903966 (47 s) load 2.00
+2026-11-05T18:39:36Z single anc 1 cereal start: need 10s waited 10s load 2.00 WindowServer 4% remote 4
+2026-11-05T18:40:38Z single anc 1 cereal done rc 0: 1793903976..1793904038 (62 s) load 1.64
+2026-11-05T18:40:48Z single anc 1 protobuf start: need 10s waited 10s load 1.64 WindowServer 4.1% remote 4
+2026-11-05T18:41:39Z single anc 1 protobuf done rc 0: 1793904048..1793904099 (51 s) load 2.03
+2026-11-05T18:41:49Z single anc 1 flatbuffers start: need 10s waited 10s load 2.03 WindowServer 4.2% remote 4
+2026-11-05T18:42:39Z single anc 1 flatbuffers done rc 0: 1793904109..1793904159 (50 s) load 2.50
+2026-11-05T18:42:50Z single anc 1 flatbuffers_noverify start: need 10s waited 10s load 2.50 WindowServer 4.2% remote 4
+2026-11-05T18:43:38Z single anc 1 flatbuffers_noverify done rc 0: 1793904170..1793904218 (48 s) load 2.04
+2026-11-05T18:43:48Z single anc 1 zpp_bits start: need 10s waited 10s load 2.04 WindowServer 4.2% remote 4
+2026-11-05T18:44:24Z single anc 1 zpp_bits done rc 0: 1793904228..1793904264 (36 s) load 1.97
+2026-11-05T18:44:35Z single anc 1 cista start: need 10s waited 10s load 1.97 WindowServer 3.7% remote 4
+2026-11-05T18:45:27Z single anc 1 cista done rc 0: 1793904275..1793904327 (52 s) load 2.26
+2026-11-05T18:45:37Z single anc 1 cista_unchecked start: need 10s waited 10s load 2.26 WindowServer 4.3% remote 4
+2026-11-05T18:46:17Z single anc 1 cista_unchecked done rc 0: 1793904337..1793904377 (40 s) load 2.10
+2026-11-05T18:46:48Z single head 1 xoffset start: need 30s waited 30s load 1.89 WindowServer 3.8% remote 4
+2026-11-05T18:47:36Z single head 1 xoffset done rc 0: 1793904408..1793904456 (48 s) load 1.98
+2026-11-05T18:47:46Z single head 1 xoffset_trusted start: need 10s waited 10s load 1.98 WindowServer 5.7% remote 4
+2026-11-05T18:48:33Z single head 1 xoffset_trusted done rc 0: 1793904466..1793904513 (47 s) load 1.86
+2026-11-05T18:48:43Z single head 1 cereal start: need 10s waited 10s load 1.86 WindowServer 3.8% remote 4
+2026-11-05T18:49:45Z single head 1 cereal done rc 0: 1793904523..1793904585 (62 s) load 2.20
+2026-11-05T18:49:55Z single head 1 protobuf start: need 10s waited 10s load 2.20 WindowServer 4.4% remote 4
+2026-11-05T18:50:48Z single head 1 protobuf done rc 0: 1793904595..1793904648 (53 s) load 1.98
+2026-11-05T18:50:58Z single head 1 flatbuffers start: need 10s waited 10s load 1.98 WindowServer 5.6% remote 4
+2026-11-05T18:51:48Z single head 1 flatbuffers done rc 0: 1793904658..1793904708 (50 s) load 1.81
+2026-11-05T18:51:58Z single head 1 flatbuffers_noverify start: need 10s waited 10s load 1.81 WindowServer 3.9% remote 4
+2026-11-05T18:52:47Z single head 1 flatbuffers_noverify done rc 0: 1793904719..1793904767 (48 s) load 1.76
+2026-11-05T18:52:57Z single head 1 zpp_bits start: need 10s waited 10s load 1.76 WindowServer 3.9% remote 4
+2026-11-05T18:53:33Z single head 1 zpp_bits done rc 0: 1793904777..1793904813 (36 s) load 1.74
+2026-11-05T18:53:43Z single head 1 cista start: need 10s waited 10s load 1.74 WindowServer 3.9% remote 4
+2026-11-05T18:54:36Z single head 1 cista done rc 0: 1793904824..1793904876 (52 s) load 1.71
+2026-11-05T18:54:46Z single head 1 cista_unchecked start: need 10s waited 10s load 1.71 WindowServer 3.1% remote 4
+2026-11-05T18:55:26Z single head 1 cista_unchecked done rc 0: 1793904886..1793904926 (40 s) load 2.09
+2026-11-05T18:55:57Z ctrl anc 1 start: need 30s waited 30s load 1.93 WindowServer 4.2% remote 4
+2026-11-05T19:03:15Z ctrl anc 1 done rc 0: 1793904957..1793905395 (438 s) load 1.70
+2026-11-05T19:03:46Z ctrl head 1 start: need 30s waited 30s load 1.79 WindowServer 4% remote 4
+2026-11-05T19:11:05Z ctrl head 1 done rc 0: 1793905426..1793905865 (439 s) load 2.20
+2026-11-05T19:11:35Z single head 2 xoffset start: need 30s waited 30s load 2.02 WindowServer 3.9% remote 4
+2026-11-05T19:12:23Z single head 2 xoffset done rc 0: 1793905895..1793905943 (48 s) load 2.35
+2026-11-05T19:12:33Z single head 2 xoffset_trusted start: need 10s waited 10s load 2.35 WindowServer 4% remote 4
+2026-11-05T19:13:22Z single head 2 xoffset_trusted done rc 0: 1793905953..1793906002 (49 s) load 2.18
+2026-11-05T19:13:32Z single head 2 cereal start: need 10s waited 10s load 2.18 WindowServer 4.3% remote 4
+2026-11-05T19:14:34Z single head 2 cereal done rc 0: 1793906012..1793906074 (62 s) load 1.99
+2026-11-05T19:14:45Z single head 2 protobuf start: need 10s waited 10s load 1.99 WindowServer 5.1% remote 4
+2026-11-05T19:15:37Z single head 2 protobuf done rc 0: 1793906085..1793906137 (52 s) load 1.85
+2026-11-05T19:15:47Z single head 2 flatbuffers start: need 10s waited 10s load 1.85 WindowServer 3.9% remote 4
+2026-11-05T19:16:38Z single head 2 flatbuffers done rc 0: 1793906147..1793906197 (50 s) load 1.92
+2026-11-05T19:16:48Z single head 2 flatbuffers_noverify start: need 10s waited 10s load 1.92 WindowServer 4.1% remote 4
+2026-11-05T19:17:36Z single head 2 flatbuffers_noverify done rc 0: 1793906208..1793906256 (48 s) load 1.73
+2026-11-05T19:17:46Z single head 2 zpp_bits start: need 10s waited 10s load 1.73 WindowServer 4.1% remote 4
+2026-11-05T19:18:23Z single head 2 zpp_bits done rc 0: 1793906266..1793906302 (36 s) load 1.72
+2026-11-05T19:18:33Z single head 2 cista start: need 10s waited 10s load 1.72 WindowServer 4.2% remote 4
+2026-11-05T19:19:25Z single head 2 cista done rc 0: 1793906313..1793906365 (52 s) load 1.97
+2026-11-05T19:19:35Z single head 2 cista_unchecked start: need 10s waited 10s load 1.97 WindowServer 4.2% remote 4
+2026-11-05T19:20:16Z single head 2 cista_unchecked done rc 0: 1793906375..1793906416 (41 s) load 1.99
+2026-11-05T19:20:46Z single anc 2 xoffset start: need 30s waited 30s load 1.94 WindowServer 4.2% remote 4
+2026-11-05T19:21:34Z single anc 2 xoffset done rc 0: 1793906446..1793906494 (48 s) load 2.32
+2026-11-05T19:21:44Z single anc 2 xoffset_trusted start: need 10s waited 10s load 2.32 WindowServer 5.8% remote 4
+2026-11-05T19:22:33Z single anc 2 xoffset_trusted done rc 0: 1793906504..1793906553 (49 s) load 1.96
+2026-11-05T19:22:43Z single anc 2 cereal start: need 10s waited 10s load 1.96 WindowServer 5.5% remote 4
+2026-11-05T19:23:45Z single anc 2 cereal done rc 0: 1793906563..1793906625 (62 s) load 2.06
+2026-11-05T19:23:56Z single anc 2 protobuf start: need 10s waited 10s load 2.06 WindowServer 4.5% remote 4
+2026-11-05T19:24:48Z single anc 2 protobuf done rc 0: 1793906636..1793906688 (52 s) load 2.12
+2026-11-05T19:24:58Z single anc 2 flatbuffers start: need 10s waited 10s load 2.12 WindowServer 4.4% remote 4
+2026-11-05T19:25:49Z single anc 2 flatbuffers done rc 0: 1793906698..1793906748 (50 s) load 2.54
+2026-11-05T19:25:59Z single anc 2 flatbuffers_noverify start: need 10s waited 10s load 2.54 WindowServer 4% remote 4
+2026-11-05T19:26:47Z single anc 2 flatbuffers_noverify done rc 0: 1793906759..1793906807 (48 s) load 2.43
+2026-11-05T19:26:57Z single anc 2 zpp_bits start: need 10s waited 10s load 2.43 WindowServer 2.6% remote 4
+2026-11-05T19:27:33Z single anc 2 zpp_bits done rc 0: 1793906817..1793906853 (36 s) load 2.33
+2026-11-05T19:27:44Z single anc 2 cista start: need 10s waited 10s load 2.33 WindowServer 4.1% remote 4
+2026-11-05T19:28:36Z single anc 2 cista done rc 0: 1793906864..1793906916 (52 s) load 2.24
+2026-11-05T19:28:46Z single anc 2 cista_unchecked start: need 10s waited 10s load 2.24 WindowServer 4.4% remote 4
+2026-11-05T19:29:27Z single anc 2 cista_unchecked done rc 0: 1793906926..1793906967 (41 s) load 2.07
+2026-11-05T19:29:57Z ctrl head 2 start: need 30s waited 30s load 1.98 WindowServer 4.4% remote 4
+2026-11-05T19:37:16Z ctrl head 2 done rc 0: 1793906997..1793907436 (439 s) load 2.42
+2026-11-05T19:37:46Z ctrl anc 2 start: need 30s waited 30s load 2.15 WindowServer 4.2% remote 4
+2026-11-05T19:45:03Z ctrl anc 2 done rc 0: 1793907466..1793907903 (437 s) load 2.52
