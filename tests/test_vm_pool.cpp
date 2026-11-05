@@ -124,6 +124,7 @@ void test_default_and_host_allocations(std::size_t page) {
 }
 
 void test_reuse_and_load_zeroing(std::size_t page) {
+    constexpr auto H = VirtualMemoryStorage::host_header;
     VmStoragePool pool({3, page * 18, page * 12});
     char* base = nullptr;
     {
@@ -133,12 +134,12 @@ void test_reuse_and_load_zeroing(std::size_t page) {
         check(pool.stats().cached_blocks == 0, "live storage is not counted as cached");
     }
     auto state = pool.stats();
-    check(state.cached_blocks == 1 && state.cached_reserved_bytes == page * 6 &&
-              state.cached_accessible_bytes == page * 4 && state.hits == 0 && state.misses == 1,
+    check(state.cached_blocks == 1 && state.cached_reserved_bytes == page * 7 - H &&
+              state.cached_accessible_bytes == page * 5 - H && state.hits == 0 && state.misses == 1,
           "return caches bounded geometry and records first miss");
     {
         VirtualMemoryStorage reused(page + 9, page * 6, pool);
-        check(reused.data() == base && reused.accessible_bytes() == page * 4,
+        check(reused.data() == base && reused.accessible_bytes() == page * 5 - H,
               "matching acquisition reuses reservation and retained pages");
         check_bytes(base, reused.size(), 0, "normal acquisition zeroes every new logical byte");
         check(reused.grow_to(page * 4), "pooled owner grows into retained dirty pages");
@@ -157,13 +158,14 @@ void test_reuse_and_load_zeroing(std::size_t page) {
         check(loaded.reclaim_tail().complete(), "pooled owner can explicitly reclaim retained pages");
     }
     state = pool.stats();
-    check(state.hits == 2 && state.misses == 1 && state.cached_accessible_bytes == page * 2,
+    check(state.hits == 2 && state.misses == 1 && state.cached_accessible_bytes == page * 2 - H,
           "pool accounts for explicit reclamation before return");
     pool.clear();
     check(!is_mapped(base), "clear releases cached reservation");
 }
 
 void test_limits_and_exact_matching(std::size_t page) {
+    constexpr auto H = VirtualMemoryStorage::host_header;
     VmStoragePool exact({3, page * 8, page * 8});
     { VirtualMemoryStorage first(1, page + 1, exact); }
     { VirtualMemoryStorage second(1, page + 2, exact); }
@@ -182,19 +184,20 @@ void test_limits_and_exact_matching(std::size_t page) {
         first = VirtualMemoryStorage{};
         second = VirtualMemoryStorage{};
         const auto state = bounded.stats();
-        check(state.cached_blocks == 1 && state.cached_reserved_bytes == page * 2 &&
-                  state.cached_accessible_bytes == page,
+        check(state.cached_blocks == 1 && state.cached_reserved_bytes == page * 3 - H &&
+                  state.cached_accessible_bytes == page - H,
               "slot, reservation and accessible budgets independently bound idle storage");
         check(!is_mapped(second_base), "owner exceeding cache budget is released");
     }
-    VmStoragePool inaccessible_only({1, page * 4, 0});
+    // Every reservation keeps its first page (the host header) read/write.
+    VmStoragePool inaccessible_only({1, page * 5, page - H});
     { VirtualMemoryStorage uncommitted(0, page * 4, inaccessible_only); }
     check(inaccessible_only.stats().cached_blocks == 1 &&
-              inaccessible_only.stats().cached_accessible_bytes == 0,
-          "zero accessible budget can retain an entirely inaccessible reservation");
+              inaccessible_only.stats().cached_accessible_bytes == page - H,
+          "a header-page accessible budget can retain an otherwise inaccessible reservation");
     const void* discarded = nullptr;
     {
-        VirtualMemoryStorage used(1, page * 4, inaccessible_only);
+        VirtualMemoryStorage used(page, page * 4, inaccessible_only);
         discarded = used.data();
     }
     check(inaccessible_only.stats().cached_blocks == 0 && !is_mapped(discarded),

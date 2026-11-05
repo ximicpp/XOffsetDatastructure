@@ -93,6 +93,19 @@ inline bool checked_vm_round_up(std::size_t bytes, std::size_t alignment,
     return true;
 }
 
+// A VM region starts with the 64-byte host header (SlotGeometry::header_bytes),
+// and the payload follows it. Payload bytes that whole pages from the region
+// start cover once `bytes` of payload are: round_up(64 + bytes, page) - 64.
+inline bool checked_vm_payload_round_up(std::size_t bytes, std::size_t page,
+                                        std::size_t& payload) noexcept {
+    constexpr std::size_t header = SlotGeometry::header_bytes;
+    std::size_t region = 0;
+    if (bytes > (std::numeric_limits<std::size_t>::max)() - header ||
+        !checked_vm_round_up(bytes + header, page, region)) return false;
+    payload = region - header;
+    return true;
+}
+
 enum class VmReclaimStatus : std::uint8_t {
     NoOp,
     Reclaimed,
@@ -146,14 +159,23 @@ private:
     friend class VirtualMemoryStorage;
 };
 
-// OS storage. V2: one read/write host page precedes the payload reservation;
-// its last pointer-sized slot names the current owner (host_owner). That page
-// is never part of the payload, so it is never copied, emitted or exposed by
-// data()/size(). Accessible means payload page permissions are read/write; it
+// OS storage. V2: a region starts with a 64-byte host header, laid out as a
+// slot's (SlotHeader); its last pointer-sized word names the current owner
+// (host_owner), and the payload starts right after it, on the same page. The
+// header is never part of the payload, so it is never copied, emitted or
+// exposed by data()/size(). (Before 3.4 it was a page of its own in front of
+// the payload: a page touched only by swap and allocation, the first to be
+// compressed or swapped out under memory pressure, plus a page table of its
+// own in the previous granule.) Accessible means payload page permissions are read/write; it
 // does not measure resident physical memory or promise future fault-free
 // allocation.
 class VirtualMemoryStorage {
 public:
+    // Bytes in front of every payload: the host header (a slot's, or a VM
+    // region's first 64 bytes). host_owner is its last word. A VM owner's
+    // accessible and reserved bytes count from the payload, so they are whole
+    // pages minus this header.
+    static constexpr std::size_t host_header = SlotGeometry::header_bytes;
     VirtualMemoryStorage() noexcept = default;
 
     VirtualMemoryStorage(std::size_t logical_bytes, std::size_t maximum_capacity)
@@ -188,9 +210,9 @@ private:
         }
         XOFFSET_VTRY(query_page_geometry());
         std::size_t reserved = 0;
-        if (!checked_vm_round_up(maximum_capacity, page_size_, reserved) ||
+        if ((maximum_capacity != 0 && !checked_vm_payload_round_up(maximum_capacity, page_size_, reserved)) ||
             reserved > static_cast<std::size_t>(
-                (std::numeric_limits<std::ptrdiff_t>::max)())) {
+                (std::numeric_limits<std::ptrdiff_t>::max)()) - host_header) {
             XOFFSET_VFAIL_STD(std::length_error, XErrc::length_error, "VM reservation page rounding overflows");
         }
         maximum_capacity_ = maximum_capacity;
@@ -200,73 +222,74 @@ private:
         if (consume_vm_failure(VmOperation::Reserve)) XOFFSET_VFAIL_BAD_ALLOC();
         pool_ = pool;
         if (!acquire_from_pool()) {
-            const std::size_t prefix = page_size_;
-            if (reserved > static_cast<std::size_t>(
-                    (std::numeric_limits<std::ptrdiff_t>::max)()) - prefix)
-                XOFFSET_VFAIL_STD(std::length_error, XErrc::length_error, "VM reservation page rounding overflows");
-            // V2.1 owner lookup: the payload starts at a 2^k boundary,
-            // k = max(22, ceil(log2 span)), and the mapping covers whole 4 MiB
-            // granules, so OwnerMap finds the payload from any address inside
-            // and no other mapping shares a granule with it. The host page sits
-            // just below the payload, in the granule before it.
+            // V2.1 owner lookup: the region (host header, then payload) starts
+            // at a 2^k boundary, k = max(22, ceil(log2 span)), and the mapping
+            // covers whole 4 MiB granules, so OwnerMap finds the payload from
+            // any address inside (64 bytes past the boundary, as for a slot)
+            // and no other mapping shares a granule with it.
+            const std::size_t region_bytes = reserved + host_header;
             const std::size_t span =
-                (reserved + OwnerMap::granule_bytes - 1) & ~(OwnerMap::granule_bytes - 1);
-            if (span < reserved)
+                (region_bytes + OwnerMap::granule_bytes - 1) & ~(OwnerMap::granule_bytes - 1);
+            if (span < region_bytes)
                 XOFFSET_VFAIL_STD(std::length_error, XErrc::length_error, "VM reservation page rounding overflows");
             std::size_t shift = slot_log2(span);
             if (shift < OwnerMap::granule_shift) shift = OwnerMap::granule_shift;
             if (shift >= OwnerMap::address_bits || !OwnerMap::ready()) XOFFSET_VFAIL_BAD_ALLOC();
             const std::size_t align = std::size_t(1) << shift;
+            if (span > (std::numeric_limits<std::size_t>::max)() - align) XOFFSET_VFAIL_BAD_ALLOC();
+            // Enabling the header page (or, for a full copy, every page) is
+            // this owner's first Enable.
+            if (consume_vm_failure(VmOperation::Enable)) XOFFSET_VFAIL_BAD_ALLOC();
 #if defined(_WIN32)
-            // A reservation starts on an allocation-granularity boundary, so
-            // the prefix is one granularity unit; only its last page (the host
-            // page) is committed. Find an aligned hole, release it and reserve
-            // exactly there; another thread may take the hole in between.
-            const std::size_t win_prefix = reservation_granularity_;
-            char* mapping = nullptr;
-            for (int attempt = 0; attempt < 8 && !mapping; ++attempt) {
+            // Find an aligned hole, release it and reserve exactly there;
+            // another thread may take the hole in between. Only the first
+            // page (host header and the payload's first bytes) is committed.
+            char* region = nullptr;
+            for (int attempt = 0; attempt < 8 && !region; ++attempt) {
                 auto* probe = static_cast<char*>(::VirtualAlloc(
-                    nullptr, win_prefix + span + align, MEM_RESERVE, PAGE_NOACCESS));
+                    nullptr, span + align, MEM_RESERVE, PAGE_NOACCESS));
                 if (!probe) XOFFSET_VFAIL_BAD_ALLOC();
-                const auto payload = (reinterpret_cast<std::uintptr_t>(probe) + win_prefix + align - 1) &
+                const auto aligned = (reinterpret_cast<std::uintptr_t>(probe) + align - 1) &
                                      ~std::uintptr_t(align - 1);
                 ::VirtualFree(probe, 0, MEM_RELEASE);
-                auto* want = reinterpret_cast<char*>(payload - win_prefix);
-                mapping = static_cast<char*>(::VirtualAlloc(want, win_prefix + span, MEM_RESERVE, PAGE_NOACCESS));
-                if (mapping && mapping != want) {
-                    ::VirtualFree(mapping, 0, MEM_RELEASE);
-                    mapping = nullptr;
+                auto* want = reinterpret_cast<char*>(aligned);
+                region = static_cast<char*>(::VirtualAlloc(want, span, MEM_RESERVE, PAGE_NOACCESS));
+                if (region && region != want) {
+                    ::VirtualFree(region, 0, MEM_RELEASE);
+                    region = nullptr;
                 }
             }
-            if (!mapping) XOFFSET_VFAIL_BAD_ALLOC();
-            if (!OwnerMap::reachable(mapping, win_prefix + span) ||
-                !::VirtualAlloc(mapping + win_prefix - prefix, prefix, MEM_COMMIT, PAGE_READWRITE)) {
-                ::VirtualFree(mapping, 0, MEM_RELEASE);
+            if (!region) XOFFSET_VFAIL_BAD_ALLOC();
+            if (!OwnerMap::reachable(region, span) ||
+                !::VirtualAlloc(region, page_size_, MEM_COMMIT, PAGE_READWRITE)) {
+                ::VirtualFree(region, 0, MEM_RELEASE);
                 XOFFSET_VFAIL_BAD_ALLOC();
             }
-            base_ = mapping + win_prefix;
+            base_ = region + host_header;
+            accessible_bytes_ = page_size_ - host_header;
 #else
-            if (full_copy && consume_vm_failure(VmOperation::Enable)) XOFFSET_VFAIL_BAD_ALLOC();
             // Over-map PROT_NONE, then trim both ends.
-            const std::size_t total = span + prefix + align;
+            const std::size_t total = span + align;
             void* raw = ::mmap(nullptr, total, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
             if (raw == MAP_FAILED) XOFFSET_VFAIL_BAD_ALLOC();
             const auto start = reinterpret_cast<std::uintptr_t>(raw);
-            const auto payload = (start + prefix + align - 1) & ~std::uintptr_t(align - 1);
-            if (payload - prefix != start) ::munmap(raw, payload - prefix - start);
-            if (start + total != payload + span)
-                ::munmap(reinterpret_cast<void*>(payload + span), start + total - (payload + span));
-            char* mapping = reinterpret_cast<char*>(payload - prefix);
-            if (!OwnerMap::reachable(mapping, span + prefix) ||
-                ::mprotect(mapping, prefix + (full_copy ? reserved : 0), PROT_READ | PROT_WRITE) != 0) {
-                ::munmap(mapping, span + prefix);
+            const auto aligned = (start + align - 1) & ~std::uintptr_t(align - 1);
+            if (aligned != start) ::munmap(raw, aligned - start);
+            if (start + total != aligned + span)
+                ::munmap(reinterpret_cast<void*>(aligned + span), start + total - (aligned + span));
+            char* region = reinterpret_cast<char*>(aligned);
+            // The first page is always read/write: it holds the host header.
+            const std::size_t enabled = full_copy ? region_bytes : page_size_;
+            if (!OwnerMap::reachable(region, span) ||
+                ::mprotect(region, enabled, PROT_READ | PROT_WRITE) != 0) {
+                ::munmap(region, span);
                 XOFFSET_VFAIL_BAD_ALLOC();
             }
-            base_ = mapping + prefix;
-            if (full_copy) accessible_bytes_ = reserved;
+            base_ = region + host_header;
+            accessible_bytes_ = enabled - host_header;
 #endif
             mapped_bytes_ = span;
-            OwnerMap::set(base_, span, static_cast<std::uint8_t>(shift));
+            OwnerMap::set(region, span, static_cast<std::uint8_t>(OwnerMap::slot_bit | shift));
             reserved_bytes_ = reserved;
         }
         set_host_owner(nullptr);
@@ -632,7 +655,7 @@ public:
     VmReclaimResult reclaim_tail() noexcept {
         if (!base_ || accessible_bytes_ == 0 || is_slot()) return {};
         std::size_t retained = 0;
-        if (!checked_vm_round_up(logical_bytes_, page_size_, retained) ||
+        if (!checked_vm_payload_round_up(logical_bytes_, page_size_, retained) ||
             retained > accessible_bytes_) return {VmReclaimStatus::Failed};
         const auto bytes = accessible_bytes_ - retained;
         if (bytes == 0) return {};
@@ -703,7 +726,7 @@ private:
         // A slot is read/write in full from the start.
         if (is_slot()) return new_logical_bytes <= accessible_bytes_;
         std::size_t new_accessible_bytes = 0;
-        if (!checked_vm_round_up(new_logical_bytes, page_size_, new_accessible_bytes) ||
+        if (!checked_vm_payload_round_up(new_logical_bytes, page_size_, new_accessible_bytes) ||
             new_accessible_bytes > reserved_bytes_) return false;
         if (new_accessible_bytes > accessible_bytes_) {
             if (consume_vm_failure(VmOperation::Enable)) return false;
@@ -759,11 +782,12 @@ private:
         if (base_) {
             // No head of this payload is live; clear its granules before the
             // range can be mapped again.
-            OwnerMap::set(base_, mapped_bytes_, 0);
+            char* const region = base_ - host_header;
+            OwnerMap::set(region, mapped_bytes_, 0);
 #if defined(_WIN32)
-            ::VirtualFree(base_ - reservation_granularity_, 0, MEM_RELEASE);
+            ::VirtualFree(region, 0, MEM_RELEASE);
 #else
-            ::munmap(base_ - page_size_, mapped_bytes_ + page_size_);
+            ::munmap(region, mapped_bytes_);
 #endif
         }
         base_ = nullptr;
