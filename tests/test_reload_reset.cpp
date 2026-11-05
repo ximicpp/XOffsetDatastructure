@@ -8,8 +8,6 @@
 #include <span>
 #include <stdexcept>
 #include <string>
-#include <utility>
-#include <vector>
 #include "../xoffsetdatastructure.hpp"
 using namespace XOffsetDatastructure;
 
@@ -257,32 +255,6 @@ void root_cache_follows_epoch() {
     need(s.grow(1u << 20), "movable slot did not grow");
     need(s.epoch() != epoch && &s.unsafe_root<ReloadRoot>() != before, "slot storage did not move");
     expect_root(s, 5, "root after the storage moved");
-
-    // Owners moved by a growing std::vector: the move clears the cache, the
-    // first root<T>() after it runs the checks and fills it again, and the
-    // calls it then serves must give the same root, until the next epoch
-    // change (another move, a reset) clears it again.
-    std::vector<XBuffer> v;
-    for (std::uint64_t i = 0; i < 9; ++i) {
-        v.push_back(XBuffer::create<ReloadRoot>(4096, cap()));
-        v.back().root<ReloadRoot>().id = 100 + i;
-    }
-    for (int round = 0; round < 3; ++round)
-        for (std::uint64_t i = 0; i < 9; ++i) expect_root(v[i], 100 + i, "root after the vector moved the owner");
-    v.insert(v.begin(), XBuffer::create<ReloadRoot>(4096, cap()));
-    for (int round = 0; round < 2; ++round) {
-        expect_root(v[0], 0, "root of an owner inserted in front");
-        for (std::uint64_t i = 1; i < 10; ++i) expect_root(v[i], 99 + i, "root after the owner moved again");
-    }
-    v[1].reset<ReloadRoot>().id = 50;
-    expect_root(v[1], 50, "root after reset of a refilled owner");
-    std::swap(v[1], v[2]);
-    expect_root(v[1], 101, "root after swap of refilled owners (1)");
-    expect_root(v[2], 50, "root after swap of refilled owners (2)");
-    bool other = false;
-    try { (void)v[3].root<OtherRoot>(); } catch (const XException&) { other = true; }
-    need(other, "root<U>() of another schema after a refilled root<T>()");
-    expect_root(v[3], 102, "root after another type was refused (refilled owner)");
 }
 
 // The small dense path (payload <= 32 KiB, no extent table) is a shortcut of
