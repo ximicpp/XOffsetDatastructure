@@ -128,6 +128,45 @@ bool test_has_root_states() {
     return true;
 }
 
+// ============================================================================
+// Test 5: a maximum capacity above MAX_PAYLOAD (2 GiB - 8) fails at create,
+// with capacity_exceeded and a message that names the limit; the limit itself
+// is accepted and grows.
+// ============================================================================
+bool test_payload_limit() {
+    std::cout << "\n[TEST] maximum capacity above the 2 GiB payload limit\n";
+    std::cout << std::string(50, '-') << "\n";
+    const std::size_t gib = std::size_t(1) << 30;
+    for (std::size_t bytes : {2 * gib, 4 * gib, std::size_t(XBufferCore::MAX_PAYLOAD) + 1}) {
+        for (auto growth : {XGrowPolicy::Explicit, XGrowPolicy::Automatic}) {
+            bool rejected = false;
+            try {
+                auto b = XBuffer::create<SimpleData>(4096, XBuffer::maximum_capacity(bytes).with_growth(growth));
+            } catch (const XException& e) {
+                rejected = e.code() == XErrc::capacity_exceeded &&
+                           std::string(e.what()).find("2 GiB") != std::string::npos;
+            }
+            assert(rejected);
+            if (!rejected) return false;
+        }
+        bool legacy = false;
+        try {
+            XBuffer b(4096, XBuffer::max_capacity(bytes));
+        } catch (const XException& e) {
+            legacy = e.code() == XErrc::capacity_exceeded;
+        }
+        assert(legacy);
+        if (!legacy) return false;
+        std::cout << "  " << (bytes >> 20) << " MiB rejected at create ... [OK]\n";
+    }
+    auto b = XBuffer::create<SimpleData>(4096, XBuffer::maximum_capacity(XBufferCore::MAX_PAYLOAD)
+                                                  .with_growth(XGrowPolicy::Automatic));
+    b.root<SimpleData>().name.assign(std::string(1u << 20, 'x'));
+    assert(b.root<SimpleData>().name.size() == (1u << 20));
+    std::cout << "  MAX_PAYLOAD accepted and grows ... [OK]\n";
+    return true;
+}
+
 int main() {
     std::cout << "=== Error Paths & Untested APIs ===\n";
 
@@ -136,6 +175,7 @@ int main() {
     all_passed &= test_root_empty();
     all_passed &= test_save_compact();
     all_passed &= test_has_root_states();
+    all_passed &= test_payload_limit();
 
     std::cout << "\n";
     if (all_passed) {
