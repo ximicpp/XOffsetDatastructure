@@ -3515,7 +3515,7 @@ namespace XOffsetDatastructure {
                     log.epoch = core.epoch();
                 }
                 T* root_ptr = find_root_at<T>(core, root);
-                core.cache_root(root_ptr);
+                if (root_ptr) core.cache_root(root_ptr);
                 cursor.version_ = parsed.header.version;
                 if (check == XDeltaCheck::full) {
                     defer_checks(cursor, core);
