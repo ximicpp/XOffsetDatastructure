@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- `xoffset_shared_delta.hpp` (experimental, D3 prototype for 3.4): shared
+  per-entity deltas. A change is written per record, as bytes at offsets
+  inside the record (the block section of delta format 1.0 counted from the
+  record's first byte) plus container operations (string assign, vector
+  replace, same-length vector patch), so one encoded change applies to a copy
+  of the record held anywhere. A server diffs each changed entity once per
+  tick against one shared baseline and copies the bytes into every
+  connection's message; per connection it keeps only its stream, message
+  version and root fields. Messages are XS 0.1 (`'X' 'S'`, its own format
+  byte; delta format 1.0 is unchanged). `XRecordDelta<T>` diffs, builds key
+  bodies, checks (masks only on plain bytes and inside the record or vector,
+  bools 0 or 1) and applies; the receiver writes only plain bytes or goes
+  through container operations, so its buffer stays one `load_verified`
+  accepts. `XSyncOut` and `XSyncWriter` build messages without per-write
+  string growth. Not part of the public API yet.
+
 - Withdrawn: the `root<T>()` cache refill of 3.3.1 (#223). On the Mac it
   made bench/slg A.req_encode 7.5% slower (release review STAGE331: 1.075,
   interval 1.065 to 1.086; A 1.016), and the HFT demo showed no gain there,
