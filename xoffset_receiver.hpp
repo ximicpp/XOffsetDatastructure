@@ -1,7 +1,7 @@
 #ifndef X_OFFSET_RECEIVER_HPP
 #define X_OFFSET_RECEIVER_HPP
 
-// Trust tiers by link type (3.4 trust tier design, phase P1).
+// Trust tiers by link type (3.4 trust tier design, phases P1 and P2).
 //
 // A receiver is built for one kind of link, and the link decides how much of
 // an incoming wire is checked:
@@ -19,6 +19,9 @@
 //                  as the sender wrote it. For links whose sender is our own
 //                  code over a protected transport (TLS or equivalent), with
 //                  the same schema on both sides. The result is mutable.
+//                  For a delta (apply_delta): its framing, stream and
+//                  version, every block and hole inside the used payload and
+//                  the root object inside it; no map of checked bytes is kept.
 //   XCheck::bounds read-only bounds check for client uplinks (phase P3, with
 //                  XView in P4); not available yet.
 //   XCheck::full   load_verified / reload_verified: every check.
@@ -172,6 +175,53 @@ public:
     template <typename T, XCheck C = default_mutable_check<L>>
     [[nodiscard]] XResult<TypedXBuffer<T>> load_typed(const std::string& wire) {
         return load_typed<T, C>(detail::as_wire(wire));
+    }
+
+    /// Applies `delta` to `dst`, the replica `cursor` follows, like
+    /// apply_delta_verified<T> (docs/DELTA_SYNC.md): a key delta replaces the
+    /// content, the others patch it in place. With admit (the default on
+    /// server_peer and from_server) the delta's framing is checked as for the
+    /// full check (format, stream and version against the cursor, root type
+    /// and schema fingerprint, every block and hole inside the used payload)
+    /// plus the root object inside the used payload; what the bytes say is the
+    /// sender's. No map of checked bytes is kept, so a full apply that later
+    /// follows admits on the same cursor verifies the whole payload once. On
+    /// failure dst keeps its content (a failed key delta leaves it empty), as
+    /// with apply_delta_verified<T>.
+    template <typename T, XCheck C = default_mutable_check<L>>
+    [[nodiscard]] XStatus apply_delta(XBuffer& dst, std::span<const std::byte> delta, XDeltaCursor& cursor) {
+        check_mutable<C>();
+        if constexpr (C == XCheck::full || detail::force_full_check) {
+            return dst.template try_apply_delta_verified<T>(delta, cursor);
+        } else {
+#if XOFFSET_NO_EXCEPTIONS
+            if (!detail::DeltaAccess::apply<T, true>(dst, delta, cursor)) return detail::take_pending_error();
+            return {};
+#else
+            try {
+                detail::DeltaAccess::apply<T, true>(dst, delta, cursor);
+                return {};
+            } catch (...) {
+                return detail::current_exception_error();
+            }
+#endif
+        }
+    }
+
+    template <typename T, XCheck C = default_mutable_check<L>>
+    [[nodiscard]] XStatus apply_delta(XBuffer& dst, const std::string& delta, XDeltaCursor& cursor) {
+        return apply_delta<T, C>(dst, detail::as_wire(delta), cursor);
+    }
+
+    /// The same for a typed buffer: rx.apply_delta(buffer, delta, cursor).
+    template <XCheck C = default_mutable_check<L>, typename T>
+    [[nodiscard]] XStatus apply_delta(TypedXBuffer<T>& dst, std::span<const std::byte> delta, XDeltaCursor& cursor) {
+        return apply_delta<T, C>(static_cast<XBuffer&>(dst), delta, cursor);
+    }
+
+    template <XCheck C = default_mutable_check<L>, typename T>
+    [[nodiscard]] XStatus apply_delta(TypedXBuffer<T>& dst, const std::string& delta, XDeltaCursor& cursor) {
+        return apply_delta<T, C>(static_cast<XBuffer&>(dst), detail::as_wire(delta), cursor);
     }
 
 private:

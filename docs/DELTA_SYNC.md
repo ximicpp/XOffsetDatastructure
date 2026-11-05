@@ -43,6 +43,15 @@ const View& v = view.root<View>();       // read in place
 `TypedXBuffer<T>` has the same members without `<T>`. `apply_delta_verified`
 throws what `try_apply_delta_verified` returns.
 
+On a trusted link (server to server, server to client) the receiver takes
+deltas through `XReceiver` (`xoffset_receiver.hpp`, section 3, "Trusted
+links"), which checks only the delta's framing:
+
+```cpp
+XReceiver<XLink::from_server> rx(XBuffer::maximum_capacity(1 << 20));
+if (XStatus r = rx.apply_delta<View>(view, d, cursor); !r) ask_sender_for_key_delta();
+```
+
 Several receivers of the same deltas (every subscriber of one map block) can
 share one baseline: the sender writes each delta once and sends it to all of
 them. A receiver that joins later starts from the recorded state:
@@ -260,6 +269,23 @@ freed since, gets its next delta verified in full. The map is built after a
 key delta, and after a whole verification of another delta only when a later
 delta first needs it (a replica whose deltas keep needing the whole
 verification, like a store receiving saves, does not rebuild it each time).
+
+**Trusted links.** `XReceiver<XLink::server_peer>` and
+`XReceiver<XLink::from_server>` apply deltas with `XCheck::admit` by default
+(`apply_delta`; `last_check()` is `admit`). Everything the parse checks stays:
+the format, the stream and version against the cursor, the root type and
+schema fingerprint of a key delta, every block and hole inside `[48,
+used_end)`, nothing after the last section. Besides that only the root object
+has to lie inside the used payload; what the bytes mean is the sender's, as
+for a whole wire taken with admit. No map of checked bytes is built or kept,
+and no undo copy unless the delta has a digest or a hole table (a digest that
+does not match rolls the delta back as above). The cursor's map then no longer
+holds, so a full apply on the same cursor after admits (`apply_delta<T,
+XCheck::full>`, or `try_apply_delta_verified`) verifies the whole payload once
+and builds the map again; the map is never built over a payload that was
+only admitted. `XReceiver<XLink::from_client>` applies with the full check
+only (`admit` does not compile), and `XOFFSET_FORCE_FULL_CHECK=1` (the default
+without `NDEBUG` and under ASan or TSan) makes admit the full check.
 
 ## 4. Guarantees
 
