@@ -1,5 +1,6 @@
-// Trust tiers by link type (xoffset_receiver.hpp), phase P1: XReceiver
-// reload / load with XCheck::admit against the full check.
+// Trust tiers by link type (xoffset_receiver.hpp), phases P1 and P2:
+// XReceiver reload / load / apply_delta with XCheck::admit against the full
+// check.
 //
 // Built with XOFFSET_FORCE_FULL_CHECK=0 so that admit is the real admit path
 // even though test assertions undefine NDEBUG (test_receiver_forced covers
@@ -349,6 +350,247 @@ void reload_reuses_buffer() {
     need(dst.get_address() == address, "admit reload changed the payload address");
     need(dst.epoch() != epoch, "admit reload did not invalidate typed references");
 }
+// ---- P2: deltas -----------------------------------------------------------
+
+std::string varint(std::uint32_t v) {
+    std::string out;
+    for (; v >= 0x80; v >>= 7) out += char(0x80 | (v & 0x7F));
+    return out + char(v);
+}
+
+// The payload past the arena header (what a delta carries) and its extent.
+bool payload_equal(const XBufferCore& a, const XBufferCore& b) {
+    return used(a) == used(b) && a.arena()->root_offset == b.arena()->root_offset &&
+           std::memcmp(a.data() + XWIRE_PAYLOAD_BEGIN, b.data() + XWIRE_PAYLOAD_BEGIN,
+                       used(a) - XWIRE_PAYLOAD_BEGIN) == 0;
+}
+
+// The changes a server makes between deltas: scalars, strings across the
+// inline and heap forms, vector growth and erasure, map inserts and erases,
+// and now and then a reset that shrinks the payload.
+void mutate(XBuffer& b, Rng& rng) {
+    auto& r = b.root<RxRoot>();
+    switch (rng.below(9)) {
+    case 0: r.seq = rng.next(); break;
+    case 1: r.flag = !r.flag; break;
+    case 2:
+        if (!r.values.empty()) r.values[rng.below(std::uint32_t(r.values.size()))] = std::uint32_t(rng.next());
+        break;
+    case 3: r.title = std::string(rng.below(3) ? rng.below(10) : 20 + rng.below(80), char('a' + rng.below(26))).c_str(); break;
+    case 4: edit(b, std::uint32_t(rng.next())); break;
+    case 5:
+        if (!r.items.empty()) r.items.erase(r.items.begin() + std::ptrdiff_t(rng.below(std::uint32_t(r.items.size()))));
+        break;
+    case 6:
+        if (!r.names.empty()) r.names.erase(r.names.begin()->first);
+        break;
+    case 7:
+        if (!r.items.empty()) {
+            auto& item = r.items[rng.below(std::uint32_t(r.items.size()))];
+            if (rng.below(2) || item.marks.empty()) item.marks.push_back(std::uint16_t(rng.next()));
+            else item.marks.pop_back();
+            item.name = std::string(rng.below(30), 'k').c_str();
+        }
+        break;
+    default:
+        if (rng.below(6) == 0) {
+            b.reset<RxRoot>();
+            b.root<RxRoot>().seq = rng.next();
+        } else if (!r.values.empty()) {
+            r.values.pop_back();
+        }
+        break;
+    }
+}
+
+// Differential: on every delta of random streams, admit leaves the same
+// payload, free table, root and cursor as apply_delta_verified, with and
+// without a digest, for key deltas, late joins and a full apply now and then
+// on the admitted replica (which then verifies the whole payload).
+void delta_admit_matches_full() {
+    XReceiver<XLink::from_server> rx(cap());
+    std::size_t deltas = 0, keys = 0, fulls = 0, joins = 0;
+    for (std::uint64_t seed = 1; seed <= 40; ++seed) {
+        Rng rng{seed * 7919};
+        auto src = make_source(seed, seed % 4 == 0 ? 3000 : 200);
+        XDeltaBaseline base(seed * 2 + 1);
+        auto admitted = XBuffer::create<RxRoot>(4096, cap());
+        auto verified = XBuffer::create<RxRoot>(4096, cap());
+        auto late = XBuffer::create<RxRoot>(4096, cap());
+        XDeltaCursor ca, cv, cl;
+        bool joined = false;
+        for (int step = 0; step < 60; ++step) {
+            if (step > 0) {
+                if (rng.below(25) == 0) base.reset();  // the receiver asked for a resync
+                const auto changes = 1 + rng.below(3);
+                for (std::uint32_t k = 0; k < changes; ++k) mutate(src, rng);
+            }
+            XDeltaOptions options;
+            options.digest = rng.below(2) != 0;
+            options.whole_blocks = rng.below(4) == 0;
+            std::string d;
+            const auto stats = src.save_delta_into<RxRoot>(d, base, options);
+            if (stats.empty) continue;
+            ++deltas;
+            keys += stats.key;
+            const bool full = !stats.key && step % 9 == 4;
+            const XStatus a = full ? rx.apply_delta<RxRoot, XCheck::full>(admitted, d, ca)
+                                   : rx.apply_delta<RxRoot>(admitted, d, ca);
+            need(a.has_value(), "admit rejected a valid delta");
+            need(verified.try_apply_delta_verified<RxRoot>(d, cv).has_value(), "verified rejected a valid delta");
+            if (full) {
+                // The first full apply after admits verifies the whole payload.
+                need(ca.last_check() == XDeltaCheck::full, "full after admit did not verify in full");
+                ++fulls;
+            } else {
+                need(ca.last_check() == XDeltaCheck::admit, "admit not reported as admit");
+            }
+            need(used_bytes_equal(admitted, verified), "admitted payload differs");
+            need(payload_equal(admitted, src), "admitted payload differs from the sender");
+            need(same_free_table(admitted, verified), "admitted free table differs");
+            need(checksum(admitted) == checksum(verified), "admitted root reads differ");
+            need(ca.version() == cv.version() && ca.stream() == cv.stream(), "admit cursor does not follow");
+            if (joined) {
+                need(rx.apply_delta<RxRoot>(late, d, cl).has_value(), "late admit rejected a shared delta");
+                need(payload_equal(late, src), "late admitted payload differs");
+            } else if (rng.below(6) == 0) {
+                need(rx.apply_delta<RxRoot>(late, base.key_delta(options), cl).has_value(), "late key admit");
+                need(payload_equal(late, src) && cl.last_check() == XDeltaCheck::admit, "late join");
+                joined = true;
+                ++joins;
+            }
+        }
+        // The admitted replica is a buffer like any other: it re-saves and verifies.
+        need(admitted.save_verified<RxRoot>() == verified.save_verified<RxRoot>(), "admitted re-save differs");
+        need(XBuffer::try_load_verified<RxRoot>(bytes_of(admitted.save_verified<RxRoot>()), cap()).has_value(),
+             "admitted replica does not verify");
+    }
+    need(deltas > 1500 && keys > 40 && fulls > 100 && joins > 10, "delta differential coverage");
+}
+
+// Admit keeps the delta's framing checks; a rejected delta leaves the replica
+// and the cursor as they were (a rejected key delta empties the replica).
+void delta_admit_rejects() {
+    XReceiver<XLink::server_peer> rx(cap());
+    auto src = make_source(41, 400);
+    XDeltaBaseline base(77);
+    const std::string key = src.save_delta<RxRoot>(base);
+    src.root<RxRoot>().seq ^= 1;
+    const std::string d1 = src.save_delta<RxRoot>(base);
+    src.root<RxRoot>().values.push_back(5);
+    const std::string d2 = src.save_delta<RxRoot>(base);
+    auto dst = XBuffer::create<RxRoot>(4096, cap());
+    XDeltaCursor cur;
+
+    auto st = rx.apply_delta<RxRoot>(dst, d1, cur);
+    need(!st && st.code() == XErrc::delta_base_mismatch, "admit applied a delta before its key delta");
+    auto other = XBuffer::create<RxOther>(4096, cap());
+    other.root<RxOther>().x = 5;
+    XDeltaBaseline other_base(78);
+    st = rx.apply_delta<RxRoot>(dst, other.save_delta<RxOther>(other_base), cur);
+    need(!st && st.code() == XErrc::root_type_mismatch, "admit took another root type's key delta");
+    need(rx.apply_delta<RxRoot>(dst, key, cur).has_value(), "admit key delta");
+
+    const std::vector<std::byte> held(reinterpret_cast<const std::byte*>(dst.data()),
+                                      reinterpret_cast<const std::byte*>(dst.data()) + used(dst));
+    auto unchanged = [&](const char* what) {
+        need(used(dst) == held.size() && std::memcmp(dst.data(), held.data(), held.size()) == 0, what);
+        need(cur.version() == 1, "a rejected delta moved the cursor");
+    };
+    std::string bad = d1;
+    bad[0] ^= 1;
+    st = rx.apply_delta<RxRoot>(dst, bad, cur);
+    need(!st && st.code() == XErrc::bad_magic, "bad magic");
+    unchanged("bad magic changed the replica");
+    st = rx.apply_delta<RxRoot>(dst, d1.substr(0, 10), cur);
+    need(!st && st.code() == XErrc::truncated, "truncated delta");
+    st = rx.apply_delta<RxRoot>(dst, d2, cur);
+    need(!st && st.code() == XErrc::delta_base_mismatch, "admit skipped a version");
+    unchanged("a skipped version changed the replica");
+    st = rx.apply_delta<RxRoot>(dst, d1 + std::string(1, '\0'), cur);
+    need(!st && st.code() == XErrc::size_mismatch, "trailing bytes");
+
+    // Hand-made deltas on the replica's stream and version: a block past the
+    // used payload, and a root object that would end past it.
+    const auto header = [&](std::uint32_t flags) {
+        std::string h = {'X', 'D', char(0x10), char(flags)};
+        const std::uint64_t stream = cur.stream();
+        h.append(reinterpret_cast<const char*>(&stream), 8);
+        return h + varint(cur.version() + 1);
+    };
+    st = rx.apply_delta<RxRoot>(dst, header(0) + varint(1) + varint(std::uint32_t(used(dst) / 64 + 4)) +
+                                         std::string(1, '\0') + std::string(64, 'x'), cur);
+    need(!st && st.code() == XErrc::invalid_extent_table, "block past used");
+    unchanged("a block past used changed the replica");
+    const auto words = std::uint32_t((used(dst) - XWIRE_PAYLOAD_BEGIN) / 8);
+    st = rx.apply_delta<RxRoot>(dst, header(8) + varint(words) + varint(words * 8 - 8) + varint(0), cur);
+    need(!st && st.code() == XErrc::root_mismatch, "root object past used");
+    unchanged("a root past used changed the replica");
+
+    // A digest that does not match rolls the patch back (a replica changed
+    // locally: the delta's result differs from the sender's).
+    XDeltaOptions digest;
+    digest.digest = true;
+    XDeltaBaseline fresh(79);
+    auto twin = XBuffer::create<RxRoot>(4096, cap());
+    XDeltaCursor tc;
+    need(rx.apply_delta<RxRoot>(twin, src.save_delta<RxRoot>(fresh), tc).has_value(), "twin key");
+    twin.root<RxRoot>().title = "changed here";
+    src.root<RxRoot>().flag = !src.root<RxRoot>().flag;
+    st = rx.apply_delta<RxRoot>(twin, src.save_delta<RxRoot>(fresh, digest), tc);
+    need(!st && st.code() == XErrc::digest_mismatch, "admit missed a digest mismatch");
+    need(std::string(twin.root<RxRoot>().title.c_str()) == "changed here", "digest mismatch was not rolled back");
+    need(tc.version() == 1, "digest mismatch moved the cursor");
+
+    // After the rejections the next delta still applies.
+    need(rx.apply_delta<RxRoot>(dst, d1, cur).has_value() && rx.apply_delta<RxRoot>(dst, d2, cur).has_value(),
+         "admit after rejections");
+}
+
+// What admit does not check: what the bytes mean. A delta that points a
+// vector head outside the payload passes admit; the full check of a later
+// delta on the same cursor verifies the whole payload and rejects it.
+void delta_admit_skips_graph() {
+    auto src = XBuffer::create<RxRoot>(4096, cap());
+    auto& r = src.root<RxRoot>();
+    for (std::uint32_t i = 0; i < 40; ++i) r.values.push_back(i);
+    XDeltaBaseline base(91);
+    XReceiver<XLink::server_peer> peer(cap());
+    auto dst = XBuffer::create<RxRoot>(4096, cap());
+    XDeltaCursor cur;
+    need(peer.apply_delta<RxRoot>(dst, src.save_delta<RxRoot>(base), cur).has_value(), "key");
+    // One block that rewrites the vector head's rel32 (bytes inside the root).
+    const auto head = std::size_t(reinterpret_cast<const char*>(&src.root<RxRoot>().values) - src.data());
+    const std::size_t block = head / 64, at = head % 64;
+    std::uint64_t mask = std::uint64_t(0xF) << at;
+    std::string d = {'X', 'D', char(0x10), char(0)};
+    const std::uint64_t stream = cur.stream();
+    d.append(reinterpret_cast<const char*>(&stream), 8);
+    d += varint(cur.version() + 1) + varint(1) + varint(std::uint32_t(block));
+    unsigned sel = 0;
+    std::string masks;
+    for (unsigned k = 0; k < 8; ++k)
+        if (const auto byte = unsigned(mask >> (8 * k)) & 0xFF) {
+            sel |= 1u << k;
+            masks += char(byte);
+        }
+    d += char(sel) + masks;
+    const std::int32_t outside = 0x40000000;
+    d.append(reinterpret_cast<const char*>(&outside), 4);
+    need(peer.apply_delta<RxRoot>(dst, d, cur).has_value(), "admit checked what the bytes mean");
+    need(cur.last_check() == XDeltaCheck::admit && cur.version() == 2, "bad delta admitted");
+    // The next delta of the stream writes nothing; checked in full it verifies
+    // the whole payload, which no longer verifies.
+    std::string next = {'X', 'D', char(0x10), char(0)};
+    next.append(reinterpret_cast<const char*>(&stream), 8);
+    next += varint(cur.version() + 1) + varint(0);
+    XReceiver<XLink::from_client> client(cap());
+    auto st = client.apply_delta<RxRoot>(dst, next, cur);
+    need(!st && st.code() != XErrc::delta_base_mismatch, "client uplink (full) accepted the payload");
+    st = peer.apply_delta<RxRoot, XCheck::full>(dst, next, cur);
+    need(!st && st.code() != XErrc::delta_base_mismatch, "full after a bad admitted delta accepted the payload");
+    need(cur.version() == 2, "a rejected full apply moved the cursor");
+}
 } // namespace
 
 int main() {
@@ -358,6 +600,9 @@ int main() {
     admit_skips_graph();
     typed_and_links();
     reload_reuses_buffer();
+    delta_admit_matches_full();
+    delta_admit_rejects();
+    delta_admit_skips_graph();
     if (failures) {
         std::fprintf(stderr, "test_receiver: %d failure(s)\n", failures);
         return 1;

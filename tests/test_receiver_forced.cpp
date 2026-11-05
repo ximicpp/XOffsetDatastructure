@@ -1,7 +1,7 @@
 // XOFFSET_FORCE_FULL_CHECK=1 (the default without NDEBUG and under ASan or
 // TSan): every admit runs the full check, so a sender's bad graph is
-// rejected instead of used. No exception of its own: also built as
-// test_receiver_forced_noexc.
+// rejected instead of used, and every delta is checked. No exception of its
+// own: also built as test_receiver_forced_noexc.
 #define XOFFSET_FORCE_FULL_CHECK 1
 #include <cstdint>
 #include <cstdio>
@@ -40,6 +40,21 @@ int main() {
     if (!rx.reload<ForcedRoot>(dst, wire)) { std::fputs("FAIL: forced admit of a valid wire\n", stderr); ++failures; }
     if (rx.reload<ForcedRoot>(dst, bad)) { std::fputs("FAIL: forced admit accepted a bad graph\n", stderr); ++failures; }
     if (rx.load<ForcedRoot>(bad)) { std::fputs("FAIL: forced admit load accepted a bad graph\n", stderr); ++failures; }
+    // Deltas: a forced admit is apply_delta_verified (key, then a checked delta).
+    XDeltaBaseline base(5);
+    auto replica = XBuffer::create<ForcedRoot>(4096, cap);
+    XDeltaCursor cur;
+    if (!rx.apply_delta<ForcedRoot>(replica, src.save_delta<ForcedRoot>(base), cur) ||
+        cur.last_check() != XDeltaCheck::key) {
+        std::fputs("FAIL: forced admit of a key delta\n", stderr);
+        ++failures;
+    }
+    src.root<ForcedRoot>().id = 4;
+    if (!rx.apply_delta<ForcedRoot>(replica, src.save_delta<ForcedRoot>(base), cur) ||
+        cur.last_check() == XDeltaCheck::admit) {
+        std::fputs("FAIL: forced admit of a delta was not checked\n", stderr);
+        ++failures;
+    }
     if (failures) return 1;
     std::puts("test_receiver_forced: ok");
     return 0;

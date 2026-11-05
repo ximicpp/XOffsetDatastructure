@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- `XReceiver<L>::apply_delta<T>` (trust tier P2): deltas on trusted links.
+  `XLink::server_peer` and `XLink::from_server` apply with `XCheck::admit` by
+  default: the parse of `apply_delta_verified` (format, stream and version
+  against the cursor, root type and fingerprint, every block and hole inside
+  the used payload) plus the root object inside the used payload; no map of
+  checked bytes is built or kept, and no undo copy without a digest or hole
+  table. `XDeltaCursor::last_check()` reports the new `XDeltaCheck::admit`. A
+  full apply on the same cursor after admits verifies the whole payload once
+  and builds the map again, so the map never describes a payload that was only
+  admitted. `XLink::from_client` applies with the full check only, and
+  `XOFFSET_FORCE_FULL_CHECK` makes admit the full check, as for whole wires.
+  `apply_delta_verified` is unchanged. Receive time with the bench's
+  `xoffset_trusted` row against `xoffset` (cloud x86, P2996, bench/slg demo M,
+  cycles 2 to 5): LK.recv 0.32, LN.recv 0.43, NP.recv 0.58, NC.recv 0.41,
+  NS.recv 0.36, NB.recv 0.39, SN.store_recv 0.12. docs/DELTA_SYNC.md section
+  3, docs/USER_GUIDE.md (K4).
 - `xoffset_shared_delta.hpp` (experimental, D3 prototype for 3.4): shared
   per-entity deltas. A change is written per record, as bytes at offsets
   inside the record (the block section of delta format 1.0 counted from the

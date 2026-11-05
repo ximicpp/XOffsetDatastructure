@@ -33,7 +33,8 @@ struct XoModel {
 // Trust tier (3.4 P1, #228; susu 07:17Z 11-04): the same model, every reuse-protocol
 // receive of a whole wire through XReceiver with XCheck::admit (server <-> server:
 // XLink::server_peer; server -> client: XLink::from_server) instead of
-// reload_verified. Delta and native receives are unchanged until P2.
+// reload_verified; every native delta receive through the same receiver's
+// apply_delta (trust tier P2: admit, no map of checked bytes).
 struct XoTrustedModel : XoModel {
     static constexpr const char* name = "xoffset_trusted";
     static constexpr bool trusted = true;
@@ -66,6 +67,21 @@ template <class M, bool Direct> class XOffsetRunnerT final : public Runner {
             b.template reload_verified<T>(w);
         }
     }
+#ifdef XOFFSET_DELTA_SYNC_API
+    // A delta receive: try_apply_delta_verified, or (Trusted) the receiver for link L
+    // with its default check (admit for server_peer / from_server: trust tier P2).
+    template <class T, XOffsetDatastructure::XLink L, class W>
+    static XOffsetDatastructure::XStatus apply_delta_wire(XOffsetDatastructure::XBuffer& b, const W& w,
+                                                         XOffsetDatastructure::XDeltaCursor& c) {
+        using namespace XOffsetDatastructure;
+        if constexpr (Trusted) {
+            static XReceiver<L> rx(XBuffer::maximum_capacity(XBuffer::DEFAULT_MAXIMUM_CAPACITY));
+            return rx.template apply_delta<T>(b, w, c);
+        } else {
+            return b.template try_apply_delta_verified<T>(w, c);
+        }
+    }
+#endif
     static constexpr auto kPeer = XOffsetDatastructure::XLink::server_peer;
     static constexpr auto kClient = XOffsetDatastructure::XLink::from_server;
 
@@ -441,7 +457,7 @@ public:
         void n_login_recv(int p) {
             auto& h = nh[std::size_t(p)];
             if (!h) h.emplace(XBuffer::create<PlayerState>(kPlayerInitial, cap()));
-            const XOffsetDatastructure::XStatus r = h->template try_apply_delta_verified<PlayerState>(nd, nc[std::size_t(p)]);
+            const XOffsetDatastructure::XStatus r = apply_delta_wire<PlayerState, kClient>(*h, nd, nc[std::size_t(p)]);
             if (!r) throw std::runtime_error("native login rejected: " + std::string(r.error().message));
         }
         std::size_t n_diff(int p) { srv[std::size_t(p)].template save_delta_into<PlayerState>(nd, nb[std::size_t(p)]); return nd.size(); }
@@ -459,7 +475,7 @@ public:
         }
         void n_recv(int p) {
             if (nd.empty()) return;
-            const XOffsetDatastructure::XStatus r = nh[std::size_t(p)]->template try_apply_delta_verified<PlayerState>(nd, nc[std::size_t(p)]);
+            const XOffsetDatastructure::XStatus r = apply_delta_wire<PlayerState, kClient>(*nh[std::size_t(p)], nd, nc[std::size_t(p)]);
             if (!r) throw std::runtime_error("native self delta rejected: " + std::string(r.error().message));
         }
         PlayerState& n_held(int p) { return nh[std::size_t(p)]->template root<PlayerState>(); }
@@ -469,12 +485,12 @@ public:
         void n_login_recv_w(int d, std::string_view w) {
             auto& h = nhw[std::size_t(d)];
             if (!h) h.emplace(XBuffer::create<PlayerState>(kPlayerInitial, cap()));
-            const XOffsetDatastructure::XStatus r = h->template try_apply_delta_verified<PlayerState>(std::as_bytes(std::span<const char>(w.data(), w.size())), ncw[std::size_t(d)]);
+            const XOffsetDatastructure::XStatus r = apply_delta_wire<PlayerState, kClient>(*h, std::as_bytes(std::span<const char>(w.data(), w.size())), ncw[std::size_t(d)]);
             if (!r) throw std::runtime_error("native login (warm) rejected: " + std::string(r.error().message));
         }
         void n_recv_from_w(int d, const std::string& w) {
             if (w.empty()) return;
-            const XOffsetDatastructure::XStatus r = nhw[std::size_t(d)]->template try_apply_delta_verified<PlayerState>(w, ncw[std::size_t(d)]);
+            const XOffsetDatastructure::XStatus r = apply_delta_wire<PlayerState, kClient>(*nhw[std::size_t(d)], w, ncw[std::size_t(d)]);
             if (!r) throw std::runtime_error("native self delta (warm) rejected: " + std::string(r.error().message));
         }
         PlayerState& n_held_w(int d) { return nhw[std::size_t(d)]->template root<PlayerState>(); }
@@ -505,12 +521,17 @@ public:
             if (nd.empty()) return;
             auto it = nh.find(p);
             if (it == nh.end()) it = nh.emplace(p, XBuffer::create<PlayerState>(kPlayerInitial, cap())).first;
-            const XOffsetDatastructure::XStatus st = it->second.template try_apply_delta_verified<PlayerState>(nd, nc[p]);
+            const XOffsetDatastructure::XStatus st = apply_delta_wire<PlayerState, kPeer>(it->second, nd, nc[p]);
             if (!st) throw std::runtime_error("native storage delta rejected: " + std::string(st.error().message));
         }
         PlayerState& n_store_held(int p) { return nh.at(p).template root<PlayerState>(); }
-        // Which check the last storage apply ran: 0 key, 1 none, 2 in place, 3 full; 4 = nothing changed.
-        int n_store_check(int p) { return nd.empty() ? 4 : int(nc[p].last_check()); }
+        // Which check the last storage apply ran: 0 key, 1 none, 2 in place, 3 full; 4 = nothing
+        // changed; 5 admit (xoffset_trusted).
+        int n_store_check(int p) {
+            if (nd.empty()) return 4;
+            const auto c = nc[p].last_check();
+            return c == XOffsetDatastructure::XDeltaCheck::admit ? 5 : int(c);
+        }
         void n_store_prime_all() {
             for (int p = 0; p < int(r->players_.size()); ++p) { n_store_diff(p); n_store_recv(p); }
         }
@@ -869,11 +890,11 @@ public:
             return h;
         }
         void n_key_recv(int c, int, int b) {
-            const XOffsetDatastructure::XStatus r = n_slot(c)->template try_apply_delta_verified<xm::ViewSnapshot>(nb[std::size_t(b)].key, ncur[std::size_t(c)]);
+            const XOffsetDatastructure::XStatus r = apply_delta_wire<xm::ViewSnapshot, kClient>(*n_slot(c), nb[std::size_t(b)].key, ncur[std::size_t(c)]);
             if (!r) throw std::runtime_error("native key delta rejected: " + std::string(r.error().message));
         }
         void n_apply(int c, int) {
-            const XOffsetDatastructure::XStatus r = nheld[std::size_t(c)]->template try_apply_delta_verified<xm::ViewSnapshot>(ndelta, ncur[std::size_t(c)]);
+            const XOffsetDatastructure::XStatus r = apply_delta_wire<xm::ViewSnapshot, kClient>(*nheld[std::size_t(c)], ndelta, ncur[std::size_t(c)]);
             if (!r) throw std::runtime_error("native delta rejected: " + std::string(r.error().message));
         }
         xm::ViewSnapshot& n_held(int c, int) { return nheld[std::size_t(c)]->template root<xm::ViewSnapshot>(); }
@@ -881,7 +902,7 @@ public:
         int n_check(int c) const { return int(ncur[std::size_t(c)].last_check()); }
         std::string_view n_wire() const { return ndelta; }
         void n_apply_from(int c, const std::string& d) {
-            const XOffsetDatastructure::XStatus r = nheld[std::size_t(c)]->template try_apply_delta_verified<xm::ViewSnapshot>(d, ncur[std::size_t(c)]);
+            const XOffsetDatastructure::XStatus r = apply_delta_wire<xm::ViewSnapshot, kClient>(*nheld[std::size_t(c)], d, ncur[std::size_t(c)]);
             if (!r) throw std::runtime_error("native delta rejected: " + std::string(r.error().message));
         }
 #endif

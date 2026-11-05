@@ -44,8 +44,8 @@
 
 接收检查分三档（2026-11-04 定，信任档和边界档的接口 3.4 加入）：信任档只查 wire 头准入和空洞表边界，
 用于服务端之间、服务端发往客户端和自己的存档，**不是**不可信输入的入口（调试和 sanitizer 构建里照样
-完整校验）。整块接收的信任档是 `XReceiver<XLink::server_peer / from_server>::reload / load`
-（`xoffset_receiver.hpp`），`XReceiver<XLink::from_client>` 在编译期拒绝信任档；把客户端连接误建成可信
+完整校验）。整块接收和增量的信任档是 `XReceiver<XLink::server_peer / from_server>::reload / load /
+apply_delta`（`xoffset_receiver.hpp`），`XReceiver<XLink::from_client>` 在编译期拒绝信任档；把客户端连接误建成可信
 链路的接收器靠代码审查发现。信任档按定义不接不可信输入，不进 fuzz，由 `test_receiver` 的差分测试保证
 它对完整档接受的输入给出相同结果；边界档用于客户端上行，只保证读取不越界，收到的数据只读使用；要原地修改客户端数据时走完整档，
 即上面这些入口。两档接口落地时，各自的 harness 加进第 5 节的表和发版前 fuzz。
