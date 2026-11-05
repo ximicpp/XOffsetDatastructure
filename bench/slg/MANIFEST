@@ -176,6 +176,11 @@
 #                        XOFFSET_DELTA_SYNC_API block. SLG_D3 unset: keys, stage ranges, states, reports unchanged.
 #   2026-11-05 D3 server path (thread 设计共享增量原型, after SLGV9c): messages built with xsync::XSyncWriter
 #                        into XSyncOut buffers; same bytes, keys and stage ranges. SLG_D3 unset: unchanged.
+#   2026-11-05 trust tier P2 (thread 3.4 发版, XReceiver<L>::apply_delta): format xoffset_trusted applies
+#                        every delta (login, warm, view, store) through XReceiver admit (kClient links use
+#                        from_server, the store kPeer link server_peer) instead of apply_delta_verified;
+#                        n_store_check counts admit as 5 (SN.check_admit). xoffset itself unchanged
+#                        (the helper forwards to try_apply_delta_verified). Same keys, bytes and states.
 # Contents: slg-reuse adapters (FlatBuffers verified_root runs the Verifier),
 # Contents: slg-reuse adapters (FlatBuffers verified_root runs the Verifier),
 # reuse protocol (c) (SLG_REUSE=1), ordinary-record declarations for every xm
@@ -187,7 +192,7 @@
 #   them (guarded; older trees keep the previous declarations). Same machine code under GCC 16
 #   and P2996 (asm_equal), the lines are tools/describe_dump output (describe_dump_slg).
 ea55baa3f59a1719135b2b3187e2bc9fc91abe171d6cfebf8216780676960eb0  CMakeLists.txt
-1a91885980e9a298f8f0eab66aa4f6318d0fddeb5390ae95e97a2fe4ef8358de  README.md
+1681a9ebf4a9750ed455fd0386d83c7bb55ac09b61ce7a61ebb02694db87b3fd  README.md
 ea141af841831b376028f48ab0d4c22e66ce2671f01d9e14c9f66814f5ebaa6e  adapters/cereal_format.hpp
 6a4e08d8a8e02d8df667c9c9b9576f6b2f783eec810c50e39ccaa83070309064  adapters/flatbuffers_format.hpp
 b79ac73b09369288d013200b93f627aa7eb2cc59a8b1f02bcc392cc5731b43bd  adapters/protobuf_format.hpp
@@ -198,11 +203,11 @@ fef3f268315b7383a8fe8ee2b45d9db70ba50ec201301ed8d58dd5ebc0ab9805  bench/runner.h
 8cf5eb70a33ec375a68580bc213b99f0b7c038acfe84e6662e4d342711863ba7  bench/slg_bench.cpp
 730a66f677d9d20077175f629cf0b13919e66ccedaf880e4eb414c6bc94c0610  bench/small_msg_probe.cpp
 6307d6a7b8419565143cecbe2d7ade4feb250e5dfa5a147f3db99286724e9737  bench/std_runner.hpp
-e47deeeda94fae62b25972e887568b4402f445f84de7252817ebc8e19339cfc5  bench/xoffset_runner.hpp
+467d8e687f817867ac4c0bb29ec5ceece4065432ed8c8fa95b6b5d38627c0499  bench/xoffset_runner.hpp
 12cab27be9331a4a09ae66f444cf5852dd81e363df562748a4ea854932e35e44  include/slg/cista_free.hpp
 f901dd6b3534240a5038157eaf601d756c07557bcd7fad74b80f8615513b6ab8  include/slg/flat_held_index.hpp
 341ba037a01f807258b0a7527aa0ba0a763f60a32bab00f78f75834f0330cffe  include/slg/generic.hpp
-08b4e0047d94c6a199085c844f0a43c5a2ecd96651c2ed6c407df69a29f14746  include/slg/login.hpp
+dd14e87ca314239e58afeb5fbe83f4f217267726dd694dbda909e14db64df83a  include/slg/login.hpp
 243e688dc0afcecc0d1ddb66c799846c60fb9292f48174173a611388c41d1ab4  include/slg/model_cista.hpp
 7e7cf80086214432ef136739451a6bf2ae41ff5806dd3e1417207414733c2322  include/slg/model_std.hpp
 d1e8f86bf5ef40b43f748c2972a8adb291d750494ef78b209d8fe90e2c5eca81  include/slg/model_xoffset.hpp
