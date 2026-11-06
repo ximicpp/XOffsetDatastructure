@@ -469,6 +469,28 @@
       "evidence": "/mnt/project-files/perf-gate/cloud/root-refill/2026-11-05-01012ad0/（ir-gcc16-summary.md 函数差异表，base fb4b96c9 head 01012ad0；cachesim-*-summary.md）",
       "approved_by": "「性能优化」（2026-11-05 02:36Z，只作记录）",
       "archived": "2026-11-05：anchor 前移到 v3.3.1（ee506d3f），条目针对的是旧 anchor，按 PERF_GATE.md 第 4 节移入存档"
+    },
+    {
+      "id": "pr240-revert-223-d",
+      "pr": 240,
+      "metric": "slg.D*",
+      "compiler": "p2996",
+      "max_ratio": 1.027,
+      "reason": "撤回 #223（root<T>() 缓存回填）时把它在云端的指令数收益还回去，回到 3.3.0 的水平。#240 在 4d1ac732 上的实测：P2996 slg.D 1.0260（全部来自 D.read，head÷anchor 同为 1.0260，anchor v3.3.1 含 #223），slg.A GCC 1.0037、P2996 1.0055（A.req_encode 1.018 / 1.017，A.apply 1.007 / 1.016）。Mac 上的依据是发版后复核 STAGE331：#223 让 A.req_encode 1.0752、A 1.016，D.read 0.993；「性能优化」07:17Z 裁定 3.3.2 撤回，3.4 重做。条目只覆盖这几项，上限是实测值加一点余量，别的 slg 回退不受影响。",
+      "evidence": "/mnt/project-files/perf-gate/cloud/revert-223-20261105/（ir-*-summary.md，base 4d1ac732 head ce791570）；/mnt/project-files/perf-gate/mac/2026-11-05-stage331-ee506d3/VERDICT.md",
+      "approved_by": "susu（2026-11-05 09:58Z「确认」，cmsg_01W8h2niLCspyDhp6DxMomYuWSjWtH7TT8Unt9BszKRh7f；「性能优化」07:17Z 裁定撤回，07:33Z 定条目范围）",
+      "archived": "2026-11-06：anchor 前移到 v3.4.0（1162e37b），条目针对的是旧 anchor v3.3.1（含 #223），v3.4.0 已含 #240 的撤回，按 PERF_GATE.md 第 4 节移入存档"
+    },
+    {
+      "id": "pr240-revert-223-a",
+      "pr": 240,
+      "metric": "slg.A",
+      "compiler": "*",
+      "max_ratio": 1.006,
+      "reason": "撤回 #223（root<T>() 缓存回填）时把它在云端的指令数收益还回去，回到 3.3.0 的水平。#240 在 4d1ac732 上的实测：P2996 slg.D 1.0260（全部来自 D.read，head÷anchor 同为 1.0260，anchor v3.3.1 含 #223），slg.A GCC 1.0037、P2996 1.0055（A.req_encode 1.018 / 1.017，A.apply 1.007 / 1.016）。Mac 上的依据是发版后复核 STAGE331：#223 让 A.req_encode 1.0752、A 1.016，D.read 0.993；「性能优化」07:17Z 裁定 3.3.2 撤回，3.4 重做。条目只覆盖这几项，上限是实测值加一点余量，别的 slg 回退不受影响。",
+      "evidence": "/mnt/project-files/perf-gate/cloud/revert-223-20261105/（ir-*-summary.md，base 4d1ac732 head ce791570）；/mnt/project-files/perf-gate/mac/2026-11-05-stage331-ee506d3/VERDICT.md",
+      "approved_by": "susu（2026-11-05 09:58Z「确认」，cmsg_01W8h2niLCspyDhp6DxMomYuWSjWtH7TT8Unt9BszKRh7f；「性能优化」07:17Z 裁定撤回，07:33Z 定条目范围）",
+      "archived": "2026-11-06：anchor 前移到 v3.4.0（1162e37b），条目针对的是旧 anchor v3.3.1（含 #223），v3.4.0 已含 #240 的撤回，按 PERF_GATE.md 第 4 节移入存档"
     }
   ]
 }
