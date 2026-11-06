@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 3.4.0: delta sync on trusted links
+
+A minor release on 3.3.1 for server-to-client sync. Deltas on trusted links
+(`XReceiver<L>::apply_delta`) are admitted instead of verified; delta format
+1.0 is frozen for 3.x, with a guide, an example and the map demo sending
+view snapshots as deltas end to end. Small messages cost less to save, VM
+buffers no longer fault on install under memory pressure, and
+`xoffset_shared_delta.hpp` adds an experimental shared-delta prototype. The
+`root<T>()` cache refill of 3.3.1 is withdrawn. Judged in the cloud only:
+Ir gates against v3.3.1 and the full local validation (docs/RELEASING.md).
+Instructions against v3.3.1, GCC 16 and P2996: every total within 1.003
+except P2996 slg.D 1.016, which is the withdrawn refill (ledger entry
+pr240-revert-223-d); every phase within 1.018.
+The pre-release fuzz run was skipped for this release (susu, 2026-11-05),
+so native delta sync (K9 in docs/USER_GUIDE.md) stays a goal; the Mac stage
+review runs after the tag.
+
 - `XReceiver<L>::apply_delta<T>` (trust tier P2): deltas on trusted links.
   `XLink::server_peer` and `XLink::from_server` apply with `XCheck::admit` by
   default: the parse of `apply_delta_verified` (format, stream and version
@@ -79,6 +96,17 @@
   P2996 map 0.97, set 0.97 (3.3.0 and 3.3.1: 1.03 to 1.05). Inserts in
   ascending key order keep the 3.3.0 gain. Contents, layout and allocation
   are unchanged.
+- Saving a small message costs less (bench/slg UP.send, the server's quiet
+  viewport send of about 3.4 marches per message: 1030 to 786 instructions
+  per message on P2996; zpp_bits 544). Below 4096 used bytes no emission form
+  saves bytes, so the save entries write the wire header, the payload and the
+  hole table with two inlined copies instead of going through the wire
+  writer; the header and alias checks are inlined and still run.
+  `reset<T>()` constructs the root inline. The first block of an empty
+  vector comes from the aligned allocation path with the alignment check
+  folded at compile time, and a `reserve` that needs no growth returns at the
+  call site. Wire bytes are unchanged (all 707 byte keys of the bench/slg
+  demo case equal before and after).
 - VM storage keeps its host header (the owner word) in the first 64 bytes of
   the payload's own region instead of a separate page in front of it, as slots
   already did: the payload starts 64 bytes past the region's 2^k boundary.
