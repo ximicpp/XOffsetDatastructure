@@ -1,0 +1,192 @@
+2026-11-06T02:04:11Z process 1 app xoffset start: need 180s waited 180s load 1.51 WindowServer 4.3% remote 4
+2026-11-06T02:04:57Z process 1 app xoffset done: 1793930651..1793930697 (46 s) load 1.73
+2026-11-06T02:05:07Z process 1 app xoffset_trusted start: need 10s waited 10s load 1.73 WindowServer 1.4% remote 4
+2026-11-06T02:05:52Z process 1 app xoffset_trusted done: 1793930707..1793930752 (45 s) load 1.86
+2026-11-06T02:06:02Z process 1 app cereal start: need 10s waited 10s load 1.86 WindowServer 1.2% remote 4
+2026-11-06T02:07:03Z process 1 app cereal done: 1793930762..1793930823 (61 s) load 1.83
+2026-11-06T02:07:13Z process 1 app protobuf start: need 10s waited 10s load 1.83 WindowServer 1.2% remote 4
+2026-11-06T02:08:03Z process 1 app protobuf done: 1793930833..1793930883 (50 s) load 3.30
+2026-11-06T02:08:23Z process 1 app flatbuffers start: need 10s waited 20s load 2.95 WindowServer 1.3% remote 4
+2026-11-06T02:09:12Z process 1 app flatbuffers done: 1793930903..1793930952 (49 s) load 2.01
+2026-11-06T02:09:22Z process 1 app flatbuffers_noverify start: need 10s waited 10s load 2.01 WindowServer 1.2% remote 4
+2026-11-06T02:10:10Z process 1 app flatbuffers_noverify done: 1793930963..1793931010 (47 s) load 1.72
+2026-11-06T02:10:20Z process 1 app zpp_bits start: need 10s waited 10s load 1.72 WindowServer 1.1% remote 4
+2026-11-06T02:10:55Z process 1 app zpp_bits done: 1793931020..1793931055 (35 s) load 1.58
+2026-11-06T02:11:05Z process 1 app cista start: need 10s waited 10s load 1.58 WindowServer 2.3% remote 4
+2026-11-06T02:11:56Z process 1 app cista done: 1793931065..1793931116 (51 s) load 1.74
+2026-11-06T02:12:06Z process 1 app cista_unchecked start: need 10s waited 10s load 1.74 WindowServer 1.4% remote 4
+2026-11-06T02:12:46Z process 1 app cista_unchecked done: 1793931126..1793931166 (40 s) load 1.50
+2026-11-06T02:13:16Z process 1 native start: need 30s waited 30s load 1.49 WindowServer 1.2% remote 4
+2026-11-06T02:14:14Z process 1 native done: 1793931196..1793931254 (58 s) load 1.68
+2026-11-06T02:14:24Z process 1 native trusted start: need 10s waited 10s load 1.68 WindowServer 1.3% remote 4
+2026-11-06T02:15:21Z process 1 native trusted done: 1793931264..1793931321 (57 s) load 1.70
+2026-11-06T02:15:51Z process 1 d3 start: need 30s waited 30s load 1.43 WindowServer 1.3% remote 4
+2026-11-06T02:16:50Z process 1 d3 done: 1793931351..1793931409 (58 s) load 1.77
+2026-11-06T02:17:20Z process 2 app xoffset start: need 30s waited 30s load 1.62 WindowServer 1.2% remote 4
+2026-11-06T02:18:07Z process 2 app xoffset done: 1793931440..1793931487 (47 s) load 1.79
+2026-11-06T02:18:17Z process 2 app xoffset_trusted start: need 10s waited 10s load 1.79 WindowServer 1.1% remote 4
+2026-11-06T02:19:03Z process 2 app xoffset_trusted done: 1793931497..1793931543 (46 s) load 1.69
+2026-11-06T02:19:13Z process 2 app cereal start: need 10s waited 10s load 1.69 WindowServer 1.1% remote 4
+2026-11-06T02:20:14Z process 2 app cereal done: 1793931553..1793931614 (61 s) load 1.90
+2026-11-06T02:20:24Z process 2 app protobuf start: need 10s waited 10s load 1.90 WindowServer 1% remote 4
+2026-11-06T02:21:14Z process 2 app protobuf done: 1793931624..1793931674 (50 s) load 1.99
+2026-11-06T02:21:24Z process 2 app flatbuffers start: need 10s waited 10s load 1.99 WindowServer 1.2% remote 4
+2026-11-06T02:22:14Z process 2 app flatbuffers done: 1793931685..1793931734 (49 s) load 2.08
+2026-11-06T02:22:24Z process 2 app flatbuffers_noverify start: need 10s waited 10s load 2.08 WindowServer 1.2% remote 4
+2026-11-06T02:23:12Z process 2 app flatbuffers_noverify done: 1793931744..1793931792 (48 s) load 2.13
+2026-11-06T02:23:22Z process 2 app zpp_bits start: need 10s waited 10s load 2.13 WindowServer 1.4% remote 4
+2026-11-06T02:23:57Z process 2 app zpp_bits done: 1793931802..1793931837 (35 s) load 1.77
+2026-11-06T02:24:07Z process 2 app cista start: need 10s waited 10s load 1.77 WindowServer 1.2% remote 4
+2026-11-06T02:24:58Z process 2 app cista done: 1793931847..1793931898 (51 s) load 1.56
+2026-11-06T02:25:09Z process 2 app cista_unchecked start: need 10s waited 10s load 1.56 WindowServer 2.4% remote 4
+2026-11-06T02:25:48Z process 2 app cista_unchecked done: 1793931909..1793931948 (39 s) load 1.69
+2026-11-06T02:26:19Z process 2 native start: need 30s waited 30s load 1.49 WindowServer 1% remote 4
+2026-11-06T02:27:17Z process 2 native done: 1793931979..1793932037 (58 s) load 1.72
+2026-11-06T02:27:27Z process 2 native trusted start: need 10s waited 10s load 1.72 WindowServer 1.2% remote 4
+2026-11-06T02:28:24Z process 2 native trusted done: 1793932047..1793932104 (57 s) load 1.69
+2026-11-06T02:28:54Z process 2 d3 start: need 30s waited 30s load 1.62 WindowServer 1.2% remote 4
+2026-11-06T02:29:53Z process 2 d3 done: 1793932134..1793932193 (59 s) load 1.61
+2026-11-06T02:30:23Z process 3 app xoffset start: need 30s waited 30s load 1.60 WindowServer 1.4% remote 4
+2026-11-06T02:31:10Z process 3 app xoffset done: 1793932223..1793932270 (47 s) load 1.67
+2026-11-06T02:31:20Z process 3 app xoffset_trusted start: need 10s waited 10s load 1.67 WindowServer 1.1% remote 4
+2026-11-06T02:32:06Z process 3 app xoffset_trusted done: 1793932280..1793932326 (46 s) load 1.55
+2026-11-06T02:32:16Z process 3 app cereal start: need 10s waited 10s load 1.55 WindowServer 1% remote 4
+2026-11-06T02:33:17Z process 3 app cereal done: 1793932336..1793932397 (61 s) load 1.64
+2026-11-06T02:33:27Z process 3 app protobuf start: need 10s waited 10s load 1.64 WindowServer 1% remote 4
+2026-11-06T02:34:18Z process 3 app protobuf done: 1793932407..1793932458 (51 s) load 2.09
+2026-11-06T02:34:28Z process 3 app flatbuffers start: need 10s waited 10s load 2.09 WindowServer 1.2% remote 4
+2026-11-06T02:35:17Z process 3 app flatbuffers done: 1793932468..1793932517 (49 s) load 2.40
+2026-11-06T02:35:28Z process 3 app flatbuffers_noverify start: need 10s waited 10s load 2.40 WindowServer 1% remote 4
+2026-11-06T02:36:15Z process 3 app flatbuffers_noverify done: 1793932528..1793932575 (47 s) load 2.30
+2026-11-06T02:36:26Z process 3 app zpp_bits start: need 10s waited 10s load 2.30 WindowServer 1.1% remote 4
+2026-11-06T02:37:01Z process 3 app zpp_bits done: 1793932586..1793932621 (35 s) load 1.96
+2026-11-06T02:37:11Z process 3 app cista start: need 10s waited 10s load 1.96 WindowServer 3.2% remote 4
+2026-11-06T02:38:02Z process 3 app cista done: 1793932631..1793932682 (51 s) load 1.71
+2026-11-06T02:38:12Z process 3 app cista_unchecked start: need 10s waited 10s load 1.71 WindowServer 2% remote 4
+2026-11-06T02:38:52Z process 3 app cista_unchecked done: 1793932692..1793932732 (40 s) load 1.95
+2026-11-06T02:39:22Z process 3 native start: need 30s waited 30s load 1.68 WindowServer 1.3% remote 4
+2026-11-06T02:40:20Z process 3 native done: 1793932762..1793932820 (58 s) load 1.71
+2026-11-06T02:40:30Z process 3 native trusted start: need 10s waited 10s load 1.74 WindowServer 1.2% remote 4
+2026-11-06T02:41:27Z process 3 native trusted done: 1793932830..1793932887 (57 s) load 1.90
+2026-11-06T02:41:58Z process 3 d3 start: need 30s waited 30s load 1.81 WindowServer 4.1% remote 4
+2026-11-06T02:42:56Z process 3 d3 done: 1793932918..1793932976 (58 s) load 1.93
+2026-11-06T02:43:27Z process 4 app xoffset start: need 30s waited 30s load 1.96 WindowServer 4% remote 4
+2026-11-06T02:44:13Z process 4 app xoffset done: 1793933007..1793933053 (46 s) load 2.42
+2026-11-06T02:44:23Z process 4 app xoffset_trusted start: need 10s waited 10s load 2.42 WindowServer 3.6% remote 4
+2026-11-06T02:45:10Z process 4 app xoffset_trusted done: 1793933064..1793933110 (46 s) load 2.45
+2026-11-06T02:45:20Z process 4 app cereal start: need 10s waited 10s load 2.45 WindowServer 4.4% remote 4
+2026-11-06T02:46:22Z process 4 app cereal done: 1793933120..1793933182 (62 s) load 2.25
+2026-11-06T02:46:32Z process 4 app protobuf start: need 10s waited 10s load 2.25 WindowServer 1% remote 4
+2026-11-06T02:47:22Z process 4 app protobuf done: 1793933192..1793933242 (50 s) load 1.99
+2026-11-06T02:47:32Z process 4 app flatbuffers start: need 10s waited 10s load 1.99 WindowServer 2.6% remote 4
+2026-11-06T02:48:22Z process 4 app flatbuffers done: 1793933252..1793933302 (50 s) load 2.02
+2026-11-06T02:48:32Z process 4 app flatbuffers_noverify start: need 10s waited 10s load 2.02 WindowServer 1% remote 4
+2026-11-06T02:49:20Z process 4 app flatbuffers_noverify done: 1793933312..1793933360 (48 s) load 2.07
+2026-11-06T02:49:30Z process 4 app zpp_bits start: need 10s waited 10s load 2.07 WindowServer 0.9% remote 4
+2026-11-06T02:50:05Z process 4 app zpp_bits done: 1793933370..1793933405 (35 s) load 1.87
+2026-11-06T02:50:15Z process 4 app cista start: need 10s waited 10s load 1.87 WindowServer 1% remote 4
+2026-11-06T02:51:07Z process 4 app cista done: 1793933415..1793933467 (52 s) load 1.94
+2026-11-06T02:51:17Z process 4 app cista_unchecked start: need 10s waited 10s load 1.94 WindowServer 1.4% remote 4
+2026-11-06T02:51:56Z process 4 app cista_unchecked done: 1793933477..1793933516 (39 s) load 2.39
+2026-11-06T02:52:27Z process 4 native start: need 30s waited 30s load 2.07 WindowServer 1.2% remote 4
+2026-11-06T02:53:25Z process 4 native done: 1793933547..1793933605 (58 s) load 1.96
+2026-11-06T02:53:35Z process 4 native trusted start: need 10s waited 10s load 1.96 WindowServer 1.3% remote 4
+2026-11-06T02:54:32Z process 4 native trusted done: 1793933615..1793933672 (57 s) load 2.10
+2026-11-06T02:55:03Z process 4 d3 start: need 30s waited 30s load 1.86 WindowServer 1.2% remote 4
+2026-11-06T02:56:01Z process 4 d3 done: 1793933703..1793933761 (58 s) load 1.73
+2026-11-06T02:56:31Z process 5 app xoffset start: need 30s waited 30s load 1.53 WindowServer 1.2% remote 4
+2026-11-06T02:57:18Z process 5 app xoffset done: 1793933791..1793933838 (47 s) load 1.60
+2026-11-06T02:57:28Z process 5 app xoffset_trusted start: need 10s waited 10s load 1.60 WindowServer 1.2% remote 4
+2026-11-06T02:58:14Z process 5 app xoffset_trusted done: 1793933848..1793933894 (46 s) load 1.79
+2026-11-06T02:58:24Z process 5 app cereal start: need 10s waited 10s load 1.79 WindowServer 1.1% remote 4
+2026-11-06T02:59:26Z process 5 app cereal done: 1793933904..1793933966 (62 s) load 1.89
+2026-11-06T02:59:36Z process 5 app protobuf start: need 10s waited 10s load 1.89 WindowServer 1.2% remote 4
+2026-11-06T03:00:26Z process 5 app protobuf done: 1793933976..1793934026 (50 s) load 1.73
+2026-11-06T03:00:36Z process 5 app flatbuffers start: need 10s waited 10s load 1.73 WindowServer 1.3% remote 4
+2026-11-06T03:01:26Z process 5 app flatbuffers done: 1793934036..1793934086 (50 s) load 1.89
+2026-11-06T03:01:36Z process 5 app flatbuffers_noverify start: need 10s waited 10s load 1.89 WindowServer 1% remote 4
+2026-11-06T03:02:24Z process 5 app flatbuffers_noverify done: 1793934096..1793934144 (48 s) load 1.53
+2026-11-06T03:02:34Z process 5 app zpp_bits start: need 10s waited 10s load 1.53 WindowServer 1.2% remote 4
+2026-11-06T03:03:09Z process 5 app zpp_bits done: 1793934154..1793934189 (35 s) load 1.68
+2026-11-06T03:03:19Z process 5 app cista start: need 10s waited 10s load 1.68 WindowServer 1.1% remote 4
+2026-11-06T03:04:10Z process 5 app cista done: 1793934199..1793934250 (51 s) load 1.68
+2026-11-06T03:04:20Z process 5 app cista_unchecked start: need 10s waited 10s load 1.68 WindowServer 1.2% remote 4
+2026-11-06T03:05:00Z process 5 app cista_unchecked done: 1793934260..1793934300 (40 s) load 1.64
+2026-11-06T03:05:31Z process 5 native start: need 30s waited 30s load 1.47 WindowServer 1.2% remote 4
+2026-11-06T03:06:29Z process 5 native done: 1793934331..1793934389 (58 s) load 1.54
+2026-11-06T03:06:39Z process 5 native trusted start: need 10s waited 10s load 1.54 WindowServer 1% remote 4
+2026-11-06T03:07:36Z process 5 native trusted done: 1793934399..1793934456 (57 s) load 1.81
+2026-11-06T03:08:06Z process 5 d3 start: need 30s waited 30s load 1.73 WindowServer 1.3% remote 4
+2026-11-06T03:09:05Z process 5 d3 done: 1793934486..1793934545 (59 s) load 1.72
+2026-11-06T03:09:35Z process 6 app xoffset start: need 30s waited 30s load 1.36 WindowServer 1.2% remote 4
+2026-11-06T03:10:22Z process 6 app xoffset done: 1793934575..1793934622 (47 s) load 1.96
+2026-11-06T03:10:32Z process 6 app xoffset_trusted start: need 10s waited 10s load 1.96 WindowServer 1.1% remote 4
+2026-11-06T03:11:18Z process 6 app xoffset_trusted done: 1793934632..1793934678 (46 s) load 1.77
+2026-11-06T03:11:28Z process 6 app cereal start: need 10s waited 10s load 1.77 WindowServer 1.2% remote 4
+2026-11-06T03:12:30Z process 6 app cereal done: 1793934688..1793934750 (62 s) load 1.55
+2026-11-06T03:12:40Z process 6 app protobuf start: need 10s waited 10s load 1.55 WindowServer 1.2% remote 4
+2026-11-06T03:13:30Z process 6 app protobuf done: 1793934760..1793934810 (50 s) load 1.60
+2026-11-06T03:13:40Z process 6 app flatbuffers start: need 10s waited 10s load 1.60 WindowServer 1.2% remote 4
+2026-11-06T03:14:30Z process 6 app flatbuffers done: 1793934820..1793934870 (50 s) load 1.44
+2026-11-06T03:14:40Z process 6 app flatbuffers_noverify start: need 10s waited 10s load 1.44 WindowServer 1% remote 4
+2026-11-06T03:15:28Z process 6 app flatbuffers_noverify done: 1793934880..1793934928 (48 s) load 1.46
+2026-11-06T03:15:38Z process 6 app zpp_bits start: need 10s waited 10s load 1.46 WindowServer 1.1% remote 4
+2026-11-06T03:16:13Z process 6 app zpp_bits done: 1793934938..1793934973 (35 s) load 1.81
+2026-11-06T03:16:23Z process 6 app cista start: need 10s waited 10s load 1.81 WindowServer 1.1% remote 4
+2026-11-06T03:17:14Z process 6 app cista done: 1793934983..1793935034 (51 s) load 2.25
+2026-11-06T03:17:25Z process 6 app cista_unchecked start: need 10s waited 10s load 2.25 WindowServer 1.1% remote 4
+2026-11-06T03:18:04Z process 6 app cista_unchecked done: 1793935045..1793935084 (39 s) load 1.84
+2026-11-06T03:18:35Z process 6 native start: need 30s waited 30s load 1.60 WindowServer 1.3% remote 4
+2026-11-06T03:19:33Z process 6 native done: 1793935115..1793935173 (58 s) load 1.67
+2026-11-06T03:19:43Z process 6 native trusted start: need 10s waited 10s load 1.67 WindowServer 1% remote 4
+2026-11-06T03:20:40Z process 6 native trusted done: 1793935183..1793935240 (57 s) load 1.95
+2026-11-06T03:21:10Z process 6 d3 start: need 30s waited 30s load 1.68 WindowServer 4.3% remote 4
+2026-11-06T03:22:09Z process 6 d3 done: 1793935271..1793935329 (58 s) load 1.55
+2026-11-06T03:22:39Z process 7 app xoffset start: need 30s waited 30s load 1.48 WindowServer 1.3% remote 4
+2026-11-06T03:23:26Z process 7 app xoffset done: 1793935359..1793935406 (47 s) load 1.69
+2026-11-06T03:23:36Z process 7 app xoffset_trusted start: need 10s waited 10s load 1.69 WindowServer 1.9% remote 4
+2026-11-06T03:24:22Z process 7 app xoffset_trusted done: 1793935416..1793935462 (46 s) load 1.81
+2026-11-06T03:24:32Z process 7 app cereal start: need 10s waited 10s load 1.81 WindowServer 1.2% remote 4
+2026-11-06T03:25:33Z process 7 app cereal done: 1793935472..1793935533 (61 s) load 1.78
+2026-11-06T03:25:44Z process 7 app protobuf start: need 10s waited 10s load 1.78 WindowServer 2.5% remote 4
+2026-11-06T03:26:34Z process 7 app protobuf done: 1793935544..1793935594 (50 s) load 1.77
+2026-11-06T03:26:44Z process 7 app flatbuffers start: need 10s waited 10s load 1.77 WindowServer 1.3% remote 4
+2026-11-06T03:27:34Z process 7 app flatbuffers done: 1793935604..1793935654 (50 s) load 1.69
+2026-11-06T03:27:44Z process 7 app flatbuffers_noverify start: need 10s waited 10s load 1.69 WindowServer 1.3% remote 4
+2026-11-06T03:28:32Z process 7 app flatbuffers_noverify done: 1793935664..1793935712 (48 s) load 2.10
+2026-11-06T03:28:42Z process 7 app zpp_bits start: need 10s waited 10s load 2.10 WindowServer 1.2% remote 4
+2026-11-06T03:29:17Z process 7 app zpp_bits done: 1793935722..1793935757 (35 s) load 2.04
+2026-11-06T03:29:27Z process 7 app cista start: need 10s waited 10s load 2.04 WindowServer 2.9% remote 4
+2026-11-06T03:30:18Z process 7 app cista done: 1793935767..1793935818 (51 s) load 1.84
+2026-11-06T03:30:29Z process 7 app cista_unchecked start: need 10s waited 10s load 1.84 WindowServer 1.2% remote 4
+2026-11-06T03:31:08Z process 7 app cista_unchecked done: 1793935829..1793935868 (39 s) load 1.87
+2026-11-06T03:31:39Z process 7 native start: need 30s waited 30s load 1.69 WindowServer 1.2% remote 4
+2026-11-06T03:32:37Z process 7 native done: 1793935899..1793935957 (58 s) load 1.88
+2026-11-06T03:32:47Z process 7 native trusted start: need 10s waited 10s load 1.88 WindowServer 1.1% remote 4
+2026-11-06T03:33:44Z process 7 native trusted done: 1793935967..1793936024 (57 s) load 1.73
+2026-11-06T03:34:15Z process 7 d3 start: need 30s waited 30s load 1.90 WindowServer 1.2% remote 4
+2026-11-06T03:35:13Z process 7 d3 done: 1793936055..1793936113 (58 s) load 2.27
+2026-11-06T03:35:43Z process 8 app xoffset start: need 30s waited 30s load 1.97 WindowServer 1.2% remote 4
+2026-11-06T03:36:30Z process 8 app xoffset done: 1793936143..1793936190 (47 s) load 1.84
+2026-11-06T03:36:40Z process 8 app xoffset_trusted start: need 10s waited 10s load 1.84 WindowServer 1.1% remote 4
+2026-11-06T03:37:26Z process 8 app xoffset_trusted done: 1793936200..1793936246 (46 s) load 1.81
+2026-11-06T03:37:36Z process 8 app cereal start: need 10s waited 10s load 1.81 WindowServer 1.2% remote 4
+2026-11-06T03:38:38Z process 8 app cereal done: 1793936256..1793936318 (62 s) load 1.73
+2026-11-06T03:38:48Z process 8 app protobuf start: need 10s waited 10s load 1.73 WindowServer 2.3% remote 4
+2026-11-06T03:39:38Z process 8 app protobuf done: 1793936328..1793936378 (50 s) load 1.69
+2026-11-06T03:39:48Z process 8 app flatbuffers start: need 10s waited 10s load 1.69 WindowServer 1.2% remote 4
+2026-11-06T03:40:38Z process 8 app flatbuffers done: 1793936388..1793936438 (50 s) load 1.66
+2026-11-06T03:40:48Z process 8 app flatbuffers_noverify start: need 10s waited 10s load 1.66 WindowServer 1.1% remote 4
+2026-11-06T03:41:36Z process 8 app flatbuffers_noverify done: 1793936448..1793936496 (48 s) load 2.02
+2026-11-06T03:41:46Z process 8 app zpp_bits start: need 10s waited 10s load 2.02 WindowServer 1.1% remote 4
+2026-11-06T03:42:21Z process 8 app zpp_bits done: 1793936506..1793936541 (35 s) load 1.89
+2026-11-06T03:42:31Z process 8 app cista start: need 10s waited 10s load 1.89 WindowServer 1.1% remote 4
+2026-11-06T03:43:22Z process 8 app cista done: 1793936551..1793936602 (51 s) load 1.63
+2026-11-06T03:43:33Z process 8 app cista_unchecked start: need 10s waited 10s load 1.63 WindowServer 2.7% remote 4
+2026-11-06T03:44:12Z process 8 app cista_unchecked done: 1793936613..1793936652 (39 s) load 1.77
+2026-11-06T03:44:43Z process 8 native start: need 30s waited 30s load 1.63 WindowServer 1.1% remote 4
+2026-11-06T03:45:41Z process 8 native done: 1793936683..1793936741 (58 s) load 1.97
+2026-11-06T03:45:51Z process 8 native trusted start: need 10s waited 10s load 1.97 WindowServer 1.2% remote 4
+2026-11-06T03:46:49Z process 8 native trusted done: 1793936751..1793936809 (58 s) load 2.98
+2026-11-06T03:47:40Z process 8 d3 start: need 30s waited 50s load 2.13 WindowServer 36.5% remote 4
+2026-11-06T03:48:39Z process 8 d3 done: 1793936860..1793936919 (59 s) load 1.96

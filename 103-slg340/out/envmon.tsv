@@ -1,0 +1,641 @@
+epoch	utc	load1	pmset_therm	top6_pcpu	background_pcpu_ge1
+1793930469	2026-11-06T02:01:09Z	2.08	none	WindowServer:10.3,apsd:5.3,VeeePlus:1.5,bash:1.2,Google Chrome Helper (Aperitif Renderer):1.1,cfprefsd:0.7	Google Chrome Helper (Aperitif Renderer):1.1
+1793930479	2026-11-06T02:01:19Z	2.29	none	UURemote:2.4,VeeePlus:1.3,WindowServer:1.3,Google Chrome Helper (Aperitif Renderer):1.0,PerfPowerServices:0.9,com.apple.DriverKit-AppleBCMWLAN:0.6	Google Chrome Helper (Aperitif Renderer):1.1
+1793930490	2026-11-06T02:01:30Z	2.40	none	Finder:1.6,VeeePlus:1.5,WindowServer:1.3,Google Chrome Helper (Aperitif Renderer):0.9,bash:0.8,com.apple.DriverKit-AppleBCMWLAN:0.7	Google Chrome Helper (Aperitif Renderer):1.1
+1793930500	2026-11-06T02:01:40Z	2.26	none	(ps):6.9,trustd:1.8,nsurlsessiond:1.7,Finder:1.6,VeeePlus:1.4,WindowServer:1.3	trustd:1.8,Google Chrome Helper (Aperitif Renderer):1.1
+1793930510	2026-11-06T02:01:50Z	2.07	none	apsd:6.1,VeeePlus:1.6,WindowServer:1.5,Finder:1.3,Google Chrome Helper (Aperitif Renderer):1.1,com.apple.DriverKit-AppleBCMWLAN:1.0	Codex (Renderer):1.0,Google Chrome Helper (Aperitif Renderer):1.1
+1793930520	2026-11-06T02:02:00Z	1.90	none	Claude Helper (Renderer):133.1,loginwindow:9.3,remotepairingd:4.3,WindowServer:3.3,mDNSResponder:2.5,VeeePlus:1.5	Claude Helper (Renderer):84.2,Google Chrome Helper (Aperitif Renderer):1.1
+1793930530	2026-11-06T02:02:10Z	2.06	none	WindowServer:1.6,Claude Helper (Renderer):1.5,VeeePlus:1.3,tccd:1.1,Finder:1.1,syspolicyd:1.0	Codex (Renderer):1.0,Google Chrome Helper (Aperitif Renderer):1.1
+1793930540	2026-11-06T02:02:20Z	1.82	none	mediaanalysisd:37.9,mds_stores:25.5,aned:7.5,(ps):6.7,mds:2.8,VeeePlus:2.2	mds:2.8,mds_stores:25.5,mediaanalysisd:37.9,mediaanalysisd-access:1.6,Google Chrome Helper (Aperitif Renderer):1.1
+1793930550	2026-11-06T02:02:30Z	1.77	none	(ps):6.2,trustd:2.3,mDNSResponder:2.0,com.apple.DriverKit-AppleBCMWLAN:1.5,VeeePlus:1.4,WindowServer:1.3	trustd:2.3,Google Chrome Helper (Aperitif Renderer):1.1
+1793930560	2026-11-06T02:02:40Z	1.81	none	UURemote:8.2,trustd:5.6,nsurlsessiond:3.9,(ps):2.7,com.apple.DriverKit-AppleBCMWLAN:1.5,WindowServer:1.4	cloudd:1.0,trustd:5.6,Google Chrome Helper (Aperitif Renderer):1.1
+1793930570	2026-11-06T02:02:50Z	1.62	none	(ps):7.6,VeeePlus:1.3,WindowServer:1.3,(awk):1.2,Google Chrome Helper (Aperitif Renderer):1.1,com.apple.DriverKit-AppleBCMWLAN:0.8	Google Chrome Helper (Aperitif Renderer):1.1
+1793930580	2026-11-06T02:03:00Z	1.60	none	loginwindow:7.8,WindowServer:3.9,VeeePlus:1.4,Google Chrome Helper (Aperitif Renderer):1.4,com.apple.DriverKit-AppleBCMWLAN:1.1,ChatGPT:0.8	Google Chrome Helper (Aperitif Renderer):1.4
+1793930591	2026-11-06T02:03:11Z	1.51	none	VeeePlus:1.5,Claude:1.3,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):1.0,com.apple.DriverKit-AppleBCMWLAN:0.9,Claude Helper:0.7	Claude:1.3,Google Chrome Helper (Aperitif Renderer):1.0
+1793930601	2026-11-06T02:03:21Z	1.50	none	ChatGPT:1.8,VeeePlus:1.3,WindowServer:1.2,Codex (Renderer):1.2,com.apple.DriverKit-AppleBCMWLAN:1.0,Google Chrome Helper (Aperitif Renderer):0.9	Codex (Renderer):1.2
+1793930611	2026-11-06T02:03:31Z	1.43	none	cloudd:2.3,cloudphotod:1.6,nsurlsessiond:1.6,VeeePlus:1.2,WindowServer:1.2,apsd:0.9	cloudd:2.3
+1793930621	2026-11-06T02:03:41Z	1.52	none	Codex (Renderer):6.7,ChatGPT:3.0,Codex (Service):1.5,VeeePlus:1.3,WindowServer:1.2,backgroundtaskmanagementd:1.2	Codex (Service):1.5,Codex (Renderer):6.7,Google Chrome Helper (Aperitif Renderer):1.0
+1793930631	2026-11-06T02:03:51Z	1.52	none	apsd:4.3,backgroundtaskmanagementd:3.7,VeeePlus:1.3,WindowServer:1.2,com.apple.DriverKit-AppleBCMWLAN:1.1,Google Chrome Helper (Aperitif Renderer):1.1	Google Chrome Helper (Aperitif Renderer):1.1
+1793930641	2026-11-06T02:04:01Z	1.51	none	loginwindow:8.2,remotepairingd:7.6,mDNSResponder:5.7,Codex (Renderer):5.5,WindowServer:4.3,ChatGPT:2.6	Codex (Service):1.6,Codex (Renderer):5.5,Google Chrome Helper (Aperitif Renderer):1.4
+1793930651	2026-11-06T02:04:11Z	1.58	none	cloudd:6.7,VeeePlus:1.2,WindowServer:1.2,mdworker_shared:1.2,cloudphotod:1.1,Google Chrome Helper (Aperitif Renderer):1.1	cloudd:6.7,mdworker_shared:1.2,Google Chrome Helper (Aperitif Renderer):1.1
+1793930661	2026-11-06T02:04:21Z	1.64	none	slg_bench:100.0,ChatGPT:1.7,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,Codex (Service):0.8	
+1793930671	2026-11-06T02:04:31Z	1.78	none	slg_bench:99.7,VeeePlus:1.2,WindowServer:1.0,Claude Helper (Renderer):1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.5	Claude Helper (Renderer):1.0
+1793930681	2026-11-06T02:04:41Z	1.81	none	slg_bench:100.0,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.7,PacketTunnel:0.4	
+1793930691	2026-11-06T02:04:51Z	1.69	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:0.9,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.3,wifip2pd:0.1	
+1793930702	2026-11-06T02:05:02Z	1.73	none	loginwindow:6.6,WindowServer:4.2,VeeePlus:1.5,Google Chrome Helper (Aperitif Renderer):1.4,com.apple.DriverKit-AppleBCMWLAN:0.9,PacketTunnel:0.5	Google Chrome Helper (Aperitif Renderer):1.4
+1793930712	2026-11-06T02:05:12Z	1.70	none	slg_bench:100.0,com.apple.DriverKit-AppleBCMWLAN:1.3,VeeePlus:1.1,WindowServer:1.0,trustd:0.9,Google Chrome Helper (Aperitif Renderer):0.9	
+1793930722	2026-11-06T02:05:22Z	1.66	none	slg_bench:99.1,apsd:3.5,VeeePlus:1.2,WindowServer:1.1,com.apple.DriverKit-AppleBCMWLAN:1.0,Google Chrome Helper (Aperitif Renderer):0.9	
+1793930732	2026-11-06T02:05:32Z	1.63	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:0.9,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.5,Claude Helper (Renderer):0.3	
+1793930742	2026-11-06T02:05:42Z	1.93	none	slg_bench:100.0,ChatGPT:2.0,Codex (Renderer):1.6,VeeePlus:1.2,Finder:1.1,Codex (Service):1.1	Codex (Service):1.1,Codex (Renderer):1.6
+1793930752	2026-11-06T02:05:52Z	1.86	none	slg_bench:100.0,VeeePlus:1.1,WindowServer:1.1,Finder:1.1,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.7	
+1793930762	2026-11-06T02:06:02Z	1.79	none	VeeePlus:4.4,trustd:3.2,ChatGPT:2.7,loginwindow:2.3,com.apple.DriverKit-AppleBCMWLAN:2.2,WindowServer:2.0	Codex (Service):1.6,Codex (Renderer):1.8,trustd:3.2,Google Chrome Helper (Aperitif Renderer):1.1
+1793930772	2026-11-06T02:06:12Z	1.76	none	slg_bench:99.8,com.apple.DriverKit-AppleBCMWLAN:1.6,sysmond:1.2,VeeePlus:1.2,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9	
+1793930782	2026-11-06T02:06:22Z	1.72	none	slg_bench:99.1,sysmond:2.4,VeeePlus:1.2,WindowServer:1.2,ChatGPT:1.0,Google Chrome Helper (Aperitif Renderer):0.9	
+1793930792	2026-11-06T02:06:32Z	1.76	none	slg_bench:100.0,sysmond:5.2,cloudd:3.0,VeeePlus:1.2,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):1.0	cloudd:3.0,Google Chrome Helper (Aperitif Renderer):1.0
+1793930802	2026-11-06T02:06:42Z	1.87	none	slg_bench:100.0,sysmond:13.1,opendirectoryd:1.6,VeeePlus:1.3,launchd:1.2,WindowServer:1.2	Google Chrome Helper (Aperitif Renderer):1.0
+1793930812	2026-11-06T02:06:52Z	1.98	none	slg_bench:99.8,zsh:1.9,Codex (Renderer):1.6,VeeePlus:1.2,ChatGPT:1.1,launchd:1.0	Codex (Renderer):1.6
+1793930822	2026-11-06T02:07:02Z	1.83	none	slg_bench:100.0,VeeePlus:2.4,nsurlsessiond:1.1,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,cloudd:0.7	
+1793930832	2026-11-06T02:07:12Z	5.49	none	Codex (Renderer):60.0,ChatGPT:3.4,Codex (Service):1.5,VeeePlus:1.2,WindowServer:1.2,com.apple.DriverKit-AppleBCMWLAN:1.0	Codex (Service):1.5,Codex (Renderer):60.0
+1793930843	2026-11-06T02:07:23Z	4.96	none	slg_bench:100.0,PerfPowerServices:7.6,airportd:1.2,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9	Google Chrome Helper (Aperitif Renderer):1.0
+1793930853	2026-11-06T02:07:33Z	4.58	none	slg_bench:99.1,nsurlsessiond:2.4,cloudd:2.2,dasd:1.8,VeeePlus:1.1,com.apple.DriverKit-AppleBCMWLAN:1.1	cloudd:2.2,trustd:4.0
+1793930863	2026-11-06T02:07:43Z	4.03	none	slg_bench:97.5,trustd:2.3,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,UURemoteServer:0.7	trustd:2.3
+1793930873	2026-11-06T02:07:53Z	3.72	none	slg_bench:100.0,remotepairingd:1.1,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,mDNSResponder:0.5	
+1793930883	2026-11-06T02:08:03Z	3.30	none	slg_bench:100.0,runningboardd:3.5,VeeePlus:1.0,WindowServer:1.0,cloudd:0.9,Google Chrome Helper (Aperitif Renderer):0.9	
+1793930893	2026-11-06T02:08:13Z	2.95	none	cloudd:2.6,VeeePlus:1.3,WindowServer:1.3,mdworker_shared:1.1,mds:1.1,Google Chrome Helper (Aperitif Renderer):1.0	mds:1.1,cloudd:2.6,mdworker_shared:1.1,Google Chrome Helper (Aperitif Renderer):1.0
+1793930903	2026-11-06T02:08:23Z	2.81	none	VeeePlus:1.2,WindowServer:1.1,apsd:1.0,com.apple.DriverKit-AppleBCMWLAN:0.9,Google Chrome Helper (Aperitif Renderer):0.9,airportd:0.6	
+1793930913	2026-11-06T02:08:33Z	2.53	none	slg_bench:100.0,ChatGPT:1.2,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,Codex (Service):0.8	
+1793930923	2026-11-06T02:08:43Z	2.45	none	slg_bench:99.1,apsd:6.3,cloudd:4.2,com.apple.DriverKit-AppleBCMWLAN:1.4,VeeePlus:1.2,WindowServer:1.1	cloudd:4.2
+1793930933	2026-11-06T02:08:53Z	2.30	none	slg_bench:99.0,airportd:1.8,com.apple.DriverKit-AppleBCMWLAN:1.5,VeeePlus:1.2,WindowServer:1.2,dasd:1.1	
+1793930943	2026-11-06T02:09:03Z	2.10	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:0.9,Google Chrome Helper (Aperitif Renderer):0.9,runningboardd:0.6,com.apple.DriverKit-AppleBCMWLAN:0.5	
+1793930953	2026-11-06T02:09:13Z	1.93	none	trustd:2.8,nsurlsessiond:2.2,com.apple.DriverKit-AppleBCMWLAN:1.5,VeeePlus:1.3,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):1.1	trustd:2.8,Google Chrome Helper (Aperitif Renderer):1.1
+1793930964	2026-11-06T02:09:24Z	1.86	none	slg_bench:94.8,VeeePlus:1.3,Claude Helper (Renderer):1.3,WindowServer:1.2,com.apple.DriverKit-AppleBCMWLAN:0.9,Google Chrome Helper (Aperitif Renderer):0.9	
+1793930974	2026-11-06T02:09:34Z	1.73	none	slg_bench:100.0,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.7,airportd:0.3	
+1793930984	2026-11-06T02:09:44Z	1.69	none	slg_bench:99.8,VeeePlus:1.0,WindowServer:0.9,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.6,cloudd:0.5	
+1793930994	2026-11-06T02:09:54Z	1.74	none	slg_bench:100.0,runningboardd:3.2,remotepairingd:1.9,mDNSResponder:1.5,cloudd:1.3,VeeePlus:1.1	cloudd:1.3
+1793931004	2026-11-06T02:10:04Z	1.78	none	slg_bench:99.8,airportd:1.6,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.8	
+1793931014	2026-11-06T02:10:14Z	1.66	none	Claude Helper (Renderer):10.5,com.apple.DriverKit-AppleBCMWLAN:1.7,VeeePlus:1.3,WindowServer:1.3,ChatGPT:1.3,Google Chrome Helper (Aperitif Renderer):1.0	Claude Helper (Renderer):10.5,Google Chrome Helper (Aperitif Renderer):1.0
+1793931024	2026-11-06T02:10:24Z	1.56	none	slg_bench:99.4,cloudd:7.1,cloudphotod:4.7,nsurlsessiond:3.3,dasd:2.8,com.apple.DriverKit-AppleBCMWLAN:2.5	cloudd:7.1,Google Chrome Helper (Aperitif Renderer):1.0
+1793931034	2026-11-06T02:10:34Z	1.63	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,codex:0.8,ChatGPT:0.6	
+1793931044	2026-11-06T02:10:44Z	1.60	none	slg_bench:98.4,VeeePlus:1.1,WindowServer:1.0,com.apple.DriverKit-AppleBCMWLAN:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.4	Codex (Service):1.3
+1793931054	2026-11-06T02:10:54Z	1.58	none	slg_bench:100.0,apsd:3.6,networkserviceproxy:1.9,airportd:1.8,VeeePlus:1.3,WindowServer:1.2	
+1793931064	2026-11-06T02:11:04Z	1.49	none	networkserviceproxy:3.5,Codex (Renderer):3.5,com.apple.DriverKit-AppleBCMWLAN:2.8,ChatGPT:1.9,airportd:1.7,WindowServer:1.5	Codex (Service):1.5,Codex (Renderer):10.5,Google Chrome Helper (Aperitif Renderer):1.1
+1793931074	2026-11-06T02:11:14Z	1.49	none	slg_bench:99.9,com.apple.DriverKit-AppleBCMWLAN:1.4,VeeePlus:1.1,WindowServer:1.0,airportd:0.9,Google Chrome Helper (Aperitif Renderer):0.9	
+1793931084	2026-11-06T02:11:24Z	1.65	none	slg_bench:99.1,ChatGPT:1.4,VeeePlus:1.3,com.apple.DriverKit-AppleBCMWLAN:1.3,networkserviceproxy:1.2,airportd:1.2	
+1793931094	2026-11-06T02:11:34Z	1.55	none	slg_bench:100.0,trustd:2.9,apsd:1.4,cloudd:1.3,VeeePlus:1.2,WindowServer:1.2	cloudd:1.3,trustd:2.9
+1793931105	2026-11-06T02:11:45Z	1.78	none	slg_bench:100.0,VeeePlus:1.1,WindowServer:1.0,Codex (Service):1.0,Google Chrome Helper (Aperitif Renderer):0.9,PacketTunnel:0.6	Codex (Service):1.0
+1793931115	2026-11-06T02:11:55Z	1.74	none	slg_bench:99.3,remotepairingd:4.6,mDNSResponder:4.1,airportd:2.7,apsd:1.6,com.apple.DriverKit-AppleBCMWLAN:1.6	
+1793931125	2026-11-06T02:12:05Z	1.62	none	VeeePlus:1.2,WindowServer:1.2,com.apple.DriverKit-AppleBCMWLAN:1.2,nsurlsessiond:1.0,PacketTunnel:1.0,Google Chrome Helper (Aperitif Renderer):1.0	Google Chrome Helper (Aperitif Renderer):1.0
+1793931135	2026-11-06T02:12:15Z	1.53	none	slg_bench:100.0,com.apple.DriverKit-AppleBCMWLAN:2.0,airportd:1.7,VeeePlus:1.2,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9	
+1793931145	2026-11-06T02:12:25Z	1.52	none	slg_bench:100.0,VeeePlus:1.1,WindowServer:1.0,com.apple.DriverKit-AppleBCMWLAN:1.0,Google Chrome Helper (Aperitif Renderer):0.9,wifip2pd:0.7	
+1793931155	2026-11-06T02:12:35Z	1.59	none	slg_bench:98.7,UURemote:5.4,trustd:4.3,nsurlsessiond:3.1,VeeePlus:1.2,WindowServer:1.2	trustd:4.3
+1793931165	2026-11-06T02:12:45Z	1.50	none	slg_bench:99.7,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.8,com.apple.DriverKit-AppleBCMWLAN:0.5	
+1793931175	2026-11-06T02:12:55Z	1.58	none	VeeePlus:1.3,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):1.1,airportd:1.0,backgroundtaskmanagementd:0.9,com.apple.DriverKit-AppleBCMWLAN:0.8	Google Chrome Helper (Aperitif Renderer):1.1
+1793931185	2026-11-06T02:13:05Z	1.49	none	backgroundtaskmanagementd:2.3,apsd:2.3,VeeePlus:1.2,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):1.1,bash:0.6	Google Chrome Helper (Aperitif Renderer):1.1
+1793931195	2026-11-06T02:13:15Z	1.42	none	trustd:4.2,cloudd:3.9,VeeePlus:2.9,WindowServer:1.3,Google Chrome Helper (Aperitif Renderer):1.1,cloudphotod:1.0	cloudd:3.9,trustd:4.2,Google Chrome Helper (Aperitif Renderer):1.1
+1793931205	2026-11-06T02:13:25Z	1.43	none	slg_bench:100.0,Claude Helper (Renderer):4.6,com.apple.DriverKit-AppleBCMWLAN:1.7,locationd:1.5,VeeePlus:1.2,WindowServer:1.2	Claude Helper (Renderer):4.6
+1793931215	2026-11-06T02:13:35Z	1.52	none	slg_bench:99.7,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.8,wifip2pd:0.2	
+1793931226	2026-11-06T02:13:46Z	1.51	none	slg_bench:99.8,trustd:3.3,ChatGPT:1.4,VeeePlus:1.2,WindowServer:1.1,Codex (Service):1.1	Codex (Service):1.1,trustd:3.3
+1793931236	2026-11-06T02:13:56Z	1.67	none	slg_bench:100.0,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.5,com.apple.DriverKit-AppleBCMWLAN:0.4	
+1793931246	2026-11-06T02:14:06Z	1.65	none	slg_bench:100.0,cfprefsd:1.2,VeeePlus:1.1,dasd:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9	
+1793931256	2026-11-06T02:14:16Z	1.54	none	Codex (Renderer):32.8,VeeePlus:1.3,ChatGPT:1.3,WindowServer:1.2,com.apple.DriverKit-AppleBCMWLAN:1.0,Google Chrome Helper (Aperitif Renderer):0.9	Codex (Renderer):32.8
+1793931266	2026-11-06T02:14:26Z	1.61	none	slg_bench:100.0,locationd:19.9,airportd:13.0,UniversalControl:6.0,trustd:3.2,rapportd:2.6	trustd:3.2
+1793931276	2026-11-06T02:14:36Z	1.67	none	slg_bench:99.1,VeeePlus:1.1,WindowServer:1.1,Claude Helper (Renderer):1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.6	Claude Helper (Renderer):1.0
+1793931286	2026-11-06T02:14:46Z	1.57	none	slg_bench:100.0,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.4,trustd:0.2	
+1793931296	2026-11-06T02:14:56Z	1.55	none	slg_bench:100.0,Google Chrome:2.8,Google Chrome Helper (Aperitif Renderer):2.7,wechatwebdevtools Helper (Renderer):2.4,cloudd:1.8,wechatwebdevtools Helper (GPU):1.7	cloudd:1.8,Google Chrome Helper (Aperitif Renderer):1.6,Google Chrome Helper (Aperitif Renderer):2.7,Google Chrome:2.8
+1793931306	2026-11-06T02:15:06Z	1.70	none	slg_bench:100.0,com.apple.DriverKit-AppleBCMWLAN:2.1,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,airportd:0.8	
+1793931316	2026-11-06T02:15:16Z	1.67	none	slg_bench:99.3,VeeePlus:1.2,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.8,sysmond:0.7	
+1793931326	2026-11-06T02:15:26Z	1.64	none	cloudd:2.4,com.apple.DriverKit-AppleBCMWLAN:2.1,airportd:1.5,VeeePlus:1.5,sysmond:1.4,WindowServer:1.4	mds_stores:1.4,cloudd:2.4,Claude:1.4,Google Chrome Helper (Aperitif Renderer):1.1
+1793931336	2026-11-06T02:15:36Z	1.47	none	sysmond:2.7,trustd:2.0,mDNSResponder:1.6,VeeePlus:1.5,WindowServer:1.3,com.apple.DriverKit-AppleBCMWLAN:1.1	trustd:2.0,Google Chrome Helper (Aperitif Renderer):1.1
+1793931347	2026-11-06T02:15:47Z	1.40	none	sysmond:7.0,VeeePlus:1.5,com.apple.DriverKit-AppleBCMWLAN:1.5,WindowServer:1.4,launchd:1.2,Google Chrome Helper (Aperitif Renderer):1.1	Google Chrome Helper (Aperitif Renderer):1.1
+1793931357	2026-11-06T02:15:57Z	1.34	none	slg_bench:99.1,launchd:28.8,sysmond:12.0,apsd:4.0,trustd:2.6,com.apple.DriverKit-AppleBCMWLAN:2.6	Codex (Renderer):1.0,trustd:2.6,Google Chrome Helper (Aperitif Renderer):1.3
+1793931367	2026-11-06T02:16:07Z	1.37	none	slg_bench:99.8,cfprefsd:2.8,dasd:2.8,zsh:2.0,VeeePlus:1.1,WindowServer:1.1	
+1793931377	2026-11-06T02:16:17Z	1.63	none	slg_bench:99.1,VeeePlus:1.0,WindowServer:0.9,Google Chrome Helper (Aperitif Renderer):0.9,dasd:0.6,PerfPowerServices:0.6	
+1793931387	2026-11-06T02:16:27Z	1.76	none	slg_bench:100.0,launchd:16.7,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.7	
+1793931397	2026-11-06T02:16:37Z	1.73	none	slg_bench:99.3,cloudd:5.4,cloudphotod:1.3,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9	cloudd:5.4
+1793931407	2026-11-06T02:16:47Z	1.77	none	slg_bench:99.1,ChatGPT:1.2,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.8	
+1793931417	2026-11-06T02:16:57Z	1.73	none	launchd:21.3,ChatGPT:2.5,com.apple.DriverKit-AppleBCMWLAN:2.3,Codex (Renderer):2.3,PacketTunnel:2.1,VeeePlus:1.6	Codex (Service):1.1,Codex (Renderer):1.5,Codex (Renderer):2.3,Google Chrome Helper (Aperitif Renderer):1.0
+1793931427	2026-11-06T02:17:07Z	1.62	none	ChatGPT:3.4,cloudd:2.2,Codex (Renderer):1.4,VeeePlus:1.3,WindowServer:1.2,apsd:1.1	cloudd:2.2,Codex (Service):1.0,Codex (Renderer):1.4,Google Chrome Helper (Aperitif Renderer):1.0
+1793931437	2026-11-06T02:17:17Z	1.74	none	VeeePlus:1.1,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.5,Claude:0.3,ChatGPT:0.3	Google Chrome Helper (Aperitif Renderer):1.1
+1793931447	2026-11-06T02:17:27Z	1.78	none	slg_bench:100.0,launchd:2.7,apsd:1.9,VeeePlus:1.1,timed:1.0,WindowServer:1.0	
+1793931457	2026-11-06T02:17:37Z	1.90	none	slg_bench:100.0,nsurlsessiond:1.9,cloudd:1.4,UURemoteServer:1.4,VeeePlus:1.2,WindowServer:1.2	cloudd:1.4,Google Chrome Helper (Aperitif Renderer):1.0
+1793931468	2026-11-06T02:17:48Z	1.84	none	slg_bench:100.0,apsd:2.2,VeeePlus:1.2,WindowServer:1.1,remotepairingd:1.1,trustd:1.0	trustd:1.0
+1793931478	2026-11-06T02:17:58Z	1.86	none	slg_bench:99.3,VeeePlus:1.1,launchd:1.0,WindowServer:1.0,Finder:0.9,Google Chrome Helper (Aperitif Renderer):0.9	
+1793931488	2026-11-06T02:18:08Z	1.73	none	apsd:4.8,trustd:3.4,Finder:1.7,com.apple.DriverKit-AppleBCMWLAN:1.5,VeeePlus:1.4,WindowServer:1.4	trustd:3.4,Google Chrome Helper (Aperitif Renderer):1.1
+1793931498	2026-11-06T02:18:18Z	1.69	none	slg_bench:96.6,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.8,Finder:0.6	
+1793931508	2026-11-06T02:18:28Z	1.74	none	slg_bench:99.0,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.7,Finder:0.6	
+1793931518	2026-11-06T02:18:38Z	1.85	none	slg_bench:99.7,ChatGPT:1.2,VeeePlus:1.1,WindowServer:1.1,Finder:1.1,Google Chrome Helper (Aperitif Renderer):0.9	
+1793931528	2026-11-06T02:18:48Z	1.79	none	slg_bench:100.0,cloudd:5.4,VeeePlus:1.1,Finder:1.1,WindowServer:1.0,com.apple.DriverKit-AppleBCMWLAN:1.0	cloudd:5.4
+1793931538	2026-11-06T02:18:58Z	1.67	none	slg_bench:99.3,com.apple.DriverKit-AppleBCMWLAN:1.8,UURemote:1.8,VeeePlus:1.2,WindowServer:1.1,Finder:1.1	trustd:4.2,Google Chrome Helper (Aperitif Renderer):1.0
+1793931548	2026-11-06T02:19:08Z	1.64	none	com.apple.DriverKit-AppleBCMWLAN:4.4,PacketTunnel:2.4,ChatGPT:2.1,UURemoteServer:2.0,Finder:1.6,WindowServer:1.4	codex:1.8,Google Chrome Helper (Aperitif Renderer):1.1
+1793931558	2026-11-06T02:19:18Z	1.78	none	slg_bench:99.3,VeeePlus:1.0,WindowServer:1.0,com.apple.DriverKit-AppleBCMWLAN:1.0,Google Chrome Helper (Aperitif Renderer):0.9,Finder:0.8	
+1793931568	2026-11-06T02:19:28Z	2.04	none	slg_bench:99.3,VeeePlus:3.9,trustd:2.8,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.6	trustd:1.7
+1793931578	2026-11-06T02:19:38Z	1.88	none	slg_bench:99.0,cloudd:5.6,cloudphotod:1.4,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9	cloudd:5.6
+1793931588	2026-11-06T02:19:48Z	1.97	none	slg_bench:99.8,runningboardd:3.2,remotepairingd:2.4,mDNSResponder:1.6,Electron:1.3,VeeePlus:1.0	
+1793931598	2026-11-06T02:19:58Z	1.90	none	slg_bench:100.0,ChatGPT:1.5,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,Finder:0.6	
+1793931609	2026-11-06T02:20:09Z	1.98	none	slg_bench:100.0,cloudd:2.3,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,cloudphotod:0.5	cloudd:2.3
+1793931619	2026-11-06T02:20:19Z	1.83	none	Codex (Renderer):8.9,ChatGPT:3.6,nsurlsessiond:1.6,com.apple.DriverKit-AppleBCMWLAN:1.5,VeeePlus:1.4,WindowServer:1.3	Codex (Service):1.3,Codex (Renderer):8.9,trustd:1.2,Google Chrome Helper (Aperitif Renderer):1.0
+1793931629	2026-11-06T02:20:29Z	1.78	none	slg_bench:99.3,VeeePlus:2.3,launchd:1.8,mDNSResponder:1.2,WindowServer:1.0,BiomeAgent:1.0	
+1793931639	2026-11-06T02:20:39Z	2.03	none	slg_bench:100.0,VeeePlus:1.1,WindowServer:1.0,com.apple.DriverKit-AppleBCMWLAN:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.6	
+1793931649	2026-11-06T02:20:49Z	1.95	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:0.9,com.apple.DriverKit-AppleBCMWLAN:0.9,Google Chrome Helper (Aperitif Renderer):0.9,apsd:0.4	
+1793931659	2026-11-06T02:20:59Z	1.88	none	slg_bench:99.0,cloudd:2.4,searchpartyd:1.4,VeeePlus:1.2,WindowServer:1.2,com.apple.DriverKit-AppleBCMWLAN:1.0	cloudd:2.4
+1793931669	2026-11-06T02:21:09Z	1.90	none	slg_bench:98.7,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,airportd:0.8,com.apple.DriverKit-AppleBCMWLAN:0.8	
+1793931679	2026-11-06T02:21:19Z	1.91	none	searchpartyd:1.9,WindowServer:1.4,VeeePlus:1.3,com.apple.DriverKit-AppleBCMWLAN:1.3,Google Chrome Helper (Aperitif Renderer):1.1,ChatGPT:1.1	Codex (Service):1.0,Google Chrome Helper (Aperitif Renderer):1.1
+1793931689	2026-11-06T02:21:29Z	1.77	none	slg_bench:100.0,VeeePlus:1.1,apsd:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,Claude:0.7	
+1793931699	2026-11-06T02:21:39Z	1.80	none	slg_bench:99.0,VeeePlus:1.1,WindowServer:1.1,com.apple.DriverKit-AppleBCMWLAN:0.9,Google Chrome Helper (Aperitif Renderer):0.9,mDNSResponder:0.5	
+1793931709	2026-11-06T02:21:49Z	1.68	none	slg_bench:99.1,remotepairingd:6.7,mDNSResponder:3.8,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9	
+1793931719	2026-11-06T02:21:59Z	1.81	none	slg_bench:100.0,cloudd:4.7,cloudphotod:1.4,VeeePlus:1.2,WindowServer:1.2,Finder:1.1	cloudd:4.7
+1793931729	2026-11-06T02:22:09Z	1.91	none	slg_bench:99.0,backgroundtaskmanagementd:1.2,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.7	
+1793931740	2026-11-06T02:22:20Z	1.99	none	backgroundtaskmanagementd:3.8,VeeePlus:1.3,WindowServer:1.2,com.apple.DriverKit-AppleBCMWLAN:1.1,Finder:1.0,Google Chrome Helper (Aperitif Renderer):1.0	Google Chrome Helper (Aperitif Renderer):1.0
+1793931750	2026-11-06T02:22:30Z	1.84	none	slg_bench:99.3,backgroundtaskmanagementd:2.2,ChatGPT:1.9,Codex (Renderer):1.5,VeeePlus:1.2,WindowServer:1.1	
+1793931760	2026-11-06T02:22:40Z	1.94	none	slg_bench:99.3,UURemote:32.4,runningboardd:6.6,com.apple.DriverKit-AppleBCMWLAN:1.9,WindowServer:1.3,VeeePlus:1.2	trustd:1.0
+1793931770	2026-11-06T02:22:50Z	1.79	none	slg_bench:99.3,Codex (Renderer):26.3,ChatGPT:1.6,com.apple.DriverKit-AppleBCMWLAN:1.5,VeeePlus:1.4,WindowServer:1.2	Codex (Renderer):26.3
+1793931780	2026-11-06T02:23:00Z	1.89	none	slg_bench:100.0,loginwindow:7.4,Claude Helper (Renderer):3.6,WindowServer:2.5,VeeePlus:1.3,Google Chrome Helper (Aperitif Renderer):0.9	Claude Helper (Renderer):3.6
+1793931790	2026-11-06T02:23:10Z	2.13	none	slg_bench:100.0,Codex (Renderer):5.4,ChatGPT:2.5,Codex (Service):2.2,VeeePlus:1.2,WindowServer:1.1	Codex (Service):2.2,Codex (Renderer):5.4
+1793931800	2026-11-06T02:23:20Z	2.03	none	cloudd:1.6,com.apple.DriverKit-AppleBCMWLAN:1.3,VeeePlus:1.2,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):0.9,apsd:0.4	cloudd:7.1,Google Chrome Helper (Aperitif Renderer):1.1
+1793931810	2026-11-06T02:23:30Z	1.87	none	slg_bench:98.4,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.7,ChatGPT:0.7	
+1793931820	2026-11-06T02:23:40Z	1.90	none	slg_bench:99.8,apsd:1.8,trustd:1.4,WindowServer:1.2,VeeePlus:1.1,Finder:1.1	trustd:1.4
+1793931830	2026-11-06T02:23:50Z	1.83	none	slg_bench:99.8,VeeePlus:1.2,WindowServer:1.2,nsurlsessiond:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.9	
+1793931840	2026-11-06T02:24:00Z	1.71	none	loginwindow:8.1,WindowServer:4.1,com.apple.DriverKit-AppleBCMWLAN:1.8,VeeePlus:1.6,Google Chrome Helper (Aperitif Renderer):1.4,ChatGPT:1.2	Google Chrome Helper (Aperitif Renderer):1.4
+1793931850	2026-11-06T02:24:10Z	1.60	none	slg_bench:99.1,com.apple.DriverKit-AppleBCMWLAN:2.2,VeeePlus:2.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.8	
+1793931860	2026-11-06T02:24:20Z	1.58	none	slg_bench:100.0,com.apple.DriverKit-AppleBCMWLAN:1.6,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,UURemoteServer:0.4	
+1793931871	2026-11-06T02:24:31Z	1.65	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,sysmond:0.8,com.apple.DriverKit-AppleBCMWLAN:0.4	
+1793931881	2026-11-06T02:24:41Z	1.62	none	slg_bench:99.7,sysmond:1.5,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.7	
+1793931891	2026-11-06T02:24:51Z	1.61	none	slg_bench:100.0,sysmond:3.0,VeeePlus:1.2,WindowServer:1.2,trustd:1.0,com.apple.DriverKit-AppleBCMWLAN:0.9	trustd:1.0
+1793931901	2026-11-06T02:25:01Z	1.51	none	loginwindow:10.1,sysmond:6.9,cloudd:5.1,WindowServer:4.4,VeeePlus:1.9,ChatGPT:1.9	cloudd:5.1,Google Chrome Helper (Aperitif Renderer):1.4
+1793931911	2026-11-06T02:25:11Z	1.43	none	slg_bench:100.0,sysmond:10.8,opendirectoryd:1.5,VeeePlus:1.5,launchd:1.3,WindowServer:1.3	Claude Helper (Renderer):1.0,Google Chrome Helper (Aperitif Renderer):1.1
+1793931921	2026-11-06T02:25:21Z	1.44	none	slg_bench:100.0,Codex (Renderer):5.4,zsh:2.0,ChatGPT:2.0,Codex (Service):2.0,(bash):1.7	Codex (Service):2.0,Codex (Renderer):5.4,Google Chrome Helper (Aperitif Renderer):1.0
+1793931931	2026-11-06T02:25:31Z	1.60	none	slg_bench:100.0,cfprefsd:2.8,dasd:1.7,Claude Helper (Renderer):1.1,VeeePlus:1.0,Finder:1.0	Claude Helper (Renderer):1.1
+1793931941	2026-11-06T02:25:41Z	1.67	none	slg_bench:99.1,remotepairingd:1.3,VeeePlus:1.1,WindowServer:1.1,Finder:1.1,com.apple.DriverKit-AppleBCMWLAN:0.9	
+1793931951	2026-11-06T02:25:51Z	1.64	none	deleted:89.4,cloudd:43.0,triald_system:28.8,triald:21.8,tccd:20.2,tccd:16.6	cloudd:43.0,Google Chrome Helper (Aperitif Renderer):2.4
+1793931961	2026-11-06T02:26:01Z	1.54	none	loginwindow:7.7,WindowServer:4.2,com.apple.DriverKit-AppleBCMWLAN:2.0,Finder:1.9,VeeePlus:1.6,Google Chrome Helper (Aperitif Renderer):1.4	Google Chrome Helper (Aperitif Renderer):1.4
+1793931971	2026-11-06T02:26:11Z	1.53	none	apsd:2.7,timed:1.3,VeeePlus:1.2,WindowServer:1.1,com.apple.DriverKit-AppleBCMWLAN:1.0,Finder:0.9	Google Chrome Helper (Aperitif Renderer):1.0
+1793931981	2026-11-06T02:26:21Z	1.61	none	slg_bench:100.0,ChatGPT:2.3,Codex (Renderer):1.8,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9	Codex (Renderer):1.8
+1793931992	2026-11-06T02:26:32Z	1.59	none	slg_bench:100.0,apsd:4.2,VeeePlus:1.2,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.8	
+1793932002	2026-11-06T02:26:42Z	1.73	none	slg_bench:100.0,airportd:3.9,com.apple.DriverKit-AppleBCMWLAN:2.4,ChatGPT:1.6,VeeePlus:1.2,WindowServer:1.1	Codex (Renderer):1.4
+1793932012	2026-11-06T02:26:52Z	1.69	none	slg_bench:100.0,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.5,Claude:0.5	
+1793932022	2026-11-06T02:27:02Z	1.75	none	slg_bench:100.0,loginwindow:3.7,trustd:2.4,WindowServer:2.1,nsurlsessiond:1.3,VeeePlus:1.2	cloudd:1.2,trustd:2.4,Google Chrome Helper (Aperitif Renderer):1.0
+1793932032	2026-11-06T02:27:12Z	1.79	none	slg_bench:100.0,mdworker_shared:17.0,tccd:2.3,WindowServer:2.1,syspolicyd:1.6,cloudd:1.5	syspolicyd:1.6,cloudd:1.5,trustd:1.4,mdworker_shared:17.0
+1793932042	2026-11-06T02:27:22Z	1.66	none	mdworker_shared:1.4,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):1.0,Codex (Service):0.9,Finder:0.7	Google Chrome Helper (Aperitif Renderer):1.0,mdworker_shared:1.4
+1793932052	2026-11-06T02:27:32Z	1.64	none	slg_bench:99.1,runningboardd:6.1,VeeePlus:1.2,WindowServer:1.1,searchpartyd:1.0,Google Chrome Helper (Aperitif Renderer):0.9	
+1793932062	2026-11-06T02:27:42Z	1.62	none	slg_bench:100.0,remotepairingd:2.1,cloudd:1.8,mDNSResponder:1.6,VeeePlus:1.1,WindowServer:1.0	cloudd:1.8
+1793932072	2026-11-06T02:27:52Z	1.52	none	slg_bench:99.1,Codex (Renderer):8.0,ChatGPT:1.3,VeeePlus:1.2,searchpartyd:1.1,WindowServer:1.1	Codex (Renderer):8.0
+1793932082	2026-11-06T02:28:02Z	1.44	none	slg_bench:99.0,WindowServer:1.4,ChatGPT:1.4,Google Chrome Helper (Aperitif Renderer):1.3,VeeePlus:1.2,Google Chrome Helper (Aperitif Renderer):0.9	Google Chrome Helper (Aperitif Renderer):1.3
+1793932092	2026-11-06T02:28:12Z	1.45	none	slg_bench:100.0,Codex (Renderer):7.7,ChatGPT:3.9,Codex (Service):2.4,WindowServer:1.4,VeeePlus:1.2	Codex (Service):1.8,Codex (Renderer):16.1
+1793932102	2026-11-06T02:28:22Z	1.69	none	slg_bench:99.1,apsd:2.3,VeeePlus:1.2,com.apple.DriverKit-AppleBCMWLAN:1.2,WindowServer:1.1,trustd:1.0	
+1793932112	2026-11-06T02:28:32Z	1.74	none	trustd:3.7,nsurlsessiond:2.5,cloudtelemetryd:2.5,cloudd:2.3,VeeePlus:1.4,WindowServer:1.3	cloudd:2.3,trustd:3.7,Google Chrome Helper (Aperitif Renderer):1.1
+1793932123	2026-11-06T02:28:43Z	1.62	none	apsd:4.9,cloudd:3.8,locationd:3.1,airportd:2.3,com.apple.DriverKit-AppleBCMWLAN:1.8,VeeePlus:1.5	cloudd:3.8,Google Chrome Helper (Aperitif Renderer):1.1,Google Chrome:1.5
+1793932133	2026-11-06T02:28:53Z	1.53	none	VeeePlus:1.1,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.7,bash:0.6,Finder:0.5	
+1793932143	2026-11-06T02:29:03Z	1.60	none	slg_bench:99.8,trustd:2.5,nsurlsessiond:1.5,VeeePlus:1.2,WindowServer:1.2,cloudd:1.2	cloudd:1.2,trustd:2.5
+1793932153	2026-11-06T02:29:13Z	1.66	none	slg_bench:100.0,airportd:9.7,PerfPowerServices:3.5,configd:3.0,cloudd:2.8,runningboardd:1.4	cloudd:2.8,trustd:1.1
+1793932163	2026-11-06T02:29:23Z	1.56	none	slg_bench:99.3,ChatGPT:2.5,Codex (Renderer):1.4,VeeePlus:1.2,cfprefsd:1.1,dasd:1.1	Codex (Renderer):1.4
+1793932173	2026-11-06T02:29:33Z	1.55	none	slg_bench:99.1,apsd:1.4,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.5	
+1793932183	2026-11-06T02:29:43Z	1.54	none	slg_bench:99.3,AddressBookSourceSync:13.0,runningboardd:5.0,trustd:4.5,remotepairingd:3.5,mDNSResponder:2.1	trustd:4.5
+1793932193	2026-11-06T02:29:53Z	1.61	none	WindowServer:2.1,tccd:1.9,syspolicyd:1.4,VeeePlus:1.4,trustd:1.2,com.apple.DriverKit-AppleBCMWLAN:1.0	syspolicyd:1.4,trustd:1.2
+1793932203	2026-11-06T02:30:03Z	1.52	none	VeeePlus:1.3,secd:1.2,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):1.0,bash:0.6,com.apple.DriverKit-AppleBCMWLAN:0.6	Google Chrome Helper (Aperitif Renderer):1.0
+1793932213	2026-11-06T02:30:13Z	1.60	none	nsurlsessiond:1.5,VeeePlus:1.5,cloudd:1.4,WindowServer:1.3,Google Chrome Helper (Aperitif Renderer):1.1,com.apple.DriverKit-AppleBCMWLAN:1.0	cloudd:1.4,Google Chrome Helper (Aperitif Renderer):1.1
+1793932223	2026-11-06T02:30:23Z	1.50	none	slg_bench:3.1,VeeePlus:1.3,bash:1.3,WindowServer:1.2,Electron:1.0,Google Chrome Helper (Aperitif Renderer):1.0	Google Chrome Helper (Aperitif Renderer):1.0
+1793932233	2026-11-06T02:30:33Z	1.65	none	slg_bench:100.0,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.9,Claude Helper (Renderer):0.5	
+1793932243	2026-11-06T02:30:43Z	1.55	none	slg_bench:100.0,airportd:3.7,com.apple.DriverKit-AppleBCMWLAN:2.7,bluetoothd:1.9,secd:1.9,ChatGPT:1.7	Google Chrome Helper (Aperitif Renderer):1.0
+1793932254	2026-11-06T02:30:54Z	1.69	none	slg_bench:99.1,Claude Helper (Renderer):1.9,VeeePlus:1.0,WindowServer:1.0,com.apple.DriverKit-AppleBCMWLAN:1.0,Google Chrome Helper (Aperitif Renderer):0.9	Claude Helper (Renderer):1.9
+1793932264	2026-11-06T02:31:04Z	1.73	none	slg_bench:100.0,Codex (Renderer):8.6,ChatGPT:4.3,com.apple.DriverKit-AppleBCMWLAN:1.9,Codex (Service):1.8,VeeePlus:1.2	Codex (Service):1.8,Codex (Renderer):8.6
+1793932274	2026-11-06T02:31:14Z	1.62	none	backgroundtaskmanagementd:1.9,VeeePlus:1.2,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):1.0,com.apple.DriverKit-AppleBCMWLAN:0.9,ChatGPT:0.6	Google Chrome Helper (Aperitif Renderer):1.1
+1793932284	2026-11-06T02:31:24Z	1.60	none	slg_bench:100.0,backgroundtaskmanagementd:3.1,apsd:2.8,VeeePlus:1.2,PerfPowerServices:1.1,WindowServer:1.1	
+1793932294	2026-11-06T02:31:34Z	1.58	none	slg_bench:100.0,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.4,mDNSResponder:0.3	
+1793932304	2026-11-06T02:31:44Z	1.57	none	slg_bench:99.3,apsd:1.5,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,timed:0.5	
+1793932314	2026-11-06T02:31:54Z	1.56	none	slg_bench:99.1,VeeePlus:1.0,WindowServer:0.9,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.3,Codex (Service):0.3	
+1793932324	2026-11-06T02:32:04Z	1.55	none	slg_bench:100.0,apsd:5.0,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.7	
+1793932334	2026-11-06T02:32:14Z	1.55	none	VeeePlus:1.3,WindowServer:1.2,bash:1.0,Google Chrome Helper (Aperitif Renderer):1.0,com.apple.DriverKit-AppleBCMWLAN:0.8,sleep:0.7	Google Chrome Helper (Aperitif Renderer):1.0
+1793932344	2026-11-06T02:32:24Z	1.54	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.7,Codex (Service):0.5	
+1793932354	2026-11-06T02:32:34Z	1.61	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:0.9,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.4,wifip2pd:0.2	
+1793932364	2026-11-06T02:32:44Z	1.51	none	slg_bench:99.3,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.4,ChatGPT:0.4	
+1793932374	2026-11-06T02:32:54Z	1.59	none	slg_bench:99.3,VeeePlus:1.0,WindowServer:0.9,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.4,Google Chrome:0.2	
+1793932385	2026-11-06T02:33:05Z	1.58	none	slg_bench:100.0,trustd:4.0,nsurlsessiond:2.2,cloudd:2.0,dasd:1.4,VeeePlus:1.2	cloudd:2.0,trustd:4.0
+1793932395	2026-11-06T02:33:15Z	1.64	none	slg_bench:100.0,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,apsd:0.5,com.apple.DriverKit-AppleBCMWLAN:0.5	cloudd:2.6,Google Chrome Helper (Aperitif Renderer):1.0
+1793932405	2026-11-06T02:33:25Z	1.54	none	ChatGPT:1.5,WindowServer:1.3,VeeePlus:1.2,Google Chrome Helper (Aperitif Renderer):0.9,Codex (Renderer):0.7,com.apple.DriverKit-AppleBCMWLAN:0.6	Google Chrome Helper (Aperitif Renderer):1.0
+1793932415	2026-11-06T02:33:35Z	1.77	none	slg_bench:99.3,runningboardd:3.6,VeeePlus:1.2,remotepairingd:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9	
+1793932425	2026-11-06T02:33:45Z	1.95	none	slg_bench:100.0,sysmond:1.2,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.7	
+1793932435	2026-11-06T02:33:55Z	2.10	none	slg_bench:100.0,Codex (Renderer):3.1,sysmond:1.8,ChatGPT:1.5,VeeePlus:1.2,WindowServer:1.2	Codex (Renderer):3.1
+1793932445	2026-11-06T02:34:05Z	2.01	none	slg_bench:100.0,sysmond:5.2,VeeePlus:1.2,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):1.0,com.apple.DriverKit-AppleBCMWLAN:0.8	Google Chrome Helper (Aperitif Renderer):1.0
+1793932455	2026-11-06T02:34:15Z	2.09	none	slg_bench:99.1,sysmond:8.0,Codex (Renderer):4.1,ChatGPT:3.1,Codex (Service):1.9,launchd:1.6	Codex (Service):1.9,Codex (Renderer):4.1,Google Chrome Helper (Aperitif Renderer):1.1
+1793932465	2026-11-06T02:34:25Z	2.00	none	zsh:2.5,opendirectoryd:2.2,launchd:1.9,VeeePlus:1.4,WindowServer:1.3,Google Chrome Helper (Aperitif Renderer):1.1	Google Chrome Helper (Aperitif Renderer):1.1
+1793932475	2026-11-06T02:34:35Z	2.32	none	slg_bench:99.8,VeeePlus:1.0,WindowServer:0.9,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.5,Codex (Service):0.5	
+1793932485	2026-11-06T02:34:45Z	2.42	none	slg_bench:100.0,VeeePlus:1.2,trustd:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.8	trustd:1.0
+1793932495	2026-11-06T02:34:55Z	2.20	none	slg_bench:99.3,com.apple.DriverKit-AppleBCMWLAN:1.3,Claude Helper (Renderer):1.3,airportd:1.2,VeeePlus:1.2,WindowServer:1.1	Claude Helper (Renderer):1.3
+1793932505	2026-11-06T02:35:05Z	2.10	none	slg_bench:99.3,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.4,apsd:0.2	
+1793932515	2026-11-06T02:35:16Z	2.40	none	slg_bench:100.0,modelcatalogd:59.3,stickersd:51.3,modelmanagerd:21.0,VTDecoderXPCService:4.5,GenerativeExperiencesSafetyInferenceProvider:2.9	cloudd:2.0,trustd:2.4,Google Chrome Helper (Aperitif Renderer):1.3
+1793932526	2026-11-06T02:35:26Z	2.43	none	cloudd:3.8,com.apple.DriverKit-AppleBCMWLAN:1.4,ps:1.3,VeeePlus:1.3,ChatGPT:1.3,WindowServer:1.2	cloudd:3.8,Google Chrome Helper (Aperitif Renderer):1.1
+1793932536	2026-11-06T02:35:36Z	2.29	none	slg_bench:99.0,ChatGPT:2.3,remotepairingd:2.2,mDNSResponder:1.6,Codex (Renderer):1.5,VeeePlus:1.2	Codex (Renderer):1.5
+1793932546	2026-11-06T02:35:46Z	2.24	none	slg_bench:100.0,VeeePlus:1.2,WindowServer:1.2,mds:1.1,com.apple.DriverKit-AppleBCMWLAN:1.0,Google Chrome Helper (Aperitif Renderer):1.0	mds:1.1,Google Chrome Helper (Aperitif Renderer):1.0
+1793932556	2026-11-06T02:35:56Z	2.12	none	slg_bench:99.1,VeeePlus:1.0,WindowServer:1.0,cloudd:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.7	cloudd:1.0
+1793932566	2026-11-06T02:36:06Z	2.18	none	slg_bench:100.0,VeeePlus:3.9,trustd:2.3,WeatherWidget:1.9,runningboardd:1.4,WindowServer:1.2	trustd:2.3
+1793932576	2026-11-06T02:36:16Z	2.30	none	WindowServer:1.6,trustd:1.5,VeeePlus:1.3,com.apple.DriverKit-AppleBCMWLAN:1.1,Google Chrome Helper (Aperitif Renderer):1.0,nsurlsessiond:0.8	trustd:1.5,Google Chrome Helper (Aperitif Renderer):1.0
+1793932586	2026-11-06T02:36:26Z	2.18	none	slg_bench:70.9,Codex (Renderer):3.8,ChatGPT:2.3,com.apple.DriverKit-AppleBCMWLAN:1.7,networkserviceproxy:1.6,Codex (Service):1.6	Codex (Service):1.6,Codex (Renderer):3.8,Google Chrome Helper (Aperitif Renderer):1.0
+1793932596	2026-11-06T02:36:36Z	2.15	none	slg_bench:100.0,com.apple.DriverKit-AppleBCMWLAN:2.0,airportd:1.4,VeeePlus:1.1,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9	
+1793932606	2026-11-06T02:36:46Z	2.06	none	slg_bench:99.3,VeeePlus:1.1,WindowServer:1.0,com.apple.DriverKit-AppleBCMWLAN:1.0,Google Chrome Helper (Aperitif Renderer):0.9,networkserviceproxy:0.7	
+1793932616	2026-11-06T02:36:56Z	2.05	none	slg_bench:99.7,cloudd:5.5,cloudphotod:1.4,VeeePlus:1.2,WindowServer:1.1,com.apple.DriverKit-AppleBCMWLAN:1.1	cloudd:5.5,Google Chrome Helper (Aperitif Renderer):1.0,Google Chrome Helper (Aperitif Renderer):1.0
+1793932626	2026-11-06T02:37:06Z	1.97	none	UURemote:11.5,VeeePlus:2.5,WindowServer:1.3,Google Chrome Helper (Aperitif Renderer):1.0,UserEventAgent:0.9,PacketTunnel:0.7	Google Chrome Helper (Aperitif Renderer):1.0
+1793932636	2026-11-06T02:37:16Z	1.82	none	slg_bench:99.7,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,apsd:0.7,com.apple.DriverKit-AppleBCMWLAN:0.7	
+1793932647	2026-11-06T02:37:27Z	1.69	none	slg_bench:99.3,launchd:7.8,VeeePlus:1.2,WindowServer:1.2,Finder:1.2,Google Chrome Helper (Aperitif Renderer):0.9	
+1793932657	2026-11-06T02:37:37Z	1.74	none	slg_bench:99.1,remotepairingd:5.4,mDNSResponder:4.0,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9	
+1793932667	2026-11-06T02:37:47Z	1.70	none	slg_bench:100.0,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.9,com.apple.DriverKit-AppleBCMWLAN:0.8	
+1793932677	2026-11-06T02:37:57Z	1.59	none	slg_bench:100.0,launchd:31.5,cloudd:2.8,cloudphotod:1.7,nsurlsessiond:1.6,VeeePlus:1.5	cloudd:1.5,Google Chrome Helper (Aperitif Renderer):1.0
+1793932687	2026-11-06T02:38:07Z	1.89	none	apsd:2.0,VeeePlus:1.3,WindowServer:1.2,ChatGPT:1.1,Google Chrome Helper (Aperitif Renderer):1.0,Codex (Renderer):1.0	Codex (Renderer):1.0,Google Chrome Helper (Aperitif Renderer):1.0
+1793932697	2026-11-06T02:38:17Z	1.75	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.6,airportd:0.3	
+1793932707	2026-11-06T02:38:27Z	2.03	none	slg_bench:100.0,launchd:8.4,apsd:1.3,VeeePlus:1.2,WindowServer:1.2,com.apple.DriverKit-AppleBCMWLAN:0.9	
+1793932717	2026-11-06T02:38:37Z	1.95	none	slg_bench:99.3,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,cloudd:0.6,com.apple.DriverKit-AppleBCMWLAN:0.6	
+1793932727	2026-11-06T02:38:47Z	2.03	none	slg_bench:100.0,apsd:1.3,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.5	
+1793932737	2026-11-06T02:38:57Z	1.87	none	launchd:12.0,Codex (Renderer):3.5,cloudd:3.3,accountsd:2.5,ChatGPT:2.2,Codex (Service):1.7	cloudd:3.3,Codex (Service):1.7,Codex (Renderer):3.5,Google Chrome Helper (Aperitif Renderer):1.1
+1793932747	2026-11-06T02:39:07Z	1.74	none	trustd:2.5,cloudtelemetryd:1.9,nsurlsessiond:1.6,cloudd:1.4,VeeePlus:1.3,WindowServer:1.2	cloudd:1.4,trustd:2.5,Google Chrome Helper (Aperitif Renderer):1.0
+1793932757	2026-11-06T02:39:17Z	1.62	none	ChatGPT:3.3,cloudd:2.4,Codex (Service):1.7,com.apple.DriverKit-AppleBCMWLAN:1.6,Codex (Renderer):1.4,VeeePlus:1.3	cloudd:1.4,Codex (Service):1.0,Google Chrome Helper (Aperitif Renderer):1.0
+1793932768	2026-11-06T02:39:28Z	1.68	none	slg_bench:100.0,launchd:1.5,VeeePlus:1.2,WindowServer:1.1,com.apple.DriverKit-AppleBCMWLAN:0.9,Google Chrome Helper (Aperitif Renderer):0.9	
+1793932778	2026-11-06T02:39:38Z	1.65	none	slg_bench:98.8,mds_stores:54.3,mediaanalysisd:22.0,runningboardd:8.0,remotepairingd:5.9,mDNSResponder:3.8	mds:2.4,mds_stores:54.3,mediaanalysisd:22.0,mediaanalysisd-access:3.0,Google Chrome Helper (Aperitif Renderer):1.1
+1793932788	2026-11-06T02:39:48Z	1.63	none	slg_bench:99.3,cloudd:5.6,trustd:4.0,UURemote:3.3,cloudphotod:1.4,airportd:1.4	cloudd:5.6,trustd:4.0,Google Chrome Helper (Aperitif Renderer):1.0
+1793932798	2026-11-06T02:39:58Z	1.69	none	slg_bench:99.1,airportd:1.4,com.apple.DriverKit-AppleBCMWLAN:1.4,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9	
+1793932808	2026-11-06T02:40:08Z	1.66	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:1.0,com.apple.DriverKit-AppleBCMWLAN:0.9,Google Chrome Helper (Aperitif Renderer):0.9,wifip2pd:0.1	
+1793932818	2026-11-06T02:40:18Z	1.71	none	slg_bench:99.3,dasd:7.6,FedStatsPluginStatic:7.3,launchd:5.3,cfprefsd:3.2,runningboardd:2.0	
+1793932828	2026-11-06T02:40:28Z	1.68	none	Claude Helper (Renderer):4.8,backgroundtaskmanagementd:1.5,VeeePlus:1.2,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):0.9,launchd:0.7	Claude Helper (Renderer):4.8,Google Chrome Helper (Aperitif Renderer):1.0
+1793932838	2026-11-06T02:40:38Z	1.79	none	slg_bench:100.0,backgroundtaskmanagementd:1.8,apsd:1.7,VeeePlus:1.2,ChatGPT:1.2,WindowServer:1.0	
+1793932848	2026-11-06T02:40:48Z	1.82	none	slg_bench:100.0,Claude Helper (Renderer):2.0,cloudd:1.9,VeeePlus:1.2,ChatGPT:1.2,WindowServer:1.1	cloudd:1.1,Claude Helper (Renderer):2.0
+1793932858	2026-11-06T02:40:58Z	1.78	none	slg_bench:99.0,com.apple.DriverKit-AppleBCMWLAN:2.6,ChatGPT:2.2,searchpartyuseragent:1.3,VeeePlus:1.3,WindowServer:1.2	
+1793932868	2026-11-06T02:41:08Z	1.89	none	slg_bench:99.0,com.apple.DriverKit-AppleBCMWLAN:1.4,PerfPowerServices:1.2,VeeePlus:1.2,WindowServer:1.2,ChatGPT:1.1	
+1793932878	2026-11-06T02:41:18Z	1.97	none	slg_bench:99.0,Claude Helper:8.5,WindowServer:3.3,Claude Helper (Renderer):2.8,VeeePlus:1.3,PerfPowerServices:1.2	Claude Helper:8.5,Claude Helper (Renderer):2.8,Google Chrome Helper (Aperitif Renderer):1.1
+1793932888	2026-11-06T02:41:28Z	1.90	none	Claude Helper:10.5,WindowServer:4.1,Codex (Renderer):3.8,ChatGPT:3.2,Claude Helper (Renderer):2.7,com.apple.DriverKit-AppleBCMWLAN:1.9	Codex (Service):1.2,Codex (Renderer):3.8,Claude Helper:10.5,Claude Helper (Renderer):2.7,Google Chrome Helper (Aperitif Renderer):1.2
+1793932899	2026-11-06T02:41:39Z	1.69	none	Claude Helper:10.2,WindowServer:4.2,Claude Helper (Renderer):3.4,VeeePlus:1.7,Google Chrome Helper (Aperitif Renderer):1.4,com.apple.DriverKit-AppleBCMWLAN:0.9	Claude Helper:10.2,Claude Helper (Renderer):3.4,Google Chrome Helper (Aperitif Renderer):1.4
+1793932909	2026-11-06T02:41:49Z	1.81	none	Claude Helper:10.3,runningboardd:4.9,WindowServer:4.0,Claude Helper (Renderer):2.7,VeeePlus:1.6,Google Chrome Helper (Aperitif Renderer):1.4	Claude Helper:10.3,Claude Helper (Renderer):2.7,Google Chrome Helper (Aperitif Renderer):1.4
+1793932919	2026-11-06T02:41:59Z	1.69	none	slg_bench:93.7,Claude Helper:9.0,runningboardd:5.5,Claude Helper (Renderer):4.0,com.apple.DriverKit-AppleBCMWLAN:3.8,WindowServer:3.3	cloudd:2.5,Claude Helper:9.2,Claude Helper (Renderer):3.4,Google Chrome Helper (Aperitif Renderer):1.1
+1793932929	2026-11-06T02:42:09Z	2.12	none	slg_bench:99.3,Claude Helper:8.1,WindowServer:3.2,Claude Helper (Renderer):2.4,VeeePlus:1.3,Google Chrome Helper (Aperitif Renderer):1.1	Claude Helper:8.1,Claude Helper (Renderer):2.4,Google Chrome Helper (Aperitif Renderer):1.1
+1793932939	2026-11-06T02:42:19Z	2.10	none	slg_bench:100.0,Claude Helper:8.1,WindowServer:3.2,Claude Helper (Renderer):2.3,VeeePlus:1.4,com.apple.DriverKit-AppleBCMWLAN:1.2	Claude Helper:8.1,Claude Helper (Renderer):2.3,Google Chrome Helper (Aperitif Renderer):1.1
+1793932949	2026-11-06T02:42:29Z	2.00	none	slg_bench:100.0,Claude Helper:8.5,WindowServer:3.2,Claude Helper (Renderer):2.8,com.apple.DriverKit-AppleBCMWLAN:1.9,VeeePlus:1.3	Claude Helper:8.5,Claude Helper (Renderer):2.8,Google Chrome Helper (Aperitif Renderer):1.1
+1793932959	2026-11-06T02:42:39Z	1.99	none	slg_bench:99.3,Claude Helper:8.1,WindowServer:3.3,Claude Helper (Renderer):2.3,com.apple.DriverKit-AppleBCMWLAN:1.7,apsd:1.6	Claude Helper:8.6,Claude Helper (Renderer):2.6,Google Chrome Helper (Aperitif Renderer):1.1
+1793932969	2026-11-06T02:42:49Z	1.91	none	slg_bench:99.7,Claude Helper:8.1,Claude Helper (Renderer):3.3,WindowServer:3.2,VeeePlus:1.3,Google Chrome Helper (Aperitif Renderer):1.1	Claude Helper:8.1,Claude Helper (Renderer):3.3,Google Chrome Helper (Aperitif Renderer):1.1
+1793932979	2026-11-06T02:42:59Z	1.93	none	Claude Helper:10.6,WindowServer:4.2,Claude Helper (Renderer):3.2,com.apple.DriverKit-AppleBCMWLAN:2.5,VeeePlus:1.8,sysmond:1.5	cloudd:1.1,Claude Helper:10.6,Claude Helper (Renderer):3.2,trustd:4.7,Google Chrome Helper (Aperitif Renderer):1.4
+1793932989	2026-11-06T02:43:09Z	1.87	none	Claude Helper:11.0,WindowServer:4.2,Claude Helper (Renderer):3.0,sysmond:2.4,VeeePlus:1.7,com.apple.DriverKit-AppleBCMWLAN:1.5	Claude Helper:11.0,Claude Helper (Renderer):3.0,Google Chrome Helper (Aperitif Renderer):1.4
+1793932999	2026-11-06T02:43:19Z	1.96	none	Claude Helper:11.0,sysmond:6.1,WindowServer:4.1,Claude Helper (Renderer):3.8,VeeePlus:3.6,com.apple.DriverKit-AppleBCMWLAN:2.3	Claude Helper:11.0,Claude Helper (Renderer):3.8,Google Chrome Helper (Aperitif Renderer):1.4
+1793933009	2026-11-06T02:43:29Z	1.89	none	slg_bench:100.0,Claude Helper:9.5,sysmond:8.2,WindowServer:3.6,Claude Helper (Renderer):2.8,cloudd:1.6	cloudd:1.6,Claude Helper:9.4,Claude Helper (Renderer):2.8,Google Chrome Helper (Aperitif Renderer):1.1
+1793933020	2026-11-06T02:43:40Z	2.06	none	slg_bench:99.7,Claude Helper:8.9,sysmond:7.2,zsh:3.3,WindowServer:3.3,Claude Helper (Renderer):3.1	Claude Helper:8.9,Claude Helper (Renderer):3.1,Google Chrome Helper (Aperitif Renderer):1.1
+1793933030	2026-11-06T02:43:50Z	2.28	none	slg_bench:99.7,Claude Helper:8.2,WindowServer:3.2,Claude Helper (Renderer):2.2,VeeePlus:1.3,com.apple.DriverKit-AppleBCMWLAN:1.3	Claude:1.0,Claude Helper:8.2,Claude Helper (Renderer):2.2,Google Chrome Helper (Aperitif Renderer):1.1
+1793933040	2026-11-06T02:44:00Z	2.55	none	slg_bench:100.0,locationd:10.9,Claude Helper (Renderer):9.8,Claude Helper:8.0,airportd:7.2,loginwindow:6.6	Claude Helper:8.0,Claude Helper (Renderer):9.8,trustd:1.9,Google Chrome Helper (Aperitif Renderer):1.1
+1793933050	2026-11-06T02:44:10Z	2.46	none	slg_bench:99.1,Claude Helper:8.6,WindowServer:3.0,Claude Helper (Renderer):2.8,VeeePlus:1.2,Finder:1.1	Claude Helper:8.0,Claude Helper (Renderer):2.6,Google Chrome Helper (Aperitif Renderer):1.1
+1793933060	2026-11-06T02:44:20Z	2.47	none	Claude Helper:10.2,Codex (Renderer):7.1,WindowServer:4.0,runningboardd:3.8,Claude Helper (Renderer):2.7,Finder:1.9	Codex (Renderer):7.1,Claude Helper:10.2,Claude Helper (Renderer):2.7,Google Chrome Helper (Aperitif Renderer):1.4
+1793933070	2026-11-06T02:44:30Z	2.31	none	slg_bench:99.1,Claude Helper:17.6,Claude Helper (Renderer):10.3,WindowServer:3.7,cloudd:2.1,apsd:2.1	cloudd:2.1,Claude:1.6,Claude Helper:17.6,Claude Helper (Renderer):10.3,Google Chrome Helper (Aperitif Renderer):1.3
+1793933080	2026-11-06T02:44:40Z	2.19	none	slg_bench:98.5,Claude Helper (Renderer):26.6,Claude Helper:17.7,WindowServer:3.4,Codex (Renderer):1.9,Claude:1.8	Codex (Renderer):1.9,Claude:1.8,Claude Helper:17.7,Claude Helper (Renderer):26.6,Google Chrome Helper (Aperitif Renderer):1.1
+1793933090	2026-11-06T02:44:50Z	2.47	none	slg_bench:100.0,Claude Helper:18.1,Claude Helper (Renderer):12.0,WindowServer:3.8,VeeePlus:1.7,Google Chrome Helper (Aperitif Renderer):1.3	Claude Helper:18.1,Claude Helper (Renderer):12.0,Google Chrome Helper (Aperitif Renderer):1.3
+1793933100	2026-11-06T02:45:00Z	2.54	none	slg_bench:99.1,Claude Helper:17.5,Claude Helper (Renderer):11.0,loginwindow:8.2,WindowServer:5.8,Codex (Renderer):3.0	Codex (Service):1.2,Codex (Renderer):3.0,Claude Helper:17.5,Claude Helper (Renderer):11.0,Google Chrome Helper (Aperitif Renderer):1.3
+1793933110	2026-11-06T02:45:10Z	2.45	none	Claude Helper:12.2,Claude Helper (Renderer):11.8,WindowServer:4.4,tccd:2.0,VeeePlus:1.8,syspolicyd:1.5	syspolicyd:1.5,Claude Helper:14.7,Claude Helper (Renderer):10.0,trustd:1.2,Google Chrome Helper (Aperitif Renderer):1.1
+1793933120	2026-11-06T02:45:20Z	2.39	none	slg_bench:21.1,Claude Helper (Renderer):20.4,Claude Helper:15.2,WindowServer:3.9,Claude:3.2,VeeePlus:2.2	Claude:3.2,Claude Helper:15.2,Claude Helper (Renderer):20.4,Google Chrome Helper (Aperitif Renderer):1.3
+1793933130	2026-11-06T02:45:30Z	2.33	none	slg_bench:99.0,remotepairingd:2.4,Claude Helper (Renderer):1.8,mDNSResponder:1.4,VeeePlus:1.1,WindowServer:1.0	Claude Helper (Renderer):1.8
+1793933140	2026-11-06T02:45:40Z	2.28	none	slg_bench:100.0,Claude Helper (Renderer):1.6,VeeePlus:1.4,cloudd:1.2,WindowServer:1.0,com.apple.DriverKit-AppleBCMWLAN:0.9	cloudd:1.2,Claude Helper (Renderer):1.6
+1793933151	2026-11-06T02:45:51Z	2.24	none	slg_bench:100.0,VeeePlus:1.2,WindowServer:1.0,com.apple.DriverKit-AppleBCMWLAN:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.6	
+1793933161	2026-11-06T02:46:01Z	2.04	none	slg_bench:99.8,loginwindow:6.6,WindowServer:3.2,VeeePlus:1.2,Google Chrome Helper (Aperitif Renderer):1.1,com.apple.DriverKit-AppleBCMWLAN:0.7	Google Chrome Helper (Aperitif Renderer):1.1
+1793933171	2026-11-06T02:46:11Z	2.20	none	slg_bench:99.3,cloudd:6.4,cloudphotod:4.7,nsurlsessiond:3.5,dasd:2.7,com.apple.DriverKit-AppleBCMWLAN:1.6	cloudd:6.4,Google Chrome Helper (Aperitif Renderer):1.0
+1793933181	2026-11-06T02:46:21Z	2.25	none	slg_bench:99.7,com.apple.DriverKit-AppleBCMWLAN:1.3,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,UURemote:0.5	
+1793933191	2026-11-06T02:46:31Z	2.05	none	VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,trustd:0.6,com.apple.DriverKit-AppleBCMWLAN:0.4,Claude:0.3	
+1793933201	2026-11-06T02:46:41Z	1.97	none	slg_bench:99.1,trustd:1.6,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,nsurlsessiond:0.7	trustd:1.0
+1793933211	2026-11-06T02:46:51Z	1.90	none	slg_bench:99.1,cloudd:1.7,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,Claude Helper:0.4	cloudd:1.0
+1793933221	2026-11-06T02:47:01Z	1.99	none	slg_bench:99.0,loginwindow:7.4,WindowServer:3.5,com.apple.DriverKit-AppleBCMWLAN:2.5,VeeePlus:2.1,apsd:1.9	Codex (Renderer):1.6,Google Chrome Helper (Aperitif Renderer):1.1
+1793933231	2026-11-06T02:47:11Z	1.99	none	slg_bench:100.0,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.6,trustd:0.4	
+1793933241	2026-11-06T02:47:21Z	1.99	none	slg_bench:100.0,apsd:2.0,VeeePlus:1.2,WindowServer:1.2,com.apple.DriverKit-AppleBCMWLAN:1.2,timed:0.9	
+1793933251	2026-11-06T02:47:31Z	1.84	none	VeeePlus:1.2,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):1.0,ChatGPT:1.0,bluetoothd:0.6,bash:0.6	Google Chrome Helper (Aperitif Renderer):1.0
+1793933261	2026-11-06T02:47:41Z	1.79	none	slg_bench:99.3,apsd:2.2,Finder:1.1,trustd:1.0,VeeePlus:1.0,WindowServer:0.9	trustd:1.0
+1793933271	2026-11-06T02:47:51Z	1.90	none	slg_bench:100.0,VeeePlus:1.2,WindowServer:1.1,ChatGPT:1.1,Finder:1.0,com.apple.DriverKit-AppleBCMWLAN:0.9	
+1793933281	2026-11-06T02:48:01Z	1.84	none	slg_bench:99.3,loginwindow:6.6,apsd:4.3,WindowServer:3.4,cloudd:3.1,com.apple.DriverKit-AppleBCMWLAN:2.4	cloudd:3.1,Codex (Service):1.3,Codex (Renderer):1.0,Google Chrome Helper (Aperitif Renderer):1.1
+1793933292	2026-11-06T02:48:12Z	1.93	none	slg_bench:99.1,com.apple.DriverKit-AppleBCMWLAN:1.8,Finder:1.5,VeeePlus:1.1,WindowServer:1.0,Claude Helper (Renderer):1.0	
+1793933302	2026-11-06T02:48:22Z	2.02	none	slg_bench:100.0,com.apple.DriverKit-AppleBCMWLAN:1.5,VeeePlus:1.0,WindowServer:1.0,Finder:1.0,Google Chrome Helper (Aperitif Renderer):0.9	
+1793933312	2026-11-06T02:48:32Z	1.94	none	cloudd:9.4,cloudphotod:5.7,dasd:3.2,VeeePlus:2.9,nsurlsessiond:2.5,runningboardd:2.0	cloudd:9.4,trustd:1.0,Google Chrome Helper (Aperitif Renderer):1.1
+1793933322	2026-11-06T02:48:42Z	1.95	none	slg_bench:99.1,VeeePlus:1.0,WindowServer:1.0,com.apple.DriverKit-AppleBCMWLAN:0.9,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.4	
+1793933332	2026-11-06T02:48:52Z	1.80	none	slg_bench:99.7,Codex (Renderer):3.5,ChatGPT:2.0,com.apple.DriverKit-AppleBCMWLAN:1.4,VeeePlus:1.2,WindowServer:1.0	Codex (Renderer):3.5
+1793933342	2026-11-06T02:49:02Z	1.98	none	slg_bench:100.0,trustd:4.2,nsurlsessiond:3.4,loginwindow:2.2,WindowServer:1.7,com.apple.DriverKit-AppleBCMWLAN:1.6	trustd:4.2,Google Chrome Helper (Aperitif Renderer):1.0
+1793933352	2026-11-06T02:49:12Z	1.98	none	slg_bench:100.0,Codex (Renderer):6.4,sysmond:5.1,ChatGPT:2.6,Codex (Service):2.0,apsd:1.5	Codex (Service):2.0,Codex (Renderer):6.4,Claude Helper (Renderer):1.3
+1793933362	2026-11-06T02:49:22Z	2.07	none	runningboardd:6.5,ChatGPT:2.2,com.apple.DriverKit-AppleBCMWLAN:1.6,trustd:1.3,VeeePlus:1.2,WindowServer:1.2	Google Chrome Helper (Aperitif Renderer):1.1
+1793933372	2026-11-06T02:49:32Z	1.90	none	slg_bench:100.0,apsd:8.7,PerfPowerServices:7.4,com.apple.DriverKit-AppleBCMWLAN:1.6,VeeePlus:1.4,WindowServer:1.2	
+1793933382	2026-11-06T02:49:42Z	1.76	none	slg_bench:100.0,cloudd:4.3,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,cloudphotod:0.8	cloudd:2.6
+1793933392	2026-11-06T02:49:52Z	2.02	none	slg_bench:100.0,backgroundtaskmanagementd:1.2,VeeePlus:1.1,WindowServer:1.0,ChatGPT:1.0,com.apple.DriverKit-AppleBCMWLAN:0.9	
+1793933402	2026-11-06T02:50:02Z	1.86	none	slg_bench:99.8,backgroundtaskmanagementd:1.9,VeeePlus:1.1,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.9	
+1793933412	2026-11-06T02:50:12Z	1.80	none	com.apple.DriverKit-AppleBCMWLAN:2.7,bluetoothd:2.4,airportd:2.3,VeeePlus:1.5,nsurlsessiond:1.3,nearbyd:1.3	Google Chrome Helper (Aperitif Renderer):1.1
+1793933423	2026-11-06T02:50:23Z	2.28	none	slg_bench:99.9,com.apple.DriverKit-AppleBCMWLAN:1.5,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.2	
+1793933433	2026-11-06T02:50:33Z	2.16	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.6,PacketTunnel:0.4	
+1793933443	2026-11-06T02:50:43Z	2.06	none	slg_bench:100.0,VeeePlus:1.2,WindowServer:1.2,searchpartyd:1.1,Google Chrome:0.9,Google Chrome Helper (Aperitif Renderer):0.9	
+1793933453	2026-11-06T02:50:53Z	1.90	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:0.9,Google Chrome Helper (Aperitif Renderer):0.9,dasd:0.3,com.apple.DriverKit-AppleBCMWLAN:0.2	
+1793933463	2026-11-06T02:51:03Z	1.76	none	slg_bench:99.1,VeeePlus:1.1,WindowServer:1.1,searchpartyd:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.8	
+1793933473	2026-11-06T02:51:13Z	2.50	none	VeeePlus:1.5,WindowServer:1.3,ChatGPT:1.1,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.7,PacketTunnel:0.4	Codex (Service):1.0,codex:1.9,Google Chrome Helper (Aperitif Renderer):1.1
+1793933483	2026-11-06T02:51:23Z	2.93	none	slg_bench:99.1,cloudd:3.2,VeeePlus:1.2,apsd:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9	cloudd:3.2
+1793933493	2026-11-06T02:51:33Z	2.72	none	slg_bench:100.0,VeeePlus:1.2,ChatGPT:1.2,Codex (Service):1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9	Codex (Service):1.1
+1793933503	2026-11-06T02:51:43Z	2.69	none	slg_bench:99.9,apsd:5.3,VeeePlus:1.2,com.apple.DriverKit-AppleBCMWLAN:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9	
+1793933513	2026-11-06T02:51:53Z	2.51	none	slg_bench:100.0,nsurlsessiond:1.2,VeeePlus:1.1,trustd:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9	trustd:1.0
+1793933523	2026-11-06T02:52:03Z	2.27	none	VeeePlus:1.2,WindowServer:1.2,apsd:1.1,com.apple.DriverKit-AppleBCMWLAN:1.0,Google Chrome Helper (Aperitif Renderer):1.0,securityd:0.6	Google Chrome Helper (Aperitif Renderer):1.0
+1793933533	2026-11-06T02:52:13Z	2.08	none	VeeePlus:1.2,WindowServer:1.2,ChatGPT:1.2,sysmond:1.0,Google Chrome Helper (Aperitif Renderer):0.9,Codex (Service):0.6	
+1793933544	2026-11-06T02:52:24Z	2.07	none	Finder:2.8,sysmond:2.1,ChatGPT:2.0,apsd:1.4,VeeePlus:1.3,WindowServer:1.3	Google Chrome Helper (Aperitif Renderer):1.1
+1793933554	2026-11-06T02:52:34Z	2.06	none	slg_bench:99.8,cloudd:3.0,sysmond:2.2,VeeePlus:1.3,WindowServer:1.2,com.apple.DriverKit-AppleBCMWLAN:0.9	cloudd:3.0
+1793933564	2026-11-06T02:52:44Z	1.89	none	slg_bench:99.1,sysmond:5.1,VeeePlus:1.4,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):0.9,opendirectoryd:0.8	
+1793933574	2026-11-06T02:52:54Z	1.98	none	slg_bench:100.0,sysmond:13.3,(zsh):3.1,VeeePlus:1.6,opendirectoryd:1.3,WindowServer:1.2	Google Chrome Helper (Aperitif Renderer):1.0
+1793933584	2026-11-06T02:53:04Z	1.90	none	slg_bench:100.0,VeeePlus:1.0,com.apple.DriverKit-AppleBCMWLAN:1.0,WindowServer:0.9,Google Chrome Helper (Aperitif Renderer):0.9,mDNSResponder:0.7	
+1793933594	2026-11-06T02:53:14Z	1.84	none	slg_bench:99.7,VeeePlus:1.1,WindowServer:1.0,UURemote:1.0,Google Chrome Helper (Aperitif Renderer):0.9,Claude Helper (Renderer):0.5	
+1793933604	2026-11-06T02:53:24Z	1.78	none	slg_bench:100.0,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.9,Finder:0.6	
+1793933614	2026-11-06T02:53:34Z	1.88	none	trustd:1.6,apsd:1.4,VeeePlus:1.2,WindowServer:1.2,cloudd:1.0,nsurlsessiond:0.9	Google Chrome Helper (Aperitif Renderer):1.1
+1793933624	2026-11-06T02:53:44Z	2.05	none	slg_bench:99.3,cloudd:1.4,VeeePlus:1.2,WindowServer:1.1,bluetoothd:0.9,Google Chrome Helper (Aperitif Renderer):0.9	
+1793933634	2026-11-06T02:53:54Z	2.04	none	slg_bench:100.0,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,apsd:0.5,timed:0.3	
+1793933644	2026-11-06T02:54:04Z	2.19	none	slg_bench:99.9,VeeePlus:1.1,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,airportd:0.5,com.apple.DriverKit-AppleBCMWLAN:0.4	
+1793933654	2026-11-06T02:54:14Z	2.25	none	slg_bench:99.0,WindowServer:1.6,trustd:1.4,cloudd:1.4,apsd:1.3,VeeePlus:1.2	syspolicyd:1.0,cloudd:1.4,trustd:1.4
+1793933664	2026-11-06T02:54:24Z	2.21	none	slg_bench:100.0,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.6,com.apple.DriverKit-AppleBCMWLAN:0.4	
+1793933675	2026-11-06T02:54:35Z	2.10	none	VeeePlus:1.1,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.4,Google Chrome:0.3,com.apple.DriverKit-AppleBCMWLAN:0.2	
+1793933685	2026-11-06T02:54:45Z	1.93	none	Codex (Service):1.7,VeeePlus:1.2,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):1.1,PacketTunnel:0.7,com.apple.DriverKit-AppleBCMWLAN:0.7	Codex (Service):1.4,Google Chrome Helper (Aperitif Renderer):1.1
+1793933695	2026-11-06T02:54:55Z	1.86	none	cloudd:6.6,ChatGPT:1.6,VeeePlus:1.3,WindowServer:1.2,cloudphotod:1.1,Google Chrome Helper (Aperitif Renderer):1.0	cloudd:4.1,Google Chrome Helper (Aperitif Renderer):1.1
+1793933705	2026-11-06T02:55:05Z	1.73	none	slg_bench:99.7,VeeePlus:1.0,WindowServer:0.9,Google Chrome Helper (Aperitif Renderer):0.9,Claude:0.7,com.apple.DriverKit-AppleBCMWLAN:0.2	
+1793933715	2026-11-06T02:55:15Z	1.70	none	slg_bench:100.0,Codex (Renderer):3.1,ChatGPT:1.6,Finder:1.4,VeeePlus:1.2,WindowServer:1.1	Codex (Renderer):2.5
+1793933725	2026-11-06T02:55:25Z	1.59	none	slg_bench:99.8,cloudd:2.6,nsurlsessiond:1.9,cloudphotod:1.6,VeeePlus:1.3,com.apple.DriverKit-AppleBCMWLAN:1.3	cloudd:2.6,Codex (Service):1.0
+1793933735	2026-11-06T02:55:35Z	1.57	none	slg_bench:98.1,Codex (Renderer):3.8,ChatGPT:2.0,Codex (Service):1.5,VeeePlus:1.2,WindowServer:1.1	Codex (Service):1.5,Codex (Renderer):3.8
+1793933745	2026-11-06T02:55:45Z	1.64	none	slg_bench:100.0,VeeePlus:2.6,trustd:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.8	trustd:1.0
+1793933755	2026-11-06T02:55:55Z	1.69	none	slg_bench:100.0,trustd:1.6,ChatGPT:1.6,VeeePlus:1.2,WindowServer:1.2,nsurlsessiond:1.1	trustd:1.6
+1793933765	2026-11-06T02:56:05Z	1.73	none	VeeePlus:1.2,WindowServer:1.2,apsd:1.2,Google Chrome Helper (Aperitif Renderer):0.9,Finder:0.6,UURemoteServer:0.5	
+1793933775	2026-11-06T02:56:15Z	1.63	none	airportd:2.0,com.apple.DriverKit-AppleBCMWLAN:1.3,VeeePlus:1.2,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):1.0,ChatGPT:0.9	Google Chrome Helper (Aperitif Renderer):1.0
+1793933786	2026-11-06T02:56:26Z	1.53	none	cloudd:2.2,UURemote:1.8,VeeePlus:1.2,WindowServer:1.2,com.apple.DriverKit-AppleBCMWLAN:0.9,Google Chrome Helper (Aperitif Renderer):0.9	cloudd:10.7
+1793933796	2026-11-06T02:56:36Z	1.45	none	slg_bench:100.0,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.6,airportd:0.3	
+1793933806	2026-11-06T02:56:46Z	1.53	none	slg_bench:100.0,VeeePlus:1.5,WindowServer:1.0,com.apple.DriverKit-AppleBCMWLAN:1.0,Google Chrome Helper (Aperitif Renderer):0.9,mdworker_shared:0.6	
+1793933816	2026-11-06T02:56:56Z	1.53	none	slg_bench:99.1,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.5,PacketTunnel:0.4	
+1793933826	2026-11-06T02:57:06Z	1.60	none	slg_bench:99.0,VeeePlus:1.0,WindowServer:0.8,Google Chrome Helper (Aperitif Renderer):0.8,notifyd:0.1,clocksyncd:0.1	
+1793933836	2026-11-06T02:57:16Z	1.66	none	slg_bench:99.1,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,apsd:0.8,nsurlsessiond:0.7	
+1793933846	2026-11-06T02:57:26Z	1.56	none	ps:1.3,VeeePlus:1.3,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):1.1,ChatGPT:1.0,sort:0.9	Google Chrome Helper (Aperitif Renderer):1.1
+1793933856	2026-11-06T02:57:36Z	1.63	none	slg_bench:100.0,VeeePlus:1.1,searchpartyd:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,bluetoothd:0.5	
+1793933866	2026-11-06T02:57:46Z	1.77	none	slg_bench:99.1,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.8,UURemote:0.6	
+1793933876	2026-11-06T02:57:56Z	1.80	none	slg_bench:99.3,Codex (Renderer):2.3,Google Chrome Helper (Aperitif Renderer):2.1,Google Chrome:1.7,VeeePlus:1.3,WindowServer:1.2	Codex (Renderer):2.3,Google Chrome Helper (Aperitif Renderer):1.0,Google Chrome Helper (Aperitif Renderer):2.1,Google Chrome:1.7,Google Chrome Helper (Aperitif):1.0
+1793933886	2026-11-06T02:58:06Z	1.76	none	slg_bench:100.0,cloudd:9.6,cloudphotod:1.2,secd:1.2,VeeePlus:1.2,WindowServer:1.1	cloudd:9.6,Google Chrome Helper (Aperitif Renderer):1.0
+1793933896	2026-11-06T02:58:16Z	1.79	none	mediaanalysisd:25.6,dasd:9.8,modelmanagerd:2.4,cfprefsd:2.0,VeeePlus:1.4,WindowServer:1.3	mds:1.4,mds_stores:25.7,mediaanalysisd:25.6,Google Chrome Helper (Aperitif Renderer):1.1
+1793933906	2026-11-06T02:58:26Z	1.75	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.6,Claude Helper (Renderer):0.2	
+1793933917	2026-11-06T02:58:37Z	1.71	none	slg_bench:99.1,cloudd:8.3,VeeePlus:1.2,cloudphotod:1.1,WindowServer:1.0,secd:0.9	cloudd:5.0
+1793933927	2026-11-06T02:58:47Z	1.75	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,backgroundtaskmanagementd:0.4,ChatGPT:0.4	
+1793933937	2026-11-06T02:58:57Z	1.79	none	slg_bench:99.7,launchd:31.3,VeeePlus:1.3,WindowServer:1.3,ChatGPT:1.3,Google Chrome Helper (Aperitif Renderer):1.0	Google Chrome Helper (Aperitif Renderer):1.0
+1793933947	2026-11-06T02:59:07Z	1.67	none	slg_bench:98.2,cloudd:2.0,backgroundtaskmanagementd:1.2,VeeePlus:1.1,WindowServer:1.0,UURemote:1.0	cloudd:2.0
+1793933957	2026-11-06T02:59:17Z	1.87	none	slg_bench:99.8,backgroundtaskmanagementd:1.9,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.7	
+1793933967	2026-11-06T02:59:27Z	1.89	none	launchd:45.8,Codex (Renderer):23.5,PerfPowerServices:2.5,VeeePlus:1.6,WindowServer:1.5,ChatGPT:1.5	Codex (Renderer):23.5,Google Chrome Helper (Aperitif Renderer):1.1
+1793933977	2026-11-06T02:59:37Z	1.90	none	slg_bench:100.0,cloudd:2.9,VeeePlus:1.0,WindowServer:0.9,Google Chrome Helper (Aperitif Renderer):0.9,cloudphotod:0.3	cloudd:2.9
+1793933987	2026-11-06T02:59:47Z	1.92	none	slg_bench:99.5,Codex (Renderer):6.2,ChatGPT:3.3,Codex (Service):1.7,VeeePlus:1.2,WindowServer:1.2	Codex (Service):1.7,Codex (Renderer):6.2,Google Chrome Helper (Aperitif Renderer):1.0
+1793933997	2026-11-06T02:59:57Z	1.78	none	slg_bench:100.0,launchd:8.0,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.6	
+1793934007	2026-11-06T03:00:07Z	1.74	none	slg_bench:100.0,apsd:2.6,Claude Helper (Renderer):2.1,cloudd:2.0,VeeePlus:1.4,securityd:1.3	cloudd:2.0,Claude Helper (Renderer):2.1,trustd:1.0,Google Chrome Helper (Aperitif Renderer):1.0
+1793934017	2026-11-06T03:00:17Z	1.78	none	slg_bench:100.0,VeeePlus:1.1,bluetoothd:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.3	
+1793934027	2026-11-06T03:00:27Z	1.73	none	launchd:7.2,trustd:4.0,runningboardd:3.6,ChatGPT:1.5,VeeePlus:1.4,UURemote:1.4	trustd:2.4,Google Chrome Helper (Aperitif Renderer):1.0
+1793934037	2026-11-06T03:00:37Z	1.84	none	slg_bench:99.8,mediaanalysisd:14.9,mds_stores:5.2,trustd:4.2,nsurlsessiond:3.2,aned:2.7	mds_stores:3.0,mediaanalysisd:8.8,trustd:2.6
+1793934048	2026-11-06T03:00:48Z	1.94	none	slg_bench:99.9,VeeePlus:1.0,WindowServer:0.9,Google Chrome Helper (Aperitif Renderer):0.9,Google Chrome:0.4,notifyd:0.1	
+1793934058	2026-11-06T03:00:58Z	1.95	none	slg_bench:100.0,launchd:1.3,ChatGPT:1.3,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9	
+1793934068	2026-11-06T03:01:08Z	1.96	none	slg_bench:99.3,VeeePlus:1.0,WindowServer:0.9,Google Chrome Helper (Aperitif Renderer):0.9,nsurlsessiond:0.6,ChatGPT:0.3	
+1793934078	2026-11-06T03:01:18Z	1.88	none	slg_bench:100.0,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.3,sysmond:0.1	
+1793934088	2026-11-06T03:01:28Z	1.82	none	VeeePlus:2.8,ChatGPT:2.0,launchd:1.6,WindowServer:1.2,Codex (Renderer):1.1,Google Chrome Helper (Aperitif Renderer):1.0	Codex (Renderer):1.1,Google Chrome Helper (Aperitif Renderer):1.0
+1793934098	2026-11-06T03:01:38Z	1.62	none	slg_bench:100.0,VeeePlus:1.2,WindowServer:1.1,Finder:1.1,sysmond:0.9,Google Chrome Helper (Aperitif Renderer):0.9	
+1793934108	2026-11-06T03:01:48Z	1.60	none	slg_bench:100.0,cloudd:5.2,sysmond:2.1,VeeePlus:1.2,WindowServer:1.2,ChatGPT:1.1	cloudd:5.2,Google Chrome Helper (Aperitif Renderer):1.0
+1793934118	2026-11-06T03:01:58Z	1.51	none	slg_bench:99.0,sysmond:3.4,apsd:2.1,Finder:1.8,VeeePlus:1.3,WindowServer:1.2	Codex (Service):1.1,Google Chrome Helper (Aperitif Renderer):1.0
+1793934128	2026-11-06T03:02:08Z	1.59	none	slg_bench:99.1,sysmond:8.0,Claude Helper (Renderer):2.6,VeeePlus:1.3,WindowServer:1.2,opendirectoryd:1.1	Claude Helper (Renderer):2.6,Google Chrome Helper (Aperitif Renderer):1.0
+1793934138	2026-11-06T03:02:18Z	1.58	none	slg_bench:99.1,sysmond:10.8,zsh:3.3,opendirectoryd:1.7,cloudd:1.7,VeeePlus:1.3	cloudd:1.7,Google Chrome Helper (Aperitif Renderer):1.0
+1793934148	2026-11-06T03:02:28Z	1.49	none	VeeePlus:1.1,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,launchd:0.3,ChatGPT:0.3,Codex (Service):0.3	Google Chrome Helper (Aperitif Renderer):1.1
+1793934158	2026-11-06T03:02:38Z	1.34	none	slg_bench:100.0,dasd:5.7,ChatGPT:2.2,Codex (Renderer):1.6,cfprefsd:1.4,VeeePlus:1.3	Codex (Renderer):1.6
+1793934168	2026-11-06T03:02:48Z	1.44	none	slg_bench:100.0,cloudd:1.9,Claude:1.3,VeeePlus:1.0,WindowServer:0.9,Google Chrome Helper (Aperitif Renderer):0.9	cloudd:1.9,Claude:1.3
+1793934178	2026-11-06T03:02:58Z	1.52	none	slg_bench:100.0,ChatGPT:1.3,VeeePlus:1.2,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,Codex (Service):0.8	
+1793934189	2026-11-06T03:03:09Z	1.68	none	slg_bench:98.4,runningboardd:5.0,bluetoothd:2.5,com.apple.DriverKit-AppleBCMWLAN:2.2,airportd:1.7,nearbyd:1.5	Google Chrome Helper (Aperitif Renderer):1.0
+1793934199	2026-11-06T03:03:19Z	1.65	none	WindowServer:1.3,ChatGPT:1.3,VeeePlus:1.2,Finder:1.1,bash:1.0,Google Chrome Helper (Aperitif Renderer):1.0	Codex (Service):1.0,Google Chrome Helper (Aperitif Renderer):1.0
+1793934209	2026-11-06T03:03:29Z	1.63	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:1.0,com.apple.DriverKit-AppleBCMWLAN:0.9,Google Chrome Helper (Aperitif Renderer):0.9,airportd:0.3	
+1793934219	2026-11-06T03:03:39Z	1.61	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.5,PacketTunnel:0.4	
+1793934229	2026-11-06T03:03:49Z	1.75	none	slg_bench:100.0,UURemote:32.9,cloudd:6.3,cloudphotod:4.5,dasd:2.6,nsurlsessiond:2.5	cloudd:6.3
+1793934239	2026-11-06T03:03:59Z	1.71	none	slg_bench:100.0,VeeePlus:1.6,trustd:1.3,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.6	trustd:1.3
+1793934249	2026-11-06T03:04:09Z	1.68	none	slg_bench:100.0,com.apple.DriverKit-AppleBCMWLAN:1.2,VeeePlus:1.1,WindowServer:1.0,apsd:0.9,Google Chrome Helper (Aperitif Renderer):0.9	
+1793934259	2026-11-06T03:04:19Z	1.74	none	cloudd:4.4,cloudphotod:3.1,nsurlsessiond:3.1,dasd:2.0,VeeePlus:1.3,WindowServer:1.2	cloudd:4.4,Google Chrome Helper (Aperitif Renderer):1.0
+1793934269	2026-11-06T03:04:29Z	1.62	none	slg_bench:100.0,VeeePlus:1.1,WindowServer:1.0,com.apple.DriverKit-AppleBCMWLAN:1.0,Google Chrome Helper (Aperitif Renderer):0.9,apsd:0.8	
+1793934279	2026-11-06T03:04:39Z	1.60	none	slg_bench:100.0,com.apple.DriverKit-AppleBCMWLAN:1.6,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,searchpartyd:0.6	
+1793934289	2026-11-06T03:04:49Z	1.58	none	slg_bench:98.8,com.apple.DriverKit-AppleBCMWLAN:1.4,trustd:1.2,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9	trustd:1.2
+1793934299	2026-11-06T03:04:59Z	1.64	none	slg_bench:100.0,VeeePlus:2.2,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,mdworker_shared:0.7,intelligenceflowd:0.4	
+1793934310	2026-11-06T03:05:10Z	1.47	none	UURemote:1.8,com.apple.DriverKit-AppleBCMWLAN:1.4,VeeePlus:1.3,WindowServer:1.3,Google Chrome Helper (Aperitif Renderer):1.0,Finder:0.7	Google Chrome Helper (Aperitif Renderer):1.0
+1793934320	2026-11-06T03:05:20Z	1.47	none	VeeePlus:1.2,WindowServer:1.2,com.apple.DriverKit-AppleBCMWLAN:1.0,Google Chrome Helper (Aperitif Renderer):1.0,PacketTunnel:0.6,bash:0.6	Google Chrome Helper (Aperitif Renderer):1.0
+1793934330	2026-11-06T03:05:30Z	1.40	none	Codex (Renderer):19.2,ChatGPT:4.9,airportd:2.8,Codex (Service):2.4,com.apple.DriverKit-AppleBCMWLAN:1.7,VeeePlus:1.4	Codex (Service):2.4,Codex (Renderer):19.2,Claude:1.0,Google Chrome Helper (Aperitif Renderer):1.0
+1793934340	2026-11-06T03:05:40Z	1.66	none	slg_bench:100.0,VeeePlus:1.2,WindowServer:1.1,ChatGPT:1.0,com.apple.DriverKit-AppleBCMWLAN:0.9,Google Chrome Helper (Aperitif Renderer):0.9	
+1793934350	2026-11-06T03:05:50Z	1.71	none	slg_bench:100.0,com.apple.DriverKit-AppleBCMWLAN:1.5,trustd:1.3,VeeePlus:1.2,WindowServer:1.2,ChatGPT:1.2	Codex (Renderer):1.1,trustd:1.3
+1793934360	2026-11-06T03:06:00Z	1.60	none	slg_bench:99.8,loginwindow:7.4,Claude Helper (Renderer):3.2,WindowServer:2.8,VeeePlus:1.2,Google Chrome Helper (Aperitif Renderer):1.0	Claude Helper (Renderer):3.2,Google Chrome Helper (Aperitif Renderer):1.0
+1793934370	2026-11-06T03:06:10Z	1.50	none	slg_bench:99.0,trustd:4.2,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.8	trustd:4.2
+1793934380	2026-11-06T03:06:20Z	1.50	none	slg_bench:100.0,trustd:2.5,nsurlsessiond:1.8,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9	trustd:1.5,Google Chrome Helper (Aperitif Renderer):1.0
+1793934390	2026-11-06T03:06:30Z	1.50	none	WindowServer:1.2,VeeePlus:1.1,airportd:1.0,com.apple.DriverKit-AppleBCMWLAN:1.0,Google Chrome Helper (Aperitif Renderer):1.0,bash:0.6	Google Chrome Helper (Aperitif Renderer):1.0
+1793934400	2026-11-06T03:06:40Z	1.49	none	slg_bench:99.5,trustd:3.8,VeeePlus:1.0,UURemote:1.0,WindowServer:0.9,Google Chrome Helper (Aperitif Renderer):0.9	trustd:3.8
+1793934410	2026-11-06T03:06:50Z	1.82	none	slg_bench:100.0,com.apple.DriverKit-AppleBCMWLAN:3.9,wifianalyticsd:3.3,VeeePlus:1.2,WindowServer:1.1,UURemote:1.0	
+1793934420	2026-11-06T03:07:00Z	1.84	none	slg_bench:100.0,loginwindow:6.9,trustd:3.6,WindowServer:3.2,cloudd:1.4,VeeePlus:1.2	cloudd:1.4,trustd:3.6,Google Chrome Helper (Aperitif Renderer):1.0
+1793934430	2026-11-06T03:07:10Z	1.79	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.5,ChatGPT:0.5	
+1793934441	2026-11-06T03:07:21Z	1.75	none	slg_bench:100.0,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.4,ChatGPT:0.4	
+1793934451	2026-11-06T03:07:31Z	1.71	none	slg_bench:99.7,UURemote:18.1,Codex (Renderer):2.3,ChatGPT:2.2,cloudd:2.1,WindowServer:1.6	cloudd:2.1,Codex (Renderer):2.3,trustd:1.0,Google Chrome Helper (Aperitif Renderer):1.0
+1793934461	2026-11-06T03:07:41Z	1.74	none	WindowServer:1.3,VeeePlus:1.2,Google Chrome Helper (Aperitif Renderer):1.0,com.apple.DriverKit-AppleBCMWLAN:0.8,PerfPowerServices:0.7,symptomsd:0.3	Google Chrome Helper (Aperitif Renderer):1.1
+1793934471	2026-11-06T03:07:51Z	1.70	none	ChatGPT:1.6,VeeePlus:1.2,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,Codex (Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.8	Google Chrome Helper (Aperitif Renderer):1.0
+1793934481	2026-11-06T03:08:01Z	1.67	none	loginwindow:7.3,WindowServer:4.2,cloudd:4.2,cloudphotod:3.0,trustd:2.7,VeeePlus:1.6	cloudd:4.2,trustd:2.7,Google Chrome Helper (Aperitif Renderer):1.4
+1793934491	2026-11-06T03:08:11Z	1.56	none	slg_bench:100.0,codex:3.2,Codex (Renderer):1.9,trustd:1.3,VeeePlus:1.0,WindowServer:1.0	Codex (Renderer):1.1,codex:1.9
+1793934501	2026-11-06T03:08:21Z	1.55	none	slg_bench:99.1,ChatGPT:2.4,apsd:2.1,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9	
+1793934511	2026-11-06T03:08:31Z	1.54	none	slg_bench:100.0,com.apple.DriverKit-AppleBCMWLAN:4.6,airportd:2.4,nsurlsessiond:1.8,cloudd:1.3,mDNSResponder:1.2	cloudd:1.3,trustd:1.2
+1793934521	2026-11-06T03:08:41Z	1.61	none	slg_bench:100.0,ChatGPT:3.0,backgroundtaskmanagementd:1.8,VeeePlus:1.2,WindowServer:1.2,Codex (Renderer):1.0	Codex (Renderer):1.0
+1793934531	2026-11-06T03:08:51Z	1.60	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.4,Codex (Service):0.3	
+1793934541	2026-11-06T03:09:01Z	1.72	none	slg_bench:100.0,Codex (Renderer):13.3,loginwindow:7.0,ChatGPT:4.2,Google Chrome:4.1,WindowServer:3.5	cloudd:1.4,Codex (Service):1.8,Codex (Renderer):13.3,trustd:2.4,Google Chrome Helper (Aperitif Renderer):1.1,Google Chrome:4.1,Google Chrome Helper (Aperitif):1.1
+1793934551	2026-11-06T03:09:11Z	1.61	none	sysmond:56.1,cloudd:3.7,VeeePlus:1.6,Google Chrome:1.4,WindowServer:1.3,systemstats:1.0	cloudd:3.7,Google Chrome Helper (Aperitif Renderer):1.0,Google Chrome:1.4
+1793934562	2026-11-06T03:09:22Z	1.36	none	ChatGPT:1.7,Codex (Renderer):1.4,VeeePlus:1.2,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):0.9,Codex (Service):0.8	Codex (Renderer):1.4
+1793934572	2026-11-06T03:09:32Z	1.31	none	ChatGPT:1.7,trustd:1.6,VeeePlus:1.3,Claude Helper (Renderer):1.3,nsurlsessiond:1.2,WindowServer:1.2	Claude Helper (Renderer):1.3,trustd:1.6,Google Chrome Helper (Aperitif Renderer):1.0
+1793934582	2026-11-06T03:09:42Z	1.42	none	slg_bench:99.7,cloudd:1.6,VeeePlus:1.2,WindowServer:1.1,com.apple.DriverKit-AppleBCMWLAN:1.0,UURemote:0.9	cloudd:1.6
+1793934592	2026-11-06T03:09:52Z	1.67	none	slg_bench:99.1,PacketTunnel:6.9,com.apple.DriverKit-AppleBCMWLAN:4.9,UURemote:4.7,VeeePlus:1.2,WindowServer:1.1	Google Chrome Helper (Aperitif Renderer):1.1
+1793934602	2026-11-06T03:10:02Z	2.03	none	slg_bench:100.0,PacketTunnel:9.3,com.apple.DriverKit-AppleBCMWLAN:7.4,UURemote:6.4,loginwindow:3.4,WindowServer:2.1	Google Chrome Helper (Aperitif Renderer):1.1
+1793934612	2026-11-06T03:10:12Z	1.95	none	slg_bench:100.0,VeeePlus:2.3,ChatGPT:1.4,trustd:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9	trustd:1.0
+1793934622	2026-11-06T03:10:22Z	1.96	none	tccd:3.2,WindowServer:2.7,syspolicyd:2.4,trustd:2.0,apsd:2.0,VeeePlus:1.3	syspolicyd:2.4,trustd:2.0
+1793934632	2026-11-06T03:10:32Z	1.81	none	cloudphotod:3.8,cloudd:3.5,nsurlsessiond:2.6,dasd:1.3,VeeePlus:1.3,WindowServer:1.3	cloudd:3.5,Google Chrome Helper (Aperitif Renderer):1.1
+1793934642	2026-11-06T03:10:42Z	1.76	none	slg_bench:99.1,Codex (Renderer):2.1,trustd:1.2,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9	Codex (Renderer):2.1,trustd:1.2
+1793934652	2026-11-06T03:10:52Z	1.79	none	slg_bench:100.0,VeeePlus:1.1,WindowServer:1.0,ChatGPT:1.0,Google Chrome Helper (Aperitif Renderer):0.9,sysmond:0.7	
+1793934662	2026-11-06T03:11:02Z	1.99	none	slg_bench:100.0,sysmond:2.0,cloudd:1.7,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9	cloudd:1.7
+1793934672	2026-11-06T03:11:12Z	1.83	none	slg_bench:100.0,sysmond:3.3,VeeePlus:1.8,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,mDNSResponder:0.6	
+1793934682	2026-11-06T03:11:22Z	1.71	none	dasd:11.4,PerfPowerTelemetryClientRegistrationService:10.2,sysmond:9.3,mediaanalysisd:5.1,launchd:2.6,cfprefsd:2.2	mediaanalysisd:5.1,Google Chrome Helper (Aperitif Renderer):1.2
+1793934693	2026-11-06T03:11:33Z	1.67	none	slg_bench:99.1,sysmond:10.2,Codex (Renderer):8.3,zsh:3.3,com.apple.DriverKit-AppleBCMWLAN:1.8,opendirectoryd:1.6	Codex (Renderer):8.3,Google Chrome Helper (Aperitif Renderer):1.0
+1793934703	2026-11-06T03:11:43Z	1.57	none	slg_bench:100.0,networkserviceproxy:1.8,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,PerfPowerServices:0.8	
+1793934713	2026-11-06T03:11:53Z	1.55	none	slg_bench:100.0,networkserviceproxy:3.9,airportd:2.0,com.apple.DriverKit-AppleBCMWLAN:1.1,VeeePlus:1.0,WindowServer:0.9	
+1793934723	2026-11-06T03:12:03Z	1.47	none	slg_bench:100.0,networkserviceproxy:3.1,airportd:2.1,WindowServer:1.1,VeeePlus:1.0,com.apple.DriverKit-AppleBCMWLAN:0.9	
+1793934733	2026-11-06T03:12:13Z	1.62	none	slg_bench:99.1,cloudd:3.6,ChatGPT:2.7,Codex (Renderer):2.4,VeeePlus:1.2,WindowServer:1.2	cloudd:3.6,Codex (Service):1.0,Codex (Renderer):2.4,Google Chrome Helper (Aperitif Renderer):1.0
+1793934743	2026-11-06T03:12:23Z	1.60	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.6,clocksyncd:0.1	
+1793934753	2026-11-06T03:12:33Z	1.51	none	apsd:2.6,Claude Helper (Renderer):2.1,networkserviceproxy:2.0,ChatGPT:1.7,mDNSResponder:1.6,VeeePlus:1.5	Codex (Renderer):1.0,Claude Helper (Renderer):1.4,trustd:1.2,Google Chrome Helper (Aperitif Renderer):1.1
+1793934763	2026-11-06T03:12:43Z	1.43	none	slg_bench:99.3,VeeePlus:1.2,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,PacketTunnel:0.4,ChatGPT:0.4	
+1793934773	2026-11-06T03:12:53Z	1.44	none	slg_bench:99.1,apsd:2.2,VeeePlus:1.2,trustd:1.0,WindowServer:1.0,codex:1.0	codex:1.0,trustd:1.0
+1793934783	2026-11-06T03:13:03Z	1.69	none	slg_bench:99.6,Codex (Renderer):6.4,ChatGPT:2.1,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9	Codex (Renderer):6.4
+1793934793	2026-11-06T03:13:13Z	1.59	none	slg_bench:99.7,apsd:2.6,VeeePlus:1.2,WindowServer:1.1,logd:1.0,Google Chrome Helper (Aperitif Renderer):0.9	
+1793934803	2026-11-06T03:13:23Z	1.57	none	slg_bench:99.3,Codex (Renderer):14.0,ChatGPT:2.5,VeeePlus:1.2,WindowServer:1.1,Codex (Service):1.0	Codex (Service):1.0,Codex (Renderer):14.0
+1793934813	2026-11-06T03:13:33Z	1.48	none	VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,Google Chrome Helper (Aperitif):0.4,clocksyncd:0.1,PacketTunnel:0.1	
+1793934824	2026-11-06T03:13:44Z	1.48	none	slg_bench:100.0,Codex (Service):1.3,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,airportd:0.7	Codex (Service):1.3
+1793934834	2026-11-06T03:13:54Z	1.56	none	slg_bench:100.0,cloudd:5.4,cloudphotod:3.4,nsurlsessiond:3.3,dasd:2.7,VeeePlus:1.2	cloudd:5.4
+1793934844	2026-11-06T03:14:04Z	1.55	none	slg_bench:100.0,ChatGPT:1.2,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,airportd:0.7	
+1793934854	2026-11-06T03:14:14Z	1.47	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,airportd:0.6,com.apple.DriverKit-AppleBCMWLAN:0.5	
+1793934864	2026-11-06T03:14:24Z	1.40	none	slg_bench:99.8,VeeePlus:1.1,WindowServer:1.0,com.apple.DriverKit-AppleBCMWLAN:1.0,Google Chrome Helper (Aperitif Renderer):0.9,airportd:0.7	
+1793934874	2026-11-06T03:14:34Z	1.41	none	VeeePlus:1.2,WindowServer:1.1,cloudd:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.7,airportd:0.5	cloudd:5.9,Google Chrome Helper (Aperitif Renderer):1.0
+1793934884	2026-11-06T03:14:44Z	1.35	none	slg_bench:99.1,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,apsd:0.5,airportd:0.4	
+1793934894	2026-11-06T03:14:54Z	1.37	none	slg_bench:100.0,WindowServer:1.1,VeeePlus:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.6,com.apple.DriverKit-AppleBCMWLAN:0.4	
+1793934904	2026-11-06T03:15:04Z	1.46	none	slg_bench:98.6,apsd:8.5,cloudd:3.1,VeeePlus:1.2,WindowServer:1.2,cfprefsd:1.0	cloudd:3.1
+1793934914	2026-11-06T03:15:14Z	1.55	none	slg_bench:99.0,VeeePlus:1.1,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.6,UURemoteServer:0.5	
+1793934924	2026-11-06T03:15:24Z	1.46	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:0.9,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.5,apsd:0.4	
+1793934934	2026-11-06T03:15:34Z	1.39	none	trustd:2.8,nsurlsessiond:2.4,VeeePlus:1.3,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):1.0,ChatGPT:1.0	trustd:2.8,Google Chrome Helper (Aperitif Renderer):1.0
+1793934944	2026-11-06T03:15:44Z	1.41	none	slg_bench:99.0,Codex (Renderer):2.4,ChatGPT:2.2,VeeePlus:1.2,WindowServer:1.2,Codex (Service):1.2	Codex (Service):1.2,Codex (Renderer):2.4
+1793934955	2026-11-06T03:15:55Z	1.50	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.2,Google Chrome:0.2	
+1793934965	2026-11-06T03:16:05Z	1.80	none	slg_bench:100.0,cloudd:1.5,VeeePlus:1.2,WindowServer:1.1,trustd:1.0,Google Chrome Helper (Aperitif Renderer):0.9	cloudd:1.5,trustd:1.0
+1793934975	2026-11-06T03:16:15Z	1.75	none	VeeePlus:1.3,WindowServer:1.3,Google Chrome Helper (Aperitif Renderer):1.0,cloudd:0.8,UURemote:0.8,ChatGPT:0.7	Google Chrome Helper (Aperitif Renderer):1.0
+1793934985	2026-11-06T03:16:25Z	1.79	none	slg_bench:98.5,VeeePlus:1.0,Google Chrome Helper (Aperitif Renderer):0.9,WindowServer:0.8,mDNSResponder:0.4,ChatGPT:0.4	
+1793934995	2026-11-06T03:16:35Z	1.90	none	slg_bench:99.7,Claude:1.2,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,Finder:0.7	Claude:1.2
+1793935005	2026-11-06T03:16:45Z	1.92	none	slg_bench:100.0,VeeePlus:1.1,WindowServer:1.0,PacketTunnel:0.9,Google Chrome Helper (Aperitif Renderer):0.9,Codex (Service):0.7	
+1793935015	2026-11-06T03:16:55Z	2.15	none	slg_bench:100.0,apsd:2.9,Codex (Renderer):2.6,Claude Helper (Renderer):1.4,ChatGPT:1.4,VeeePlus:1.2	Codex (Renderer):2.6,Claude Helper (Renderer):1.4
+1793935025	2026-11-06T03:17:05Z	2.12	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,Google Chrome Helper (Aperitif Renderer):0.4,ChatGPT:0.4	
+1793935035	2026-11-06T03:17:15Z	2.25	none	WindowServer:1.3,VeeePlus:1.1,ChatGPT:1.0,Codex (Service):1.0,Google Chrome Helper (Aperitif Renderer):0.9,apsd:0.7	Codex (Service):1.0
+1793935045	2026-11-06T03:17:25Z	2.06	none	slg_bench:86.2,cloudd:1.9,VeeePlus:1.5,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.6	cloudd:1.9
+1793935055	2026-11-06T03:17:35Z	2.05	none	slg_bench:100.0,Claude Helper (Renderer):25.1,ChatGPT:1.3,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9	Claude Helper (Renderer):25.1
+1793935065	2026-11-06T03:17:45Z	1.96	none	slg_bench:100.0,dasd:4.1,spotlightknowledged.updater:2.7,VeeePlus:1.2,WindowServer:1.2,backgroundtaskmanagementd:1.2	
+1793935075	2026-11-06T03:17:55Z	1.81	none	slg_bench:100.0,cloudd:2.1,backgroundtaskmanagementd:1.8,VeeePlus:1.2,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):0.9	cloudd:2.1
+1793935086	2026-11-06T03:18:06Z	1.84	none	backgroundtaskmanagementd:4.3,VeeePlus:1.2,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):1.0,apsd:0.5,notifyd:0.3	Google Chrome Helper (Aperitif Renderer):1.0
+1793935096	2026-11-06T03:18:16Z	1.71	none	PerfPowerServices:1.4,VeeePlus:1.3,WindowServer:1.2,mDNSResponder:1.0,Google Chrome Helper (Aperitif Renderer):1.0,PacketTunnel:0.7	Google Chrome Helper (Aperitif Renderer):1.0
+1793935106	2026-11-06T03:18:26Z	1.60	none	trustd:2.8,nsurlsessiond:2.5,VeeePlus:1.2,WindowServer:1.2,codex:1.2,Google Chrome Helper (Aperitif Renderer):0.9	codex:1.2,trustd:2.8
+1793935116	2026-11-06T03:18:36Z	1.51	none	slg_bench:99.3,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.4,Codex (Renderer):0.2	
+1793935126	2026-11-06T03:18:46Z	1.58	none	slg_bench:100.0,apsd:8.2,ChatGPT:3.1,VeeePlus:1.2,WindowServer:1.1,timed:0.9	
+1793935136	2026-11-06T03:18:56Z	1.57	none	slg_bench:100.0,wechatwebdevtools Helper (Renderer):5.2,Google Chrome:2.1,Google Chrome Helper (Aperitif Renderer):1.4,VeeePlus:1.0,WindowServer:1.0	Google Chrome Helper (Aperitif Renderer):1.4,Google Chrome:2.1
+1793935146	2026-11-06T03:19:06Z	1.63	none	slg_bench:100.0,Claude Helper (Renderer):2.4,VeeePlus:1.2,WindowServer:1.1,cloudd:0.9,Google Chrome Helper (Aperitif Renderer):0.9	Claude Helper (Renderer):2.4
+1793935156	2026-11-06T03:19:16Z	1.68	none	slg_bench:99.7,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,apsd:0.2,securityd:0.1	
+1793935166	2026-11-06T03:19:26Z	1.73	none	slg_bench:100.0,Codex (Renderer):3.3,ChatGPT:1.3,VeeePlus:1.2,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):0.9	Codex (Renderer):2.0
+1793935176	2026-11-06T03:19:36Z	1.62	none	cloudd:4.0,VeeePlus:1.3,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):1.0,cloudphotod:0.9,ChatGPT:0.6	cloudd:4.0,Google Chrome Helper (Aperitif Renderer):1.0
+1793935186	2026-11-06T03:19:46Z	1.60	none	slg_bench:98.6,ChatGPT:3.0,Codex (Renderer):2.1,Codex (Service):1.7,VeeePlus:1.2,WindowServer:1.1	Codex (Service):1.7,Codex (Renderer):2.1
+1793935196	2026-11-06T03:19:56Z	1.74	none	slg_bench:100.0,ChatGPT:1.3,VeeePlus:1.2,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):0.9,PerfPowerServices:0.7	
+1793935207	2026-11-06T03:20:07Z	1.70	none	slg_bench:100.0,trustd:2.5,nsurlsessiond:1.9,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9	trustd:2.5
+1793935217	2026-11-06T03:20:17Z	1.74	none	slg_bench:99.0,UURemote:30.0,WindowServer:2.2,tccd:1.7,syspolicyd:1.3,trustd:1.2	syspolicyd:1.3,trustd:1.2
+1793935227	2026-11-06T03:20:27Z	1.94	none	slg_bench:100.0,launchd:25.7,sysmond:3.1,VeeePlus:1.5,WindowServer:1.3,Google Chrome Helper (Aperitif Renderer):1.1	Google Chrome Helper (Aperitif Renderer):1.1
+1793935237	2026-11-06T03:20:37Z	1.95	none	slg_bench:100.0,sysmond:5.1,VeeePlus:1.3,WindowServer:1.2,nsurlsessiond:1.1,Finder:1.1	trustd:1.0,Google Chrome Helper (Aperitif Renderer):1.1
+1793935247	2026-11-06T03:20:47Z	1.80	none	sysmond:15.7,opendirectoryd:1.8,VeeePlus:1.6,launchd:1.4,WindowServer:1.3,Google Chrome Helper (Aperitif Renderer):1.1	Google Chrome Helper (Aperitif Renderer):1.1
+1793935257	2026-11-06T03:20:57Z	1.68	none	launchd:51.2,apsd:4.8,zsh:2.5,VeeePlus:1.8,WindowServer:1.6,mDNSResponder:1.4	Google Chrome Helper (Aperitif Renderer):1.1
+1793935267	2026-11-06T03:21:07Z	1.49	none	VeeePlus:1.2,WindowServer:1.2,ChatGPT:1.1,Google Chrome Helper (Aperitif Renderer):1.0,runningboardd:0.9,Codex (Service):0.9	Google Chrome Helper (Aperitif Renderer):1.0
+1793935277	2026-11-06T03:21:17Z	1.49	none	slg_bench:100.0,WindowServer:1.1,VeeePlus:1.0,cloudd:1.0,Google Chrome Helper (Aperitif Renderer):0.9,tccd:0.3	cloudd:1.0
+1793935287	2026-11-06T03:21:27Z	1.57	none	slg_bench:99.3,launchd:7.9,VeeePlus:1.2,WindowServer:1.2,Codex (Service):1.2,ChatGPT:1.1	Codex (Service):1.2
+1793935297	2026-11-06T03:21:37Z	1.70	none	slg_bench:99.1,PerfPowerServices:1.0,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.7	Claude Helper (Renderer):1.7
+1793935307	2026-11-06T03:21:47Z	1.67	none	slg_bench:100.0,ChatGPT:1.3,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,Codex (Service):0.8	
+1793935317	2026-11-06T03:21:57Z	1.57	none	slg_bench:100.0,launchd:2.7,VeeePlus:1.2,WindowServer:1.2,ChatGPT:1.0,Google Chrome Helper (Aperitif Renderer):0.9	
+1793935327	2026-11-06T03:22:07Z	1.55	none	slg_bench:100.0,VeeePlus:2.0,WindowServer:1.1,cfprefsd:1.0,apsd:0.9,Google Chrome Helper (Aperitif Renderer):0.9	
+1793935338	2026-11-06T03:22:18Z	1.47	none	Codex (Renderer):6.1,ChatGPT:1.7,VeeePlus:1.3,WindowServer:1.2,trustd:1.0,nsurlsessiond:1.0	Codex (Renderer):6.1,trustd:1.0
+1793935348	2026-11-06T03:22:28Z	1.48	none	mdworker_shared:21.5,launchd:4.9,apsd:2.4,VeeePlus:1.4,mds:1.4,com.apple.DriverKit-AppleBCMWLAN:1.3	cloudd:6.8,Google Chrome Helper (Aperitif Renderer):1.1,mdworker_shared:21.5
+1793935358	2026-11-06T03:22:38Z	1.48	none	Codex (Renderer):4.0,WindowServer:1.2,VeeePlus:1.1,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.9,com.apple.DriverKit-AppleBCMWLAN:0.5	Codex (Renderer):2.4,Google Chrome Helper (Aperitif Renderer):1.0
+1793935368	2026-11-06T03:22:48Z	1.48	none	slg_bench:100.0,mds_stores:55.6,mediaanalysisd:22.2,mediaanalysisd-access:3.1,modelmanagerd:2.5,mds:2.5	mds:2.5,mds_stores:55.6,mediaanalysisd:22.2,mediaanalysisd-access:3.1,Google Chrome Helper (Aperitif Renderer):1.1
+1793935378	2026-11-06T03:22:58Z	1.64	none	slg_bench:99.1,Codex (Renderer):3.9,ChatGPT:2.0,trustd:1.3,VeeePlus:1.2,WindowServer:1.2	Codex (Service):1.0,Codex (Renderer):3.9,trustd:1.3,Google Chrome Helper (Aperitif Renderer):1.0
+1793935388	2026-11-06T03:23:08Z	1.69	none	slg_bench:99.8,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,bluetoothd:0.6,ChatGPT:0.6	
+1793935398	2026-11-06T03:23:18Z	1.75	none	slg_bench:100.0,mdworker_shared:14.6,Codex (Renderer):4.2,ChatGPT:1.6,VeeePlus:1.2,Finder:1.1	Codex (Service):1.0,Codex (Renderer):4.2,mdworker_shared:14.6
+1793935408	2026-11-06T03:23:28Z	1.63	none	trustd:4.7,nsurlsessiond:4.2,networkserviceproxy:2.1,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):1.1	trustd:4.7,Google Chrome Helper (Aperitif Renderer):1.1
+1793935418	2026-11-06T03:23:38Z	1.61	none	slg_bench:100.0,cfprefsd:4.6,dasd:4.5,networkserviceproxy:1.9,VeeePlus:1.2,airportd:1.0	
+1793935428	2026-11-06T03:23:48Z	1.67	none	slg_bench:99.8,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,Claude Helper (Renderer):0.7,codex:0.4	
+1793935438	2026-11-06T03:23:58Z	1.72	none	slg_bench:98.1,UURemote:27.9,apsd:2.1,VeeePlus:1.2,WindowServer:1.2,trustd:1.0	trustd:1.0
+1793935448	2026-11-06T03:24:08Z	1.76	none	slg_bench:100.0,cloudd:1.7,VeeePlus:1.2,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):0.9,adid:0.6	cloudd:1.7
+1793935459	2026-11-06T03:24:19Z	1.79	none	slg_bench:100.0,VeeePlus:1.1,WindowServer:1.0,ChatGPT:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.7	
+1793935469	2026-11-06T03:24:29Z	1.74	none	VeeePlus:1.2,WindowServer:1.2,ChatGPT:1.2,Google Chrome Helper (Aperitif Renderer):1.0,bash:0.9,com.apple.DriverKit-AppleBCMWLAN:0.9	Google Chrome Helper (Aperitif Renderer):1.0
+1793935479	2026-11-06T03:24:39Z	1.63	none	slg_bench:99.1,dasd:4.6,VeeePlus:2.2,cloudd:1.7,nsurlsessiond:1.3,WindowServer:1.2	cloudd:1.7,trustd:1.0
+1793935489	2026-11-06T03:24:49Z	1.69	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.5,networkserviceproxy:0.4	
+1793935499	2026-11-06T03:24:59Z	1.81	none	slg_bench:99.9,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,apsd:0.8,com.apple.DriverKit-AppleBCMWLAN:0.6	
+1793935509	2026-11-06T03:25:09Z	1.85	none	slg_bench:100.0,trustd:4.2,nsurlsessiond:2.3,com.apple.DriverKit-AppleBCMWLAN:1.3,VeeePlus:1.2,WindowServer:1.1	trustd:4.2
+1793935519	2026-11-06T03:25:19Z	1.71	none	slg_bench:100.0,UURemote:5.4,mDNSResponder:1.2,WindowServer:1.2,VeeePlus:1.1,UURemoteServer:1.1	
+1793935529	2026-11-06T03:25:29Z	1.76	none	slg_bench:99.7,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.6,apsd:0.3	
+1793935539	2026-11-06T03:25:39Z	1.71	none	trustd:4.4,cloudd:3.4,nsurlsessiond:2.9,VeeePlus:2.1,dasd:1.7,WindowServer:1.3	cloudd:3.4,trustd:4.4,Google Chrome Helper (Aperitif Renderer):1.1
+1793935549	2026-11-06T03:25:49Z	1.60	none	slg_bench:98.2,VeeePlus:1.2,apsd:1.2,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ps:0.5	
+1793935559	2026-11-06T03:25:59Z	1.66	none	slg_bench:99.3,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,mds:0.5,com.apple.DriverKit-AppleBCMWLAN:0.5	
+1793935569	2026-11-06T03:26:09Z	1.86	none	slg_bench:100.0,mdworker_shared:2.3,mdworker_shared:2.2,apsd:1.9,ChatGPT:1.9,Codex (Renderer):1.6	Codex (Renderer):1.6,mdworker_shared:2.3,mdworker_shared:2.2
+1793935579	2026-11-06T03:26:19Z	1.72	none	slg_bench:99.1,cloudd:1.7,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,searchpartyd:0.6	cloudd:1.7
+1793935590	2026-11-06T03:26:30Z	1.83	none	slg_bench:100.0,Claude:1.8,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.5	Claude:1.8
+1793935600	2026-11-06T03:26:40Z	1.71	none	trustd:1.8,nsurlsessiond:1.7,VeeePlus:1.2,WindowServer:1.2,com.apple.DriverKit-AppleBCMWLAN:1.0,Google Chrome Helper (Aperitif Renderer):1.0	trustd:1.1,Google Chrome Helper (Aperitif Renderer):1.0
+1793935610	2026-11-06T03:26:50Z	1.68	none	slg_bench:99.3,VeeePlus:1.0,WindowServer:0.9,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.8,ChatGPT:0.3	trustd:1.5
+1793935620	2026-11-06T03:27:00Z	1.65	none	slg_bench:99.1,loginwindow:7.7,Claude Helper (Renderer):7.4,WindowServer:2.6,VeeePlus:1.2,Google Chrome Helper (Aperitif Renderer):0.9	Claude Helper (Renderer):4.4
+1793935630	2026-11-06T03:27:10Z	1.63	none	slg_bench:99.6,VeeePlus:1.2,com.apple.DriverKit-AppleBCMWLAN:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,backgroundtaskmanagementd:0.7	
+1793935640	2026-11-06T03:27:20Z	1.69	none	slg_bench:100.0,backgroundtaskmanagementd:1.8,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.4	
+1793935650	2026-11-06T03:27:30Z	1.66	none	slg_bench:100.0,backgroundtaskmanagementd:3.3,VeeePlus:1.1,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,mds:0.6	
+1793935660	2026-11-06T03:27:40Z	1.71	none	searchpartyd:1.5,apsd:1.5,VeeePlus:1.2,WindowServer:1.1,com.apple.DriverKit-AppleBCMWLAN:1.1,ChatGPT:1.1	Google Chrome Helper (Aperitif Renderer):1.0
+1793935670	2026-11-06T03:27:50Z	1.91	none	slg_bench:99.1,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,nsurlsessiond:0.8,Codex (Renderer):0.8	
+1793935680	2026-11-06T03:28:00Z	1.92	none	slg_bench:99.2,loginwindow:8.1,trustd:3.8,WindowServer:3.4,UURemoteServer:1.5,VeeePlus:1.2	trustd:3.8,Google Chrome Helper (Aperitif Renderer):1.0
+1793935690	2026-11-06T03:28:10Z	2.01	none	slg_bench:99.3,mds_stores:4.2,mediaanalysisd:1.2,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9	mds_stores:4.2,mediaanalysisd:1.2
+1793935700	2026-11-06T03:28:20Z	1.93	none	slg_bench:99.8,ChatGPT:3.4,Codex (Renderer):2.7,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9	Codex (Renderer):1.7
+1793935710	2026-11-06T03:28:30Z	2.10	none	slg_bench:99.3,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,Claude Helper (Renderer):0.7,apsd:0.3	
+1793935721	2026-11-06T03:28:41Z	1.93	none	Codex (Renderer):16.1,ChatGPT:3.6,Codex (Service):2.0,VeeePlus:1.5,WindowServer:1.3,Google Chrome Helper (Aperitif Renderer):1.1	Codex (Service):2.0,Codex (Renderer):16.1,Google Chrome Helper (Aperitif Renderer):1.1
+1793935731	2026-11-06T03:28:51Z	1.87	none	slg_bench:99.1,UURemote:12.6,apsd:1.7,trustd:1.6,VeeePlus:1.3,WindowServer:1.3	trustd:1.6
+1793935741	2026-11-06T03:29:01Z	2.05	none	slg_bench:99.1,loginwindow:7.1,WindowServer:3.4,ChatGPT:1.9,com.apple.DriverKit-AppleBCMWLAN:1.3,Codex (Renderer):1.3	cloudd:1.0,Codex (Renderer):1.3,Google Chrome Helper (Aperitif Renderer):1.0
+1793935751	2026-11-06T03:29:11Z	2.05	none	slg_bench:100.0,com.apple.DriverKit-AppleBCMWLAN:1.3,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,wifip2pd:0.4	
+1793935761	2026-11-06T03:29:21Z	1.96	none	Google Chrome:3.8,VeeePlus:1.2,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.7	Google Chrome Helper (Aperitif Renderer):1.0,Google Chrome:2.3
+1793935771	2026-11-06T03:29:31Z	1.89	none	slg_bench:100.0,runningboardd:1.2,VeeePlus:1.2,Finder:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9	
+1793935781	2026-11-06T03:29:41Z	1.90	none	slg_bench:99.1,trustd:1.7,sysmond:1.7,AddressBookSourceSync:1.4,VeeePlus:1.1,Finder:1.1	trustd:1.7,Google Chrome Helper (Aperitif Renderer):1.0
+1793935791	2026-11-06T03:29:51Z	1.76	none	slg_bench:100.0,sysmond:3.4,cfprefsd:2.9,Finder:1.8,VeeePlus:1.3,WindowServer:1.1	
+1793935801	2026-11-06T03:30:01Z	1.80	none	slg_bench:100.0,loginwindow:8.8,sysmond:5.2,WindowServer:4.1,cfprefsd:1.6,Finder:1.6	cloudd:1.0,Google Chrome Helper (Aperitif Renderer):1.1
+1793935811	2026-11-06T03:30:11Z	1.83	none	slg_bench:100.0,sysmond:10.6,opendirectoryd:1.6,launchd:1.4,VeeePlus:1.4,WindowServer:1.3	Google Chrome Helper (Aperitif Renderer):1.1
+1793935821	2026-11-06T03:30:21Z	1.77	none	zsh:2.5,launchd:1.5,VeeePlus:1.3,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):1.0,cfprefsd:0.8	Google Chrome Helper (Aperitif Renderer):1.0
+1793935831	2026-11-06T03:30:31Z	1.74	none	slg_bench:100.0,Claude Helper (Renderer):2.1,trustd:1.0,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9	Claude Helper (Renderer):2.1,trustd:1.0
+1793935841	2026-11-06T03:30:41Z	2.02	none	slg_bench:100.0,apsd:2.5,trustd:2.1,timed:1.3,VeeePlus:1.2,WindowServer:1.1	trustd:1.3,Google Chrome Helper (Aperitif Renderer):1.0
+1793935852	2026-11-06T03:30:52Z	1.93	none	slg_bench:100.0,bluetoothd:2.7,com.apple.DriverKit-AppleBCMWLAN:1.7,UniversalControl:1.3,VeeePlus:1.2,WindowServer:1.1	
+1793935862	2026-11-06T03:31:02Z	1.94	none	slg_bench:100.0,loginwindow:7.5,runningboardd:5.4,WindowServer:2.8,PerfPowerServices:2.4,ChatGPT:1.7	Google Chrome Helper (Aperitif Renderer):1.0
+1793935872	2026-11-06T03:31:12Z	1.80	none	cloudd:10.7,Finder:2.0,cloudphotod:1.5,secd:1.5,com.apple.DriverKit-AppleBCMWLAN:1.5,VeeePlus:1.3	cloudd:10.7,Google Chrome Helper (Aperitif Renderer):1.1
+1793935882	2026-11-06T03:31:22Z	1.75	none	VeeePlus:1.1,WindowServer:1.1,com.apple.DriverKit-AppleBCMWLAN:1.0,Google Chrome Helper (Aperitif Renderer):0.9,airportd:0.6,syslogd:0.1	Google Chrome Helper (Aperitif Renderer):1.0
+1793935892	2026-11-06T03:31:32Z	1.71	none	Finder:1.9,ChatGPT:1.6,VeeePlus:1.3,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):1.0,com.apple.DriverKit-AppleBCMWLAN:0.6	Google Chrome Helper (Aperitif Renderer):1.0
+1793935902	2026-11-06T03:31:42Z	1.60	none	slg_bench:100.0,VeeePlus:1.2,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.7,trustd:0.6	
+1793935912	2026-11-06T03:31:52Z	1.66	none	slg_bench:100.0,VeeePlus:2.7,trustd:1.5,WindowServer:1.1,ChatGPT:1.0,Google Chrome Helper (Aperitif Renderer):0.9	trustd:1.5
+1793935922	2026-11-06T03:32:02Z	1.63	none	slg_bench:99.1,Google Chrome Helper (Aperitif):1.7,WindowServer:1.3,VeeePlus:1.2,com.apple.DriverKit-AppleBCMWLAN:1.1,Google Chrome Helper (Aperitif Renderer):0.9	Google Chrome Helper (Aperitif):1.7
+1793935932	2026-11-06T03:32:12Z	1.69	none	slg_bench:99.7,Codex (Renderer):3.9,ChatGPT:2.7,Codex (Service):1.5,VeeePlus:1.3,WindowServer:1.2	Codex (Service):1.5,Codex (Renderer):3.9,Google Chrome Helper (Aperitif Renderer):1.0
+1793935942	2026-11-06T03:32:22Z	1.74	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,Finder:0.7,cloudd:0.5	
+1793935952	2026-11-06T03:32:32Z	1.78	none	slg_bench:99.0,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,Codex (Service):0.5,mDNSResponder:0.4	
+1793935963	2026-11-06T03:32:43Z	1.88	none	VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,airportd:0.8,Finder:0.6,com.apple.DriverKit-AppleBCMWLAN:0.4	Google Chrome Helper (Aperitif Renderer):1.0
+1793935973	2026-11-06T03:32:53Z	1.98	none	slg_bench:100.0,apsd:5.0,VeeePlus:1.8,WindowServer:1.0,cloudd:0.9,Google Chrome Helper (Aperitif Renderer):0.9	
+1793935983	2026-11-06T03:33:03Z	1.99	none	slg_bench:100.0,WindowServer:1.1,VeeePlus:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.3,notifyd:0.1	
+1793935993	2026-11-06T03:33:13Z	1.91	none	slg_bench:99.1,apsd:1.6,VeeePlus:1.0,WindowServer:0.9,Google Chrome Helper (Aperitif Renderer):0.9,securityd:0.7	
+1793936003	2026-11-06T03:33:23Z	1.92	none	slg_bench:99.6,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,runningboardd:0.7,PacketTunnel:0.4	
+1793936013	2026-11-06T03:33:33Z	1.86	none	slg_bench:99.3,Claude Helper (Renderer):1.4,VeeePlus:1.1,WindowServer:1.1,ChatGPT:1.0,Google Chrome Helper (Aperitif Renderer):0.9	Claude Helper (Renderer):1.4
+1793936023	2026-11-06T03:33:43Z	1.73	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:1.0,ChatGPT:1.0,Google Chrome Helper (Aperitif Renderer):0.9,sleep:0.2	
+1793936033	2026-11-06T03:33:53Z	2.07	none	trustd:4.9,cloudd:4.0,nsurlsessiond:3.7,dasd:2.0,bluetoothd:1.6,Finder:1.5	cloudd:4.0,trustd:4.9,Google Chrome Helper (Aperitif Renderer):1.1
+1793936043	2026-11-06T03:34:03Z	1.90	none	Finder:1.9,VeeePlus:1.3,WindowServer:1.2,ChatGPT:1.1,Google Chrome Helper (Aperitif Renderer):1.0,com.apple.DriverKit-AppleBCMWLAN:0.7	Google Chrome Helper (Aperitif Renderer):1.0
+1793936053	2026-11-06T03:34:13Z	1.69	none	VeeePlus:1.3,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):1.0,ChatGPT:1.0,com.apple.DriverKit-AppleBCMWLAN:0.8,Codex (Service):0.8	Google Chrome Helper (Aperitif Renderer):1.0
+1793936063	2026-11-06T03:34:23Z	1.74	none	slg_bench:99.3,Finder:1.3,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.6	
+1793936073	2026-11-06T03:34:33Z	1.78	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,cloudd:0.4,com.apple.DriverKit-AppleBCMWLAN:0.4	
+1793936083	2026-11-06T03:34:43Z	2.06	none	slg_bench:99.1,Codex (Renderer):4.4,ChatGPT:2.3,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9	Codex (Renderer):4.4
+1793936094	2026-11-06T03:34:54Z	2.68	none	slg_bench:100.0,Claude Helper (Renderer):2.1,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.7	Claude Helper (Renderer):2.1
+1793936104	2026-11-06T03:35:04Z	2.50	none	slg_bench:100.0,trustd:1.6,nsurlsessiond:1.2,VeeePlus:1.2,WindowServer:1.2,ChatGPT:1.0	trustd:1.6
+1793936114	2026-11-06T03:35:14Z	2.27	none	WindowServer:1.3,VeeePlus:1.2,com.apple.DriverKit-AppleBCMWLAN:0.9,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.6,syspolicyd:0.4	
+1793936124	2026-11-06T03:35:24Z	2.15	none	VeeePlus:1.3,WindowServer:1.2,ps:1.1,Google Chrome Helper (Aperitif Renderer):1.0,sort:0.8,airportd:0.7	Google Chrome Helper (Aperitif Renderer):1.0
+1793936134	2026-11-06T03:35:34Z	1.97	none	VeeePlus:1.2,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.7,runningboardd:0.6,bash:0.6	
+1793936144	2026-11-06T03:35:44Z	1.98	none	slg_bench:84.4,corespotlightd:3.8,airportd:2.8,Claude:2.5,VeeePlus:1.2,WindowServer:1.1	corespotlightd:3.8,Claude:2.5
+1793936154	2026-11-06T03:35:54Z	1.90	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,airportd:0.6,ChatGPT:0.4	
+1793936164	2026-11-06T03:36:04Z	1.84	none	slg_bench:100.0,ChatGPT:1.3,VeeePlus:1.2,networkserviceproxy:1.1,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9	
+1793936174	2026-11-06T03:36:14Z	1.79	none	slg_bench:99.1,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,cloudd:0.6,ChatGPT:0.6	
+1793936184	2026-11-06T03:36:24Z	1.82	none	slg_bench:99.1,backgroundtaskmanagementd:1.2,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.9	
+1793936194	2026-11-06T03:36:34Z	1.77	none	backgroundtaskmanagementd:4.0,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):1.0,Google Chrome Helper (Aperitif):0.4,wechatwebdevtools Helper (GPU):0.3	Google Chrome Helper (Aperitif Renderer):1.0
+1793936204	2026-11-06T03:36:44Z	1.89	none	slg_bench:99.1,VeeePlus:1.2,WindowServer:1.1,com.apple.DriverKit-AppleBCMWLAN:1.0,PacketTunnel:0.9,Google Chrome Helper (Aperitif Renderer):0.9	
+1793936215	2026-11-06T03:36:55Z	1.91	none	slg_bench:99.1,apsd:8.6,VeeePlus:1.2,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,securityd:0.8	
+1793936225	2026-11-06T03:37:05Z	1.92	none	slg_bench:100.0,bluetoothd:1.6,cfprefsd:1.3,VeeePlus:1.2,WindowServer:1.1,com.apple.DriverKit-AppleBCMWLAN:1.0	
+1793936235	2026-11-06T03:37:15Z	1.86	none	slg_bench:98.8,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.4,cloudd:0.3	
+1793936245	2026-11-06T03:37:25Z	1.81	none	slg_bench:99.4,cloudd:4.4,ChatGPT:1.7,VeeePlus:1.2,WindowServer:1.1,Codex (Service):1.1	cloudd:4.4,Codex (Service):1.1
+1793936255	2026-11-06T03:37:35Z	1.90	none	WindowServer:1.2,VeeePlus:1.1,ChatGPT:1.1,com.apple.DriverKit-AppleBCMWLAN:1.0,Google Chrome Helper (Aperitif Renderer):0.9,bash:0.6	
+1793936265	2026-11-06T03:37:45Z	2.14	none	slg_bench:99.9,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,com.apple.DriverKit-AppleBCMWLAN:0.5,PacketTunnel:0.3	
+1793936275	2026-11-06T03:37:55Z	1.97	none	slg_bench:99.9,Codex (Renderer):19.2,trustd:4.2,nsurlsessiond:3.2,VeeePlus:1.2,WindowServer:1.1	Codex (Renderer):19.2,trustd:4.2
+1793936285	2026-11-06T03:38:05Z	1.89	none	slg_bench:100.0,airportd:2.0,VeeePlus:1.7,WindowServer:1.1,com.apple.DriverKit-AppleBCMWLAN:0.9,Google Chrome Helper (Aperitif Renderer):0.9	
+1793936295	2026-11-06T03:38:15Z	1.91	none	slg_bench:99.7,Codex (Renderer):7.0,ChatGPT:4.0,Codex (Service):2.8,VeeePlus:1.2,WindowServer:1.1	Codex (Service):2.8,Codex (Renderer):7.0
+1793936305	2026-11-06T03:38:25Z	1.85	none	slg_bench:99.3,apsd:2.8,VeeePlus:1.2,WindowServer:1.1,timed:1.0,contextstored:1.0	
+1793936315	2026-11-06T03:38:35Z	1.80	none	slg_bench:98.9,cloudd:1.9,ChatGPT:1.5,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9	cloudd:1.9
+1793936325	2026-11-06T03:38:45Z	1.67	none	Finder:1.7,VeeePlus:1.4,WindowServer:1.3,apsd:1.2,Google Chrome Helper (Aperitif Renderer):1.1,com.apple.DriverKit-AppleBCMWLAN:1.0	Codex (Service):1.0,Google Chrome Helper (Aperitif Renderer):1.1
+1793936335	2026-11-06T03:38:55Z	1.57	none	slg_bench:99.7,sysmond:1.2,VeeePlus:1.2,PerfPowerServices:1.0,WindowServer:1.0,Finder:1.0	
+1793936346	2026-11-06T03:39:06Z	1.64	none	slg_bench:100.0,trustd:2.4,sysmond:2.1,VeeePlus:1.2,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9	trustd:2.4
+1793936356	2026-11-06T03:39:16Z	1.76	none	slg_bench:100.0,sysmond:5.1,Claude Helper (Renderer):3.3,VeeePlus:1.2,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):1.0	Claude Helper (Renderer):3.3,Google Chrome Helper (Aperitif Renderer):1.0
+1793936366	2026-11-06T03:39:26Z	1.79	none	slg_bench:100.0,sysmond:9.6,searchpartyd:2.4,opendirectoryd:1.6,launchd:1.6,VeeePlus:1.5	Google Chrome Helper (Aperitif Renderer):1.1
+1793936376	2026-11-06T03:39:36Z	1.75	none	slg_bench:99.0,zsh:1.9,launchd:1.2,VeeePlus:1.1,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9	
+1793936386	2026-11-06T03:39:46Z	1.64	none	cloudd:8.8,cloudphotod:5.6,dasd:3.6,nsurlsessiond:3.3,VeeePlus:1.4,WindowServer:1.3	cloudd:8.8,Google Chrome Helper (Aperitif Renderer):1.1
+1793936396	2026-11-06T03:39:56Z	1.62	none	slg_bench:100.0,VeeePlus:1.0,Google Chrome Helper (Aperitif Renderer):0.9,WindowServer:0.8,ChatGPT:0.4,Finder:0.3	
+1793936406	2026-11-06T03:40:06Z	1.68	none	slg_bench:99.1,cfprefsd:1.9,dasd:1.9,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9	
+1793936416	2026-11-06T03:40:16Z	1.73	none	slg_bench:100.0,Codex (Renderer):2.5,ChatGPT:2.1,VeeePlus:1.2,WindowServer:1.1,Codex (Service):1.0	Codex (Service):1.0,Codex (Renderer):2.5
+1793936426	2026-11-06T03:40:26Z	1.70	none	slg_bench:99.1,trustd:1.1,VeeePlus:1.1,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9,mDNSResponder:0.7	trustd:1.1
+1793936436	2026-11-06T03:40:36Z	1.66	none	slg_bench:100.0,WindowServer:1.1,VeeePlus:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.8,Codex (Renderer):0.5	
+1793936446	2026-11-06T03:40:46Z	1.63	none	mdworker_shared:2.9,WindowServer:1.3,VeeePlus:1.2,Google Chrome Helper (Aperitif Renderer):1.1,Codex (Service):1.0,ChatGPT:0.8	Google Chrome Helper (Aperitif Renderer):1.1,mdworker_shared:1.7
+1793936456	2026-11-06T03:40:56Z	1.94	none	slg_bench:99.1,VeeePlus:1.2,PacketTunnel:1.2,UURemote:1.2,mDNSResponder:1.1,WindowServer:1.1	Google Chrome Helper (Aperitif Renderer):1.0
+1793936466	2026-11-06T03:41:06Z	1.95	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:0.9,Google Chrome Helper (Aperitif Renderer):0.9,Finder:0.4,ChatGPT:0.4	
+1793936476	2026-11-06T03:41:16Z	1.88	none	slg_bench:100.0,apsd:4.0,trustd:1.5,VeeePlus:1.2,WindowServer:1.1,Google Chrome Helper (Aperitif Renderer):0.9	trustd:1.5
+1793936487	2026-11-06T03:41:27Z	2.12	none	slg_bench:99.1,Codex (Renderer):3.9,ChatGPT:1.3,VeeePlus:1.2,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):0.9	Codex (Renderer):3.9
+1793936497	2026-11-06T03:41:37Z	2.02	none	apsd:3.3,cfprefsd:1.6,WindowServer:1.5,timed:1.2,VeeePlus:1.2,dasd:1.0	
+1793936507	2026-11-06T03:41:47Z	1.86	none	slg_bench:85.9,Codex (Renderer):5.9,ChatGPT:2.5,VeeePlus:1.2,WindowServer:1.2,Codex (Service):1.0	Codex (Service):1.0,Codex (Renderer):5.9
+1793936517	2026-11-06T03:41:57Z	1.81	none	slg_bench:100.0,launchd:31.8,VeeePlus:1.4,ChatGPT:1.4,WindowServer:1.3,Google Chrome Helper (Aperitif Renderer):1.0	Google Chrome Helper (Aperitif Renderer):1.0
+1793936527	2026-11-06T03:42:07Z	1.84	none	slg_bench:98.8,Claude:15.7,cloudd:4.5,nsurlsessiond:3.4,cloudphotod:2.6,ChatGPT:2.1	cloudd:4.5,Claude:15.7,Google Chrome Helper (Aperitif Renderer):1.0
+1793936537	2026-11-06T03:42:17Z	1.79	none	slg_bench:100.0,Finder:1.1,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,logd:0.1	
+1793936547	2026-11-06T03:42:27Z	1.81	none	launchd:30.0,VeeePlus:1.9,WindowServer:1.3,Google Chrome Helper (Aperitif Renderer):1.1,dasd:0.6,Finder:0.6	Google Chrome Helper (Aperitif Renderer):1.1
+1793936557	2026-11-06T03:42:37Z	1.76	none	slg_bench:100.0,trustd:3.4,nsurlsessiond:3.0,VeeePlus:1.0,WindowServer:1.0,cloudd:0.9	trustd:3.0
+1793936567	2026-11-06T03:42:47Z	1.73	none	slg_bench:99.3,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.8,Codex (Service):0.6	
+1793936577	2026-11-06T03:42:57Z	1.77	none	slg_bench:100.0,launchd:4.9,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.3	
+1793936587	2026-11-06T03:43:07Z	1.73	none	slg_bench:100.0,runningboardd:4.1,VeeePlus:1.0,Google Chrome Helper (Aperitif Renderer):0.9,WindowServer:0.8,ChatGPT:0.6	
+1793936597	2026-11-06T03:43:17Z	1.69	none	slg_bench:99.8,cloudd:9.8,cloudphotod:1.4,VeeePlus:1.3,WindowServer:1.2,secd:1.1	cloudd:9.8
+1793936608	2026-11-06T03:43:28Z	1.66	none	VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,apsd:0.8,Claude:0.2,Codex (Service):0.2	
+1793936618	2026-11-06T03:43:38Z	1.64	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:0.9,Google Chrome Helper (Aperitif Renderer):0.9,Google Chrome Helper (Aperitif):0.4,PacketTunnel:0.2	
+1793936628	2026-11-06T03:43:48Z	1.62	none	slg_bench:99.1,nsurlsessiond:1.3,VeeePlus:1.3,trustd:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9	trustd:1.0
+1793936638	2026-11-06T03:43:58Z	1.60	none	slg_bench:100.0,launchd:1.1,VeeePlus:1.1,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.4	
+1793936648	2026-11-06T03:44:08Z	1.66	none	slg_bench:100.0,VeeePlus:1.0,WindowServer:1.0,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.5,Claude Helper (Renderer):0.3	
+1793936658	2026-11-06T03:44:18Z	1.71	none	VeeePlus:1.3,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):1.0,apsd:0.4,ChatGPT:0.4,securityd_system:0.3	Google Chrome Helper (Aperitif Renderer):1.0
+1793936668	2026-11-06T03:44:28Z	1.60	none	Codex (Renderer):6.4,apsd:4.4,cloudd:4.2,Assistive Control:3.6,cloudphotod:3.1,nsurlsessiond:2.2	cloudd:4.2,Codex (Renderer):6.4,Google Chrome Helper (Aperitif Renderer):1.1
+1793936678	2026-11-06T03:44:38Z	1.66	none	UURemoteServer:3.7,UURemote:1.7,runningboardd:1.6,VeeePlus:1.3,WindowServer:1.2,Google Chrome Helper (Aperitif Renderer):1.0	Google Chrome Helper (Aperitif Renderer):1.0
+1793936688	2026-11-06T03:44:48Z	1.56	none	slg_bench:99.1,VeeePlus:1.0,WindowServer:0.9,Google Chrome Helper (Aperitif Renderer):0.9,ChatGPT:0.9,Codex (Service):0.4	
+1793936698	2026-11-06T03:44:58Z	1.55	none	slg_bench:99.1,trustd:2.4,nsurlsessiond:2.3,ChatGPT:1.3,VeeePlus:1.1,WindowServer:1.0	trustd:2.4
+1793936708	2026-11-06T03:45:08Z	1.54	none	slg_bench:100.0,VeeePlus:1.1,WindowServer:1.0,ChatGPT:1.0,Google Chrome Helper (Aperitif Renderer):0.9,Codex (Service):0.6	
+1793936718	2026-11-06T03:45:18Z	1.61	none	slg_bench:99.3,ChatGPT:3.6,tccd:2.3,syspolicyd:1.6,trustd:1.5,Codex (Service):1.3	syspolicyd:1.6,Codex (Service):1.3,Codex (Renderer):1.3,trustd:1.5
+1793936728	2026-11-06T03:45:28Z	1.59	none	slg_bench:100.0,ChatGPT:1.3,VeeePlus:1.2,WindowServer:1.1,Codex (Service):1.0,Google Chrome Helper (Aperitif Renderer):0.9	Codex (Service):1.0
+1793936739	2026-11-06T03:45:39Z	1.96	none	slg_bench:100.0,cloudd:6.6,cloudphotod:3.5,Codex (Renderer):3.4,ChatGPT:3.1,dasd:2.5	cloudd:4.3,Codex (Renderer):2.0,Google Chrome Helper (Aperitif Renderer):1.0
+1793936749	2026-11-06T03:45:49Z	1.97	none	WindowServer:42.9,UURemoteServer:36.8,WallpaperAerialsExtension:16.6,VTDecoderXPCService:6.8,com.apple.DriverKit-AppleBCMWLAN:6.4,VTEncoderXPCService:3.6	codex:1.0,Claude:1.4,Google Chrome Helper (Aperitif Renderer):2.0,Google Chrome Helper (Aperitif):1.2
+1793936759	2026-11-06T03:45:59Z	4.46	none	slg_bench:100.0,WindowServer:41.8,mdworker_shared:18.2,UURemoteServer:12.3,Claude Helper (Renderer):8.8,WallpaperAerialsExtension:3.6	Claude Helper (Renderer):8.8,Google Chrome Helper (Aperitif Renderer):1.5,mdworker_shared:2.1,mdworker_shared:2.1,mdworker_shared:18.2,Google Chrome:2.0
+1793936769	2026-11-06T03:46:09Z	4.08	none	slg_bench:99.3,WindowServer:12.7,UURemoteServer:9.0,trustd:4.7,nsurlsessiond:3.3,VeeePlus:1.6	trustd:4.7,Google Chrome Helper (Aperitif Renderer):1.1
+1793936779	2026-11-06T03:46:19Z	3.76	none	slg_bench:99.0,WindowServer:11.3,UURemoteServer:8.4,VeeePlus:1.5,Google Chrome Helper (Aperitif Renderer):1.0,com.apple.DriverKit-AppleBCMWLAN:0.9	Google Chrome Helper (Aperitif Renderer):1.0
+1793936789	2026-11-06T03:46:29Z	3.41	none	slg_bench:99.0,WindowServer:10.9,UURemoteServer:8.4,VeeePlus:1.5,Google Chrome Helper (Aperitif Renderer):1.1,VTEncoderXPCService:0.9	Google Chrome Helper (Aperitif Renderer):1.1
+1793936799	2026-11-06T03:46:39Z	3.34	none	slg_bench:99.6,UURemoteServer:13.8,WindowServer:11.9,VeeePlus:1.6,com.apple.DriverKit-AppleBCMWLAN:1.5,runningboardd:1.4	Google Chrome Helper (Aperitif Renderer):1.1
+1793936809	2026-11-06T03:46:49Z	2.98	none	slg_bench:99.0,WindowServer:11.7,UURemoteServer:7.0,dasd:5.9,spotlightknowledged.updater:4.6,cfprefsd:3.0	cloudd:2.1,Google Chrome Helper (Aperitif Renderer):1.0
+1793936819	2026-11-06T03:46:59Z	3.04	none	UURemoteServer:9.1,WindowServer:2.0,VeeePlus:1.9,VTEncoderXPCService:1.8,ChatGPT:1.6,com.apple.DriverKit-AppleBCMWLAN:1.2	Google Chrome Helper (Aperitif Renderer):1.1
+1793936829	2026-11-06T03:47:09Z	2.80	none	corespotlightd:130.3,UURemoteServer:6.7,spotlightknowledged.updater:4.0,VeeePlus:1.9,WindowServer:1.9,VTEncoderXPCService:1.1	corespotlightd:130.3,Google Chrome Helper (Aperitif Renderer):1.1
+1793936839	2026-11-06T03:47:19Z	2.52	none	UURemoteServer:8.1,VeeePlus:2.6,trustd:2.4,networkserviceproxy:2.1,WindowServer:2.0,ChatGPT:1.9	Codex (Service):1.3,trustd:2.4,Google Chrome Helper (Aperitif Renderer):1.1
+1793936850	2026-11-06T03:47:30Z	2.13	none	WindowServer:36.2,WallpaperAerialsExtension:21.3,UURemoteServer:19.8,VTDecoderXPCService:10.3,Codex (Renderer):8.7,com.apple.DriverKit-AppleBCMWLAN:7.7	Codex (Service):1.4,Codex (Renderer):8.7,Claude:2.8,trustd:2.3,Google Chrome Helper (Aperitif Renderer):1.7
+1793936860	2026-11-06T03:47:40Z	1.97	none	WindowServer:16.3,UURemoteServer:11.5,VeeePlus:2.1,com.apple.DriverKit-AppleBCMWLAN:2.1,UURemote:1.9,airportd:1.6	Google Chrome Helper (Aperitif Renderer):1.5
+1793936870	2026-11-06T03:47:50Z	1.97	none	slg_bench:100.0,WindowServer:12.2,UURemoteServer:8.6,airportd:2.8,com.apple.DriverKit-AppleBCMWLAN:2.4,networkserviceproxy:2.0	Google Chrome Helper (Aperitif Renderer):1.1
+1793936880	2026-11-06T03:48:00Z	1.90	none	Claude Helper (Renderer):150.0,slg_bench:96.2,WindowServer:14.5,UURemoteServer:8.5,cloudd:4.4,replayd:3.3	cloudd:4.4,Claude Helper (Renderer):150.0,Google Chrome Helper (Aperitif Renderer):1.3
+1793936890	2026-11-06T03:48:10Z	1.84	none	slg_bench:99.0,WindowServer:12.6,UURemoteServer:8.9,sysmond:5.2,com.apple.DriverKit-AppleBCMWLAN:2.2,airportd:1.9	Google Chrome Helper (Aperitif Renderer):1.1
+1793936900	2026-11-06T03:48:20Z	1.86	none	slg_bench:99.0,WindowServer:12.5,UURemoteServer:8.6,sysmond:8.0,runningboardd:6.1,VeeePlus:2.2	Google Chrome Helper (Aperitif Renderer):1.1
+1793936910	2026-11-06T03:48:30Z	2.04	none	slg_bench:99.8,WindowServer:31.3,UURemoteServer:12.3,Codex (Renderer):12.3,gh:11.8,dasd:9.4	cloudd:1.2,Codex (Service):3.8,Codex (Renderer):12.3,mediaanalysisd:4.1,Claude:5.3,trustd:1.5,Google Chrome Helper (Aperitif Renderer):1.4

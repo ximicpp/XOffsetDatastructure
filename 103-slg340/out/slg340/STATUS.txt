@@ -1,0 +1,2 @@
+SLG340 done: 8 processes x 21 cycles, nine formats one process each + native xoffset and xoffset_trusted + D3 (SLG_D3=1, same binary), slg_bench b933762cecc4573e2ab2852b55d05fc16c1c3c91ef7a50760bc975a31a9c1c0b, source tree 28785dd4ff283d8aa549739172844f43c60366a9 (export of v3.4.0 1162e37b (fixed), bench/slg 07f5a956ac0690bdeba794b8cfc12c31e0db6732)
+screen watcher: 104 calls (dark.log)
