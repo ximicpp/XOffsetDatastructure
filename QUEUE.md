@@ -1,6 +1,6 @@
 # Mac queue
 
-Updated 2026-11-05T19:45:08Z after 101-pr241nf: done 0 2026-11-05T19:45:04Z
+Updated 2026-11-06T00:51:30Z after 102-stage340: running 2026-11-06T00:51:27Z
 
 ```
 runner: pid 4651 (version 2)
@@ -106,4 +106,6 @@ free: 43 GB on /Volumes/XOffsetCS, 43 GB on /Users/ximi
 099-slgv9d                               done 0 2026-11-05T13:34:21Z
 100-pr241                                done 0 2026-11-05T17:23:30Z
 101-pr241nf                              done 0 2026-11-05T19:45:04Z
+102-stage340                             running 2026-11-06T00:51:27Z
+103-slg340                               queued
 ```
