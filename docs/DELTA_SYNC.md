@@ -43,6 +43,15 @@ const View& v = view.root<View>();       // read in place
 `TypedXBuffer<T>` has the same members without `<T>`. `apply_delta_verified`
 throws what `try_apply_delta_verified` returns.
 
+On a trusted link (server to server, server to client) the receiver takes
+deltas through `XReceiver` (`xoffset_receiver.hpp`, section 3, "Trusted
+links"), which checks only the delta's framing:
+
+```cpp
+XReceiver<XLink::from_server> rx(XBuffer::maximum_capacity(1 << 20));
+if (XStatus r = rx.apply_delta<View>(view, d, cursor); !r) ask_sender_for_key_delta();
+```
+
 Several receivers of the same deltas (every subscriber of one map block) can
 share one baseline: the sender writes each delta once and sends it to all of
 them. A receiver that joins later starts from the recorded state:
@@ -135,12 +144,31 @@ available on such a baseline.
   deltas to receivers where apply time counts more than bytes.
 
 The receiver's `XDeltaCursor::last_check()` says what it checked for the last
-delta (`key`, `none`, `in_place`, `full`; section 3).
+delta (`key`, `none`, `in_place`, `full`, or `admit` on a trusted link;
+section 3).
+
+`examples/delta_sync.cpp` runs a server and a client through key delta,
+small deltas, a lost delta and the key delta that recovers from it.
 
 ## 2. Format 1.0
 
 Little-endian. A delta is exactly the header, the optional fields its flags
 announce, the block section and the optional hole section; nothing may follow.
+
+**Stability.** Format 1.0 is frozen from 3.4.0 for every 3.x release: a 3.x
+sender writes 1.0 and a 3.x receiver reads it, on every 64-bit little-endian
+target, compiler and schema backend. Nothing in this section changes within
+1.0: not the fields, not their order or meaning, not what a receiver accepts
+or rejects. An addition gets a new format byte; a 1.0 receiver rejects any
+format byte but `0x10` with `unsupported_version` before reading further, and
+a sender writes a newer format only to a receiver known to read it.
+`tests/test_delta_format.cpp` pins the bytes of a small delta stream (a key
+delta, a scalar delta, a digest delta) both ways, written out field by field
+after the table below: the sender must write them and the receiver must apply
+them, with the full check and with admit, so a framing change fails on every
+compiler. What is not frozen is where the library places data inside the
+payload (the same release on both ends gives the same payload; a delta always
+carries payload bytes at payload offsets of the sender's own buffer).
 
 | offset | field | type | value |
 | ---: | --- | --- | --- |
@@ -208,7 +236,8 @@ section 3.
 block out of bounds or a zero mask byte, `invalid_payload`, `root_mismatch`,
 `capacity_exceeded`), plus two codes: `delta_base_mismatch` (the delta is for
 another state than the replica holds, or the replica holds no key delta) and
-`digest_mismatch`. The messages start with `apply_delta_verified<T>()`.
+`digest_mismatch`. The messages start with `apply_delta_verified<T>()`
+(`XReceiver::apply_delta<T, admit>()` for admit).
 
 ## 3. What the receiver checks
 
@@ -261,6 +290,23 @@ key delta, and after a whole verification of another delta only when a later
 delta first needs it (a replica whose deltas keep needing the whole
 verification, like a store receiving saves, does not rebuild it each time).
 
+**Trusted links.** `XReceiver<XLink::server_peer>` and
+`XReceiver<XLink::from_server>` apply deltas with `XCheck::admit` by default
+(`apply_delta`; `last_check()` is `admit`). Everything the parse checks stays:
+the format, the stream and version against the cursor, the root type and
+schema fingerprint of a key delta, every block and hole inside `[48,
+used_end)`, nothing after the last section. Besides that only the root object
+has to lie inside the used payload; what the bytes mean is the sender's, as
+for a whole wire taken with admit. No map of checked bytes is built or kept,
+and no undo copy unless the delta has a digest or a hole table (a digest that
+does not match rolls the delta back as above). The cursor's map then no longer
+holds, so a full apply on the same cursor after admits (`apply_delta<T,
+XCheck::full>`, or `try_apply_delta_verified`) verifies the whole payload once
+and builds the map again; the map is never built over a payload that was
+only admitted. `XReceiver<XLink::from_client>` applies with the full check
+only (`admit` does not compile), and `XOFFSET_FORCE_FULL_CHECK=1` (the default
+without `NDEBUG` and under ASan or TSan) makes admit the full check.
+
 ## 4. Guarantees
 
 - **Byte identity.** After a delta applies, the receiver's payload
@@ -273,9 +319,11 @@ verification, like a store receiving saves, does not rebuild it each time).
   A key delta rejected by its header checks changes nothing; one rejected
   after them leaves the buffer empty (as a failed `reload_verified`) and the
   cursor cleared.
-- **Same checks as a full load.** The patched payload passes exactly the
-  verification a wire of the same payload passes in `load_verified<T>` (section
-  3), so a delta cannot produce a payload a wire could not.
+- **Same checks as a full load.** With the full check, the patched payload
+  passes exactly the verification a wire of the same payload passes in
+  `load_verified<T>` (section 3), so a delta cannot produce a payload a wire
+  could not. With admit (trusted links, section 3) the framing is checked and
+  the payload is the sender's, as for a whole wire taken with admit.
 - **Order.** Versions count up per stream; a delta applies only to the version
   before it, so a lost, repeated or reordered delta is rejected with
   `delta_base_mismatch`. `XDeltaBaseline::reset()` keeps counting, so deltas
@@ -298,9 +346,15 @@ verification, like a store receiving saves, does not rebuild it each time).
   sends deltas the other way.
 - **Touch what you change** (only with `touched_only`): section 1.
 - **Same schema on both ends.** Deltas carry no schema conversion. The
-  fingerprint is checked on the key delta; a client on another schema version
-  needs a sender-side buffer in its version (see
-  [SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)) and its own baseline.
+  fingerprint is checked on the key delta (`schema_mismatch`,
+  `root_type_mismatch`). Decide at connect time: when the schema handshake
+  (`xoffset_handshake.hpp`, `examples/schema_handshake.cpp`) answers `same`
+  for the root type, send deltas; when it answers `convert`, send whole wires
+  converted for that client ([SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)), or
+  keep a sender-side buffer in the client's version with its own baseline.
+  A client that gets `schema_mismatch` on a key delta has the wrong verdict
+  and reconnects with a new handshake; asking for another key delta would not
+  help.
 - **Stable positions.** The comparison is positional. Data whose elements
   stay where they are (slots that are cleared and reused, fields assigned in
   place) gives small deltas. An erase from the middle of an `XVector`, or an

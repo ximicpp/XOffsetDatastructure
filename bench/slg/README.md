@@ -233,8 +233,10 @@ so earlier batches and the perf gate compare as before.
   (A, B, S, SD, L, EB, LD, U* and their warm-device stages, D) through
   `XReceiver<XLink::server_peer>` (server <-> server) or
   `XReceiver<XLink::from_server>` (a client) with `XCheck::admit`, instead of
-  `reload_verified`. The same keys and stages; delta and native receives are
-  unchanged until P2. Builds with `NDEBUG` (otherwise
+  `reload_verified`. The same keys and stages. Native delta receives (LK,
+  LN, N*, NB, SN) go through the same receivers' `apply_delta` (3.4 P2:
+  admit, no map of checked bytes; `SN.check_admit` and no `NB.check_*`
+  counts). Builds with `NDEBUG` (otherwise
   `XOFFSET_FORCE_FULL_CHECK` makes admit the full check). Its rows are the
   XOffset main column of the application-level cases and class 1
   (`pool_v6.py`); `xoffset` (full check) is report only.

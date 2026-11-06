@@ -23,6 +23,9 @@ Verdicts per tier:
   * A sent every client snapshots of the schema version it was built with
     (a_snapshots.csv schema column against the client's client_build.txt);
   * a client run with --encoding cycle received every encoding;
+  * a client run with --encoding delta received deltas only (the first a
+    key delta), with the digests above equal: patching its copy with each
+    delta gave A's snapshot;
   * normal, full and empty categories each sampled on both sides; every
     empty snapshot has visible == 0; every full-scene snapshot has
     visible == units; check_ok all 1 on both sides;
@@ -118,7 +121,8 @@ HEADLESS_OPTIONAL = ("c.draw_us", "c.present_us")
 # Recorded only when a snapshot was zstd-compressed (checked per encoding),
 # or converted for a version-1 client (checked per client).
 ENCODING_OPTIONAL = ("a.snap_compress_us", "c.decompress_us", "a.snap_convert_us")
-ENCODINGS = ("dense", "compact", "zstd")
+ENCODINGS = ("dense", "compact", "zstd")            # whole wires: what --encoding cycle covers
+VIEW_ENCODINGS = ENCODINGS + ("delta",)            # per-encoding stats; delta: --encoding delta
 EVENT_ENCODINGS = ("raw", "zstd", "zdict", "batch")
 DESTROY_METRICS = ("a.destroy_us", "b.destroy_us", "a.snap_destroy_us", "c.destroy_us")
 REQUIRED_METRICS = tuple(k for k, _ in BATCH_METRICS + VIEW_METRICS
@@ -568,7 +572,7 @@ def summarize_tier(root, name, min_steps):
                   for c in schema_clients))
 
     per_enc = {}
-    for enc in ENCODINGS:
+    for enc in VIEW_ENCODINGS:
         ar = [r for r in a_snap if r.get("encoding") == enc]
         cr = [r for r in c_snap if r.get("encoding") == enc]
         per_enc[enc] = {
@@ -585,6 +589,11 @@ def summarize_tier(root, name, min_steps):
         missing_enc = [e for e in ENCODINGS if not per_enc[e]["a_count"] or not per_enc[e]["client_count"]]
         v.add(scope, "every encoding sampled (--encoding cycle)", not missing_enc,
               ", ".join("{} {}/{}".format(e, per_enc[e]["a_count"], per_enc[e]["client_count"]) for e in ENCODINGS))
+    for cname, _, args_key, rows in clients:
+        if "--encoding delta" in meta.get(args_key, ""):
+            other = sum(1 for r in rows if r.get("encoding") != "delta")
+            v.add(scope, "{}: deltas only (--encoding delta)".format(cname), bool(rows) and not other,
+                  "delta {}, other {}".format(len(rows) - other, other))
     for cname, _, args_key, rows in clients[1:]:
         if "--encoding cycle" in meta.get(args_key, ""):
             counts = {e: sum(1 for r in rows if r.get("encoding") == e) for e in ENCODINGS}
@@ -735,16 +744,19 @@ def render_tier(lines, t):
     row("client destroy (us)", lambda c: mean_p95(c["c.destroy_us"]))
     lines.append("")
     pe = t["per_encoding"]
-    if any(pe[e]["client_count"] for e in ENCODINGS):
+    shown = ENCODINGS + tuple(e for e in VIEW_ENCODINGS[len(ENCODINGS):] if pe.get(e, {}).get("client_count"))
+    if any(pe[e]["client_count"] for e in shown):
         lines.append("### View snapshots by encoding (per-request rows; mean / p95)")
         lines.append("")
-        lines.append("wire = the XOffset wire the client verified; net = the frame payload (zstd: compressed).")
+        lines.append("wire = the XOffset wire the client verified; net = the frame payload (zstd: compressed)." +
+                     (" delta: the delta patched into the client's copy (load = apply, XReceiver from_server)."
+                      if "delta" in shown else ""))
         lines.append("")
-        lines.append("| | " + " | ".join(ENCODINGS) + " |")
-        lines.append("| --- | " + " | ".join("---:" for _ in ENCODINGS) + " |")
+        lines.append("| | " + " | ".join(shown) + " |")
+        lines.append("| --- | " + " | ".join("---:" for _ in shown) + " |")
 
         def erow(label, f):
-            lines.append("| {} | {} |".format(label, " | ".join(f(pe[e]) for e in ENCODINGS)))
+            lines.append("| {} | {} |".format(label, " | ".join(f(pe[e]) for e in shown)))
 
         erow("requests (A / client)", lambda c: "{} / {}".format(c["a_count"], c["client_count"]))
         erow("wire bytes", lambda c: mean_p95(c["wire_bytes"], "_bytes"))
