@@ -1,0 +1,4 @@
+4d1ac7323979a8644ce232830726e30b2e0cb0f9|#237 merged (sorted inserts, class S; the #214 thread asked for this point); #236 (bench only) and #239 (ledger) before it
+56aa849e044b022b77e0379c9f390219c76d5647|#240 merged (revert of #223, class S)
+fd0dc58cfbf7c7a49119148a7e6c21b92917922b|#241 merged (VM host header in the first page, class L); #242 (D3 header, class L) before it
+8003a5d5c9af2b6af5b18448726bba1194540569|#243 merged (UP.send small-message fixed cost, class S); the last range holds #244 (trust tier P2) and #245 (release)

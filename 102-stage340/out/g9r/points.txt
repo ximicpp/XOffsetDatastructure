@@ -1,0 +1,19 @@
+t0 ee506d3f54a979ededdd71cdc5cca5857ff38f11 tree becbab81e91384527bc313392fb407f61f690d36 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (v3.3.1 ee506d3f (previous release tag))
+t1 1162e37bf40fad6074b9e4cc9c7ff109a8b35288 tree 28785dd4ff283d8aa549739172844f43c60366a9 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (STAGE340 head (v3.4.0 1162e37b))
+t1: diff over t0 sha256 346c56ba34e7def10ae087becdab8151c95c8e0494faebabc97515f7dc207514 ( 59 files changed, 3666 insertions(+), 486 deletions(-))
+t1: library header diff over t0:  2 files changed, 296 insertions(+), 146 deletions(-)
+t1: first-parent commits over t0:
+  1162e37b Merge pull request #245 from ximicpp/claude/release-3.4.0
+  e71ee31f Merge pull request #244 from ximicpp/claude/delta-trust-p2-20261105
+  8003a5d5 Merge pull request #243 from ximicpp/claude/up-send-small-msg-20261105 (class S): UP.send small-message fixed cost
+  fd0dc58c Merge pull request #241 from ximicpp/claude/mem-pressure-20261105 (class L): VM host header in the payload's first page
+  d10ede94 Merge pull request #242 from ximicpp/claude/shared-delta-d3-20261104 (class L): D3 shared deltas, XS 0.1 (experimental)
+  56aa849e Merge pull request #240 from ximicpp/claude/revert-223-20261105 (class S): revert #223 root<T>() cache refill
+  4d1ac732 Merge pull request #237 from ximicpp/claude/sorted-insert-split-20261105 (class S): sorted inserts, random back below 3.2.1
+  59899aec Merge pull request #239 from ximicpp/claude/anchor-3.3.1 (class 0): anchor at v3.3.1
+  93124535 Merge pull request #236 from ximicpp/claude/slg-trust-keys-20261105
+bench/reloc of t1: same tree as t0
+reloc_bench t0 sha256 70ef4974d92872cec20fcdc0207e6af7aca7ed4abc17338d8e001729a41b3762
+reloc_bench t1 sha256 f71169a7897c9ff17ecbdb4b0ee74b1cc73680b876442304409f4ff6e9a8dd4d
+reloc_bench t0a sha256 d8e183035a70417d0de3f5b4430ad52d986d54b8761d9eff018bee33f8ca2159
+reloc_bench t1a sha256 2aea6f1c2364924b6b81f369b8ee6b909918013f00eaa1b8fc4df45ba7576a7a
