@@ -16,10 +16,12 @@ namespace mapdemo::codec {
 std::optional<ViewFlags> parse_view_flags(std::uint16_t flags) noexcept {
     const unsigned category = flags & 0xffu;
     const unsigned encoding = (flags >> 8) & 0xfu;
-    if ((flags >> 12) != 0) return std::nullopt;
+    const bool key = (flags & kViewKeyFlag) != 0;
+    if ((flags >> 13) != 0) return std::nullopt;
     if (category > static_cast<unsigned>(net::ViewCategory::Empty)) return std::nullopt;
-    if (encoding >= unsigned(kEncodingCount)) return std::nullopt;
-    return ViewFlags{static_cast<net::ViewCategory>(category), static_cast<Encoding>(encoding)};
+    if (encoding >= unsigned(kEncodingCount) && encoding != unsigned(Encoding::Delta)) return std::nullopt;
+    if (key && encoding != unsigned(Encoding::Delta)) return std::nullopt;
+    return ViewFlags{static_cast<net::ViewCategory>(category), static_cast<Encoding>(encoding), key};
 }
 
 const char* encoding_name(Encoding e) noexcept {
@@ -27,6 +29,7 @@ const char* encoding_name(Encoding e) noexcept {
     case Encoding::Dense: return "dense";
     case Encoding::Compact: return "compact";
     case Encoding::Zstd: return "zstd";
+    case Encoding::Delta: return "delta";
     }
     return "?";
 }
@@ -35,6 +38,7 @@ std::optional<Encoding> parse_encoding(std::string_view text) noexcept {
     if (text == "dense") return Encoding::Dense;
     if (text == "compact") return Encoding::Compact;
     if (text == "zstd") return Encoding::Zstd;
+    if (text == "delta") return Encoding::Delta;
     return std::nullopt;
 }
 

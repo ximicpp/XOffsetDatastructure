@@ -102,6 +102,8 @@ namespace XOffsetDatastructure {
                    ///< vector sizes, heap strings, sets and maps, and containers of plain elements
                    ///< that moved, got a block or lost it (with the coverage of live blocks and holes)
         full,      ///< the whole payload was verified (the root or a vector of records moved, ...)
+        admit,     ///< trust tier admit (XReceiver on a trusted link, xoffset_receiver.hpp): the delta's
+                   ///< framing and bounds and the root's place only; the payload was not verified
     };
 
     namespace detail {
@@ -3325,13 +3327,17 @@ namespace XOffsetDatastructure {
                 return vok();
             }
 
-            template <typename T>
+            // Admit: the key delta's payload is taken like XReceiver::reload<T,
+            // admit> takes a wire (finish_admitted_load: the root object inside
+            // the used payload; holes are inside it by the parse), and no map
+            // of checked bytes is built.
+            template <typename T, bool Admit = false>
             static vstatus apply_key(XBuffer& xbuf, const Parsed& parsed, XDeltaCursor& cursor,
                                      DeltaReceiveScratch& scratch, const char* who) {
                 XBufferCore& core = xbuf;
                 const std::size_t used = parsed.header.used_bytes;
                 cursor.clear();
-                XOFFSET_VTRY(size_checks(cursor, used));
+                if constexpr (!Admit) XOFFSET_VTRY(size_checks(cursor, used));
                 XOFFSET_ROLLBACK_BEGIN
                     std::size_t clean_from = 0;
                     XOFFSET_VTRY(core.reinit_for_overwrite(used, clean_from));
@@ -3359,18 +3365,27 @@ namespace XOffsetDatastructure {
                     header.used_bytes = parsed.header.used_bytes;
                     header.root_offset = parsed.header.root_offset;
                     header.hole_count = static_cast<std::uint32_t>(scratch.holes.size());
-                    XOFFSET_VTRY(xbuf.template finish_verified_load<T>(
-                        header, reinterpret_cast<const char*>(scratch.holes.data()), scratch.holes.size(),
-                        default_wire_upstream(), who, &xbuf.retained_reload_scratch()));
+                    if constexpr (Admit) {
+                        XOFFSET_VTRY(xbuf.template finish_admitted_load<T>(
+                            header, reinterpret_cast<const char*>(scratch.holes.data()), scratch.holes.size(), who));
+                    } else {
+                        XOFFSET_VTRY(xbuf.template finish_verified_load<T>(
+                            header, reinterpret_cast<const char*>(scratch.holes.data()), scratch.holes.size(),
+                            default_wire_upstream(), who, &xbuf.retained_reload_scratch()));
+                    }
                 XOFFSET_ROLLBACK_END(core.reset_arena(0))
                 cursor.stream_ = parsed.header.stream;
                 cursor.version_ = parsed.header.version;
                 cursor.schema_hash_ = wire_schema_hash<T>();
                 cursor.root_type_id_ = wire_root_type_id<T>();
-                // Deltas follow a key delta: its map is built now.
-                defer_checks(cursor, core);
-                (void)ensure_checks<T>(cursor, core, parsed.header.root_offset);
-                cursor.last_check_ = XDeltaCheck::key;
+                if constexpr (Admit) {
+                    cursor.last_check_ = XDeltaCheck::admit;  // no map: checks_valid_ stays false
+                } else {
+                    // Deltas follow a key delta: its map is built now.
+                    defer_checks(cursor, core);
+                    (void)ensure_checks<T>(cursor, core, parsed.header.root_offset);
+                    cursor.last_check_ = XDeltaCheck::key;
+                }
                 return vok();
             }
 
@@ -3527,11 +3542,101 @@ namespace XOffsetDatastructure {
                 return vok();
             }
 
+            // Trust tier admit of a non-key delta (XReceiver<L>::apply_delta<T,
+            // admit>, trust tier design P2). What the parse checks stays (format,
+            // stream and version, root type and fingerprint, every block and hole
+            // inside [48, used), the root below used) and the root object must lie
+            // inside the used payload, aligned; the payload itself is the sender's
+            // promise. No map of checked bytes is kept: the cursor's map no longer
+            // matches, so a later verified delta on this cursor verifies the whole
+            // payload (and rebuilds the map), and the map is never rebuilt over a
+            // payload that was only admitted. An undo copy is kept only for a
+            // digest or a hole table, the two steps that can fail after the patch.
             template <typename T>
+            static vstatus apply_incremental_admit(XBuffer& xbuf, const Parsed& parsed, XDeltaCursor& cursor,
+                                                   DeltaReceiveScratch& scratch, const char* who) {
+                XBufferCore& core = xbuf;
+                const std::size_t used = parsed.header.used_bytes;
+                const auto root = static_cast<std::uint64_t>(parsed.header.root_offset);
+                const std::size_t old_used = static_cast<std::size_t>(core.arena()->used_end);
+                const std::uint64_t old_root = core.arena()->root_offset;
+                const bool touch_log_current = xbuf.touch_log_ && xbuf.touch_log_->epoch == core.epoch();
+                using Storage = std::conditional_t<has_wire_allocator_ctor<T>, T, ReflectRoot<T>>;
+                if (sizeof(Storage) > used - root || root % alignof(Storage) != 0)
+                    XOFFSET_VFAIL(XException, XErrc::root_mismatch, msg(who, "root not found"));
+                cursor.checks_valid_ = false;
+
+                auto& undo = scratch.undo;
+                const bool keep_undo = parsed.digest_present || parsed.holes;
+                if (keep_undo) {
+                    const std::size_t undo_bytes = parsed.undo_bytes + (used < old_used ? old_used - used : 0u);
+                    XOFFSET_TRY {
+                        if (undo.size() < undo_bytes) undo.resize(undo_bytes);
+                    } XOFFSET_CATCH(const std::bad_alloc&) {
+                        XOFFSET_VFAIL_BAD_ALLOC();
+                    }
+                }
+                if (used > core.segment_size() && !core.grow(used - core.segment_size()))
+                    XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, arena_failure_message);
+
+                // Bytes at or past old_used are zero (N2).
+                char* base = core.data();
+                const char* const src_end = reinterpret_cast<const char*>(parsed.readable_end);
+                if (keep_undo) {
+                    char* u = undo.data();
+                    for_each_block(parsed, [&](std::size_t offset, const char* bytes, std::uint64_t mask) {
+                        const std::size_t lo = std::max(offset, payload_begin);  // block 0: past the arena header
+                        if (lo < old_used) {
+                            const std::size_t kept = std::min(offset + delta_block, old_used) - lo;
+                            if (kept == delta_block) std::memcpy(u, base + offset, delta_block);
+                            else std::memcpy(u, base + lo, kept);
+                            u += kept;
+                        }
+                        delta_get_masked(base + offset, bytes, mask, src_end);
+                    });
+                    if (used < old_used) {
+                        std::memcpy(u, base + used, old_used - used);
+                        std::memset(base + used, 0, old_used - used);
+                    }
+                } else {
+                    for_each_block(parsed, [&](std::size_t offset, const char* bytes, std::uint64_t mask) {
+                        delta_get_masked(base + offset, bytes, mask, src_end);
+                    });
+                    if (used < old_used) std::memset(base + used, 0, old_used - used);
+                }
+                auto* sm = core.arena();
+                sm->used_end = used;
+                sm->root_offset = root;
+                if (keep_undo) {
+                    XOFFSET_ROLLBACK_BEGIN
+                        XOFFSET_VTRY(check_digest<T>(core, parsed, who));
+                        if (parsed.holes)
+                            XOFFSET_VTRY(core.load_free_blocks(scratch.holes.data(), scratch.holes.size()));
+                    XOFFSET_ROLLBACK_END(roll_back(core, parsed, undo.data(), old_used, old_root))
+                }
+
+                // Committed: a new epoch, as for a verified delta.
+                core.advance_epoch();
+                if (touch_log_current) {
+                    DeltaTouchLog& log = *xbuf.touch_log_;
+                    for_each_block(parsed, [&](std::size_t offset, const char*, std::uint64_t mask) {
+                        touch_block(log, offset / delta_block, mask);
+                    });
+                    log.epoch = core.epoch();
+                }
+                core.cache_root(find_root_at<T>(core, root));
+                cursor.version_ = parsed.header.version;
+                cursor.last_check_ = XDeltaCheck::admit;
+                return vok();
+            }
+
+            // Admit selects the trust tier admit (apply_incremental_admit,
+            // apply_key<T, true>); false is apply_delta_verified<T>.
+            template <typename T, bool Admit = false>
             static vstatus apply(XBuffer& xbuf, std::span<const std::byte> data, XDeltaCursor& cursor) {
                 static_assert(is_v1_wire_admitted_v<T>,
                               "apply_delta_verified<T>() requires an admitted fixed-schema wire type.");
-                constexpr const char* who = "apply_delta_verified<T>()";
+                constexpr const char* who = Admit ? "XReceiver::apply_delta<T, admit>()" : "apply_delta_verified<T>()";
                 XBufferCore& core = xbuf;
                 // The cursor's fields are read throughout: fetched while the
                 // buffer's state is looked up.
@@ -3563,11 +3668,12 @@ namespace XOffsetDatastructure {
                 Parsed parsed{};
                 XOFFSET_VTRY(parse<T>(data, room, cursor, old_used, old_root, scratch.holes, scratch.blocks, parsed, who,
                                       has_state ? static_cast<const char*>(core.get_address()) : nullptr));
-                if (parsed.key) return apply_key<T>(xbuf, parsed, cursor, scratch, who);
+                if (parsed.key) return apply_key<T, Admit>(xbuf, parsed, cursor, scratch, who);
                 if (!has_state)
                     XOFFSET_VFAIL(XException, XErrc::delta_base_mismatch,
                                   msg(who, "buffer holds no verified root of this type (ask for a key delta)"));
-                return apply_incremental<T>(xbuf, parsed, cursor, scratch, who);
+                if constexpr (Admit) return apply_incremental_admit<T>(xbuf, parsed, cursor, scratch, who);
+                else return apply_incremental<T>(xbuf, parsed, cursor, scratch, who);
             }
         };
     } // namespace detail

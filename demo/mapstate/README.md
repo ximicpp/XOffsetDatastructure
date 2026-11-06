@@ -14,7 +14,11 @@ XOffset paths with real processes and real TCP:
    snapshot buffer**. The client builds as C++20 for Windows (MinGW, MSVC),
    Android and iOS from the same sources, with no game engine; it asks for
    the snapshot dense, compact (`save_compact`) or compact + zstd, and
-   verifies it the same way after decompression. The client code never
+   verifies it the same way after decompression. Or it asks for deltas
+   (`--encoding delta`, 3.4): A keeps a copy of what each client holds and
+   sends only the bytes that changed; the client patches its snapshot in
+   place through `XReceiver<XLink::from_server>` and reads it as before
+   (below). The client code never
    throws, so the same sources also build without exceptions
    (`mapdemo_client_noexc`, `-fno-exceptions` / MSVC `/EHs-c-`), as engine
    clients are usually built. Clients that have not updated keep working:
@@ -211,6 +215,26 @@ lines and every row of the evil client's `client_checks.csv` passes. Snapshot
 rows also agree on encoding, bytes sent and wire digest; a client run with
 `--encoding cycle` must have received every encoding.
 
+### Deltas instead of whole snapshots
+
+```bash
+MAPDEMO_CLIENT_ARGS="--encoding delta" MAPDEMO_CLIENT2_ARGS="--encoding compact" \
+    demo/mapstate/tools/run_all_tiers.sh build/bin/Release delta-results
+```
+
+With `--encoding delta` A writes each snapshot as usual, then sends it as a
+delta against the last one this client received (`save_delta_into`, one
+`XDeltaBaseline` per connection). The client applies it to the snapshot it
+holds with `XReceiver<XLink::from_server>::apply_delta`, a trusted link:
+the delta's framing, its bounds and the root are checked, not every offset
+(docs/DELTA_SYNC.md section 3). The tier checks are the same as for whole
+wires: A and the client log the same content digest for every request, so
+each patched snapshot equals the one A built. After a write-back changed its
+copy, the client sets the KEY flag and A answers with a key delta. Deltas
+need the same schema on both ends, so the version-1 client keeps a
+whole-wire encoding. The table "View snapshots by encoding" gains a `delta`
+column (net bytes per delta, client apply time as "verify").
+
 ### End to end across client platforms
 
 ```bash
@@ -342,7 +366,8 @@ path by one point between 4 and 8. Rects are min-inclusive, max-exclusive.
 
 Structural validation is not authentication or tamper-proofing; zstd is a
 transport encoding, and the decompressed wire goes through the same
-verification. No `XBufferPool`, incremental sync, LOD or gameplay; one arena per
+verification. A delta (`--encoding delta`) applied on the trusted link is
+checked for framing and bounds, not verified in full. No `XBufferPool`, LOD or gameplay; one arena per
 batch, per snapshot and for the catalog (kept and refilled in `reuse`, new per
 message in `fresh`). Cloud (GCC 16, x86-64 VM) numbers are smoke
 numbers; formal timing is the Mac run recorded in `RESULT.md`.

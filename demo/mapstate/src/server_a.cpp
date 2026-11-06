@@ -221,6 +221,9 @@ struct Client {
     bool writes_back = false;   // sent an accepted Edit: receives the others' (Forward)
     bool subscribed = false;
     std::uint16_t event_mode = 0;   // codec::EventEncoding or codec::kEventCycle
+    // Encoding delta: what this client holds (a copy of the last snapshot sent
+    // to it as a delta). A ViewReq with the KEY flag resets it.
+    XDeltaBaseline delta_base;
 };
 
 class ServerA {
@@ -306,7 +309,8 @@ private:
     std::uint64_t step_checks_ = 0;
     std::uint64_t snap_checks_ = 0;
     std::uint64_t snaps_by_cat_[3] = {0, 0, 0};
-    std::uint64_t snaps_by_enc_[codec::kEncodingCount] = {};
+    std::uint64_t snaps_by_enc_[codec::kEncodingSlots] = {};
+    std::uint64_t delta_keys_ = 0;   // key deltas among snaps_by_enc_[Delta]
     std::uint64_t snaps_nonempty_ = 0;
     std::uint64_t snaps_zero_ = 0;
     std::uint64_t category_mismatch_ = 0;
@@ -664,6 +668,13 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
         reject(c, "ViewReq: encoding zstd is not available (built without zstd)", false);
         return;
     }
+    // A delta patches the client's copy byte for byte, so both ends need the
+    // same schema (docs/DELTA_SYNC.md section 5); a version-1 client gets
+    // whole wires.
+    if (vf->encoding == codec::Encoding::Delta && c.v1_snapshots) {
+        reject(c, "ViewReq: encoding delta needs the same schema version on both ends (client has version 1)", false);
+        return;
+    }
     const char* cat = category_name(vf->category);
     const codec::Encoding enc = vf->encoding;
 
@@ -779,12 +790,17 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
 
     // Save in the requested encoding. wire = the frame payload; xwire = the
     // XOffset wire the client will verify (the payload itself, or for zstd
-    // the compact wire before compression).
+    // the compact wire before compression). Delta: the bytes that differ from
+    // what this client holds (a key delta first, or after a KEY request).
     sw.restart();
     std::string wire = reuse() ? c.conn.take_tx_buffer() : std::string();
     std::string& xwire = enc == codec::Encoding::Zstd ? compact_ : wire;
     const XCompactOptions canonical{0};   // capacity == size: the smallest wire
-    if (v1) {
+    bool delta_key = false;
+    if (enc == codec::Encoding::Delta) {
+        if (vf->key) c.delta_base.reset();
+        delta_key = snap_buf.save_delta_into(xwire, c.delta_base).key;
+    } else if (v1) {
         if (enc == codec::Encoding::Dense) v1->save_verified_into(xwire);
         else v1->save_compact_into(xwire, canonical);
     } else if (enc == codec::Encoding::Dense) {
@@ -810,8 +826,11 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
     rec_.add("a.snap_net_bytes", double(net_bytes));
     rec_.add("a.visible_count", double(hits.size()));
     ++snaps_by_enc_[static_cast<int>(enc)];
+    if (delta_key) ++delta_keys_;
 
-    if (!opt_.corpus_dir.empty() && corpus_written_ < opt_.corpus_max)
+    // The corpus holds whole wires (a delta means nothing without the state
+    // it patches).
+    if (!opt_.corpus_dir.empty() && corpus_written_ < opt_.corpus_max && enc != codec::Encoding::Delta)
         write_corpus(req.request_id, frame.flags, cat, enc, wire, wire_bytes, xwire_digest,
                      checks::snapshot_digest(snap_buf.root()), hits.size());
 
@@ -1285,7 +1304,9 @@ void ServerA::write_results() {
             " full=" + std::to_string(snaps_by_cat_[1]) + " empty=" + std::to_string(snaps_by_cat_[2]) +
             " nonempty=" + std::to_string(snaps_nonempty_) + " zero_visible=" + std::to_string(snaps_zero_) +
             " dense=" + std::to_string(snaps_by_enc_[0]) + " compact=" + std::to_string(snaps_by_enc_[1]) +
-            " zstd=" + std::to_string(snaps_by_enc_[2]));
+            " zstd=" + std::to_string(snaps_by_enc_[2]) +
+            " delta=" + std::to_string(snaps_by_enc_[int(codec::Encoding::Delta)]) +
+            " delta_keys=" + std::to_string(delta_keys_));
         // Each served category hit its expected path: Empty -> zero units,
         // FullScene -> every unit. Whether a run covered both the non-empty
         // and the zero-visible path is judged per tier by tools/summarize.py

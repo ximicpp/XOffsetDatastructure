@@ -467,6 +467,42 @@ if (auto v = view_fixed_batch<Quote>(recv_bytes))
 1 到 8 条指令，每个读者多 5 到 8 条；与把同样记录放进 XOffset 根相比，编码少 6 到 12 倍，
 读少 1.7 到 6 倍。
 
+### 4.5 增量同步：只发改过的字节
+
+接收方手里已经有一份副本（客户端握着自己的单位或玩家数据，存储服务器握着玩家）时，发送方改了几个字段
+不必再发整块：`xoffset_delta.hpp`（主头文件已包含）只发变了的载荷字节，接收方就地补进副本，补完后两边
+载荷逐字节相同。格式、检查和保证见 [DELTA_SYNC.md](DELTA_SYNC.md)，完整的收发循环见
+`examples/delta_sync.cpp`。
+
+```cpp
+// 发送方：每个接收方一个基线（总是收同样增量的一组接收方可以共用一个）。
+XDeltaBaseline base;                                   // 对方手里还什么都没有
+std::string d;
+world.save_delta_into<View>(d, base);                  // 第一次是关键增量（整份状态）
+// ... 原地修改 world：root<View>().units[i].hp -= 3 ...
+if (world.save_delta_into<View>(d, base); !d.empty()) send(d);   // 以后只发改过的
+base.reset();                                          // 对方要求重来时：下一条是关键增量
+
+// 接收方：按链路建接收器（第 8 节 K4），游标记住副本处在哪条流的哪个版本。
+XReceiver<XLink::from_server> rx(XBuffer::maximum_capacity(1 << 20));
+XDeltaCursor cursor;
+if (XStatus r = rx.apply_delta<View>(held, d, cursor); !r) ask_for_key_delta();
+const View& v = held.root<View>();                     // 就地读
+```
+
+- 丢包、乱序、重复或客户端重启后，增量对不上副本的版本，返回 `delta_base_mismatch`，副本和游标不变；
+  请发送方 `reset()` 基线发关键增量即可恢复。中途加入的接收方从 `key_delta_into` 起步，之后和其他人
+  收同一串增量。
+- 副本只读：接收方改了自己的副本，下一条增量的结果就不再是发送方的数据（带 `digest` 发送时会被发现
+  并回滚）。要回传修改，接收方用自己的 buffer 和基线反方向发增量。
+- 两端 schema 相同才发增量：连接时握手（`xoffset_handshake.hpp`）对根类型答 `same` 就发增量，答
+  `convert` 就发转换过的整块（第 7 节）。收到 `schema_mismatch` 说明握手结果不对，要重连，再要关键
+  增量没有用。
+- 可信链路（服务端之间、服务端发往客户端）默认 admit：只查增量的格式、流和版本、每个块和空洞在已用
+  载荷之内，不建检查表；从客户端收的增量只能完整校验（DELTA_SYNC.md 第 3 节）。
+- 增量格式 1.0 从 3.4.0 起在 3.x 内冻结（DELTA_SYNC.md 第 2 节），`tests/test_delta_format.cpp`
+  逐字节固定了一小串增量。
+
 ## 5. 必须遵守的约束
 
 | 约束 | 不遵守的后果 |
@@ -571,8 +607,8 @@ buffer 地址固定（在 VM 预留内增长），只在显式时间点搬：输
 省掉校验，不可信输入走 K4。
 
 接收检查分三档（2026-11-04 定）。3.3.x 及以前只有完整档：`load_verified`、`reload_verified`、增量 apply
-等现有入口都做全图校验。3.4 起整块接收的信任档由 `XReceiver`（`xoffset_receiver.hpp`）提供，增量 apply 的
-信任档和边界档随后加入。各链路的默认如下：
+等现有入口都做全图校验。3.4 起整块接收和增量 apply 的信任档由 `XReceiver`（`xoffset_receiver.hpp`）提供，
+边界档随后加入。各链路的默认如下：
 
 | 档 | 默认用在哪 | 查什么 | 收到后能做什么 |
 | --- | --- | --- | --- |
@@ -592,13 +628,16 @@ XReceiver<XLink::from_server> rx(XBuffer::maximum_capacity(16 << 20));   // 客�
 XStatus st = rx.reload<Profile>(held, wire);        // 信任档：解析 wire 头和表、复制、装空闲表，不遍历对象图
 XStatus full = rx.reload<Profile, XCheck::full>(held, wire);   // 同一链路显式完整校验
 auto fresh = rx.load<Profile>(wire);                // 新建 buffer（每次新映射，热路径用 reload）
+XDeltaCursor cur;                                   // held 跟着哪条增量流
+XStatus d = rx.apply_delta<Profile>(held, delta, cur);   // 信任档增量：只查格式、流和版本、块和空洞的边界
 
 XReceiver<XLink::from_client> up(XBuffer::maximum_capacity(64 << 10));   // 服务端收客户端
 (void)up.reload<Profile>(state, wire);              // 只能完整档；写 XCheck::admit 编译不过
 ```
 
 信任档接受任何 V2 wire（`save_verified` 的各种 emission、`save_compact`），结果和完整档一样可以原地读写、
-再发。`XOFFSET_FORCE_FULL_CHECK=1` 让信任档改走完整校验：没有 `NDEBUG` 的构建和 ASan、TSan 构建默认如此，
+再发。增量的信任档不建、不维护检查表（docs/DELTA_SYNC.md 第 3 节），同一个游标之后若改走完整档，第一次会
+整块校验一遍再重建检查表。`XOFFSET_FORCE_FULL_CHECK=1` 让信任档改走完整校验：没有 `NDEBUG` 的构建和 ASan、TSan 构建默认如此，
 发布构建可以手动打开做压测或灰度。
 
 K7 的现状：

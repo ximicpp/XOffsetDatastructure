@@ -159,6 +159,7 @@ set(REFLECTION_TESTS
     test_reset_used_range
     test_clone
     test_delta_sync
+    test_delta_format
     test_shared_delta
 )
 
@@ -269,6 +270,7 @@ set(NO_EXCEPTIONS_TESTS
     test_xstring_direct_assign
     test_schema_handshake
     test_delta_sync
+    test_delta_format
     test_fixed_message
     test_receiver
     test_receiver_forced
