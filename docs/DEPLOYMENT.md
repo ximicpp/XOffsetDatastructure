@@ -10,13 +10,13 @@ XOffset 用于**同一份 schema 的 C++ 程序之间**搬运可变状态：服�
 与客户端之间。编译器和平台可以不同，schema 必须相同。它不是跨语言协议，也不是
 长期存储格式。
 
-服务端与客户端之间的用法目前是目标，对外不宣传。3.4.0 的现状（详见
+服务端与客户端之间的用法目前是目标，对外不宣传。3.5.0 的现状（详见
 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)）：
 
 - 客户端用 C++20/C++23 字段表构建（`XOFFSET_RECORD`，各平台原生编译器），服务端用 C++26
-  反射，wire 逐字节相同。Windows x64（MSVC 19.44、clang-cl 19、MinGW GCC）在 3.4.0 上全量测试通过，读入服务端写出的
+  反射，wire 逐字节相同。Windows x64（MSVC 19.44、clang-cl 19、MinGW GCC）在 3.5.0 上全量测试通过，读入服务端写出的
   参照语料，改过后再存出与服务端相同的字节；macOS arm64 和 iOS 模拟器（Apple clang）的同样结果
-  来自 3.3.0，Android arm64（NDK r29/r30）的来自 3.2.x，3.4.0 都没有重跑（3.3.1 起发版只用云端）。
+  来自 3.3.0，Android arm64（NDK r29/r30）的来自 3.2.x，3.5.0 都没有重跑（3.3.1 起发版只用云端）。
 - 端到端 demo（`demo/mapstate`）：Linux 服务端到 Windows、Android 模拟器、iOS 模拟器、macOS
   客户端都已跑通。真机：3.2.0-rc.1 在一台 Android 11 手机上功能全部通过（记录见
   [validation/2026-10-28-rc1-platform](validation/2026-10-28-rc1-platform/README.md)），iPhone 15 Pro Max

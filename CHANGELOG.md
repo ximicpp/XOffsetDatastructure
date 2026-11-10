@@ -13,7 +13,12 @@ and a read-only in-place view instead of the full check, and the clients' hot vi
 (combat 0.88x cista_unchecked, was 1.03x). Native delta sync
 (K9) becomes a core promise after the pre-release fuzz run. Judged in the
 cloud only: Ir gates against v3.4.0 and the full local validation
-(docs/RELEASING.md). IR_VERDICT_PENDING
+(docs/RELEASING.md). Ir against v3.4.0 passes on both compilers: totals
+within 0.997-1.001 (GCC 16) and 0.998-1.000 (P2996); one phase warning,
+GCC 16 `reloc.map.find` 1.025 (code placement; the same flip as before, P2996
+1.000). `tools/local_validate.sh --release` passed every step it can run
+here, including the Windows client columns (MSVC C++20/C++23, clang-cl,
+MinGW); the Android NDK columns were not run.
 Pre-release fuzz (`tools/fuzz_prerelease.sh --budget hour`, ASan+UBSan) on
 the release candidate: PASS, no findings over GCC 16 differential and replay,
 libFuzzer on all five targets in the reflection build, the four field-list
@@ -53,6 +58,9 @@ Known gaps, carried to 3.6 (report only, not product-path regressions):
 - `tools/fuzz_prerelease.sh --budget hour`: about 1 h of fuzzing over all
   nine targets (gcc 900 s, libFuzzer 300 s per target per build); counts for
   a release.
+- `bench/slg`: `root` is named as a template on dependent buffers
+  (`->template root<...>`), so the benchmark and the iOS test host build with
+  Apple clang 21 (#250; bench only).
 - Shared deltas (D3) are a product interface: `XReceiver<L>::apply_sync`
   applies an XS 1.0 message to the records a client keeps, through a target
   that names its tables and finds, adds and drops entries by id
