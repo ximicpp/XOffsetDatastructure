@@ -160,6 +160,7 @@ set(REFLECTION_TESTS
     test_clone
     test_delta_sync
     test_delta_format
+    test_delta_capacity
     test_shared_delta
     test_shared_delta_sync
     test_shared_delta_format

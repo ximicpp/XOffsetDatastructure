@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- A delta whose header announces a payload larger than the replica's
+  `maximum_capacity()` is refused with `capacity_exceeded` before anything is
+  sized for it, for key and non-key deltas, on the full check and the trust
+  tier admit; the replica and the cursor stay as they were. Before, the map of
+  checked bytes (about 0.4 bytes per announced payload byte, up to about
+  800 MB for a payload near 2 GiB) was allocated first and the arena's growth
+  refused after. Found by the 3.5.0 pre-release fuzz (`fuzz_delta_sync`,
+  inputs `509a8c24e3` and `e02375e4de` in `tests/fuzz/regressions/delta_sync/`);
+  `test_delta_capacity` checks it, with no allocation over 1 MiB during the
+  refused apply. The fuzz harness also accepts that admit and the full check
+  name different first findings when a delta has both a bad root and a bad
+  digest.
 - Shared deltas (D3) are a product interface: `XReceiver<L>::apply_sync`
   applies an XS 1.0 message to the records a client keeps, through a target
   that names its tables and finds, adds and drops entries by id
