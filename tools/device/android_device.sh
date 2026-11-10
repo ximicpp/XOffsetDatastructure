@@ -12,7 +12,9 @@
 #   3. SC-6 slg (bench/slg on the field-list backend, with FlatBuffers 25.12.19 built from
 #      source): verify, then $XO_SLG_RUNS timed runs, thermal status before each;
 #   4. SC-12 memory probe: the largest single maximum_capacity, live reservations, and
-#      committed memory in 64 MiB steps until the system kills the program.
+#      committed memory in 64 MiB steps until the system kills the program;
+#   5. address-space probe (xo_va_probe) for the virtual-slot growth design: reservable
+#      address space, footprint of untouched reservations, ranges per region, cost.
 #
 #   tools/device/android_device.sh [all|setup|build|run|clean]     (default all)
 #
@@ -32,7 +34,7 @@
 #   ADB            adb to use (default: adb on PATH, else the downloaded platform-tools)
 #   ANDROID_NDK    NDK root (default: NDK r29 downloaded into $XO_WORK/sdk)
 #   XO_JOBS        build jobs (default: CPU count)
-#   XO_SKIP        space-separated steps to skip: ctest corpus slg mem demo
+#   XO_SKIP        space-separated steps to skip: ctest corpus slg mem va demo
 #   XO_SLG_RUNS    timed slg runs (default 3); XO_SLG_SCALE S|M|L (M), XO_SLG_CYCLES (41)
 #   XO_MEM_LIMIT   MiB the commit probe stops at if the system has not killed it (default:
 #                  the phone's MemTotal)
@@ -328,6 +330,7 @@ cmd_run() {
     fi
     skip slg || slg_phone
     skip mem || mem_phone
+    skip va || va_phone
     skip demo || demo_phone
     finish $RC
 }
@@ -452,6 +455,26 @@ mem_phone() {
         echo "- low memory killer lines: mem/lmkd.txt"
     } > "$d/SUMMARY.md"
     row mem passed "mem/SUMMARY.md (commit probe rc $e: 137 = killed by the system at the limit)"
+}
+va_phone() {
+    local d=$XO_OUT/va VP=$W/android/bin/Release/xo_va_probe RUN=$W/src/tools/device/adb_run.sh c f
+    log "address-space probe (xo_va_probe)"
+    mkdir -p "$d"
+    [ -f "$VP" ] || { row va "**not run**" "no xo_va_probe in $W/android"; fail; return; }
+    "$ADB" shell cat /proc/sys/vm/max_map_count 2>/dev/null | tr -d '\r' > "$d/max_map_count.txt"
+    "$RUN" "$VP" --raw 1024 > "$d/raw_none_1024.txt" 2>&1 || { row va "**failed**" "--raw (va/raw_none_1024.txt)"; fail; return; }
+    "$RUN" "$VP" --raw 1024 rw > "$d/raw_rw_1024.txt" 2>&1
+    "$RUN" "$VP" --footprint 2048 > "$d/footprint_2048.txt" 2>&1
+    for c in 64 1024; do "$RUN" "$VP" --vslab $c 1024 20000 > "$d/vslab_$c.txt" 2>&1; done
+    "$RUN" "$VP" --cost 64 > "$d/cost_64.txt" 2>&1
+    {
+        echo "# address-space probe (Android)"; echo
+        echo "- phone: $(sed -n 's/^model=//p' "$XO_OUT/device.txt"), $(sed -n 's/^android=//p' "$XO_OUT/device.txt"), vm.max_map_count $(cat "$d/max_map_count.txt")"
+        for f in raw_none_1024 raw_rw_1024 footprint_2048 vslab_64 vslab_1024 cost_64; do
+            echo "- $f: $(grep -vE '^(sizeof_pointer|page_size|vslab_progress) ' "$d/$f.txt" | tr '\n' ' ')"
+        done
+    } > "$d/SUMMARY.md"
+    row va passed "va/SUMMARY.md"
 }
 cmd_clean() {
     docker rm -f "$RT" > /dev/null 2>&1

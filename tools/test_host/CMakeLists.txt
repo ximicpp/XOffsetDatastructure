@@ -5,6 +5,8 @@
 #
 # Programs that exist only for phone measurements live here too:
 #   xo_mem_probe   SC-12: address space and memory a process may use (mem_probe.cpp)
+#   xo_va_probe    virtual-slot growth design: reservable address space, footprint of
+#                  untouched reservations, ranges per region, create/destroy cost (va_probe.cpp)
 #   xo_host_selftest  (test_host_new_forwarding) the host serves a program's operator new
 #   xo_slg_bench   SC-6: bench/slg/bench/slg_bench.cpp on the field-list backend, with
 #                  FlatBuffers when -DXO_SLG_FLATBUFFERS_INCLUDE (flatbuffers headers) and
@@ -12,6 +14,8 @@
 
 add_executable(xo_mem_probe mem_probe.cpp)
 configure_xoffset_target(xo_mem_probe)
+add_executable(xo_va_probe va_probe.cpp)
+configure_xoffset_target(xo_va_probe)
 
 set(XO_SLG_FLATBUFFERS_INCLUDE "" CACHE PATH "flatbuffers include directory for xo_slg_bench")
 set(XO_SLG_GENERATED "" CACHE PATH "directory with slg_generated.h (flatc --cpp bench/slg/schema/slg.fbs)")
