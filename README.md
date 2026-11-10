@@ -228,16 +228,16 @@ Both public headers are required for full consumers. Keep header versions,
 compile-time options and toolchain settings consistent across translation units.
 A release does not promise stable source API, ABI or arbitrary cross-toolchain
 wire compatibility; the [user guide](docs/USER_GUIDE.md#8-核心承诺与-api-稳定性) lists the
-core guarantees (K0–K8, starting with K0: the payload holds no absolute
+core guarantees (K0–K9, starting with K0: the payload holds no absolute
 address, so after any modification the whole region can still be copied to
 another address, process or machine) and which interfaces they cover. K8,
 native client builds (iOS, Android, Windows) sharing one library and one wire
 with the servers, became a core guarantee on 2026-11-04. Schema evolution
 (different schema versions on the two ends, since 3.2.0) is provided, see
 [SCHEMA_EVOLUTION.md](docs/SCHEMA_EVOLUTION.md). K9, native delta sync (send
-only the bytes that changed; the receiver merges them into its copy), is a
-target: its API arrives in 3.3, and it becomes a guarantee once the conditions
-in the user guide are met. Receive checks come in three tiers (user guide
+only the bytes that changed; the receiver merges them into its copy: delta
+format 1.0 for whole states, shared deltas XS 1.0 for views), became a core
+guarantee in 3.5.0 after its apply entry points passed the pre-release fuzz. Receive checks come in three tiers (user guide
 section 8): today every receive entry point does the full check; 3.4 adds a
 trusted tier (default between servers and from server to client: header and
 hole-table bounds only, never for untrusted input) and a bounds tier (default
