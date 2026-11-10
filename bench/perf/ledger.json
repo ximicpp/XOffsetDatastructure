@@ -1,4 +1,15 @@
 {
   "schema": "xoffset-perf-ledger-v1",
-  "entries": []
+  "entries": [
+    {
+      "id": "w2-reloc-map-find-layout",
+      "pr": 248,
+      "metric": "reloc.map.find.*",
+      "compiler": "gcc16",
+      "max_ratio": 1.03,
+      "reason": "W2 (x86 UP.send): the map.find lambda's instructions are identical in base and head; only its start address moved, so 3 alignment-padding NOPs now execute in the lookup loop (+36,864 Ir, 1.0254). Placement only, no code change; P2996 unchanged.",
+      "evidence": "/mnt/project-files/w2-up-send-20261110/W2_RESULT.md; per-instruction diff of reloc_bench base e71d4ed vs head 97cb35b (callgrind --dump-instr)",
+      "approved_by": "susu (thread 追平小消息的服务端发送开销, card 2026-11-10 07:53Z, message cmsg_01W8h2niLCspyDhp6DxMomYuPHTGvq99V5ojLMwcVwp9B7)"
+    }
+  ]
 }
