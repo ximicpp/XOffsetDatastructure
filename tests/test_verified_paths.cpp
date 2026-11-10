@@ -7,6 +7,9 @@
 #include <iostream>
 #include <memory_resource>
 #include <new>
+#if defined(_WIN32)
+#include <malloc.h>
+#endif
 #include <stdexcept>
 #include <string>
 
@@ -18,17 +21,25 @@ inline thread_local void* arena_allocation = nullptr;
 inline thread_local std::size_t arena_bytes = 0;
 inline thread_local bool route_arena = false;
 }
+namespace host {
+// The armed failure point counts every replaceable allocation form: an
+// over-aligned object (XBuffer is 64-byte aligned, so is any control block
+// holding one) allocates through the align_val_t overloads.
+inline void count() {
+    if (remaining == 0) {
+        remaining = -1;
+        ++calls;
+        if (auto f = std::exchange(callback, nullptr)) f();
+        else throw std::bad_alloc();
+    } else if (remaining > 0) --remaining;
+}
+}
 void* operator new(std::size_t n) {
     if (std::exchange(host::route_arena, false)) {
         if (n > host::arena_bytes) throw std::bad_alloc();
         return host::arena_allocation;
     }
-    if (host::remaining == 0) {
-        host::remaining = -1;
-        ++host::calls;
-        if (auto f = std::exchange(host::callback, nullptr)) f();
-        else throw std::bad_alloc();
-    } else if (host::remaining > 0) --host::remaining;
+    host::count();
     if (auto* p = std::malloc(n ? n : 1)) return p;
     throw std::bad_alloc();
 }
@@ -40,6 +51,33 @@ void operator delete(void* p) noexcept {
 void operator delete[](void* p) noexcept { ::operator delete(p); }
 void operator delete(void* p, std::size_t) noexcept { ::operator delete(p); }
 void operator delete[](void* p, std::size_t) noexcept { ::operator delete(p); }
+namespace host {
+inline void* aligned_malloc(std::size_t n, std::size_t align) {
+    n = (n ? n + align - 1 : align) / align * align;
+#if defined(_WIN32)
+    return _aligned_malloc(n, align);
+#else
+    return std::aligned_alloc(align, n);
+#endif
+}
+inline void aligned_free(void* p) {
+#if defined(_WIN32)
+    _aligned_free(p);
+#else
+    std::free(p);
+#endif
+}
+}
+void* operator new(std::size_t n, std::align_val_t a) {
+    host::count();
+    if (auto* p = host::aligned_malloc(n, std::size_t(a))) return p;
+    throw std::bad_alloc();
+}
+void* operator new[](std::size_t n, std::align_val_t a) { return ::operator new(n, a); }
+void operator delete(void* p, std::align_val_t) noexcept { host::aligned_free(p); }
+void operator delete[](void* p, std::align_val_t) noexcept { host::aligned_free(p); }
+void operator delete(void* p, std::size_t, std::align_val_t) noexcept { host::aligned_free(p); }
+void operator delete[](void* p, std::size_t, std::align_val_t) noexcept { host::aligned_free(p); }
 
 namespace xo = XOffsetDatastructure;
 struct PathsRoot {
