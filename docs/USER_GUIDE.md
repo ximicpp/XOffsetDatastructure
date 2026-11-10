@@ -1,4 +1,4 @@
-# XOffsetDatastructure 用户指南（3.4.0，wire 格式 2.1）
+# XOffsetDatastructure 用户指南（3.5.0，wire 格式 2.1）
 
 本文面向使用者，说明怎么定义类型、构建、修改、保存、加载，以及必须遵守的约束。
 部署要求见 [DEPLOYMENT.md](DEPLOYMENT.md)，格式细节见 [V2_FORMAT.md](V2_FORMAT.md)，输入与兼容边界见
@@ -621,7 +621,7 @@ XStatus done = token ? token->try_finish() : XStatus(token.error());
 
 ## 8. 核心承诺与 API 稳定性
 
-版本之间不承诺源码 API 或 ABI 稳定。下面 K0–K8 是核心承诺（整块搬运），后续版本不得回退；
+版本之间不承诺源码 API 或 ABI 稳定。下面 K0–K9 是核心承诺（整块搬运），后续版本不得回退；
 相关接口如有改名或签名变化，会在 CHANGELOG 中单独列出并给出替代写法。
 
 | # | 承诺 | 接口 / 机制 |
@@ -635,6 +635,7 @@ XStatus done = token ? token->try_finish() : XStatus(token.error());
 | K6 | schema 指纹精确匹配，不同就拒绝；版本不同的两端走演进握手和转换（E0） | wire 头 `schema_hash` |
 | K7 | 跨编译器、跨平台的对象表示一致 | 用户 schema：`XOFFSET_PIN_SCHEMA`；库自带类型：`tools/sigs/` 签名基线；跨编译器 wire 语料比对（`tools/platform_matrix.sh`） |
 | K8 | 客户端与服务端用同一套库、同一 wire：客户端（iOS、Android、Windows，64 位小端）用字段表后端，按 C++20 用各平台原生编译器构建，能接收、读写、校验、再发（3.2.0 交付，2026-11-04 升为核心承诺） | 字段表后端（`XOFFSET_RECORD`，第 2.1 节）；`tools/native_targets.sh` |
+| K9 | 原生增量同步：程序改完工作状态后只发改过的字节；接收方把增量合并进自己的副本，按链路的档检查后接着读写。整份状态用增量 1.0（`XReceiver<L>::apply_delta`，3.4 起冻结），视口用共享增量 XS 1.0（`XReceiver<L>::apply_sync`，3.5 起冻结），两种格式在 3.x 内都不变；schema 版本不同时按握手回落整份 wire。增量 apply 在每次发版前的 ASan fuzz 里（K4）（3.5.0 升为核心承诺） | `apply_delta`、`XDeltaCursor`、`apply_sync`、`xsync::XSyncCursor`（[DELTA_SYNC.md](DELTA_SYNC.md)、[SHARED_DELTA.md](SHARED_DELTA.md)） |
 
 K0 的边界：搬的单位是整个区域，不是其中单个对象（容器头禁止拷贝和移动）。正在使用的
 buffer 地址固定（在 VM 预留内增长），只在显式时间点搬：输出、接收、reload、`XCompactor`
@@ -716,22 +717,23 @@ K4 的前提：接收方必须设置 `maximum_capacity`。否则发送方可以�
 任何档都**不保证内容完整性**。
 只改动某个标量字段值的数据会被接受，因此不能把校验当作防篡改手段。
 
-K8 的现状（3.4.0）：客户端用字段表后端（第 2.1 节），按 C++20 用各平台原生编译器构建（Apple clang、
+K8 的现状（3.5.0）：客户端用字段表后端（第 2.1 节），按 C++20 用各平台原生编译器构建（Apple clang、
 Android NDK Clang、Windows 编译器），服务端照旧用 C++26 反射。Windows（MSVC 19.44、clang-cl 19、MinGW）
-在 3.4.0 上全量 CTest 都通过，语料与服务端逐字节一致；macOS 和 iOS 模拟器（Apple clang，部署目标 macOS 14.0 /
-iOS 17.0）的同样结果来自 3.3.0，Android（NDK r29/r30）的来自 3.2.x，3.4.0 都没有重跑（逐目标的数字见
-[CLIENT_TARGETS.md](CLIENT_TARGETS.md)）。真机（3.2.x，3.4.0 没有重跑）：iPhone 15 Pro Max（iOS 26.6.2）
+在 3.5.0 上全量 CTest 都通过，语料与服务端逐字节一致；macOS 和 iOS 模拟器（Apple clang，部署目标 macOS 14.0 /
+iOS 17.0）的同样结果来自 3.3.0，Android（NDK r29/r30）的来自 3.2.x，3.5.0 都没有重跑（逐目标的数字见
+[CLIENT_TARGETS.md](CLIENT_TARGETS.md)）。真机（3.2.x，3.5.0 没有重跑）：iPhone 15 Pro Max（iOS 26.6.2）
 CTest 138/138、语料逐字节一致、demo 通过；3.2.0-rc.1 在一台 Android 11 手机上功能全部通过。
 保证的范围：三个客户端目标都原生构建、CTest 通过，跨目标 wire 语料一致，签名与 `tools/sigs/` 基线一致；
 iOS 的地址空间和最低部署目标（系统 libc++ 的 `std::pmr` 在 macOS 14 / iOS 17 以下加载失败）见
 [DEPLOYMENT.md](DEPLOYMENT.md)。客户端在手机上的速度数字等真机复核后再对外宣传（Android 还没有计时）。
 3.1.0 没有这条构建路径：Android、iOS 和 MSVC 编不了。
 
-**目标（尚未承诺）K9 原生增量同步**：程序改完工作状态后只发改过的字节；接收方把增量合并进自己的副本，
-按链路的档检查后接着读写，覆盖视口增量和玩家自身增量。API 在 3.3 加入；视口增量的产品路径是共享增量
-（XS 1.0，`XReceiver::apply_sync`，3.5 起，第 4.6 节）。升为核心承诺的条件：增量 wire 1.0
-在 1.x 内冻结；增量 apply 进入发版前 ASan fuzz（K4）；有增量使用指南和示例；与演进握手衔接（schema
-版本变了就回落全量）；视口 demo 端到端用原生增量；字节、服务端、客户端的性能门槛达标。
+K9 的现状（3.5.0 起为核心承诺）：整份状态的增量（格式 1.0，3.4.0 冻结）和视口的共享增量（XS 1.0，3.5.0 冻结）
+都有拒绝用例、随机流测试和逐字节的金标准测试（[STABILITY_TESTS.md](STABILITY_TESTS.md)）；两种增量的 apply 都在发版前
+ASan fuzz 的目标里（`fuzz_delta_sync`、`fuzz_shared_delta`，服务端和客户端两种构建），3.5.0 在发版前跑过一轮、
+没有发现；地图 demo 端到端用原生增量。schema 版本不同的两端不发增量：连接时握手答 `convert` 就发转换后的整份
+wire（DELTA_SYNC.md 第 5 节）。性能只报：Mac SLG340 上客户端原生增量 NP 对 zpp_bits 0.766；服务端逐客户端原生增量
+（非产品路径，视口走共享增量）仍慢于对手，见 [PERFORMANCE.md](PERFORMANCE.md)。
 
 以下接口提供但属于可选或实验性质，可能在后续版本中改变：
 
@@ -752,5 +754,5 @@ iOS 的地址空间和最低部署目标（系统 libc++ 的 `std::pmr` 在 macO
 正式计时只来自一台 Apple M4、一个游戏服务器负载（`bench/slg`），六家在同一进程里对比
 zpp_bits、cista、cereal、protobuf、FlatBuffers；每个版本的数字、测法和局限见
 [PERFORMANCE.md](PERFORMANCE.md)。引用时请同时说明机器、负载和适配写法；
-没有 Linux 或 Windows 的计时结论。第 3 节那组云端比例（GCC 16，Linux 虚拟机）只用来
+没有 Linux 或 Windows 的正式计时结论（云端 x86-64 的只报数字见 PERFORMANCE.md 第 6 节）。第 3 节那组云端比例（GCC 16，Linux 虚拟机）只用来
 说明声明普通记录的量级，不是正式测量。

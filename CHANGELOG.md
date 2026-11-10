@@ -2,6 +2,39 @@
 
 ## Unreleased
 
+## 3.5.0: performance on the production platform
+
+A minor release on 3.4.0, aimed at speed on the cloud x86-64 servers and the
+clients they feed. Server sends of small messages cost less on x86 (UP.send
+0.91x zpp_bits on cloud x86; the 3.4.0 library measured 0.98x, upper bound
+1.07); shared deltas (D3) become a product
+interface with a frozen format, XS 1.0; clients' uplink gets a bounds check
+and a read-only in-place view instead of the full check, and the clients' hot views of server messages read in place
+(combat 0.88x cista_unchecked, was 1.03x). Native delta sync
+(K9) becomes a core promise after the pre-release fuzz run. Judged in the
+cloud only: Ir gates against v3.4.0 and the full local validation
+(docs/RELEASING.md). Ir against v3.4.0 passes on both compilers: totals
+within 0.997-1.001 (GCC 16) and 0.998-1.000 (P2996); one phase warning,
+GCC 16 `reloc.map.find` 1.025 (code placement; the same flip as before, P2996
+1.000). `tools/local_validate.sh --release` passed every step it can run
+here, including the Windows client columns (MSVC C++20/C++23, clang-cl,
+MinGW); the Android NDK columns were not run.
+Pre-release fuzz (`tools/fuzz_prerelease.sh --budget hour`, ASan+UBSan) on
+the release candidate: PASS, no findings over GCC 16 differential and replay,
+libFuzzer on all five targets in the reflection build, the four field-list
+targets and the cross-build outcome diff. The first run found the delta
+capacity issue fixed below.
+
+Known gaps, carried to 3.6 (report only, not product-path regressions):
+- Client hot view, peace (UPW.recv): XOffset is 1.11x cista_unchecked on GCC
+  16 builds only (P2996 0.94x). Callgrind counts fewer instructions, cache
+  and branch misses for XOffset; the cause is outside what valgrind models.
+- Client uplink send (UL.send, report-only column) is 1.40x zpp_bits; its
+  bytes (136 vs 76, uncompressed) make zstd build tables per message, so
+  compressing it (not in the compared time) takes 5.1 vs 1.4 us.
+- Wire bytes stay 11-33% larger than zpp_bits (wire format unchanged by
+  decision).
+
 - A delta whose header announces a payload larger than the replica's
   `maximum_capacity()` is refused with `capacity_exceeded` before anything is
   sized for it, for key and non-key deltas, on the full check and the trust
@@ -14,6 +47,20 @@
   refused apply. The fuzz harness also accepts that admit and the full check
   name different first findings when a delta has both a bad root and a bad
   digest.
+- Server send of small messages on x86 (3.5 W2): `XBufferCore` is 64-byte
+  aligned and its first line holds what `reset<T>()`, `root<T>()`, a fresh
+  message's allocations and save read. `reset<T>()` of an owner whose root
+  cache already holds `T` keeps the root type and schema binding. A small wire
+  is written in `save_into`'s own frame (general path out of line).
+  `XFixedVector`'s first storage for elements aligned to at most 8 is one
+  shared out-of-line function. Wire bytes unchanged. Cloud x86 D1 misses per
+  UP.send 23.2 -> 16.5.
+- `tools/fuzz_prerelease.sh --budget hour`: about 1 h of fuzzing over all
+  nine targets (gcc 900 s, libFuzzer 300 s per target per build); counts for
+  a release.
+- `bench/slg`: `root` is named as a template on dependent buffers
+  (`->template root<...>`), so the benchmark and the iOS test host build with
+  Apple clang 21 (#250; bench only).
 - Shared deltas (D3) are a product interface: `XReceiver<L>::apply_sync`
   applies an XS 1.0 message to the records a client keeps, through a target
   that names its tables and finds, adds and drops entries by id
