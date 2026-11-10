@@ -503,6 +503,41 @@ const View& v = held.root<View>();                     // 就地读
 - 增量格式 1.0 从 3.4.0 起在 3.x 内冻结（DELTA_SYNC.md 第 2 节），`tests/test_delta_format.cpp`
   逐字节固定了一小串增量。
 
+### 4.6 共享增量：视口同步
+
+服务端给每个客户端发它看得到的那部分共享世界（视口里的单位、行军、地块）时，4.5 节的增量要给每个客户端
+各存一份基线、各比较一遍。共享增量（`xoffset_shared_delta.hpp`，XS 1.0）按记录写：服务端每个实体每 tick
+只和一份共享基线比较、编码一次，看得到它的连接都收同一段字节；客户端按 id 在自己的槽位里找到记录就地写入，
+布局是自己的。格式、目标接口、检查和保证见 [SHARED_DELTA.md](SHARED_DELTA.md)，完整的收发循环见
+`examples/shared_delta.cpp`。
+
+```cpp
+namespace xs = XOffsetDatastructure::xsync;
+// 服务端：每 tick 每个变了的实体只比较一次（基线随之更新），再给每个客户端拼一条消息。
+xs::XRecordDelta<Unit>::diff(unit, baseline, bodies);            // 这段字节发给所有持有者
+xs::XSyncWriter m(msg, need_key ? xs::kFlagKey : 0, stream, ++version);
+m.op(kUnit, xs::leave, gone_id);                                  // 离开视口
+m.op(kUnit, xs::enter, new_id, key.data(), key.size());           // 进入视口：XRecordDelta::key 写的整条记录
+m.op(kUnit, xs::change, id, body, len);                           // 留在视口：共享的那段变化
+m.finish();
+
+// 客户端：目标把 id 映射到自己的记录（SHARED_DELTA.md 第 1 节），接收器按链路建（第 8 节 K4）。
+XReceiver<XLink::from_server> rx(XBuffer::maximum_capacity(1 << 20));
+xs::XSyncCursor cursor;                                           // 跟的是哪条流的哪个版本
+if (xs::is_key(msg)) target.empty_units();                        // 关键消息重新进入全部条目
+if (XStatus r = rx.apply_sync(msg, cursor, target); !r) ask_for_key();
+```
+
+- 目标说明有哪些表、每张表的记录类型，按 id 找记录（`find`、`record`）；单位、行军这类会进出视口的表
+  再加 `enter`、`leave`。进入时库先把记录清零再写入；离开时记录原样交给目标，要让空槽读出来是空的就在
+  `leave` 里清。
+- 丢消息、乱序或客户端重启后版本对不上，返回 `delta_base_mismatch`，什么都不改；请服务端发关键消息。
+- 档位跟链路走：`from_server`、`server_peer` 默认 admit，查消息头、流和版本、每条操作的表、种类和 id，
+  消息体信任发送方；`apply_sync<XCheck::full>` 先逐条检查消息体再写，拒绝的消息什么都不改。
+  `from_client` 上 `apply_sync` 编译不过：服务端不把客户端上行当共享增量读。
+- XS 1.0 从 3.5.0 起在 3.x 内冻结（SHARED_DELTA.md 第 2 节），`tests/test_shared_delta_format.cpp`
+  逐字节固定了一条关键消息和其后的一条增量。
+
 ## 5. 必须遵守的约束
 
 | 约束 | 不遵守的后果 |
@@ -681,7 +716,8 @@ iOS 的地址空间和最低部署目标（系统 libc++ 的 `std::pmr` 在 macO
 3.1.0 没有这条构建路径：Android、iOS 和 MSVC 编不了。
 
 **目标（尚未承诺）K9 原生增量同步**：程序改完工作状态后只发改过的字节；接收方把增量合并进自己的副本，
-按链路的档检查后接着读写，覆盖视口增量和玩家自身增量。API 在 3.3 加入。升为核心承诺的条件：增量 wire 1.0
+按链路的档检查后接着读写，覆盖视口增量和玩家自身增量。API 在 3.3 加入；视口增量的产品路径是共享增量
+（XS 1.0，`XReceiver::apply_sync`，3.5 起，第 4.6 节）。升为核心承诺的条件：增量 wire 1.0
 在 1.x 内冻结；增量 apply 进入发版前 ASan fuzz（K4）；有增量使用指南和示例；与演进握手衔接（schema
 版本变了就回落全量）；视口 demo 端到端用原生增量；字节、服务端、客户端的性能门槛达标。
 
@@ -696,7 +732,6 @@ iOS 的地址空间和最低部署目标（系统 libc++ 的 `std::pmr` 在 macO
 | E4 | `load_unverified` | 只用于调用方已信任的数据 |
 | E5 | `XCompactor` | 同类型压缩整理 |
 | E6 | `xoffset_fixed_message.hpp`（定长消息，4.4 节） | 不经 XBuffer 收发定长记录 |
-| E7 | `xoffset_shared_delta.hpp`（D3 共享增量原型，XS 0.1） | 服务端每个实体每 tick 只比较、编码一次，同一段以记录为坐标的字节发给所有看得到它的连接；客户端按 id 找到自己的槽位就地写入。`XRecordDelta<T>`：`diff`、`key`、`check`（完整档）、`apply`；`XSyncOut`、`XSyncWriter` 组消息。还没接入 `XReceiver`：完整档 = 每段先 `check` 再 `apply`，信任档 = 只认消息头后直接 `apply`，由调用方按链路选；只用于服务端发往客户端 |
 
 `XHandle`、诊断与统计接口、`XBufferCore` 的底层成员不属于承诺范围。
 

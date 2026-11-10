@@ -15,7 +15,7 @@
 #
 #   tools/fuzz_report.py --repo ximicpp/XOffsetDatastructure report \
 #     --findings-dir OUT --needs-json OUT/needs.json \
-#     --expect gcc16-diff,gcc16-replay,libfuzzer-v2_wire,libfuzzer-wire_schemas,libfuzzer-schema_evolution,libfuzzer-delta_sync ...
+#     --expect gcc16-diff,gcc16-replay,libfuzzer-v2_wire,libfuzzer-wire_schemas,libfuzzer-schema_evolution,libfuzzer-delta_sync,libfuzzer-shared_delta ...
 #
 # --inject is the drill: builds with XOFFSET_FUZZ_INJECT_CRASH=ON, runs an
 # XOFFSET-INJECT input on v2_wire (one finding expected) and keeps the corpus
@@ -55,8 +55,8 @@ if [ -z "$OUT" ] || ! [[ "$SECS" =~ ^[0-9]+$ ]] || [ "$SECS" -lt 10 ]; then
   echo "usage: $0 --out DIR [--seconds N>=10] [--corpus-dir DIR] [--targets a,b] [--backend reflection|fieldlist] [--inject]" >&2; exit 2
 fi
 case "$BACKEND" in
-  reflection) KNOWN='v2_wire wire_schemas schema_evolution delta_sync' JOB=libfuzzer STD=26 ;;
-  fieldlist) KNOWN='v2_wire wire_schemas delta_sync' JOB=libfuzzer-fieldlist STD=20 ;;
+  reflection) KNOWN='v2_wire wire_schemas schema_evolution delta_sync shared_delta' JOB=libfuzzer STD=26 ;;
+  fieldlist) KNOWN='v2_wire wire_schemas delta_sync shared_delta' JOB=libfuzzer-fieldlist STD=20 ;;
   *) echo "unknown backend '$BACKEND'" >&2; exit 2 ;;
 esac
 TARGETS=${TARGETS:-$KNOWN}
@@ -142,7 +142,7 @@ EOF
 chmod +x build/xo-native
 
 BUILD=build/$JOB
-BUILD_TARGETS="test_v2_fuzz fuzz_v2_wire fuzz_wire_schemas fuzz_wire_schemas_seeds fuzz_delta_sync fuzz_delta_sync_replay"
+BUILD_TARGETS="test_v2_fuzz fuzz_v2_wire fuzz_wire_schemas fuzz_wire_schemas_seeds fuzz_delta_sync fuzz_delta_sync_replay fuzz_shared_delta fuzz_shared_delta_replay"
 [ "$BACKEND" = reflection ] && BUILD_TARGETS="$BUILD_TARGETS fuzz_schema_evolution fuzz_schema_evolution_seeds"
 { "$CMAKE" -S . -B $BUILD -DCMAKE_BUILD_TYPE=Debug -DXOFFSET_CXX_STANDARD=$STD -DCMAKE_CXX_COMPILER="$P2996_ROOT/bin/clang++" \
     "-DCMAKE_CXX_FLAGS=-O1 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -ffile-prefix-map=$ROOT=/workspace" \
@@ -162,6 +162,7 @@ for T in $TARGETS; do
     wire_schemas) $BIN/fuzz_wire_schemas_seeds "$W/seeds" > "$R/seeds.log" 2>&1 ;;
     schema_evolution) $BIN/fuzz_schema_evolution_seeds "$W/seeds" > "$R/seeds.log" 2>&1 ;;
     delta_sync) $BIN/fuzz_delta_sync_replay --write-seeds "$W/seeds" > "$R/seeds.log" 2>&1 ;;
+    shared_delta) $BIN/fuzz_shared_delta_replay --write-seeds "$W/seeds" > "$R/seeds.log" 2>&1 ;;
   esac
   SOURCE=none FROM=$STORE
   # A new field-list corpus starts from the reflection one (same wires).

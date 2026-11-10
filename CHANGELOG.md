@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+- Shared deltas (D3) are a product interface: `XReceiver<L>::apply_sync`
+  applies an XS 1.0 message to the records a client keeps, through a target
+  that names its tables and finds, adds and drops entries by id
+  (docs/SHARED_DELTA.md, `examples/shared_delta.cpp`, USER_GUIDE.md section
+  4.6). `XLink::server_peer` and `XLink::from_server` apply with
+  `XCheck::admit` by default (header, stream and version, every op's table,
+  kind and id against the records held; bodies are the sender's);
+  `XCheck::full` checks every body against its record and that no entry
+  appears twice before any op applies, so a message it rejects changes
+  nothing. On `XLink::from_client` `apply_sync` does not compile. An
+  `xsync::XSyncCursor` keeps the stream and version per connection;
+  `xsync::is_key` tells a key message. An enter clears the record before its
+  body applies; a leave leaves the record to the target.
+- XS 1.0: the message format of the 3.4 prototype (until now called XS 0.1;
+  format byte 0x01) is frozen within 3.x with the same bytes.
+  `tests/test_shared_delta_format.cpp` pins a key message and the delta after
+  it for the sender and both receive tiers.
+- `fuzz_shared_delta` (libFuzzer, and `fuzz_shared_delta_replay` with any
+  compiler) feeds `apply_sync` raw op sections, corrupted real streams, whole
+  messages and key messages; every message goes to the full tier, and to
+  admit on a copy whenever full accepts it (same records and cursor). It is
+  in `tools/fuzz_libfuzzer.sh`, the nightly script and the pre-release fuzz
+  inventory. `test_shared_delta_sync` runs 1,500 messages through both tiers
+  against a server model.
+- `xoffset_shared_delta.hpp` is no longer experimental (E7 leaves the
+  experimental table). Its out-of-line varint path returns the position by
+  value, so inline readers keep it in a register.
+- bench/slg: the D3 client rows (`D*.recv`, `D*T.recv`) apply through
+  `XReceiver<XLink::from_server>::apply_sync` instead of the bench's own loop.
+
 ## 3.4.0: delta sync on trusted links
 
 A minor release on 3.3.1 for server-to-client sync. Deltas on trusted links

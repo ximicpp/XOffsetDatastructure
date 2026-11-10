@@ -26,6 +26,14 @@
 //                  XView in P4); not available yet.
 //   XCheck::full   load_verified / reload_verified: every check.
 //
+// Shared deltas (XS 1.0, xoffset_shared_delta.hpp, docs/SHARED_DELTA.md) go
+// through apply_sync on server_peer and from_server receivers only: a server
+// does not read a client's uplink as one, so apply_sync does not compile on
+// from_client. admit there reads the header, the stream and version, every
+// op's table, kind and id against the receiver's records, and trusts the
+// bodies; full also checks every body against its record and applies nothing
+// of a message it rejects.
+//
 // The input is a V2 wire (save_verified, save_compact, any emission), not an
 // arena image: admit runs the same parse and copy as the full check and only
 // skips the graph walk, so a reload into a buffer whose pages are already
@@ -41,6 +49,7 @@
 // 0; define it to 0 or 1 to choose.
 
 #include "xoffsetdatastructure.hpp"
+#include "xoffset_shared_delta.hpp"
 
 #ifndef XOFFSET_FORCE_FULL_CHECK
 #  if !defined(NDEBUG) || defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_THREAD__)
@@ -222,6 +231,81 @@ public:
     template <XCheck C = default_mutable_check<L>, typename T>
     [[nodiscard]] XStatus apply_delta(TypedXBuffer<T>& dst, const std::string& delta, XDeltaCursor& cursor) {
         return apply_delta<T, C>(static_cast<XBuffer&>(dst), detail::as_wire(delta), cursor);
+    }
+
+    /// Applies the shared delta `msg` (an XS 1.0 message) to the records
+    /// `target` keeps for the stream `cursor` follows (docs/SHARED_DELTA.md).
+    /// The target names its tables and finds, adds and drops their entries:
+    ///
+    ///   using tables = std::tuple<R0, R1, ...>;      // the record type of table K (1 to 64 tables)
+    ///   template <unsigned K> static constexpr bool keyed = ...;
+    ///                                                 // entries enter and leave
+    ///   template <unsigned K> std::int64_t find(std::uint32_t id);
+    ///                                                 // the entry's handle, < 0 if not held
+    ///   template <unsigned K> R& record(std::int64_t handle);
+    ///   keyed tables:
+    ///   template <unsigned K> std::int64_t enter(std::uint32_t id);
+    ///                                                 // adds the entry: its handle, < 0 if it is
+    ///                                                 // held already or cannot be added
+    ///   template <unsigned K> void leave(std::uint32_t id, std::int64_t handle);
+    ///                                                 // drops it; its record is left as it is
+    ///   optional:
+    ///   template <unsigned K> void applied(std::uint32_t id, std::int64_t handle);
+    ///                                                 // after an enter or change wrote the record
+    ///
+    /// An enter clears the record (XRecordDelta<R>::clear) before its body
+    /// applies: on a keyed table the one enter() returns, on a fixed table
+    /// the one find() returns. A leave does not touch the record; a target
+    /// whose free records must read as empty clears it in leave(). record()
+    /// is called for each op after that op's enter, and the reference is
+    /// used for that op only (adding an entry or a container operation may
+    /// move the records' storage). A handle stays valid until its own entry
+    /// leaves: leave() must not move other entries. A key message
+    /// (xsync::is_key) enters every entry: empty the keyed tables before
+    /// applying one. Other messages need the next version of the stream the
+    /// cursor holds, else delta_base_mismatch (ask the sender for a key
+    /// message).
+    ///
+    /// admit (the default) checks the header, the stream and version, and
+    /// every op's table, kind and id against the records held; bodies are
+    /// the sender's. A message it rejects after the header may be partly
+    /// applied: the cursor is then empty. full checks every body against its
+    /// record (an enter against a cleared one) and that no entry appears
+    /// twice before any op applies: a message it rejects changes nothing.
+    /// What full accepts writes only plain bytes of the record type (checked
+    /// against its byte classes) and changes containers through library
+    /// operations in the receiver's own arena, so a buffer holding the
+    /// records stays one that load_verified<T> accepts. admit leaves that to
+    /// the sender: bodies that are not the sender's own may be read past
+    /// their end and may write any byte of a record.
+    template <XCheck C = default_mutable_check<L>, class Target>
+    [[nodiscard]] XStatus apply_sync(std::span<const std::byte> msg, xsync::XSyncCursor& cursor, Target& target) {
+        static_assert(L != XLink::from_client,
+                      "XReceiver<XLink::from_client>::apply_sync: shared deltas go from a server to its clients "
+                      "and between servers; a client's uplink is not read as one");
+        check_mutable<C>();
+        const char* const p = reinterpret_cast<const char*>(msg.data());
+        const char* const end = p + msg.size();
+#if XOFFSET_NO_EXCEPTIONS
+        bool ok;
+        if constexpr (C == XCheck::full || detail::force_full_check) ok = bool(xsync::sd_detail::SyncAccess::full(p, end, cursor, target));
+        else ok = bool(xsync::sd_detail::SyncAccess::admit(p, end, cursor, target));
+        if (!ok) return detail::take_pending_error();
+        return {};
+#else
+        try {
+            if constexpr (C == XCheck::full || detail::force_full_check) xsync::sd_detail::SyncAccess::full(p, end, cursor, target);
+            else xsync::sd_detail::SyncAccess::admit(p, end, cursor, target);
+            return {};
+        } catch (...) {
+            return detail::current_exception_error();
+        }
+#endif
+    }
+
+    template <XCheck C = default_mutable_check<L>, class Target>
+    [[nodiscard]] XStatus apply_sync(std::string_view msg, xsync::XSyncCursor& cursor, Target& target) {
+        return apply_sync<C>(std::span<const std::byte>(reinterpret_cast<const std::byte*>(msg.data()), msg.size()), cursor, target);
     }
 
 private:
