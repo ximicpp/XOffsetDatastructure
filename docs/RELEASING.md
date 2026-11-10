@@ -64,7 +64,11 @@ tools/fuzz_prerelease.sh --out $OUT --phase client     # 客户端字段表构�
 tools/fuzz_prerelease.sh --out $OUT --phase verdict    # 写 VERDICT.md，PASS 才往下走
 ```
 
-VERDICT 只有在三个阶段都跑在 C 上（工作树干净）、预算是 `release`、每个作业成功且没有发现时才是
+预算：默认 `--budget release`（GCC 2700 秒，libFuzzer 每个目标每种构建 1200 秒，合计约 4 小时）。
+3.5 起按 susu 2026-11-10 的决定用 `--budget hour`（GCC 900 秒，libFuzzer 每个目标 300 秒，九个目标合计
+约 1 小时，另加构建时间），四个阶段的 `--budget` 必须一致；`quick` 只是试跑，不算数。
+
+VERDICT 只有在三个阶段都跑在 C 上（工作树干净）、预算是 `release` 或 `hour`、每个作业成功且没有发现时才是
 PASS。有发现：`tools/fuzz_report.py` 开 issue（用法见 `tools/fuzz_nightly.sh` 开头），修复 PR 把最小化
 后的输入放进 `tests/fuzz/regressions/<target>/`，合入后在新的 C 上重跑。VERDICT.md 贴进发版 PR。
 
