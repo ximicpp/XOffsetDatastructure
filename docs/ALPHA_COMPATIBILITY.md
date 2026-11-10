@@ -1,19 +1,19 @@
-# 3.4.0 兼容与输入边界
+# 3.5.0 兼容与输入边界
 
 （文件名沿用 alpha 时期。）此预发布版面向固定编译器、依赖、schema 并自行验收的试用者。核心实现可用，
-但预发布版之间不承诺源码 API 或 ABI 稳定（稳定承诺只有 K0–K8，见 `docs/STABILITY_TESTS.md`），也不承诺任意编译器、标准库、schema
+但预发布版之间不承诺源码 API 或 ABI 稳定（稳定承诺只有 K0–K9，见 `docs/STABILITY_TESTS.md`），也不承诺任意编译器、标准库、schema
 演进与布局组合之间的长期 wire 兼容。本版本使用 V2 存储与 wire 格式（`docs/V2_FORMAT.md`），
 不读取 V1 wire。
 
 ## 版本和工具链
 
-源码根目录的 `XOFFSET_VERSION`（安装后为 `share/XOffsetDatastructure/VERSION`）是完整版本 `3.4.0` 的唯一文本来源；CMake project 数字版本是
-`3.4.0`。安装消费采用无版本查找，再检查完整字符串：
+源码根目录的 `XOFFSET_VERSION`（安装后为 `share/XOffsetDatastructure/VERSION`）是完整版本 `3.5.0` 的唯一文本来源；CMake project 数字版本是
+`3.5.0`。安装消费采用无版本查找，再检查完整字符串：
 
 ```cmake
 find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
-if(NOT XOffsetDatastructure_VERSION STREQUAL "3.4.0")
-    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 3.4.0")
+if(NOT XOffsetDatastructure_VERSION STREQUAL "3.5.0")
+    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 3.5.0")
 endif()
 ```
 

@@ -24,15 +24,18 @@
 #             one per task: gcc, libfuzzer, client, then verdict)
 #
 # --budget release (default): gcc 2700 s, libFuzzer 1200 s per target per
-# backend. --budget quick: 300 s / 120 s, a dry run of the pipeline that does
-# not count for a release. The corpus store (default
+# backend (about 4 h). --budget hour: gcc 900 s, libFuzzer 300 s per target per
+# backend, about 1 h of fuzzing over all nine targets plus builds (susu
+# 2026-11-10: pre-release fuzz about 1 h); it counts for a release.
+# --budget quick: 300 s / 120 s, a dry run of the pipeline that does not
+# count for a release. The corpus store (default
 # /mnt/project-files/fuzz-nightly/corpus) is reused and updated, so each
 # release starts from everything earlier rounds found.
 #
 # Findings: tools/fuzz_report.py files them (see fuzz_nightly.sh); the fix PR
 # adds the minimized input under tests/fuzz/regressions/<target>/.
 #
-# usage: tools/fuzz_prerelease.sh --out DIR [--phase P] [--budget release|quick]
+# usage: tools/fuzz_prerelease.sh --out DIR [--phase P] [--budget release|hour|quick]
 #                                 [--corpus-dir DIR]
 # Exit status: verdict and all: 0 PASS, 1 FAIL; other phases: 0 when the phase
 # ran (findings or not, see its needs.json); 2 on bad arguments or a missing
@@ -46,11 +49,12 @@ while [ $# -gt 0 ]; do
     --phase) PHASE=$2; shift 2 ;;
     --budget) BUDGET=$2; shift 2 ;;
     --corpus-dir) CORPUS_ARGS=(--corpus-dir "$2"); shift 2 ;;
-    *) echo "usage: $0 --out DIR [--phase all|gcc|libfuzzer|client|verdict] [--budget release|quick] [--corpus-dir DIR]" >&2; exit 2 ;;
+    *) echo "usage: $0 --out DIR [--phase all|gcc|libfuzzer|client|verdict] [--budget release|hour|quick] [--corpus-dir DIR]" >&2; exit 2 ;;
   esac
 done
 case "$BUDGET" in
   release) GCC_SECS=2700 LF_SECS=1200 ;;
+  hour) GCC_SECS=900 LF_SECS=300 ;;
   quick) GCC_SECS=300 LF_SECS=120 ;;
   *) echo "unknown budget '$BUDGET'" >&2; exit 2 ;;
 esac
@@ -130,7 +134,7 @@ for phase, jobs in expect.items():
                 findings.append((f.parent.name, x.get('signature', '?'), x.get('error_type', '?'), x.get('top_function') or '?'))
         except ValueError:
             problems.append('unreadable %s' % f.relative_to(out))
-if budget != 'release':
+if budget not in ('release', 'hour'):
     problems.append('budget %s does not count for a release' % budget)
 verdict = 'PASS' if not problems and not findings else 'FAIL'
 now = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')

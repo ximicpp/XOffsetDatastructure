@@ -1,6 +1,6 @@
-# 稳定承诺与自动化测试对照（K0–K8）
+# 稳定承诺与自动化测试对照（K0–K9）
 
-K0–K8 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。本表把每条承诺
+K0–K9 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。本表把每条承诺
 对应到会在 CI 里失败的测试。测试名就是 CTest 名称；"CI 作业"指
 `.github/workflows/ci.yml` 里的作业（GitHub CI 自 2026-10-23 停用，这些检查由本地验证
 `tools/local_validate.sh` 执行）。改动任何一条承诺的行为时，对应测试必须先失败。
@@ -44,20 +44,21 @@ K0–K8 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 客户端（iOS、Android、Windows，64 位小端）用字段表后端、各平台原生编译器构建，与服务端用同一套库、
 同一 wire。它不是 CTest 里的一项，而是每个客户端目标各跑一遍 `tools/native_targets.sh`：
 
-| 检查 | 测的是什么 | 现状（3.4.0） |
+| 检查 | 测的是什么 | 现状（3.5.0） |
 |---|---|---|
-| 目标上的全量 CTest（Release） | 上面 K0–K7 中两种构建都跑的测试，在该目标的编译器和标准库上通过 | Windows x64（MSVC 19.44 C++20/C++23、clang-cl 19、MinGW GCC 13）在 3.4.0 上都通过；macOS arm64 和 iOS 模拟器（Apple clang）的通过结果来自 3.3.0，Android arm64（NDK r29/r30）的来自 3.2.x，3.4.0 都没有重跑（数字见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)）；真机（3.2.x）：iPhone 15 Pro Max 138/138、Android 11 手机（3.2.0-rc.1）通过（[DEVICE_TESTING.md](DEVICE_TESTING.md) 第 9 节） |
+| 目标上的全量 CTest（Release） | 上面 K0–K7 中两种构建都跑的测试，在该目标的编译器和标准库上通过 | Windows x64（MSVC 19.44 C++20/C++23、clang-cl 19、MinGW GCC 13）在 3.5.0 上都通过；macOS arm64 和 iOS 模拟器（Apple clang）的通过结果来自 3.3.0，Android arm64（NDK r29/r30）的来自 3.2.x，3.5.0 都没有重跑（数字见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)）；真机（3.2.x）：iPhone 15 Pro Max 138/138、Android 11 手机（3.2.0-rc.1）通过（[DEVICE_TESTING.md](DEVICE_TESTING.md) 第 9 节） |
 | 读参照语料 | 服务端 C++26 反射构建写出的 6 个语料，目标全部 `load_verified` 接受 | 上述目标全部接受 |
 | 写语料 `diff -r` | 目标写出的语料与参照逐字节一致 | 上述目标逐字节一致 |
 
 保证的范围见 [USER_GUIDE.md](USER_GUIDE.md) 第 8 节，逐目标结果见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)。
 发版前每个客户端目标都要跑一遍（[RELEASING.md](RELEASING.md)）。
 
-## 目标 K9（尚未承诺）：原生增量同步
+## K9（核心承诺，3.5.0 起）：原生增量同步
 
-只发改过的字节，接收方合并后按链路的档检查（API 3.3 加入）。升为核心承诺前要有：增量 apply 的拒绝用例和随机流
-测试（`test_delta_sync`，含关异常构建）、增量 apply 的发版前 ASan fuzz、增量 wire 1.0 冻结的金标准测试。
-条件全文见 [USER_GUIDE.md](USER_GUIDE.md) 第 8 节。
+只发改过的字节，接收方合并后按链路的档检查（API 3.3 加入，3.5.0 升为核心承诺）。整份状态的增量（格式 1.0）：
+`test_delta_sync`（拒绝用例和随机流，含关异常构建）、`test_delta_format`（增量 wire 1.0 冻结的金标准）、
+`fuzz_delta_sync`（发版前 ASan fuzz，服务端和客户端两种构建，admit 与 full 差分）、`test_receiver`（`apply_delta`
+按链路的默认档）。条件全文见 [USER_GUIDE.md](USER_GUIDE.md) 第 8 节。
 
 视口增量走共享增量（XS 1.0，`XReceiver::apply_sync`，3.5 起）：`test_shared_delta_sync`（1500 条消息的随机流，
 full 和 admit 两个客户端每条之后都与服务端模型比较；拒绝用例、篡改消息、重复条目；含关异常构建）、

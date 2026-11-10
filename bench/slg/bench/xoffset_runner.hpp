@@ -620,12 +620,12 @@ public:
             auto& h = held_views[std::size_t(c) + std::size_t(k)];
             if (!h) h.emplace(XBuffer::create<xm::ViewSnapshot>(4096, held_cap()));
             reload_wire<xm::ViewSnapshot, kClient>(*h, snaps[std::size_t(b)]);
-            held_roots[std::size_t(c) + std::size_t(k)] = &h->root<xm::ViewSnapshot>();
+            held_roots[std::size_t(c) + std::size_t(k)] = &h->template root<xm::ViewSnapshot>();
         }
         xm::ViewSnapshot& held(int c, int k) {
             const std::size_t i = std::size_t(c) + std::size_t(k);
 #ifdef SLG_RP_CHECK
-            if (held_roots[i] != &held_views[i]->root<xm::ViewSnapshot>()) {
+            if (held_roots[i] != &held_views[i]->template root<xm::ViewSnapshot>()) {
                 std::fprintf(stderr, "SLG_RP_CHECK: held root of view %zu is stale\n", i);
                 std::abort();
             }
