@@ -161,6 +161,8 @@ set(REFLECTION_TESTS
     test_delta_sync
     test_delta_format
     test_shared_delta
+    test_shared_delta_sync
+    test_shared_delta_format
 )
 
 foreach(test_name ${REFLECTION_TESTS})
@@ -194,6 +196,14 @@ add_test(NAME receiver_from_client_admit_fail
 set_tests_properties(receiver_from_client_admit_fail PROPERTIES
     LABELS reflection
     PASS_REGULAR_EXPRESSION "data from a client is never admitted unchecked")
+# Shared deltas (XReceiver::apply_sync) do not compile on a client uplink.
+add_executable(receiver_from_client_sync_fail EXCLUDE_FROM_ALL receiver/from_client_sync_fail.cpp)
+configure_xoffset_target(receiver_from_client_sync_fail)
+add_test(NAME receiver_from_client_sync_fail
+    COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target receiver_from_client_sync_fail --config $<CONFIG>)
+set_tests_properties(receiver_from_client_sync_fail PROPERTIES
+    LABELS reflection
+    PASS_REGULAR_EXPRESSION "a client's uplink is not read as one")
 
 # Fixed messages (xoffset_fixed_message.hpp): records with no arena
 # container, sent as their own bytes and read in place.
@@ -275,6 +285,8 @@ set(NO_EXCEPTIONS_TESTS
     test_receiver
     test_receiver_forced
     test_shared_delta
+    test_shared_delta_sync
+    test_shared_delta_format
 )
 foreach(test_name ${NO_EXCEPTIONS_TESTS})
     if(NOT XOFFSET_TESTS_REFLECTION AND test_name IN_LIST XOFFSET_CXX26_ONLY_TESTS)
@@ -302,7 +314,7 @@ set_tests_properties(test_no_exceptions_fatal test_no_exceptions_noexc_fatal PRO
 #   fuzz_<target>_replay_corpus   replays the harness's own seed corpus, written
 #                                 by fuzz_<target>_replay_seeds
 # Names start with the target name so tools/validate_vm.py --targets selects all three.
-set(XOFFSET_REPLAY_TARGETS v2_wire wire_schemas delta_sync)
+set(XOFFSET_REPLAY_TARGETS v2_wire wire_schemas delta_sync shared_delta)
 if(XOFFSET_TESTS_REFLECTION)
     list(APPEND XOFFSET_REPLAY_TARGETS schema_evolution)  # server side, reflection only
 else()

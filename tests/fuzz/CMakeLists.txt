@@ -82,6 +82,29 @@ add_test(NAME fuzz_delta_sync_smoke
 set_tests_properties(fuzz_delta_sync_smoke PROPERTIES
     LABELS "fuzz" FIXTURES_REQUIRED fuzz_delta_sync_seeds)
 
+# Shared delta receiver (XS 1.0, XReceiver::apply_sync): XCheck::admit against
+# XCheck::full on a client view; the first byte picks the mode. Seeds come
+# from the replay build (--write-seeds).
+add_executable(fuzz_shared_delta fuzz_shared_delta.cpp)
+configure_xoffset_target(fuzz_shared_delta)
+xoffset_enable_test_assertions(fuzz_shared_delta)
+target_compile_options(fuzz_shared_delta PRIVATE -fsanitize=fuzzer)
+target_link_options(fuzz_shared_delta PRIVATE -fsanitize=fuzzer)
+target_link_libraries(fuzz_shared_delta PRIVATE ${XOFFSET_FUZZER_LINK_LIBS})
+if(XOFFSET_FUZZ_INJECT_CRASH)
+    target_compile_definitions(fuzz_shared_delta PRIVATE XOFFSET_FUZZ_INJECT_CRASH)
+endif()
+set(XOFFSET_FUZZ_SHARED_DELTA_SEEDS "${CMAKE_CURRENT_BINARY_DIR}/seeds/shared_delta")
+add_test(NAME fuzz_shared_delta_seeds
+    COMMAND $<TARGET_FILE:fuzz_shared_delta_replay> --write-seeds "${XOFFSET_FUZZ_SHARED_DELTA_SEEDS}")
+set_tests_properties(fuzz_shared_delta_seeds PROPERTIES
+    LABELS "fuzz" FIXTURES_SETUP fuzz_shared_delta_seeds)
+add_test(NAME fuzz_shared_delta_smoke
+    COMMAND $<TARGET_FILE:fuzz_shared_delta> -seed=1 -runs=20000 -max_len=4096
+            -rss_limit_mb=2048 -timeout=30 "${XOFFSET_FUZZ_SHARED_DELTA_SEEDS}")
+set_tests_properties(fuzz_shared_delta_smoke PROPERTIES
+    LABELS "fuzz" FIXTURES_REQUIRED fuzz_shared_delta_seeds)
+
 # Schema evolution (xoffset_evolution.hpp): receive of every lineage version,
 # send to every version, handshake; the first input byte picks the mode.
 # Server side: reflection backend only.
