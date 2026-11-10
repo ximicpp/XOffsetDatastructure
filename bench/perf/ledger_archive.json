@@ -491,6 +491,17 @@
       "evidence": "/mnt/project-files/perf-gate/cloud/revert-223-20261105/（ir-*-summary.md，base 4d1ac732 head ce791570）；/mnt/project-files/perf-gate/mac/2026-11-05-stage331-ee506d3/VERDICT.md",
       "approved_by": "susu（2026-11-05 09:58Z「确认」，cmsg_01W8h2niLCspyDhp6DxMomYuWSjWtH7TT8Unt9BszKRh7f；「性能优化」07:17Z 裁定撤回，07:33Z 定条目范围）",
       "archived": "2026-11-06：anchor 前移到 v3.4.0（1162e37b），条目针对的是旧 anchor v3.3.1（含 #223），v3.4.0 已含 #240 的撤回，按 PERF_GATE.md 第 4 节移入存档"
+    },
+    {
+      "id": "w2-reloc-map-find-layout",
+      "pr": 248,
+      "metric": "reloc.map.find.*",
+      "compiler": "gcc16",
+      "max_ratio": 1.03,
+      "reason": "W2 (x86 UP.send): the map.find lambda's instructions are identical in base and head; only its start address moved, so 3 alignment-padding NOPs now execute in the lookup loop (+36,864 Ir, 1.0254). Placement only, no code change; P2996 unchanged.",
+      "evidence": "/mnt/project-files/w2-up-send-20261110/W2_RESULT.md; per-instruction diff of reloc_bench base e71d4ed vs head 97cb35b (callgrind --dump-instr)",
+      "approved_by": "susu (thread 追平小消息的服务端发送开销, card 2026-11-10 07:53Z, message cmsg_01W8h2niLCspyDhp6DxMomYuPHTGvq99V5ojLMwcVwp9B7)",
+      "archived": "2026-11-10：anchor 前移到 v3.5.0（0cbc130d，Release 3.5.0 #252），它已含 #248 的这次摆放，head÷anchor 不再需要放行（PERF_GATE 第 4 节）"
     }
   ]
 }
