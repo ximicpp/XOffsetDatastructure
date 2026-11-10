@@ -638,9 +638,26 @@ public:
             return dw.size();
         }
         std::string_view delta_wire() const { return dw; }
-        void delta_recv() { reload_wire<xm::ViewDelta, kClient>(*dr, dw); }
-        void delta_recv_from(const std::string& w) { reload_wire<xm::ViewDelta, kClient>(*dr, w); }
-        const xm::ViewDelta& delta() { return dr->root<xm::ViewDelta>(); }
+        // xoffset reloads a delta into the reused buffer with the full check; xoffset_trusted
+        // reads it in place (XReceiver<from_server>::view, admit: framing and root in the
+        // payload) and copies nothing. The wire stays alive while the delta is applied.
+        const xm::ViewDelta* dview = nullptr;
+        void delta_in(const std::string& w) {
+            if constexpr (Trusted) {
+                static XOffsetDatastructure::XReceiver<kClient> rx(XBuffer::maximum_capacity(XBuffer::DEFAULT_MAXIMUM_CAPACITY));
+                const auto v = rx.template view<xm::ViewDelta>(w);
+                if (!v) throw std::runtime_error("trusted delta view rejected: " + std::string(v.error().message));
+                dview = &v->root();
+            } else {
+                reload_wire<xm::ViewDelta, kClient>(*dr, w);
+            }
+        }
+        void delta_recv() { delta_in(dw); }
+        void delta_recv_from(const std::string& w) { delta_in(w); }
+        const xm::ViewDelta& delta() {
+            if constexpr (Trusted) return *dview;
+            else return dr->root<xm::ViewDelta>();
+        }
 
         // A view's record id -> slot map (native N* and D3 clients): open
         // addressing with linear probing and backward-shift erase, at most half

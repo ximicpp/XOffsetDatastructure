@@ -194,6 +194,10 @@
 #                        protobuf msg_of<March>, an UL op set on every runner's LoginOps, the UL scenario in
 #                        tools/analyze.py. Existing keys, stage ranges and states unchanged; report_sum now
 #                        includes the orders' reads (equal across formats).
+#   2026-11-10 xoffset_trusted reads the clients' view deltas in place (3.5 W4, W1 loss list item 1):
+#                        U*.recv / U*W.recv go through XReceiver<from_server>::view (admit) instead of reload
+#                        into the reused delta buffer; the delta applies from the wire's bytes. Same keys,
+#                        views and states; xoffset (full check) unchanged.
 # Contents: slg-reuse adapters (FlatBuffers verified_root runs the Verifier),
 # Contents: slg-reuse adapters (FlatBuffers verified_root runs the Verifier),
 # reuse protocol (c) (SLG_REUSE=1), ordinary-record declarations for every xm
@@ -205,7 +209,7 @@
 #   them (guarded; older trees keep the previous declarations). Same machine code under GCC 16
 #   and P2996 (asm_equal), the lines are tools/describe_dump output (describe_dump_slg).
 ea55baa3f59a1719135b2b3187e2bc9fc91abe171d6cfebf8216780676960eb0  CMakeLists.txt
-df52482bf9262e36c6521e64cf41a68cd00c0209cc1a670428c23e7df301d17b  README.md
+8ff4f2de69f5530b7b60bbb36af52a672257b31c561d8173a9b4e9ae3ad11ffc  README.md
 ea141af841831b376028f48ab0d4c22e66ce2671f01d9e14c9f66814f5ebaa6e  adapters/cereal_format.hpp
 6441a0f51cf04424de67df98f6a3696b378f8ec3cd3d97c2bf5a6ec065db2768  adapters/flatbuffers_format.hpp
 677c3607ff9390c5a1b9d6a348da3dcd7aee4eef52740a35911d2ab041136ced  adapters/protobuf_format.hpp
@@ -216,7 +220,7 @@ fef3f268315b7383a8fe8ee2b45d9db70ba50ec201301ed8d58dd5ebc0ab9805  bench/runner.h
 8cf5eb70a33ec375a68580bc213b99f0b7c038acfe84e6662e4d342711863ba7  bench/slg_bench.cpp
 730a66f677d9d20077175f629cf0b13919e66ccedaf880e4eb414c6bc94c0610  bench/small_msg_probe.cpp
 56cb184e9bbebd0a61e184a431fa9ede2e9d75a617ee7ce838e17e1a342aad76  bench/std_runner.hpp
-49b274179c507b235e214a92f0d9af63aec921b7f92ff1d57ef2c0823dc74a9b  bench/xoffset_runner.hpp
+fd6282b8b8c0033fa544aba3f26e52c141a19d97fff4c999f043ace57f849e16  bench/xoffset_runner.hpp
 12cab27be9331a4a09ae66f444cf5852dd81e363df562748a4ea854932e35e44  include/slg/cista_free.hpp
 f901dd6b3534240a5038157eaf601d756c07557bcd7fad74b80f8615513b6ab8  include/slg/flat_held_index.hpp
 341ba037a01f807258b0a7527aa0ba0a763f60a32bab00f78f75834f0330cffe  include/slg/generic.hpp

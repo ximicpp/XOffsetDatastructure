@@ -256,6 +256,11 @@ so earlier batches and the perf gate compare as before.
   `XOFFSET_FORCE_FULL_CHECK` makes admit the full check). Its rows are the
   XOffset main column of the application-level cases and class 1
   (`pool_v6.py`); `xoffset` (full check) is report only.
+  Since 2026-11-10 (3.5 W4) the clients' view deltas (U*.recv, U*W.recv) are
+  read in place instead: `XReceiver<XLink::from_server>::view` (admit: the
+  framing and the root inside the payload) and the delta is applied from the
+  wire's bytes, with no copy into a buffer, as `cista_unchecked` and
+  `flatbuffers_noverify` read theirs.
 - Memory, report only: a `-DSLG_MEMCOUNT=1` build (CMake `SLG_MEMCOUNT=ON`)
   counts the live bytes of every `operator new` (one counter for every format
   and platform, malloc's own overhead not counted); `--mode mem --out m.jsonl`
