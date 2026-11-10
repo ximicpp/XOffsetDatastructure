@@ -19,6 +19,9 @@
 #                        slg     SC-6: slg_bench verify, then --slg-runs timed runs (A..D);
 #                                each run in a newly started app (as the memory probes)
 #                        mem     SC-12: xo_mem_probe --single, --va, --commit until killed
+#                        va      xo_va_probe: reservable address space (PROT_NONE and read/write),
+#                                footprint of an untouched reservation, virtual-slot ranges of
+#                                16/64 MiB in 256 MiB regions, create/destroy cost (not in the default list)
 #                        net     @net HOST PORT 180 (--server-host): waits until the app may
 #                                reach the server (the phone asks once for local network access)
 #                        clients wrappers OUT/clients/mapdemo_client[_noexc] for run_e2e.sh,
@@ -232,6 +235,26 @@ step_mem() {
     } > "$d/SUMMARY.md"
     row mem passed "mem/SUMMARY.md (commit probe rc $e: 125 = killed by the system at the limit)"
 }
+step_va() {
+    log "va (virtual-slot address space)"
+    local d=$OUT/va c
+    mkdir -p "$d"
+    host @info > "$d/info.txt" 2>&1
+    fresh "$BIN/xo_va_probe" --raw 64 > "$d/raw_none_64.txt" 2>&1 || { bad va "--raw (va/raw_none_64.txt)"; return; }
+    fresh "$BIN/xo_va_probe" --raw 64 rw > "$d/raw_rw_64.txt" 2>&1
+    fresh "$BIN/xo_va_probe" --raw 1024 > "$d/raw_none_1024.txt" 2>&1
+    fresh "$BIN/xo_va_probe" --footprint 2048 > "$d/footprint_2048.txt" 2>&1
+    for c in 16 64; do fresh "$BIN/xo_va_probe" --vslab $c 256 > "$d/vslab_$c.txt" 2>&1; done
+    fresh "$BIN/xo_va_probe" --cost 64 > "$d/cost_64.txt" 2>&1
+    {
+        echo "# address-space probe ($MODE)"; echo
+        echo "- device: $(sed -n 's/^hw.machine //p' "$d/info.txt" | head -1), iOS $(sed -n 's/^kern.osproductversion //p' "$d/info.txt" | head -1), $(sed -n 's/^hw.memsize //p' "$d/info.txt" | head -1) bytes physical"
+        for f in raw_none_64 raw_rw_64 raw_none_1024 footprint_2048 vslab_16 vslab_64 cost_64; do
+            echo "- $f: $(grep -vE '^(sizeof_pointer|page_size|vslab_progress) ' "$d/$f.txt" | tr '\n' ' ')"
+        done
+    } > "$d/SUMMARY.md"
+    row va passed "va/SUMMARY.md"
+}
 step_net() {
     [ -n "$SERVER" ] || { bad net "no --server-host"; return 1; }
     log "net: tap Allow on the phone if it asks for local network access (180 s)"
@@ -257,7 +280,7 @@ for s in $(echo "$STEPS" | tr ',' ' '); do
     [ "$s" = build ] || [ "$s" = clients ] || reset_totals
     case "$s" in
         build) step_build || finish ;;
-        info|ctest|corpus|slg|mem|clients) "step_$s" ;;
+        info|ctest|corpus|slg|mem|va|clients) "step_$s" ;;
         net) step_net || finish ;;
         *) echo "unknown step $s" >&2; RC=2; finish ;;
     esac

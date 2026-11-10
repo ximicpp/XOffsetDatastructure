@@ -10,6 +10,9 @@
 # the phone and creates the profile); its profile and entitlements are then put on a
 # copy of APP, whose libraries and executable are signed with the same certificate.
 # TEAM_ID defaults to the team of the first "Apple Development" certificate.
+# XO_IOS_EVA=1 asks for com.apple.developer.kernel.extended-virtual-addressing (a larger
+# address space, iOS 14+): the stub requests the capability, so the profile carries it if
+# the team may have it; if not, the stub build fails and says so.
 # macOS bash 3.2. Exit 0 signed, 1 failed (the log says where), 2 usage.
 set -uo pipefail
 APP=${1:?app}; OUT=${2:?out app}; UDID=${3:?device udid}; TEAM=${4:-}
@@ -30,6 +33,12 @@ say "bundle $BUNDLE_ID, team $TEAM, device $UDID"
 # 1. stub app with automatic signing: Xcode makes (or reuses) the profile for this phone
 mkdir -p "$W/stub"
 cp "$APP/Info.plist" "$W/stub/Info.plist"
+ENT_ATTR=""
+if [ "${XO_IOS_EVA:-0}" = 1 ]; then
+    printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict><key>com.apple.developer.kernel.extended-virtual-addressing</key><true/></dict></plist>\n' > "$W/stub/eva.entitlements"
+    ENT_ATTR="XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS \"$W/stub/eva.entitlements\""
+    say "requesting extended-virtual-addressing"
+fi
 cat > "$W/stub/CMakeLists.txt" <<EOF
 cmake_minimum_required(VERSION 3.20)
 project(xo_stub LANGUAGES CXX OBJCXX)
@@ -40,7 +49,7 @@ set_target_properties(xo_stub PROPERTIES
     XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "$TEAM"
     XCODE_ATTRIBUTE_CODE_SIGN_STYLE Automatic
     XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "Apple Development"
-    XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES)
+    XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES $ENT_ATTR)
 target_compile_features(xo_stub PRIVATE cxx_std_17)
 target_link_libraries(xo_stub PRIVATE "-framework UIKit" "-framework CoreGraphics" "-framework Foundation")
 EOF
