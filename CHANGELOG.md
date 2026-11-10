@@ -14,7 +14,11 @@ and a read-only in-place view instead of the full check, and the clients' hot vi
 (K9) becomes a core promise after the pre-release fuzz run. Judged in the
 cloud only: Ir gates against v3.4.0 and the full local validation
 (docs/RELEASING.md). IR_VERDICT_PENDING
-FUZZ_VERDICT_PENDING
+Pre-release fuzz (`tools/fuzz_prerelease.sh --budget hour`, ASan+UBSan) on
+the release candidate: PASS, no findings over GCC 16 differential and replay,
+libFuzzer on all five targets in the reflection build, the four field-list
+targets and the cross-build outcome diff. The first run found the delta
+capacity issue fixed below.
 
 Known gaps, carried to 3.6 (report only, not product-path regressions):
 - Client hot view, peace (UPW.recv): XOffset is 1.11x cista_unchecked on GCC
