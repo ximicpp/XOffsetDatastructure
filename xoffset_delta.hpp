@@ -3668,6 +3668,12 @@ namespace XOffsetDatastructure {
                 Parsed parsed{};
                 XOFFSET_VTRY(parse<T>(data, room, cursor, old_used, old_root, scratch.holes, scratch.blocks, parsed, who,
                                       has_state ? static_cast<const char*>(core.get_address()) : nullptr));
+                // A payload past the replica's maximum capacity is refused before
+                // anything is sized for it: the map of checked bytes (about a
+                // third of the payload) and the undo copy would otherwise be
+                // allocated first and the arena's growth refused only after.
+                if (const std::size_t cap = core.maximum_capacity(); cap != 0 && parsed.header.used_bytes > cap)
+                    [[unlikely]] XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, arena_failure_message);
                 if (parsed.key) return apply_key<T, Admit>(xbuf, parsed, cursor, scratch, who);
                 if (!has_state)
                     XOFFSET_VFAIL(XException, XErrc::delta_base_mismatch,
