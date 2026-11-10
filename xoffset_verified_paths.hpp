@@ -13,6 +13,13 @@
 #else
 #define XOFFSET_DETAIL_WIRE_INLINE inline
 #endif
+#if defined(_MSC_VER)
+#define XOFFSET_DETAIL_WIRE_NOINLINE __declspec(noinline)
+#elif defined(__clang__) || defined(__GNUC__)
+#define XOFFSET_DETAIL_WIRE_NOINLINE __attribute__((noinline))
+#else
+#define XOFFSET_DETAIL_WIRE_NOINLINE
+#endif
 // A lambda's call operator inlined (after its parameter list); GCC and Clang.
 #if (defined(__clang__) || defined(__GNUC__)) && !defined(_MSC_VER)
 #define XOFFSET_DETAIL_LAMBDA_INLINE __attribute__((always_inline))
@@ -27,12 +34,27 @@ namespace detail {
         if (!an || !bn) return false;
         const auto x = reinterpret_cast<std::uintptr_t>(a);
         const auto y = reinterpret_cast<std::uintptr_t>(b);
-        return x <= y ? y - x < an : x - y < bn;
+        // x <= y ? y - x < an : x - y < bn, as one unsigned comparison: the
+        // ranges meet iff x - y lies in (-an, bn), i.e. x - y + an - 1 < an + bn - 1
+        // (modulo 2^64), while an + bn - 1 does not wrap.
+        const std::size_t span = an + (bn - 1);
+        if (span < an) [[unlikely]] return x <= y ? y - x < an : x - y < bn;
+        return x - y + (an - 1) < span;
     }
 
     template<class T>
     XWireHeaderV2 VerifiedPathsAccess::header(XBufferCore& source) {
         return header_inline<T>(source);
+    }
+
+    // Out of line: its hole vector and graph walk stay out of the frames of
+    // the paths that inline header_inline.
+    template<class T>
+    XOFFSET_DETAIL_WIRE_NOINLINE void VerifiedPathsAccess::rebuild_free_table(T& root, XBufferCore& source) {
+        std::vector<XBufferCore::WireHole> holes;
+        XOFFSET_VREQUIRE(verify_structural_wire_graph(root, source, std::pmr::new_delete_resource(),
+                                                      nullptr, 0, false, &holes));
+        source.replace_free_blocks(holes);
     }
 
     template<class T>
@@ -68,27 +90,97 @@ namespace detail {
         }
         // V2: the free table is the wire hole table; recompute it exactly if a
         // host allocation failure (or an unverified load) left it incomplete.
-        if (!source.free_table_complete()) {
-            std::vector<XBufferCore::WireHole> holes;
-            XOFFSET_VREQUIRE(verify_structural_wire_graph(*root, source, std::pmr::new_delete_resource(),
-                                                          nullptr, 0, false, &holes));
-            source.replace_free_blocks(holes);
-        }
+        if (!source.free_table_complete()) [[unlikely]] rebuild_free_table<T>(*root, source);
         const auto* base = static_cast<const char*>(source.get_address());
         return make_wire_header<T>(source.arena()->used_end,
             reinterpret_cast<std::uintptr_t>(root) - reinterpret_cast<std::uintptr_t>(base),
             source.free_block_count());
     }
 
+    // The output must not alias the source's storage (or hold it).
+    XOFFSET_DETAIL_WIRE_INLINE void save_check_alias(const std::string& out, const XBufferCore& candidate) {
+        if (out.capacity() == (std::numeric_limits<std::size_t>::max)())
+            XOFFSET_THROW(std::length_error("save_verified_into: output capacity overflows alias range"));
+        if (verified_paths_intersect(&out, sizeof(out), candidate.get_address(), candidate.segment_size()) ||
+            verified_paths_intersect(out.data(), out.capacity() + 1, candidate.get_address(), candidate.segment_size()))
+            XOFFSET_THROW(XException(XErrc::invalid_state, "save_verified_into: output aliases source storage"));
+    }
+
+    // A small wire (each message of a stream) is written by save_small_into,
+    // inline in this function's small frame; every other save takes
+    // save_into_general, whose locals (gap list, reserve path) a message
+    // written here does not touch.
     template<class T>
     void VerifiedPathsAccess::save_into(XBufferCore& source, std::string& out, XSaveOptions options) {
-        auto check_alias = [&](XBufferCore& candidate) XOFFSET_DETAIL_LAMBDA_INLINE {
-            if (out.capacity() == (std::numeric_limits<std::size_t>::max)())
-                XOFFSET_THROW(std::length_error("save_verified_into: output capacity overflows alias range"));
-            if (verified_paths_intersect(&out, sizeof(out), candidate.get_address(), candidate.segment_size()) ||
-                verified_paths_intersect(out.data(), out.capacity() + 1, candidate.get_address(), candidate.segment_size()))
-                XOFFSET_THROW(XException(XErrc::invalid_state, "save_verified_into: output aliases source storage"));
-        };
+        if (save_small_into<T>(source, out, options.emission)) [[likely]] return;
+        save_into_general<T>(source, out, options);
+    }
+
+    // save_into_general's fast path for a payload below
+    // wire_zero_scan_min_payload (far below the copier's prefault size): no
+    // emission elides a byte there, so the wire is the header (extent_count
+    // 0), the payload and the holes, as write_wire writes it; two plain
+    // copies, written inline. False (nothing done) for anything else.
+    template<class T>
+    XOFFSET_DETAIL_WIRE_INLINE bool VerifiedPathsAccess::save_small_into(XBufferCore& source, std::string& out,
+                                                                        XWireEmission emission) {
+#if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
+        static_assert(is_v1_wire_admitted_v<T>);
+#ifdef XOFFSET_REJECT_IMPLICIT_PADDING
+        static_assert(!has_implicit_padding_v<T>,
+            "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");
+#endif
+        // header_inline's checks for the state this path admits: a root cache
+        // hit (typed access, schema binding and root as make<T>() or a
+        // verified load of T left them), an exact free table, and a used
+        // end in [XWIRE_PAYLOAD_BEGIN, min(size, wire_zero_scan_min_payload)),
+        // so MAX_PAYLOAD and the string limit cannot be reached. A miss or
+        // anything else takes save_into_general, which runs them all.
+        const auto* arena = source.arena();
+        T* const root = source.template cached_root<T>();
+        if (!arena || !root || !owns_record(source) || !source.free_table_complete()) return false;
+        const std::uint64_t used = arena->used_end;
+        const std::size_t holes = source.free_block_count();
+        const std::size_t final_size = sizeof(XWireHeaderV2) + std::size_t(used - XWIRE_PAYLOAD_BEGIN) +
+                                       holes * sizeof(XBufferCore::WireHole);
+        if (used < XWIRE_PAYLOAD_BEGIN || used >= wire_zero_scan_min_payload || used > source.segment_size() ||
+            (emission == XWireEmission::free_runs && source.free_block_bytes() >= wire_free_run_min_gap) ||
+            final_size > out.capacity())
+            return false;
+        if (std::memcmp(arena->magic, XBufferCore::payload_magic_, 8) != 0 ||
+            arena->header_size != sizeof(XBufferCore::arena_header))
+            XOFFSET_THROW(XException(XErrc::invalid_payload_header, "verified paths: payload header mismatch"));
+        save_check_alias(out, source);
+        const auto* base = static_cast<const char*>(source.get_address());
+        const auto final_header = make_wire_header<T>(
+            used, reinterpret_cast<std::uintptr_t>(root) - reinterpret_cast<std::uintptr_t>(base), holes);
+        // The copy reads one frame object, so the operation is a single
+        // pointer wherever the string's resize_and_overwrite is compiled.
+        struct SmallWire {
+            XWireHeaderV2 header;
+            const char* base;
+            XBufferCore* source;
+            std::size_t size;
+        } const wire{final_header, base, &source, final_size};
+        out.resize_and_overwrite(final_size, [w = &wire](char* destination, std::size_t) noexcept {
+            const std::size_t payload = std::size_t(w->header.used_bytes) - XWIRE_PAYLOAD_BEGIN;
+            std::memcpy(destination, &w->header, sizeof(XWireHeaderV2));
+            std::memcpy(destination + sizeof(XWireHeaderV2), w->base + XWIRE_PAYLOAD_BEGIN, payload);
+            if (w->header.hole_count != 0)
+                w->source->write_free_blocks(destination + sizeof(XWireHeaderV2) + payload);
+            return w->size;
+        });
+        return true;
+#else
+        (void)source; (void)out; (void)emission;
+        return false;
+#endif
+    }
+
+    template<class T>
+    XOFFSET_DETAIL_WIRE_NOINLINE void VerifiedPathsAccess::save_into_general(XBufferCore& source, std::string& out,
+                                                                            XSaveOptions options) {
+        auto check_alias = [&](XBufferCore& candidate) XOFFSET_DETAIL_LAMBDA_INLINE { save_check_alias(out, candidate); };
         const auto emission = options.emission;
         // Fast path: no host allocation can run before the wire is written,
         // so no callback can move or change the source; it is examined once,
@@ -109,21 +201,6 @@ namespace detail {
             const auto* base = static_cast<const char*>(source.get_address());
             const WireGaps none{};
 #if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
-            // Small payload (below wire_zero_scan_min_payload, far below the
-            // copier's prefault size): no emission elides a byte here, so the
-            // wire is the header (extent_count 0), the payload and the holes,
-            // as write_wire writes it; two plain copies, written inline.
-            if (final_header.used_bytes < wire_zero_scan_min_payload) [[likely]] {
-                out.resize_and_overwrite(final_size, [&](char* destination, std::size_t) noexcept {
-                    const std::size_t payload = final_header.used_bytes - XWIRE_PAYLOAD_BEGIN;
-                    std::memcpy(destination, &final_header, sizeof(XWireHeaderV2));
-                    std::memcpy(destination + sizeof(XWireHeaderV2), base + XWIRE_PAYLOAD_BEGIN, payload);
-                    if (final_header.hole_count != 0)
-                        source.write_free_blocks(destination + sizeof(XWireHeaderV2) + payload);
-                    return final_size;
-                });
-                return;
-            }
             out.resize_and_overwrite(final_size, [&](char* destination, std::size_t) noexcept {
                 return write_wire(destination, final_header, base, source, emission, none);
             });
