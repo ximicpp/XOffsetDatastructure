@@ -674,10 +674,12 @@ namespace XOffsetDatastructure {
             return object_at_offset<T>(root_offset);
         }
 
-        template <typename T, typename... Args>
+        // BindType false: the caller keeps the root type identity, which
+        // already names the root (XBuffer::reset<T>()'s same-type path).
+        template <typename T, bool BindType = true, typename... Args>
         XOFFSET_DETAIL_MOVE_INLINE T* construct_root_storage(Args&&... args) {
             T* result = construct_object_at_slot<T>(root_offset_slot(), std::forward<Args>(args)...);
-            bind_root_type<T>();
+            if constexpr (BindType) bind_root_type<T>();
             return result;
         }
 
@@ -2231,6 +2233,16 @@ namespace XOffsetDatastructure {
         // keeps it within FreeTableRecycler's keep limits.
         void begin_reinit(bool reset = false) noexcept {
             advance_epoch();
+            empty_free_table(reset);
+            free_table_lost_ = false;
+            typed_root_access_allowed_ = false;
+            schema_bound_ = false;
+            bound_root_type_id_ = 0;
+            bound_schema_hash_ = 0;
+            root_type_identity_ = nullptr;
+        }
+
+        XOFFSET_DETAIL_MOVE_INLINE void empty_free_table(bool reset) noexcept {
             // An empty table whose bins are within the keep limits (not
             // grown since the last empty) is already what a reload keeps.
             if (const FreeTable* table = free_table_.get(); table && (table->count != 0 || table->grown)) {
@@ -2240,12 +2252,22 @@ namespace XOffsetDatastructure {
                 else FreeTableRecycler::recycle_bins(*kept, true);
                 if (!free_table_) free_table_ = std::move(kept);
             }
+        }
+
+        // XBuffer::reset<T>() of an owner whose root cache holds T. The cache
+        // is set only with a root of T that make<T>(), a verified load of T or
+        // a delta of T bound, and every epoch change clears it; so typed root
+        // access is open and the root type identity is T's. With the schema
+        // binding the make<T>() that follows would leave (checked by the
+        // caller), only the epoch, the free table, the payload and the root
+        // change: reset_arena(size()) without the binding stores. Typed
+        // access stays closed until the caller has the new root, as there.
+        XOFFSET_DETAIL_MOVE_INLINE void reset_arena_keeping_binding() noexcept {
+            advance_epoch();
+            empty_free_table(true);
             free_table_lost_ = false;
             typed_root_access_allowed_ = false;
-            schema_bound_ = false;
-            bound_root_type_id_ = 0;
-            bound_schema_hash_ = 0;
-            root_type_identity_ = nullptr;
+            clear_used_payload();
         }
 
         // Same admission as init_from_storage, against this owner's maximum.
@@ -2462,17 +2484,23 @@ namespace XOffsetDatastructure {
         // header the owner simply stays without one.
         void reset_arena(size_type logical) noexcept {
             begin_reinit(true);
-            if (buffer_.maximum_capacity() < min_payload_size()) return;
-            if (logical == buffer_.size() && logical >= min_payload_size()) {
-                const auto used = used_end_clamped();
-                std::memset(buffer_.data() + min_payload_size(), 0, used - min_payload_size());
-                write_empty_header();
+            // size() <= maximum_capacity(): the common reset (same logical
+            // length) reads nothing past the owner's first line.
+            if (logical == buffer_.size() && logical >= min_payload_size()) [[likely]] {
+                clear_used_payload();
                 return;
             }
+            if (buffer_.maximum_capacity() < min_payload_size()) return;
             if (buffer_.size() < min_payload_size() && !buffer_.grow_to(min_payload_size())) return;
             if (buffer_.size() > min_payload_size()) buffer_.resize_logical(min_payload_size());
             write_empty_header();
             if (logical > min_payload_size()) (void)buffer_.grow_to(std::min(logical, buffer_.maximum_capacity()));
+        }
+
+        XOFFSET_DETAIL_MOVE_INLINE void clear_used_payload() noexcept {
+            const auto used = used_end_clamped();
+            std::memset(buffer_.data() + min_payload_size(), 0, used - min_payload_size());
+            write_empty_header();
         }
 
         void write_empty_header() noexcept {
@@ -2522,20 +2550,16 @@ namespace XOffsetDatastructure {
         friend struct detail::VerifiedReceiveAccess;
         friend struct detail::DeltaAccess;
         friend struct fixed_detail::StableEraseOwnerWitness;
-        // Hot fields first, in one run of 40 bytes at offset 0: the root
-        // cache (all that root<T>()'s fast path reads; 16-byte aligned, so
-        // its two words never straddle a line), the free table, then the
-        // storage, whose first two fields are the payload base and size. A
-        // root<T>() and the update that follows it (prefetch_for_update(), an
-        // allocation) find base, size and free table on the line the root
-        // lookup brought in.
-        alignas(16) const void* root_cache_type_ = nullptr;
-        void* root_cache_ = nullptr;
-        FreeTablePtr free_table_;
-        detail::VirtualMemoryStorage buffer_;
-        std::uint64_t m_epoch = 0;
-        OwnerRecordPtr owner_record_;
-        bool free_table_lost_ = false;
+        // The owner is 64-byte aligned and its first line holds everything
+        // the per-message paths touch: the flags, the epoch, the root cache
+        // (root<T>()'s fast path), the free table pointer and the storage's
+        // payload base and size (VirtualMemoryStorage's first two fields, at
+        // 40 and 48). root<T>() and the update that follows it, reset<T>()
+        // and the allocations of a fresh message find all of it there; a
+        // save adds only the owner record's line. Growth (maximum capacity,
+        // zero watermark), the owner record and the schema binding follow.
+        // Fields of different access keep this declaration order.
+        alignas(64) bool free_table_lost_ = false;
 
     protected:
         // XBuffer's flag for an open direct reload (VerifiedReloadToken),
@@ -2546,15 +2570,25 @@ namespace XOffsetDatastructure {
         // transfers through XBufferCore cannot leave derived flags behind.
         bool typed_root_access_allowed_ = true;
         bool schema_bound_ = false;
-        std::uint64_t bound_root_type_id_ = 0;
-        std::uint64_t bound_schema_hash_ = 0;
 
     private:
         // Next D6 growth step below zero_from() (ensure_allocation_extent).
         std::uint32_t dirty_step_ = first_dirty_step;
+        std::uint64_t m_epoch = 0;
+        const void* root_cache_type_ = nullptr;
+        void* root_cache_ = nullptr;
+        FreeTablePtr free_table_;
+        detail::VirtualMemoryStorage buffer_;
+        OwnerRecordPtr owner_record_;
+
+    protected:
+        std::uint64_t bound_root_type_id_ = 0;
+        std::uint64_t bound_schema_hash_ = 0;
+
+    private:
         uint64_t dirty_epoch_ = 0;  // m_epoch when dirty_step_ was last reset
-        XGrowPolicy growth_policy_ = XGrowPolicy::Explicit;
         const void* root_type_identity_ = nullptr;
+        XGrowPolicy growth_policy_ = XGrowPolicy::Explicit;
     };
 
     // ========================================================================
@@ -2881,6 +2915,25 @@ namespace XOffsetDatastructure {
                     return allocate_dynamic_bytes(alloc_ref, bytes, Alignment); // throws the usual error
                 return owner->allocate_block(block_bytes_of(bytes), Alignment);
             }
+        }
+
+        // XFixedVector::reserve's first storage (an empty vector filled anew,
+        // as after a reset) for elements aligned to at most 8: `bytes` from
+        // the payload holding the vector at `self`, with the checks, errors
+        // and placement of allocate_dynamic_bytes_aligned. Out of line and
+        // one copy for every element type, so a message that fills vectors of
+        // several types runs the same instructions for each.
+        [[noreturn]] XOFFSET_DETAIL_MOVE_COLD inline void throw_vector_unbound() {
+            XOFFSET_THROW(XException(XErrc::invalid_state, "XFixedVector needs a block but lies outside every XOffset payload"));
+        }
+        XOFFSET_DETAIL_NOINLINE inline void* allocate_first_storage(const void* self, std::uint32_t bytes,
+                                                                    std::size_t alignment) {
+            auto* const segment = reinterpret_cast<XArena*>(detail::OwnerMap::payload_of(self));
+            if (!segment) [[unlikely]] throw_vector_unbound();
+            auto* owner = XBufferCore::owner_from_arena_noexcept(segment);
+            if (!owner || bytes > XBufferCore::MAX_PAYLOAD - 8u) [[unlikely]]
+                return allocate_dynamic_bytes(allocator_ref{segment}, bytes, alignment); // throws the usual error
+            return owner->allocate_block(block_bytes_of(bytes), alignment);
         }
 
         // Live block of old_bytes grows in place to new_bytes (tail only).
@@ -4036,10 +4089,16 @@ namespace XOffsetDatastructure {
         void reserve_first_or_grow(std::size_t requested) {
             if (capacity_ != 0 || requested > max_size()) return reserve_grow(requested);
             const auto new_cap = static_cast<size_type>(requested);
-            const auto alloc = bound_binding();
             // First storage: nothing to expand, move or retire.
-            auto* fresh = detail::begin_dynamic_array<T>(fixed_detail::allocate_dynamic_bytes_aligned<alignof(T)>(
-                alloc, static_cast<std::uint32_t>(new_cap * sizeof(T))), new_cap);
+            void* block;
+            if constexpr (alignof(T) <= 8) {
+                block = fixed_detail::allocate_first_storage(this, static_cast<std::uint32_t>(new_cap * sizeof(T)),
+                                                             alignof(T));
+            } else {
+                block = fixed_detail::allocate_dynamic_bytes_aligned<alignof(T)>(
+                    bound_binding(), static_cast<std::uint32_t>(new_cap * sizeof(T)));
+            }
+            auto* fresh = detail::begin_dynamic_array<T>(block, new_cap);
             fixed_detail::set_rel32(data_delta, &data_delta, fresh);
             capacity_ = new_cap;
         }
@@ -7760,13 +7819,13 @@ namespace XOffsetDatastructure {
             }
         };
 
-        template <typename T>
+        template <typename T, bool BindType = true>
         XOFFSET_DETAIL_MOVE_INLINE T* construct_root(XBufferCore& xbuf) {
             auto alloc = allocator_binding_for(xbuf);
             if constexpr (has_wire_allocator_ctor<T>) {
-                return xbuf.template construct_root_storage<T>(alloc);
+                return xbuf.template construct_root_storage<T, BindType>(alloc);
             } else {
-                auto* wrapper = xbuf.template construct_root_storage<ReflectRoot<T>>(alloc);
+                auto* wrapper = xbuf.template construct_root_storage<ReflectRoot<T>, BindType>(alloc);
                 return &wrapper->ref();
             }
         }
@@ -8116,6 +8175,9 @@ namespace XOffsetDatastructure {
             // header<T>'s body, inlined into save_into's fast path.
             template<class T> XOFFSET_DETAIL_MOVE_INLINE static XWireHeaderV2 header_inline(XBufferCore&);
             template<class T> static void save_into(XBufferCore&, std::string&, XSaveOptions);
+            template<class T> static bool save_small_into(XBufferCore&, std::string&, XWireEmission);
+            template<class T> static void save_into_general(XBufferCore&, std::string&, XSaveOptions);
+            template<class T> static void rebuild_free_table(T&, XBufferCore&);
             template<class T> static void save_compact_into(XBufferCore&, std::string&, XCompactOptions);
             template<class T, class... M> static void save_composed_into(XBufferCore&, std::string&, XCompactOptions,
                                                                          const XAssign<M>&...);
@@ -8813,6 +8875,15 @@ namespace XOffsetDatastructure {
         /// reload_verified.
         template <typename T>
         XOFFSET_DETAIL_MOVE_INLINE T& reset() {
+            // The same root type again (each message of a stream): the root
+            // type and schema binding already are what make<T>() would bind.
+            if (this->template cached_root<T>() && schema_bound_ == has_schema_name_v<T>) [[likely]] {
+                this->reset_arena_keeping_binding();
+                T* result = detail::construct_root<T, false>(*this);
+                typed_root_access_allowed_ = true;
+                this->cache_root(result);
+                return *result;
+            }
             reset_arena(this->get_size());
             if (!this->arena()) XOFFSET_THROW(XException(XErrc::invalid_state, "reset<T>(): buffer has no arena"));
             return *this->template make_inline<T>();
@@ -9066,8 +9137,11 @@ namespace XOffsetDatastructure {
 
     // XBuffer adds its two pointers to XBufferCore and nothing else: a new
     // flag goes into XBufferCore's padding, so that vectors of XBuffer and
-    // std::optional<XBuffer> members keep their size.
-    static_assert(sizeof(XBuffer) == sizeof(XBufferCore) + 2 * sizeof(void*),
+    // std::optional<XBuffer> members keep their size. The pointers fit in the
+    // tail padding of the 64-byte aligned XBufferCore where an ABI reuses it
+    // (Itanium); elsewhere (MSVC) they take one more 64-byte unit.
+    static_assert(alignof(XBufferCore) == 64 && sizeof(XBufferCore) == 256, "XBufferCore: four 64-byte lines");
+    static_assert(sizeof(XBuffer) == sizeof(XBufferCore) || sizeof(XBuffer) == sizeof(XBufferCore) + 64,
                   "XBuffer grew: put the new field into XBufferCore's padding");
 
     // Open direct reload of one XBuffer (XBuffer::begin_verified_reload).
