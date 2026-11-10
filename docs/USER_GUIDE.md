@@ -1,4 +1,4 @@
-# XOffsetDatastructure 用户指南（3.4.0，wire 格式 2.1）
+# XOffsetDatastructure 用户指南（3.5.0，wire 格式 2.1）
 
 本文面向使用者，说明怎么定义类型、构建、修改、保存、加载，以及必须遵守的约束。
 部署要求见 [DEPLOYMENT.md](DEPLOYMENT.md)，格式细节见 [V2_FORMAT.md](V2_FORMAT.md)，输入与兼容边界见
@@ -752,5 +752,5 @@ iOS 的地址空间和最低部署目标（系统 libc++ 的 `std::pmr` 在 macO
 正式计时只来自一台 Apple M4、一个游戏服务器负载（`bench/slg`），六家在同一进程里对比
 zpp_bits、cista、cereal、protobuf、FlatBuffers；每个版本的数字、测法和局限见
 [PERFORMANCE.md](PERFORMANCE.md)。引用时请同时说明机器、负载和适配写法；
-没有 Linux 或 Windows 的计时结论。第 3 节那组云端比例（GCC 16，Linux 虚拟机）只用来
+没有 Linux 或 Windows 的正式计时结论（云端 x86-64 的只报数字见 PERFORMANCE.md 第 6 节）。第 3 节那组云端比例（GCC 16，Linux 虚拟机）只用来
 说明声明普通记录的量级，不是正式测量。
