@@ -31,6 +31,25 @@
   value, so inline readers keep it in a register.
 - bench/slg: the D3 client rows (`D*.recv`, `D*T.recv`) apply through
   `XReceiver<XLink::from_server>::apply_sync` instead of the bench's own loop.
+- `XReceiver<XLink::from_client>::view<T>` and `XView<T>` (3.5 W4, trust tier
+  P3 and P4): the client uplink check, `XCheck::bounds`. The wire's framing
+  is admitted as for reload; then one walk from the root over every container
+  head: each block lies inside the used payload past the payload header,
+  aligned, size within capacity, a heap string ends in NUL, an inline string
+  is at most 10 bytes, a bool is 0 or 1, and the element bytes walked add up
+  to at most the payload (blocks may overlap; this bounds the work). Overlap,
+  coverage, key order and padding are not checked. The result is read in place
+  in the wire's bytes, with const access only (a write does not compile);
+  the wire must be dense and start on an 8-byte boundary. Trusted links get
+  `view` too (default `XCheck::admit`: the framing and the root inside the
+  payload). `default_view_check<L>`, `XOFFSET_RECEIVER_VIEW_API`.
+  `XReceiver<from_client>::view<T, XCheck::admit>` does not compile. Tests:
+  `test_receiver_view` (differential against reload_verified, crafted
+  defects, overlap bound, mutations read under ASan), two compile-fail tests,
+  and acceptor 9 of `v2_fuzz_core.hpp`. Cloud x86, P2996, check only (view or
+  reload, no read): a 152-byte march order 113 Ir against 410 for the full
+  check (0.28), a 616-byte order with a string, nested marches and a bool 252
+  against 664 (0.38). bench/slg: new uplink case UL (report only).
 
 ## 3.4.0: delta sync on trusted links
 

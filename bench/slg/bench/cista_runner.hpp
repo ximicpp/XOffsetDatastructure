@@ -28,6 +28,7 @@
 #include "slg/trace.hpp"
 #include "slg/login.hpp"
 #include "slg/view.hpp"
+#include "slg/uplink.hpp"
 
 namespace slg {
 
@@ -269,6 +270,7 @@ public:
         for (int i = 0; i < ViewCases::count; ++i)
             run_view_case(bs_[i], ops_[i], ViewCases::keys(i), cycle, st, keep ? &keep->view : nullptr, keep ? &keep->delta : nullptr);
         run_login(lops_, mix_seed(seed_, 0x1062), cycle, 4, st, lseq_);
+        run_uplink(lops_, mix_seed(seed_, 0x1063), cycle, 4, st);
     }
 
     // L / LD (login.hpp): players live in cista buffers; a client copies the wire
@@ -294,6 +296,13 @@ public:
         template <class Fill> std::size_t patch_encode(Fill&& fill) { fill(pm); return save(pw, pm).size(); }
         void patch_recv() { pr.receive({pw.data(), pw.size()}); }
         const cm::PlayerPatch& patch() const { return *pr; }
+        // UL (uplink.hpp): the client saves a march order, the server receives it (the format's mode).
+        cm::March um;
+        Held<cm::March> ur;
+        Bytes uw;
+        template <class Fill> std::size_t up_encode(Fill&& fill) { fill(um); return save(uw, um).size(); }
+        uint64_t up_recv() { ur.receive({uw.data(), uw.size()}); return query_order(*ur); }
+        std::string_view up_wire() const { return sv(uw); }
     };
     struct StoreOps {
         CistaRunner* r = nullptr;
