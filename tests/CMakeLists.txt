@@ -204,6 +204,24 @@ add_test(NAME receiver_from_client_sync_fail
 set_tests_properties(receiver_from_client_sync_fail PROPERTIES
     LABELS reflection
     PASS_REGULAR_EXPRESSION "a client's uplink is not read as one")
+# Client uplinks (3.5 W4): the bounds-checked read-only view, and two programs
+# that must not compile: an admit view on a client uplink, and a write
+# through a view.
+add_xoffset_test(test_receiver_view reflection)
+add_executable(receiver_from_client_view_admit_fail EXCLUDE_FROM_ALL receiver/from_client_view_admit_fail.cpp)
+configure_xoffset_target(receiver_from_client_view_admit_fail)
+add_test(NAME receiver_from_client_view_admit_fail
+    COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target receiver_from_client_view_admit_fail --config $<CONFIG>)
+set_tests_properties(receiver_from_client_view_admit_fail PROPERTIES
+    LABELS reflection
+    PASS_REGULAR_EXPRESSION "view it with XCheck::bounds")
+add_executable(receiver_view_write_fail EXCLUDE_FROM_ALL receiver/view_write_fail.cpp)
+configure_xoffset_target(receiver_view_write_fail)
+add_test(NAME receiver_view_write_fail
+    COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target receiver_view_write_fail --config $<CONFIG>)
+set_tests_properties(receiver_view_write_fail PROPERTIES
+    LABELS reflection
+    PASS_REGULAR_EXPRESSION "VIEW_WRITE_MARKER|C2662|C3490|C3892")
 
 # Fixed messages (xoffset_fixed_message.hpp): records with no arena
 # container, sent as their own bytes and read in place.
@@ -284,6 +302,7 @@ set(NO_EXCEPTIONS_TESTS
     test_fixed_message
     test_receiver
     test_receiver_forced
+    test_receiver_view
     test_shared_delta
     test_shared_delta_sync
     test_shared_delta_format

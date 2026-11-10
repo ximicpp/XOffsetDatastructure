@@ -21,6 +21,7 @@
 #include "slg/trace.hpp"
 #include "slg/login.hpp"
 #include "slg/view.hpp"
+#include "slg/uplink.hpp"
 #include "xoffset_receiver.hpp"
 #include "xoffset_shared_delta.hpp"
 
@@ -394,6 +395,7 @@ public:
         }
 #endif
         run_login(lops_, mix_seed(seed_, 0x1062), cycle, 4, st, lseq_);
+        run_uplink(lops_, mix_seed(seed_, 0x1063), cycle, 4, st);
     }
 
     // L / LD (login.hpp): the server's players are resident XBuffers; a client
@@ -445,6 +447,40 @@ public:
         PlayerState& held_w(int d) { return hw[std::size_t(d)]->template root<PlayerState>(); }
         void patch_recv_from(const std::string& w) { reload_wire<xm::PlayerPatch, kClient>(*pr, w); }
         const xm::PlayerPatch& patch() { return pr->template root<xm::PlayerPatch>(); }
+        // UL (uplink.hpp): the client fills a march order in its reused buffer and saves
+        // it; the server receives it through XReceiver<from_client>: xoffset reloads it
+        // with the full check into a reused buffer, xoffset_trusted views it in place
+        // with the bounds check (and times the full check as ULF.recv).
+        std::optional<XBuffer> um, ur;
+        std::string uw;
+        template <class Fill> std::size_t up_encode(Fill&& fill) {
+            if (!um) um.emplace(XBuffer::create<xm::March>(kUplinkInitial, cap()));
+            fill(um->template reset<xm::March>());
+            um->template save_verified_into<xm::March>(uw);
+            return uw.size();
+        }
+        static XOffsetDatastructure::XReceiver<XOffsetDatastructure::XLink::from_client>& uplink_rx() {
+            static XOffsetDatastructure::XReceiver<XOffsetDatastructure::XLink::from_client> rx(
+                XBuffer::maximum_capacity(XBuffer::DEFAULT_MAXIMUM_CAPACITY));
+            return rx;
+        }
+        uint64_t up_recv_checked() {
+            if (!ur) ur.emplace(XBuffer::create<xm::March>(kUplinkInitial, cap()));
+            const XOffsetDatastructure::XStatus r = uplink_rx().template reload<xm::March>(*ur, uw);
+            if (!r) throw std::runtime_error("uplink receive rejected: " + std::string(r.error().message));
+            return query_order(ur->template root<xm::March>());
+        }
+        uint64_t up_recv() {
+            if constexpr (Trusted) {
+                const auto v = uplink_rx().template view<xm::March>(uw);
+                if (!v) throw std::runtime_error("uplink view rejected: " + std::string(v.error().message));
+                return query_order(v->root());
+            } else {
+                return up_recv_checked();
+            }
+        }
+        uint64_t up_recv_full() requires Trusted { return up_recv_checked(); }
+        std::string_view up_wire() const { return uw; }
 #ifdef XOFFSET_DELTA_SYNC_API
         std::vector<XOffsetDatastructure::XDeltaBaseline> nb;
         std::vector<XOffsetDatastructure::XDeltaCursor> nc;
@@ -1288,6 +1324,7 @@ private:
     static constexpr std::size_t kShardInitial = 4 * 1024 * 1024;
     static constexpr std::size_t kReportInitial = 4 * 1024;
     static constexpr std::size_t kViewInitial = 16 * 1024;
+    static constexpr std::size_t kUplinkInitial = 4 * 1024;   // UL orders (uplink.hpp)
 
     // Every buffer reserves 256 MiB of address space. SLG_XOFFSET_CAP_MIB=N reserves N MiB
     // for each player, battle and report buffer instead (the shard keeps 256 MiB): an

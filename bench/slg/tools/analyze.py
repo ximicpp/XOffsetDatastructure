@@ -88,6 +88,8 @@ def main():
                 "L": "登录全量", "LD": "登录后自身增量"}
         scen["EB"] = "浏览地图，视口全量"
         scen["EBW"] = "浏览地图，单设备热视图接收"
+        if any(m.startswith("UL.") for f in formats for m in ns[f]):   # uplink.hpp (SLG_UL_OFF=1 drops it)
+            scen["UL"] = "客户端上行（行军指令，服务端收：边界档 / 对手各自的检查）"
         for r, name in (("P", "和平"), ("C", "交战"), ("S", "压力")):
             scen["U" + r] = f"静止视口增量（{name}）"
         # XOffset's own delta sync (xoffset_delta.hpp): N* deltas per static

@@ -171,6 +171,7 @@ template <> struct msg_of<stdm::ShardState> { using type = pb::ShardState; };
 template <> struct msg_of<stdm::Report> { using type = pb::Report; };
 template <> struct msg_of<stdm::ViewSnapshot> { using type = pb::ViewSnapshot; };
 template <> struct msg_of<stdm::ViewDelta> { using type = pb::ViewDelta; };
+template <> struct msg_of<stdm::March> { using type = pb::March; };   // UL orders (uplink.hpp)
 
 } // namespace slg::pbconv
 
@@ -204,6 +205,7 @@ struct ProtobufFormat {
         Pair<pb::ViewSnapshot> view;
         Pair<pb::ViewDelta> delta;
         Pair<pb::PlayerPatch> patch;
+        Pair<pb::March> march;
         std::string slot[kSlots];
         template <class T> auto& pair() {
             if constexpr (std::is_same_v<T, stdm::BattleMsg>) return battle;
@@ -212,6 +214,7 @@ struct ProtobufFormat {
             else if constexpr (std::is_same_v<T, stdm::ViewSnapshot>) return view;
             else if constexpr (std::is_same_v<T, stdm::ViewDelta>) return delta;
             else if constexpr (std::is_same_v<T, stdm::PlayerPatch>) return patch;
+            else if constexpr (std::is_same_v<T, stdm::March>) return march;
             else return report;
         }
         template <class T> std::span<const uint8_t> encode(int s, const T& v) {
