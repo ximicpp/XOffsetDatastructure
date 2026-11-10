@@ -48,8 +48,12 @@
 apply_delta`（`xoffset_receiver.hpp`），`XReceiver<XLink::from_client>` 在编译期拒绝信任档；把客户端连接误建成可信
 链路的接收器靠代码审查发现。信任档按定义不接不可信输入，不保证对任意输入给出可用的结果；fuzz 和
 `test_receiver` 的差分测试只要求两件事：它自己的解析和写入对任何输入都不越界（ASan），对完整档接受的
-输入给出相同结果（第 5 节表中的 admit 一行）。边界档用于客户端上行，只保证读取不越界，收到的数据只读使用；
-要原地修改客户端数据时走完整档，即上面这些入口。边界档接口落地时，它的 harness 加进第 5 节的表和发版前 fuzz。
+输入给出相同结果（第 5 节表中的 admit 一行）。边界档（3.5）用于客户端上行：`XReceiver<XLink::from_client>::view`
+在 wire 字节上给出只读视图 `XView<T>`，只有 const 访问。它保证的是：任何 const 访问都不读出 wire 之外，
+遍历的工作量不超过负载大小的线性倍数（块可以重叠，所以按负载大小限遍历的元素字节总数），bool 不会是
+0、1 以外的值（避免未定义行为）。它不保证值有意义：块重叠、set/map 键乱序、填充字节非零的输入可能被接受，
+读出来的是垃圾值或查找不到。要原地修改客户端数据时走完整档，即上面这些入口。harness 见第 5 节表中的
+bounds 一行。
 
 ## 3. 威胁与现状
 
@@ -161,6 +165,7 @@ M1–M6 已在 0.3.0-beta.1 实施，行为变化见 CHANGELOG。M3 的修改路
 | 增量 apply：`try_apply_delta_verified` / `apply_delta_verified`（3.3） | `fuzz_delta_sync`（反射和字段表两种构建）：快路径（none、in_place）与克隆副本上的全量校验比较结论、错误和结果；拒绝时副本和游标不变；接受的结果能再校验加载 |
 | 信任档（3.4）：`XReceiver<server_peer / from_server>` 的 `reload`、`load`、`apply_delta`（admit） | 整块：`v2_fuzz_core.hpp` 第 8 列（`fuzz_v2_wire`、`test_v2_fuzz`），完整档接受的必须接受且结果逐字节相同，oracle 在线头阶段拒绝的必须拒绝；增量：`fuzz_delta_sync` 在另一份克隆上走 admit，完整档接受的必须接受且结果相同，解析阶段的错误必须相同，拒绝时副本和游标不变。admit 多接受的输入不读 |
 | 共享增量（3.5）：`XReceiver<server_peer / from_server>::apply_sync`（XS 1.0，full 和 admit） | `fuzz_shared_delta`（反射和字段表两种构建）：原始操作段、真实消息流加篡改、整条消息、关键消息四种输入；每条先走 full，拒绝时记录和游标不变，接受的结果能再校验加载；full 接受的再在副本上走 admit，记录和游标必须相同。admit 不读 full 拒绝的输入（消息体信任发送方） |
+| 边界档（3.5）：`XReceiver<from_client>::view`（bounds） | `v2_fuzz_core.hpp` 第 9 列（`fuzz_v2_wire`、`test_v2_fuzz`）：wire 复制进一个大小正好的堆块，完整档接受的稠密 wire 必须接受且读出的每个字段相同，稀疏 wire 和 oracle 在线头阶段拒绝的必须拒绝；多接受的输入通过视图读完全部字段，不能越界（ASan）。`test_receiver_view`：构造的越界块、超长内联字符串、缺 NUL、bool 2、重叠放大和随机变异 |
 | 客户端字段表构建、关异常构建 | `fuzz_v2_wire`、`fuzz_wire_schemas` 的 C++20 字段表构建（libFuzzer），`tools/fuzz_outcome_diff.sh`（三种构建逐条比较结果和错误文字） |
 
 各阶段与预算见脚本开头的说明；一轮发版 fuzz 约 4 小时（GCC 45 分钟，每个 libFuzzer 目标每种构建

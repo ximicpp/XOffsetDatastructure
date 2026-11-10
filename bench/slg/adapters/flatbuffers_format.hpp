@@ -283,6 +283,7 @@ template <> struct table_of<stdm::ShardState> { using type = fb::ShardState; };
 template <> struct table_of<stdm::Report> { using type = fb::Report; };
 template <> struct table_of<stdm::ViewSnapshot> { using type = fb::ViewSnapshot; };
 template <> struct table_of<stdm::ViewDelta> { using type = fb::ViewDelta; };
+template <> struct table_of<stdm::March> { using type = fb::March; };   // UL orders (uplink.hpp)
 
 } // namespace slg::fbconv
 

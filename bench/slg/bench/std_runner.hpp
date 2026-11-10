@@ -10,6 +10,7 @@
 #include "slg/trace.hpp"
 #include "slg/login.hpp"
 #include "slg/view.hpp"
+#include "slg/uplink.hpp"
 
 namespace slg {
 
@@ -224,6 +225,7 @@ public:
         for (int i = 0; i < ViewCases::count; ++i)
             run_view_case(bs_[i], ops_[i], ViewCases::keys(i), cycle, st, keep ? &keep->view : nullptr, keep ? &keep->delta : nullptr);
         run_login(lops_, mix_seed(seed_, 0x1062), cycle, 4, st, lseq_);
+        run_uplink(lops_, mix_seed(seed_, 0x1063), cycle, 4, st);
     }
 
     // L / LD (login.hpp): the server's players and the clients' held players are
@@ -248,6 +250,12 @@ public:
         template <class Fill> std::size_t patch_encode(Fill&& fill) { fill(pm); pw = rz->encode(kDelta, pm); return pw.size(); }
         void patch_recv() { rz->decode(pw, pr); }
         const stdm::PlayerPatch& patch() const { return pr; }
+        // UL (uplink.hpp): the client encodes a march order, the server decodes it.
+        stdm::March um, ur;
+        std::span<const uint8_t> uw;
+        template <class Fill> std::size_t up_encode(Fill&& fill) { fill(um); uw = rz->encode(kReq, um); return uw.size(); }
+        uint64_t up_recv() { rz->decode(uw, ur); return query_order(ur); }
+        std::string_view up_wire() const { return sv(uw); }
     };
     // SD: the scene's resident players; storage decodes with the format's checks.
     struct StoreOps {

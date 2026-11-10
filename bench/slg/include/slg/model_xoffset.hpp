@@ -192,3 +192,5 @@ XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::ShardState, "slg.ShardState.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::Report, "slg.Report.v1")
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::ViewSnapshot, "slg.ViewSnapshot.v4")
 XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::ViewDelta, "slg.ViewDelta.v4")
+// Client uplink orders (uplink.hpp, UL).
+XOFFSET_REGISTER_SCHEMA_NAME(slg::xm::March, "slg.March.v1")
