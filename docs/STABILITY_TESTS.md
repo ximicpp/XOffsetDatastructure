@@ -59,6 +59,11 @@ K0–K8 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 测试（`test_delta_sync`，含关异常构建）、增量 apply 的发版前 ASan fuzz、增量 wire 1.0 冻结的金标准测试。
 条件全文见 [USER_GUIDE.md](USER_GUIDE.md) 第 8 节。
 
+视口增量走共享增量（XS 1.0，`XReceiver::apply_sync`，3.5 起）：`test_shared_delta_sync`（1500 条消息的随机流，
+full 和 admit 两个客户端每条之后都与服务端模型比较；拒绝用例、篡改消息、重复条目；含关异常构建）、
+`test_shared_delta_format`（XS 1.0 逐字节的金标准，发送端和两档接收）、`fuzz_shared_delta`（发版前 ASan fuzz）、
+`receiver_from_client_sync_fail`（`from_client` 上 `apply_sync` 编译不过）。
+
 ## 不在 CTest 里的部分
 
 - 字段表构建与反射构建的等价性：`tools/local_validate.sh` 的 `diff-c++20` 列用同一批变异 wire

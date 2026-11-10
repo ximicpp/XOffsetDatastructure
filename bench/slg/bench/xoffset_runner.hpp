@@ -11,6 +11,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 #include "runner.hpp"
@@ -926,12 +927,81 @@ public:
             SlotMap uidx, midx;
             std::vector<int32_t> ufree, mfree;
             int32_t usize = 0, msize = 0;
-            uint64_t stream = 0;
-            uint32_t version = 0;
+            XOffsetDatastructure::xsync::XSyncCursor cursor;
             TileSpan span{};
         };
-        struct D3Op { uint8_t code; int32_t id; int32_t slot; const char* body; };
         enum : unsigned { kTRoot = 0, kTUnit = 1, kTMarch = 2, kTTile = 3 };
+        // A client's view as the records XReceiver::apply_sync writes: the
+        // root fields (through a D3Root copy), units and marches by id -> slot
+        // (a slot that leaves is reused), tiles by tile id inside the view's
+        // span. Adding a slot may move the slots; the view root is re-read if
+        // the buffer moved.
+        // The target's calls on the receive path are forced inline: this
+        // translation unit (every format, every case) reaches GCC's
+        // inline-unit-growth limit, past which whether they inline depends on
+        // unrelated code.
+#define SLG_D3_HOT [[gnu::always_inline]]
+#define SLG_D3_FLAT [[gnu::always_inline, gnu::flatten]]
+        struct D3Target {
+            using tables = std::tuple<xm::D3Root, xm::ViewUnit, xm::ViewMarch, xm::Tile>;
+            template <unsigned K> static constexpr bool keyed = K == kTUnit || K == kTMarch;
+            D3Client* L;
+            xm::ViewSnapshot* v;
+            const void* base;
+            xm::D3Root root{};
+            explicit D3Target(D3Client& c) : L(&c), v(&c.view->template root<xm::ViewSnapshot>()), base(c.view->get_address()) {}
+            template <unsigned K> SLG_D3_FLAT int64_t find(uint32_t id) {
+                if constexpr (K == kTRoot) {
+                    if (id != 0) return -1;
+                    root = xm::D3Root{v->request_id, v->tick};
+                    return 0;
+                } else if constexpr (K == kTTile) {
+                    const uint32_t tx = id % uint32_t(kTiles) - uint32_t(L->span.tx0), ty = id / uint32_t(kTiles) - uint32_t(L->span.ty0);
+                    if (tx >= uint32_t(L->span.cols) || ty >= uint32_t(L->span.rows)) return -1;
+                    return int64_t(ty) * L->span.cols + tx;
+                } else {
+                    const int32_t* at = (K == kTUnit ? L->uidx : L->midx).find(int32_t(id));
+                    return at ? *at : -1;
+                }
+            }
+            template <unsigned K> SLG_D3_HOT auto& record(int64_t h) {
+                if constexpr (K == kTRoot) return root;
+                else if constexpr (K == kTUnit) return v->units[std::size_t(h)];
+                else if constexpr (K == kTMarch) return v->marches[std::size_t(h)];
+                else return v->tiles[std::size_t(h)];
+            }
+            template <unsigned K> SLG_D3_HOT int64_t enter(uint32_t id) {
+                SlotMap& idx = K == kTUnit ? L->uidx : L->midx;
+                std::vector<int32_t>& fr = K == kTUnit ? L->ufree : L->mfree;
+                const auto [val, added] = idx.try_emplace(int32_t(id));
+                if (!added) return -1;
+                int32_t s;
+                if (!fr.empty()) { s = fr.back(); fr.pop_back(); }
+                else {
+                    if constexpr (K == kTUnit) { s = L->usize++; v->units.resize(std::size_t(L->usize)); }
+                    else { s = L->msize++; v->marches.resize(std::size_t(L->msize)); }
+                    if (L->view->get_address() != base) { base = L->view->get_address(); v = &L->view->template root<xm::ViewSnapshot>(); }
+                }
+                *val = s;
+                return s;
+            }
+            template <unsigned K> SLG_D3_HOT void leave(uint32_t id, int64_t h) {
+                RD<std::tuple_element_t<K, tables>>::clear(record<K>(h));   // free slots stay zeroed (query_view)
+                (K == kTUnit ? L->uidx : L->midx).erase(int32_t(id));
+                push_free(K == kTUnit ? L->ufree : L->mfree, int32_t(h));
+            }
+            SLG_D3_FLAT static void push_free(std::vector<int32_t>& f, int32_t s) { f.push_back(s); }
+            template <unsigned K> SLG_D3_HOT void applied(uint32_t, int64_t) {
+                if constexpr (K == kTRoot) { v->request_id = root.request_id; v->tick = root.tick; }
+            }
+        };
+#undef SLG_D3_FLAT
+#undef SLG_D3_HOT
+        static XOffsetDatastructure::XReceiver<XOffsetDatastructure::XLink::from_server>& d_rx() {
+            static XOffsetDatastructure::XReceiver<XOffsetDatastructure::XLink::from_server> rx(
+                XBuffer::maximum_capacity(XBuffer::DEFAULT_MAXIMUM_CAPACITY));
+            return rx;
+        }
         std::optional<XBuffer> dstore, dbase;
         std::vector<D3Ent> due, dte, dme;
         std::vector<xm::ViewMarch> dmprev;
@@ -942,7 +1012,6 @@ public:
         std::vector<D3Conn> dconn;
         std::vector<D3Client> dcli;
         std::vector<D3Client> dclt;   // the same clients in the trust tier (d_recv_trusted)
-        std::vector<D3Op> dops;
         template <class T> using RD = XOffsetDatastructure::xsync::XRecordDelta<T>;
 
         // Clients 0..clients-1, then the warm devices' views (clients + d), as held().
@@ -1142,169 +1211,26 @@ public:
             return n;
         }
         // Trust tier (susu 2026-11-04: server -> client over a trusted
-        // transport): the message header is admitted (magic, format, flags,
-        // stream and version), then every op is applied in one pass, with no
-        // check of ids or bodies. Same view layout and id index as d_recv.
+        // transport): XReceiver<from_server>::apply_sync with its default
+        // check, admit (header, stream and version, every op's table, kind
+        // and id; bodies are the sender's). Same view layout and id index as
+        // d_recv.
         void d_recv_trusted(int c) { d_recv_trusted_from(c, dmsg.view()); }
         void d_recv_trusted_from(int c, std::string_view msg) {
-            namespace xs = XOffsetDatastructure::xsync;
             D3Client& L = dclt[std::size_t(c)];
-            const char* p = msg.data();
-            const char* const end = p + msg.size();
-            xs::XSyncHeader h;
-            p = xs::get_header(p, end, h);
-            if (!p) throw std::runtime_error("D3: bad header");
-            if (h.flags & xs::kFlagKey) { L.stream = h.stream; }
-            else if (h.version != L.version + 1) throw std::runtime_error("D3: version gap");
-            L.version = h.version;
-            xm::ViewSnapshot* v = &L.view->template root<xm::ViewSnapshot>();
-            const void* base = L.view->get_address();
-            for (uint32_t n = 0; n < h.count; ++n) {
-                const unsigned code = static_cast<unsigned char>(*p++);
-                uint32_t uid;
-                xs::get_varint(p, end, uid);
-                const int32_t id = int32_t(uid);
-                const unsigned kind = code & 3u;
-                switch (code >> 2) {
-                case kTRoot: {
-                    xm::D3Root root{v->request_id, v->tick};
-                    p = RD<xm::D3Root>::apply(p, root);
-                    v->request_id = root.request_id; v->tick = root.tick;
-                    break;
-                }
-                case kTUnit:
-                    if (kind == xs::change) p = RD<xm::ViewUnit>::apply(p, v->units[std::size_t(*L.uidx.find(id))]);
-                    else if (kind == xs::leave) {
-                        const int32_t s = *L.uidx.find(id);
-                        RD<xm::ViewUnit>::clear(v->units[std::size_t(s)]); L.uidx.erase(id); L.ufree.push_back(s);
-                    } else {
-                        int32_t s;
-                        if (!L.ufree.empty()) { s = L.ufree.back(); L.ufree.pop_back(); }
-                        else { s = L.usize++; v->units.resize(std::size_t(L.usize)); }
-                        *L.uidx.try_emplace(id).first = s;
-                        p = RD<xm::ViewUnit>::apply(p, v->units[std::size_t(s)]);
-                    }
-                    break;
-                case kTMarch:
-                    if (kind == xs::change) p = RD<xm::ViewMarch>::apply(p, v->marches[std::size_t(*L.midx.find(id))]);
-                    else if (kind == xs::leave) {
-                        const int32_t s = *L.midx.find(id);
-                        RD<xm::ViewMarch>::clear(v->marches[std::size_t(s)]); L.midx.erase(id); L.mfree.push_back(s);
-                    } else {
-                        int32_t s;
-                        if (!L.mfree.empty()) { s = L.mfree.back(); L.mfree.pop_back(); }
-                        else { s = L.msize++; v->marches.resize(std::size_t(L.msize)); }
-                        *L.midx.try_emplace(id).first = s;
-                        p = RD<xm::ViewMarch>::apply(p, v->marches[std::size_t(s)]);
-                    }
-                    break;
-                default: {
-                    const int32_t tx = id % kTiles - L.span.tx0, ty = id / kTiles - L.span.ty0;
-                    p = RD<xm::Tile>::apply(p, v->tiles[std::size_t(ty * L.span.cols + tx)]);
-                    break;
-                }
-                }
-                if (L.view->get_address() != base) { base = L.view->get_address(); v = &L.view->template root<xm::ViewSnapshot>(); }
-            }
+            D3Target t(L);
+            const XOffsetDatastructure::XStatus r = d_rx().apply_sync(msg, L.cursor, t);
+            if (!r) throw std::runtime_error("D3 (trust tier): " + r.error().message);
         }
-        // The client: check every op against its view (ids held or not, bodies
-        // against their records), then apply. A rejected message changes nothing.
+        // The client: XReceiver<from_server>::apply_sync with XCheck::full,
+        // every op checked against its view (ids held or not, bodies against
+        // their records), then applied. A rejected message changes nothing.
         void d_recv(int c) { d_recv_from(c, dmsg.view()); }
         void d_recv_from(int c, std::string_view msg) {
-            namespace xs = XOffsetDatastructure::xsync;
             D3Client& L = dcli[std::size_t(c)];
-            const char* p = msg.data();
-            const char* const end = p + msg.size();
-            xs::XSyncHeader h;
-            p = xs::get_header(p, end, h);
-            if (!p) throw std::runtime_error("D3: bad header");
-            if (h.flags & xs::kFlagKey) { L.stream = h.stream; }
-            else if (h.version != L.version + 1) throw std::runtime_error("D3: version gap");
-            xm::ViewSnapshot* v = &L.view->template root<xm::ViewSnapshot>();
-            dops.clear();
-            xm::D3Root root{v->request_id, v->tick};
-            for (uint32_t n = 0; n < h.count; ++n) {
-                if (p == end) throw std::runtime_error("D3: truncated");
-                const uint8_t code = uint8_t(*p++);
-                uint32_t uid;
-                if (!xs::get_varint(p, end, uid)) throw std::runtime_error("D3: truncated");
-                const int32_t id = int32_t(uid);
-                const unsigned table = code >> 2, kind = code & 3u;
-                int32_t slot = -1;
-                const char* body = p;
-                switch (table) {
-                case kTRoot:
-                    if (kind != xs::change || id != 0) throw std::runtime_error("D3: bad root op");
-                    p = RD<xm::D3Root>::check(p, end, &root);
-                    break;
-                case kTUnit: {
-                    const int32_t* at = L.uidx.find(id);
-                    if (kind == xs::leave) { if (!at) throw std::runtime_error("D3: unit not held"); slot = *at; break; }
-                    if (kind == xs::enter) { if (at) throw std::runtime_error("D3: unit already held"); p = RD<xm::ViewUnit>::check(p, end, nullptr); break; }
-                    if (kind != xs::change || !at) throw std::runtime_error("D3: bad unit op");
-                    slot = *at;
-                    p = RD<xm::ViewUnit>::check(p, end, &v->units[std::size_t(slot)]);
-                    break;
-                }
-                case kTMarch: {
-                    const int32_t* at = L.midx.find(id);
-                    if (kind == xs::leave) { if (!at) throw std::runtime_error("D3: march not held"); slot = *at; break; }
-                    if (kind == xs::enter) { if (at) throw std::runtime_error("D3: march already held"); p = RD<xm::ViewMarch>::check(p, end, nullptr); break; }
-                    if (kind != xs::change || !at) throw std::runtime_error("D3: bad march op");
-                    slot = *at;
-                    p = RD<xm::ViewMarch>::check(p, end, &v->marches[std::size_t(slot)]);
-                    break;
-                }
-                case kTTile: {
-                    const int32_t tx = id % kTiles - L.span.tx0, ty = id / kTiles - L.span.ty0;
-                    if (id < 0 || tx < 0 || ty < 0 || tx >= L.span.cols || ty >= L.span.rows || kind == xs::leave) throw std::runtime_error("D3: bad tile op");
-                    slot = ty * L.span.cols + tx;
-                    p = RD<xm::Tile>::check(p, end, &v->tiles[std::size_t(slot)]);
-                    break;
-                }
-                default: throw std::runtime_error("D3: bad table");
-                }
-                if (!p) throw std::runtime_error("D3: bad body");
-                dops.push_back(D3Op{code, id, slot, body});
-            }
-            if (p != end) throw std::runtime_error("D3: trailing bytes");
-            L.version = h.version;
-            // Apply. An op that allocates may move slot storage: re-read the root then.
-            const void* base = L.view->get_address();
-            for (const D3Op& o : dops) {
-                const unsigned table = o.code >> 2, kind = o.code & 3u;
-                switch (table) {
-                case kTRoot: RD<xm::D3Root>::apply(o.body, root); v->request_id = root.request_id; v->tick = root.tick; break;
-                case kTUnit:
-                    if (kind == xs::leave) { RD<xm::ViewUnit>::clear(v->units[std::size_t(o.slot)]); L.uidx.erase(o.id); L.ufree.push_back(o.slot); }
-                    else if (kind == xs::change) RD<xm::ViewUnit>::apply(o.body, v->units[std::size_t(o.slot)]);
-                    else {
-                        int32_t s;
-                        if (!L.ufree.empty()) { s = L.ufree.back(); L.ufree.pop_back(); }
-                        else { s = L.usize++; v->units.resize(std::size_t(L.usize)); }
-                        const auto [val, added] = L.uidx.try_emplace(o.id);
-                        if (!added) throw std::runtime_error("D3: unit entered twice");
-                        *val = s;
-                        RD<xm::ViewUnit>::apply(o.body, v->units[std::size_t(s)]);
-                    }
-                    break;
-                case kTMarch:
-                    if (kind == xs::leave) { RD<xm::ViewMarch>::clear(v->marches[std::size_t(o.slot)]); L.midx.erase(o.id); L.mfree.push_back(o.slot); }
-                    else if (kind == xs::change) RD<xm::ViewMarch>::apply(o.body, v->marches[std::size_t(o.slot)]);
-                    else {
-                        int32_t s;
-                        if (!L.mfree.empty()) { s = L.mfree.back(); L.mfree.pop_back(); }
-                        else { s = L.msize++; v->marches.resize(std::size_t(L.msize)); }
-                        const auto [val, added] = L.midx.try_emplace(o.id);
-                        if (!added) throw std::runtime_error("D3: march entered twice");
-                        *val = s;
-                        RD<xm::ViewMarch>::apply(o.body, v->marches[std::size_t(s)]);
-                    }
-                    break;
-                default: RD<xm::Tile>::apply(o.body, v->tiles[std::size_t(o.slot)]); break;
-                }
-                if (L.view->get_address() != base) { base = L.view->get_address(); v = &L.view->template root<xm::ViewSnapshot>(); }
-            }
+            D3Target t(L);
+            const XOffsetDatastructure::XStatus r = d_rx().template apply_sync<XOffsetDatastructure::XCheck::full>(msg, L.cursor, t);
+            if (!r) throw std::runtime_error("D3: " + r.error().message);
         }
     };
 

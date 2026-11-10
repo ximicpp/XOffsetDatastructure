@@ -1,8 +1,13 @@
 #ifndef X_OFFSET_SHARED_DELTA_HPP
 #define X_OFFSET_SHARED_DELTA_HPP
 
-// EXPERIMENTAL (D3 prototype, 2026-11-04): record-relative shared deltas.
-// Not part of the public API; names, format and behaviour may change or go.
+// Shared deltas: record-relative deltas a server writes once per entity and
+// sends to every connection that holds the entity (docs/SHARED_DELTA.md).
+// The message format is XS 1.0, frozen within 3.x (format byte 0x01;
+// tests/test_shared_delta_format.cpp pins its bytes). A client applies a
+// message with XReceiver<XLink::from_server>::apply_sync
+// (xoffset_receiver.hpp); this header has the sender side, the record codec
+// and the receive engine apply_sync runs.
 //
 // A delta of xoffset_delta.hpp carries bytes at payload offsets, so it only
 // applies to a replica with the sender's layout: one baseline per receiver.
@@ -37,7 +42,7 @@
 //             op 1 VSET   varint n, n x (plain bytes of E, in order)
 //             op 2 VPATCH an inline section over the elements' bytes
 //                         [0, size * sizeof(E)) at the current size
-// Supported in the prototype: scalars, bools, fixed-underlying enums, nested
+// Supported: scalars, bools, fixed-underlying enums, nested
 // ordinary records and arrays of them, XString, and XVector of elements
 // without containers. Sets, maps and vectors of records with containers are
 // rejected at compile time.
@@ -48,6 +53,7 @@
 
 #include "xoffsetdatastructure.hpp"
 
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <cstddef>
@@ -58,9 +64,24 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 #include <vector>
+
+#if defined(_MSC_VER) && !defined(__clang__)
+#define XOFFSET_SYNC_INLINE __forceinline
+#define XOFFSET_SYNC_LAMBDA_INLINE [[msvc::forceinline]]
+#define XOFFSET_SYNC_COLD __declspec(noinline)
+#elif defined(__GNUC__) || defined(__clang__)
+#define XOFFSET_SYNC_INLINE inline __attribute__((always_inline))
+#define XOFFSET_SYNC_LAMBDA_INLINE __attribute__((always_inline))
+#define XOFFSET_SYNC_COLD __attribute__((noinline, cold))
+#else
+#define XOFFSET_SYNC_INLINE inline
+#define XOFFSET_SYNC_LAMBDA_INLINE
+#define XOFFSET_SYNC_COLD
+#endif
 
 namespace XOffsetDatastructure::xsync {
 
@@ -148,17 +169,52 @@ namespace XOffsetDatastructure::xsync {
     inline void put_varint(XSyncOut& out, std::uint32_t v) {
         write_into(out, 5, [&](char* d) { return encode_varint(d, v); });
     }
-    inline bool get_varint(const char*& p, const char* end, std::uint32_t& v) noexcept {
-        if (p != end && !(static_cast<unsigned char>(*p) & 0x80)) { v = static_cast<unsigned char>(*p++); return true; }
-        std::uint32_t r = 0;
-        for (unsigned s = 0; s < 35; s += 7) {
-            if (p == end) return false;
-            const auto b = static_cast<unsigned char>(*p++);
-            if (s == 28 && b > 0x0f) return false;
-            r |= std::uint32_t(b & 0x7f) << s;
-            if (!(b & 0x80)) { v = r; return true; }
+    namespace sd_detail {
+        // A varint read out of line: where it ends and its value, ok false
+        // when it is cut by end or longer than five bytes. Returned by value,
+        // so the inline readers keep their position in a register.
+        struct VarintAt {
+            const char* p;
+            std::uint32_t v;
+            bool ok;
+        };
+        XOFFSET_DETAIL_NOINLINE inline VarintAt varint_slow(const char* p, const char* end) noexcept {
+            std::uint32_t r = 0;
+            for (unsigned s = 0; s < 35; s += 7) {
+                if (p == end) return {p, 0, false};
+                const auto b = static_cast<unsigned char>(*p++);
+                if (s == 28 && b > 0x0f) return {p, 0, false};
+                r |= std::uint32_t(b & 0x7f) << s;
+                if (!(b & 0x80)) return {p, r, true};
+            }
+            return {p, 0, false};
         }
-        return false;
+    } // namespace sd_detail
+    namespace sd_detail {
+        // A varint already checked (a body check() accepted, or the sender's):
+        // one byte inline.
+        XOFFSET_SYNC_INLINE std::uint32_t read_varint(const char*& p) noexcept {
+            const auto b0 = static_cast<unsigned char>(*p);
+            if (!(b0 & 0x80)) { ++p; return b0; }
+            const VarintAt r = varint_slow(p, p + 5);
+            p = r.p;
+            return r.v;
+        }
+    } // namespace sd_detail
+    // One and two bytes inline (ids below 2^14), the rest out of line.
+    XOFFSET_SYNC_INLINE bool get_varint(const char*& p, const char* end, std::uint32_t& v) noexcept {
+        if (p != end) {
+            const auto b0 = static_cast<unsigned char>(p[0]);
+            if (!(b0 & 0x80)) { v = b0; ++p; return true; }
+            if (end - p >= 2) {
+                const auto b1 = static_cast<unsigned char>(p[1]);
+                if (!(b1 & 0x80)) { v = (b0 & 0x7fu) | std::uint32_t(b1) << 7; p += 2; return true; }
+            }
+        }
+        const sd_detail::VarintAt r = sd_detail::varint_slow(p, end);
+        p = r.p;
+        if (r.ok) v = r.v;
+        return r.ok;
     }
 
     namespace sd_detail {
@@ -192,7 +248,7 @@ namespace XOffsetDatastructure::xsync {
                 for (std::size_t i = 0; i < sizeof(U); ++i) out[base + i] = kPlain;
             } else if constexpr (std::is_enum_v<U>) {
                 static_assert(enum_fixed<U>() && !std::is_same_v<std::underlying_type_t<U>, bool>,
-                              "xsync prototype: enums need a fixed, non-bool underlying type");
+                              "xsync: enums need a fixed, non-bool underlying type");
                 for (std::size_t i = 0; i < sizeof(U); ++i) out[base + i] = kPlain;
             } else if constexpr (is_container<U>()) {
                 // a head: written only through container operations
@@ -201,12 +257,12 @@ namespace XOffsetDatastructure::xsync {
                 for (std::size_t i = 0; i < std::extent_v<U>; ++i) classify<E>(out, base + i * sizeof(E));
             } else if constexpr (std::is_class_v<U>) {
                 static_assert(schema::is_described_v<U> && schema::base_count_v<U> == 0,
-                              "xsync prototype: records must be described and have no bases");
+                              "xsync: records must be described and have no bases");
                 [&]<std::size_t... I>(std::index_sequence<I...>) {
                     (classify<typename schema::member_t<U, I>::type>(out, base + schema::member_t<U, I>::offset), ...);
                 }(std::make_index_sequence<schema::member_count_v<U>>{});
             } else {
-                static_assert(always_false<U>, "xsync prototype: unsupported field type");
+                static_assert(always_false<U>, "xsync: unsupported field type");
             }
         }
 
@@ -292,8 +348,8 @@ namespace XOffsetDatastructure::xsync {
             static constexpr std::size_t plain_bytes = [] { std::size_t n = 0; for (auto c : classes) n += c != 0; return n; }();
             using containers = typename ContainersOf<T, 0>::type;
             static constexpr std::size_t container_count = containers::size;
-            static_assert(container_count < 64, "xsync prototype: at most 63 containers per record");
-            static_assert((size + 63) / 64 < 128, "xsync prototype: records up to 8 KiB");
+            static_assert(container_count < 64, "xsync: at most 63 containers per record");
+            static_assert((size + 63) / 64 < 128, "xsync: records up to 8 KiB");
         };
 
         template <class S> constexpr bool slot_supported() { return supported_container<typename S::type>(); }
@@ -469,14 +525,11 @@ namespace XOffsetDatastructure::xsync {
         }
 
         // Applies a checked block section to dst. Returns its end.
-        inline const char* apply_blocks(const char* p, unsigned char* dst) noexcept {
-            std::uint32_t count;   // the varints were checked: p + 5 bounds nothing
-            get_varint(p, p + 5, count);
+        XOFFSET_SYNC_INLINE const char* apply_blocks(const char* p, unsigned char* dst) noexcept {
+            const std::uint32_t count = read_varint(p);
             std::size_t next = 0;
             for (std::uint32_t e = 0; e < count; ++e) {
-                std::uint32_t skip;
-                get_varint(p, p + 5, skip);
-                const std::size_t b = next + skip;
+                const std::size_t b = next + read_varint(p);
                 const unsigned sel = static_cast<unsigned char>(*p++);
                 const char* masks = p;
                 p += kPop8[sel];
@@ -506,7 +559,7 @@ namespace XOffsetDatastructure::xsync {
     struct XRecordDelta {
         using I = sd_detail::Info<T>;
         static_assert(sd_detail::all_supported(typename I::containers{}),
-                      "xsync prototype: containers must be strings or vectors of elements without containers");
+                      "xsync: containers must be strings or vectors of elements without containers");
         static constexpr std::size_t container_count = I::container_count;
 
         // Appends the change from before to now and copies it into before.
@@ -585,7 +638,7 @@ namespace XOffsetDatastructure::xsync {
                                         [](std::size_t w) -> unsigned { return I::bools[w]; });
             if (!p) return nullptr;
             if constexpr (container_count > 0) {
-                std::uint32_t m;
+                std::uint32_t m = 0;
                 if (!get_varint(p, end, m) || m > container_count) return nullptr;
                 int last = -1;
                 for (std::uint32_t i = 0; i < m; ++i) {
@@ -596,14 +649,14 @@ namespace XOffsetDatastructure::xsync {
                     last = int(field);
                     const bool ok = sd_detail::visit(typename I::containers{}, field, [&]<class C, std::size_t Off>() -> bool {
                         if constexpr (sd_detail::is_fixed_string_v<C>) {
-                            std::uint32_t len;
+                            std::uint32_t len = 0;
                             if (op != sd_detail::kStr || !get_varint(p, end, len) || std::size_t(end - p) < len) return false;
                             p += len;
                             return true;
                         } else {
                             using E = typename C::value_type;
                             if (op == sd_detail::kVset) {
-                                std::uint32_t n;
+                                std::uint32_t n = 0;
                                 if (!get_varint(p, end, n)) return false;
                                 constexpr std::size_t P = sd_detail::Info<E>::plain_bytes;
                                 if constexpr (P == 0) { if (n > (std::size_t(1) << 20)) return false; }
@@ -727,9 +780,12 @@ namespace XOffsetDatastructure::xsync {
         }
     };
 
-    // ---- message framing (XS 0.1) ---------------------------------------------
-    //   'X' 'S' u8 format(0x01) u8 flags [u64 stream if KEY] varint version varint count
+    // ---- message framing (XS 1.0) ---------------------------------------------
+    //   'X' 'S' u8 format(0x01) u8 flags [u64 stream LE if KEY] varint version varint count
     //   then count ops: u8 (table << 2 | kind), varint id, [body]
+    //   kinds: enter 0 (body: the record from cleared), change 1 (body: the
+    //   change), leave 2 (no body; keyed tables only). XSyncWriter writes the
+    //   count as three varint bytes; a receiver takes any varint.
     inline constexpr std::uint8_t kFormat = 0x01;
     inline constexpr std::uint8_t kFlagKey = 0x01;
     enum XSyncKind : std::uint8_t { enter = 0, change = 1, leave = 2 };
@@ -860,6 +916,348 @@ namespace XOffsetDatastructure::xsync {
         if (!get_varint(p, end, h.version) || !get_varint(p, end, h.count)) return nullptr;
         return p;
     }
+
+    // ---- receiving --------------------------------------------------------------
+
+    class XSyncCursor;
+    namespace sd_detail {
+        struct SyncAccess;
+        // One op of a message under the full check: where its body starts and
+        // the handle its check found.
+        struct SyncOp {
+            const char* body;
+            std::int64_t handle;
+            std::uint32_t id;
+            std::uint8_t code;
+        };
+    } // namespace sd_detail
+
+    /// Receiver side of one XS stream: the stream and version of the last
+    /// message applied, and the scratch the full check uses (kept, so applying
+    /// messages does not allocate once it has grown). One cursor per stream,
+    /// next to the records it keeps.
+    class XSyncCursor {
+    public:
+        /// No key message applied yet, or the last message failed while it
+        /// was being applied: only a key message applies.
+        bool empty() const noexcept { return !keyed_; }
+        std::uint64_t stream() const noexcept { return stream_; }
+        std::uint32_t version() const noexcept { return version_; }
+        /// Forget the state: only a key message applies next.
+        void clear() noexcept { stream_ = 0; version_ = 0; keyed_ = false; }
+        void release_scratch() noexcept {
+            std::vector<sd_detail::SyncOp>().swap(ops_);
+            std::vector<std::uint64_t>().swap(seen_);
+            stamp_ = 0;
+        }
+
+    private:
+        friend struct sd_detail::SyncAccess;
+        std::uint64_t stream_ = 0;
+        std::uint32_t version_ = 0;
+        bool keyed_ = false;
+        std::uint32_t stamp_ = 0;               // this message's mark in seen_
+        std::vector<sd_detail::SyncOp> ops_;
+        std::vector<std::uint64_t> seen_;      // (stamp << 38) | (table << 32 | id)
+    };
+
+    /// Whether msg is a key message: an XS 1.0 header with the KEY flag. A
+    /// receiver empties its keyed tables before it applies one.
+    inline bool is_key(std::string_view msg) noexcept {
+        return msg.size() >= 4 && msg[0] == 'X' && msg[1] == 'S' && static_cast<unsigned char>(msg[2]) == kFormat &&
+               (static_cast<unsigned char>(msg[3]) & kFlagKey) != 0;
+    }
+    inline bool is_key(std::span<const std::byte> msg) noexcept {
+        return is_key(std::string_view(reinterpret_cast<const char*>(msg.data()), msg.size()));
+    }
+
+    namespace sd_detail {
+        template <class Target, unsigned K>
+        using sync_record_t = std::tuple_element_t<K, typename Target::tables>;
+
+        template <class Target> inline constexpr unsigned sync_tables = unsigned(std::tuple_size_v<typename Target::tables>);
+
+        inline constexpr const char* kUnknownTable = "shared delta: unknown table";
+        inline constexpr const char* kNotHeld = "shared delta: an op on an entry the receiver does not hold";
+        inline constexpr const char* kHeld = "shared delta: enter of an entry the receiver already holds";
+        inline constexpr const char* kBadKind = "shared delta: invalid op kind for this table";
+        inline constexpr const char* kBadBody = "shared delta: a record body does not check";
+        inline constexpr const char* kRefused = "shared delta: the receiver could not add an entry";
+
+        // f.template operator()<K>() for K == table (one jump; at most 64 tables).
+        template <unsigned N, class F>
+        XOFFSET_SYNC_INLINE const char* sync_switch(unsigned table, F&& f) {
+            static_assert(N >= 1 && N <= 64, "XReceiver::apply_sync: a target has 1 to 64 tables");
+            switch (table) {
+#define XOFFSET_SYNC_CASE(k) case k: if constexpr ((k) < N) return f.template operator()<(k)>(); else break;
+#define XOFFSET_SYNC_CASE8(k) XOFFSET_SYNC_CASE(k) XOFFSET_SYNC_CASE(k + 1) XOFFSET_SYNC_CASE(k + 2) XOFFSET_SYNC_CASE(k + 3) \
+                              XOFFSET_SYNC_CASE(k + 4) XOFFSET_SYNC_CASE(k + 5) XOFFSET_SYNC_CASE(k + 6) XOFFSET_SYNC_CASE(k + 7)
+            XOFFSET_SYNC_CASE8(0) XOFFSET_SYNC_CASE8(8) XOFFSET_SYNC_CASE8(16) XOFFSET_SYNC_CASE8(24)
+            XOFFSET_SYNC_CASE8(32) XOFFSET_SYNC_CASE8(40) XOFFSET_SYNC_CASE8(48) XOFFSET_SYNC_CASE8(56)
+#undef XOFFSET_SYNC_CASE8
+#undef XOFFSET_SYNC_CASE
+            default: break;
+            }
+            return kUnknownTable;
+        }
+
+        template <unsigned K, class Target>
+        XOFFSET_SYNC_INLINE void sync_applied(Target& t, std::uint32_t id, std::int64_t h) {
+            if constexpr (requires { t.template applied<K>(id, h); }) t.template applied<K>(id, h);
+        }
+
+        // XRecordDelta<R>::apply, with the block section inline for records
+        // without containers.
+        template <class R>
+        XOFFSET_SYNC_INLINE const char* sync_apply(const char* p, R& r) {
+            if constexpr (XRecordDelta<R>::container_count == 0) return apply_blocks(p, reinterpret_cast<unsigned char*>(&r));
+            else return XRecordDelta<R>::apply(p, r);
+        }
+
+        // XRecordDelta<R>::clear, inline for records without containers.
+        template <class R>
+        XOFFSET_SYNC_INLINE void sync_clear(R& r) {
+            if constexpr (XRecordDelta<R>::container_count == 0) {
+                using I = Info<R>;
+                auto* d = reinterpret_cast<unsigned char*>(&r);
+                [&]<std::size_t... N>(std::index_sequence<N...>) XOFFSET_SYNC_LAMBDA_INLINE {
+                    (std::memset(d + I::runs[N].at, 0, I::runs[N].len), ...);
+                }(std::make_index_sequence<I::run_count>{});
+            } else XRecordDelta<R>::clear(r);
+        }
+
+        // Where a body ends, or why the op is refused.
+        struct SyncStep {
+            const char* p;
+            const char* err;
+        };
+
+        struct SyncAccess {
+            using vstatus = ::XOffsetDatastructure::detail::vstatus;
+
+            XOFFSET_SYNC_COLD static vstatus fail(XErrc code, const char* why) {
+                XOFFSET_VFAIL(XException, code, why);
+            }
+
+            // The header, and the stream and version rules against cur: where
+            // the ops start, or nullptr (header_error() says why).
+            XOFFSET_SYNC_INLINE static const char* header(const char* p, const char* end, const XSyncCursor& cur,
+                                                          XSyncHeader& h) noexcept {
+                if (end - p < 6 || p[0] != 'X' || p[1] != 'S' || static_cast<unsigned char>(p[2]) != kFormat) return nullptr;
+                h.flags = static_cast<std::uint8_t>(p[3]);
+                p += 4;
+                if (h.flags != 0) {
+                    if (h.flags != kFlagKey || end - p < 8) return nullptr;
+                    std::memcpy(&h.stream, p, 8);
+                    p += 8;
+                }
+                if (!get_varint(p, end, h.version)) return nullptr;
+                // The count: three varint bytes as XSyncWriter writes it, or any varint.
+                if (end - p >= 3 && (static_cast<unsigned char>(p[0]) & static_cast<unsigned char>(p[1]) & 0x80) &&
+                    !(static_cast<unsigned char>(p[2]) & 0x80)) {
+                    h.count = (static_cast<unsigned char>(p[0]) & 0x7fu) | (static_cast<unsigned char>(p[1]) & 0x7fu) << 7 |
+                              std::uint32_t(static_cast<unsigned char>(p[2])) << 14;
+                    p += 3;
+                } else if (!get_varint(p, end, h.count)) return nullptr;
+                if (h.flags == 0 && (!cur.keyed_ || h.version != std::uint32_t(cur.version_ + 1))) return nullptr;
+                // Every op takes at least two bytes.
+                if (h.count > std::size_t(end - p) / 2) return nullptr;
+                return p;
+            }
+            XOFFSET_SYNC_COLD static vstatus header_error(const char* p, const char* end, const XSyncCursor& cur) {
+                const std::size_t n = std::size_t(end - p);
+                if ((n >= 1 && p[0] != 'X') || (n >= 2 && p[1] != 'S'))
+                    return fail(XErrc::bad_magic, "shared delta: not an XS message");
+                if (n < 4) return fail(XErrc::truncated, "shared delta: message shorter than its header");
+                if (static_cast<unsigned char>(p[2]) != kFormat)
+                    return fail(XErrc::unsupported_version, "shared delta: unsupported XS format (this receiver reads XS 1.0)");
+                const auto flags = static_cast<std::uint8_t>(p[3]);
+                if (flags & ~kFlagKey) return fail(XErrc::unsupported_flags, "shared delta: unknown flags");
+                p += 4;
+                if (flags & kFlagKey) {
+                    if (end - p < 8) return fail(XErrc::truncated, "shared delta: message shorter than its header");
+                    p += 8;
+                }
+                std::uint32_t version, count;
+                if (!get_varint(p, end, version) || !get_varint(p, end, count))
+                    return fail(p == end ? XErrc::truncated : XErrc::invalid_payload, "shared delta: bad header varint");
+                if (!(flags & kFlagKey)) {
+                    if (!cur.keyed_) return fail(XErrc::delta_base_mismatch, "shared delta: no key message applied (ask for one)");
+                    if (version != std::uint32_t(cur.version_ + 1))
+                        return fail(XErrc::delta_base_mismatch, "shared delta: version gap (ask for a key message)");
+                }
+                return fail(XErrc::truncated, "shared delta: fewer bytes than ops");
+            }
+
+            static void done(XSyncCursor& cur, const XSyncHeader& h) noexcept {
+                if (h.flags & kFlagKey) cur.stream_ = h.stream;
+                cur.version_ = h.version;
+                cur.keyed_ = true;
+            }
+
+            // Applies one op of a kind table K takes. h: the record's handle
+            // (find's result; ignored for a keyed enter, which asks enter()).
+            // An enter clears the record before its body applies; a leave
+            // hands the entry back to the target.
+            template <unsigned K, class Target>
+            XOFFSET_SYNC_INLINE static SyncStep apply_op(Target& t, unsigned kind, std::uint32_t id, std::int64_t h,
+                                                         const char* p) {
+                using R = sync_record_t<Target, K>;
+                if constexpr (Target::template keyed<K>) {
+                    if (kind == XSyncKind::enter) {
+                        h = t.template enter<K>(id);
+                        if (h < 0) [[unlikely]] return {p, kRefused};
+                    } else if (h < 0) [[unlikely]] return {p, kNotHeld};
+                    else if (kind == XSyncKind::leave) {
+                        t.template leave<K>(id, h);
+                        return {p, nullptr};
+                    }
+                } else if (h < 0) [[unlikely]] return {p, kNotHeld};
+                R& r = t.template record<K>(h);
+                if (kind == XSyncKind::enter) sync_clear(r);
+                p = sync_apply(p, r);
+                sync_applied<K>(t, id, h);
+                return {p, nullptr};
+            }
+            // The last kind table K takes: leave for keyed tables, change for fixed ones.
+            template <unsigned K, class Target>
+            static constexpr unsigned last_kind = Target::template keyed<K> ? unsigned(XSyncKind::leave) : unsigned(XSyncKind::change);
+
+            // XCheck::admit: the header and the stream rules, then every op
+            // in one pass. Ids are looked up (an op on an entry the receiver
+            // does not hold is rejected) and tables and kinds checked; bodies
+            // are the sender's. A message rejected after its header may be
+            // partly applied: the cursor is then empty (ask for a key).
+            template <class Target>
+            static vstatus admit(const char* const begin, const char* const end, XSyncCursor& cur, Target& t) {
+                XSyncHeader h;
+                const char* p = header(begin, end, cur, h);
+                if (!p) [[unlikely]] return header_error(begin, end, cur);
+                cur.keyed_ = false;
+                // The header bounds the first op; later ones start where the
+                // sender's bodies end (bodies are not checked here).
+                for (std::uint32_t n = h.count; n != 0; --n) {
+                    std::uint32_t id;
+                    const unsigned code = static_cast<unsigned char>(*p++);
+                    if (!get_varint(p, end, id)) [[unlikely]] return fail(XErrc::truncated, "shared delta: message ends inside an op");
+                    const char* e = sync_switch<sync_tables<Target>>(code >> 2, [&]<unsigned K>() XOFFSET_SYNC_LAMBDA_INLINE -> const char* {
+                        const unsigned kind = code & 3u;
+                        if (kind > last_kind<K, Target>) [[unlikely]] return kBadKind;
+                        const std::int64_t h = Target::template keyed<K> && kind == XSyncKind::enter ? std::int64_t(-1)
+                                                                                                    : t.template find<K>(id);
+                        const SyncStep s = apply_op<K>(t, kind, id, h, p);
+                        p = s.p;
+                        return s.err;
+                    });
+                    if (e) [[unlikely]] return fail(XErrc::invalid_payload, e);
+                }
+                if (p != end) [[unlikely]] return fail(XErrc::invalid_payload, "shared delta: bytes after the last op");
+                done(cur, h);
+                return ::XOffsetDatastructure::detail::vok();
+            }
+
+            // Checks one enter or leave op (change takes the inline path).
+            template <unsigned K, class Target>
+            XOFFSET_SYNC_INLINE static SyncStep check_other(Target& t, unsigned kind, std::uint32_t id, const char* p,
+                                                                const char* end, std::int64_t& handle) {
+                using R = sync_record_t<Target, K>;
+                if (kind > XSyncKind::leave || (!Target::template keyed<K> && kind == XSyncKind::leave)) return {p, kBadKind};
+                handle = t.template find<K>(id);
+                if (kind == XSyncKind::leave) return {p, handle < 0 ? kNotHeld : nullptr};
+                if constexpr (Target::template keyed<K>) {
+                    if (handle >= 0) return {p, kHeld};
+                } else if (handle < 0) return {p, kNotHeld};
+                p = XRecordDelta<R>::check(p, end, nullptr);
+                return {p, p ? nullptr : kBadBody};
+            }
+
+            // XCheck::full: every op is checked against the records as they
+            // are (an enter against a cleared record) before any applies; an
+            // entry appears at most once per message. A rejected message
+            // changes nothing. A failure while the checked ops apply (the
+            // receiver could not add an entry, out of storage) leaves the
+            // ops before it applied and the cursor empty.
+            template <class Target>
+            static vstatus full(const char* const begin, const char* const end, XSyncCursor& cur, Target& t) {
+                XSyncHeader h;
+                const char* p = header(begin, end, cur, h);
+                if (!p) [[unlikely]] return header_error(begin, end, cur);
+                if (cur.ops_.size() < h.count) cur.ops_.resize(h.count);
+                SyncOp* const ops = cur.ops_.data();
+                // Entries seen in this message. Up to 64 ops: a 256-bit filter
+                // on the stack, and an op whose bit is set is compared with the
+                // ops before it. More: open addressing over (table, id) in the
+                // cursor, marked with the message's stamp (no clearing per
+                // message).
+                const bool small = h.count <= 64;
+                std::uint64_t filter[4] = {0, 0, 0, 0};
+                std::size_t slots = 0;
+                std::uint64_t* seen = nullptr;
+                std::uint64_t mark = 0;
+                unsigned shift = 0;
+                if (!small) {
+                    slots = 16;
+                    while (slots < std::size_t(h.count) * 2) slots *= 2;
+                    if (cur.seen_.size() < slots) cur.seen_.assign(slots, 0);
+                    if (++cur.stamp_ == (1u << 26)) {
+                        cur.stamp_ = 1;
+                        std::fill(cur.seen_.begin(), cur.seen_.end(), std::uint64_t(0));
+                    }
+                    seen = cur.seen_.data();
+                    mark = std::uint64_t(cur.stamp_) << 38;
+                    shift = unsigned(64 - std::countr_zero(slots));
+                }
+                for (std::uint32_t n = 0; n < h.count; ++n) {
+                    std::uint32_t id;
+                    if (p >= end) [[unlikely]] return fail(XErrc::truncated, "shared delta: message ends inside an op");
+                    const unsigned code = static_cast<unsigned char>(*p++);
+                    if (!get_varint(p, end, id)) [[unlikely]] return fail(XErrc::truncated, "shared delta: message ends inside an op");
+                    const std::uint64_t key = (std::uint64_t(code >> 2) << 32) | id;
+                    if (small) {
+                        const unsigned bit = unsigned((key * 0x9E3779B97F4A7C15ull) >> 56);
+                        const std::uint64_t m = std::uint64_t(1) << (bit & 63u);
+                        if (filter[bit >> 6] & m) [[unlikely]] {
+                            for (std::uint32_t k = 0; k < n; ++k)
+                                if ((ops[k].code >> 2) == (code >> 2) && ops[k].id == id)
+                                    return fail(XErrc::invalid_payload, "shared delta: an entry appears twice in one message");
+                        }
+                        filter[bit >> 6] |= m;
+                    } else {
+                        for (std::size_t s = std::size_t((key * 0x9E3779B97F4A7C15ull) >> shift);; s = (s + 1) & (slots - 1)) {
+                            if ((seen[s] & ~((std::uint64_t(1) << 38) - 1)) != mark) { seen[s] = mark | key; break; }
+                            if (seen[s] == (mark | key)) [[unlikely]]
+                                return fail(XErrc::invalid_payload, "shared delta: an entry appears twice in one message");
+                        }
+                    }
+                    const char* const body = p;
+                    std::int64_t handle = -1;
+                    const char* e = sync_switch<sync_tables<Target>>(code >> 2, [&]<unsigned K>() XOFFSET_SYNC_LAMBDA_INLINE -> const char* {
+                        if ((code & 3u) == XSyncKind::change) [[likely]] {
+                            handle = t.template find<K>(id);
+                            if (handle < 0) [[unlikely]] return kNotHeld;
+                            p = XRecordDelta<sync_record_t<Target, K>>::check(p, end, &t.template record<K>(handle));
+                            return p ? nullptr : kBadBody;
+                        }
+                        const SyncStep s = check_other<K>(t, code & 3u, id, p, end, handle);
+                        p = s.p;
+                        return s.err;
+                    });
+                    if (e) [[unlikely]] return fail(XErrc::invalid_payload, e);
+                    ops[n] = SyncOp{body, handle, id, std::uint8_t(code)};
+                }
+                if (p != end) [[unlikely]] return fail(XErrc::invalid_payload, "shared delta: bytes after the last op");
+                cur.keyed_ = false;
+                for (const SyncOp* o = ops; o != ops + h.count; ++o) {
+                    const char* e = sync_switch<sync_tables<Target>>(unsigned(o->code >> 2), [&]<unsigned K>() XOFFSET_SYNC_LAMBDA_INLINE -> const char* {
+                        return apply_op<K>(t, o->code & 3u, o->id, o->handle, o->body).err;
+                    });
+                    if (e) [[unlikely]] return fail(XErrc::invalid_payload, e);
+                }
+                done(cur, h);
+                return ::XOffsetDatastructure::detail::vok();
+            }
+        };
+    } // namespace sd_detail
 
 } // namespace XOffsetDatastructure::xsync
 
