@@ -231,13 +231,27 @@ enter).
 
 ## 6. Cost
 
-The `bench/slg` viewport cases (M scale, peace, conflict and siege) time the
-D3 rows: the server's per-entity compare and per-client messages
-(`DP.send`, `DC.send`, `DS.send`) and the client's apply through
-`apply_sync` on its view (`DPT.recv` and the others: admit; `DP.recv`: full).
-Messages average 30 to 60 bytes. The receive path costs about the same
-instructions as the hand-written loop the bench used before the receiver
-took it over (`tools/perf_gate`, SLG340 baseline).
+The `bench/slg` viewport cases time the D3 rows (`SLG_D3=1`): the server's
+once-per-tick compare and per-client messages (`DP.send`, `DC.send`,
+`DS.send` for peace, conflict and siege) and each client's apply through
+`apply_sync` on its view (`DPT.recv` and the other `T` rows: admit;
+`DP.recv` and the others: full). At M scale a message averages about 70 bytes
+in peace, 330 in conflict and 960 under siege, before zstd.
+
+Instructions per delivery (GCC 16, M scale, callgrind), against the
+hand-written receive loop the bench used in 3.4 (SLG340 baseline):
+
+| Row | 3.4 loop | `apply_sync` | ratio |
+|---|---:|---:|---:|
+| `DPT.recv` (peace, admit) | 1204 | 1194 | 0.991 |
+| `DCT.recv` (conflict, admit) | 4681 | 4487 | 0.959 |
+| `DST.recv` (siege, admit) | 13767 | 13225 | 0.961 |
+| `DP.recv` (peace, full) | 2052 | 2143 | 1.044 |
+| `DC.recv` (conflict, full) | 11053 | 10613 | 0.960 |
+| `DS.recv` (siege, full) | 32102 | 31615 | 0.985 |
+
+The full tier also looks for duplicate entries in a message, which the 3.4
+loop did not do. The server rows did not change (within 0.2%).
 
 ## 7. Not in XS 1.0
 
