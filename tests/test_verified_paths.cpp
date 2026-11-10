@@ -7,6 +7,9 @@
 #include <iostream>
 #include <memory_resource>
 #include <new>
+#if defined(_WIN32)
+#include <malloc.h>
+#endif
 #include <stdexcept>
 #include <string>
 
@@ -48,17 +51,33 @@ void operator delete(void* p) noexcept {
 void operator delete[](void* p) noexcept { ::operator delete(p); }
 void operator delete(void* p, std::size_t) noexcept { ::operator delete(p); }
 void operator delete[](void* p, std::size_t) noexcept { ::operator delete(p); }
+namespace host {
+inline void* aligned_malloc(std::size_t n, std::size_t align) {
+    n = (n ? n + align - 1 : align) / align * align;
+#if defined(_WIN32)
+    return _aligned_malloc(n, align);
+#else
+    return std::aligned_alloc(align, n);
+#endif
+}
+inline void aligned_free(void* p) {
+#if defined(_WIN32)
+    _aligned_free(p);
+#else
+    std::free(p);
+#endif
+}
+}
 void* operator new(std::size_t n, std::align_val_t a) {
     host::count();
-    const auto align = std::size_t(a);
-    if (auto* p = std::aligned_alloc(align, (n + align - 1) / align * align)) return p;
+    if (auto* p = host::aligned_malloc(n, std::size_t(a))) return p;
     throw std::bad_alloc();
 }
 void* operator new[](std::size_t n, std::align_val_t a) { return ::operator new(n, a); }
-void operator delete(void* p, std::align_val_t) noexcept { std::free(p); }
-void operator delete[](void* p, std::align_val_t) noexcept { std::free(p); }
-void operator delete(void* p, std::size_t, std::align_val_t) noexcept { std::free(p); }
-void operator delete[](void* p, std::size_t, std::align_val_t) noexcept { std::free(p); }
+void operator delete(void* p, std::align_val_t) noexcept { host::aligned_free(p); }
+void operator delete[](void* p, std::align_val_t) noexcept { host::aligned_free(p); }
+void operator delete(void* p, std::size_t, std::align_val_t) noexcept { host::aligned_free(p); }
+void operator delete[](void* p, std::size_t, std::align_val_t) noexcept { host::aligned_free(p); }
 
 namespace xo = XOffsetDatastructure;
 struct PathsRoot {
