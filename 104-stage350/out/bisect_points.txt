@@ -1,0 +1,4 @@
+38a741f3124b1fc7271d4118c9ae9527ee8c43d0|#248 merged (W2: x86 UP.send, class S); #246 (anchor file only) before it
+21dc9708f3013d318e65de166c0683147f3b4651|#249 merged (W3: D3 shared delta product API apply_sync, XS 1.0)
+f0557545a37fb9f129a2dd1e48ef8b8c0e5bd0ab|#247 merged (W4: uplink bounds tier and XView)
+46e0b4dc17d5d3042865595de10460dd126ad3d6|#251 merged (delta capacity check, class S); the last range holds #252 (release: version, docs, #250 bench fix)

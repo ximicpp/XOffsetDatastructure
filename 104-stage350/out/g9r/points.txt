@@ -1,0 +1,16 @@
+t0 1162e37bf40fad6074b9e4cc9c7ff109a8b35288 tree 28785dd4ff283d8aa549739172844f43c60366a9 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (v3.4.0 1162e37b (previous release tag))
+t1 0cbc130decd722fc1baaa4c96882c1085e5b20a3 tree e44176fae42c6a107169775060d5b1b61937c90d typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (STAGE350 head (v3.5.0 0cbc130d))
+t1: diff over t0 sha256 7250fdfd3e27c4c79f59feafc0da79e2d8382284f2df0728929c6c7272dc00a9 ( 55 files changed, 4113 insertions(+), 406 deletions(-))
+t1: library header diff over t0:  1 file changed, 110 insertions(+), 36 deletions(-)
+t1: first-parent commits over t0:
+  0cbc130d Merge pull request #252 from ximicpp/claude/release-3.5.0
+  46e0b4dc Merge pull request #251 from ximicpp/claude/delta-capacity-fix-20261110
+  f0557545 Merge pull request #247 from ximicpp/claude/uplink-bounds-view-20261110
+  21dc9708 Merge pull request #249 from ximicpp/claude/d3-product-20261110
+  38a741f3 Merge pull request #248 from ximicpp/claude/w2-up-send-x86-20261110
+  e71d4ed3 Merge pull request #246 from ximicpp/claude/anchor-v3.4.0
+bench/reloc of t1: same tree as t0
+reloc_bench t0 sha256 b1883605c93d07ff18696b926e47a161e4ae8b15a00ee31a2bd220cb168dc9f5
+reloc_bench t1 sha256 99f7fa449d9a06306c8a4422a5cdc0a0167c3c046a9e2a6e7244d74f7ec0be37
+reloc_bench t0a sha256 997e1491ce3abb1086e01e3c2d5b33db1c36e4c1655f6c984edb32204baaa8b5
+reloc_bench t1a sha256 5d3f8e550c5c4f818b636c844538e9d3b43389af69817490dfe76c3f843c720d
