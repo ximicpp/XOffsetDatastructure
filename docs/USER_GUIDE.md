@@ -643,12 +643,12 @@ buffer 地址固定（在 VM 预留内增长），只在显式时间点搬：输
 
 接收检查分三档（2026-11-04 定）。3.3.x 及以前只有完整档：`load_verified`、`reload_verified`、增量 apply
 等现有入口都做全图校验。3.4 起整块接收和增量 apply 的信任档由 `XReceiver`（`xoffset_receiver.hpp`）提供，
-边界档随后加入。各链路的默认如下：
+3.5 起客户端上行的边界档由 `XReceiver<XLink::from_client>::view` 提供。各链路的默认如下：
 
 | 档 | 默认用在哪 | 查什么 | 收到后能做什么 |
 | --- | --- | --- | --- |
 | 信任 | 服务端之间、服务端发往客户端、自己写的存档 | wire 头准入（指纹、上限、根偏移）和空洞表边界；跳过图遍历和增量的检查维护 | 直接读写 |
-| 边界 | 客户端发往服务端 | 保证读取不越界 | 只读使用 |
+| 边界 | 客户端发往服务端（`view`） | wire 头准入同上；从根走一遍容器头：每个块在负载内且对齐，size 不超 capacity，堆字符串以 NUL 结尾，内联字符串不超 10 字节，bool 只能是 0 或 1，遍历的元素字节总数不超负载大小。不查块重叠、覆盖、set/map 键序、填充字节 | 就地只读（`XView<T>`，只有 const 访问），不复制 |
 | 完整 | 要原地修改客户端发来的数据时；任何链路都可以显式打开 | 全图结构校验 | 原地读写、再发 |
 
 信任档的前提是发送方是自己的同构建服务，链路有 TLS、mTLS 或在内网；它不是不可信输入的入口。调试和
@@ -667,8 +667,20 @@ XDeltaCursor cur;                                   // held 跟着哪条增量�
 XStatus d = rx.apply_delta<Profile>(held, delta, cur);   // 信任档增量：只查格式、流和版本、块和空洞的边界
 
 XReceiver<XLink::from_client> up(XBuffer::maximum_capacity(64 << 10));   // 服务端收客户端
-(void)up.reload<Profile>(state, wire);              // 只能完整档；写 XCheck::admit 编译不过
+if (auto v = up.view<Order>(wire)) {                // 边界档：就地只读，不复制
+    const Order& o = v->root();                     // 只有 const 访问，写操作编译不过
+    apply_order(world, o);                          // 读出需要的字段，写进服务端自己的状态
+}
+(void)up.reload<Profile>(state, wire);              // 要保留并修改客户端的整份数据：只能完整档；写 XCheck::admit 编译不过
 ```
+
+`view` 的前提：wire 是稠密的（没有 extent 表；4 KiB 以下的 wire 总是稠密的，更大的用
+`XSaveOptions{XWireEmission::dense}` 发），字节从 8 字节边界开始，并且在用完视图之前不被改动或释放。稀疏
+wire 和没对齐的字节返回 `XErrc::invalid_argument`。边界档的结果可能是垃圾值（例如两个容器共用一个块、
+set 的键乱序时查找会找不到），但任何 const 访问都不会读出 wire 之外；块可以重叠，所以遍历按负载大小
+限总量，一条小消息不能让遍历反复走同一个大块。可信链路上 `view` 默认信任档（只查 wire 头和根在负载内），
+也可以显式写 `view<T, XCheck::bounds>`。`XOFFSET_FORCE_FULL_CHECK=1` 时 `view` 另外在一份拷贝上跑完整校验，
+完整档拒绝的也拒绝。
 
 信任档接受任何 V2 wire（`save_verified` 的各种 emission、`save_compact`），结果和完整档一样可以原地读写、
 再发。增量的信任档不建、不维护检查表（docs/DELTA_SYNC.md 第 3 节），同一个游标之后若改走完整档，第一次会

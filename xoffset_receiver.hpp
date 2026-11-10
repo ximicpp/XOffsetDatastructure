@@ -22,8 +22,17 @@
 //                  For a delta (apply_delta): its framing, stream and
 //                  version, every block and hole inside the used payload and
 //                  the root object inside it; no map of checked bytes is kept.
-//   XCheck::bounds read-only bounds check for client uplinks (phase P3, with
-//                  XView in P4); not available yet.
+//   XCheck::bounds read-only: the framing as admit, then one walk from the
+//                  root over every container head it reaches: each block a
+//                  head names lies inside the used payload (past the payload
+//                  header), aligned; size <= capacity; a heap string ends in
+//                  NUL; an inline string is at most 10 bytes; a bool is 0 or
+//                  1; the element bytes walked add up to at most the payload
+//                  (blocks may overlap, so this caps the work). Not checked:
+//                  overlap and coverage, set and map key order, padding. The
+//                  result is an XView (const access only), read in place.
+//                  Default for view() on from_client; on trusted links view()
+//                  defaults to admit (framing and the root only).
 //   XCheck::full   load_verified / reload_verified: every check.
 //
 // Shared deltas (XS 1.0, xoffset_shared_delta.hpp, docs/SHARED_DELTA.md) go
@@ -51,6 +60,9 @@
 #include "xoffsetdatastructure.hpp"
 #include "xoffset_shared_delta.hpp"
 
+// XReceiver::view and XView (XCheck::bounds for client uplinks, 3.5).
+#define XOFFSET_RECEIVER_VIEW_API 1
+
 #ifndef XOFFSET_FORCE_FULL_CHECK
 #  if !defined(NDEBUG) || defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_THREAD__)
 #    define XOFFSET_FORCE_FULL_CHECK 1
@@ -73,6 +85,36 @@ enum class XCheck : std::uint8_t { admit, bounds, full };
 template <XLink L>
 inline constexpr XCheck default_mutable_check = L == XLink::from_client ? XCheck::full : XCheck::admit;
 
+/// The check a receiver for link L applies to a view when none is named.
+template <XLink L>
+inline constexpr XCheck default_view_check = L == XLink::from_client ? XCheck::bounds : XCheck::admit;
+
+/// A read-only view of a wire's root, in the wire's own bytes (XReceiver::view):
+/// nothing is copied. Only const access is given, so no write compiles; to
+/// change the data, receive it into an XBuffer with reload() (on from_client
+/// that is the full check). The view refers to the wire: the bytes must stay
+/// alive and unchanged while it is used.
+template <typename T>
+class XView {
+public:
+    const T& root() const noexcept { return *root_; }
+    const T& operator*() const noexcept { return *root_; }
+    const T* operator->() const noexcept { return root_; }
+    /// The wire the view reads.
+    std::span<const std::byte> wire() const noexcept { return wire_; }
+    /// The check it passed (XCheck::admit or XCheck::bounds).
+    XCheck check() const noexcept { return check_; }
+
+private:
+    template <XLink> friend class XReceiver;
+    XView(const T* root, std::span<const std::byte> wire, XCheck check) noexcept
+        : root_(root), wire_(wire), check_(check) {}
+
+    const T* root_;
+    std::span<const std::byte> wire_;
+    XCheck check_;
+};
+
 namespace detail {
     inline constexpr bool force_full_check = XOFFSET_FORCE_FULL_CHECK != 0;
 
@@ -89,6 +131,149 @@ namespace detail {
 
     inline std::span<const std::byte> as_wire(const std::string& data) noexcept {
         return {reinterpret_cast<const std::byte*>(data.data()), data.size()};
+    }
+
+    // ---- XCheck::bounds (views of client uplinks) -------------------------
+    // One walk from the root over the container heads it reaches, in the
+    // wire's bytes. Addresses are payload offsets: `base` is the address of
+    // payload offset 0 (the wire's payload bytes start at offset 48), held as
+    // an integer because it lies before the wire. Every block a head names
+    // must lie in [48, used) and be aligned; nothing else in the payload is
+    // read before it is checked. Blocks may overlap (a view only reads), so
+    // the element bytes walked are counted against `budget` (the payload
+    // size): one small wire cannot make the walk revisit one block many times.
+    struct BoundsWalk {
+        std::uintptr_t base;
+        std::uint64_t used;
+        std::uint64_t budget;
+        const char* why = nullptr;
+
+        bool fail(const char* reason) noexcept {
+            why = reason;
+            return false;
+        }
+
+        // The block of `bytes` at head-relative `delta` (head at &delta).
+        template <std::size_t Align>
+        bool block(const std::int32_t& delta, std::uint64_t bytes, const char*& out) noexcept {
+            const std::uint64_t head = reinterpret_cast<std::uintptr_t>(&delta) - base;
+            const std::int64_t off = std::int64_t(head) + delta;
+            if (off < std::int64_t(XWIRE_PAYLOAD_BEGIN) || std::uint64_t(off) > used ||
+                bytes > used - std::uint64_t(off) || (std::uint64_t(off) & 7u) != 0) [[unlikely]]
+                return fail("block out of bounds");
+            const auto address = base + std::uint64_t(off);
+            if constexpr (Align > 8) {
+                if ((address & (Align - 1u)) != 0) [[unlikely]] return fail("misaligned block");
+            }
+            out = reinterpret_cast<const char*>(address);
+            return true;
+        }
+    };
+
+    template <typename T>
+    bool bounds_value(const T& value, BoundsWalk& walk) noexcept;
+
+    inline bool bounds_string(const XFixedString& value, BoundsWalk& walk) noexcept {
+        if (value.is_inline()) [[likely]] {
+            // Bytes past the length are not read; the length must stay in the head.
+            if (((value.capacity_ >> 24) & 0x7fu) > XFixedString::inline_max) [[unlikely]]
+                return walk.fail("inline string length exceeds 10");
+            return true;
+        }
+        if (value.size_ > value.capacity_) [[unlikely]] return walk.fail("string size exceeds capacity");
+        if (value.data_delta == 0) return value.size_ == 0 || walk.fail("empty string with a size");
+        const char* data;
+        if (!walk.block<8>(value.data_delta, std::uint64_t(value.capacity_) + 1u, data)) [[unlikely]] return false;
+        // c_str() stops at the terminator inside the block.
+        return data[value.size_] == '\0' || walk.fail("string missing terminator");
+    }
+
+    template <typename E>
+    bool bounds_vector(const XFixedVector<E>& value, BoundsWalk& walk) noexcept {
+        if (value.size_ > value.capacity_) [[unlikely]] return walk.fail("vector size exceeds capacity");
+        if (value.data_delta == 0) return value.size_ == 0 || walk.fail("empty vector with a size");
+        const char* raw;
+        if (!walk.block<(alignof(E) > 8 ? alignof(E) : 8)>(
+                value.data_delta, std::uint64_t(value.capacity_) * sizeof(E), raw)) [[unlikely]]
+            return false;
+        if constexpr (wire_value_needs_validation_v<E>) {
+            const std::uint64_t bytes = std::uint64_t(value.size_) * sizeof(E);
+            if (bytes > walk.budget) [[unlikely]] return walk.fail("walk exceeds the payload (overlapping blocks)");
+            walk.budget -= bytes;
+            const auto* data = reinterpret_cast<const E*>(raw);
+            for (std::uint32_t i = 0; i < value.size_; ++i)
+                if (!bounds_value(data[i], walk)) [[unlikely]] return false;
+        }
+        return true;
+    }
+
+    template <typename T, std::size_t... Bs, std::size_t... Ms>
+    bool bounds_record(const T& value, BoundsWalk& walk, std::index_sequence<Bs...>,
+                       std::index_sequence<Ms...>) noexcept {
+        auto member = [&]<std::size_t N>(std::integral_constant<std::size_t, N>) {
+            using M = schema::member_t<T, N>;
+            if constexpr (wire_value_needs_validation_v<typename M::type>) return bounds_value(M::get(value), walk);
+            else return true;
+        };
+        return (bounds_value(static_cast<const schema::base_t<T, Bs>&>(value), walk) && ...) &&
+               (member(std::integral_constant<std::size_t, Ms>{}) && ...);
+    }
+
+    template <typename T>
+    bool bounds_value(const T& value, BoundsWalk& walk) noexcept {
+        using CleanT = std::remove_cv_t<T>;
+        if constexpr (std::is_same_v<CleanT, bool>) {
+            unsigned char bits;
+            std::memcpy(&bits, &value, 1);
+            return bits <= 1 || walk.fail("invalid bool");
+        } else if constexpr (std::is_array_v<CleanT>) {
+            if constexpr (wire_value_needs_validation_v<std::remove_extent_t<CleanT>>)
+                for (const auto& element : value)
+                    if (!bounds_value(element, walk)) [[unlikely]] return false;
+            return true;
+        } else if constexpr (is_fixed_string_v<CleanT>) {
+            return bounds_string(value, walk);
+        } else if constexpr (is_fixed_vector_v<CleanT> || is_fixed_flat_set_v<CleanT> ||
+                             is_fixed_flat_map_v<CleanT>) {
+            // Sets and maps: their key order is not checked; a lookup in a
+            // misordered one stays inside [0, size) and may miss.
+            return bounds_vector(static_cast<const XFixedVector<typename CleanT::value_type>&>(value), walk);
+        } else if constexpr (std::is_class_v<CleanT> && wire_value_needs_validation_v<CleanT>) {
+            return bounds_record(value, walk, std::make_index_sequence<schema::base_count_v<CleanT>>{},
+                                 std::make_index_sequence<schema::member_count_v<CleanT>>{});
+        } else {
+            return true;
+        }
+    }
+
+    // The header fields of a dense wire for T that do not depend on the
+    // payload, as words (used_bytes, root_offset, hole_count and extent_count 0).
+    template <typename T>
+    constexpr std::array<std::uint64_t, 5> view_wire_image() noexcept {
+        XWireHeaderV2 h{};
+        h.magic = XWIRE_MAGIC;
+        h.flags = XWIRE_FLAGS;
+        h.schema_hash = wire_schema_hash<T>();
+        h.root_type_id = wire_root_type_id<T>();
+        return std::bit_cast<std::array<std::uint64_t, 5>>(h);
+    }
+
+    // The framing a view needs, as a status with the error the full check
+    // would give for the same header (only reached when the fast test fails).
+    template <typename T>
+    vstatus view_framing_error(std::span<const std::byte> wire, std::size_t cap, const char* who) {
+        XWireHeaderV2 header;
+        XOFFSET_VTRY(read_wire_header(wire.data(), wire.size_bytes(), who, header));
+        if (header.root_type_id != wire_root_type_id<T>())
+            XOFFSET_VFAIL(XException, XErrc::root_type_mismatch, std::string(who) + ": root type id mismatch");
+        if (header.schema_hash != wire_schema_hash<T>())
+            XOFFSET_VFAIL(XException, XErrc::schema_mismatch, std::string(who) + ": schema hash mismatch");
+        XOFFSET_VTRY(check_wire_extent(header, who));
+        XOFFSET_VTRY(require_wire_within_capacity(header.used_bytes, cap, true, who));
+        if (header.extent_count != 0)
+            XOFFSET_VFAIL(XException, XErrc::invalid_argument,
+                          std::string(who) + ": a view needs a dense wire (no extent table); use reload");
+        XOFFSET_VFAIL(XException, XErrc::size_mismatch, std::string(who) + ": used size mismatch");
     }
 } // namespace detail
 
@@ -308,11 +493,92 @@ public:
         return apply_sync<C>(std::span<const std::byte>(reinterpret_cast<const std::byte*>(msg.data()), msg.size()), cursor, target);
     }
 
+    /// A read-only view of `wire`'s root in the wire's own bytes, without a
+    /// copy (XView<T>). XCheck::bounds (the default on from_client) walks the
+    /// containers once so that no const access reads outside the payload;
+    /// XCheck::admit (the default on server_peer and from_server) checks the
+    /// framing and that the root lies in the payload. Either way the framing
+    /// is checked as for reload (magic, flags, root type and schema
+    /// fingerprint, used_bytes within maximum_capacity(), root offset, section
+    /// lengths). The wire must be dense (no extent table: wires below 4 KiB
+    /// always are, larger ones when sent with XWireEmission::dense), start on
+    /// an 8-byte boundary, and outlive the view. With XOFFSET_FORCE_FULL_CHECK
+    /// the full check also runs on a copy, and what it rejects is rejected.
+    template <typename T, XCheck C = default_view_check<L>>
+    [[nodiscard]] XResult<XView<T>> view(std::span<const std::byte> wire) const {
+        check_view<C>();
+        static_assert(is_v1_wire_admitted_v<T>, "XReceiver::view<T>() requires an admitted fixed-schema wire type.");
+        constexpr const char* who = C == XCheck::bounds ? "XReceiver::view<T, bounds>()" : "XReceiver::view<T, admit>()";
+        constexpr auto image = detail::view_wire_image<T>();
+        constexpr std::size_t head = sizeof(XWireHeaderV2);
+        std::array<std::uint64_t, 5> words;
+        if (wire.size_bytes() < head) [[unlikely]] return framing_error<T>(wire, who);
+        std::memcpy(words.data(), wire.data(), head);
+        const auto used = std::uint64_t(std::uint32_t(words[1]));
+        const auto root = std::uint64_t(std::uint32_t(words[1] >> 32));
+        const auto holes = std::uint64_t(std::uint32_t(words[2]));
+        // Word 0: magic, flags; word 2 high: extent_count (0: dense); 3, 4: fingerprint.
+        const std::uint64_t diff = (words[0] ^ image[0]) | (words[2] >> 32) | (words[3] ^ image[3]) | (words[4] ^ image[4]);
+        const std::uint64_t body = wire.size_bytes() - head;
+        if (diff != 0 || used < XWIRE_PAYLOAD_BEGIN || used > cap_.value || (used & 7u) != 0 ||
+            root < XWIRE_PAYLOAD_BEGIN || root >= used || used - XWIRE_PAYLOAD_BEGIN > body ||
+            body - (used - XWIRE_PAYLOAD_BEGIN) != holes * 8u) [[unlikely]]
+            return framing_error<T>(wire, who);
+        if ((reinterpret_cast<std::uintptr_t>(wire.data()) & 7u) != 0) [[unlikely]]
+            return XError{XErrc::invalid_argument, std::string(who) + ": the wire must start on an 8-byte boundary"};
+        // Payload offset 0 lies 8 bytes before the wire (the payload header is not sent).
+        const auto base = reinterpret_cast<std::uintptr_t>(wire.data()) + head - XWIRE_PAYLOAD_BEGIN;
+        if (sizeof(T) > used - root || (root & (alignof(T) - 1u)) != 0 ||
+            ((base + root) & (alignof(T) - 1u)) != 0) [[unlikely]]
+            return XError{XErrc::root_mismatch, std::string(who) + ": root not found"};
+        const auto* object = reinterpret_cast<const T*>(base + root);
+        if constexpr (C == XCheck::bounds) {
+            detail::BoundsWalk walk{base, used, used};
+            if (!detail::bounds_value(*object, walk)) [[unlikely]]
+                return XError{XErrc::invalid_payload, std::string(who) + ": " + walk.why};
+        }
+        if constexpr (detail::force_full_check) {
+            auto full = XBuffer::try_load_verified<T>(wire, cap_);
+            if (!full) return std::move(full).error();
+        }
+        return XView<T>(object, wire, C);
+    }
+
+    template <typename T, XCheck C = default_view_check<L>>
+    [[nodiscard]] XResult<XView<T>> view(const std::string& wire) const {
+        return view<T, C>(detail::as_wire(wire));
+    }
+
 private:
+    template <typename T>
+    XError framing_error(std::span<const std::byte> wire, const char* who) const {
+#if XOFFSET_NO_EXCEPTIONS
+        (void)detail::view_framing_error<T>(wire, cap_.value, who);
+        return detail::take_pending_error();
+#else
+        try {
+            detail::view_framing_error<T>(wire, cap_.value, who);
+        } catch (...) {
+            return detail::current_exception_error();
+        }
+        return XError{XErrc::unspecified, std::string(who) + ": framing"};
+#endif
+    }
+
+    template <XCheck C>
+    static constexpr void check_view() noexcept {
+        static_assert(C != XCheck::full,
+                      "XReceiver::view: a view is read-only (XCheck::bounds or XCheck::admit); "
+                      "the full check gives a mutable XBuffer through reload or load");
+        static_assert(!(L == XLink::from_client && C == XCheck::admit),
+                      "XReceiver<XLink::from_client>: data from a client is never admitted unchecked; "
+                      "view it with XCheck::bounds");
+    }
+
     template <XCheck C>
     static constexpr void check_mutable() noexcept {
         static_assert(C != XCheck::bounds,
-                      "XReceiver: XCheck::bounds gives a read-only result (XView, not available yet); "
+                      "XReceiver: XCheck::bounds gives a read-only result (view()); "
                       "a mutable result takes XCheck::admit or XCheck::full");
         static_assert(!(L == XLink::from_client && C == XCheck::admit),
                       "XReceiver<XLink::from_client>: data from a client is never admitted unchecked; "
