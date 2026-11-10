@@ -205,10 +205,14 @@ xo::XStatus apply_checked(xo::TypedXBuffer<Root>& rep, const std::string& d, xo:
         }
     } else {
         // Codes only the checks after the parse give (section 3: the
-        // verification, the in-place checks, the root binding).
+        // verification, the in-place checks, the root binding, the digest
+        // of the result). Admit checks the root before it patches and the
+        // digest after, the full check the digest first: a delta wrong in
+        // both is refused by each with its own first finding.
         // The whole verification also needs the replica's free table.
         const auto c = r.code();
         const bool checks_only = c == xo::XErrc::invalid_payload || c == xo::XErrc::root_mismatch ||
+                                 c == xo::XErrc::digest_mismatch ||
                                  c == xo::XErrc::invalid_payload_header || c == xo::XErrc::capacity_exceeded ||
                                  c == xo::XErrc::out_of_storage || c == xo::XErrc::host_allocation_failed ||
                                  r.error().message.find("free table incomplete") != std::string::npos;
