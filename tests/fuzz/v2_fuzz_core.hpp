@@ -24,6 +24,13 @@
 //      the oracle rejects at the header stage; a wire it accepts beyond those
 //      is not read (the payload is the sender's on a trusted link). Its own
 //      parse must stay in bounds on any input (ASan).
+//   9. (client uplink, 3.5) XReceiver<from_client>::view with XCheck::bounds,
+//      over a copy of the wire in a heap block of exactly its size. Not one
+//      more vote either: it must accept every dense wire load_verified accepts
+//      and read the same fields, refuse every sparse wire (a view needs the
+//      payload in one piece) and every wire the oracle rejects at the header
+//      stage; a wire it accepts beyond those is read whole through the view,
+//      in bounds (ASan): the walk does not look for overlap or key order.
 // Every acceptor must agree on accept/reject (raw/receive only see inputs whose
 // wire header is well formed). Acceptors 2, 5, 6 and 7 go through the
 // non-throwing entries (try_load_verified, try_reload_verified,
@@ -52,6 +59,7 @@
 #include <cstring>
 #include <filesystem>
 #include <iostream>
+#include <memory>
 #include <memory_resource>
 #include <optional>
 #include <random>
@@ -534,6 +542,31 @@ void check_admit(const std::string& w, const Oracle& o, Buffer* typed, const std
         fail(id + ": admit accepted a wire the oracle rejects at the header (" + o.why + ")");
     if (!st) require_no_root(target, "XReceiver admit");
 }
+
+#if defined(XOFFSET_RECEIVER_VIEW_API)
+std::string dump(const fz::Root& r);
+// Acceptor 9: the bounds-checked view of a client uplink.
+void check_view(const std::string& w, const Oracle& o, Buffer* typed, const std::string& id) {
+    static const xo::XReceiver<xo::XLink::from_client> rx(xo::XBuffer::maximum_capacity(kLimit));
+    static_assert(!xo::detail::force_full_check, "acceptor 9 needs the real bounds walk");
+    // Exactly the wire's bytes on the heap (8-aligned): a read past them is an ASan error.
+    const std::unique_ptr<std::byte[]> exact(new std::byte[w.size() ? w.size() : 1]);
+    if (!w.empty()) std::memcpy(exact.get(), w.data(), w.size());
+    const auto v = rx.view<fz::Root>(std::span<const std::byte>(exact.get(), w.size()));
+    xo::XWireHeaderV2 h{};
+    if (w.size() >= kHeader) std::memcpy(&h, w.data(), kHeader);
+    const bool sparse = w.size() >= kHeader && h.extent_count != 0;
+    if (typed && !sparse) {
+        if (!v) fail(id + ": bounds view rejected a dense wire load_verified accepts (" + v.error().message + ")");
+        if (dump(v->root()) != dump(typed->root())) fail(id + ": bounds view reads differ from load_verified");
+        return;
+    }
+    if (v && sparse) fail(id + ": bounds view accepted a sparse wire");
+    if (v && !o.ok && o.stage == Oracle::Stage::Header)
+        fail(id + ": bounds view accepted a wire the oracle rejects at the header (" + o.why + ")");
+    if (v) (void)dump(v->root());  // every const access stays in the wire
+}
+#endif
 
 #if defined(XOFFSET_VERIFIED_RELOAD_API)
 // Acceptor 6: direct reload (XBuffer::begin_verified_reload) into ONE
@@ -1314,6 +1347,9 @@ Outcome check_case(const std::string& w, std::mt19937_64& rng, const std::string
     check_direct(w, bool(typed), typed ? &*typed : nullptr, "case " + id);
 #endif
     check_admit(w, o, typed ? &*typed : nullptr, "case " + id);
+#if defined(XOFFSET_RECEIVER_VIEW_API)
+    check_view(w, o, typed ? &*typed : nullptr, "case " + id);
+#endif
     compare_inflated(w, typed, terr, o, "case " + id);
 #if defined(XOFFSET_TRY_ENTRIES_API)
     {

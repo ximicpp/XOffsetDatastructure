@@ -143,6 +143,22 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   XOffset native: LK login key delta, LN self deltas, SN delta to what storage
   holds; every native receiver is checked equal to the application-level one.
 
+- client uplink (`include/slg/uplink.hpp`, 2026-11-10, 3.5 W4, report only):
+  UL, every online client sends the server one march order per round (4
+  rounds per cycle): one of the armies of the player it holds, a target tile,
+  an arrival time and part of each troop type. `UL.send` is the client's fill
+  + encode, `UL.recv` the server's receive with the checks it runs on client
+  data plus the read of every field. The rivals decode as everywhere else
+  here (FlatBuffers' Verifier runs; cista in its format's mode); `xoffset`
+  reloads with the full check through `XReceiver<XLink::from_client>`
+  (same as `reload_verified`); `xoffset_trusted` reads the wire in place
+  through `XReceiver<XLink::from_client>::view` (`XCheck::bounds`, read-only)
+  and also times `ULF.recv`, the full-check reload of the same wire plus the
+  same read, in the same process (order alternating by message), for the
+  bounds / full ratio. Bytes `UL.order`, `UL.order_zstd` (`ULZ.send`), count
+  `UL.orders`. Runs after the login case; `SLG_UL_OFF=1` drops it. New keys
+  only.
+
 XOffset's A adapter (both case sets) calls `prefetch_for_update()` on the two
 players' buffers when the battle result starts arriving, inside the timed
 A.res_decode: a public cache hint that changes nothing, so A.apply does not
@@ -240,6 +256,11 @@ so earlier batches and the perf gate compare as before.
   `XOFFSET_FORCE_FULL_CHECK` makes admit the full check). Its rows are the
   XOffset main column of the application-level cases and class 1
   (`pool_v6.py`); `xoffset` (full check) is report only.
+  Since 2026-11-10 (3.5 W4) the clients' view deltas (U*.recv, U*W.recv) are
+  read in place instead: `XReceiver<XLink::from_server>::view` (admit: the
+  framing and the root inside the payload) and the delta is applied from the
+  wire's bytes, with no copy into a buffer, as `cista_unchecked` and
+  `flatbuffers_noverify` read theirs.
 - Memory, report only: a `-DSLG_MEMCOUNT=1` build (CMake `SLG_MEMCOUNT=ON`)
   counts the live bytes of every `operator new` (one counter for every format
   and platform, malloc's own overhead not counted); `--mode mem --out m.jsonl`
