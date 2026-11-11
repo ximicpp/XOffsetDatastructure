@@ -277,6 +277,10 @@ so earlier batches and the perf gate compare as before.
   (mappings), and `PROC.base_*` sampled before any format's setup. Run one
   format per process (the numbers belong to the process); `SLG_PROC_SMAPS=<file>`
   also keeps a copy of `/proc/self/smaps` for diagnosis. Never time this run.
+  XOffset layout for the gate (2026-11-11): player, battle and report buffers
+  are `XBuffer::relocating()` (a slot, a move when one outgrows it), held
+  views a fixed 128 KiB slot (`kHeldMax`); the shard keeps 256 MiB. At scale M
+  page tables went from 13.1 to 5.6 MiB (0.84% of RSS; the gate is 1%).
 
 D3 shared deltas (2026-11-04, thread 设计共享增量原型, doc X5MZPWya7DWFzdCughpZqL;
 `xoffset_shared_delta.hpp`, XS 1.0 since 3.5, docs/SHARED_DELTA.md). XOffset only, class 3 only;
