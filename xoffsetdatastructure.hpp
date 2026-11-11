@@ -3541,7 +3541,10 @@ namespace XOffsetDatastructure {
         T& soft_sink() noexcept {
             alignas(T) static thread_local unsigned char storage[sizeof(T)];
             std::memset(storage, 0, sizeof(T));
-            return *::new (static_cast<void*>(storage)) T{};
+            // Zero bytes are an empty element (empty containers, zero
+            // values); a type with allocator constructors only is used as is.
+            if constexpr (std::is_default_constructible_v<T>) return *::new (static_cast<void*>(storage)) T{};
+            else return *std::launder(reinterpret_cast<T*>(storage));
         }
 #define XOFFSET_SOFT_PREFLIGHT(head, bytes, ...) \
     do { if (!::XOffsetDatastructure::fixed_detail::soft_preflight((head), (bytes))) return __VA_ARGS__; } while (0)
