@@ -303,9 +303,9 @@ void hole_table_paths() {
     // A size class whose bin is full: retiring it needs a host allocation.
     lost.root().name=std::string(300,'q');
     lost.root().blob.reserve(lost.root().blob.capacity()+64); // name block leaves the tail
-    {   // A bin holds its first free_bin_inline_entries holes inline: fill the name block's bin.
+    {   // A bin holds its first free_table_inline_entries holes inline: fill the name block's bin.
         const std::uint32_t name_block=static_cast<std::uint32_t>((lost.root().name.capacity()+1+7)/8*8);
-        std::array<void*,xo::XBufferCore::free_bin_inline_entries> fill{};
+        std::array<void*,xo::XBufferCore::free_table_inline_entries> fill{};
         const auto before=lost.free_block_count();
         for(auto& p:fill)p=lost.arena()->allocate_aligned(name_block,8);
         for(auto p:fill)lost.arena()->deallocate(p,name_block);

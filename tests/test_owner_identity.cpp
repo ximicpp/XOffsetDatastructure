@@ -305,10 +305,10 @@ void callback_during_allocation_bookkeeping() {
     // the host free table. That new_handler may transfer, release or reenter
     // the owner; the allocation must commit to, and return memory of, the
     // actual payload owner, or fail closed once that payload is released.
-    // A bin records its first free_bin_inline_entries holes without host
+    // A bin records its first free_table_inline_entries holes without host
     // storage, so the fixture first fills the remainder's bin (16 bytes): the
     // remainder is the hole that needs bin storage.
-    constexpr std::size_t fillers = xo::XBufferCore::free_bin_inline_entries;
+    constexpr std::size_t fillers = xo::XBufferCore::free_table_inline_entries;
     for (Action which : {Action::move, Action::swap, Action::release, Action::reenter}) {
         auto from = make_buffer(), to = make_buffer(), unrelated = make_buffer();
         from.root<OwnerRoot>().numbers.resize(3, 29u); auto ref = binding(from);
@@ -421,9 +421,9 @@ void delete_callbacks_observe_complete_move() {
         auto to = xo::XBuffer::create<OtherOwnerRoot>(4096, policy());
         from.root<OwnerRoot>().numbers.resize(3, 313u);
         // Releasing the table returns its bins' host storage. A bin holds its
-        // first free_bin_inline_entries holes inline, so the fixture fills
+        // first free_table_inline_entries holes inline, so the fixture fills
         // bin 32 first and captures the storage the next hole allocates.
-        std::array<void*, xo::XBufferCore::free_bin_inline_entries> fill{};
+        std::array<void*, xo::XBufferCore::free_table_inline_entries> fill{};
         for (auto& q : fill) q = to.arena()->allocate_aligned(32, 8);
         auto* p = to.arena()->allocate_aligned(32, 8);
         for (auto q : fill) to.arena()->deallocate(q, 32);
