@@ -2,6 +2,49 @@
 
 ## Unreleased
 
+## 3.6.0: losing cells and memory
+
+A minor release on 3.5.0 that clears losing cells on the production paths and
+caps memory. Buffers can grow by relocating (growth policy parts 1-4,
+`XGrowPolicy::Relocating`, proxies and pin scopes, named accessors, batch
+operations); the first reservation is sized from the first content. Memory
+(SLG demo M, app level, one format per process, cloud x86): xoffset_trusted
+process RSS 663.5 MiB, 0.98x the leanest rival (protobuf; was 1.20x on 3.5),
+page tables 0.44% of RSS (2.89 MiB; was 13.3 MiB), both within the new 3.6
+memory gate (RSS <= 1.10x the leanest rival, page tables <= 1% of RSS). The
+small-server D3 path (S scale, 64 clients, cloud x86) against zpp per
+delivery: peace 1.85x, conflict 1.30x (report only, susu 2026-11-11), siege
+0.69x; M scale and siege stay gated. Free tables 12 KiB -> 2.4 KiB per buffer.
+
+Breaking API: `TypedXBuffer<T>::root()` and `reset()` return a proxy
+(`XRef<T>`); the old plain reference is `plain_root()` (it dangles when the
+payload moves). Wire format unchanged (2.1; delta 1.0 and XS 1.0 unchanged).
+
+Judged in the cloud only (docs/RELEASING.md): VALIDATE_VERDICT_PENDING
+Pre-release fuzz (`tools/fuzz_prerelease.sh --budget hour`, ASan+UBSan) on
+the release candidate: FUZZ_VERDICT_PENDING
+
+Known items (report only, explained):
+- Mac A.req_encode +6.3% after #266 (the `root<T>()` cache refill, redo of
+  #223; the same +6.3% as #223 in 3.3): accepted by the performance thread
+  2026-11-11 as the cost of the checked-path refill; it is the new baseline.
+- Remaining losses moved to the 4.0 measure list (not regressions): client
+  uplink UL.send ~1.5x zpp_bits on cloud x86 (ceiling 1.80x holds); under
+  memory pressure (cgroup limit + swap) xoffset vs zpp_bits UP.apply 1.7x,
+  UC.apply 1.3x, LD.apply 2.4x, B.out_encode 2.7x; small-server D3 peace and
+  conflict (above).
+- Bytes stay 11-33% above zpp_bits (wire format not changed for size).
+
+- Retired arena blocks of at least `XOFFSET_RETIRE_DISCARD_BYTES` (16 KiB;
+  0 disables) give their whole pages back with `MADV_DONTNEED` on Linux
+  instead of being cleared with `memset` (the partial pages at both ends are
+  cleared as before; arena storage is private anonymous memory, so the pages
+  read back as zero and the hole rule holds; other platforms keep the
+  `memset`). A vector that outgrows its block in a long-lived buffer leaves a
+  hole later requests may never reuse; its pages no longer stay dirty. SLG
+  demo M, xoffset_trusted process RSS 812 -> 717 MiB. Test
+  `test_retire_discard`.
+
 - `root<T>()` fills its cache when it takes the checked path, so an `XBuffer`
   that was moved (into a `std::vector`, by a swap) pays the checks once
   instead of on every call. The cache hit is inlined (one compare and one
