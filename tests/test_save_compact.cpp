@@ -58,7 +58,7 @@ void check_common(Buffer& b, const std::string& wire, xo::XCompactOptions option
     need(o.ok, where + ": oracle rejects the compact wire: " + o.why);
     auto loaded = typed_load(wire);
     need(bool(loaded), where + ": load_verified rejects the compact wire");
-    need(dump(loaded->root()) == semantics, where + ": compact wire changed the contents");
+    need(dump(loaded->plain_root()) == semantics, where + ": compact wire changed the contents");
     need(loaded->save_compact(options) == wire, where + ": compact wire is not a fixpoint");
     need(loaded->save_verified() == wire, where + ": compact wire does not re-save identically");
     std::string into = "previous contents that are longer than nothing";
@@ -82,7 +82,7 @@ void check_common(Buffer& b, const std::string& wire, xo::XCompactOptions option
 void check(Buffer& b, const std::string& where) {
     const auto before = b.copy_bytes();
     const auto size_before = b.get_size();
-    const auto semantics = dump(b.root());
+    const auto semantics = dump(b.plain_root());
     const auto wire = b.save_compact(kTight);
     need(b.copy_bytes() == before && b.get_size() == size_before, where + ": save_compact changed the source");
     need(wire == reference(b), where + ": differs from XCompactor + save_verified");
@@ -100,7 +100,7 @@ void check(Buffer& b, const std::string& where) {
     auto tight_loaded = typed_load(wire);
     auto slack_loaded = typed_load(slack);
     std::size_t extra = 0;
-    need(slack_extra(tight_loaded->root(), slack_loaded->root(), extra), where + ": slack layout differs");
+    need(slack_extra(tight_loaded->plain_root(), slack_loaded->plain_root(), extra), where + ": slack layout differs");
     // Spare elements may fill block padding: the wire grows by at most
     // `extra` and never shrinks.
     need(slack.size() >= wire.size() && slack.size() - wire.size() <= extra,
@@ -116,7 +116,7 @@ void fixed_cases() {
     {   // Strings at the inline boundary, heap strings shrunk below it, empty
         // containers with retained capacity.
         auto b = Buffer::create(4096, xo::XBuffer::maximum_capacity(1u << 20).with_growth(xo::XGrowPolicy::Automatic));
-        auto& r = b.root();
+        auto& r = b.plain_root();
         r.title = std::string(10, 't');
         auto& a = r.items.emplace_back();
         a.name = std::string(11, 'n');
@@ -143,7 +143,7 @@ int main(int argc, char** argv) {
         auto wire = build_wire(rng);
         auto b = typed_load(wire);
         need(bool(b), "case " + std::to_string(i) + ": generated wire rejected");
-        if (rng() % 2) mutate_valid(b->root(), rng); // fresh holes and slack in the live buffer
+        if (rng() % 2) mutate_valid(b->plain_root(), rng); // fresh holes and slack in the live buffer
         check(*b, "case " + std::to_string(i));
         smaller += b->save_compact(kTight).size() < b->save_verified().size();
     }

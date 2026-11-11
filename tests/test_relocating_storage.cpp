@@ -232,7 +232,15 @@ void test_wire_and_clone() {
     need(a.storage_kind() == XStorageKind::Vm || XBufferCore::RELOCATE_STEP != 0 || !kSlots, "moved");
     const auto wa = a.save_verified<RelocRoot>();
     const auto wr = ref.save_verified<RelocRoot>();
+#if !defined(XOFFSET_STRESS_RELOCATE)
     need(wa == wr, "same wire as an Automatic buffer");
+#else
+    // Stress mode regrows a Relocating buffer's containers into fresh blocks:
+    // another layout of the same content.
+    (void)wr;
+    auto same = XBuffer::load_verified<RelocRoot>(wa);
+    need(values_are(same, 3, 400000), "same content as an Automatic buffer");
+#endif
 
     auto c = a.clone();
     need(c.growth_policy() == XGrowPolicy::Relocating && c.maximum_capacity() == a.maximum_capacity(), "clone keeps the policy");

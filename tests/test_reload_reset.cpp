@@ -154,12 +154,12 @@ void save_into_is_an_independent_copy() {
     b.root<ReloadRoot>().values.push_back(2);
     need(out == copy, "save_verified_into output changed with the buffer");
     auto t = TypedXBuffer<ReloadRoot>::create(4096, cap());
-    t.root().id = 5;
+    t.plain_root().id = 5;
     t.save_verified_into(out);
     TypedXBuffer<ReloadRoot> r = TypedXBuffer<ReloadRoot>::create(4096, cap());
     r.reload_verified(out);
-    need(r.root().id == 5, "TypedXBuffer reload_verified");
-    need(r.reset().id == 0, "TypedXBuffer reset");
+    need(r.plain_root().id == 5, "TypedXBuffer reload_verified");
+    need(r.reset().id().get() == 0, "TypedXBuffer reset");
 }
 
 void reload_scratch_survives_release_and_swap() {
@@ -461,7 +461,7 @@ void direct_reload_equals_reload() {
     need(out.root<ReloadRoot>().values.back() == 7, "mutate after direct reload");
     TypedXBuffer<ReloadRoot> typed = TypedXBuffer<ReloadRoot>::create(4096, cap());
     direct_reload(typed, small);
-    need(typed.root().id == 2, "TypedXBuffer direct reload");
+    need(typed.plain_root().id == 2, "TypedXBuffer direct reload");
 }
 
 // N2 on the direct path (#70 with #50): after a direct reload every logical

@@ -80,7 +80,7 @@ void cleanup_need(bool v)noexcept{if(!v){std::fputs("cold-callback fixture clean
 
 auto policy(){return xo::XBuffer::maximum_capacity(131072).with_growth(xo::XGrowPolicy::Automatic);}
 std::string wire(){
-    auto b=Buffer::create(32768,policy());auto& r=b.root();r.marker=0x99887766;
+    auto b=Buffer::create(32768,policy());auto& r=b.plain_root();r.marker=0x99887766;
     r.name="cold canonical callback";r.values.resize(8);
     for(unsigned i=0;i<8;++i)r.values[i]=200+i;
     return b.save_verified();
@@ -100,7 +100,7 @@ Buffer received(const std::string& bytes){
      op.complete(h.size(),p.size(),table.size());}
     return xo::finish_verified(token);
 }
-void check(Buffer& b){auto& r=b.root();need(r.marker==0x99887766&&r.name=="cold canonical callback"&&
+void check(Buffer& b){auto& r=b.plain_root();need(r.marker==0x99887766&&r.name=="cold canonical callback"&&
     r.values.size()==8&&r.values[0]==200&&r.values[7]==207,"actual received values differ");}
 
 class CacheScope {
@@ -195,7 +195,7 @@ void direct_cold_has_no_eviction(const std::string& bytes){
 // terminal delete callback, move A or lose the retired block.
 void real_free_table_growth_has_no_callback(const std::string& bytes){
     CacheScope scope;auto a=std::make_unique<Buffer>(received(bytes));Buffer b;check(*a);
-    auto binding=a->root().values.binding();
+    auto binding=a->plain_root().values.binding();
     // A table holds its first free_table_inline_entries holes of one size in
     // its inline pool; fill them so the next retire must grow the pool.
     constexpr std::size_t inline_entries=XOffsetDatastructure::XBufferCore::free_table_inline_entries;

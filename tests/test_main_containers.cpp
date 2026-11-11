@@ -201,7 +201,7 @@ bool test_main_containers_round_trip() {
 
     auto verified_loaded = TypedXBuffer<BridgeRoot>::load_verified(
         xbuf.save_verified<BridgeRoot>());
-    assert_base_shape(verified_loaded.root());
+    assert_base_shape(verified_loaded.plain_root());
 
     std::cout << "  [OK]\n";
     return true;
@@ -257,7 +257,7 @@ bool test_main_containers_assoc_round_trip_and_compaction() {
 
     auto verified_loaded = TypedXBuffer<BridgeAssocRoot>::load_verified(
         xbuf.save_verified<BridgeAssocRoot>());
-    assert_assoc_shape(verified_loaded.root());
+    assert_assoc_shape(verified_loaded.plain_root());
 
     auto compacted = XCompactor::compact<BridgeAssocRoot>(xbuf);
     assert_assoc_shape(compacted.root<BridgeAssocRoot>());

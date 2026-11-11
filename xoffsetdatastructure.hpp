@@ -308,6 +308,80 @@ namespace XOffsetDatastructure {
     }
 
     class XBufferCore;
+#if defined(XOFFSET_STRESS_RELOCATE)
+    namespace detail {
+        // Stress mode (growth policy part 4, test builds only): a pattern no
+        // live value is expected to hold, written over storage the library
+        // stopped using, so a stale plain reference reads garbage at once.
+        inline constexpr unsigned char stress_poison_byte = 0xDB;
+
+        // Storage a payload moved out of is not released at once: its whole
+        // pages become inaccessible (a stale plain reference faults), the rest
+        // is overwritten with the poison pattern, and it stays reserved until
+        // 32 later moves have happened (so the addresses are not reused by
+        // the next buffer meanwhile).
+        class StressGraveyard {
+        public:
+            static void bury(VirtualMemoryStorage&& old) noexcept {
+                if (!old.data()) return;
+                Grave grave;
+                grave.storage = std::move(old);
+                seal(grave);
+                std::lock_guard<std::mutex> lock(state().mutex);
+                auto& graves = state().graves;
+                if (graves.size() >= limit) {
+                    unseal(graves.front());
+                    graves.erase(graves.begin());   // released here
+                }
+                XOFFSET_TRY {
+                    graves.push_back(std::move(grave));
+                } XOFFSET_CATCH(...) {
+                    unseal(grave);
+                }
+            }
+
+        private:
+            static constexpr std::size_t limit = 32;
+            struct Grave {
+                VirtualMemoryStorage storage;
+                char* lo = nullptr;
+                std::size_t bytes = 0;
+            };
+            struct State {
+                std::mutex mutex;
+                std::vector<Grave> graves;
+            };
+            // Never destroyed: graves may outlive every other static.
+            static State& state() noexcept {
+                static State* s = new State;
+                return *s;
+            }
+            static void seal(Grave& grave) noexcept {
+                auto& st = grave.storage;
+                char* const data = st.data();
+                const std::size_t used = (std::max)(st.size(), st.accessible_bytes());
+                const std::size_t page = st.page_size() ? st.page_size() : 4096u;
+                const auto region = reinterpret_cast<std::uintptr_t>(data) - VirtualMemoryStorage::host_header;
+                const auto end = reinterpret_cast<std::uintptr_t>(data) + st.accessible_bytes();
+                const auto lo = (region + page - 1) & ~std::uintptr_t(page - 1);
+                const auto hi = end & ~std::uintptr_t(page - 1);
+                if (st.size() != 0) std::memset(data, stress_poison_byte, (std::min)(st.size(), used));
+#if !defined(_WIN32)
+                if (hi > lo && ::mprotect(reinterpret_cast<void*>(lo), hi - lo, PROT_NONE) == 0) {
+                    grave.lo = reinterpret_cast<char*>(lo);
+                    grave.bytes = hi - lo;
+                }
+#endif
+            }
+            static void unseal(Grave& grave) noexcept {
+#if !defined(_WIN32)
+                if (grave.bytes) (void)::mprotect(grave.lo, grave.bytes, PROT_READ | PROT_WRITE);
+#endif
+                grave.bytes = 0;
+            }
+        };
+    }
+#endif
     namespace detail {
         // A payload lineage's control block (growth policy, part 2). Proxies
         // (XRef) hold a pointer to it and a copy of `base` and `version`:
@@ -852,6 +926,27 @@ namespace XOffsetDatastructure {
             }
         }
 
+        // XBuffer::build's scope: counted on this lineage's block, or, when
+        // there is none (no proxy was ever made), bare: only pinned_, and no
+        // block to renew per message. `*slot` is the block the scope counts
+        // on; a block made while a bare scope is open goes there (make_ctl).
+        // Close with pin_exit(*slot), or pin_close_bare() while it is null.
+        void pin_open_lean(detail::XCtl** slot) noexcept {
+            detail::XCtl* const ctl = ctl_;
+            *slot = ctl;
+            if (ctl) ++ctl->borrow;
+            else bare_slot_ = slot;
+            pinned_ = true;
+        }
+        void pin_close_bare() noexcept {
+            bare_slot_ = nullptr;
+            pinned_ = false;
+            release_quarantine();
+#if defined(XOFFSET_STRESS_RELOCATE)
+            stress_relocate();
+#endif
+        }
+
     private:
         void make_ctl() noexcept {
             XOFFSET_TRY {
@@ -862,7 +957,20 @@ namespace XOffsetDatastructure {
             if (ctl_) {
                 ctl_->core = this;
                 ctl_->base = buffer_.data();
+                if (pinned_) [[unlikely]] {
+                    // Made inside a bare scope (a nested scope, a recorded
+                    // failure, a move): the block counts that scope, which
+                    // now closes on it.
+                    ctl_->borrow = 1;
+                    if (bare_slot_) *bare_slot_ = ctl_;
+                    bare_slot_ = nullptr;
+                }
             }
+        }
+        // A bare scope that the content may leave (move, swap) gets its
+        // block first, so the scope follows the content as a counted one.
+        void promote_bare_pin() noexcept {
+            if (pinned_ && !ctl_) [[unlikely]] make_ctl();
         }
         // After ctl_ changed hands: point it at this owner, mirror its pins.
         void adopt_ctl() noexcept {
@@ -913,6 +1021,13 @@ namespace XOffsetDatastructure {
             }
         }
 #if defined(XOFFSET_STRESS_RELOCATE)
+        void stress_poison_block(void* ptr, std::uint32_t bytes) noexcept {
+            const auto base = reinterpret_cast<std::uintptr_t>(buffer_.data());
+            const auto address = reinterpret_cast<std::uintptr_t>(ptr);
+            if (!ptr || bytes == 0 || address < base || address - base >= buffer_.size() ||
+                bytes > buffer_.size() - (address - base)) return;
+            std::memset(ptr, detail::stress_poison_byte, bytes);
+        }
         // Stress mode: every pin scope's end moves the payload, so a plain
         // reference kept past the scope points at released storage.
         void stress_relocate() noexcept {
@@ -959,6 +1074,8 @@ namespace XOffsetDatastructure {
 
         void swap(XBufferCore& other) noexcept {
             if (this == &other) return;
+            promote_bare_pin();
+            other.promote_bare_pin();
             std::swap(ctl_, other.ctl_);
             quarantine_.swap(other.quarantine_);
             buffer_.swap(other.buffer_);
@@ -1139,6 +1256,12 @@ namespace XOffsetDatastructure {
             const auto offset = static_cast<size_type>(address - base);
             if (std::uint64_t(offset) + old_bytes != arena()->used_end) return false;
             if (new_bytes <= old_bytes) return true;
+#if defined(XOFFSET_STRESS_RELOCATE)
+            // Stress mode: in a Relocating buffer a container always regrows
+            // into a fresh block (and the old one is poisoned when retired),
+            // as std::vector would. Other policies keep their layout.
+            if (growth_policy_ == XGrowPolicy::Relocating) return false;
+#endif
             if (new_bytes > MAX_PAYLOAD - offset || !ensure_allocation_extent(offset + new_bytes)) return false;
             arena()->used_end = offset + new_bytes;
             return true;
@@ -1151,6 +1274,11 @@ namespace XOffsetDatastructure {
         // needs no host allocation and runs no host callback; it is published
         // inline. Everything else takes retire_block_general unchanged.
         XOFFSET_DETAIL_MOVE_INLINE void retire_block(void* ptr, std::uint32_t bytes) noexcept {
+#if defined(XOFFSET_STRESS_RELOCATE)
+            // Stress mode: a retired block is poisoned, in a pin scope too (a
+            // reference the container's own rules invalidated reads garbage).
+            if (growth_policy_ == XGrowPolicy::Relocating) stress_poison_block(ptr, bytes);
+#endif
             // Inside a pin scope a retired block is not reused until the
             // scope closes: plain references into it stay harmless.
             if (pinned_) [[unlikely]] return quarantine_block(ptr, bytes);
@@ -2556,7 +2684,9 @@ namespace XOffsetDatastructure {
                 free_table_.swap(other.free_table_);
                 free_table_lost_ = std::exchange(other.free_table_lost_, false);
                 publish_host_owner();
-                if (ctl_ || other.ctl_) [[unlikely]] {
+                if (ctl_ || other.ctl_ || pinned_ || other.pinned_) [[unlikely]] {
+                    promote_bare_pin();
+                    other.promote_bare_pin();
                     retire_ctl();
                     ctl_ = std::exchange(other.ctl_, nullptr);
                     quarantine_.swap(other.quarantine_);
@@ -2702,6 +2832,11 @@ namespace XOffsetDatastructure {
                 ctl_->base = buffer_.data();
                 ctl_->version += 2;
             }
+#if defined(XOFFSET_STRESS_RELOCATE)
+            // Stress mode: a Relocating buffer's old storage becomes
+            // inaccessible instead.
+            if (growth_policy_ == XGrowPolicy::Relocating) detail::StressGraveyard::bury(std::move(next));
+#endif
             return true;
             // `next` (the old storage) is released here.
         }
@@ -3325,6 +3460,9 @@ namespace XOffsetDatastructure {
         bool pinned_ = false;
         detail::XCtl* ctl_ = nullptr;
         std::vector<std::uint64_t> quarantine_;
+        // An open bare pin scope (pin_open_lean without a block): where the
+        // block goes if one is made before it closes.
+        detail::XCtl** bare_slot_ = nullptr;
     };
 
     // ========================================================================
@@ -9316,6 +9454,87 @@ namespace XOffsetDatastructure {
             return ok();
         }
 
+        // A message in one step, for senders that fill a new one each time:
+        // reset<T>(), then f(T& root) in a pin scope entered with the fresh
+        // root (no root lookup and no entry move: the emptied payload is at
+        // its smallest). Otherwise as edit<T>(f, expected_growth): the same
+        // fail-soft result, and f must return void. A failed buffer starts
+        // over (reset replaces its content and clears the failure).
+        //
+        // A Relocating buffer whose reservation turns out too small (the
+        // payload cannot move inside the scope) is built again: reset, a
+        // reservation of at least twice the size reached, and f once more,
+        // until it fits or the buffer is at its maximum. So f may run more
+        // than once: it must only write into the buffer (no side effects
+        // outside it that a second run would repeat). The larger reservation
+        // stays with the buffer, so a reused buffer pays this once.
+        template<typename T, typename F>
+        XOFFSET_DETAIL_MOVE_INLINE bool build(F&& f, size_type expected_growth = 0) {
+            if (build_once<T>(f, expected_growth)) [[likely]] return true;
+            return build_again<T>(f);
+        }
+
+    private:
+        // A failure a larger reservation can cure: the scope could not move
+        // the payload, and the buffer can still grow.
+        bool build_outgrew() const noexcept {
+            const XErrc e = error();
+            if (e != XErrc::out_of_storage && e != XErrc::borrowed) return false;
+            return !this->pinned() && !this->address_stable() && reservation_limit() < maximum_capacity();
+        }
+        template<typename T, typename F>
+        XOFFSET_DETAIL_NOINLINE bool build_again(F& f) {
+            for (int attempt = 0; attempt < 16 && build_outgrew(); ++attempt) {
+                const size_type limit = reservation_limit();
+                const size_type reached = arena() ? static_cast<size_type>(arena()->used_end) : 0;
+                (void)reset<T>();
+                const size_type target = std::min<size_type>(std::max(limit, reached) * 2u, maximum_capacity());
+                const size_type used = arena() ? static_cast<size_type>(arena()->used_end) : 0;
+                if (target <= used || make_room(target - used) != XErrc::ok || reservation_limit() <= limit) {
+                    record_error(XErrc::out_of_storage);
+                    return false;
+                }
+                if (build_once<T>(f, 0)) return true;
+            }
+            return false;
+        }
+        template<typename T, typename F>
+        XOFFSET_DETAIL_MOVE_INLINE bool build_once(F& f, size_type expected_growth) {
+            using R = std::invoke_result_t<F&, T&>;
+            static_assert(std::is_void_v<R>,
+                "build(f): f must return void (a value made inside may point into the payload; "
+                "use read(f) to compute a value)");
+            T& fresh = reset<T>();
+            if (expected_growth != 0 || this->pinned()) [[unlikely]] return edit<T>(f, expected_growth);
+            // Lean scope: bare while this lineage has no control block.
+            struct Close {
+                XBufferCore* core;
+                detail::XCtl* ctl;
+                ~Close() {
+                    if (!ctl) core->pin_close_bare();
+                    else XBufferCore::pin_exit(ctl);
+                }
+            } close{this, nullptr};
+            this->pin_open_lean(&close.ctl);
+#if XOFFSET_NO_EXCEPTIONS
+            detail::SoftFailScope soft;
+            f(fresh);
+            if (soft.failed()) record_error(soft.code());
+#else
+            try {
+                f(fresh);
+            } catch (const XException& e) {
+                record_error(e.code() == XErrc::unspecified ? XErrc::out_of_storage : e.code());
+            } catch (const std::bad_alloc&) {
+                record_error(XErrc::host_allocation_failed);
+            }
+#endif
+            // A failure made a block (record_error); the block follows the content.
+            return !close.ctl || close.ctl->sticky == XErrc::ok;
+        }
+
+    public:
+
         // Read-only pin scope: returns f(const T& root). The result may not
         // be (or hold) a pointer, reference, string_view or span.
         template<typename T, typename F>
@@ -10315,7 +10534,8 @@ namespace XOffsetDatastructure {
     // Usage:
     //   TypedXBuffer<GameData> buf(4096);
     //   auto* game = buf.make();         // no <GameData> needed
-    //   auto& g = buf.root();            // no <GameData> needed
+    //   auto g = buf.root();             // a proxy (XRef<GameData>): g.level() = 3
+    //   buf.edit([](GameData& g) { ... });   // plain references, pinned
     //   auto bytes = buf.save();          // standard save
     //   auto loaded = TypedXBuffer<GameData>::load(bytes);
     // ========================================================================
@@ -10339,11 +10559,19 @@ namespace XOffsetDatastructure {
         /// Creates the single root object of type T.
         T* make() { return XBuffer::make<T>(); }
 
-        /// Returns a reference to the root object.
-        T& root() { return XBuffer::root<T>(); }
-
-        /// A proxy of the root (valid across moves; see XBuffer::ref).
+        /// A proxy of the root: valid across moves of the payload and of this
+        /// buffer, fail-soft (see XBuffer::ref and xoffset_proxy.hpp). With a
+        /// field list (XOFFSET_RECORD) its fields have named accessors:
+        /// buf.root().units().emplace_back().hp() = 5.
+        XRef<T> root() noexcept { return XBuffer::ref<T>(); }
+        /// The same proxy.
         XRef<T> ref() noexcept { return XBuffer::ref<T>(); }
+        /// A plain reference to the root (what root() returned before the
+        /// growth policy), with no protection: it dangles when the payload
+        /// moves (a Relocating buffer growing past its reservation, grow() of
+        /// a movable buffer). Prefer root(), or a pin scope (edit / read),
+        /// whose plain references cannot dangle.
+        T& plain_root() { return XBuffer::root<T>(); }
         /// Pin scopes (see XBuffer::edit / read).
         template <typename F>
         bool edit(F&& f, size_type expected_growth = 0) { return XBuffer::edit<T>(std::forward<F>(f), expected_growth); }
@@ -10381,7 +10609,12 @@ namespace XOffsetDatastructure {
         std::string save_verified(XSaveOptions options = {}) { return XBuffer::save_verified<T>(options); }
         void reload_verified(const std::string& data) { XBuffer::reload_verified<T>(data); }
         void reload_verified(std::span<const std::byte> data) { XBuffer::reload_verified<T>(data); }
-        T& reset() { return XBuffer::reset<T>(); }
+        /// Empties the buffer and makes a new root; a proxy of it (proxies
+        /// of the old content become stale).
+        XRef<T> reset() {
+            (void)XBuffer::reset<T>();
+            return XBuffer::ref<T>();
+        }
 
         TypedXBuffer clone() const { return TypedXBuffer(XBuffer::clone()); }
         void clone_into(TypedXBuffer& dst) const { XBuffer::clone_into(dst); }

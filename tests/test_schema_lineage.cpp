@@ -98,7 +98,7 @@ namespace {
 template <typename P>
 TypedXBuffer<P> make_player(std::string_view name, std::int32_t hp, int items) {
     auto b = TypedXBuffer<P>::create(1 << 14, XBuffer::maximum_capacity(1 << 22).with_growth(XGrowPolicy::Automatic));
-    auto& p = b.root();
+    auto& p = b.plain_root();
     p.name.assign(name);
     if constexpr (requires { p.hp; }) p.hp = hp;
     if constexpr (requires { p.mp; }) p.mp = 5;
@@ -131,37 +131,37 @@ void one_server_three_clients() {
     {
         auto c1 = make_player<v1::Player>("one", 11, 3);
         auto got = p1.load_verified<v3::Player>(c1.save_compact());
-        CHECK(got.root().name.view() == "one" && got.root().hp == 11 && got.root().mp == 0);
-        CHECK(got.root().items.size() == 3 && got.root().items[2].n == 20 && got.root().items[2].quality == 0);
-        CHECK(got.root().guild.empty());
+        CHECK(got.plain_root().name.view() == "one" && got.plain_root().hp == 11 && got.plain_root().mp == 0);
+        CHECK(got.plain_root().items.size() == 3 && got.plain_root().items[2].n == 20 && got.plain_root().items[2].quality == 0);
+        CHECK(got.plain_root().guild.empty());
     }
     {
         auto c2 = make_player<v2::Player>("two", 22, 2);
         auto got = p2.load_verified<v3::Player>(c2.save_verified());
-        CHECK(got.root().hp == 22 && got.root().mp == 5 && got.root().items.size() == 2);
+        CHECK(got.plain_root().hp == 22 && got.plain_root().mp == 5 && got.plain_root().items.size() == 2);
     }
 
     // Send: one v3 object, a wire per version, each verified by its client.
     auto server = make_player<v3::Player>("state", 33, 4);
-    server.root().guild = "g";
-    server.root().items[1].quality = 9;
+    server.plain_root().guild = "g";
+    server.plain_root().items[1].quality = 9;
     {
         auto w1 = p1.save(server);
         CHECK(peek_wire_fingerprint(w1).fingerprint == wire_fingerprint_v<v1::Player>);
         auto c = TypedXBuffer<v1::Player>::load_verified(w1);
-        CHECK(c.root().name.view() == "state" && c.root().hp == 33 && c.root().items.size() == 4);
+        CHECK(c.plain_root().name.view() == "state" && c.plain_root().hp == 33 && c.plain_root().items.size() == 4);
         auto w2 = p2.save(server);
         auto c2 = TypedXBuffer<v2::Player>::load_verified(w2);
-        CHECK(c2.root().mp == 5 && c2.root().items[3].n == 30);
+        CHECK(c2.plain_root().mp == 5 && c2.plain_root().items[3].n == 30);
         auto w3 = p3.save(server);
         CHECK(w3 == server.save_verified());
     }
 
     // Downgrade that cannot be represented fails the message, nothing is sent.
-    server.root().hp = std::int64_t(1) << 40;
+    server.plain_root().hp = std::int64_t(1) << 40;
     CHECK(failure_of([&] { (void)p2.save(server); }).find("hp: value out of range") != std::string::npos);
     CHECK(failure_of([&] { (void)p3.save(server); }).empty());
-    server.root().hp = 33;
+    server.plain_root().hp = 33;
 
     // Broadcast: each version written once, shared by its peers.
     XBroadcast<v3::Player> b(server);
@@ -194,7 +194,7 @@ void rejections() {
     // Same fingerprint as v2 (the wire cannot tell): read as v2. The handshake
     // is what stops this build.
     auto got = XPeerSchemas{}.load_verified<v3::Player>(w);
-    CHECK(got.root().hp == 0);  // `health` is not `hp`
+    CHECK(got.plain_root().hp == 0);  // `health` is not `hp`
     auto v3c = make_player<v3::Player>("v3", 1, 0);
     CHECK(failure_of([&] { (void)XPeerSchemas{}.load_verified<v2::Player>(v3c.save_compact()); })
               .find("schema hash mismatch") != std::string::npos);
@@ -215,22 +215,22 @@ void servers_mixed() {
     auto s3 = make_player<v3::Player>("from-v3", 7, 2);
     auto wire = at_v3.save(s3);
     auto in_v2 = at_v2.load_verified<v2::Player>(wire);
-    CHECK(in_v2.root().name.view() == "from-v3" && in_v2.root().items.size() == 2);
+    CHECK(in_v2.plain_root().name.view() == "from-v3" && in_v2.plain_root().items.size() == 2);
     auto back = at_v3.load_verified<v3::Player>(at_v2.save(in_v2));
-    CHECK(back.root().hp == 7 && back.root().items[1].n == 10);
+    CHECK(back.plain_root().hp == 7 && back.plain_root().items[1].n == 10);
 }
 
 void snapshots() {
     auto old = make_player<v1::Player>("snap", 3, 5);
     auto now = evolve_load_verified<v3::Player>(old.save_verified());
-    CHECK(now.root().name.view() == "snap" && now.root().items.size() == 5 && now.root().hp == 3);
+    CHECK(now.plain_root().name.view() == "snap" && now.plain_root().items.size() == 5 && now.plain_root().hp == 3);
     // Capacity of the receive bounds the conversion too.
     auto big = make_player<v1::Player>("big", 1, 2000);
     const std::string w = big.save_compact();
     CHECK(failure_of([&] {
               (void)evolve_load_verified<v3::Player>(w, XBuffer::maximum_capacity(w.size() + 4096));
           }).find("maximum capacity") != std::string::npos);
-    CHECK(evolve_load_verified<v3::Player>(w, XBuffer::maximum_capacity(1 << 20)).root().items.size() == 2000);
+    CHECK(evolve_load_verified<v3::Player>(w, XBuffer::maximum_capacity(1 << 20)).plain_root().items.size() == 2000);
 }
 
 void without_handshake() {
@@ -254,20 +254,20 @@ void staged_release() {
     CHECK(older.accepted() && older.send_index<s2::T>() == 0);
     // Receive from s3: downgraded to the working s2.
     auto c = TypedXBuffer<s3::T>::create();
-    c.root().a = 1; c.root().b = 2; c.root().c = 3;
+    c.plain_root().a = 1; c.plain_root().b = 2; c.plain_root().c = 3;
     auto got = newer.load_verified<s2::T>(c.save_compact());
-    CHECK(got.root().a == 1 && got.root().b == 2);
+    CHECK(got.plain_root().a == 1 && got.plain_root().b == 2);
     // Send to s3: upgraded; to s1: downgraded.
     auto w = newer.save(got);
     CHECK(peek_wire_fingerprint(w).fingerprint == wire_fingerprint_v<s3::T>);
     auto at3 = TypedXBuffer<s3::T>::load_verified(w);
-    CHECK(at3.root().a == 1 && at3.root().b == 2 && at3.root().c == 0);
+    CHECK(at3.plain_root().a == 1 && at3.plain_root().b == 2 && at3.plain_root().c == 0);
     auto at1 = TypedXBuffer<s1::T>::load_verified(older.save(got));
-    CHECK(at1.root().a == 1);
+    CHECK(at1.plain_root().a == 1);
     // The server's hello lists s1 and s3 as known.
     auto h = TypedXBuffer<XSchemaHello>::load_verified(make_server_schema_hello<s2::T>("srv"));
-    CHECK(h.root().entries.size() == 3 && h.root().entries[0].schema_hash == wire_schema_hash_v<s2::T>() &&
-          h.root().entries[0].kind == 0 && h.root().entries[2].kind == 1);
+    CHECK(h.plain_root().entries.size() == 3 && h.plain_root().entries[0].schema_hash == wire_schema_hash_v<s2::T>() &&
+          h.plain_root().entries[0].kind == 0 && h.plain_root().entries[2].kind == 1);
 }
 
 void plans() {

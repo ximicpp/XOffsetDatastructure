@@ -226,15 +226,15 @@ bool test_typed_buffer_capacity() {
     assert(!limited.grow(1));
     assert(limited.get_address() == base);
     assert(limited.epoch() == epoch);
-    assert(&limited.root() == data);
-    assert(limited.root().id == 123);
+    assert(&limited.plain_root() == data);
+    assert(limited.plain_root().id == 123);
 
     TypedXBuffer<SmallData> legacy(4096, XBuffer::max_capacity(limit));
     assert(legacy.maximum_capacity() == XBufferCore::DEFAULT_MAXIMUM_CAPACITY);
     TypedXBuffer<SmallData> ordinary(4096);
     assert(ordinary.maximum_capacity() == XBufferCore::DEFAULT_MAXIMUM_CAPACITY);
     ordinary.make()->id = 456;
-    assert(ordinary.root().id == 456);
+    assert(ordinary.plain_root().id == 456);
     std::cout << "[PASS] Typed buffers preserve hint and hard-limit semantics\n";
     return true;
 }

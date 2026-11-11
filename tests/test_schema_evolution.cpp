@@ -171,13 +171,13 @@ TypedXBuffer<T> reload(TypedXBuffer<T>& b) {
 
 void upgrade_rules() {
     auto src = TypedXBuffer<v1::Player>::create(1 << 14);
-    fill_v1(src.root());
+    fill_v1(src.plain_root());
     auto wire = src.save_compact();
     auto received = TypedXBuffer<v1::Player>::load_verified(wire);  // the old version, fully verified
 
     auto up = evolve<v2::Player>(received);
     auto checked = reload(up);
-    const v2::Player& p = checked.root();
+    const v2::Player& p = checked.plain_root();
     CHECK(p.name.view() == "susu");                     // same name, same type
     CHECK(p.level == 42);
     CHECK(p.gold == -7);                                // hook: widened
@@ -201,7 +201,7 @@ void upgrade_rules() {
 }
 
 v2::Player& make_v2(TypedXBuffer<v2::Player>& b) {
-    auto& p = b.root();
+    auto& p = b.plain_root();
     p.name = "server";
     p.level = 7;
     p.gold = 1234567;
@@ -223,7 +223,7 @@ void downgrade_rules() {
     make_v2(src);
     auto down = evolve<v1::Player>(src);
     auto checked = reload(down);
-    const v1::Player& p = checked.root();
+    const v1::Player& p = checked.plain_root();
     CHECK(p.name.view() == "server" && p.level == 7 && p.gold == 1234567);
     CHECK(p.hp == 1 && p.mp == 2);
     CHECK(p.legacy_flags == 0);                         // removed in v2: initial value
@@ -233,28 +233,28 @@ void downgrade_rules() {
     CHECK(p.seen.size() == 1);
 
     // checked_narrow: out of range fails the whole conversion, naming the field.
-    src.root().gold = std::int64_t(1) << 40;
+    src.plain_root().gold = std::int64_t(1) << 40;
     auto why = failure_of([&] { (void)evolve<v1::Player>(src); });
     CHECK(why.find("schema evolution") != std::string::npos);
     CHECK(why.find("gold: value out of range") != std::string::npos);
-    src.root().gold = 0;
+    src.plain_root().gold = 0;
 
     // Enum value the old version does not have: fails, with the path.
-    src.root().bag[0].rarity = v2::Rarity::epic;
+    src.plain_root().bag[0].rarity = v2::Rarity::epic;
     why = failure_of([&] { (void)evolve<v1::Player>(src); });
     CHECK(why.find("bag.rarity") != std::string::npos);
     CHECK(why.find("not an enumerator") != std::string::npos);
-    src.root().bag[0].rarity = v2::Rarity::common;
+    src.plain_root().bag[0].rarity = v2::Rarity::common;
 
     // Same for a set key and a map key.
-    src.root().seen.insert(v2::Rarity::epic);
+    src.plain_root().seen.insert(v2::Rarity::epic);
     why = failure_of([&] { (void)evolve<v1::Player>(src); });
     CHECK(why.find("seen") != std::string::npos);
-    src.root().seen.erase(v2::Rarity::epic);
-    src.root().titles.try_emplace(v2::Rarity::epic);
+    src.plain_root().seen.erase(v2::Rarity::epic);
+    src.plain_root().titles.try_emplace(v2::Rarity::epic);
     why = failure_of([&] { (void)evolve<v1::Player>(src); });
     CHECK(why.find("titles") != std::string::npos);
-    src.root().titles.erase(v2::Rarity::epic);
+    src.plain_root().titles.erase(v2::Rarity::epic);
     CHECK(failure_of([&] { (void)evolve<v1::Player>(src); }).empty());
 }
 
@@ -264,7 +264,7 @@ void round_trip_and_base() {
     auto& orig = make_v2(src);
     auto down = evolve<v1::Player>(src);
     auto back = evolve<v2::Player>(down);
-    const auto& p = back.root();
+    const auto& p = back.plain_root();
     CHECK(p.name.view() == orig.name.view() && p.gold == orig.gold && p.hp == orig.hp);
     CHECK(p.display_name.view() == orig.display_name.view());
     CHECK(p.bag.size() == 1 && p.bag[0].durability == 100);   // v1 cannot carry it
@@ -274,20 +274,20 @@ void round_trip_and_base() {
     XEvolveOptions o;
     o.with_base(&orig);
     auto merged = evolve<v2::Player>(down, o);
-    CHECK(merged.root().achievements.size() == 1 && merged.root().achievements[0] == 9);
+    CHECK(merged.plain_root().achievements.size() == 1 && merged.plain_root().achievements[0] == 9);
 }
 
 void identity_is_compact_copy() {
     auto src = TypedXBuffer<v1::Player>::create(1 << 14);
-    fill_v1(src.root());
+    fill_v1(src.plain_root());
     auto same = evolve<v1::Player>(src);
     CHECK(same.save_compact() == src.save_compact());
 }
 
 void capacity_limit() {
     auto src = TypedXBuffer<v1::Player>::create(1 << 16);
-    fill_v1(src.root());
-    for (int i = 0; i < 400; ++i) src.root().bag.emplace_back().label = std::string(64, 'x');
+    fill_v1(src.plain_root());
+    for (int i = 0; i < 400; ++i) src.plain_root().bag.emplace_back().label = std::string(64, 'x');
     XEvolveOptions o;
     o.maximum_capacity = 8192;
     auto why = failure_of([&] { (void)evolve<v2::Player>(src, o); });
@@ -296,22 +296,22 @@ void capacity_limit() {
 
 void swapped_fields_by_name() {
     auto a = TypedXBuffer<swap_a::S>::create();
-    a.root().hp = 1;
-    a.root().mp = 2;
+    a.plain_root().hp = 1;
+    a.plain_root().mp = 2;
     auto b = evolve<swap_b::S>(a);
-    CHECK(b.root().hp == 1 && b.root().mp == 2);
+    CHECK(b.plain_root().hp == 1 && b.plain_root().mp == 2);
 }
 
 void long_string_keys() {
     auto a = TypedXBuffer<keys_a::K>::create(4096, XBuffer::maximum_capacity(1 << 20).with_growth(XGrowPolicy::Automatic));
     const std::string long_key(100, 'k');
-    a.root().by_name[long_key] = 7;
-    a.root().by_name["s"] = 1;
-    a.root().names.emplace((long_key + "!").c_str());
+    a.plain_root().by_name[long_key] = 7;
+    a.plain_root().by_name["s"] = 1;
+    a.plain_root().names.emplace((long_key + "!").c_str());
     auto b = evolve<keys_b::K>(a);
-    CHECK(b.root().by_name.size() == 2 && b.root().by_name.find(long_key) != b.root().by_name.end());
-    CHECK(b.root().by_name.find(long_key)->second == 7);
-    CHECK(b.root().names.size() == 1 && b.root().names.begin()->view() == long_key + "!");
+    CHECK(b.plain_root().by_name.size() == 2 && b.plain_root().by_name.find(long_key) != b.plain_root().by_name.end());
+    CHECK(b.plain_root().by_name.find(long_key)->second == 7);
+    CHECK(b.plain_root().names.size() == 1 && b.plain_root().names.begin()->view() == long_key + "!");
     auto back = evolve<keys_a::K>(b);
     CHECK(back.save_compact() == evolve<keys_a::K>(a).save_compact());
 }

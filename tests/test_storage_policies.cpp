@@ -39,7 +39,7 @@ void automatic_growth_and_limits() {
     const auto automatic = XBuffer::maximum_capacity(limit).with_growth(XGrowPolicy::Automatic);
     auto buffer = TypedXBuffer<PolicyRoot>::create(64, automatic);
     assert(buffer.growth_policy() == XGrowPolicy::Automatic);
-    auto* root = &buffer.root();
+    auto* root = &buffer.plain_root();
     root->marker = 0x12345678;
     const auto base = buffer.get_address();
     const auto epoch = buffer.epoch();
@@ -48,7 +48,7 @@ void automatic_growth_and_limits() {
     auto* values = root->values.data();
     for (std::uint32_t i = 1; i < 20'000; ++i) root->values.push_back(i);
     assert(buffer.get_size() > initial && buffer.get_size() <= limit);
-    assert(buffer.get_address() == base && &buffer.root() == root);
+    assert(buffer.get_address() == base && &buffer.plain_root() == root);
     assert(root->values.data() == values && buffer.epoch() == epoch);
     for (std::uint32_t i = 0; i < root->values.size(); ++i) assert(root->values[i] == i);
 
@@ -61,14 +61,14 @@ void automatic_growth_and_limits() {
 
     const auto wire = buffer.save_verified();
     auto loaded = TypedXBuffer<PolicyRoot>::load(wire, automatic);
-    loaded.root().text = std::string(60'000, 'z');
-    assert(loaded.root().marker == root->marker && loaded.root().values[19'999] == 19'999);
-    assert(loaded.root().text.size() == 60'000);
+    loaded.plain_root().text = std::string(60'000, 'z');
+    assert(loaded.plain_root().marker == root->marker && loaded.plain_root().values[19'999] == 19'999);
+    assert(loaded.plain_root().text.size() == 60'000);
     auto explicit_load = TypedXBuffer<PolicyRoot>::load(wire);
     assert(explicit_load.growth_policy() == XGrowPolicy::Explicit);
-    bad_alloc([&] { explicit_load.root().text = std::string(60'000, 'x'); });
+    bad_alloc([&] { explicit_load.plain_root().text = std::string(60'000, 'x'); });
     explicit_load.set_growth_policy(XGrowPolicy::Automatic);
-    explicit_load.root().text = std::string(60'000, 'x');
+    explicit_load.plain_root().text = std::string(60'000, 'x');
 
     auto raw = XBuffer::load_unverified(buffer.copy_bytes(), automatic);
     assert(raw.growth_policy() == XGrowPolicy::Automatic);
@@ -93,7 +93,7 @@ void failures_and_ownership() {
     for (const auto fault : {VmOperation::Enable, VmOperation::Prepare}) {
         auto buffer = TypedXBuffer<PolicyRoot>::create(4096,
             XBuffer::maximum_capacity(limit).with_growth(XGrowPolicy::Automatic));
-        auto* root = &buffer.root();
+        auto* root = &buffer.plain_root();
         root->values.push_back(71);
         const auto old = buffer.copy_bytes();
         const auto logical = buffer.get_size();
@@ -149,7 +149,7 @@ void nested_mutation_failure_after_successful_growth() {
     constexpr std::size_t hard_limit = 16 * 1024;
     auto buffer = TypedXBuffer<NestedPolicyRoot>::create(4096,
         XBuffer::maximum_capacity(hard_limit).with_growth(XGrowPolicy::Automatic));
-    auto& root = buffer.root();
+    auto& root = buffer.plain_root();
     root.rows.reserve(4);
     auto& existing = root.rows.emplace_back();
     existing.first = "old first";
@@ -183,21 +183,21 @@ void nested_mutation_failure_after_successful_growth() {
     check_original(root);
     auto loaded = TypedXBuffer<NestedPolicyRoot>::load(buffer.save_verified(),
         XBuffer::maximum_capacity(hard_limit * 2).with_growth(XGrowPolicy::Automatic));
-    check_original(loaded.root());
-    loaded.root().rows.push_back(loaded.root().source);
-    assert(loaded.root().rows.size() == 2);
-    assert(loaded.root().rows[1].first == std::string(2048, 'a'));
-    assert(loaded.root().rows[1].second == std::string(8192, 'b'));
+    check_original(loaded.plain_root());
+    loaded.plain_root().rows.push_back(loaded.plain_root().source);
+    assert(loaded.plain_root().rows.size() == 2);
+    assert(loaded.plain_root().rows[1].first == std::string(2048, 'a'));
+    assert(loaded.plain_root().rows[1].second == std::string(8192, 'b'));
     auto roundtrip = TypedXBuffer<NestedPolicyRoot>::load(loaded.save_verified());
-    assert(roundtrip.root().rows.size() == 2 && roundtrip.root().rows[0].first == "old first");
-    assert(roundtrip.root().rows[1].first == std::string(2048, 'a'));
-    assert(roundtrip.root().rows[1].second == std::string(8192, 'b'));
+    assert(roundtrip.plain_root().rows.size() == 2 && roundtrip.plain_root().rows[0].first == "old first");
+    assert(roundtrip.plain_root().rows[1].first == std::string(2048, 'a'));
+    assert(roundtrip.plain_root().rows[1].second == std::string(8192, 'b'));
 }
 
 void reclaim_integration() {
     auto buffer = TypedXBuffer<PolicyRoot>::create(limit,
         XBuffer::maximum_capacity(limit).with_growth(XGrowPolicy::Automatic));
-    auto* root = &buffer.root();
+    auto* root = &buffer.plain_root();
     root->marker = 99;
     for (std::uint32_t i = 0; i < 100; ++i) root->values.push_back(i);
     const auto base = buffer.get_address();
@@ -227,7 +227,7 @@ void pooled_verified_lifecycle() {
     std::string wire;
     {
         auto buffer = TypedXBuffer<PolicyRoot>::create(4096, options);
-        auto* root = &buffer.root();
+        auto* root = &buffer.plain_root();
         root->marker = 123;
         root->text = std::string(50'000, 'a');
         root->values.push_back(42);
@@ -238,17 +238,17 @@ void pooled_verified_lifecycle() {
     {
         auto buffer = TypedXBuffer<PolicyRoot>::load(wire, options);
         assert(buffer.get_address() == first && pool.stats().cached_blocks == 0);
-        assert(buffer.root().marker == 123 && buffer.root().values[0] == 42);
+        assert(buffer.plain_root().marker == 123 && buffer.plain_root().values[0] == 42);
         auto moved = std::move(buffer);
-        moved.root().values.push_back(43); // owner index follows pooled storage
-        assert(moved.root().values[1] == 43);
+        moved.plain_root().values.push_back(43); // owner index follows pooled storage
+        assert(moved.plain_root().values[1] == 43);
     }
     assert(pool.stats().cached_blocks == 1 && pool.stats().hits >= 1);
     {
         // Empty construction must clear reused logical bytes and prior graph.
         auto clean = TypedXBuffer<PolicyRoot>::create(4096, options);
         assert(clean.get_address() == first);
-        assert(clean.root().marker == 0 && clean.root().text.empty() && clean.root().values.empty());
+        assert(clean.plain_root().marker == 0 && clean.plain_root().text.empty() && clean.plain_root().values.empty());
         const auto offset = clean.arena()->used_end;
         const auto n = clean.get_size();
         for (auto i = offset; i < n; ++i) assert(clean.data()[i] == 0);
@@ -275,10 +275,10 @@ void pooled_verified_lifecycle() {
     catch (const XException&) { rejected = true; }
     assert(rejected && pool.stats().cached_blocks == 1);
     auto retry = TypedXBuffer<PolicyRoot>::load(wire, options);
-    assert(retry.root().values[0] == 42);
+    assert(retry.plain_root().values[0] == 42);
     pool.clear(); // live reservation is unaffected
-    retry.root().values.push_back(44);
-    assert(retry.root().values.back() == 44 && pool.stats().cached_blocks == 0);
+    retry.plain_root().values.push_back(44);
+    assert(retry.plain_root().values.back() == 44 && pool.stats().cached_blocks == 0);
 }
 } // namespace
 
