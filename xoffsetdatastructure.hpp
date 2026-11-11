@@ -949,9 +949,10 @@ namespace XOffsetDatastructure {
             if (this == &other) return;
             std::swap(ctl_, other.ctl_);
             quarantine_.swap(other.quarantine_);
+            buffer_.swap(other.buffer_);
+            // After the payloads swapped: each block names its content's base.
             adopt_ctl();
             other.adopt_ctl();
-            buffer_.swap(other.buffer_);
             owner_record_.swap(other.owner_record_);
             free_table_.swap(other.free_table_);
             std::swap(free_table_lost_, other.free_table_lost_);
