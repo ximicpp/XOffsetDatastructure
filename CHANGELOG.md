@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- Free table: a buffer's table of holes is about 2.4 KiB instead of 12 KiB.
+  Each of the 512 exact-size bins is now a 4-byte head that holds the bin's
+  only hole itself, or names a contiguous segment in one word pool the table
+  shares between its bins (32 words inline; host storage when it grows, which
+  a reload keeps up to 16 KiB). Thousands of live buffers each keep a table
+  (game players, client views): on SLG demo M (xoffset alone) peak memory is
+  710 to 657 MiB. Under memory pressure (cloud, five formats in one process,
+  cgroup limit 2000 MiB + swap, ABBA) the cold pages a save or an allocation
+  had to bring back were mostly table pages: xoffset B.out_encode 12.2-13.9
+  to 3.9-5.3 ms, S.save_encode 5.1-5.6 to 1.5-2.4 ms, UP.apply 207-221 to
+  147-155 ms, UC.apply 301-303 to 267-276 ms. Which block every request
+  takes, and the order holes are written in, are unchanged (checked against
+  the previous table on random allocate/retire/clone/reload runs); wire
+  format unchanged; both Ir gates pass. `XBufferCore::free_bin_inline_entries`
+  (4 per bin) is replaced by `free_table_inline_entries` (16 holes of one
+  size per table).
+
 - Shared deltas: changed members only. `XRecordDelta<T>::fields(members)`
   (bit i = member i, `XSyncFields`), `diff(now, before, out, fields)` and
   `update(rec, fields, out, set)`, which changes a record and writes its body
