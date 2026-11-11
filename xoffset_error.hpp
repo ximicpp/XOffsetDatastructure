@@ -59,6 +59,9 @@ enum class XErrc : std::uint16_t {
     invalid_state = 97,            // not valid in the object's current state
     length_error = 98,
     no_root = 99,                  // typed access to a buffer without a verified root
+    borrowed = 100,                // the buffer would move while a pin scope (read/edit) is open
+    stale = 101,                   // a proxy of a buffer that is gone or whose content was replaced
+    out_of_range = 102,            // a write through a proxy that names no element (index or key)
     unspecified = 255,
 };
 
@@ -87,6 +90,9 @@ inline const char* to_string(XErrc code) noexcept {
         case XErrc::invalid_state: return "invalid_state";
         case XErrc::length_error: return "length_error";
         case XErrc::no_root: return "no_root";
+        case XErrc::borrowed: return "borrowed";
+        case XErrc::stale: return "stale";
+        case XErrc::out_of_range: return "out_of_range";
         case XErrc::unspecified: return "unspecified";
     }
     return "unknown";
@@ -158,6 +164,52 @@ template <class E>
 [[noreturn]] void fatal_from(const E& e) noexcept {
     fatal(error_code_of(e), e.what());
 }
+} // namespace detail
+
+namespace detail {
+// Fail-soft region (growth policy part 2: proxies and pin scopes in builds
+// without exceptions). While one is open on this thread, an arena
+// allocation that fails records its code here and returns null instead of
+// calling the fatal handler; the container operation that asked for it then
+// returns without effect.
+struct SoftFailState {
+    int depth = 0;
+    XErrc code = XErrc::ok;
+};
+inline SoftFailState& soft_fail_state() noexcept {
+    static thread_local SoftFailState state;
+    return state;
+}
+// True (and `code` recorded) inside a fail-soft region.
+inline bool soft_fail(XErrc code) noexcept {
+    auto& state = soft_fail_state();
+    if (state.depth == 0) return false;
+    if (state.code == XErrc::ok) state.code = code;
+    return true;
+}
+inline bool soft_fail_active() noexcept { return soft_fail_state().depth != 0; }
+class SoftFailScope {
+public:
+    SoftFailScope() noexcept : saved_(soft_fail_state().code) {
+        auto& state = soft_fail_state();
+        ++state.depth;
+        state.code = XErrc::ok;
+    }
+    // The region's failure is its owner's to handle (failed(), code());
+    // the enclosing region keeps its own.
+    ~SoftFailScope() {
+        auto& state = soft_fail_state();
+        --state.depth;
+        state.code = saved_;
+    }
+    SoftFailScope(const SoftFailScope&) = delete;
+    SoftFailScope& operator=(const SoftFailScope&) = delete;
+    bool failed() const noexcept { return soft_fail_state().code != XErrc::ok; }
+    XErrc code() const noexcept { return soft_fail_state().code; }
+
+private:
+    XErrc saved_;
+};
 } // namespace detail
 
 // expected-style result of a try_* entry: a value or an XError.

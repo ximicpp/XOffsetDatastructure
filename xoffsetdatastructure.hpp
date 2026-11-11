@@ -307,6 +307,84 @@ namespace XOffsetDatastructure {
         struct allocator_ref;
     }
 
+    class XBufferCore;
+    namespace detail {
+        // A payload lineage's control block (growth policy, part 2). Proxies
+        // (XRef) hold a pointer to it and a copy of `base` and `version`:
+        // one compare of the version tells them the payload is where they
+        // last saw it. The version is even while the lineage lives and grows
+        // by 2 when the payload moves; it is odd once the buffer is gone or
+        // its content was replaced (reload, reset, clone_into), and a proxy
+        // whose version is below `birth` belongs to an earlier lineage of the
+        // same block. Blocks are never freed (a type-stable pool): a stale
+        // proxy reads a valid block and a mismatching version.
+        // The control block follows the content: an XBuffer move or swap
+        // takes it along, so proxies stay valid across them.
+        struct XCtl {
+            std::uint64_t version = 1;
+            char* base = nullptr;
+            std::uint64_t birth = 0;
+            XBufferCore* core = nullptr;
+            std::uint32_t borrow = 0;      // open pin scopes (read/edit)
+            XErrc sticky = XErrc::ok;      // the first failure (fail-soft)
+            XCtl* next_free = nullptr;
+        };
+
+        class XCtlPool {
+        public:
+            // A control block for a new lineage: even version, birth = version.
+            static XCtl* acquire() {
+                auto& state = global();
+                XCtl* ctl = nullptr;
+                {
+                    std::lock_guard<std::mutex> lock(state.mutex);
+                    if (!state.free) refill(state);
+                    ctl = state.free;
+                    if (ctl) state.free = ctl->next_free;
+                }
+                if (!ctl) return nullptr;
+                ctl->next_free = nullptr;
+                ctl->version = (ctl->version | 1u) + 1u;
+                ctl->birth = ctl->version;
+                ctl->borrow = 0;
+                ctl->sticky = XErrc::ok;
+                return ctl;
+            }
+            // The lineage ends: every proxy of it becomes stale.
+            static void release(XCtl* ctl) noexcept {
+                ctl->version |= 1u;
+                ctl->base = nullptr;
+                ctl->core = nullptr;
+                auto& state = global();
+                std::lock_guard<std::mutex> lock(state.mutex);
+                ctl->next_free = state.free;
+                state.free = ctl;
+            }
+
+        private:
+            struct State {
+                std::mutex mutex;
+                XCtl* free = nullptr;
+            };
+            static State& global() noexcept {
+                alignas(State) static unsigned char storage[sizeof(State)];
+                static State* state = ::new (static_cast<void*>(storage)) State;
+                return *state;
+            }
+            // 4 KiB of blocks at a time, never returned.
+            static void refill(State& state) noexcept {
+                constexpr std::size_t count = 4096 / sizeof(XCtl);
+                auto* blocks = static_cast<XCtl*>(::operator new(count * sizeof(XCtl), std::nothrow));
+                if (!blocks) return;
+                for (std::size_t i = 0; i < count; ++i) {
+                    ::new (static_cast<void*>(blocks + i)) XCtl;
+                    blocks[i].next_free = state.free;
+                    state.free = blocks + i;
+                }
+            }
+        };
+    }
+
     class XBufferCore {
     public:
         using size_type = std::size_t;
@@ -355,7 +433,10 @@ namespace XOffsetDatastructure {
         };
 
         XBufferCore() = default;
-        ~XBufferCore() { unregister_registry(); }
+        ~XBufferCore() {
+            retire_ctl();
+            unregister_registry();
+        }
 
         XBufferCore(const XBufferCore&) = delete;
         XBufferCore& operator=(const XBufferCore&) = delete;
@@ -655,6 +736,14 @@ namespace XOffsetDatastructure {
         // result is capacity_exceeded past the maximum, out_of_storage when
         // the OS gives no memory or address space, invalid_state without a
         // payload. On failure nothing changed.
+        // True when `bytes` more fit in the committed payload: an allocation
+        // of at most that much needs no growth and no move (proxies run such
+        // operations inline).
+        XOFFSET_DETAIL_MOVE_INLINE bool has_room(size_type bytes) const noexcept {
+            const size_type used = used_end_clamped();
+            return used <= buffer_.size() && bytes <= buffer_.size() - used;
+        }
+
         XErrc make_room(size_type bytes) noexcept {
             if (buffer_.empty()) [[unlikely]] return XErrc::invalid_state;
             const size_type used = used_end_clamped();
@@ -664,7 +753,141 @@ namespace XOffsetDatastructure {
             return make_room_slow(need);
         }
 
+        // ---- growth policy part 2: control block, sticky error, pin scopes.
+
+        // This lineage's control block (made on first use; null when no
+        // block can be allocated).
+        detail::XCtl* control() noexcept {
+            if (!ctl_) [[unlikely]] make_ctl();
+            return ctl_;
+        }
+        // The first failure a proxy or a pin scope recorded (fail-soft:
+        // nothing throws or aborts). A failed buffer refuses save_verified
+        // and the other emission entries until clear_error().
+        XErrc error() const noexcept { return ctl_ ? ctl_->sticky : XErrc::ok; }
+        bool ok() const noexcept { return error() == XErrc::ok; }
+        void clear_error() noexcept { if (ctl_) ctl_->sticky = XErrc::ok; }
+        // Records `code` unless an earlier failure is recorded.
+        void record_error(XErrc code) noexcept {
+            if (code == XErrc::ok) return;
+            if (auto* ctl = control(); ctl && ctl->sticky == XErrc::ok) ctl->sticky = code;
+        }
+        // An open pin scope: the payload does not move, retired blocks wait.
+        bool pinned() const noexcept { return pinned_; }
+
+        // A buffer with a recorded failure emits nothing: `out` is cleared
+        // and, with exceptions, XException(error()) is thrown; without them
+        // the entry returns (true here) and the caller sees an empty wire.
+        XOFFSET_DETAIL_MOVE_INLINE bool refuse_failed_emit(std::string& out) {
+            if (!ctl_ || ctl_->sticky == XErrc::ok) [[likely]] return false;
+            return refuse_failed_emit_slow(out);
+        }
+        XOFFSET_DETAIL_NOINLINE bool refuse_failed_emit_slow(std::string& out) {
+            out.clear();
+#if XOFFSET_NO_EXCEPTIONS
+            return true;
+#else
+            throw XException(ctl_->sticky,
+                std::string("the buffer has a recorded failure (") + to_string(ctl_->sticky) +
+                "); it emits no wire until clear_error()");
+#endif
+        }
+
+        // Pin scope bracket (XBuffer::read / edit use it; nests). Entering
+        // fails only when no control block can be made.
+        bool pin_enter() noexcept {
+            auto* ctl = control();
+            if (!ctl) return false;
+            ++ctl->borrow;
+            pinned_ = true;
+            return true;
+        }
+        // Closes a scope opened by pin_enter on this lineage. `ctl` is the
+        // block pin_enter used (the XBuffer may have moved meanwhile: the
+        // block follows the content to its current owner).
+        static void pin_exit(detail::XCtl* ctl) noexcept {
+            if (!ctl || ctl->borrow == 0) return;
+            if (--ctl->borrow != 0) return;
+            if (auto* core = ctl->core) {
+                core->pinned_ = false;
+                core->release_quarantine();
+#if defined(XOFFSET_STRESS_RELOCATE)
+                core->stress_relocate();
+#endif
+            }
+        }
+
     private:
+        void make_ctl() noexcept {
+            XOFFSET_TRY {
+                ctl_ = detail::XCtlPool::acquire();
+            } XOFFSET_CATCH(...) {
+                ctl_ = nullptr;
+            }
+            if (ctl_) {
+                ctl_->core = this;
+                ctl_->base = buffer_.data();
+            }
+        }
+        // After ctl_ changed hands: point it at this owner, mirror its pins.
+        void adopt_ctl() noexcept {
+            if (ctl_) {
+                ctl_->core = this;
+                ctl_->base = buffer_.data();
+            }
+            pinned_ = ctl_ && ctl_->borrow != 0;
+        }
+        void retire_ctl() noexcept {
+            if (!ctl_) return;
+            detail::XCtlPool::release(ctl_);
+            ctl_ = nullptr;
+            pinned_ = false;
+            quarantine_.clear();
+        }
+        // The content is replaced (reload, reset, clone_into): proxies of the
+        // old content become stale. An open pin scope keeps its block (the
+        // scope closes on it), which starts a new lineage in place.
+        void end_lineage() noexcept {
+            quarantine_.clear();
+            if (ctl_->borrow == 0) {
+                retire_ctl();
+                return;
+            }
+            ctl_->version += 2;
+            ctl_->birth = ctl_->version;
+            ctl_->sticky = XErrc::ok;
+        }
+        // retire_block inside a pin scope: remember the block (host memory;
+        // when that fails the block is simply never reused).
+        XOFFSET_DETAIL_NOINLINE void quarantine_block(void* ptr, std::uint32_t bytes) noexcept {
+            const auto base = reinterpret_cast<std::uintptr_t>(buffer_.data());
+            const auto address = reinterpret_cast<std::uintptr_t>(ptr);
+            if (!ptr || bytes == 0 || address < base || address - base >= buffer_.size()) return;
+            XOFFSET_TRY {
+                quarantine_.push_back((std::uint64_t(address - base) << 32) | bytes);
+            } XOFFSET_CATCH(...) {
+            }
+        }
+        void release_quarantine() noexcept {
+            if (quarantine_.empty()) return;
+            auto blocks = std::move(quarantine_);
+            quarantine_.clear();
+            for (const auto entry : blocks) {
+                const auto offset = static_cast<std::uint32_t>(entry >> 32);
+                const auto bytes = static_cast<std::uint32_t>(entry);
+                if (offset < buffer_.size() && bytes <= buffer_.size() - offset)
+                    retire_block(buffer_.data() + offset, bytes);
+            }
+        }
+#if defined(XOFFSET_STRESS_RELOCATE)
+        // Stress mode: every pin scope's end moves the payload, so a plain
+        // reference kept past the scope points at released storage.
+        void stress_relocate() noexcept {
+            if (growth_policy_ != XGrowPolicy::Relocating || buffer_.empty()) return;
+            (void)replace_storage(buffer_.size(), true);
+        }
+#endif
+
         XOFFSET_DETAIL_NOINLINE XErrc make_room_slow(size_type need) noexcept {
             if (need > buffer_.maximum_capacity()) return XErrc::capacity_exceeded;
             const size_type limit = buffer_.reservation_limit();
@@ -674,6 +897,7 @@ namespace XOffsetDatastructure {
                 return buffer_.grow_to(target) || buffer_.grow_to(need) ? XErrc::ok : XErrc::out_of_storage;
             }
             if (!buffer_.movable() && growth_policy_ != XGrowPolicy::Relocating) return XErrc::out_of_storage;
+            if (pinned_) return XErrc::borrowed;
             return replace_storage(need, true) ? XErrc::ok : XErrc::out_of_storage;
         }
 
@@ -702,6 +926,10 @@ namespace XOffsetDatastructure {
 
         void swap(XBufferCore& other) noexcept {
             if (this == &other) return;
+            std::swap(ctl_, other.ctl_);
+            quarantine_.swap(other.quarantine_);
+            adopt_ctl();
+            other.adopt_ctl();
             buffer_.swap(other.buffer_);
             owner_record_.swap(other.owner_record_);
             free_table_.swap(other.free_table_);
@@ -892,6 +1120,9 @@ namespace XOffsetDatastructure {
         // needs no host allocation and runs no host callback; it is published
         // inline. Everything else takes retire_block_general unchanged.
         XOFFSET_DETAIL_MOVE_INLINE void retire_block(void* ptr, std::uint32_t bytes) noexcept {
+            // Inside a pin scope a retired block is not reused until the
+            // scope closes: plain references into it stay harmless.
+            if (pinned_) [[unlikely]] return quarantine_block(ptr, bytes);
             const auto base = reinterpret_cast<std::uintptr_t>(buffer_.data());
             const auto address = reinterpret_cast<std::uintptr_t>(ptr);
             FreeTable* table = free_table_.get();
@@ -2053,6 +2284,13 @@ namespace XOffsetDatastructure {
                 free_table_.swap(other.free_table_);
                 free_table_lost_ = std::exchange(other.free_table_lost_, false);
                 publish_host_owner();
+                if (ctl_ || other.ctl_) [[unlikely]] {
+                    retire_ctl();
+                    ctl_ = std::exchange(other.ctl_, nullptr);
+                    quarantine_.swap(other.quarantine_);
+                    adopt_ctl();
+                    other.adopt_ctl();
+                }
                 growth_policy_ = std::exchange(other.growth_policy_, XGrowPolicy::Explicit);
                 root_type_identity_ = std::exchange(other.root_type_identity_, nullptr);
                 typed_root_access_allowed_ = std::exchange(other.typed_root_access_allowed_, true);
@@ -2161,6 +2399,8 @@ namespace XOffsetDatastructure {
         XOFFSET_DETAIL_NOINLINE bool replace_storage(size_type logical, bool copy, bool pin = false) noexcept {
             const auto maximum = buffer_.maximum_capacity();
             if (logical > maximum) return false;
+            // A pin scope holds plain references into the payload.
+            if (pinned_) return false;
             detail::VirtualMemoryStorage next;
             PreparedOwner prepared;
             XOFFSET_TRY {
@@ -2186,6 +2426,10 @@ namespace XOffsetDatastructure {
             buffer_.swap(next);
             publish_host_owner();
             advance_epoch();
+            if (ctl_) {
+                ctl_->base = buffer_.data();
+                ctl_->version += 2;
+            }
             return true;
             // `next` (the old storage) is released here.
         }
@@ -2427,6 +2671,7 @@ namespace XOffsetDatastructure {
         // reloaded in between. A reset keeps all its bin storage; a reload
         // keeps it within FreeTableRecycler's keep limits.
         void begin_reinit(bool reset = false) noexcept {
+            if (ctl_) [[unlikely]] end_lineage();
             advance_epoch();
             empty_free_table(reset);
             free_table_lost_ = false;
@@ -2458,6 +2703,7 @@ namespace XOffsetDatastructure {
         // change: reset_arena(size()) without the binding stores. Typed
         // access stays closed until the caller has the new root, as there.
         XOFFSET_DETAIL_MOVE_INLINE void reset_arena_keeping_binding() noexcept {
+            if (ctl_) [[unlikely]] end_lineage();
             advance_epoch();
             empty_free_table(true);
             free_table_lost_ = false;
@@ -2788,6 +3034,12 @@ namespace XOffsetDatastructure {
         uint64_t dirty_epoch_ = 0;  // m_epoch when dirty_step_ was last reset
         const void* root_type_identity_ = nullptr;
         XGrowPolicy growth_policy_ = XGrowPolicy::Explicit;
+        // Growth policy part 2: an open pin scope (mirrors ctl_->borrow), the
+        // lineage's control block, and blocks retired inside the scope
+        // (payload offset << 32 | bytes).
+        bool pinned_ = false;
+        detail::XCtl* ctl_ = nullptr;
+        std::vector<std::uint64_t> quarantine_;
     };
 
     // ========================================================================
@@ -8396,7 +8648,11 @@ namespace XOffsetDatastructure {
     // XBufferCore::prefetch_for_update() (a cache hint) is available.
 #define XOFFSET_PREFETCH_FOR_UPDATE_API 1
     template <typename T> class VerifiedReloadToken;
+} // namespace XOffsetDatastructure
 
+#include "xoffset_proxy.hpp"
+
+namespace XOffsetDatastructure {
     class XBuffer : public XBufferCore {
     public:
         XBuffer() = default;
@@ -8486,6 +8742,37 @@ namespace XOffsetDatastructure {
             return result;
         }
 
+    private:
+        // An open pin scope (nests); closes on the block, which follows the
+        // content if this XBuffer is moved meanwhile.
+        struct PinGuard {
+            detail::XCtl* ctl = nullptr;
+            explicit PinGuard(XBuffer& buffer) noexcept {
+                if (buffer.pin_enter()) ctl = buffer.control();
+            }
+            ~PinGuard() { XBufferCore::pin_exit(ctl); }
+            PinGuard(const PinGuard&) = delete;
+            PinGuard& operator=(const PinGuard&) = delete;
+        };
+        // The root for a pin scope, after the entry move (see edit).
+        template<typename T>
+        T* pin_root(size_type expected_growth) {
+            if (!pinned() && !address_stable()) {
+                const size_type used = arena() ? static_cast<size_type>(arena()->used_end) : 0;
+                const size_type limit = reservation_limit();
+                size_type want = expected_growth;
+                if (used > limit / 2) want = std::max(want, limit - used + 1u);
+                if (want != 0) (void)make_room(want);
+            }
+            T* root_ptr = nullptr;
+            XOFFSET_TRY {
+                root_ptr = &root<T>();
+            } XOFFSET_CATCH(...) {
+                record_error(XErrc::no_root);
+            }
+            return root_ptr;
+        }
+
     public:
         template<typename T>
         T& root() {
@@ -8500,6 +8787,79 @@ namespace XOffsetDatastructure {
                     "Call make<T>() first or check with has_root<T>()."));
             }
             return *ptr;
+        }
+
+        // ---- growth policy part 2: proxies and pin scopes (xoffset_proxy.hpp)
+
+        // A proxy of the root: valid across moves of the payload (and of this
+        // XBuffer object); fail-soft. An empty proxy when the buffer has no
+        // root of type T.
+        template<typename T>
+        XRef<T> ref() noexcept {
+            T* root_ptr = nullptr;
+            XOFFSET_TRY {
+                root_ptr = &root<T>();
+            } XOFFSET_CATCH(...) {
+                root_ptr = nullptr;
+            }
+            auto* ctl = root_ptr ? control() : nullptr;
+            if (!ctl) return XRef<T>();
+            return XRef<T>(proxy_detail::Anchor(ctl),
+                           proxy_detail::RootPath{static_cast<std::uint32_t>(
+                               reinterpret_cast<char*>(root_ptr) - data())});
+        }
+
+        // Pin scope: f(T& root) with plain references at plain speed. The
+        // payload does not move while it runs (an operation that would need
+        // to fails with `borrowed`), and blocks the containers retire are
+        // reused only after it. On entry a Relocating buffer whose
+        // reservation is more than half used moves first, or makes room for
+        // `expected_growth` bytes. False when an operation inside failed
+        // (the first failure is error()); the failing operation has no
+        // effect, and with exceptions the rest of f is skipped.
+        // f may not return a pointer, reference, string_view or span.
+        template<typename T, typename F>
+        bool edit(F&& f, size_type expected_growth = 0) {
+            using R = std::invoke_result_t<F&, T&>;
+            static_assert(std::is_void_v<R>,
+                "edit(f): f must return void (a value made inside may point into the payload; "
+                "use read(f) to compute a value)");
+            if (!ok()) return false;
+            T* root_ptr = pin_root<T>(expected_growth);
+            if (!root_ptr) return false;
+            PinGuard guard(*this);
+            if (!guard.ctl) return false;
+#if XOFFSET_NO_EXCEPTIONS
+            detail::SoftFailScope soft;
+            f(*root_ptr);
+            if (soft.failed()) record_error(soft.code());
+#else
+            try {
+                f(*root_ptr);
+            } catch (const XException& e) {
+                record_error(e.code() == XErrc::unspecified ? XErrc::out_of_storage : e.code());
+            } catch (const std::bad_alloc&) {
+                record_error(XErrc::host_allocation_failed);
+            }
+#endif
+            return ok();
+        }
+
+        // Read-only pin scope: returns f(const T& root). The result may not
+        // be (or hold) a pointer, reference, string_view or span.
+        template<typename T, typename F>
+        decltype(auto) read(F&& f) {
+            using R = std::invoke_result_t<F&, const T&>;
+            static_assert(!proxy_detail::escapes<std::remove_cv_t<R>>::value && !std::is_reference_v<R>,
+                "read(f): f may not return a pointer, reference, string_view or span "
+                "(it would point into the payload after the scope)");
+            const T& root_ref = root<T>();
+            PinGuard guard(*this);
+            if constexpr (std::is_void_v<R>) {
+                f(root_ref);
+            } else {
+                return R(f(root_ref));
+            }
         }
 
         template<typename T>
@@ -8587,6 +8947,7 @@ namespace XOffsetDatastructure {
 
         template <typename T>
         void save_verified_into(std::string& out, XSaveOptions options = {}) {
+            if (refuse_failed_emit(out)) return;
             detail::VerifiedPathsAccess::save_into<T>(*this, out, options);
         }
 
@@ -8598,6 +8959,7 @@ namespace XOffsetDatastructure {
         // receiver accepts it.
         template <typename T>
         void save_compact_into(std::string& out, XCompactOptions options = {}) {
+            if (refuse_failed_emit(out)) return;
             require_typed_root_access("save_compact<T>(): unverified payload cannot be relabeled as verified");
             require_schema_match<T>("save_compact<T>(): schema mismatch for requested root type");
             if (!detail::find_root<T>(*this))
@@ -8615,6 +8977,7 @@ namespace XOffsetDatastructure {
         template <typename T, typename A0, typename... A>
         void save_compact_into(std::string& out, XCompactOptions options, const XAssign<A0>& first,
                                const XAssign<A>&... rest) {
+            if (refuse_failed_emit(out)) return;
             XOFFSET_TRY {
                 require_typed_root_access("save_compact<T>(): unverified payload cannot be relabeled as verified");
                 require_schema_match<T>("save_compact<T>(): schema mismatch for requested root type");
@@ -8665,6 +9028,10 @@ namespace XOffsetDatastructure {
             static_assert(!has_implicit_padding_v<T>,
                 "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");
 #endif
+            {
+                std::string refused;
+                if (refuse_failed_emit(refused)) return refused;
+            }
             require_typed_root_access("save_verified<T>(): unverified payload cannot be relabeled as verified");
             require_schema_match<T>("save_verified<T>(): schema mismatch for requested root type");
             auto* root_ptr = detail::find_root<T>(*this);
@@ -9503,6 +9870,14 @@ namespace XOffsetDatastructure {
 
         /// Returns a reference to the root object.
         T& root() { return XBuffer::root<T>(); }
+
+        /// A proxy of the root (valid across moves; see XBuffer::ref).
+        XRef<T> ref() noexcept { return XBuffer::ref<T>(); }
+        /// Pin scopes (see XBuffer::edit / read).
+        template <typename F>
+        bool edit(F&& f, size_type expected_growth = 0) { return XBuffer::edit<T>(std::forward<F>(f), expected_growth); }
+        template <typename F>
+        decltype(auto) read(F&& f) { return XBuffer::read<T>(std::forward<F>(f)); }
 
         /// Returns true if a root object exists.
         bool has_root() { return XBuffer::has_root<T>(); }
