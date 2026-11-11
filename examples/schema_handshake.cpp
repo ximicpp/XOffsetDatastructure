@@ -77,14 +77,15 @@ int main() {
 
     // From here on: ordinary messages.
     auto player = TypedXBuffer<Player>::create();
-    player.root().name = "susu";
-    player.root().level = 3;
-    player.root().items.push_back(42);
+    auto p = player.root();   // a proxy: p.name() is the field name
+    p.name() = "susu";
+    p.level() = 3;
+    p.items().push_back(42);
     send_frame(to_client, player.save_compact());
 
     if (!receive_frame(to_client, frame, 1u << 20)) return 1;
     auto received = TypedXBuffer<Player>::load_verified(frame, XBuffer::maximum_capacity(1u << 20));
     std::printf("handshake ok (%s <-> %s); %s level %d\n", peer.label.c_str(), "example-server-1.0",
-                std::string(received.root().name.view()).c_str(), received.root().level);
+                received.root().name().copy().c_str(), int(received.root().level()));
     return 0;
 }

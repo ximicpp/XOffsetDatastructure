@@ -51,7 +51,7 @@ constexpr xo::XSaveOptions kDense{.emission = xo::XWireEmission::dense};
 
 // Retires the blocks of blobs `indices` (ascending) by erasing the blobs.
 void release(Buffer& b, std::vector<std::size_t> indices) {
-    auto& blobs = b.root().blobs;
+    auto& blobs = b.plain_root().blobs;
     for (auto it = indices.rbegin(); it != indices.rend(); ++it)
         blobs.erase(blobs.begin() + std::ptrdiff_t(*it));
 }
@@ -60,7 +60,7 @@ void release(Buffer& b, std::vector<std::size_t> indices) {
 // then a live barrier block; frees the blocks whose index is in `freed`.
 Buffer make(const std::vector<std::size_t>& sizes, const std::vector<std::size_t>& freed) {
     auto b = Buffer::create(1u << 16, xo::XBuffer::maximum_capacity(1u << 22).with_growth(xo::XGrowPolicy::Automatic));
-    auto& r = b.root();
+    auto& r = b.plain_root();
     r.blobs.reserve(sizes.size() + 1);
     for (auto bytes : sizes) {
         auto& blob = r.blobs.emplace_back();
@@ -133,7 +133,7 @@ std::vector<Hole> emit(Buffer& b, const std::string& where) {
 }
 
 std::uint32_t offset_of_block(Buffer& b, std::size_t i) {
-    return std::uint32_t(reinterpret_cast<const char*>(b.root().blobs[i].data.data()) -
+    return std::uint32_t(reinterpret_cast<const char*>(b.plain_root().blobs[i].data.data()) -
                          static_cast<const char*>(b.get_address()));
 }
 } // namespace

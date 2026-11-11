@@ -272,12 +272,12 @@ void clone_into_reuses_destination() {
     need(explicit_dst.growth_policy() == XGrowPolicy::Explicit, "clone_into replaced the growth policy");
     // TypedXBuffer forms.
     auto t = TypedXBuffer<CloneRoot>::create(4096, cap());
-    t.root().id = 11;
+    t.plain_root().id = 11;
     auto tc = t.clone();
-    need(tc.root().id == 11, "TypedXBuffer clone");
+    need(tc.plain_root().id == 11, "TypedXBuffer clone");
     auto td = TypedXBuffer<CloneRoot>::create(4096, cap());
     t.clone_into(td);
-    need(td.root().id == 11 && td.save_verified() == t.save_verified(), "TypedXBuffer clone_into");
+    need(td.plain_root().id == 11 && td.save_verified() == t.save_verified(), "TypedXBuffer clone_into");
 }
 
 void explicit_growth_keeps_room() {

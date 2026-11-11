@@ -29,7 +29,7 @@ constexpr std::uint64_t v2_hash = 0x3f97b5b93fc5601full, v2_digest = 0xa731926e9
 template <typename Player>
 std::string old_client_message() {
     auto b = TypedXBuffer<Player>::create(4096, XBuffer::maximum_capacity(1 << 20).with_growth(XGrowPolicy::Automatic));
-    auto& p = b.root();
+    auto& p = b.plain_root();
     p.name = "old client";
     p.level = 7;
     p.slots[1][2] = 5;
@@ -46,7 +46,7 @@ template <typename Player>
 void round_trip() {
     const std::string wire = old_client_message<Player>();
     auto back = TypedXBuffer<Player>::load_verified(wire, XBuffer::maximum_capacity(1 << 20));
-    const auto& p = back.root();
+    const auto& p = back.plain_root();
     CHECK(p.name.view() == "old client" && p.level == 7 && p.slots[1][2] == 5);
     CHECK(p.items.size() == 1 && p.items[0].rarity == game_v1::Rarity::legendary);
     CHECK(p.items[0].label.view() == "a label longer than an inline string");

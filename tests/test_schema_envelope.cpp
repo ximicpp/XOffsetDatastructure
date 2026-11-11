@@ -219,7 +219,7 @@ bool test_typed_buffer_verified_api() {
 
     std::string data = xbuf.save_verified();
     auto loaded = TypedXBuffer<EnvelopeData>::load_verified(data);
-    auto& root = loaded.root();
+    auto& root = loaded.plain_root();
 
     assert(root.id == 123);
     assert(root.name == "Typed");
@@ -242,7 +242,7 @@ bool test_verified_span_api() {
     auto bytes = std::span<const std::byte>(
         reinterpret_cast<const std::byte*>(data.data()), data.size());
     auto loaded = TypedXBuffer<EnvelopeData>::load_verified(bytes);
-    auto& root = loaded.root();
+    auto& root = loaded.plain_root();
 
     assert(root.id == 321);
     assert(root.name == "Span");
@@ -263,7 +263,7 @@ bool test_typed_load_defaults_to_verified() {
 
     std::string data = xbuf.save_verified();
     auto loaded = TypedXBuffer<EnvelopeData>::load(data);
-    auto& root = loaded.root();
+    auto& root = loaded.plain_root();
 
     assert(root.id == 456);
     assert(root.name == "DefaultLoad");
@@ -304,7 +304,7 @@ bool test_verified_save_is_normalized_transport() {
 
     auto loaded = TypedXBuffer<EnvelopeData>::load_verified(data);
     auto after = loaded.stats();
-    auto& root = loaded.root();
+    auto& root = loaded.plain_root();
 
     assert(after.total_size == header.used_bytes);
     assert(after.total_size < before.total_size);

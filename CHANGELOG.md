@@ -2,6 +2,39 @@
 
 ## Unreleased
 
+- Free table: a buffer's table of holes is about 2.4 KiB instead of 12 KiB.
+  Each of the 512 exact-size bins is now a 4-byte head that holds the bin's
+  only hole itself, or names a contiguous segment in one word pool the table
+  shares between its bins (32 words inline; host storage when it grows, which
+  a reload keeps up to 16 KiB). Thousands of live buffers each keep a table
+  (game players, client views): on SLG demo M (xoffset alone) peak memory is
+  710 to 657 MiB. Under memory pressure (cloud, five formats in one process,
+  cgroup limit 2000 MiB + swap, ABBA) the cold pages a save or an allocation
+  had to bring back were mostly table pages: xoffset B.out_encode 12.2-13.9
+  to 3.9-5.3 ms, S.save_encode 5.1-5.6 to 1.5-2.4 ms, UP.apply 207-221 to
+  147-155 ms, UC.apply 301-303 to 267-276 ms. Which block every request
+  takes, and the order holes are written in, are unchanged (checked against
+  the previous table on random allocate/retire/clone/reload runs); wire
+  format unchanged; both Ir gates pass. `XBufferCore::free_bin_inline_entries`
+  (4 per bin) is replaced by `free_table_inline_entries` (16 holes of one
+  size per table).
+
+- Shared deltas: the block encoder's scratch arrays and `update`'s snapshot
+  are `[[indeterminate]]` (`XOFFSET_INDETERMINATE`): GCC 16 no longer zeroes
+  them on every call (C++26 erroneous behaviour; 240 bytes per `update` of a
+  view unit). `byte_mask` takes six operations instead of nine. Instructions
+  of the bench's D3 server (S scale, GCC 16, pub + send): -5% in peace,
+  conflict and siege. Bytes unchanged; P2996 (Clang does not fill) unchanged.
+
+- Shared deltas: `XRecordDelta::update` snapshots the hinted blocks with
+  copies of a constant size (unrolled per block) instead of a run-time length
+  per block. The bench's D3 server keeps a delivery's loop small: the first
+  use of a unit, march or tile in a tick (compare and encode) and key bodies
+  run out of line, and a march slot looks for the lowest live march id only
+  when another march holds the slot. Instructions (S scale, GCC 16, callgrind,
+  pub + send): S peace -7%, conflict -14%, siege -10%; M peace -4%,
+  conflict -18%, siege -19%. Bytes unchanged.
+
 - Shared deltas: changed members only. `XRecordDelta<T>::fields(members)`
   (bit i = member i, `XSyncFields`), `diff(now, before, out, fields)` and
   `update(rec, fields, out, set)`, which changes a record and writes its body
@@ -73,6 +106,21 @@
   Without exceptions, allocating container operations inside a scope check
   their room first and return without effect when it is missing. New
   `XErrc::borrowed`, `stale`, `out_of_range`. Wire format unchanged.
+- Growth policy, part 3 (named accessors). Breaking: `TypedXBuffer<T>::root()`
+  and `reset()` return a proxy (`XRef<T>`) instead of `T&`; the old plain
+  reference is `plain_root()` (unprotected: it dangles when the payload
+  moves). `XOFFSET_RECORD` and `XOFFSET_RECORD_DERIVED` now also give the
+  record's proxy one accessor per listed field, `u.hp()` being
+  `u.field<&Unit::hp>()` (same instructions); a derived record also has its
+  described bases' accessors. They are ordinary member functions: MSVC,
+  no-exceptions builds and compilers without reflection get them too. The
+  proxy's own functions (`get`, `set`, `field`, `member`, `valid`, `error`)
+  win over a field of the same name (reach it with `field<&T::m>()`).
+  C array fields have a
+  proxy (`size()`, `[i]`, iteration; past the end an empty proxy and
+  `out_of_range`). Examples, README, USER_GUIDE (section 3.5) and the
+  mapstate demo use the new forms; tests that test plain references call
+  `plain_root()`. Wire format unchanged.
 - Growth policy, part 4 (batch operations, `XOFFSET_PROXY_BATCH_API`):
   vector proxies gain `append` (span, array, initializer list, count copies),
   `assign` and `emplace_n`; set and map proxies insert a span (or a vector of

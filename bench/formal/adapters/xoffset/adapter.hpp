@@ -71,7 +71,7 @@ struct XOffsetAdapter {
         return XOffsetDatastructure::XBuffer::maximum_capacity(native_arena_maximum)
             .with_growth(XOffsetDatastructure::XGrowPolicy::Automatic);
     }
-    static xo_detail::Snapshot& root(const State& state) { return state->root(); }
+    static xo_detail::Snapshot& root(const State& state) { return state->plain_root(); }
 
     static State build(const Snapshot& input) {
         auto state = std::make_unique<Buffer>(Buffer::create(native_arena_initial, policy()));

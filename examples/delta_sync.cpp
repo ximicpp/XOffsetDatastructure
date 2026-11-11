@@ -35,13 +35,15 @@ XOFFSET_REGISTER_SCHEMA_NAME(View, "example.View")
 
 int main() {
     // Server: the world as this client sees it.
+    // world.root() is a proxy (XRef<View>): v.units().emplace_back() may grow
+    // the buffer, and the proxies stay valid. Each field has an accessor.
     auto world = TypedXBuffer<View>::create();
+    auto units = world.root().units();
     for (std::uint32_t i = 0; i < 8; ++i) {
-        world.root().units.emplace_back();
-        Unit& u = world.root().units.back();
-        u.id = i;
-        u.hp = 100;
-        u.name = ("unit-" + std::to_string(i)).c_str();
+        auto u = units.emplace_back();
+        u.id() = i;
+        u.hp() = 100;
+        u.name() = "unit-" + std::to_string(i);
     }
     XDeltaBaseline client_base;  // what the client holds: nothing yet
 
@@ -53,16 +55,19 @@ int main() {
 
     std::string delta;
     for (int tick = 1; tick <= 6; ++tick) {
-        // Server: change a few fields in place, then write the delta.
-        View& v = world.root();
-        v.tick = std::uint64_t(tick);
-        v.units[std::size_t(tick)].hp -= 7 * tick;
-        if (tick == 3) {
-            v.units.emplace_back();
-            v.units.back().id = 8;
-            v.units.back().hp = 50;
-            v.units.back().name = "reinforcement";
-        }
+        // Server: change a few fields in place, then write the delta. A pin
+        // scope gives plain references at plain speed; the buffer does not
+        // move while it runs.
+        world.edit([&](View& v) {
+            v.tick = std::uint64_t(tick);
+            v.units[std::size_t(tick)].hp -= 7 * tick;
+            if (tick == 3) {
+                Unit& u = v.units.emplace_back();
+                u.id = 8;
+                u.hp = 50;
+                u.name = "reinforcement";
+            }
+        });
         const XDeltaStats stats = world.save_delta_into(delta, client_base);
         if (stats.empty) continue;  // nothing changed: nothing to send
         if (tick == 4) {
@@ -86,8 +91,9 @@ int main() {
 
     // The client's copy is the server's, read in place.
     const View& seen = held.root<View>();
-    const bool same = seen.tick == world.root().tick && seen.units.size() == world.root().units.size() &&
-                      seen.units[5].hp == world.root().units[5].hp;
+    const auto v = world.root();
+    const bool same = seen.tick == v.tick() && seen.units.size() == v.units().size() &&
+                      seen.units[5].hp == v.units()[5].hp();
     std::printf("client holds tick %llu, %zu units, unit 5 hp %d: %s\n",
                 static_cast<unsigned long long>(seen.tick), std::size_t(seen.units.size()), seen.units[5].hp,
                 same ? "same as the server" : "DIFFERENT");
