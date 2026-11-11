@@ -78,10 +78,16 @@ std::string random_text(std::mt19937& rng) {
     return s;
 }
 
-void mutate(sdt::Rec& r, std::mt19937& rng) {
+// Changes a few members of r; *members gets the bit of each member it may
+// have changed (member index, declaration order), as a game's dirty flags.
+void mutate(sdt::Rec& r, std::mt19937& rng, std::uint64_t* members = nullptr) {
     const int changes = 1 + int(rng() % 4);
+    std::uint64_t m = 0;
     for (int i = 0; i < changes; ++i) {
-        switch (rng() % 12) {
+        const unsigned c = unsigned(rng() % 12);
+        constexpr std::uint64_t kMembers[12] = {1u << 0, 1u << 1, 1u << 2, 1u << 3, 1u << 3, 1u << 4, 1u << 7, 1u << 5, 1u << 5, 1u << 6, 1u << 6, 1u << 8 | 1u << 9};
+        m |= kMembers[c];
+        switch (c) {
         case 0: r.id = int(rng()); break;
         case 1: r.flag = !r.flag; break;
         case 2: r.d = double(rng() % 1000) / 7.0; break;
@@ -108,6 +114,46 @@ void mutate(sdt::Rec& r, std::mt19937& rng) {
         default: r.small = std::uint8_t(rng()); r.arr[rng() % 2].b += 5; r.arr[1].f = rng() % 2; break;
         }
     }
+    if (members) *members = m;
+}
+
+// diff over fields(members) and update(rec, fields(members), out, set) write
+// the bytes of the whole-record diff, and leave the same records.
+void restricted_bodies(std::mt19937& rng) {
+    static_assert(RD::member_count == 10);
+    auto now = make(kRecs), base = make(kRecs), part = make(kRecs), image = make(kRecs);
+    xs::XSyncOut full, fields, upd;
+    std::size_t nonempty = 0;
+    for (int step = 0; step < 3000; ++step) {
+        const std::size_t i = rng() % kRecs;
+        const std::uint32_t seed = std::uint32_t(rng());
+        auto& N = now.root<sdt::Holder>().recs[i];
+        std::uint64_t members = 0;
+        std::mt19937 r1(seed);
+        mutate(N, r1, &members);
+        full.clear(); fields.clear(); upd.clear();
+        const bool a = RD::diff(N, base.root<sdt::Holder>().recs[i], full);
+        const bool b = RD::diff(N, part.root<sdt::Holder>().recs[i], fields, RD::fields(members));
+        std::mt19937 r2(seed);
+        const bool c = RD::update(image.root<sdt::Holder>().recs[i], RD::fields(members), upd, [&](sdt::Rec& r) { mutate(r, r2); });
+        if (a != b || a != c) fail("restricted diff / update: changed flag differs", step);
+        if (full.view() != fields.view()) fail("restricted diff body differs from the whole-record diff", step);
+        if (full.view() != upd.view()) fail("update body differs from the whole-record diff", step);
+        if (!RD::same(N, part.root<sdt::Holder>().recs[i])) fail("restricted diff left before out of date", step);
+        if (!RD::same(N, image.root<sdt::Holder>().recs[i])) fail("update left the record wrong", step);
+        nonempty += a;
+    }
+    // A part that leaves a changed member out: neither compared nor copied.
+    auto& N = now.root<sdt::Holder>().recs[0];
+    auto& P = part.root<sdt::Holder>().recs[0];
+    N.id += 1;
+    N.tag = std::string_view("changed");
+    fields.clear();
+    if (RD::diff(N, P, fields, RD::fields(1u << 8))) fail("restricted diff of unchanged members wrote a body", -1);
+    if (P.id == N.id || P.tag.view() == N.tag.view()) fail("restricted diff copied a member outside its part", -1);
+    if (!RD::diff(N, P, fields, RD::fields(1u << 0 | 1u << 7)) || P.id != N.id || P.tag.view() != N.tag.view())
+        fail("restricted diff of the changed members", -1);
+    std::printf("test_shared_delta: restricted diff and update match the whole-record diff (%zu bodies)\n", nonempty);
 }
 } // namespace
 
@@ -204,6 +250,9 @@ int main() {
         // and a root change; the count is patched in by finish().
         sdt::Inner now{}, before{};
         now.a = 7;
+        sdt::Inner ref_before = before;
+        xs::XSyncOut ref;
+        xs::XRecordDelta<sdt::Inner>::diff(now, ref_before, ref);
         xs::XSyncOut msg;
         xs::XSyncWriter m(msg, 0, 0, 42);
         m.op(1, xs::leave, 300);
@@ -222,7 +271,36 @@ int main() {
         if (p[8] != char(0 << 2 | xs::change) || p[9] != 0) fail("writer change op", -1);
         const char* bend = msg.data() + n;
         if (xs::XRecordDelta<sdt::Inner>::check(p + 10, bend, &before) != bend) fail("writer change body", -1);
+        if (std::string_view(p + 10, std::size_t(bend - (p + 10))) != ref.view()) fail("writer change body differs from diff()", -1);
+        // change() on a record without containers writes in place: the same
+        // bytes as an op plus a diff() body, and the same updated before.
+        for (int step = 0; step < 2000; ++step) {
+            sdt::Inner n = before, b1 = before, b2 = before;
+            if (rng() % 2) n.a = int(rng() % 4);
+            if (rng() % 2) n.f = rng() % 2;
+            if (rng() % 3 == 0) n.b = std::int64_t(rng()) << (rng() % 40);
+            ref.clear();
+            const bool want = xs::XRecordDelta<sdt::Inner>::diff(n, b1, ref);
+            xs::XSyncOut one;
+            xs::XSyncWriter w(one, 0, 0, 1);
+            const std::uint32_t id = std::uint32_t(rng() % 1000);
+            if (w.change(3, id, n, b2) != want) fail("writer change: changed flag differs from diff()", step);
+            w.finish();
+            xs::XSyncOut expect;
+            if (want) {
+                xs::XSyncWriter e(expect, 0, 0, 1);
+                e.op(3, xs::change, id, ref.data(), ref.size());
+                e.finish();
+            } else {
+                xs::XSyncWriter e(expect, 0, 0, 1);
+                e.finish();
+            }
+            if (one.view() != expect.view()) fail("writer change bytes differ from op + diff()", step);
+            if (b1.a != b2.a || b1.f != b2.f || b1.b != b2.b) fail("writer change left before differently from diff()", step);
+            before = n;
+        }
     }
+    restricted_bodies(rng);
     if (!verifies(client)) fail("client buffer does not verify at the end", -1);
     for (std::size_t i = 0; i < kRecs; ++i)
         if (!RD::same(server.root<sdt::Holder>().recs[i], client.root<sdt::Holder>().recs[slot[i]])) fail("final state differs", int(i));

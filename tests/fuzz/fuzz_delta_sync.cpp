@@ -121,7 +121,7 @@ template <class Root>
 bool has_state(xo::TypedXBuffer<Root>& b) { return b.arena() && b.has_root(); }
 
 template <class Root>
-std::string dump_of(xo::TypedXBuffer<Root>& b) { return has_state(b) ? dump(b.root()) : std::string("<none>"); }
+std::string dump_of(xo::TypedXBuffer<Root>& b) { return has_state(b) ? dump(b.plain_root()) : std::string("<none>"); }
 
 // XOFFSET_FUZZ_STATS=1: at exit, applies by outcome and receiver check
 // (key, none, in_place, full), to see that a corpus reaches the fast paths.
@@ -244,7 +244,7 @@ xo::XStatus apply_checked(xo::TypedXBuffer<Root>& rep, const std::string& d, xo:
         auto again = typed_load<Root>(wire);
         need(bool(again), where + ": an accepted delta left a payload that does not verify");
         need(again->save_verified() == wire, where + ": accepted payload does not re-save byte-identically");
-        need(dump(again->root()) == dump(rep.root()), where + ": accepted payload reads differently after a load");
+        need(dump(again->plain_root()) == dump(rep.plain_root()), where + ": accepted payload reads differently after a load");
     }
     return r;
 }
@@ -373,9 +373,9 @@ struct Fixture {
           base(0x5eedull * 2 + 1 + seed * 2ull),
           rep(4096, xo::XBuffer::maximum_capacity(kLimit)),
           rng(0xde17a000ull + seed) {
-        fill(src.root(), rng);
+        fill(src.plain_root(), rng);
         for (unsigned step = 0; step <= warm; ++step) {
-            if (step) mutate(src.root(), rng, unsigned(rng()));
+            if (step) mutate(src.plain_root(), rng, unsigned(rng()));
             std::string d;
             const auto stats = src.save_delta_into(d, base);
             if (stats.empty) continue;
@@ -470,8 +470,8 @@ void run_stream(std::uint8_t seed, In& in) {
         const std::uint8_t op = in.u8();
         f.rng.seed(0x51e9ull * (step + 1) + in.u16());
         if (op % 16 == 0) f.base.reset();
-        else if (op % 16 == 1) { f.src.reset(); fill(f.src.root(), f.rng); }
-        else if (op % 16 != 2) mutate(f.src.root(), f.rng, op >> 4);
+        else if (op % 16 == 1) { f.src.reset(); fill(f.src.plain_root(), f.rng); }
+        else if (op % 16 != 2) mutate(f.src.plain_root(), f.rng, op >> 4);
         xo::XDeltaOptions o;
         o.digest = op & 0x20;
         o.whole_blocks = (op & 0xc0) == 0xc0;
@@ -509,7 +509,7 @@ void run_stream(std::uint8_t seed, In& in) {
         need(bool(r), where + ": a real delta was rejected: " + (r ? std::string() : r.error().message));
         need(payload_of(f.src) == payload_of(f.rep), where + ": replica payload differs from the sender's");
         need(holes_of(f.src) == holes_of(f.rep), where + ": replica hole set differs from the sender's");
-        need(dump(f.src.root()) == dump(f.rep.root()), where + ": replica contents differ");
+        need(dump(f.src.plain_root()) == dump(f.rep.plain_root()), where + ": replica contents differ");
         need(f.cur.version() == f.base.version() && f.cur.stream() == f.base.stream(), where + ": cursor does not follow");
     }
 }
@@ -565,7 +565,7 @@ extern "C" int XOffsetFuzzWriteSeeds(const char* dir) {
             auto bare = [&](auto tag) {
                 using Root = typename decltype(tag)::type;
                 Fixture<Root> f(seed, 1);
-                mutate(f.src.root(), f.rng, seed);
+                mutate(f.src.plain_root(), f.rng, seed);
                 xo::XDeltaOptions o;
                 o.digest = seed & 1;
                 o.whole_blocks = seed & 2;

@@ -257,6 +257,32 @@ Apple clang 21.0.0，C++20：macOS arm64 和 iOS 模拟器（iPhone 17，iOS 27.
 - 非产品路径（11-10 决定只报）：逐客户端原生增量 NP 7.1×、NC 2.0× zpp_bits，第 1 类原生存储 SN 1.88× zpp_bits。
 - 3.4.0 在 Mac 上的 SLG 计分卡见 project files 的 `slg340-20261106/SLG340_REPORT.md`（对 SLGV9c 无回退）。
 
+### 3.6：小消息视图预取、x86 列和上行列的门槛（2026-11-11）
+
+另一台云端机器（Xeon 2.3 GHz，型号 173，4 核），GCC 16 `-O3`，`tools/perf_gate/x86_columns.sh` 10 批交错，
+`x86_columns.py` 按（批，周期）配对。基线 `d8c5018d`（含 #255），头 = 基线 + `XReceiver::view` 的小消息预取。
+两轮各 10 批：
+
+| 格（xoffset_trusted ÷ 对手） | 基线 | 头 |
+| --- | --- | --- |
+| UPW.recv ÷ cista_unchecked | 1.151 / 1.151 | 1.022 / 1.000 |
+| UPW.recv ÷ zpp_bits | 0.859 / 0.919 | 0.763 / 0.799 |
+| UPW.recv 头 ÷ 基线 | | 0.888 [0.85, 0.93] / 0.869 [0.83, 0.91] |
+| UCW.recv、USW.recv 头 ÷ 基线 | | 0.97–0.98、1.00 |
+| UP.send ÷ zpp_bits | 0.970 | 0.952 / 0.977 |
+| UL.recv ÷ zpp_bits（边界档） | 0.88–0.91 | 0.92–0.94 |
+| UL.send ÷ zpp_bits | 1.66–1.70 | 1.53–1.55 |
+
+- 和平热视图的差额不在指令数：callgrind 把 UPW.recv 拆成 view 和 apply 两段，view 段 XOffset 更快
+  （不复制，计时 312 对 408 ns），apply 段 XOffset 的指令更少（577 对 613/条），但多出每条 5.3 次 D1 读缺失，
+  全是第一次读线上字节：cista 在接收时整段 `memcpy`，这几行一次并行取进来；XOffset 原地读，缺失落在
+  apply 循环里，一个接一个。`view()` 现在对 ≤1 KiB 的线上消息先把每一行都请求一遍（读预取），
+  apply 段 407 → 350 ns。更大的消息交给硬件的顺序预取（整段预取让 14 KB 的 USW 慢了 12%）。
+- 和 cista_unchecked 现在在云端 A/A 噪声里（同一份代码两次构建 10 批，几何均值偏 0.98–1.04）。
+- #255（1 MiB 起步预留）对这几格没有影响：3.5 的库 `7a0d3d96` ÷ `d8c5018d` 是 UPW 0.996、UCW 1.033、USW 1.037。
+- str.append（STAGE350 的 3.6 观察项，Mac 对齐构建 1.035）：v3.4.0 和 v3.5.0 的 `reloc_bench` str.append
+  在 GCC 16 和 P2996 上 Ir、Dr、Dw、D1 缺失逐项相同，是 Mac 上的代码摆放，不改代码。
+
 ## 7. 局限
 
 - 正式计时只有一台 M4。别的 arm64 核（存储转发、分支预测不同）上的快慢关系可能不一样；x86-64 只有第 6 节那组

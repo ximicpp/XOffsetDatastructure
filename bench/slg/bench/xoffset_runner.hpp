@@ -106,7 +106,7 @@ public:
         shard_.emplace(XBuffer::create<ShardState>(kShardInitial, cap(true)));
         copy_shard(shard_->root<ShardState>(), src);
         if (reuse_mode()) {
-            a_req_.emplace(XBuffer::create<BattleMsg>(kBattleInitial, cap()));
+            a_req_.emplace(XBuffer::create<BattleMsg>(kBattleInitial, build_cap()));
             a_m_.emplace(XBuffer::create<BattleMsg>(kBattleInitial, cap()));
             a_r_.emplace(XBuffer::create<BattleMsg>(kBattleInitial, cap()));
             b_m_.emplace(XBuffer::create<PlayerState>(kPlayerInitial, cap()));
@@ -146,17 +146,20 @@ public:
             std::string req, res;
             std::optional<XBuffer> m, r;
             timed(st, "A.req_encode", [&] {
-                XBuffer b = XBuffer::create<BattleMsg>(kBattleInitial, cap());
-                auto& msg = b.root<BattleMsg>();
-                msg.battle_id = pr.battle_id; msg.seed = pr.seed; msg.winner = 0;
+                XBuffer b = XBuffer::create<BattleMsg>(kBattleInitial, build_cap());
+                build_in<BattleMsg>(b, [&](BattleMsg& msg) {
+                    msg.battle_id = pr.battle_id; msg.seed = pr.seed; msg.winner = 0;
 #if defined(XOFFSET_SAVE_COMPOSED_API)
-                // Adapter v3: the request is composed from the two armies straight
-                // into the wire (tight save_compact layout); the draft holds only the root.
-                b.save_compact_into<BattleMsg>(req, XCompactOptions{.slack_div = 0},
-                                               xassign(msg.attacker, att), xassign(msg.defender, def));
+                    // Adapter v3: the request is composed from the two armies straight
+                    // into the wire (tight save_compact layout); the draft holds only the root.
+                    b.save_compact_into<BattleMsg>(req, XCompactOptions{.slack_div = 0},
+                                                   xassign(msg.attacker, att), xassign(msg.defender, def));
 #else
-                msg.attacker = att;  // T4 adapter (c): public copy assignment
-                msg.defender = def;
+                    msg.attacker = att;  // T4 adapter (c): public copy assignment
+                    msg.defender = def;
+#endif
+                });
+#if !defined(XOFFSET_SAVE_COMPOSED_API)
                 req = b.save_verified<BattleMsg>();
 #endif
             });
@@ -223,8 +226,8 @@ public:
         std::vector<std::string> wires;
         wires.reserve(reports.size());
         for (const auto& rep : reports) {
-            XBuffer b = XBuffer::create<Report>(kReportInitial, cap());
-            copy_report(b.root<Report>(), rep);
+            XBuffer b = XBuffer::create<Report>(kReportInitial, build_cap());
+            build_in<Report>(b, [&](Report& out) { copy_report(out, rep); });
             wires.push_back(b.save_verified<Report>());
         }
         for (const auto& w : wires) st.bytes["D.report"] += w.size();
@@ -256,15 +259,20 @@ public:
             timed(st, "A.req_encode", [&] {
 #if defined(XOFFSET_SAVE_COMPOSED_API)
                 // Adapter v3 (see above): a_req_'s armies stay empty, nothing is reset.
-                auto& msg = a_req_->root<BattleMsg>();
-                msg.battle_id = pr.battle_id; msg.seed = pr.seed; msg.winner = 0;
-                a_req_->save_compact_into<BattleMsg>(req_, XCompactOptions{.slack_div = 0},
-                                                     xassign(msg.attacker, att), xassign(msg.defender, def));
+                auto compose = [&](BattleMsg& msg) {
+                    msg.battle_id = pr.battle_id; msg.seed = pr.seed; msg.winner = 0;
+                    a_req_->save_compact_into<BattleMsg>(req_, XCompactOptions{.slack_div = 0},
+                                                         xassign(msg.attacker, att), xassign(msg.defender, def));
+                };
+                // Scalar stores only, nothing allocates: the payload cannot
+                // move, so the plain root reference needs no pin scope.
+                compose(a_req_->root<BattleMsg>());
 #else
-                auto& msg = a_req_->reset<BattleMsg>();
-                msg.battle_id = pr.battle_id; msg.seed = pr.seed; msg.winner = 0;
-                msg.attacker = att;  // T4 adapter (c): public copy assignment
-                msg.defender = def;
+                build_in<BattleMsg>(*a_req_, [&](BattleMsg& msg) {
+                    msg.battle_id = pr.battle_id; msg.seed = pr.seed; msg.winner = 0;
+                    msg.attacker = att;  // T4 adapter (c): public copy assignment
+                    msg.defender = def;
+                });
                 a_req_->save_verified_into<BattleMsg>(req_);
 #endif
             });
@@ -349,8 +357,8 @@ public:
         std::vector<std::string> wires;
         wires.reserve(reports.size());
         for (const auto& rep : reports) {
-            XBuffer b = XBuffer::create<Report>(kReportInitial, cap());
-            copy_report(b.root<Report>(), rep);
+            XBuffer b = XBuffer::create<Report>(kReportInitial, build_cap());
+            build_in<Report>(b, [&](Report& out) { copy_report(out, rep); });
             wires.push_back(b.save_verified<Report>());
         }
         for (const auto& w : wires) st.bytes["D.report"] += w.size();
@@ -409,7 +417,7 @@ public:
         std::string lw, pw;
         void setup() {
             hold.clear(); hold.resize(srv.size());
-            pm.emplace(XBuffer::create<xm::PlayerPatch>(kViewInitial, cap()));
+            pm.emplace(XBuffer::create<xm::PlayerPatch>(kViewInitial, build_cap()));
             pr.emplace(XBuffer::create<xm::PlayerPatch>(kViewInitial, cap()));
             for (auto& h : hw) h.reset();
 #ifdef XOFFSET_DELTA_SYNC_API
@@ -430,7 +438,7 @@ public:
         }
         PlayerState& held(int p) { return hold[std::size_t(p)]->template root<PlayerState>(); }
         template <class Fill> std::size_t patch_encode(Fill&& fill) {
-            fill(pm->template reset<xm::PlayerPatch>());
+            build_in<xm::PlayerPatch>(*pm, fill);
             pm->template save_verified_into<xm::PlayerPatch>(pw);
             return pw.size();
         }
@@ -454,8 +462,8 @@ public:
         std::optional<XBuffer> um, ur;
         std::string uw;
         template <class Fill> std::size_t up_encode(Fill&& fill) {
-            if (!um) um.emplace(XBuffer::create<xm::March>(kUplinkInitial, cap()));
-            fill(um->template reset<xm::March>());
+            if (!um) um.emplace(XBuffer::create<xm::March>(kUplinkInitial, build_cap()));
+            build_in<xm::March>(*um, fill);
             um->template save_verified_into<xm::March>(uw);
             return uw.size();
         }
@@ -542,8 +550,8 @@ public:
         std::string w;
         PlayerState& player(int p) { return r->players_[std::size_t(p)].template root<PlayerState>(); }
         template <class Fill> std::size_t modules_encode(Fill&& fill) {
-            if (!pm) { pm.emplace(XBuffer::create<xm::PlayerPatch>(kPlayerInitial, cap())); pr.emplace(XBuffer::create<xm::PlayerPatch>(kPlayerInitial, cap())); }
-            fill(pm->template reset<xm::PlayerPatch>());
+            if (!pm) { pm.emplace(XBuffer::create<xm::PlayerPatch>(kPlayerInitial, build_cap())); pr.emplace(XBuffer::create<xm::PlayerPatch>(kPlayerInitial, cap())); }
+            build_in<xm::PlayerPatch>(*pm, fill);
             pm->template save_verified_into<xm::PlayerPatch>(w);
             return w.size();
         }
@@ -595,8 +603,8 @@ public:
         // -DSLG_RP_CHECK checks every use against root<ViewSnapshot>() (off by default).
         std::vector<xm::ViewSnapshot*> held_roots;
         void setup(int clients, int units, int marches) {
-            es.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, cap()));
-            ds.emplace(XBuffer::create<xm::ViewDelta>(kViewInitial, cap()));
+            es.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, build_cap()));
+            ds.emplace(XBuffer::create<xm::ViewDelta>(kViewInitial, build_cap()));
             dr.emplace(XBuffer::create<xm::ViewDelta>(kViewInitial, cap()));
             snaps.assign(1, {});
             held_views.clear();
@@ -609,7 +617,7 @@ public:
 #endif
         }
         template <class Fill> std::size_t snap_encode(int b, Fill&& fill) {
-            fill(es->reset<xm::ViewSnapshot>());
+            build_in<xm::ViewSnapshot>(*es, fill);
             es->save_verified_into<xm::ViewSnapshot>(snaps[std::size_t(b)]);
             return snaps[std::size_t(b)].size();
         }
@@ -633,7 +641,7 @@ public:
             return *held_roots[i];
         }
         template <class Fill> std::size_t delta_encode(Fill&& fill) {
-            fill(ds->reset<xm::ViewDelta>());
+            build_in<xm::ViewDelta>(*ds, fill);
             ds->save_verified_into<xm::ViewDelta>(dw);
             return dw.size();
         }
@@ -962,18 +970,28 @@ public:
 #endif
 
         // ---- D3 prototype (EXPERIMENTAL, xoffset_shared_delta.hpp), keys D* ----
-        // Server: one entity store (units by world index, tiles by tile id) and
-        // one shared baseline of it, for all connections. Every unit changed in
-        // a tick is copied from the world, compared and encoded once
-        // (d_publish); marches and tiles are compared and encoded on their
-        // first use in the tick; key bodies (an entity entering a view) are
-        // built once per tick on first use. A delivery copies those bodies into
+        // Server: one image of every entity as its holders have it (units in
+        // dstore by world index, tiles and marches next to their entries),
+        // shared by all connections. Every changed unit some view holds is
+        // compared and encoded once per tick (d_publish); other units, marches
+        // and tiles on their first use in the tick; key bodies (an entity
+        // entering a view) are built once per tick on first use. A delivery
+        // copies those bodies into
         // its message (d_send). Per connection the server keeps its stream,
         // message version and the root fields it last sent, nothing per entity
         // beyond the tracker every format shares. Client: its own view buffer
         // and slots, an id -> slot index; d_recv checks the whole message,
         // then applies it.
-        struct D3Ent { int64_t tick = -1; uint32_t off = 0, len = 0; int64_t ktick = -1; uint32_t koff = 0, klen = 0; };
+        // A shared body of this tick and the key body of this tick (ticks fit 32 bits).
+        struct D3Ent { int32_t tick = -1, ktick = -1; uint32_t off = 0, len = 0, koff = 0, klen = 0; };
+        // Units (d_unit): dirty flags of tick ptick (now) and of earlier ticks
+        // no delivery used (old); rtick, the tick d_unit last ran.
+        // hold: connections whose view holds the unit (enters sent minus leaves).
+        struct D3UEnt : D3Ent { uint64_t now = 0, old = 0; int32_t ptick = -1, rtick = -1, hold = 0; };
+        // Marches and tiles keep the image every holder has next to the entry:
+        // one cache line per entity.
+        struct alignas(64) D3MEnt : D3Ent { xm::ViewMarch prev{}; };
+        struct D3TEnt : D3Ent { xm::Tile prev{}; };
         struct D3Conn { uint64_t stream = 0; uint32_t version = 0; xm::D3Root root{}; };
         struct D3Client {
             std::optional<XBuffer> view;
@@ -1055,18 +1073,33 @@ public:
                 XBuffer::maximum_capacity(XBuffer::DEFAULT_MAXIMUM_CAPACITY));
             return rx;
         }
-        std::optional<XBuffer> dstore, dbase;
-        std::vector<D3Ent> due, dte, dme;
-        std::vector<xm::ViewMarch> dmprev;
-        std::vector<xm::Tile> dtprev;
+        std::optional<XBuffer> dstore;   // every unit as its holders have it (the shared image)
+        std::vector<D3UEnt> due;
+        std::vector<D3TEnt> dte;
+        // Marches by id in a ring of a power-of-two size (slot id & (size - 1);
+        // march ids only grow, so an id-indexed array would grow forever): a
+        // slot whose march has left the world is reused, a live one makes the
+        // ring double.
+        std::vector<D3MEnt> dme;
         XOffsetDatastructure::xsync::XSyncOut darena, dmsg;   // this tick's bodies; the message being built
-        int64_t dtick = -1;
+        int64_t dtick = -1;   // the world's tick (entries keep it as int32_t)
         int32_t ducap = 0, dmcap = 0;   // view capacity, as NP's (n_setup)
         std::vector<D3Conn> dconn;
         std::vector<D3Client> dcli;
         std::vector<D3Client> dclt;   // the same clients in the trust tier (d_recv_trusted)
         template <class T> using RD = XOffsetDatastructure::xsync::XRecordDelta<T>;
+        // A dirty flag's bit is its ViewUnit member's index (d_publish).
+#define SLG_X(f) static_assert(XOffsetDatastructure::schema::member_t<xm::ViewUnit, dbit::f>::offset == offsetof(xm::ViewUnit, f));
+        SLG_VUNIT_SCALARS(SLG_X)
+        SLG_X(name) SLG_X(alliance_tag) SLG_X(owner_name) SLG_X(commander) SLG_X(heroes) SLG_X(troops) SLG_X(buffs)
+#undef SLG_X
+        static_assert(RD<xm::ViewUnit>::member_count == std::size_t(dbit::buffs) + 1);
 
+#if defined(__GNUC__) || defined(__clang__)
+#define SLG_PREFETCH(p) __builtin_prefetch(p)
+#else
+#define SLG_PREFETCH(p) ((void)(p))
+#endif
         // Clients 0..clients-1, then the warm devices' views (clients + d), as held().
         void d_init(const MapWorld& w) {
             const ViewScale& vs = w.scale();
@@ -1074,17 +1107,15 @@ public:
             dmcap = vs.marches / 4 + 32;
             const std::size_t views = std::size_t(vs.clients + warm_devices(vs.clients));
             dstore.emplace(XBuffer::create<xm::ViewSnapshot>(std::size_t(4) << 20, cap(true)));
-            dbase.emplace(XBuffer::create<xm::ViewSnapshot>(std::size_t(4) << 20, cap(true)));
             auto& s = dstore->template root<xm::ViewSnapshot>();
-            auto& b = dbase->template root<xm::ViewSnapshot>();
             s.units.resize(std::size_t(vs.units));
-            b.units.resize(std::size_t(vs.units));
-            for (int32_t i = 0; i < vs.units; ++i) { copy_unit(s.units[std::size_t(i)], w.unit(i)); copy_unit(b.units[std::size_t(i)], w.unit(i)); }
-            dtprev.assign(std::size_t(kTiles) * kTiles, {});
-            for (int32_t t = 0; t < kTiles * kTiles; ++t) copy_vtile(dtprev[std::size_t(t)], w, t % kTiles, t / kTiles);
+            for (int32_t i = 0; i < vs.units; ++i) copy_unit(s.units[std::size_t(i)], w.unit(i));
+            dte.assign(std::size_t(kTiles) * kTiles, {});
+            for (int32_t t = 0; t < kTiles * kTiles; ++t) copy_vtile(dte[std::size_t(t)].prev, w, t % kTiles, t / kTiles);
             due.assign(std::size_t(vs.units), {});
-            dte.assign(dtprev.size(), {});
-            dme.clear(); dmprev.clear();
+            dme.assign(std::bit_ceil(std::size_t(vs.marches) * 4 + 64), {});
+            dnext = 0;
+            for (int32_t j = 0; j < w.march_count(); ++j) dnext = std::max(dnext, w.march(j).id + 1);
             dconn.assign(std::size_t(vs.clients), {});
             dcli.clear();
             dcli.resize(views);
@@ -1110,79 +1141,177 @@ public:
         xm::ViewSnapshot& d_held_trusted(int c) { return dclt[std::size_t(c)].view->template root<xm::ViewSnapshot>(); }
         std::string_view d_wire() const { return dmsg.view(); }
 
-        // Server memory (--mode mem, MEM.D*): per connection, and the store,
-        // baseline and arenas every connection shares.
+        // Server memory (--mode mem, MEM.D*): per connection, and the image,
+        // entries and arenas every connection shares.
         std::size_t d_conn_bytes() const { return sizeof(D3Conn); }
         std::size_t d_shared_bytes() const {
             if (!dstore) return 0;
-            return dstore->get_size() + dbase->get_size() + (due.capacity() + dte.capacity() + dme.capacity()) * sizeof(D3Ent) +
-                   dmprev.capacity() * sizeof(xm::ViewMarch) + dtprev.capacity() * sizeof(xm::Tile) + darena.capacity() + dmsg.capacity();
+            return dstore->get_size() + due.capacity() * sizeof(D3UEnt) + dte.capacity() * sizeof(D3TEnt) + dme.capacity() * sizeof(D3MEnt) +
+                   darena.capacity() + dmsg.capacity();
         }
 
 
-        // Once per tick: every unit the world changed is copied into the store
-        // (the fields its dirty flags name), compared with the shared baseline
-        // and encoded into this tick's arena.
+        // Once per tick: the dirty flags of every unit the world changed are
+        // noted, and every changed unit some connection holds is copied,
+        // compared and encoded (each once, for all its holders). A unit no
+        // one holds waits for its first use (a key: an entering view), so a
+        // small server whose viewports cover a fraction of the world does not
+        // encode changes no one receives.
         void d_publish(const MapWorld& w) {
             dtick = w.tick_no();
             darena.clear();
-            auto& s = dstore->template root<xm::ViewSnapshot>();
-            auto& b = dbase->template root<xm::ViewSnapshot>();
-            for (int32_t i : w.changed_units()) {
-                auto& d = s.units[std::size_t(i)];
-                const WorldUnit& u = w.unit(i);
-                const uint64_t m = w.dirty(i);
-#define SLG_X(f) if (m & SLG_D(f)) d.f = u.f;
+            const auto& cu = w.changed_units();
+            // Three passes, so the cache misses of different units overlap:
+            // the entries, then the images of held units, then the encoding.
+            for (int32_t i : cu) SLG_PREFETCH(&due[std::size_t(i)]);
+            auto& units = dstore->template root<xm::ViewSnapshot>().units;
+            for (int32_t i : cu) {
+                D3UEnt& e = due[std::size_t(i)];
+                if (e.ptick != dtick) { e.old |= e.now; e.now = 0; e.ptick = int32_t(dtick); }
+                e.now |= w.dirty(i);
+                if (e.hold > 0) {
+                    const char* r = reinterpret_cast<const char*>(&units[std::size_t(i)]);
+                    for (std::size_t o = 0; o < sizeof(xm::ViewUnit); o += 64) SLG_PREFETCH(r + o);
+                }
+            }
+            for (int32_t i : cu) if (due[std::size_t(i)].hold > 0) d_unit(w, i);
+            // Tiles whose owner changed: their entries are fetched now (one
+            // line each, all at once); they are encoded on first use.
+            for (int32_t t : w.changed_tiles()) SLG_PREFETCH(&dte[std::size_t(t)]);
+            // The same for the marches that started this tick (the world
+            // appends them: the ids from dnext on, at the end).
+            for (int32_t j = w.march_count() - 1; j >= 0 && w.march(j).id >= dnext; --j)
+                SLG_PREFETCH(&dme[std::size_t(w.march(j).id) & (dme.size() - 1)]);
+            if (const int32_t n = w.march_count()) dnext = std::max(dnext, w.march(n - 1).id + 1);
+        }
+        int32_t dnext = 0;   // the lowest march id d_publish has not seen
+        // Unit i on its first use in the tick: the members changed since the
+        // store last saw it are copied in from the world. Changes of earlier
+        // ticks that no delivery used (old) had no holder, so none holds the
+        // unit now except through a key of this tick: the image takes them
+        // and no change op goes out. Otherwise this tick's change is compared
+        // with the image, over the changed members only, and encoded: the
+        // same body as comparing whole records. Returns the entry; e.tick ==
+        // dtick when the unit has a change body this tick.
+        D3UEnt& d_unit(const MapWorld& w, int32_t i) {
+            D3UEnt& e = due[std::size_t(i)];
+            if (e.rtick == dtick) return e;
+            return d_unit_fill(w, i);
+        }
+        // The first use in the tick, out of line: a delivery's loop stays
+        // small (it runs between other work that evicts the I-cache).
+        XOFFSET_DETAIL_NOINLINE D3UEnt& d_unit_fill(const MapWorld& w, int32_t i) {
+            D3UEnt& e = due[std::size_t(i)];
+            e.rtick = dtick;
+            const uint64_t now = e.ptick == dtick ? e.now : 0;
+            const uint64_t old = e.old | (e.ptick == dtick ? 0 : e.now);
+            const uint64_t m = now | old;
+            e.now = e.old = 0;
+            if (!m) return e;
+            auto& d = dstore->template root<xm::ViewSnapshot>().units[std::size_t(i)];
+            const WorldUnit& u = w.unit(i);
+            const auto set = [&](xm::ViewUnit& r) {
+#define SLG_X(f) if (m & SLG_D(f)) r.f = u.f;
                 SLG_VUNIT_SCALARS(SLG_X)
 #undef SLG_X
-                if (m & SLG_D(name)) set_str(d.name, u.name);
-                if (m & SLG_D(alliance_tag)) set_str(d.alliance_tag, u.alliance_tag);
-                if (m & SLG_D(owner_name)) set_str(d.owner_name, u.owner_name);
-                if (m & SLG_D(commander)) copy_uhero(d.commander, u.commander);
-                if (m & SLG_D(heroes)) copy_list(d.heroes, u.heroes, [](auto& a, const auto& e) { copy_uhero(a, e); });
-                if (m & SLG_D(troops)) copy_list(d.troops, u.troops, [](auto& a, const auto& e) { a.type = e.type; a.count = e.count; a.wounded = e.wounded; });
-                if (m & SLG_D(buffs)) copy_list(d.buffs, u.buffs, [](auto& a, const auto& e) { a.id = e.id; a.stacks = e.stacks; a.expire_ms = e.expire_ms; });
-                D3Ent& e = due[std::size_t(i)];
-                const std::size_t at = darena.size();
-                if (RD<xm::ViewUnit>::diff(d, b.units[std::size_t(i)], darena)) { e.tick = dtick; e.off = uint32_t(at); e.len = uint32_t(darena.size() - at); }
-            }
+                if (m & SLG_D(name)) set_str(r.name, u.name);
+                if (m & SLG_D(alliance_tag)) set_str(r.alliance_tag, u.alliance_tag);
+                if (m & SLG_D(owner_name)) set_str(r.owner_name, u.owner_name);
+                if (m & SLG_D(commander)) copy_uhero(r.commander, u.commander);
+                if (m & SLG_D(heroes)) copy_list(r.heroes, u.heroes, [](auto& a, const auto& x) { copy_uhero(a, x); });
+                if (m & SLG_D(troops)) copy_list(r.troops, u.troops, [](auto& a, const auto& x) { a.type = x.type; a.count = x.count; a.wounded = x.wounded; });
+                if (m & SLG_D(buffs)) copy_list(r.buffs, u.buffs, [](auto& a, const auto& x) { a.id = x.id; a.stacks = x.stacks; a.expire_ms = x.expire_ms; });
+            };
+            if (old) { set(d); return e; }   // no holder: the image catches up, nothing is sent
+            // This tick's change, compared over the changed members only (the
+            // rest of the image is unchanged): the body a whole-record
+            // comparison with last tick's image writes.
+            const std::size_t at = darena.size();
+            if (RD<xm::ViewUnit>::update(d, RD<xm::ViewUnit>::fields(now), darena, set)) { e.tick = dtick; e.off = uint32_t(at); e.len = uint32_t(darena.size() - at); }
+            return e;
         }
         // A march's body for this tick (compared with the image every holder
         // has, on first use in the tick) and its key body.
-        D3Ent& d_march(const MapWorld& w, int32_t i) {
+        D3MEnt& d_march(const MapWorld& w, int32_t i) {
             const WorldMarch& m = w.march(i);
-            const std::size_t id = std::size_t(m.id);
-            if (id >= dme.size()) { dme.resize(id * 2 + 64); dmprev.resize(id * 2 + 64); }
-            D3Ent& e = dme[id];
-            if (e.tick != dtick) {
+            D3MEnt& e = dme[std::size_t(m.id) & (dme.size() - 1)];
+            if (e.prev.id == m.id && e.tick == dtick) return e;
+            return d_march_fill(w, i);
+        }
+        XOFFSET_DETAIL_NOINLINE D3MEnt& d_march_fill(const MapWorld& w, int32_t i) {
+            const WorldMarch& m = w.march(i);
+            D3MEnt* e = &dme[std::size_t(m.id) & (dme.size() - 1)];
+            if (e->prev.id != m.id) {
+                if (e->prev.id != 0 && e->prev.id >= d_min_live(w)) e = &d_march_grow(w, m.id);
+                else *e = D3MEnt{};
+            }
+            if (e->tick != dtick) {
                 xm::ViewMarch img;
                 copy_vmarch(img, m);
-                xm::ViewMarch& prev = dmprev[id];
-                if (prev.id == 0) { prev = img; e.len = 0; }
-                else { const std::size_t at = darena.size(); RD<xm::ViewMarch>::diff(img, prev, darena); e.off = uint32_t(at); e.len = uint32_t(darena.size() - at); }
-                e.tick = dtick;
+                if (e->prev.id == 0) { e->prev = img; e->len = 0; }
+                else { const std::size_t at = darena.size(); RD<xm::ViewMarch>::diff(img, e->prev, darena); e->off = uint32_t(at); e->len = uint32_t(darena.size() - at); }
+                e->tick = int32_t(dtick);
             }
+            return *e;
+        }
+        void d_march_key(D3MEnt& e) {
+            if (e.ktick != dtick) d_march_key_fill(e);
+        }
+        XOFFSET_DETAIL_NOINLINE void d_march_key_fill(D3MEnt& e) {
+            e.koff = uint32_t(darena.size()); RD<xm::ViewMarch>::key(e.prev, darena); e.klen = uint32_t(darena.size() - e.koff); e.ktick = int32_t(dtick);
+        }
+        // The lowest id of a march in the world this tick (found on the first
+        // slot taken in the tick): a march with a lower id has left it.
+        int32_t d_min_live(const MapWorld& w) {
+            if (dmin_tick != dtick) {
+                dmin_tick = dtick;
+                dmin_live = std::numeric_limits<int32_t>::max();
+                for (int32_t j = 0; j < w.march_count(); ++j) dmin_live = std::min(dmin_live, w.march(j).id);
+            }
+            return dmin_live;
+        }
+        int32_t dmin_live = 0;
+        int64_t dmin_tick = -1;
+        // A live march holds id's slot: double the ring until every live march
+        // has a slot of its own. Returns id's (empty) entry.
+        XOFFSET_DETAIL_NOINLINE D3MEnt& d_march_grow(const MapWorld& w, int32_t id) {
+            for (std::size_t n = dme.size() * 2;; n *= 2) {
+                std::vector<D3MEnt> r(n);
+                bool ok = true;
+                for (const D3MEnt& e : dme) {
+                    if (e.prev.id == 0 || e.prev.id < d_min_live(w)) continue;
+                    D3MEnt& to = r[std::size_t(e.prev.id) & (n - 1)];
+                    if (to.prev.id != 0) { ok = false; break; }
+                    to = e;
+                }
+                if (!ok || r[std::size_t(id) & (n - 1)].prev.id != 0) continue;
+                dme.swap(r);
+                return dme[std::size_t(id) & (n - 1)];
+            }
+        }
+        D3TEnt& d_tile(const MapWorld& w, int32_t t) {
+            D3TEnt& e = dte[std::size_t(t)];
+            if (e.tick != dtick) d_tile_fill(w, t);
             return e;
         }
-        D3Ent& d_tile(const MapWorld& w, int32_t t) {
-            D3Ent& e = dte[std::size_t(t)];
-            if (e.tick != dtick) {
+        XOFFSET_DETAIL_NOINLINE void d_tile_fill(const MapWorld& w, int32_t t) {
+            D3TEnt& e = dte[std::size_t(t)];
+            {
                 xm::Tile img;
                 copy_vtile(img, w, t % kTiles, t / kTiles);
                 const std::size_t at = darena.size();
-                RD<xm::Tile>::diff(img, dtprev[std::size_t(t)], darena);
+                RD<xm::Tile>::diff(img, e.prev, darena);
                 e.off = uint32_t(at); e.len = uint32_t(darena.size() - at);
-                e.tick = dtick;
+                e.tick = int32_t(dtick);
             }
-            return e;
         }
-        void d_unit_key(int32_t i) {
-            D3Ent& e = due[std::size_t(i)];
+        XOFFSET_DETAIL_NOINLINE void d_unit_key(const MapWorld& w, int32_t i) {
+            D3UEnt& e = d_unit(w, i);
             if (e.ktick == dtick) return;
             e.koff = uint32_t(darena.size());
             RD<xm::ViewUnit>::key(dstore->template root<xm::ViewSnapshot>().units[std::size_t(i)], darena);
             e.klen = uint32_t(darena.size() - e.koff);
-            e.ktick = dtick;
+            e.ktick = int32_t(dtick);
         }
         using D3Writer = XOffsetDatastructure::xsync::XSyncWriter;
         void d_put(D3Writer& m, unsigned table, XOffsetDatastructure::xsync::XSyncKind kind, int32_t id, uint32_t off, uint32_t len) {
@@ -1211,18 +1340,18 @@ public:
             k.stream = 0x5d3000000ull + uint64_t(c);
             D3Writer m(dmsg, xs::kFlagKey, k.stream, ++k.version);
             d_root(m, k, 0, w.tick_no());
-            for (int32_t i : p.units) { d_unit_key(i); const D3Ent& e = due[std::size_t(i)]; d_put(m, kTUnit, xs::enter, w.unit(i).id, e.koff, e.klen); }
+            for (int32_t i : p.units) { d_unit_key(w, i); D3UEnt& e = due[std::size_t(i)]; ++e.hold; d_put(m, kTUnit, xs::enter, w.unit(i).id, e.koff, e.klen); }
             for (int32_t i : p.marches) {
-                D3Ent& e = d_march(w, i);
-                if (e.ktick != dtick) { e.koff = uint32_t(darena.size()); RD<xm::ViewMarch>::key(dmprev[std::size_t(w.march(i).id)], darena); e.klen = uint32_t(darena.size() - e.koff); e.ktick = dtick; }
+                D3MEnt& e = d_march(w, i);
+                d_march_key(e);
                 d_put(m, kTMarch, xs::enter, w.march(i).id, e.koff, e.klen);
             }
             const TileSpan sp = dcli[std::size_t(c)].span;
             for (int32_t ty = sp.ty0; ty < sp.ty0 + sp.rows; ++ty)
                 for (int32_t tx = sp.tx0; tx < sp.tx0 + sp.cols; ++tx) {
                     const int32_t t = ty * kTiles + tx;
-                    D3Ent& e = dte[std::size_t(t)];
-                    if (e.ktick != dtick) { e.koff = uint32_t(darena.size()); RD<xm::Tile>::key(dtprev[std::size_t(t)], darena); e.klen = uint32_t(darena.size() - e.koff); e.ktick = dtick; }
+                    D3TEnt& e = dte[std::size_t(t)];
+                    if (e.ktick != dtick) { e.koff = uint32_t(darena.size()); RD<xm::Tile>::key(e.prev, darena); e.klen = uint32_t(darena.size() - e.koff); e.ktick = int32_t(dtick); }
                     d_put(m, kTTile, xs::enter, t, e.koff, e.klen);
                 }
             m.finish();
@@ -1237,19 +1366,18 @@ public:
 #endif
             D3Writer m(dmsg, 0, k.stream, ++k.version);
             d_root(m, k, id, w.tick_no());
-            for (int32_t uid : p.removed) m.op(kTUnit, xs::leave, uint32_t(uid));
+            for (int32_t uid : p.removed) { m.op(kTUnit, xs::leave, uint32_t(uid)); --due[std::size_t(uid - 1)].hold; }   // unit id = index + 1
             for (int32_t mid : p.removed_marches) m.op(kTMarch, xs::leave, uint32_t(mid));
             for (std::size_t q = 0; q < p.units.size(); ++q) {
                 const int32_t i = p.units[q];
-                D3Ent& e = due[std::size_t(i)];
-                if (p.unew[q]) { d_unit_key(i); d_put(m, kTUnit, xs::enter, w.unit(i).id, e.koff, e.klen); }
-                else if (e.tick == dtick) d_put(m, kTUnit, xs::change, w.unit(i).id, e.off, e.len);
+                if (p.unew[q]) { d_unit_key(w, i); D3UEnt& e = due[std::size_t(i)]; ++e.hold; d_put(m, kTUnit, xs::enter, w.unit(i).id, e.koff, e.klen); }
+                else if (const D3Ent& e = d_unit(w, i); e.tick == dtick) d_put(m, kTUnit, xs::change, w.unit(i).id, e.off, e.len);
             }
             for (std::size_t q = 0; q < p.marches.size(); ++q) {
                 const int32_t i = p.marches[q];
-                D3Ent& e = d_march(w, i);
+                D3MEnt& e = d_march(w, i);
                 if (p.mnew[q]) {
-                    if (e.ktick != dtick) { e.koff = uint32_t(darena.size()); RD<xm::ViewMarch>::key(dmprev[std::size_t(w.march(i).id)], darena); e.klen = uint32_t(darena.size() - e.koff); e.ktick = dtick; }
+                    d_march_key(e);
                     d_put(m, kTMarch, xs::enter, w.march(i).id, e.koff, e.klen);
                 } else if (e.len) d_put(m, kTMarch, xs::change, w.march(i).id, e.off, e.len);
             }
@@ -1358,6 +1486,31 @@ private:
                      .with_growth(XOffsetDatastructure::XGrowPolicy::Automatic);
         return use_pool() || reuse_mode() ? c.with_pool(pool()) : c;
     }
+#if defined(XOFFSET_PROXY_BATCH_API)
+    // Growth policy (3.6): a buffer a sender builds its messages in is
+    // Relocating (1 MiB reserved, moved only when a message outgrows it) and
+    // is filled inside a pin scope: plain references at plain speed, and no
+    // move can leave one dangling. Received and resident buffers keep cap().
+    // The reservation is explicit: build<T> runs a fill again when the
+    // reservation is too small, and the case fills draw from the shared Rng,
+    // so a second run would change every later message (verify would show
+    // it). 1 MiB holds every SLG message; the senders are a few long-lived
+    // buffers, so it costs no page tables to speak of.
+    static XOffsetDatastructure::XBuffer::MaximumCapacity build_cap() {
+        using XOffsetDatastructure::XBuffer;
+        return XBuffer::relocating().with_reserve(XBuffer::size_type(1) << 20);   // a 1 MiB slot
+    }
+    // One message: XBuffer::build<T> (reset<T>(), then fill(T&) in a pin scope).
+    template <class T, class Fill>
+    [[gnu::always_inline]] static inline void build_in(XOffsetDatastructure::XBuffer& b, Fill&& fill) {
+        if (!b.template build<T>([&](T& m) { fill(m); })) [[unlikely]]
+            throw std::runtime_error(std::string("message build failed: ") + XOffsetDatastructure::to_string(b.error()));
+    }
+#else
+    static XOffsetDatastructure::XBuffer::MaximumCapacity build_cap() { return cap(); }
+    template <class T, class Fill>
+    [[gnu::always_inline]] static inline void build_in(XOffsetDatastructure::XBuffer& b, Fill&& fill) { fill(b.template reset<T>()); }
+#endif
     // Diagnostic only (small-message probe): SLG_XOFFSET_POOL=1 reuses idle VM
     // owners through the public XBufferPool. Every load is still load_verified.
     static bool use_pool() { static const bool on = std::getenv("SLG_XOFFSET_POOL") != nullptr; return on; }

@@ -2,6 +2,69 @@
 
 ## Unreleased
 
+- Free table: a buffer's table of holes is about 2.4 KiB instead of 12 KiB.
+  Each of the 512 exact-size bins is now a 4-byte head that holds the bin's
+  only hole itself, or names a contiguous segment in one word pool the table
+  shares between its bins (32 words inline; host storage when it grows, which
+  a reload keeps up to 16 KiB). Thousands of live buffers each keep a table
+  (game players, client views): on SLG demo M (xoffset alone) peak memory is
+  710 to 657 MiB. Under memory pressure (cloud, five formats in one process,
+  cgroup limit 2000 MiB + swap, ABBA) the cold pages a save or an allocation
+  had to bring back were mostly table pages: xoffset B.out_encode 12.2-13.9
+  to 3.9-5.3 ms, S.save_encode 5.1-5.6 to 1.5-2.4 ms, UP.apply 207-221 to
+  147-155 ms, UC.apply 301-303 to 267-276 ms. Which block every request
+  takes, and the order holes are written in, are unchanged (checked against
+  the previous table on random allocate/retire/clone/reload runs); wire
+  format unchanged; both Ir gates pass. `XBufferCore::free_bin_inline_entries`
+  (4 per bin) is replaced by `free_table_inline_entries` (16 holes of one
+  size per table).
+
+- Shared deltas: the block encoder's scratch arrays and `update`'s snapshot
+  are `[[indeterminate]]` (`XOFFSET_INDETERMINATE`): GCC 16 no longer zeroes
+  them on every call (C++26 erroneous behaviour; 240 bytes per `update` of a
+  view unit). `byte_mask` takes six operations instead of nine. Instructions
+  of the bench's D3 server (S scale, GCC 16, pub + send): -5% in peace,
+  conflict and siege. Bytes unchanged; P2996 (Clang does not fill) unchanged.
+
+- Shared deltas: `XRecordDelta::update` snapshots the hinted blocks with
+  copies of a constant size (unrolled per block) instead of a run-time length
+  per block. The bench's D3 server keeps a delivery's loop small: the first
+  use of a unit, march or tile in a tick (compare and encode) and key bodies
+  run out of line, and a march slot looks for the lowest live march id only
+  when another march holds the slot. Instructions (S scale, GCC 16, callgrind,
+  pub + send): S peace -7%, conflict -14%, siege -10%; M peace -4%,
+  conflict -18%, siege -19%. Bytes unchanged.
+
+- Shared deltas: changed members only. `XRecordDelta<T>::fields(members)`
+  (bit i = member i, `XSyncFields`), `diff(now, before, out, fields)` and
+  `update(rec, fields, out, set)`, which changes a record and writes its body
+  in one step, with no baseline copy. Both write the bytes of the whole-record
+  `diff`. `XSyncWriter::change` encodes records of plain bytes in place, and
+  the block encoder writes a word's mask and its contiguous changed bytes with
+  single stores. The bench's D3 server (`bench/slg`) now encodes in `D*.pub`
+  only the changed units some view holds, over their dirty members, keeps one
+  image per entity (no second baseline) and prefetches the entries of the
+  tick's changed tiles and new marches. Small server (S scale, 64 clients,
+  cloud x86, GCC 16), server per delivery against zpp `U*.send`: peace 2.8x ->
+  1.9x, conflict 3.35x -> 1.33x, siege 1.38x -> 0.75x. M scale unchanged
+  (peace) or faster (conflict 1048 -> 780 ns, siege 4347 -> 2834 ns).
+  Bytes and wire format unchanged.
+- `XReceiver::view` requests every cache line of a wire of at most 1 KiB
+  before it checks the header (a read prefetch: `__builtin_prefetch`, or
+  `_mm_prefetch` on MSVC x64). A view copies nothing, so before this the first
+  read of each line of a small message fell inside the caller's loops, one
+  miss after another; a receive that copies (cista, the old reload) brought
+  them in with one parallel `memcpy`. Cloud x86 GCC 16, 10 interleaved
+  batches: the client's warm peace view (UPW.recv) is 11% faster (0.888 of
+  its own base, [0.85, 0.93]); ÷ zpp_bits 0.859 -> 0.763, ÷ cista_unchecked
+  1.151 -> 1.022 (inside the cloud A/A spread). Larger wires are left to the
+  hardware prefetcher (UCW.recv -3%, USW.recv unchanged). Wire format and
+  checks unchanged.
+- Cloud x86 and client-uplink scorecard columns get thresholds
+  (`tools/perf_gate/x86_columns.sh` / `x86_columns.py`, docs/RELEASING.md
+  section 2a): a main cell passes at GM <= 1.00, warns up to 1.05 (the cloud
+  A/A spread) and fails above; UL.send has a ceiling until 4.0 clears it.
+
 - Growth policy, part 1 (storage): `XGrowPolicy::Relocating`
   (`XBuffer::relocating(maximum)`, default maximum 2 GiB - 8). A buffer
   starts in a slot sized from its first content (create's initial size or
@@ -25,6 +88,60 @@
   than today, all page tables (2 KiB per 1 MiB slot); a 4 KiB first
   reservation costs the same as today; create + fill + destroy 29 fewer
   instructions than an Automatic slot buffer (`tools/bench_relocating_storage.cpp`).
+  Wire format unchanged.
+- Growth policy, part 2 (proxies and pin scopes, `xoffset_proxy.hpp`):
+  `XBuffer::ref<T>()` returns an `XRef<T>`, a proxy that stays valid when the
+  payload moves (and when the `XBuffer` object is moved or swapped), and
+  notices a destroyed or replaced buffer (`stale`). Proxies cover values,
+  records (`field<&T::m>()`, `member<I>()`), strings, vectors, sets and maps;
+  element proxies hold container + index (map: key + cached index) and are
+  bounds-checked, so after a change they read another element or nothing,
+  never a retired block. Container proxies keep the size in a register, so a
+  push_back loop costs about what a plain reference does. `edit<T>(f)` /
+  `read<T>(f)` are pin scopes with plain references: the payload does not move
+  while one is open (an operation that would need a move fails with
+  `borrowed`), blocks retired inside are reused only after it, and a
+  Relocating buffer more than half full moves on entry. Failure is soft:
+  nothing throws or aborts; the failing operation has no effect, the first
+  failure stays in `error()` (`borrowed`, `stale`, `out_of_range`,
+  `capacity_exceeded`, `out_of_storage`) and a failed buffer refuses
+  `save_verified`, `save_compact` and `save_delta` until `clear_error()`.
+  Without exceptions, allocating container operations inside a scope check
+  their room first and return without effect when it is missing. New
+  `XErrc::borrowed`, `stale`, `out_of_range`. Wire format unchanged.
+- Growth policy, part 3 (named accessors). Breaking: `TypedXBuffer<T>::root()`
+  and `reset()` return a proxy (`XRef<T>`) instead of `T&`; the old plain
+  reference is `plain_root()` (unprotected: it dangles when the payload
+  moves). `XOFFSET_RECORD` and `XOFFSET_RECORD_DERIVED` now also give the
+  record's proxy one accessor per listed field, `u.hp()` being
+  `u.field<&Unit::hp>()` (same instructions); a derived record also has its
+  described bases' accessors. They are ordinary member functions: MSVC,
+  no-exceptions builds and compilers without reflection get them too. The
+  proxy's own functions (`get`, `set`, `field`, `member`, `valid`, `error`)
+  win over a field of the same name (reach it with `field<&T::m>()`).
+  C array fields have a
+  proxy (`size()`, `[i]`, iteration; past the end an empty proxy and
+  `out_of_range`). Examples, README, USER_GUIDE (section 3.5) and the
+  mapstate demo use the new forms; tests that test plain references call
+  `plain_root()`. Wire format unchanged.
+- Growth policy, part 4 (batch operations, `XOFFSET_PROXY_BATCH_API`):
+  vector proxies gain `append` (span, array, initializer list, count copies),
+  `assign` and `emplace_n`; set and map proxies insert a span (or a vector of
+  pairs) in one call; `XRef::batch(f, expected_growth)` runs `f` on the
+  proxy's container or record as a pin scope (resolved once, plain
+  references). Each sizes the target once and moves the payload at most once;
+  a source inside the payload is copied out first. `XBuffer::build<T>(f,
+  expected_growth)` is `reset<T>()` plus a pin scope in one step, for senders
+  that make a new message each time. When a Relocating buffer's reservation is
+  too small, it starts over in one twice as large and runs f again (until the
+  buffer's maximum), so f must only write into the buffer. The SLG adapters now build every sent
+  message this way in a Relocating buffer. `test_proxy_fuzz` (also without
+  exceptions) interleaves proxies, scopes, batches, growth past 1 MiB, moves,
+  swaps, reloads, destruction and VM failure injection, and checks every
+  buffer against a model. CMake option `XOFFSET_STRESS_RELOCATE` (test builds
+  only): a Relocating buffer moves at every pin scope's end, its old storage
+  becomes inaccessible, containers always regrow into a fresh block and
+  retired blocks are poisoned, so a reference kept past its scope faults.
   Wire format unchanged.
 
 ## 3.5.0: performance on the production platform
