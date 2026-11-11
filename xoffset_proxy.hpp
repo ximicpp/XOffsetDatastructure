@@ -403,7 +403,8 @@ public:
         using Traits = proxy_detail::member_traits<decltype(MP)>;
         static_assert(std::is_base_of_v<typename Traits::class_type, T>, "field<MP>: not a member of this record");
         using M = typename Traits::type;
-        return Base::template member_at<M>(proxy_detail::member_offset(MP));
+        // As a member of T: a member of a base sits at the base's offset.
+        return Base::template member_at<M>(proxy_detail::member_offset(static_cast<M T::*>(MP)));
     }
     // Member I of the schema (declaration order).
     template <std::size_t I>
