@@ -1,0 +1,13 @@
+== 2026-11-11T15:30:15Z 0. tools
+selftest: 73 ok, 0 FAIL (cloud: 73 ok)
+cmake version 4.4.4
+1.13.2
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+anchor: next_cpp26 cf9b63e5 (first parent of #266)
+== 2026-11-11T15:30:34Z 1. export
+head bb537d0db6a7d629f10165e9cc68aadc745b5171 tree a52e26a113f33216c2a5009a95bb164dc2275468 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+anc cf9b63e584247ca6c61f524591557d468062bb48 tree aa3418684e6eb23af02981d9556a115f0262cd21 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+== 2026-11-11T15:30:41Z 2. build
+slg init cache /Volumes/XOffsetCS/perf-gate/slg-init-p2996-d77eff1.cmake sha ed916a0cf280cedf798d20f523b09c055e24ba4da58723df5d51d5558ebedde9
+STOP: sc_xoffset head build failed (prep-pr266/build_sc_head.log)
+== 2026-11-11T15:30:45Z finish rc=2
