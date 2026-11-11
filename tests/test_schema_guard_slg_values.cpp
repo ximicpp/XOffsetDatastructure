@@ -6,10 +6,10 @@
 template<class T,class F> void check(F mutate) {
     using B=XOffsetDatastructure::TypedXBuffer<T>;
     auto a=B::create(1u<<20,xsg_slg::cap()), b=B::create(1u<<20,xsg_slg::cap());
-    xsg_slg::fill(a.root()); xsg_slg::fill(b.root());
-    if(!xsg_slg::values_equal(a.root(),b.root())) fail("semantic comparison rejected equal roots");
-    mutate(b.root());
-    if(xsg_slg::values_equal(a.root(),b.root())) fail("semantic comparison missed changed field");
+    xsg_slg::fill(a.plain_root()); xsg_slg::fill(b.plain_root());
+    if(!xsg_slg::values_equal(a.plain_root(),b.plain_root())) fail("semantic comparison rejected equal roots");
+    mutate(b.plain_root());
+    if(xsg_slg::values_equal(a.plain_root(),b.plain_root())) fail("semantic comparison missed changed field");
 }
 struct SemanticRegression { SemanticRegression() {
     check<slg::xm::PlayerState>([](auto& r){r.armies[0].heroes[0].level+=1;});

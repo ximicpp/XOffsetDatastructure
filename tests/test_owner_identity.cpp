@@ -279,7 +279,7 @@ void transfers_and_deterministic_reused_payload_base() {
     // A frozen snapshot is immutable: its payload names no allocation owner.
     // Its payload segment is the payload past the 48-byte payload header.
     auto typed = xo::TypedXBuffer<OwnerRoot>::create(4096, policy());
-    typed.root().numbers.resize(2, 5u);
+    typed.plain_root().numbers.resize(2, 5u);
     const void* base = typed.data();
     auto frozen = xo::freeze_verified(std::move(typed));
     need(static_cast<const void*>(frozen.segments()[1].data()) ==

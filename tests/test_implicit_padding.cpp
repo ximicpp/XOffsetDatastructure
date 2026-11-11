@@ -130,7 +130,7 @@ void expect_exact_zeroing(const char* what, std::size_t lead, std::size_t period
 std::string build(unsigned char garbage) {
     auto b = xo::TypedXBuffer<padrt::Root>::create(
         4096, xo::XBuffer::maximum_capacity(1u << 22).with_growth(xo::XGrowPolicy::Automatic));
-    auto& r = b.root();
+    auto& r = b.plain_root();
     r.scratch.assign(512, 0x0101010101010101ull * garbage);
     r.scratch.reserve(8192);                           // the dirty 4 KiB block goes to the free table
     r.scratch.clear();

@@ -78,7 +78,7 @@ const char* stage="entry";
 void need(bool value,const char* message){if(!value)throw std::runtime_error(message);}
 auto make_source(std::size_t name_reserve=256){
     auto source=xo::TypedXBuffer<ReceiveRoot>::create(name_reserve>16384?65536:32768);
-    auto& r=source.root();r.marker=0x9988776655443322ULL;r.counter=7;r.enabled=true;r.name="direct receive";
+    auto& r=source.plain_root();r.marker=0x9988776655443322ULL;r.counter=7;r.enabled=true;r.name="direct receive";
     r.attrs.resize(3);for(unsigned i=0;i<3;++i){r.attrs[i].key="short";r.attrs[i].value.resize(24);r.attrs[i].value[3]=std::uint8_t(10+i);}
     r.flags.reserve(8);r.flags.push_back(true);
     // Live size validates bit0 only; capacity tail need not hold legal bools.
@@ -205,8 +205,8 @@ std::string body_image(const xo::VerifiedReceiveToken<T>& token){
     return std::string(static_cast<const char*>(token.payload_address())+kBegin,token.payload_size()-kBegin);
 }
 void exercise_edit(xo::TypedXBuffer<ReceiveRoot>& buffer){
-    check(buffer.root());need(buffer.grow(4096),"post-receive explicit grow failed");
-    auto& r=buffer.root();r.name="mutated received";r.attrs[1].value.clear();r.attrs[1].value.resize(40);r.attrs[1].value[7]=99;
+    check(buffer.plain_root());need(buffer.grow(4096),"post-receive explicit grow failed");
+    auto& r=buffer.plain_root();r.name="mutated received";r.attrs[1].value.clear();r.attrs[1].value.resize(40);r.attrs[1].value[7]=99;
     r.flags.push_back(false);need(r.flags.size()==2&&!r.flags[1],"bool spare activation/growth failed");
     r.attrs.erase(r.attrs.begin());r.attrs.resize(4);r.attrs[3].key="new live head";
     r.tail.resize(200); // keep the old Attr allocation away from the arena tail
@@ -215,7 +215,7 @@ void exercise_edit(xo::TypedXBuffer<ReceiveRoot>& buffer){
     need(r.attrs.back().key==r.attrs[0].key && r.attrs.back().value.size()==40 &&
          r.attrs.back().value[7]==99,"received aggregate transfer construction failed");
     auto wire=buffer.save_verified();auto again=xo::TypedXBuffer<ReceiveRoot>::load_verified(wire);
-    need(again.root().name=="mutated received"&&again.root().attrs[3].key=="new live head","received further mutation/reload failed");
+    need(again.plain_root().name=="mutated received"&&again.plain_root().attrs[3].key=="new live head","received further mutation/reload failed");
 }
 void direct_growth_and_lifetime(){
     auto source=make_source();const auto wire=source.save_verified();const auto f=framing_of(wire);const auto payload=f.payload;
@@ -257,7 +257,7 @@ void direct_growth_and_lifetime(){
     need(output.maximum_capacity()==payload+8192,"receive max capacity lost");
     need(output.free_table_complete() && output.free_block_count()==f.holes &&
          output.free_block_bytes()==source.free_block_bytes(),"received hole table not installed as the free table");
-    check(output.root());need(output.save_verified()==wire,"activation changed V2 bytes");exercise_edit(output);
+    check(output.plain_root());need(output.save_verified()==wire,"activation changed V2 bytes");exercise_edit(output);
 }
 void completion_cancel_and_owner_lifetime(){
     auto source=make_source();const auto wire=source.save_verified();const auto f=framing_of(wire);const auto payload=f.payload;
@@ -270,7 +270,7 @@ void completion_cancel_and_owner_lifetime(){
     write_parts(operation,wire,f);
     operation.complete(h.size(),b.size(),hole_bytes);rejects([&]{(void)xo::finish_verified(moved);}); // cancel != successful completion
     {auto retry=moved.acquire_operation();retry.complete(sizeof(xo::XWireHeaderV2),payload-kBegin,hole_bytes);}
-    auto output=xo::finish_verified(moved);need(output.get_address()==base,"cancel/recomplete changed owner");check(output.root());
+    auto output=xo::finish_verified(moved);need(output.get_address()==base,"cancel/recomplete changed owner");check(output.plain_root());
     auto orphan_operation=[&]{auto temporary=xo::begin_verified_receive<ReceiveRoot>(payload,std::nullopt,f.holes);return temporary.acquire_operation();}();
     need(orphan_operation.payload_bytes().size()==payload-kBegin && orphan_operation.hole_bytes().size()==hole_bytes,
          "destroying token released outstanding-operation mapping");
@@ -291,7 +291,7 @@ void completion_cancel_and_owner_lifetime(){
     {auto part=short_holes.acquire_operation();write_parts(part,wire,f);part.complete(sizeof(xo::XWireHeaderV2),payload-kBegin,hole_bytes-1);}
     rejects([&]{(void)xo::finish_verified(short_holes);});
     {auto part=short_holes.acquire_operation();part.complete(sizeof(xo::XWireHeaderV2),payload-kBegin,hole_bytes);}
-    auto completed=xo::finish_verified(short_holes);check(completed.root());
+    auto completed=xo::finish_verified(short_holes);check(completed.plain_root());
     for(const auto count:{f.holes-1,f.holes+1}){
         auto token_count=xo::begin_verified_receive<ReceiveRoot>(payload,std::nullopt,count);
         auto part=token_count.acquire_operation();
@@ -319,7 +319,7 @@ void rollback_and_rejection(){
         auto token=receive(wire,xo::XBuffer::maximum_capacity(n+4096));const auto before=body_image(token);const auto*base=token.payload_address();
         host::remaining=point;bool failed=false;try{(void)xo::finish_verified(token);}catch(const xo::XBadAlloc&){failed=true;}
         host::remaining=-1;need(failed&&token.payload_address()==base&&token.received_length()==n-kBegin&&token.maximum_capacity()==n+4096&&body_image(token)==before,"registry preparation failure lost token");
-        auto out=xo::finish_verified(token);check(out.root());
+        auto out=xo::finish_verified(token);check(out.plain_root());
     }
     // V2: every host allocation of finish (registry record/node, default raw
     // scratch, and the host free table loaded from the hole table after raw
@@ -334,7 +334,7 @@ void rollback_and_rejection(){
             host::remaining=point;bool failed=false;
             try{
                 auto out=xo::finish_verified(token);host::remaining=-1;finished=true;
-                check(out.root());
+                check(out.plain_root());
                 need(out.free_table_complete()&&out.free_block_count()==framing.holes,"received free table incomplete after success");
                 need(out.save_verified()==wire,"received owner did not re-emit identical V2 bytes");
             }catch(const xo::XBadAlloc&){failed=true;}catch(const std::bad_alloc&){failed=true;}
@@ -343,13 +343,13 @@ void rollback_and_rejection(){
             ++failures;
             need(failed&&token&&token.payload_address()==base&&token.received_length()==n-kBegin&&body_image(token)==before,
                  "host allocation failure during finish lost or changed the token");
-            auto out=xo::finish_verified(token);check(out.root());
+            auto out=xo::finish_verified(token);check(out.plain_root());
             need(out.free_table_complete()&&out.free_block_count()==framing.holes,"retried finish lost the hole table");
         }
         need(finished&&failures>2,"finish host-allocation points (registry + free table) not exercised");
     }
     {   // Payloads up to 32 KiB validate in inline scratch: the resource is unused.
-        auto token=receive(wire);Resource resource(0);auto out=xo::finish_verified(token,&resource);check(out.root());
+        auto token=receive(wire);Resource resource(0);auto out=xo::finish_verified(token,&resource);check(out.plain_root());
         need(resource.attempt==0,"small payload used the raw scratch resource");
     }
     {   // Larger payloads take one scratch block; its failure leaves the token intact.
@@ -358,11 +358,11 @@ void rollback_and_rejection(){
         auto token=receive(big);const auto before=body_image(token);const auto*base=token.payload_address();Resource resource(0);bool failed=false;
         try{(void)xo::finish_verified(token,&resource);}catch(const std::bad_alloc&){failed=true;}
         need(failed&&resource.live==0&&token.payload_address()==base&&body_image(token)==before&&token.received_length()==big_n-kBegin,"raw scratch OOM lost token/bytes");
-        auto out=xo::finish_verified(token);check(out.root());
+        auto out=xo::finish_verified(token);check(out.plain_root());
     }
     auto token=receive(wire);const auto before=body_image(token);xo::detail::fail_next_registry_registration();
     rejects([&]{(void)xo::finish_verified(token);});need(body_image(token)==before&&token.received_length()==n-kBegin,"registry injection rewrote raw token");
-    xo::detail::clear_registry_failures();auto out=xo::finish_verified(token);check(out.root());
+    xo::detail::clear_registry_failures();auto out=xo::finish_verified(token);check(out.plain_root());
     for(unsigned kind=0;kind<6;++kind){
         auto malformed=wire;const auto h=header_of(wire);
         const auto hole_at=sizeof(h)+std::size_t(h.used_bytes)-kBegin;
@@ -422,7 +422,7 @@ void rollback_and_rejection(){
 void sparse_wire_receive(){
     auto source=xo::TypedXBuffer<ReceiveRoot>::create(65536,
         xo::XBuffer::maximum_capacity(1u<<20).with_growth(xo::XGrowPolicy::Automatic));
-    auto& r=source.root();r.marker=0x0102030405060708ULL;r.name="sparse receive fixture";
+    auto& r=source.plain_root();r.marker=0x0102030405060708ULL;r.name="sparse receive fixture";
     r.tail.resize(12288);for(std::size_t i=0;i<r.tail.size();++i)r.tail[i]=std::uint8_t(i%251+1);
     r.numbers.reserve(16);r.numbers.resize(3,77u); // keeps the tail block off the arena tail
     r.tail.reserve(20000); // relocates: the old 12 KiB block becomes one hole
@@ -432,7 +432,7 @@ void sparse_wire_receive(){
     need(wire.size()<sizeof(xo::XWireHeaderV2)+f.payload-kBegin,"sparse wire did not skip its free run");
     auto token=receive(wire,xo::XBuffer::maximum_capacity(f.payload+65536).with_growth(xo::XGrowPolicy::Automatic));
     const auto* base=token.payload_address();
-    auto output=xo::finish_verified(token);auto& o=output.root();
+    auto output=xo::finish_verified(token);auto& o=output.plain_root();
     need(output.get_address()==base&&o.marker==0x0102030405060708ULL&&o.name=="sparse receive fixture"&&
          o.tail.size()==12288&&o.numbers.size()==3&&o.numbers[2]==77u,"sparse receive contents differ");
     for(std::size_t i=0;i<o.tail.size();++i)need(o.tail[i]==std::uint8_t(i%251+1),"sparse receive tail differs");
@@ -446,10 +446,10 @@ void sparse_wire_receive(){
         auto part=bad.acquire_operation();write_parts(part,wire,f);complete_all(part);
         rejects([&]{(void)xo::finish_verified(bad);});need(bool(bad),"extent count mismatch consumed the token");
     }
-    auto reread=xo::finish_verified(wrong);need(reread.root().tail[12287]==std::uint8_t(12287%251+1),"sparse reread differs");
+    auto reread=xo::finish_verified(wrong);need(reread.plain_root().tail[12287]==std::uint8_t(12287%251+1),"sparse reread differs");
     o.tail.resize(16);o.name="sparse receive mutated after load";
     auto again=xo::TypedXBuffer<ReceiveRoot>::load_verified(output.save_verified());
-    need(again.root().name=="sparse receive mutated after load"&&again.root().tail.size()==16,"sparse received owner not mutable");
+    need(again.plain_root().name=="sparse receive mutated after load"&&again.plain_root().tail.size()==16,"sparse received owner not mutable");
 }
 Token* reentry_token=nullptr;Token* reentry_moved=nullptr;
 const std::string* replacement_wire=nullptr;
@@ -476,32 +476,32 @@ void vm_failures_and_new_handler(){
     host::remaining=0;host::callback=callback;host::callbacks=0;
     auto out=xo::finish_verified(token);host::remaining=-1;host::callback=nullptr;
     need(host::callbacks==1&&rejected_reentry&&out.get_address()==base,"new-handler reentry/owner publication not isolated");
-    need(unpublished,"unvalidated receive owner reachable from its payload base (host page) during finish new_handler");check(out.root());
+    need(unpublished,"unvalidated receive owner reachable from its payload base (host page) during finish new_handler");check(out.plain_root());
     auto cancelled=receive(wire);const auto cancelled_image=body_image(cancelled);reentry_token=&cancelled;
     host::remaining=0;host::callback=cancel_callback;
     rejects([&]{(void)xo::finish_verified(cancelled);});host::remaining=-1;host::callback=nullptr;
     need(cancelled&&body_image(cancelled)==cancelled_image,"callback cancellation consumed/changed input");
     {auto completion=cancelled.acquire_operation();complete_all(completion);}
-    auto uncancelled=xo::finish_verified(cancelled);check(uncancelled.root());
+    auto uncancelled=xo::finish_verified(cancelled);check(uncancelled.plain_root());
     auto original=receive(wire);Token moved;const auto* original_base=original.payload_address();
     reentry_token=&original;reentry_moved=&moved;
     host::remaining=0;host::callback=move_token_callback;
     auto moved_result=xo::finish_verified(original);host::remaining=-1;host::callback=nullptr;
     need(!original&&!moved&&moved_result.get_address()==original_base,
-         "callback moved token did not observe consumed State");check(moved_result.root());
+         "callback moved token did not observe consumed State");check(moved_result.plain_root());
     rejects([&]{(void)moved.acquire_operation();});rejects([&]{(void)moved.grow(0);});
     rejects([&]{(void)xo::finish_verified(moved);});
     auto replaced=receive(wire);const auto* replaced_base=replaced.payload_address();
     reentry_token=&replaced;replacement_wire=&wire;host::remaining=0;host::callback=replace_token_callback;
     auto replaced_result=xo::finish_verified(replaced);host::remaining=-1;host::callback=nullptr;
     need(replaced&&replaced.payload_address()!=replaced_base&&replaced_result.get_address()==replaced_base,
-         "finish consumed callback's unrelated replacement token");check(replaced_result.root());
-    auto replacement_result=xo::finish_verified(replaced);check(replacement_result.root());
+         "finish consumed callback's unrelated replacement token");check(replaced_result.plain_root());
+    auto replacement_result=xo::finish_verified(replaced);check(replacement_result.plain_root());
     auto* destroyed=new Token(receive(wire));const auto* destroyed_base=destroyed->payload_address();
     reentry_token=destroyed;host::remaining=0;host::callback=destroy_token_callback;
     auto destroyed_result=xo::finish_verified(*destroyed);host::remaining=-1;host::callback=nullptr;
     need(reentry_token==nullptr&&destroyed_result.get_address()==destroyed_base,
-         "finish failed after callback destroyed original Token object");check(destroyed_result.root());
+         "finish failed after callback destroyed original Token object");check(destroyed_result.plain_root());
 }
 
 void canonical_external_heads_and_many_owners(){
@@ -515,7 +515,7 @@ void canonical_external_heads_and_many_owners(){
     // root/data/binding and free-table reuse addresses alternate.
     for(unsigned round=0;round<4;++round)for(unsigned i=0;i<owners.size();++i){
         auto& owner=*owners[(i*3+round)%owners.size()];
-        check(owner.root());const auto a=owner.root().tail.binding();
+        check(owner.plain_root());const auto a=owner.plain_root().tail.binding();
         auto* p=xo::fixed_detail::allocate_dynamic_bytes(a,24,8);
         xo::fixed_detail::retire_dynamic_bytes(a,p,24);
         auto* q=xo::fixed_detail::allocate_dynamic_bytes(a,24,8);
@@ -524,16 +524,16 @@ void canonical_external_heads_and_many_owners(){
     }
     auto moved=std::move(*owners[0]);owners[0].reset();
     std::swap(moved,*owners[1]);owners[0].emplace(std::move(moved));
-    for(auto& owner:owners)check(owner->root());
+    for(auto& owner:owners)check(owner->plain_root());
     owners[3].reset(); // dead record may still occupy a TLS slot
     {auto token=receive(wire,capacity);owners[3].emplace(xo::finish_verified(token));}
-    for(auto& owner:owners)check(owner->root());
+    for(auto& owner:owners)check(owner->plain_root());
 
     // V2.1: a head belongs to the payload it lies in (the owner table); the
     // allocator a constructor receives names no owner. Heads placed in a
     // normal arena with a received target's allocator bind to the normal arena.
     auto normal=xo::TypedXBuffer<ReceiveRoot>::create(16384,capacity.with_storage(xo::XStorage::Pinned));
-    auto& target=*owners[2];const auto binding=target.root().name.binding();
+    auto& target=*owners[2];const auto binding=target.plain_root().name.binding();
     auto* text_slot=normal.arena()->allocate_aligned(sizeof(xo::XString),alignof(xo::XString));
     auto* vector_slot=normal.arena()->allocate_aligned(sizeof(xo::XVector<std::uint32_t>),alignof(xo::XVector<std::uint32_t>));
     const auto target_before=target.free_block_bytes();
@@ -569,15 +569,15 @@ void custom_future_lifetimes(){
     namespace ex=receive_custom_v2_examples;
     auto source=xo::TypedXBuffer<CustomReceiveRoot>::create(65536,
         xo::XBuffer::maximum_capacity(262144).with_growth(xo::XGrowPolicy::Automatic));
-    source.root().numbers.resize(3);
-    for(unsigned i=0;i<3;++i)source.root().numbers[i].value=40+i;
-    source.root().attrs.resize(2);
-    for(unsigned i=0;i<2;++i){source.root().attrs[i].text="owned custom";source.root().attrs[i].value=100+i;}
+    source.plain_root().numbers.resize(3);
+    for(unsigned i=0;i<3;++i)source.plain_root().numbers[i].value=40+i;
+    source.plain_root().attrs.resize(2);
+    for(unsigned i=0;i<2;++i){source.plain_root().attrs[i].text="owned custom";source.plain_root().attrs[i].value=100+i;}
     const auto wire=source.save_verified();const auto n=framing_of(wire).payload;
     auto token=receive_as<CustomReceiveRoot>(wire,
         xo::XBuffer::maximum_capacity(n+131072).with_growth(xo::XGrowPolicy::Automatic));
     const auto* base=token.payload_address();
-    auto output=xo::finish_verified(token);auto& r=output.root();
+    auto output=xo::finish_verified(token);auto& r=output.plain_root();
     need(output.get_address()==base&&r.numbers[1].value==41&&r.attrs[1].value==101&&
          r.attrs[1].text=="owned custom","custom initial canonical activation differs");
     need(output.save_verified()==wire,"custom initial activation changed complete wire bytes");
@@ -621,7 +621,7 @@ void custom_future_lifetimes(){
     auto final_wire=output.save_verified();
     auto final_token=receive_as<CustomReceiveRoot>(final_wire);
     auto reread=xo::finish_verified(final_token);
-    need(reread.root().numbers.back().value==40&&reread.root().attrs.back().text=="owned custom",
+    need(reread.plain_root().numbers.back().value==40&&reread.plain_root().attrs.back().text=="owned custom",
          "custom mutated V2 fresh raw-reader semantic check failed");
 
     auto malformed=wire;const auto h=header_of(wire);
@@ -656,22 +656,22 @@ void custom_future_lifetimes(){
 // unaffected. A child of a parent with concurrent library activity may only exec.
 void fork_after_receive(){
     auto source=make_source();const auto wire=source.save_verified();
-    auto token=receive(wire);auto parent=xo::finish_verified(token);check(parent.root());
+    auto token=receive(wire);auto parent=xo::finish_verified(token);check(parent.plain_root());
     const pid_t pid=::fork();need(pid>=0,"fork failed");
     if(pid==0){
         int code=0;
         try{
-            auto loaded=xo::TypedXBuffer<ReceiveRoot>::load_verified(wire);check(loaded.root());
+            auto loaded=xo::TypedXBuffer<ReceiveRoot>::load_verified(wire);check(loaded.plain_root());
             const auto cap=xo::XBuffer::maximum_capacity(wire.size()+65536).with_growth(xo::XGrowPolicy::Automatic);
-            auto child_token=receive(wire,cap);auto child=xo::finish_verified(child_token);check(child.root());
-            check(parent.root());exercise_edit(child);
+            auto child_token=receive(wire,cap);auto child=xo::finish_verified(child_token);check(child.plain_root());
+            check(parent.plain_root());exercise_edit(child);
             if(child.get_address()==parent.get_address())code=2;
         }catch(...){code=1;}
         std::_Exit(code);
     }
     int status=0;
     need(::waitpid(pid,&status,0)==pid&&WIFEXITED(status)&&WEXITSTATUS(status)==0,"forked child could not load or receive");
-    check(parent.root());
+    check(parent.plain_root());
 }
 #endif
 int main(int argc,char**argv){try{
@@ -681,9 +681,9 @@ int main(int argc,char**argv){try{
     if(argc==3&&std::string_view(argv[1])=="--read-wire"){
         std::ifstream f(argv[2],std::ios::binary);std::string wire((std::istreambuf_iterator<char>(f)),{});
 #if defined(XOFFSET_VERIFIED_RECEIVE_API)
-        auto token=receive(wire);auto result=xo::finish_verified(token);check(result.root());
+        auto token=receive(wire);auto result=xo::finish_verified(token);check(result.plain_root());
 #else
-        auto result=xo::TypedXBuffer<ReceiveRoot>::load_verified(wire);check(result.root());
+        auto result=xo::TypedXBuffer<ReceiveRoot>::load_verified(wire);check(result.plain_root());
 #endif
         return 0;
     }

@@ -67,7 +67,7 @@ void check_contents(const sc::Root& r, std::uint32_t n, const char* what) {
 void k3_output_is_independent() {
     constexpr std::uint32_t n = 64;
     std::optional<Buffer> source(Buffer::create(4096, cap()));
-    fill(source->root(), n);
+    fill(source->plain_root(), n);
     const std::string wire = source->save_verified();
     const std::string copy = wire;
     std::string into;
@@ -75,7 +75,7 @@ void k3_output_is_independent() {
     if (into != wire) fail("K3: save_verified_into differs from save_verified");
 
     // Mutate in place, grow past the current reservation, erase, clear.
-    auto& r = source->root();
+    auto& r = source->plain_root();
     r.epoch = 99;
     for (auto& it : r.items) it.label = std::string(200, 'x');
     for (std::uint32_t i = 0; i < 4096; ++i) r.items.emplace_back().id = 1u << 20;
@@ -85,15 +85,15 @@ void k3_output_is_independent() {
     source.reset();  // destroy the source
     if (wire != copy || into != copy) fail("K3: destroying the source changed an emitted wire");
     auto loaded = Buffer::load(wire, cap());
-    check_contents(loaded.root(), n, "K3 reload after source destroyed");
+    check_contents(loaded.plain_root(), n, "K3 reload after source destroyed");
 }
 
 void k5_free_space_travels_with_wire() {
     constexpr std::uint32_t n = 256;
     auto sender = Buffer::create(4096, cap());
-    fill(sender.root(), n);
+    fill(sender.plain_root(), n);
     // Retire every other label: their heap blocks become holes.
-    for (std::uint32_t i = 0; i < n; i += 2) sender.root().items[i].label = "s";
+    for (std::uint32_t i = 0; i < n; i += 2) sender.plain_root().items[i].label = "s";
     const auto wire = sender.save_verified();
     const auto holes = sender.free_block_count();
     if (holes == 0) fail("K5: fixture left no holes");
@@ -106,8 +106,8 @@ void k5_free_space_travels_with_wire() {
     // Refill the retired labels on both sides: holes are reused, the tail
     // does not move, and both sides place every block at the same offset.
     for (std::uint32_t i = 0; i < n; i += 2) {
-        sender.root().items[i].label = label(i);
-        receiver.root().items[i].label = label(i);
+        sender.plain_root().items[i].label = label(i);
+        receiver.plain_root().items[i].label = label(i);
     }
     if (receiver.arena()->used_end != tail) fail("K5: receiver grew the tail instead of reusing holes");
     if (receiver.save_verified() != sender.save_verified())
@@ -115,11 +115,11 @@ void k5_free_space_travels_with_wire() {
 
     // A second hop keeps the property (no degradation across hops).
     auto third = Buffer::load(receiver.save_verified(), cap());
-    for (std::uint32_t i = 1; i < n; i += 2) third.root().items[i].label = "t";
+    for (std::uint32_t i = 1; i < n; i += 2) third.plain_root().items[i].label = "t";
     const auto tail3 = third.arena()->used_end;
-    for (std::uint32_t i = 1; i < n; i += 2) third.root().items[i].label = label(i);
+    for (std::uint32_t i = 1; i < n; i += 2) third.plain_root().items[i].label = label(i);
     if (third.arena()->used_end != tail3) fail("K5: second hop grew the tail instead of reusing holes");
-    check_contents(third.root(), n, "K5 second hop");
+    check_contents(third.plain_root(), n, "K5 second hop");
 }
 } // namespace
 
