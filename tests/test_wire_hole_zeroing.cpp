@@ -59,7 +59,7 @@ xo::XBufferCore::MaximumCapacity cap() {
 // retired, so the secret's block is still a hole when the wire is emitted.
 Buffer make(bool sparse) {
     auto b = Buffer::create(65536, cap());
-    auto& r = b.root();
+    auto& r = b.plain_root();
     for (int i = 0; i < 8; ++i) {
         auto& e = r.entries.emplace_back();
         e.flag = 1;
@@ -189,7 +189,7 @@ void loaded_holes_keep_sender_bytes() {
     std::memset(wire.data() + at, 0x5a, hole.bytes);
     auto loaded = Buffer::load(wire, cap());
     if (loaded.save_verified() != wire) fail("sender hole bytes were not forwarded unchanged");
-    auto& r = loaded.root();
+    auto& r = loaded.plain_root();
     r.secret = std::string(kSecret);
     r.entries.emplace_back().note = "keeps the secret's block off the tail";
     r.secret = std::string(300, 'y');           // the receiver retires the secret's block

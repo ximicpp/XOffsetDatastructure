@@ -198,7 +198,7 @@ void edit(W& p, std::mt19937_64& rng) {
 
 xo::TypedXBuffer<W> random_player(std::mt19937_64& rng) {
     auto b = fresh();
-    for (int i = int(rng() % 24); i > 0; --i) edit(b.root(), rng);
+    for (int i = int(rng() % 24); i > 0; --i) edit(b.plain_root(), rng);
     return b;
 }
 
@@ -224,7 +224,7 @@ void check_send(std::mt19937_64& rng) {
         if (failed) {
             // Only a value an old version cannot hold fails: hp out of int32 or
             // an epic item for v1.
-            const auto& p = object.root();
+            const auto& p = object.plain_root();
             bool lossy = p.hp < INT32_MIN || p.hp > INT32_MAX;
             if constexpr (I() == 0) {
                 for (const auto& it : p.items) lossy |= it.rarity == ev::v3::Rarity::epic;
@@ -272,8 +272,8 @@ void check_handshake(const std::string& bytes) {
 template <std::size_t I>
 std::string old_wire(std::mt19937_64& rng) {
     auto object = random_player(rng);
-    object.root().hp = std::int64_t(rng() % 1000);
-    for (auto& it : object.root().items) it.rarity = ev::v3::Rarity(rng() % 2);
+    object.plain_root().hp = std::int64_t(rng() % 1000);
+    for (auto& it : object.plain_root().items) it.rarity = ev::v3::Rarity(rng() % 2);
     std::string out;
     xe::save_version<W>(object, I, out, {});
     return out;

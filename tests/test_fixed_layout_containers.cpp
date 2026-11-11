@@ -143,7 +143,7 @@ bool test_verified_round_trip() {
     std::string data = xbuf.save_verified<FixedRoot>();
     root = &xbuf.root<FixedRoot>();
     auto loaded = TypedXBuffer<FixedRoot>::load_verified(data);
-    auto& restored = loaded.root();
+    auto& restored = loaded.plain_root();
 
     assert(restored.id == 99);
     assert(restored.name == "Verified");
@@ -212,7 +212,7 @@ bool test_nested_record_round_trip() {
     std::string data = xbuf.save_verified<FixedNestedRoot>();
     root = &xbuf.root<FixedNestedRoot>();
     auto loaded = TypedXBuffer<FixedNestedRoot>::load_verified(data);
-    auto& restored = loaded.root();
+    auto& restored = loaded.plain_root();
 
     assert(restored.owner == "RoundTripNested");
     assert(restored.items.size() == 6);
@@ -399,7 +399,7 @@ bool test_fixed_flat_set_map_round_trip() {
 
     std::string data = xbuf.save_verified<FixedAssocRoot>();
     auto loaded = TypedXBuffer<FixedAssocRoot>::load_verified(data);
-    auto& restored = loaded.root();
+    auto& restored = loaded.plain_root();
 
     assert(restored.ids.size() == 6);
     assert(restored.ids.begin()[0] == 0);

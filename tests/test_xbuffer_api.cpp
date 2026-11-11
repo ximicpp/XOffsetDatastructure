@@ -170,13 +170,13 @@ bool test_create_api() {
     root.name = "Created";
 
     auto typed = TypedXBuffer<TestData>::create(4096);
-    typed.root().id = 88;
-    typed.root().name = "TypedCreated";
+    typed.plain_root().id = 88;
+    typed.plain_root().name = "TypedCreated";
 
     std::string verified = typed.save_verified();
     auto loaded = TypedXBuffer<TestData>::load(verified);
-    assert(loaded.root().id == 88);
-    assert(std::string(loaded.root().name.c_str()) == "TypedCreated");
+    assert(loaded.plain_root().id == 88);
+    assert(std::string(loaded.plain_root().name.c_str()) == "TypedCreated");
 
     std::cout << "  XBuffer::create / TypedXBuffer::create ... [OK]\n";
     return true;

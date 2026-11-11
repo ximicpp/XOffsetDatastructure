@@ -233,7 +233,7 @@ void legal(Buffer& buf, const std::string& where) {
     }
     try {
         auto again = Buffer::load_verified(wire);
-        if (digest_of(again.root()) != digest_of(buf.root())) fail(where + ": reloaded digest differs");
+        if (digest_of(again.plain_root()) != digest_of(buf.plain_root())) fail(where + ": reloaded digest differs");
     } catch (const xo::XException& e) {
         fail(where + ": load_verified of the saved wire threw: " + e.what());
     }
@@ -315,7 +315,7 @@ void build_mids(xo::XVector<sc::Mid>& a, xo::XVector<sc::Mid>& b, Rng& rng) {
         // Built elsewhere and copied in: element-wise (or subtree) copies
         // lay a large source out as one range.
         auto scratch = Buffer::create(4096, growable());
-        auto& big = scratch.root().mb;
+        auto& big = scratch.plain_root().mb;
         for (std::size_t i = 0; i < n; ++i) fill_mid(big.emplace_back(), rng, false, dirty, width);
         b = big;
         return;
@@ -360,7 +360,7 @@ void build_root(sc::Root& r, Rng& rng) {
 
 std::string build_wire(Rng& rng) {
     auto buf = Buffer::create(4096, growable());
-    build_root(buf.root(), rng);
+    build_root(buf.plain_root(), rng);
     return buf.save_verified();
 }
 
@@ -513,20 +513,20 @@ void run_case(std::size_t index, Rng& rng, Coverage& cov) {
     auto b = load(wire);
     auto s = load(source_wire);
     const auto s_before = state_bytes(s);
-    const auto root_before = digest_of(a.root());
+    const auto root_before = digest_of(a.plain_root());
 
-    const auto op = choose_op(rng, a.root(), s.root());
-    const auto ma_before = a.root().ma.size();
+    const auto op = choose_op(rng, a.plain_root(), s.plain_root());
+    const auto ma_before = a.plain_root().ma.size();
 
     const auto hits_before = stats().whole_hits + stats().compact_hits;
     const auto compact_before = stats().compact_hits;
     const auto bytes_before = stats().bytes;
     std::string src_a, src_a2, src_b;
-    src_a = apply_op(a.root(), s.root(), op);
+    src_a = apply_op(a.plain_root(), s.plain_root(), op);
     // A compacted copy is one packed preorder range with no spare capacity,
     // so the next copy from it can take the whole path.
     if (op.kind == 0 && stats().compact_hits == compact_before + 1) {
-        const auto& ma = a.root().ma;
+        const auto& ma = a.plain_root().ma;
         xd::SubtreeExtent extent;
         xd::subtree_measure_elements<sc::Mid>(ma.data(), ma.size_, ma.capacity_, extent);
         if (!extent.contiguous() || extent.sum != extent.exact || extent.sum != stats().bytes - bytes_before)
@@ -534,9 +534,9 @@ void run_case(std::size_t index, Rng& rng, Coverage& cov) {
         ++cov.packed_checks;
     }
     if (stats().whole_hits + stats().compact_hits > hits_before && stats().bytes - bytes_before > 4096) ++cov.large_hits;
-    src_a2 = apply_op(a2.root(), s.root(), op);
+    src_a2 = apply_op(a2.plain_root(), s.plain_root(), op);
     xd::subtree_copy_hook_enabled = false;
-    src_b = apply_op(b.root(), s.root(), op);
+    src_b = apply_op(b.plain_root(), s.plain_root(), op);
     xd::subtree_copy_hook_enabled = true;
     if (src_a != src_b || src_a != src_a2) fail(where + ": source digests differ before the copy");
 
@@ -548,32 +548,32 @@ void run_case(std::size_t index, Rng& rng, Coverage& cov) {
     legal(b, where + " B");
     // c. logical equality
     if (!src_a.empty()) {
-        const auto written = written_digest(a.root(), op, ma_before);
+        const auto written = written_digest(a.plain_root(), op, ma_before);
         if (written != src_a) fail(where + ": destination digest != source digest (kind " + std::to_string(op.kind) + ")");
-        if (written != written_digest(b.root(), op, ma_before)) fail(where + ": destination digest A != B");
+        if (written != written_digest(b.plain_root(), op, ma_before)) fail(where + ": destination digest A != B");
     }
-    if (digest_of(a.root()) != digest_of(b.root())) fail(where + ": root digest A != B (kind " + std::to_string(op.kind) + ")");
+    if (digest_of(a.plain_root()) != digest_of(b.plain_root())) fail(where + ": root digest A != B (kind " + std::to_string(op.kind) + ")");
     (void)root_before;
     // d. source unchanged
     if (state_bytes(s) != s_before) fail(where + ": source arena changed");
     // e. hygiene (padding of the written subtree, which element-wise also zeroes)
-    hygiene(a.root(), where + " A");
+    hygiene(a.plain_root(), where + " A");
     if (!src_a.empty())
-        visit_written(a.root(), op, ma_before, [&](const auto& v) { hygiene(v, where + " A written", true); });
+        visit_written(a.plain_root(), op, ma_before, [&](const auto& v) { hygiene(v, where + " A written", true); });
     holes_zero(a, where + " A");
 
     // f. the same mutations on A and B
     const auto mseed = rng();
     Rng ma(mseed), mb(mseed);
     for (int step = 0; step < 6; ++step) {
-        mutate(a.root(), s.root(), ma);
+        mutate(a.plain_root(), s.plain_root(), ma);
         xd::subtree_copy_hook_enabled = false;
-        mutate(b.root(), s.root(), mb);
+        mutate(b.plain_root(), s.plain_root(), mb);
         xd::subtree_copy_hook_enabled = true;
         const auto at = where + " step " + std::to_string(step);
-        if (digest_of(a.root()) != digest_of(b.root())) fail(at + ": root digest A != B after mutation");
+        if (digest_of(a.plain_root()) != digest_of(b.plain_root())) fail(at + ": root digest A != B after mutation");
         legal(a, at + " A");
-        hygiene(a.root(), at + " A");
+        hygiene(a.plain_root(), at + " A");
         holes_zero(a, at + " A");
     }
     if (state_bytes(s) != s_before) fail(where + ": source arena changed by mutations");
@@ -591,14 +591,14 @@ void run_explicit_case(std::size_t index, Rng& rng, Coverage& cov) {
     auto cap = xo::XBuffer::maximum_capacity(room);
     auto a = Buffer::load_verified(wire, cap);
     auto b = Buffer::load_verified(wire, cap);
-    const auto before = digest_of(a.root());
-    Op op = choose_op(rng, a.root(), a.root(), false);
+    const auto before = digest_of(a.plain_root());
+    Op op = choose_op(rng, a.plain_root(), a.plain_root(), false);
     // One container assignment each (a record assignment is several).
     if (op.kind == 7 || op.kind == 8 || op.kind == 10) op.kind = 0;
     bool threw_a = false, threw_b = false;
-    try { (void)apply_op(a.root(), a.root(), op); } catch (const xo::XBadAlloc&) { threw_a = true; }
+    try { (void)apply_op(a.plain_root(), a.plain_root(), op); } catch (const xo::XBadAlloc&) { threw_a = true; }
     xd::subtree_copy_hook_enabled = false;
-    try { (void)apply_op(b.root(), b.root(), op); } catch (const xo::XBadAlloc&) { threw_b = true; }
+    try { (void)apply_op(b.plain_root(), b.plain_root(), op); } catch (const xo::XBadAlloc&) { threw_b = true; }
     xd::subtree_copy_hook_enabled = true;
     // One range may fit where many blocks do not (A succeeds, B throws);
     // when A throws, its fast path fell back first, so it is exactly B.
@@ -606,14 +606,14 @@ void run_explicit_case(std::size_t index, Rng& rng, Coverage& cov) {
         ++cov.explicit_throws;
         if (!threw_b) fail(where + ": A threw XBadAlloc, B did not");
         if (state_bytes(a) != state_bytes(b)) fail(where + ": A differs from B after XBadAlloc");
-        if (digest_of(a.root()) != before) fail(where + ": strong guarantee broken (kind " + std::to_string(op.kind) + ")");
+        if (digest_of(a.plain_root()) != before) fail(where + ": strong guarantee broken (kind " + std::to_string(op.kind) + ")");
     } else if (threw_b) {
         ++cov.explicit_only_b;
-    } else if (digest_of(a.root()) != digest_of(b.root())) {
+    } else if (digest_of(a.plain_root()) != digest_of(b.plain_root())) {
         fail(where + ": root digest A != B");
     }
     legal(a, where + " A");
-    hygiene(a.root(), where + " A");
+    hygiene(a.plain_root(), where + " A");
     holes_zero(a, where + " A");
 }
 
@@ -622,9 +622,9 @@ void steady_state(Rng& rng) {
     auto source = Buffer::create(4096, growable());
     {
         auto scratch = Buffer::create(4096, growable());
-        scratch.root().mb.reserve(4);
-        for (int i = 0; i < 4; ++i) fill_mid(scratch.root().mb.emplace_back(), rng, false, false, 5);
-        source.root().mb = scratch.root().mb;  // a contiguous copy
+        scratch.plain_root().mb.reserve(4);
+        for (int i = 0; i < 4; ++i) fill_mid(scratch.plain_root().mb.emplace_back(), rng, false, false, 5);
+        source.plain_root().mb = scratch.plain_root().mb;  // a contiguous copy
     }
     for (int side = 0; side < 2; ++side) {
         const bool fast = side == 0;
@@ -633,7 +633,7 @@ void steady_state(Rng& rng) {
         const auto hits_before = stats().whole_hits;
         std::vector<std::uint64_t> curve;
         for (int k = 0; k < 100; ++k) {
-            dst.root().ma = source.root().mb;
+            dst.plain_root().ma = source.plain_root().mb;
             curve.push_back(used_end(dst));
         }
         xd::subtree_copy_hook_enabled = true;
@@ -656,10 +656,10 @@ void steady_state(Rng& rng) {
         auto src = load(build_wire(shapes));
         xd::subtree_copy_hook_enabled = fast;
         for (int k = 0; k < 100; ++k) {
-            src.root().ma.clear();
-            src.root().mb.clear();
-            build_mids(src.root().ma, src.root().mb, shapes);
-            dst.root().ma = src.root().mb;
+            src.plain_root().ma.clear();
+            src.plain_root().mb.clear();
+            build_mids(src.plain_root().ma, src.plain_root().mb, shapes);
+            dst.plain_root().ma = src.plain_root().mb;
         }
         xd::subtree_copy_hook_enabled = true;
         legal(dst, "random shapes");

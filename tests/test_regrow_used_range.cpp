@@ -44,7 +44,7 @@ bool tail_zero(Buffer& buffer) {
 int main() {
     // High-water mark: 2 MiB of non-zero values, then reload a small wire in place.
     auto a = Buffer::create(4096, growable());
-    for (std::uint64_t i = 0; i < (std::uint64_t(2) << 20) / 8; ++i) a.root().values.push_back(~i);
+    for (std::uint64_t i = 0; i < (std::uint64_t(2) << 20) / 8; ++i) a.plain_root().values.push_back(~i);
     const std::size_t high = a.get_size();
     const std::size_t old_used = used_end(a);
     assert(high >= (std::size_t(2) << 20) && old_used <= high);
@@ -52,7 +52,7 @@ int main() {
     std::string small;
     {
         auto s = Buffer::create(4096, growable());
-        s.root().values.push_back(7);
+        s.plain_root().values.push_back(7);
         small = s.save_verified();
     }
     a.reload_verified(small);
@@ -65,8 +65,8 @@ int main() {
     std::size_t growths = 0, last = a.get_size();
     std::uint64_t pushed = 0;
     while (used_end(a) + 64 * 1024 < old_used) {
-        a.root().other.push_back(pushed);
-        b.root().other.push_back(pushed);
+        a.plain_root().other.push_back(pushed);
+        b.plain_root().other.push_back(pushed);
         ++pushed;
         if (a.get_size() != last) {
             ++growths;
@@ -85,8 +85,8 @@ int main() {
     bool doubled = false;
     while (used_end(a) < 4 * high) {
         const std::size_t before = a.get_size();
-        a.root().other.push_back(pushed);
-        b.root().other.push_back(pushed);
+        a.plain_root().other.push_back(pushed);
+        b.plain_root().other.push_back(pushed);
         ++pushed;
         if (a.get_size() != before) {
             assert(tail_zero(a));
@@ -95,7 +95,7 @@ int main() {
     }
     assert(doubled);
     assert(a.save_verified() == b.save_verified());
-    assert(a.root().other.size() == pushed && a.root().values.size() == 1);
+    assert(a.plain_root().other.size() == pushed && a.plain_root().values.size() == 1);
 
     // Two reloads in a row: after the first the old content's bytes past the
     // new length are still dirty, so the second may not treat its own
@@ -103,14 +103,14 @@ int main() {
     // expose zero bytes only.
     {
         auto c = Buffer::create(4096, growable());
-        for (std::uint64_t i = 0; i < (std::uint64_t(1) << 20) / 8; ++i) c.root().values.push_back(~i);
+        for (std::uint64_t i = 0; i < (std::uint64_t(1) << 20) / 8; ++i) c.plain_root().values.push_back(~i);
         c.reload_verified(small);
         c.reload_verified(small);
         auto d = Buffer::load_verified(small, growable());
         for (std::uint64_t i = 0; i < (std::uint64_t(2) << 20) / 8; ++i) {
             const std::size_t before = c.get_size();
-            c.root().other.push_back(i);
-            d.root().other.push_back(i);
+            c.plain_root().other.push_back(i);
+            d.plain_root().other.push_back(i);
             if (c.get_size() != before) assert(tail_zero(c));
         }
         assert(c.save_verified() == d.save_verified());

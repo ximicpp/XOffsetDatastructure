@@ -45,7 +45,7 @@ template <class Assign>
 std::string reference(Buffer& draft, xo::XCompactOptions options, Assign&& assign) {
     auto clone = typed_load(draft.save_verified());
     if (!clone) fail("clone of the draft rejected");
-    assign(clone->root());
+    assign(clone->plain_root());
     return clone->save_compact(options);
 }
 
@@ -85,14 +85,14 @@ void check(Buffer& draft, Buffer& a, Buffer& b, const std::string& where) {
     const auto draft_before = draft.copy_bytes();
     const auto a_before = a.copy_bytes();
     const auto b_before = b.copy_bytes();
-    auto& d = draft.root();
+    auto& d = draft.plain_root();
     for (const auto options : {kTight, xo::XCompactOptions{}}) {
         const std::string w = where + (options.slack_div ? " (slack)" : " (tight)");
         // Members from two other buffers.
         {
-            const auto want = reference(draft, options, [&](fz::Root& r) { r.items = a.root().items; r.title = b.root().title; });
+            const auto want = reference(draft, options, [&](fz::Root& r) { r.items = a.plain_root().items; r.title = b.plain_root().title; });
             outputs_agree(want, [&](std::string& out) {
-                draft.save_compact_into(out, options, xo::xassign(d.items, a.root().items), xo::xassign(d.title, b.root().title));
+                draft.save_compact_into(out, options, xo::xassign(d.items, a.plain_root().items), xo::xassign(d.title, b.plain_root().title));
             }, w + " items+title");
             auto loaded = typed_load(want);
             need(bool(loaded), w + ": composed wire rejected by load_verified");
@@ -101,7 +101,7 @@ void check(Buffer& draft, Buffer& a, Buffer& b, const std::string& where) {
         // The whole root.
         {
             const auto want = a.save_compact(options);
-            outputs_agree(want, [&](std::string& out) { draft.save_compact_into(out, options, xo::xassign(d, a.root())); },
+            outputs_agree(want, [&](std::string& out) { draft.save_compact_into(out, options, xo::xassign(d, a.plain_root())); },
                           w + " root");
         }
         // Scalars and a source inside the draft itself (simultaneous: the
@@ -110,13 +110,13 @@ void check(Buffer& draft, Buffer& a, Buffer& b, const std::string& where) {
             const auto want = reference(draft, options, [&](fz::Root& r) {
                 auto items_copy = typed_load(draft.save_verified());
                 r.epoch = 77;
-                r.tags = items_copy->root().tags;
-                r.items = a.root().items;
+                r.tags = items_copy->plain_root().tags;
+                r.items = a.plain_root().items;
             });
             const std::uint64_t epoch = 77;
             outputs_agree(want, [&](std::string& out) {
                 draft.save_compact_into(out, options, xo::xassign(d.epoch, epoch), xo::xassign(d.tags, d.tags),
-                                        xo::xassign(d.items, a.root().items));
+                                        xo::xassign(d.items, a.plain_root().items));
             }, w + " scalar+self");
         }
     }
@@ -128,19 +128,19 @@ void check(Buffer& draft, Buffer& a, Buffer& b, const std::string& where) {
         need(throws([&] { compose(o); }), where + ": " + what + " accepted");
         need(o.empty(), where + ": " + what + " left bytes in the output");
     };
-    rejected([&](std::string& o) { draft.save_compact_into(o, kTight, xo::xassign(d, a.root()), xo::xassign(d.items, a.root().items)); },
+    rejected([&](std::string& o) { draft.save_compact_into(o, kTight, xo::xassign(d, a.plain_root()), xo::xassign(d.items, a.plain_root().items)); },
              "nested targets");
-    rejected([&](std::string& o) { draft.save_compact_into(o, kTight, xo::xassign(d.items, a.root().items), xo::xassign(d.items, b.root().items)); },
+    rejected([&](std::string& o) { draft.save_compact_into(o, kTight, xo::xassign(d.items, a.plain_root().items), xo::xassign(d.items, b.plain_root().items)); },
              "duplicate targets");
-    rejected([&](std::string& o) { draft.save_compact_into(o, kTight, xo::xassign(a.root().items, b.root().items)); },
+    rejected([&](std::string& o) { draft.save_compact_into(o, kTight, xo::xassign(a.plain_root().items, b.plain_root().items)); },
              "target outside the root");
     // Inside the root's bytes, but a field of a container head, not a member
     // subobject the walk reaches.
     const std::uint32_t size_source = 3;
-    rejected([&](std::string& o) { draft.save_compact_into(o, xo::XCompactOptions{}, xo::xassign(d.items, a.root().items), xo::xassign(d.title.size_, size_source)); },
+    rejected([&](std::string& o) { draft.save_compact_into(o, xo::XCompactOptions{}, xo::xassign(d.items, a.plain_root().items), xo::xassign(d.title.size_, size_source)); },
              "target inside a container head");
     if (!d.items.empty())
-        rejected([&](std::string& o) { draft.save_compact_into(o, kTight, xo::xassign(d.items[0].name, b.root().title)); },
+        rejected([&](std::string& o) { draft.save_compact_into(o, kTight, xo::xassign(d.items[0].name, b.plain_root().title)); },
                  "target inside a container");
     need(draft.copy_bytes() == draft_before, where + ": draft changed");
     need(a.copy_bytes() == a_before && b.copy_bytes() == b_before, where + ": a source changed");
@@ -149,7 +149,7 @@ using CmpBuffer = xo::TypedXBuffer<cmp::Root>;
 
 CmpBuffer make_cmp(std::uint32_t seed) {
     auto b = CmpBuffer::create(4096, xo::XBuffer::maximum_capacity(1u << 22).with_growth(xo::XGrowPolicy::Automatic));
-    auto& r = b.root();
+    auto& r = b.plain_root();
     r.version = seed;
     r.pod.tag = std::uint8_t(seed);
     r.pod.value = seed * 11u;
@@ -174,7 +174,7 @@ void padded_targets() {
     auto src = make_cmp(40);
     (void)draft.save_verified(); (void)src.save_verified();
     // Garbage in the padding of a source that lives in a buffer.
-    auto* named_bytes = reinterpret_cast<unsigned char*>(&src.root().other);
+    auto* named_bytes = reinterpret_cast<unsigned char*>(&src.plain_root().other);
     for (const auto& r : xo::detail::padding_ranges<cmp::Named>)
         for (std::size_t k = 0; k < r.count; ++k) std::memset(named_bytes + r.offset + k * r.stride, 0xC3, r.bytes);
     cmp::Pod pod;
@@ -184,26 +184,26 @@ void padded_targets() {
     const auto draft_before = draft.copy_bytes();
     for (const auto options : {kTight, xo::XCompactOptions{}}) {
         auto clone = *typed_load<cmp::Root>(draft.save_verified());
-        auto& c = clone.root();
+        auto& c = clone.plain_root();
         c.pod = pod;
         c.pods[1] = pod;
-        c.named = src.root().other;
-        c.other = src.root().list[3];
+        c.named = src.plain_root().other;
+        c.other = src.plain_root().list[3];
         xo::detail::zero_implicit_padding(&c.pod);
         xo::detail::zero_implicit_padding(&c.pods[1]);
         xo::detail::zero_implicit_padding(&c.named);
         xo::detail::zero_implicit_padding(&c.other);
         const auto want = clone.save_compact(options);
         std::string out(want.size() + 32, char(0xA5));
-        auto& d = draft.root();
+        auto& d = draft.plain_root();
         draft.save_compact_into(out, options, xo::xassign(d.pod, pod), xo::xassign(d.pods[1], pod),
-                                xo::xassign(d.named, src.root().other), xo::xassign(d.other, src.root().list[3]));
+                                xo::xassign(d.named, src.plain_root().other), xo::xassign(d.other, src.plain_root().list[3]));
         need(out == want, std::string("padded targets: composed wire differs") + (options.slack_div ? " (slack)" : " (tight)"));
         auto loaded = *typed_load<cmp::Root>(out);
-        const auto& l = loaded.root();
+        const auto& l = loaded.plain_root();
         need(l.pod.tag == 9 && l.pod.value == 99 && l.pods[1].value == 99 && l.pods[2].value == d.pods[2].value &&
-                 l.named.id == src.root().other.id && l.named.name.view() == src.root().other.name.view() &&
-                 l.other.ids.size() == src.root().list[3].ids.size(),
+                 l.named.id == src.plain_root().other.id && l.named.name.view() == src.plain_root().other.name.view() &&
+                 l.other.ids.size() == src.plain_root().list[3].ids.size(),
              "padded targets: loaded values differ");
         // The padding of every target in the wire is zero.
         const char* root = out.data() + sizeof(xo::XWireHeaderV2); // the root is the first payload byte on the wire
@@ -235,16 +235,16 @@ void heap_string_words() {
     auto src = make_cmp(3);
     std::string out;
     for (std::uint32_t n = 11; n <= 80; ++n) {
-        auto& s = src.root();
+        auto& s = src.plain_root();
         s.named.name = std::string(n, char('A' + n % 26));
         s.other.name.reserve(n + n % 13);
         s.other.name = std::string(n, char('a' + n % 26));
         (void)src.save_verified();
         auto clone = *typed_load<cmp::Root>(draft.save_verified());
-        clone.root().named = s.named;
-        clone.root().other = s.other;
+        clone.plain_root().named = s.named;
+        clone.plain_root().other = s.other;
         const auto want = clone.save_compact(kTight);
-        auto& d = draft.root();
+        auto& d = draft.plain_root();
         draft.save_compact_into(out, kTight, xo::xassign(d.named, s.named), xo::xassign(d.other, s.other));
         need(out == want, "heap string of " + std::to_string(n) + " bytes: composed wire differs");
     }
@@ -261,7 +261,7 @@ int main(int argc, char** argv) {
             auto w = build_wire(rng);
             auto b = typed_load(w);
             need(bool(b), "case " + std::to_string(i) + ": generated wire rejected");
-            if (rng() % 2) mutate_valid(b->root(), rng);
+            if (rng() % 2) mutate_valid(b->plain_root(), rng);
             return std::move(*b);
         };
         auto draft = make();

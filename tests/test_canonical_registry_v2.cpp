@@ -46,7 +46,7 @@ using Token=xo::VerifiedReceiveToken<CanonicalRegistryRoot>;
 namespace{
 void need(bool p,const char* why){if(!p)throw std::runtime_error(why);}
 auto policy(){return xo::XBuffer::maximum_capacity(131072).with_growth(xo::XGrowPolicy::Automatic);}
-std::string wire(){auto b=Buffer::create(32768,policy());auto& r=b.root();r.marker=0xa1200345;r.label="canonical registry";r.values.resize(5);for(unsigned i=0;i<5;++i)r.values[i]=101+i;return b.save_verified();}
+std::string wire(){auto b=Buffer::create(32768,policy());auto& r=b.plain_root();r.marker=0xa1200345;r.label="canonical registry";r.values.resize(5);for(unsigned i=0;i<5;++i)r.values[i]=101+i;return b.save_verified();}
 // V2.1 dense wire: [XWireHeaderV2][payload bytes [48, used_bytes)][hole table: hole_count x 8].
 Token receive(const std::string& bytes){
     xo::XWireHeaderV2 header{};need(bytes.size()>=sizeof(header),"fixture wire too small");
@@ -62,7 +62,7 @@ Token receive(const std::string& bytes){
     op.complete(h.size(),p.size(),table.size());return t;
 }
 void check(Buffer& b){
-    auto& r=b.root();need(r.marker==0xa1200345&&r.label=="canonical registry"&&r.values.size()==5&&r.values[4]==105,"complete owner values differ");
+    auto& r=b.plain_root();need(r.marker==0xa1200345&&r.label=="canonical registry"&&r.values.size()==5&&r.values[4]==105,"complete owner values differ");
     const auto base=reinterpret_cast<std::uintptr_t>(b.get_address());
     const auto target=reinterpret_cast<std::uintptr_t>(r.values.data());
     auto* recovered=xo::XBufferCore::canonical_bytes_at(&r.values,target,5*sizeof(std::uint32_t));
@@ -82,8 +82,8 @@ void handler(){
     // would deadlock if pending record allocation held the registry mutex.
     for(auto& item:*live_owners)if(item)check(*item);
     std::swap((*live_owners)[0],(*live_owners)[1]);
-    auto normal=Buffer::create(4096,policy());normal.root().marker=7;
-    need(normal.root().marker==7,"handler normal owner publication failed");
+    auto normal=Buffer::create(4096,policy());normal.plain_root().marker=7;
+    need(normal.plain_root().marker==7,"handler normal owner publication failed");
 }
 void many_owners_and_pending_oom(){
     const auto input=wire();std::array<std::optional<Buffer>,7> owners;
@@ -112,9 +112,9 @@ void many_owners_and_pending_oom(){
     // Inert TLS shared records can remain, but no active C registration or VM
     // owner remains. Do not require final global C++ live requested bytes zero.
     need(xo::XBufferCore::canonical_bytes_at(retired_anchor,retired_number,1)==nullptr,"retired C anchor found after all owners released");
-    auto normal=Buffer::create(8192,policy());normal.root().marker=91;normal.root().values.resize(4);normal.root().values[3]=71;
-    need(normal.root().marker==91&&normal.root().values[3]==71,"normal reads after last C owner differ");
-    need(xo::XBufferCore::canonical_bytes_at(&normal.root(),reinterpret_cast<std::uintptr_t>(normal.root().values.data()),sizeof(std::uint32_t))==nullptr,"ordinary VM falsely claimed canonical origin");
+    auto normal=Buffer::create(8192,policy());normal.plain_root().marker=91;normal.plain_root().values.resize(4);normal.plain_root().values[3]=71;
+    need(normal.plain_root().marker==91&&normal.plain_root().values[3]==71,"normal reads after last C owner differ");
+    need(xo::XBufferCore::canonical_bytes_at(&normal.plain_root(),reinterpret_cast<std::uintptr_t>(normal.plain_root().values.data()),sizeof(std::uint32_t))==nullptr,"ordinary VM falsely claimed canonical origin");
 }
 // Direct-receive owners are the only indexed owners, so their record and
 // index node are the only registry allocations left. Fail each host request

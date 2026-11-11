@@ -88,7 +88,7 @@ std::string text(std::uint32_t seed, std::size_t n) {
 // Deterministic content; `large` frees a >= 4 KiB block before saving.
 std::string build(bool large, xo::XSaveOptions options = {}) {
     auto buf = Buffer::create(4096, xo::XBuffer::maximum_capacity(1u << 20).with_growth(xo::XGrowPolicy::Automatic));
-    auto& m = buf.root();
+    auto& m = buf.plain_root();
     m.version = 7;
     m.name = "golden-model";               // heap (> 10 bytes)
     for (std::uint32_t i = 0; i < 12; ++i) {
@@ -134,7 +134,7 @@ void check(const std::string& wire, bool expect_sparse, std::size_t pinned_size,
     // Again through a growable reload and a no-op mutation cycle.
     auto again = Buffer(xo::XBuffer::load_verified<golden::Model>(
         wire, xo::XBuffer::maximum_capacity(1u << 20).with_growth(xo::XGrowPolicy::Automatic)));
-    if (again.root().entries.size() == 0 || again.save_verified(options) != wire) fail("second rewrite differs");
+    if (again.plain_root().entries.size() == 0 || again.save_verified(options) != wire) fail("second rewrite differs");
 }
 
 struct Hole { std::uint32_t offset, bytes; };

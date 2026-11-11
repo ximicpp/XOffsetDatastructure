@@ -12,7 +12,7 @@ XOFFSET_RECORD_DERIVED(HeaderOnlyRoot, (), cells)
 XOFFSET_REGISTER_SCHEMA_NAME(HeaderOnlyRoot,"four-paths.snapshot-index-header-only.v1")
 int main(){try{
     auto source=xo::TypedXBuffer<HeaderOnlyRoot>::create(65536);
-    source.root().cells.resize(2);source.root().cells[0].value="a";source.root().cells[1].value="b";
+    source.plain_root().cells.resize(2);source.plain_root().cells[0].value="a";source.plain_root().cells[1].value="b";
     auto owner=xo::freeze_verified(std::move(source));
     auto index=xo::make_verified_snapshot_array_index(owner,owner.root().cells);
     if(index || xo::snapshot_index_detail::registry()!=nullptr ||

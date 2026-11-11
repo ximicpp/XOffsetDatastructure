@@ -1196,6 +1196,12 @@ public:
         D3UEnt& d_unit(const MapWorld& w, int32_t i) {
             D3UEnt& e = due[std::size_t(i)];
             if (e.rtick == dtick) return e;
+            return d_unit_fill(w, i);
+        }
+        // The first use in the tick, out of line: a delivery's loop stays
+        // small (it runs between other work that evicts the I-cache).
+        XOFFSET_DETAIL_NOINLINE D3UEnt& d_unit_fill(const MapWorld& w, int32_t i) {
+            D3UEnt& e = due[std::size_t(i)];
             e.rtick = dtick;
             const uint64_t now = e.ptick == dtick ? e.now : 0;
             const uint64_t old = e.old | (e.ptick == dtick ? 0 : e.now);
@@ -1228,9 +1234,15 @@ public:
         // has, on first use in the tick) and its key body.
         D3MEnt& d_march(const MapWorld& w, int32_t i) {
             const WorldMarch& m = w.march(i);
+            D3MEnt& e = dme[std::size_t(m.id) & (dme.size() - 1)];
+            if (e.prev.id == m.id && e.tick == dtick) return e;
+            return d_march_fill(w, i);
+        }
+        XOFFSET_DETAIL_NOINLINE D3MEnt& d_march_fill(const MapWorld& w, int32_t i) {
+            const WorldMarch& m = w.march(i);
             D3MEnt* e = &dme[std::size_t(m.id) & (dme.size() - 1)];
             if (e->prev.id != m.id) {
-                if (e->prev.id >= d_min_live(w)) e = &d_march_grow(w, m.id);
+                if (e->prev.id != 0 && e->prev.id >= d_min_live(w)) e = &d_march_grow(w, m.id);
                 else *e = D3MEnt{};
             }
             if (e->tick != dtick) {
@@ -1243,7 +1255,9 @@ public:
             return *e;
         }
         void d_march_key(D3MEnt& e) {
-            if (e.ktick == dtick) return;
+            if (e.ktick != dtick) d_march_key_fill(e);
+        }
+        XOFFSET_DETAIL_NOINLINE void d_march_key_fill(D3MEnt& e) {
             e.koff = uint32_t(darena.size()); RD<xm::ViewMarch>::key(e.prev, darena); e.klen = uint32_t(darena.size() - e.koff); e.ktick = int32_t(dtick);
         }
         // The lowest id of a march in the world this tick (found on the first
@@ -1277,7 +1291,12 @@ public:
         }
         D3TEnt& d_tile(const MapWorld& w, int32_t t) {
             D3TEnt& e = dte[std::size_t(t)];
-            if (e.tick != dtick) {
+            if (e.tick != dtick) d_tile_fill(w, t);
+            return e;
+        }
+        XOFFSET_DETAIL_NOINLINE void d_tile_fill(const MapWorld& w, int32_t t) {
+            D3TEnt& e = dte[std::size_t(t)];
+            {
                 xm::Tile img;
                 copy_vtile(img, w, t % kTiles, t / kTiles);
                 const std::size_t at = darena.size();
@@ -1285,9 +1304,8 @@ public:
                 e.off = uint32_t(at); e.len = uint32_t(darena.size() - at);
                 e.tick = int32_t(dtick);
             }
-            return e;
         }
-        void d_unit_key(const MapWorld& w, int32_t i) {
+        XOFFSET_DETAIL_NOINLINE void d_unit_key(const MapWorld& w, int32_t i) {
             D3UEnt& e = d_unit(w, i);
             if (e.ktick == dtick) return;
             e.koff = uint32_t(darena.size());

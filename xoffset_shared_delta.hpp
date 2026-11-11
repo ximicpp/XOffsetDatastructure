@@ -377,9 +377,10 @@ namespace XOffsetDatastructure::xsync {
 
         // Bit b of the result: byte b of x is nonzero.
         inline unsigned byte_mask(std::uint64_t x) noexcept {
-            x |= x >> 4; x |= x >> 2; x |= x >> 1;
-            x &= 0x0101010101010101ull;
-            return unsigned((x * 0x0102040810204080ull) >> 56);
+            // Top bit of each nonzero byte (its low seven bits carried up,
+            // or its own top bit), then gathered into the top byte.
+            const std::uint64_t h = (((x & 0x7f7f7f7f7f7f7f7full) + 0x7f7f7f7f7f7f7f7full) | x) & 0x8080808080808080ull;
+            return unsigned((h * 0x0002040810204081ull) >> 56);
         }
         // Word a / 8 of p: rem = bytes left from a (zero fill past them).
         inline std::uint64_t load(const unsigned char* p, std::size_t rem) noexcept {
@@ -437,8 +438,8 @@ namespace XOffsetDatastructure::xsync {
             std::size_t next = 0;
             for (std::size_t b = 0; b < blocks; ++b) {
                 if (only && !(only[b / 64] >> (b % 64) & 1u)) continue;
-                std::uint64_t cw[8];
-                unsigned masks[8];
+                XOFFSET_INDETERMINATE std::uint64_t cw[8];
+                XOFFSET_INDETERMINATE unsigned masks[8];
                 unsigned sel = 0, nm = 0;
                 std::uint64_t packed = 0;   // the block's masks, in order
                 const std::size_t words = n - b * 64 >= 64 ? 8 : (n - b * 64 + 7) / 8;
@@ -660,12 +661,17 @@ namespace XOffsetDatastructure::xsync {
         // set may change anything, but only the part fields names is
         // compared, and it must not move rec.
         template <class F> static bool update(T& rec, const XSyncFields& fields, XSyncOut& out, F&& set) {
-            alignas(8) unsigned char snap[sizeof(T)];
+            XOFFSET_INDETERMINATE alignas(8) unsigned char snap[sizeof(T)];
             const auto* r = reinterpret_cast<const unsigned char*>(&rec);
             constexpr std::size_t nblocks = (sizeof(T) + 63) / 64;
-            for (std::size_t b = 0; b < nblocks; ++b)
-                if (fields.blocks[b / 64] >> (b % 64) & 1u)
-                    std::memcpy(snap + b * 64, r + b * 64, sizeof(T) - b * 64 >= 64 ? 64 : sizeof(T) - b * 64);
+            // One copy of a constant size per hinted block (unrolled: a few
+            // vector moves each, no length computed at run time).
+            [&]<std::size_t... B>(std::index_sequence<B...>) {
+                ((fields.blocks[B / 64] >> (B % 64) & 1u
+                      ? (void)std::memcpy(snap + B * 64, r + B * 64, sizeof(T) - B * 64 >= 64 ? 64 : sizeof(T) - B * 64)
+                      : (void)0),
+                 ...);
+            }(std::make_index_sequence<nblocks>{});
             [[maybe_unused]] std::array<std::uint32_t, container_count + 1> at{};
             [[maybe_unused]] std::array<std::uint32_t, container_count + 1> len{};
             XSyncOut& keep = scratch();

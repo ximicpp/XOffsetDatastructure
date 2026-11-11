@@ -1,4 +1,5 @@
-// Growth policy part 2 gate: proxies (XRef) and pin scopes (edit) against
+// Growth policy part 2 and 3 gate: proxies (XRef, by field<&T::m>() and by
+// the named accessors of XOFFSET_RECORD) and pin scopes (edit) against
 // plain references, on the workloads of the design's fast-proxy prototype
 // (/mnt/project-files/grow-policy-20261110/fastproxy/).
 //
@@ -124,6 +125,21 @@ NOINLINE void players_batch(XRef<Root> r, int n) {
     }, std::size_t(n) * 96u);
 }
 
+// The same through the named accessors XOFFSET_RECORD generates (growth
+// policy part 3): p.id() is p.field<&Player::id>(), so the code must be the
+// same instructions.
+NOINLINE void players_named(XRef<Root> r, int n) {
+    auto players = r.players();
+    for (int i = 0; i < n; ++i) {
+        auto p = players.emplace_back();
+        p.id() = i;
+        p.level() = i & 63;
+        p.name() = g_names[i];
+        auto items = p.items();
+        for (int k = 0; k < 4; ++k) items.push_back(i + k);
+    }
+}
+
 // ---- reads (report only)
 NOINLINE std::int64_t levels_raw(const Root& r) {
     std::int64_t s = 0;
@@ -133,6 +149,11 @@ NOINLINE std::int64_t levels_raw(const Root& r) {
 NOINLINE std::int64_t levels_proxy(XRef<Root> r) {
     std::int64_t s = 0;
     for (auto p : r.field<&Root::players>()) s += p.field<&Player::level>() + p.field<&Player::items>().size();
+    return s;
+}
+NOINLINE std::int64_t levels_named(XRef<Root> r) {
+    std::int64_t s = 0;
+    for (auto p : r.players()) s += p.level() + p.items().size();
     return s;
 }
 
@@ -226,6 +247,8 @@ int main(int argc, char** argv) {
               [&](XRef<Root> r) { ints_bulk_proxy(r, asc.data(), n); });
         three("players batch", 1.05, [&](Root& r) { players_raw(r, n); },
               [&](XRef<Root> r) { players_batch(r, n); });
+        three("players build named", 1.20, [&](Root& r) { players_raw(r, n); },
+              [&](XRef<Root> r) { players_named(r, n); });
         if (cg) continue;
         {   // reads: report only (the design keeps bulk reads in read scopes)
             auto b = make(Mode::relocating);
@@ -242,9 +265,11 @@ int main(int argc, char** argv) {
             };
             const double raw = time([&] { return levels_raw(b.root<Root>()); });
             const double proxy = time([&] { return levels_proxy(b.ref<Root>()); });
+            const double named = time([&] { return levels_named(b.ref<Root>()); });
             const double scope = time([&] { return b.read<Root>([](const Root& r) { return levels_raw(r); }); });
-            std::printf("n=%-6d %-22s raw %7.2f  proxy %7.2f (%.3fx, report only)  read %7.2f (%.3fx)\n", n,
-                        "players read", raw, proxy, proxy / raw, scope, scope / raw);
+            std::printf("n=%-6d %-22s raw %7.2f  proxy %7.2f (%.3fx, report only)  named %7.2f (%.3fx)  "
+                        "read %7.2f (%.3fx)\n",
+                        n, "players read", raw, proxy, proxy / raw, named, named / raw, scope, scope / raw);
         }
     }
     return g_fail ? 1 : 0;

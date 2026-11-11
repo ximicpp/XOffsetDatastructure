@@ -79,6 +79,13 @@ namespace rr = xo::detail::receive_raw;
 // Raw and verified receive report rejection only by exception.
 constexpr bool kRawAcceptors = !XOFFSET_NO_EXCEPTIONS;
 
+// The root as a plain reference: TypedXBuffer::plain_root() (root() returns a
+// proxy), or root() in older libraries (the differential's base).
+template <class B> decltype(auto) plain_root_of(B&& b) {
+    if constexpr (requires { b.plain_root(); }) return b.plain_root();
+    else return b.root();
+}
+
 namespace fz {
 struct Item {
     std::uint32_t id{};
@@ -477,7 +484,7 @@ template <class B>
 void require_no_root(B& target, const char* who) {
 #if !XOFFSET_NO_EXCEPTIONS
     bool refused = false;
-    try { (void)target.root(); } catch (const xo::XException&) { refused = true; }
+    try { (void)plain_root_of(target); } catch (const xo::XException&) { refused = true; }
     if (!refused) fail(std::string("root() succeeded after a rejected ") + who);
 #endif
     if (target.has_root()) fail(std::string("has_root() after a rejected ") + who);
@@ -558,7 +565,7 @@ void check_view(const std::string& w, const Oracle& o, Buffer* typed, const std:
     const bool sparse = w.size() >= kHeader && h.extent_count != 0;
     if (typed && !sparse) {
         if (!v) fail(id + ": bounds view rejected a dense wire load_verified accepts (" + v.error().message + ")");
-        if (dump(v->root()) != dump(typed->root())) fail(id + ": bounds view reads differ from load_verified");
+        if (dump(v->root()) != dump(plain_root_of(*typed))) fail(id + ": bounds view reads differ from load_verified");
         return;
     }
     if (v && sparse) fail(id + ": bounds view accepted a sparse wire");
@@ -897,7 +904,7 @@ std::string elide_zero_runs(const std::string& dense);
 
 std::string build_wire(std::mt19937_64& rng) {
     auto buf = Buffer::create(4096, xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic));
-    auto& r = buf.root();
+    auto& r = plain_root_of(buf);
     r.epoch = rng();
     r.title = random_text(rng, 30);
     const int items = int(rng() % 9);
@@ -1216,9 +1223,9 @@ void check_clone(B& buf, const std::string& saved, const std::mt19937_64& rng) {
         if (copy.save_verified() != saved) fail("clone() re-save differs");
         if (clone_target().save_verified() != saved) fail("clone_into() re-save differs");
         auto r1 = rng, r2 = rng, r3 = rng;
-        mutate_valid(buf.root(), r1);
-        mutate_valid(copy.root(), r2);
-        mutate_valid(clone_target().root(), r3);
+        mutate_valid(plain_root_of(buf), r1);
+        mutate_valid(plain_root_of(copy), r2);
+        mutate_valid(plain_root_of(clone_target()), r3);
         const auto next = buf.save_verified();
         if (copy.save_verified() != next || clone_target().save_verified() != next)
             fail("clone diverged from its source under the same mutation");
@@ -1237,14 +1244,14 @@ void check_composed([[maybe_unused]] Buffer& buf, [[maybe_unused]] const std::st
     auto r = rng;
     auto src = typed_load(build_wire(r));
     if (!src) fail("composed: generated source wire rejected");
-    if (r() % 2) mutate_valid(src->root(), r);
-    auto& d = buf.root();
-    const auto& s = src->root();
+    if (r() % 2) mutate_valid(plain_root_of(*src), r);
+    auto& d = plain_root_of(buf);
+    const auto& s = plain_root_of(*src);
     const auto options = r() % 2 ? xo::XCompactOptions{.slack_div = 0} : xo::XCompactOptions{};
     const auto form = r() % 6;
     auto clone = typed_load(saved);
     if (!clone) fail("composed: clone of the case rejected");
-    auto& c = clone->root();
+    auto& c = plain_root_of(*clone);
     std::string out(std::size_t(r() % 2 ? 0 : r() % 4096), char(0xA5)); // stale bytes must not survive
     switch (form) {
     case 0: c.items = s.items;
@@ -1267,13 +1274,13 @@ void check_composed([[maybe_unused]] Buffer& buf, [[maybe_unused]] const std::st
     if (buf.save_verified() != saved) fail("save_compact_into with assignments changed the draft");
     auto loaded = typed_load(out);
     if (!loaded) fail("composed wire rejected by load_verified");
-    if (dump(loaded->root()) != dump(clone->root())) fail("composed wire loads different values");
+    if (dump(plain_root_of(*loaded)) != dump(plain_root_of(*clone))) fail("composed wire loads different values");
     ++composed_comparisons;
 #endif
 }
 
 std::string exercise(Buffer& buf, std::mt19937_64& rng) {
-    auto& r = buf.root();
+    auto& r = plain_root_of(buf);
     std::uint64_t sink = r.epoch + r.title.size();
     for (const auto& it : r.items) { sink += it.id + it.name.size(); for (auto v : it.vals) sink += v; }
     for (const auto& t : r.tags) sink += t.size();
@@ -1285,7 +1292,7 @@ std::string exercise(Buffer& buf, std::mt19937_64& rng) {
     const auto saved = buf.save_verified();
     auto again = typed_load(saved);
     if (!again) fail("re-saved wire after mutating an accepted input was rejected");
-    if (dump(again->root()) != before) fail("re-saved wire changed semantics");
+    if (dump(plain_root_of(*again)) != before) fail("re-saved wire changed semantics");
     if (again->save_verified() != saved) fail("write-read-write not byte stable after mutation");
     check_composed(buf, saved, rng);
     check_clone(buf, saved, rng);
@@ -1300,7 +1307,7 @@ void check_slot_mutation(const std::string& w, std::mt19937_64 rng, const std::s
     const auto cap = xo::XBuffer::maximum_capacity(xo::XBufferCore::SLOT_MAX).with_growth(xo::XGrowPolicy::Automatic);
     auto slot = Buffer(xo::XBuffer::load_verified<fz::Root>(w, cap));
     if (slot.storage_kind() != xo::XStorageKind::PinnedSlot) fail(where + ": expected a pinned slot");
-    mutate_valid(slot.root(), rng);
+    mutate_valid(plain_root_of(slot), rng);
     if (slot.save_verified() != saved_vm) fail(where + ": mutation on a pinned slot re-saves a different wire");
 }
 #endif
@@ -1469,7 +1476,7 @@ std::vector<std::string> seed_pool(std::mt19937_64& rng, std::size_t count) {
 // Same content for every call with the same rng; only the vector length varies.
 std::string sized_wire(std::mt19937_64 rng, std::size_t vals) {
     auto buf = Buffer::create(4096, xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic));
-    auto& r = buf.root();
+    auto& r = plain_root_of(buf);
     r.epoch = rng();
     r.title = random_text(rng, 30);
     for (int i = int(rng() % 4); i > 0; --i) r.tags.emplace_back(random_text(rng, 20), r.tags.get_stored_allocator());

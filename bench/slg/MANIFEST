@@ -231,6 +231,9 @@
 #                        build_cap() asks for a 1 MiB slot explicitly (with_reserve): build<T>
 #                        reruns a fill whose reservation is too small, and the fills draw from
 #                        the shared Rng, so the senders must never start small.
+#   bench/xoffset_runner.hpp  2026-11-11 (small-server D3, round 2): first use of a unit, march
+#                        or tile in a tick and key bodies out of line; march slot checks the
+#                        lowest live id only when another march holds it. D3 bytes unchanged.
 ea55baa3f59a1719135b2b3187e2bc9fc91abe171d6cfebf8216780676960eb0  CMakeLists.txt
 035efa87a69963b1bd4e2c2f03d472d77a3ffba01ee782d763cafda0d322ec52  README.md
 ea141af841831b376028f48ab0d4c22e66ce2671f01d9e14c9f66814f5ebaa6e  adapters/cereal_format.hpp
@@ -243,7 +246,7 @@ fef3f268315b7383a8fe8ee2b45d9db70ba50ec201301ed8d58dd5ebc0ab9805  bench/runner.h
 168bf7d2b3ce419c8b001793ba64b64e31dc281041ae01e16cf622c40ef75c5f  bench/slg_bench.cpp
 730a66f677d9d20077175f629cf0b13919e66ccedaf880e4eb414c6bc94c0610  bench/small_msg_probe.cpp
 56cb184e9bbebd0a61e184a431fa9ede2e9d75a617ee7ce838e17e1a342aad76  bench/std_runner.hpp
-709782285b1d917786c69dab226b1ad9d8cbe56ee9a7faeaa3dfab2e7f5d15e8  bench/xoffset_runner.hpp
+20d351e6f55b58d3df3e2572eb905c71eec28d2aeb99dd41ef95ed40101e4956  bench/xoffset_runner.hpp
 12cab27be9331a4a09ae66f444cf5852dd81e363df562748a4ea854932e35e44  include/slg/cista_free.hpp
 f901dd6b3534240a5038157eaf601d756c07557bcd7fad74b80f8615513b6ab8  include/slg/flat_held_index.hpp
 341ba037a01f807258b0a7527aa0ba0a763f60a32bab00f78f75834f0330cffe  include/slg/generic.hpp
