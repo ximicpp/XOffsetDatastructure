@@ -3720,6 +3720,7 @@ namespace XOffsetDatastructure {
         static_assert(!has_implicit_padding_v<T>,
             "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");
 #endif
+        if (refuse_failed_emit(out)) return XDeltaStats{};
         require_typed_root_access("save_delta<T>(): unverified payload cannot be relabeled as verified");
         require_schema_match<T>("save_delta<T>(): schema mismatch for requested root type");
         auto* root_ptr = detail::find_root<T>(*this);
