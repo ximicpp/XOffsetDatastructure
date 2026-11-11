@@ -45,9 +45,11 @@
 tools/local_validate.sh --release --base <上一个 tag>
 ```
 
-`--release` 在默认步骤（GCC 16 Release 全量 CTest、ASan+UBSan、`test_v2_fuzz`、
+`--release` 在 PR 层步骤（GCC 16 Release 全量 CTest、ASan+UBSan、`test_v2_fuzz`、
 校验差分、bench smoke、两种编译器的 Ir 门禁、P2996 构建与签名核对）之外加上 GCC 16 TSan
-全量 CTest。每一步都要是 pass，两个 Ir 门按第 2 节判。客户端列里容器没有工具链、报
+全量 CTest、整个 C++20/C++23 矩阵和全部客户端列（[PERF_GATE.md](PERF_GATE.md) 开头的分层表）。
+发版 PR 本身只改版本号和文档，PR 前的候选已经跑过 `--release`。fuzz（3.1 节）和 `--release`
+互不依赖，放在两个线程里同时跑，不要一个跑完再开另一个。每一步都要是 pass，两个 Ir 门按第 2 节判。客户端列里容器没有工具链、报
 「not run」的（例如 Android NDK），在发版 PR 和文档里写明这一版没有重跑。`REPORT.md` 贴进发版 PR。
 
 ### 3.1 发版前 fuzz（K4）
