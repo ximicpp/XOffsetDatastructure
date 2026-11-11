@@ -23,6 +23,26 @@
   reservation costs the same as today; create + fill + destroy 29 fewer
   instructions than an Automatic slot buffer (`tools/bench_relocating_storage.cpp`).
   Wire format unchanged.
+- Growth policy, part 2 (proxies and pin scopes, `xoffset_proxy.hpp`):
+  `XBuffer::ref<T>()` returns an `XRef<T>`, a proxy that stays valid when the
+  payload moves (and when the `XBuffer` object is moved or swapped), and
+  notices a destroyed or replaced buffer (`stale`). Proxies cover values,
+  records (`field<&T::m>()`, `member<I>()`), strings, vectors, sets and maps;
+  element proxies hold container + index (map: key + cached index) and are
+  bounds-checked, so after a change they read another element or nothing,
+  never a retired block. Container proxies keep the size in a register, so a
+  push_back loop costs about what a plain reference does. `edit<T>(f)` /
+  `read<T>(f)` are pin scopes with plain references: the payload does not move
+  while one is open (an operation that would need a move fails with
+  `borrowed`), blocks retired inside are reused only after it, and a
+  Relocating buffer more than half full moves on entry. Failure is soft:
+  nothing throws or aborts; the failing operation has no effect, the first
+  failure stays in `error()` (`borrowed`, `stale`, `out_of_range`,
+  `capacity_exceeded`, `out_of_storage`) and a failed buffer refuses
+  `save_verified`, `save_compact` and `save_delta` until `clear_error()`.
+  Without exceptions, allocating container operations inside a scope check
+  their room first and return without effect when it is missing. New
+  `XErrc::borrowed`, `stale`, `out_of_range`. Wire format unchanged.
 
 ## 3.5.0: performance on the production platform
 
