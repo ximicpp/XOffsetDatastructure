@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+- Growth policy, part 1 (storage): `XGrowPolicy::Relocating`
+  (`XBuffer::relocating(maximum)`, default maximum 2 GiB - 8). A buffer
+  starts in a 1 MiB slot that is reserved, not zeroed
+  (`XOFFSET_RELOCATING_RESERVE_BYTES`; `MaximumCapacity::with_reserve` starts
+  smaller), container operations grow it in place inside that reservation, and
+  `make_room(bytes)` / `grow()` move it to a larger one when it is full:
+  servers in one move to a reservation of the whole maximum, phones to 16 MiB
+  (iOS) or 64 MiB (Android) and then doubling (`XOFFSET_RELOCATE_STEP_BYTES`).
+  A buffer that started small moves through larger slots first. When the OS
+  refuses the address space the reservation halves down to what is needed.
+  `make_room` never throws or aborts (`ok`, `capacity_exceeded`,
+  `out_of_storage`); a move invalidates pointers into the payload (epoch, as
+  `grow()` on a movable slot). The Auto storage rule and `SLOT_MAX` are
+  unchanged: the 512 KiB and 1 MiB slot classes serve relocating buffers only,
+  and their chunks are not backed by transparent huge pages. The slot
+  retention budget now counts the bytes free slots dirtied, not their nominal
+  size. Measured (cloud x86, P2996): 100k live small buffers cost 196 MB more
+  than today, all page tables (2 KiB per 1 MiB slot); a 4 KiB first
+  reservation costs the same as today; create + fill + destroy 29 fewer
+  instructions than an Automatic slot buffer (`tools/bench_relocating_storage.cpp`).
+  Wire format unchanged.
+
 ## 3.5.0: performance on the production platform
 
 A minor release on 3.4.0, aimed at speed on the cloud x86-64 servers and the
