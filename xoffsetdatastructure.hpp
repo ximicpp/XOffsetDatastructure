@@ -823,6 +823,20 @@ namespace XOffsetDatastructure {
             pinned_ = true;
             return true;
         }
+        // pin_enter when nothing has to happen first: a live lineage with no
+        // failure and no open scope, whose payload stays put (address-stable,
+        // or a reservation at most half used). False: take the full entry.
+        bool pin_quiet() noexcept {
+            detail::XCtl* const live = ctl_;
+            if (!live || live->sticky != XErrc::ok || pinned_) return false;
+            if (!address_stable()) {
+                const auto* sm = arena();
+                if (!sm || static_cast<size_type>(sm->used_end) > buffer_.reservation_limit() / 2) return false;
+            }
+            ++live->borrow;
+            pinned_ = true;
+            return true;
+        }
         // Closes a scope opened by pin_enter on this lineage. `ctl` is the
         // block pin_enter used (the XBuffer may have moved meanwhile: the
         // block follows the content to its current owner).
@@ -870,10 +884,6 @@ namespace XOffsetDatastructure {
         // scope closes on it), which starts a new lineage in place.
         void end_lineage() noexcept {
             quarantine_.clear();
-            if (ctl_->borrow == 0) {
-                retire_ctl();
-                return;
-            }
             ctl_->version += 2;
             ctl_->birth = ctl_->version;
             ctl_->sticky = XErrc::ok;
@@ -890,7 +900,9 @@ namespace XOffsetDatastructure {
             }
         }
         void release_quarantine() noexcept {
-            if (quarantine_.empty()) return;
+            if (!quarantine_.empty()) [[unlikely]] release_quarantine_slow();
+        }
+        XOFFSET_DETAIL_NOINLINE void release_quarantine_slow() noexcept {
             auto blocks = std::move(quarantine_);
             quarantine_.clear();
             for (const auto entry : blocks) {
@@ -8926,6 +8938,7 @@ namespace XOffsetDatastructure {
             explicit PinGuard(XBuffer& buffer) noexcept {
                 if (buffer.pin_enter()) ctl = buffer.control();
             }
+            explicit PinGuard(detail::XCtl* entered) noexcept : ctl(entered) {}
             ~PinGuard() { XBufferCore::pin_exit(ctl); }
             PinGuard(const PinGuard&) = delete;
             PinGuard& operator=(const PinGuard&) = delete;
@@ -9000,11 +9013,16 @@ namespace XOffsetDatastructure {
             static_assert(std::is_void_v<R>,
                 "edit(f): f must return void (a value made inside may point into the payload; "
                 "use read(f) to compute a value)");
-            if (!ok()) return false;
-            T* root_ptr = pin_root<T>(expected_growth);
-            if (!root_ptr) return false;
-            PinGuard guard(*this);
-            if (!guard.ctl) return false;
+            T* root_ptr = nullptr;
+            // Fast entry (no growth asked, the root cached, see pin_quiet).
+            if (expected_growth == 0 && (root_ptr = this->template cached_root<T>()) && pin_quiet()) [[likely]] {
+            } else {
+                if (!ok()) return false;
+                root_ptr = pin_root<T>(expected_growth);
+                if (!root_ptr) return false;
+                if (!pin_enter()) return false;
+            }
+            PinGuard guard(control());
 #if XOFFSET_NO_EXCEPTIONS
             detail::SoftFailScope soft;
             f(*root_ptr);

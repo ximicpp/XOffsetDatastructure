@@ -253,7 +253,10 @@ bool test_pin_scopes() {
         for (int i = 0; i < 100000; ++i)
             if (!ints.push_back(i)) break;
     });
-    CHECK(!ok && small.error() == XErrc::borrowed && small.data() == where);
+    CHECK(!ok && small.error() == XErrc::borrowed);
+#if !defined(XOFFSET_STRESS_RELOCATE)   // stress mode moves the payload at every scope exit
+    CHECK(small.data() == where);
+#endif
     const auto kept = small.root<Root>().ints.size();
     CHECK(kept > 0 && kept < 100000u);
     small.clear_error();
@@ -301,7 +304,10 @@ bool test_scope_overflow_fails_soft() {
         root.title.append(std::string(100000, 'y'));
         reached = 1;
     });
-    CHECK(!ok && !b.ok() && b.data() == where);
+    CHECK(!ok && !b.ok());
+#if !defined(XOFFSET_STRESS_RELOCATE)
+    CHECK(b.data() == where);
+#endif
     CHECK(b.root<Root>().ints.size() < 100000u);
 #if XOFFSET_NO_EXCEPTIONS
     CHECK(reached == 1);                    // every failing operation returned
