@@ -192,7 +192,7 @@ namespace XOffsetDatastructure {
         std::string write(Fill&& fill) {
             auto buffer = TypedXBuffer<Message>::create(
                 4096, XBuffer::maximum_capacity(4 * XSCHEMA_HELLO_MAX_BYTES).with_growth(XGrowPolicy::Automatic));
-            fill(buffer.root());
+            fill(buffer.plain_root());
             return buffer.save_compact(XCompactOptions{.slack_div = 0});
         }
 
@@ -231,7 +231,7 @@ namespace XOffsetDatastructure {
                 return false;
             }
 #endif
-            const Message& m = out.root();
+            const Message& m = out.plain_root();
             if (m.wire_format != XSCHEMA_HELLO_WIRE_FORMAT) {
                 error = "handshake from another wire format";
                 return false;
@@ -287,7 +287,7 @@ namespace XOffsetDatastructure {
                 if (result.message.empty()) result.message = "not a schema handshake hello";
                 return result;
             }
-            const XSchemaHello& hello = buffer.root();
+            const XSchemaHello& hello = buffer.plain_root();
             result.valid = true;
             result.role = hello.role == 1 ? XSchemaRole::server : XSchemaRole::client;
             result.label.assign(hello.label.view());
@@ -365,7 +365,7 @@ namespace XOffsetDatastructure {
             if (r.message.empty()) r.message = "not a schema handshake ack";
             return r;
         }
-        const XSchemaHelloAck& ack = buffer.root();
+        const XSchemaHelloAck& ack = buffer.plain_root();
         auto check = [&](const XWireFingerprint fp) -> bool {
             for (const XSchemaAckEntry& e : ack.entries) {
                 if (e.root_type_id != fp.root_type_id || e.schema_hash != fp.schema_hash) continue;

@@ -112,7 +112,7 @@ xo::XStatus apply_entry(xo::TypedXBuffer<Root>& rep, const std::string& d, xo::X
 void same_state(fz::Root& src_root, Buffer& src, Buffer& rep, const std::string& where) {
     need(payload_of(src) == payload_of(rep), where + ": replica payload differs from the sender's");
     need(holes_of(src) == holes_of(rep), where + ": replica hole set differs from the sender's");
-    need(dump(src_root) == dump(rep.root()), where + ": replica contents differ");
+    need(dump(src_root) == dump(rep.plain_root()), where + ": replica contents differ");
     need(rep.save_compact(kTight) == src.save_compact(kTight), where + ": replica compact wire differs");
 }
 
@@ -125,7 +125,7 @@ void corrupt_trials(Buffer& rep, const xo::XDeltaCursor& cur, const std::string&
                     const std::string& expected_payload, std::mt19937_64& rng, const std::string& where) {
     const auto before = payload_of(rep);
     const auto before_holes = holes_of(rep);
-    const auto before_dump = dump(rep.root());
+    const auto before_dump = dump(rep.plain_root());
     for (int k = 0; k < 6; ++k) {
         std::string bad = d;
         switch (rng() % 6) {
@@ -147,7 +147,7 @@ void corrupt_trials(Buffer& rep, const xo::XDeltaCursor& cur, const std::string&
             need(payload_of(rep) == before && holes_of(rep) == before_holes,
                  where + ": a rejected delta changed the replica (" + r.error().message + ")");
             need(tc.version() == cur.version() && tc.stream() == cur.stream(), where + ": a rejected delta moved the cursor");
-            need(dump(rep.root()) == before_dump, where + ": a rejected delta changed the contents");
+            need(dump(rep.plain_root()) == before_dump, where + ": a rejected delta changed the contents");
             ++totals.corrupt_rejected;
         } else {
             auto again = typed_load(rep.save_verified());
@@ -213,7 +213,7 @@ void mutate_light(fz::Root& r, std::mt19937_64& rng) {
 void random_stream(std::uint64_t seed, int steps) {
     std::mt19937_64 rng(seed);
     auto src = Buffer::create(4096, xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic));
-    fill(src.root(), rng);
+    fill(src.plain_root(), rng);
     xo::XDeltaBaseline base(seed * 2 + 1);
     Buffer rep(4096, xo::XBuffer::maximum_capacity(kLimit)); // an empty arena: only a key delta applies
     xo::XDeltaCursor cur;
@@ -229,13 +229,13 @@ void random_stream(std::uint64_t seed, int steps) {
             base.reset(); // the receiver asked for a resync: a key delta onto its current content
         } else if (op == 1) {
             src.reset(); // the payload shrinks
-            fill(src.root(), rng);
+            fill(src.plain_root(), rng);
             ++totals.shrinks;
         } else if (op < 9 && op > 2) {
-            mutate_light(src.root(), rng);
+            mutate_light(src.plain_root(), rng);
         } else if (op != 2) { // op 2: nothing changes
-            mutate_valid(src.root(), rng);
-            if (rng() % 4 == 0) src.root().epoch ^= std::uint64_t(1) << (rng() % 64); // one bit
+            mutate_valid(src.plain_root(), rng);
+            if (rng() % 4 == 0) src.plain_root().epoch ^= std::uint64_t(1) << (rng() % 64); // one bit
         }
         xo::XDeltaOptions options;
         options.digest = rng() % 2;
@@ -264,12 +264,12 @@ void random_stream(std::uint64_t seed, int steps) {
         need(bool(r), where + ": delta rejected: " + (r ? std::string() : r.error().message));
         need((cur.last_check() == xo::XDeltaCheck::key) == stats.key, where + ": key delta not reported as key");
         ++totals.checks[std::size_t(cur.last_check())];
-        same_state(src.root(), src, rep, where);
+        same_state(src.plain_root(), src, rep, where);
         need(cur.version() == base.version() && cur.stream() == base.stream(), where + ": cursor does not follow");
         if (joined) {
             auto lr = apply_entry(late, d, late_cur);
             need(bool(lr), where + ": late receiver rejected a shared delta: " + (lr ? std::string() : lr.error().message));
-            same_state(src.root(), src, late, where + " (late receiver)");
+            same_state(src.plain_root(), src, late, where + " (late receiver)");
         } else if (rng() % 5 == 0) {
             const auto version = base.version();
             std::string k = "stale";
@@ -278,7 +278,7 @@ void random_stream(std::uint64_t seed, int steps) {
             need(k == base.key_delta(options), where + ": key_delta and key_delta_into differ");
             auto lr = apply_entry(late, k, late_cur);
             need(bool(lr), where + ": late key delta rejected: " + (lr ? std::string() : lr.error().message));
-            same_state(src.root(), src, late, where + " (late join)");
+            same_state(src.plain_root(), src, late, where + " (late join)");
             need(late_cur.version() == base.version() && late_cur.stream() == base.stream(),
                  where + ": late cursor does not follow the baseline");
             ++totals.late_joins;
@@ -335,7 +335,7 @@ void fixed_cases() {
     // maximum, as load_verified would), then empty and incremental deltas.
     {
         auto src = Buffer::create(4096, cap);
-        fill(src.root(), rng);
+        fill(src.plain_root(), rng);
         xo::XDeltaBaseline base;
         Buffer rep;
         xo::XDeltaCursor cur;
@@ -343,29 +343,29 @@ void fixed_cases() {
         const auto key = delta_of(src, base);
         need(!key.empty() && base.version() == 1 && base.stream() != 0, "first delta is not a key delta");
         need(bool(apply_entry(rep, key, cur)), "key delta into a default buffer rejected");
-        same_state(src.root(), src, rep, "default buffer");
+        same_state(src.plain_root(), src, rep, "default buffer");
         std::string d = "x";
         const auto stats = src.save_delta_into(d, base);
         need(stats.empty && d.empty() && base.version() == 1, "unchanged buffer gave a delta");
-        src.root().epoch += 1;
+        src.plain_root().epoch += 1;
         const auto small = delta_of(src, base);
         need(small.size() <= 20, "one changed scalar gave a large delta: " +
              std::to_string(small.size()));
         need(bool(apply_entry(rep, small, cur)), "scalar delta rejected");
-        same_state(src.root(), src, rep, "scalar");
+        same_state(src.plain_root(), src, rep, "scalar");
     }
 
     // Base mismatch: out of order, repeated, on an empty cursor, another stream.
     {
         auto src = Buffer::create(4096, cap);
-        fill(src.root(), rng);
+        fill(src.plain_root(), rng);
         xo::XDeltaBaseline base;
         Buffer rep(4096, xo::XBuffer::maximum_capacity(kLimit));
         xo::XDeltaCursor cur;
         need(bool(apply_entry(rep, delta_of(src, base), cur)), "key rejected");
-        src.root().title = "first";
+        src.plain_root().title = "first";
         const auto d1 = delta_of(src, base);
-        src.root().title = "second, long enough for a heap block";
+        src.plain_root().title = "second, long enough for a heap block";
         const auto d2 = delta_of(src, base);
         const auto held = payload_of(rep);
         auto r = apply_entry(rep, d2, cur);
@@ -374,7 +374,7 @@ void fixed_cases() {
         r = apply_entry(rep, d1, cur);
         need(!r && r.code() == xo::XErrc::delta_base_mismatch, "repeated delta applied");
         need(bool(apply_entry(rep, d2, cur)), "d2 rejected");
-        same_state(src.root(), src, rep, "in order");
+        same_state(src.plain_root(), src, rep, "in order");
 
         Buffer other(4096, xo::XBuffer::maximum_capacity(kLimit));
         xo::XDeltaCursor empty;
@@ -383,7 +383,7 @@ void fixed_cases() {
 
         xo::XDeltaBaseline second; // another stream of the same buffer
         (void)delta_of(src, second);
-        src.root().epoch ^= 5;
+        src.plain_root().epoch ^= 5;
         const auto foreign = delta_of(src, second);
         r = apply_entry(rep, foreign, cur);
         need(!r && r.code() == xo::XErrc::delta_base_mismatch, "delta of another stream applied");
@@ -392,14 +392,14 @@ void fixed_cases() {
     // A replica changed locally: a digest delta rejects and rolls back.
     {
         auto src = Buffer::create(4096, cap);
-        fill(src.root(), rng);
+        fill(src.plain_root(), rng);
         xo::XDeltaBaseline base;
         Buffer rep(4096, xo::XBuffer::maximum_capacity(kLimit));
         xo::XDeltaCursor cur;
         need(bool(apply_entry(rep, delta_of(src, base), cur)), "key rejected");
-        rep.root().epoch ^= 0xFF; // not allowed by the contract: replicas are read-only
+        rep.plain_root().epoch ^= 0xFF; // not allowed by the contract: replicas are read-only
         const auto changed = payload_of(rep);
-        src.root().title = "after the local change";
+        src.plain_root().title = "after the local change";
         xo::XDeltaOptions with_digest;
         with_digest.digest = true;
         const auto d = delta_of(src, base, with_digest);
@@ -409,18 +409,18 @@ void fixed_cases() {
         // Resync: a key delta onto the replica's current content.
         base.reset();
         need(bool(apply_entry(rep, delta_of(src, base, with_digest), cur)), "resync key delta rejected");
-        same_state(src.root(), src, rep, "resync");
+        same_state(src.plain_root(), src, rep, "resync");
     }
 
     // The replica's maximum capacity: growth past it rejects, nothing changes.
     {
         auto src = Buffer::create(4096, cap);
-        fill(src.root(), rng);
+        fill(src.plain_root(), rng);
         xo::XDeltaBaseline base;
         Buffer rep(4096, xo::XBuffer::maximum_capacity(64 * 1024));
         xo::XDeltaCursor cur;
         need(bool(apply_entry(rep, delta_of(src, base), cur)), "key rejected");
-        auto& big = src.root().items.emplace_back();
+        auto& big = src.plain_root().items.emplace_back();
         for (int i = 0; i < 40000; ++i) big.vals.push_back(std::uint16_t(i));
         const auto held = payload_of(rep);
         auto r = apply_entry(rep, delta_of(src, base), cur);
@@ -432,15 +432,15 @@ void fixed_cases() {
     // cursor cleared; a good key delta then applies.
     {
         auto src = Buffer::create(4096, cap);
-        fill(src.root(), rng);
-        src.root().items.emplace_back().name = "a heap string that is long enough";
+        fill(src.plain_root(), rng);
+        src.plain_root().items.emplace_back().name = "a heap string that is long enough";
         xo::XDeltaBaseline base;
         Buffer rep(4096, xo::XBuffer::maximum_capacity(kLimit));
         xo::XDeltaCursor cur;
         auto key = delta_of(src, base);
         need(bool(apply_entry(rep, key, cur)), "key rejected");
         base.reset();
-        src.root().epoch += 3;
+        src.plain_root().epoch += 3;
         key = delta_of(src, base);
         // The root offset (the third header varint) one word further: the
         // header checks pass, verification of the patched payload rejects.
@@ -458,7 +458,7 @@ void fixed_cases() {
         auto r = apply_entry(rep, bad, cur);
         need(!r && cur.empty() && !rep.has_root(), "rejected key delta did not leave the buffer empty");
         need(bool(apply_entry(rep, key, cur)), "good key delta after a rejected one");
-        same_state(src.root(), src, rep, "key after reject");
+        same_state(src.plain_root(), src, rep, "key after reject");
     }
 }
 
@@ -470,7 +470,7 @@ void view_sizes() {
     std::mt19937_64 rng(42);
     const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
     auto server = ViewBuffer::create(4096, cap);
-    auto& v = server.root();
+    auto& v = server.plain_root();
     v.slots.resize(128);
     std::uint32_t next_id = 1;
     auto enter = [&](dz::Unit& u) {
@@ -619,12 +619,12 @@ void block_section_case() {
     std::mt19937_64 rng(11);
     const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
     auto src = Buffer::create(4096, cap);
-    fill(src.root(), rng);
+    fill(src.plain_root(), rng);
     xo::XDeltaBaseline base;
     Buffer rep(4096, xo::XBuffer::maximum_capacity(kLimit));
     xo::XDeltaCursor cur;
     need(bool(apply_entry(rep, delta_of(src, base), cur)), "block section: key delta rejected");
-    src.root().epoch += 1;
+    src.plain_root().epoch += 1;
     const std::string good = delta_of(src, base);
     const std::size_t used = std::size_t(rep.arena()->used_end);
     const std::size_t last = (used - 1) / 64; // index of the last block (block k: bytes [64k, 64k + 64))
@@ -694,7 +694,7 @@ void block_section_case() {
              std::string("block section: rejecting ") + c.what + " changed the replica");
     }
     need(bool(apply_entry(rep, good, cur)), "block section: the good delta was rejected");
-    same_state(src.root(), src, rep, "block section");
+    same_state(src.plain_root(), src, rep, "block section");
 }
 
 // A delta with one block that writes `bytes` at payload offset `at`, as the
@@ -720,7 +720,7 @@ void check_path_case() {
     std::mt19937_64 rng(5);
     const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
     auto src = Buffer::create(4096, cap);
-    auto& r = src.root();
+    auto& r = src.plain_root();
     r.title = "short";
     for (int i = 0; i < 3; ++i) {
         auto& it = r.items.emplace_back();
@@ -747,7 +747,7 @@ void check_path_case() {
         need(bool(res), std::string("check path: rejected ") + what + (res ? "" : ": " + res.error().message));
         need(cur.last_check() == want, std::string("check path: unexpected check for ") + what + ": " +
                                            std::to_string(int(cur.last_check())));
-        same_state(src.root(), src, rep, std::string("check path: ") + what);
+        same_state(src.plain_root(), src, rep, std::string("check path: ") + what);
     };
     using C = xo::XDeltaCheck;
     step("a scalar", C::none, [&] { r.epoch = 77; });
@@ -809,22 +809,22 @@ void check_path_case() {
         need(payload_of(rep) == before && tc.version() == cur.version(),
              std::string("check path: rejecting ") + what + " changed the replica");
     };
-    rejects("a bool of 2", poke_delta(rep, cur, off(&rep.root().items[0].flag), std::string(1, '\x02')),
+    rejects("a bool of 2", poke_delta(rep, cur, off(&rep.plain_root().items[0].flag), std::string(1, '\x02')),
             "invalid bool representation");
-    rejects("inline padding", poke_delta(rep, cur, off(&rep.root().items[0].name) + 9, std::string(1, 'z')),
+    rejects("inline padding", poke_delta(rep, cur, off(&rep.plain_root().items[0].name) + 9, std::string(1, 'z')),
             "nonzero padding");
-    rejects("an inline length of 11", poke_delta(rep, cur, off(&rep.root().items[0].name) + 11, std::string(1, char(0x8B))),
+    rejects("an inline length of 11", poke_delta(rep, cur, off(&rep.plain_root().items[0].name) + 11, std::string(1, char(0x8B))),
             "exceeds 10");
-    rejects("unordered set keys", poke_delta(rep, cur, off(&*rep.root().keys.begin()), std::string(4, '\xFF')),
+    rejects("unordered set keys", poke_delta(rep, cur, off(&*rep.plain_root().keys.begin()), std::string(4, '\xFF')),
             "set keys not strictly ordered");
-    rejects("a vector size past capacity", poke_delta(rep, cur, off(&rep.root().items[0].vals) + 4, std::string(1, '\x7F')),
+    rejects("a vector size past capacity", poke_delta(rep, cur, off(&rep.plain_root().items[0].vals) + 4, std::string(1, '\x7F')),
             "size exceeds capacity");
     rejects("a missing terminator",
-            poke_delta(rep, cur, off(rep.root().title.data() + rep.root().title.size()), std::string(1, 'x')),
+            poke_delta(rep, cur, off(rep.plain_root().title.data() + rep.plain_root().title.size()), std::string(1, 'x')),
             "missing terminator");
     {
         // Moved blocks are checked against the live blocks and holes.
-        const std::size_t head = off(&rep.root().items[0].vals);
+        const std::size_t head = off(&rep.plain_root().items[0].vals);
         const auto head_bytes = [&](std::int64_t data_at, std::uint32_t size, std::uint32_t capacity) {
             const auto delta = std::int32_t(data_at - std::int64_t(head));
             std::string b(12, '\0');
@@ -835,7 +835,7 @@ void check_path_case() {
         };
         need(head % 64 + 12 <= 64, "check path: vector head crosses a block");
         rejects("a vector block onto another live block",
-                poke_delta(rep, cur, head, head_bytes(std::int64_t(off(rep.root().items[2].vals.data())), 2, 4)),
+                poke_delta(rep, cur, head, head_bytes(std::int64_t(off(rep.plain_root().items[2].vals.data())), 2, 4)),
                 "wire validation");
         rejects("a vector block over the arena header", poke_delta(rep, cur, head, head_bytes(8, 2, 4)),
                 "wire validation");
@@ -843,7 +843,7 @@ void check_path_case() {
                 poke_delta(rep, cur, head, head_bytes(std::int64_t(rep.arena()->used_end) - 8, 2, 8)),
                 "wire validation");
         rejects("a vector block that is not 8-aligned",
-                poke_delta(rep, cur, head, head_bytes(std::int64_t(off(rep.root().items[0].vals.data())) + 2, 2, 4)),
+                poke_delta(rep, cur, head, head_bytes(std::int64_t(off(rep.plain_root().items[0].vals.data())) + 2, 2, 4)),
                 "wire validation");
         std::vector<std::pair<std::uint32_t, std::uint32_t>> holes;
         rep.for_each_free_block([&](xo::XBufferCore::WireHole h) { holes.emplace_back(h.offset, h.bytes); });
@@ -855,10 +855,10 @@ void check_path_case() {
             // A record brought back past the size is verified on its own:
             // first a bool of 2 in the slot past the size (a free byte then),
             // then the size that takes it in.
-            const std::size_t items = off(&rep.root().items);
-            const std::uint32_t size = rep.root().items.size() + 1u;
+            const std::size_t items = off(&rep.plain_root().items);
+            const std::uint32_t size = rep.plain_root().items.size() + 1u;
             need((items + 4) % 64 + 4 <= 64, "check path: vector size crosses a block");
-            const auto& slot = rep.root().items.data()[size - 1];
+            const auto& slot = rep.plain_root().items.data()[size - 1];
             const std::size_t flag = off(&slot.flag);
             auto res = apply_entry(rep, poke_delta(rep, cur, flag, std::string(1, '\x02')), cur);
             need(bool(res) && cur.last_check() == C::none, "check path: a byte past the size was checked");
@@ -876,10 +876,10 @@ void check_path_case() {
                 cur = tc;
             }
         }
-        const std::size_t title = off(&rep.root().title);  // a heap string with a block of at least 48 bytes
+        const std::size_t title = off(&rep.plain_root().title);  // a heap string with a block of at least 48 bytes
         if (title % 64 + 4 <= 64) {
             std::string t(4, '\0');
-            const auto tdelta = std::int32_t(std::int64_t(off(rep.root().items[2].vals.data())) - std::int64_t(title));
+            const auto tdelta = std::int32_t(std::int64_t(off(rep.plain_root().items[2].vals.data())) - std::int64_t(title));
             std::memcpy(&t[0], &tdelta, 4);
             rejects("a string block onto a vector's block", poke_delta(rep, cur, title, t), "wire validation");
         } else {
@@ -892,7 +892,7 @@ void check_path_case() {
     {
         // A vector of records that moves or shrinks has all its elements
         // verified again and what its old elements owned freed.
-        const std::size_t items = off(&rep.root().items);
+        const std::size_t items = off(&rep.plain_root().items);
         const auto items_head = [&](std::int64_t data_at, std::uint32_t size, std::uint32_t capacity) {
             const auto delta = std::int32_t(data_at - std::int64_t(items));
             std::string b(12, '\0');
@@ -902,13 +902,13 @@ void check_path_case() {
             return b;
         };
         need(items % 64 + 12 <= 64, "check path: records head crosses a block");
-        need(!rep.root().title.empty() && rep.root().title.size() > 10, "check path: no heap title");
+        need(!rep.plain_root().title.empty() && rep.plain_root().title.size() > 10, "check path: no heap title");
         rejects("a vector of records moved onto a live block",
-                poke_delta(rep, cur, items, items_head(std::int64_t(off(rep.root().title.data())), 1, 1)),
+                poke_delta(rep, cur, items, items_head(std::int64_t(off(rep.plain_root().title.data())), 1, 1)),
                 "wire validation");
         // Shrunk by hand, with no hole for what the last record owned:
         // accepted only if the whole verification accepts the result.
-        const std::uint32_t size = rep.root().items.size();
+        const std::uint32_t size = rep.plain_root().items.size();
         need(size > 1, "check path: too few records");
         std::string b(4, '\0');
         const std::uint32_t smaller = size - 1u;
@@ -927,7 +927,7 @@ void check_path_case() {
     {
         // Free bytes take any value without a check.
         auto tc = cur;
-        const auto d = poke_delta(rep, cur, off(&rep.root().epoch), std::string("\x01\x02\x03\x04", 4));
+        const auto d = poke_delta(rep, cur, off(&rep.plain_root().epoch), std::string("\x01\x02\x03\x04", 4));
         auto res = apply_entry(rep, d, tc);
         need(bool(res) && tc.last_check() == C::none, "check path: free bytes were not applied unchecked");
         need(bool(typed_load(rep.save_verified())), "check path: unchecked result does not verify");
@@ -937,7 +937,7 @@ void check_path_case() {
 // Changes with their touch() marks: exactly the objects and containers
 // changed (containers after the change, wherever their block is now).
 void mutate_touched(Buffer& src, std::mt19937_64& rng) {
-    auto& r = src.root();
+    auto& r = src.plain_root();
     for (int n = 1 + int(rng() % 4); n > 0; --n) {
         switch (rng() % 14) {
         case 0:
@@ -1028,7 +1028,7 @@ void touched_stream(std::uint64_t seed, int steps) {
     std::mt19937_64 rng(seed);
     const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
     auto src = Buffer::create(4096, cap);
-    fill(src.root(), rng);
+    fill(src.plain_root(), rng);
     xo::XDeltaBaseline tb(seed * 2 + 1), wb(seed * 2 + 1);
     Buffer rep(4096, cap);
     xo::XDeltaCursor cur;
@@ -1046,12 +1046,12 @@ void touched_stream(std::uint64_t seed, int steps) {
         bool replaced = false;
         if (op == 0) {
             src.reset();  // content replaced: the next touched delta compares everything
-            fill(src.root(), rng);
+            fill(src.plain_root(), rng);
             replaced = true;
             ++touch_totals.replaced;
         } else if (op == 1) {
-            mutate_valid(src.root(), rng);
-            src.touch(src.root());  // everything
+            mutate_valid(src.plain_root(), rng);
+            src.touch(src.plain_root());  // everything
         } else if (op == 2) {
             tb.reset();  // the receiver asked for a key delta
             wb.reset();
@@ -1076,7 +1076,7 @@ void touched_stream(std::uint64_t seed, int steps) {
             if (!src.save_delta_into(d2, tb2, touched).empty) {
                 auto r2 = apply_entry(rep2, d2, cur2);
                 need(bool(r2), where + ": second receiver's delta rejected: " + (r2 ? std::string() : r2.error().message));
-                same_state(src.root(), src, rep2, where + " (second receiver)");
+                same_state(src.plain_root(), src, rep2, where + " (second receiver)");
                 ++touch_totals.second;
             }
         }
@@ -1084,7 +1084,7 @@ void touched_stream(std::uint64_t seed, int steps) {
         ++touch_totals.deltas;
         auto r = apply_entry(rep, dt, cur);
         need(bool(r), where + ": delta rejected: " + (r ? std::string() : r.error().message));
-        same_state(src.root(), src, rep, where);
+        same_state(src.plain_root(), src, rep, where);
         // The relay forwards.
         std::string rt = "stale", rw = "stale";
         const auto rst = rep.save_delta_into(rt, rtb, touched);
@@ -1095,7 +1095,7 @@ void touched_stream(std::uint64_t seed, int steps) {
         ++touch_totals.relayed;
         auto dr = apply_entry(down, rt, down_cur);
         need(bool(dr), where + ": relayed delta rejected: " + (dr ? std::string() : dr.error().message));
-        same_state(src.root(), src, down, where + " (downstream)");
+        same_state(src.plain_root(), src, down, where + " (downstream)");
     }
 }
 
@@ -1115,7 +1115,7 @@ void touches_stream(std::uint64_t seed, int steps) {
     std::mt19937_64 rng(seed);
     const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
     auto src = Buffer::create(4096, cap);
-    fill(src.root(), rng);
+    fill(src.plain_root(), rng);
     xo::XDeltaBaseline xb(xo::XDeltaRecord::touches), cb(seed * 2 + 1);
     Buffer rep(4096, cap);
     xo::XDeltaCursor cur;
@@ -1129,10 +1129,10 @@ void touches_stream(std::uint64_t seed, int steps) {
         const auto op = rng() % 16;
         if (op == 0) {
             src.reset();  // content replaced: a key delta
-            fill(src.root(), rng);
+            fill(src.plain_root(), rng);
         } else if (op == 1) {
-            mutate_valid(src.root(), rng);
-            src.touch(src.root());  // everything (often more blocks than the list holds)
+            mutate_valid(src.plain_root(), rng);
+            src.touch(src.plain_root());  // everything (often more blocks than the list holds)
         } else if (op == 2) {
             xb.reset();  // the receiver asked for a key delta
         } else if (op != 3) {  // op 3: nothing changes
@@ -1153,7 +1153,7 @@ void touches_stream(std::uint64_t seed, int steps) {
             touches_totals.bytes += d.size();
             auto r = apply_entry(rep, d, cur);
             need(bool(r), where + ": touches delta rejected: " + (r ? std::string() : r.error().message));
-            same_state(src.root(), src, rep, where);
+            same_state(src.plain_root(), src, rep, where);
         }
         if (rng() % 6 == 0) {
             // A copy baseline pairs in between.
@@ -1166,7 +1166,7 @@ void touches_stream(std::uint64_t seed, int steps) {
                 touches_totals.copy_bytes += dc.size();
                 auto r = apply_entry(crep, dc, ccur);
                 need(bool(r), where + ": copy delta rejected: " + (r ? std::string() : r.error().message));
-                same_state(src.root(), src, crep, where + " (copy)");
+                same_state(src.plain_root(), src, crep, where + " (copy)");
             }
         }
         // The relay forwards.
@@ -1179,7 +1179,7 @@ void touches_stream(std::uint64_t seed, int steps) {
         ++touches_totals.relayed;
         auto dr = apply_entry(down, rd, down_cur);
         need(bool(dr), where + ": relayed touches delta rejected: " + (dr ? std::string() : dr.error().message));
-        same_state(src.root(), src, down, where + " (downstream)");
+        same_state(src.plain_root(), src, down, where + " (downstream)");
     }
 }
 
@@ -1190,8 +1190,8 @@ void touches_fixed_case() {
     std::mt19937_64 rng(23);
     const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
     auto src = Buffer::create(4096, cap);
-    fill(src.root(), rng);
-    while (src.root().items.size() < 2) src.root().items.emplace_back().id = 1;
+    fill(src.plain_root(), rng);
+    while (src.plain_root().items.size() < 2) src.plain_root().items.emplace_back().id = 1;
     xo::XDeltaBaseline xb(xo::XDeltaRecord::touches);
     Buffer rep(4096, cap);
     xo::XDeltaCursor cur;
@@ -1200,50 +1200,50 @@ void touches_fixed_case() {
     need(st.key && xb.recorded_bytes() == 0 && !xb.empty(), "touches: first delta is not a key delta");
     need(bool(apply_entry(rep, d, cur)), "touches: key delta");
     // A touched scalar that did not change still goes (its 8 bytes).
-    src.touch(src.root().epoch);
+    src.touch(src.plain_root().epoch);
     st = src.save_delta_into(d, xb);
-    need(!st.empty && st.blocks == 1 && st.changed_bytes == sizeof(src.root().epoch) && st.compared_bytes == 0,
+    need(!st.empty && st.blocks == 1 && st.changed_bytes == sizeof(src.plain_root().epoch) && st.compared_bytes == 0,
          "touches: an unchanged touched scalar did not go as its bytes");
     need(bool(apply_entry(rep, d, cur)), "touches: scalar delta");
-    same_state(src.root(), src, rep, "touches: scalar");
+    same_state(src.plain_root(), src, rep, "touches: scalar");
     // Nothing touched: nothing sent.
     st = src.save_delta_into(d, xb);
     need(st.empty, "touches: an untouched buffer sent a delta");
     // touch_set: only the bytes that changed go; an equal value touches nothing.
     {
-        auto& e = src.root().epoch;
+        auto& e = src.plain_root().epoch;
         const std::uint64_t low = (e & ~std::uint64_t(0xFF)) | ((e + 1) & 0xFF);
         need(src.touch_set(e, low), "touches: touch_set did not assign");
         need(!src.touch_set(e, low), "touches: touch_set assigned an equal value");
         st = src.save_delta_into(d, xb);
         need(!st.empty && st.blocks == 1 && st.changed_bytes == 1, "touches: touch_set of the low byte did not go as 1 byte");
         need(bool(apply_entry(rep, d, cur)), "touches: touch_set delta");
-        same_state(src.root(), src, rep, "touches: touch_set");
+        same_state(src.plain_root(), src, rep, "touches: touch_set");
         st = src.save_delta_into(d, xb);
         need(st.empty, "touches: an equal touch_set sent a delta");
     }
     // An untouched change is not sent; the digest catches it.
-    src.root().epoch += 1;
-    src.root().items[0].id += 1;
-    src.touch(src.root().items[0].id);
+    src.plain_root().epoch += 1;
+    src.plain_root().items[0].id += 1;
+    src.touch(src.plain_root().items[0].id);
     xo::XDeltaOptions digest;
     digest.digest = true;
     st = src.save_delta_into(d, xb, digest);
-    need(!st.empty && st.changed_bytes == sizeof(src.root().items[0].id), "touches: the touched id did not go alone");
+    need(!st.empty && st.changed_bytes == sizeof(src.plain_root().items[0].id), "touches: the touched id did not go alone");
     auto res = apply_entry(rep, d, cur);
     need(!res && res.code() == xo::XErrc::digest_mismatch, "touches: the digest did not catch an untouched change");
     xb.reset();
     need(bool(apply_entry(rep, src.save_delta(xb), cur)) && src.save_delta_into(d, xb).empty,
          "touches: resync key delta");
-    same_state(src.root(), src, rep, "touches: resync");
+    same_state(src.plain_root(), src, rep, "touches: resync");
     // Growth: the bytes past the receiver's used size go where nonzero.
-    auto& vals = src.root().items[1].vals;
+    auto& vals = src.plain_root().items[1].vals;
     for (int i = 0; i < 3000; ++i) vals.push_back(std::uint16_t(i + 1));
     src.touch(vals);
     st = src.save_delta_into(d, xb);
     need(!st.empty, "touches: no delta for growth");
     need(bool(apply_entry(rep, d, cur)), "touches: growth delta");
-    same_state(src.root(), src, rep, "touches: growth");
+    same_state(src.plain_root(), src, rep, "touches: growth");
     // More touched blocks than the list holds: each still goes by the bytes
     // touched in it (one baseline keeps them past the list).
     const auto used = std::size_t(src.arena()->used_end);
@@ -1258,7 +1258,7 @@ void touches_fixed_case() {
              st.changed_bytes == touched_blocks * sizeof(vals[0]),
          "touches: an overflowed list did not send the touched bytes");
     need(bool(apply_entry(rep, d, cur)), "touches: overflow delta");
-    same_state(src.root(), src, rep, "touches: overflow");
+    same_state(src.plain_root(), src, rep, "touches: overflow");
     // The next period overflows again: its own bytes, not the last period's.
     for (std::size_t i = 16; i < vals.size(); i += 32) vals[i] = std::uint16_t(vals[i] + 1);
     for (std::size_t i = 16; i < vals.size(); i += 32) src.touch(vals[i]);
@@ -1267,7 +1267,7 @@ void touches_fixed_case() {
     need(st.blocks == second && st.changed_bytes == second * sizeof(vals[0]),
          "touches: a second overflowed period sent other bytes");
     need(bool(apply_entry(rep, d, cur)), "touches: second overflow delta");
-    same_state(src.root(), src, rep, "touches: second overflow");
+    same_state(src.plain_root(), src, rep, "touches: second overflow");
     // Back within the list: only the touched bytes again.
     vals[5] = 7;
     src.touch(vals[5]);
@@ -1275,20 +1275,20 @@ void touches_fixed_case() {
     need(st.blocks == 1 && st.changed_bytes == sizeof(std::uint16_t), "touches: the list was not used again");
     need(bool(apply_entry(rep, d, cur)), "touches: delta after overflow");
     // An item erased: its blocks become holes (they go with the hole change).
-    src.root().items.erase(src.root().items.begin() + 1);
-    src.touch(src.root().items);
+    src.plain_root().items.erase(src.plain_root().items.begin() + 1);
+    src.touch(src.plain_root().items);
     st = src.save_delta_into(d, xb);
     need(st.holes, "touches: erasing an item changed no hole");
     need(bool(apply_entry(rep, d, cur)), "touches: erase delta");
-    same_state(src.root(), src, rep, "touches: erase");
+    same_state(src.plain_root(), src, rep, "touches: erase");
 }
 
 void touched_fixed_case() {
     std::mt19937_64 rng(17);
     const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
     auto src = Buffer::create(4096, cap);
-    fill(src.root(), rng);
-    while (src.root().items.size() < 2) src.root().items.emplace_back().id = 1;
+    fill(src.plain_root(), rng);
+    while (src.plain_root().items.size() < 2) src.plain_root().items.emplace_back().id = 1;
     xo::XDeltaOptions touched;
     touched.touched_only = true;
     xo::XDeltaBaseline base;
@@ -1299,17 +1299,17 @@ void touched_fixed_case() {
     std::string d;
     // The first touched delta of a baseline compares everything (the key
     // delta paired it); a touched change then compares its block only.
-    src.root().epoch += 1;
-    src.touch(src.root().epoch);
+    src.plain_root().epoch += 1;
+    src.touch(src.plain_root().epoch);
     auto st = src.save_delta_into(d, base, touched);
     // Its block: 64 bytes, or the 16 past the arena header for block 0.
-    const auto epoch_at = std::size_t(reinterpret_cast<const char*>(&src.root().epoch) -
+    const auto epoch_at = std::size_t(reinterpret_cast<const char*>(&src.plain_root().epoch) -
                                       static_cast<const char*>(static_cast<const xo::XBufferCore&>(src).get_address()));
     const std::size_t epoch_block = epoch_at < 64 ? 64 - xo::XWIRE_PAYLOAD_BEGIN : 64;
-    need(epoch_at % 64 + sizeof(src.root().epoch) <= 64, "touched: the scalar crosses a block");
+    need(epoch_at % 64 + sizeof(src.plain_root().epoch) <= 64, "touched: the scalar crosses a block");
     need(!st.empty && st.compared_bytes == epoch_block, "touched: one touched scalar did not compare one block");
     need(bool(apply_entry(rep, d, cur)), "touched: scalar delta");
-    same_state(src.root(), src, rep, "touched: scalar");
+    same_state(src.plain_root(), src, rep, "touched: scalar");
     // Nothing touched: nothing compared, nothing sent.
     st = src.save_delta_into(d, base, touched);
     need(st.empty && st.compared_bytes == 0, "touched: an untouched buffer compared bytes");
@@ -1320,32 +1320,32 @@ void touched_fixed_case() {
         Buffer rep_behind = rep.clone();
         xo::XDeltaCursor cur_behind = cur;
         for (int i = 0; i < 2; ++i) {
-            src.root().epoch += 1;
-            src.touch(src.root().epoch);
+            src.plain_root().epoch += 1;
+            src.touch(src.plain_root().epoch);
             need(bool(apply_entry(rep, src.save_delta(base, touched), cur)), "touched: delta ahead of a copy");
         }
         auto sb = src.save_delta_into(d, behind, touched);
         need(sb.compared_bytes == whole, "touched: a baseline left behind did not compare everything");
         need(bool(apply_entry(rep_behind, d, cur_behind)), "touched: delta of a baseline left behind");
-        same_state(src.root(), src, rep_behind, "touched: baseline left behind");
+        same_state(src.plain_root(), src, rep_behind, "touched: baseline left behind");
         // Its delta paired it: the log is now shared, and the original
         // still compares only what was touched since its own last delta.
-        src.root().epoch += 1;
-        src.touch(src.root().epoch);
+        src.plain_root().epoch += 1;
+        src.touch(src.plain_root().epoch);
         st = src.save_delta_into(d, base, touched);
         need(st.compared_bytes == epoch_block, "touched: the original compared more once the log was shared");
         need(bool(apply_entry(rep, d, cur)), "touched: delta after sharing");
         sb = src.save_delta_into(d, behind, touched);
         need(sb.compared_bytes == epoch_block, "touched: the second baseline compared more than its touches");
         need(bool(apply_entry(rep_behind, d, cur_behind)), "touched: second baseline's delta");
-        same_state(src.root(), src, rep_behind, "touched: second baseline");
+        same_state(src.plain_root(), src, rep_behind, "touched: second baseline");
     }
     // A change not touched is not sent; with a digest the receiver finds out.
-    src.root().epoch += 1;
+    src.plain_root().epoch += 1;
     st = src.save_delta_into(d, base, touched);
     need(st.empty, "touched: an untouched change was sent");
-    src.root().items[0].id += 1;
-    src.touch(src.root().items[0].id);
+    src.plain_root().items[0].id += 1;
+    src.touch(src.plain_root().items[0].id);
     xo::XDeltaOptions digest = touched;
     digest.digest = true;
     st = src.save_delta_into(d, base, digest);
@@ -1354,35 +1354,35 @@ void touched_fixed_case() {
     need(!res && res.code() == xo::XErrc::digest_mismatch, "touched: the digest did not catch an untouched change");
     base.reset();  // the receiver asks for a key delta
     need(bool(apply_entry(rep, delta_of(src, base, touched), cur)), "touched: resync key delta");
-    same_state(src.root(), src, rep, "touched: resync");
+    same_state(src.plain_root(), src, rep, "touched: resync");
     // A touch outside the payload: everything is compared next time.
     std::uint64_t elsewhere = 0;
     src.touch(elsewhere);
-    src.root().epoch += 1;
+    src.plain_root().epoch += 1;
     st = src.save_delta_into(d, base, touched);
     need(!st.empty && st.compared_bytes == whole, "touched: a foreign touch did not compare everything");
     need(bool(apply_entry(rep, d, cur)), "touched: delta after a foreign touch");
-    same_state(src.root(), src, rep, "touched: foreign touch");
+    same_state(src.plain_root(), src, rep, "touched: foreign touch");
     // Content replaced in place (reload): everything is compared.
     auto copy = src.save_verified();
     src.reload_verified(copy);
-    src.root().epoch += 1;
-    src.touch(src.root().epoch);
+    src.plain_root().epoch += 1;
+    src.touch(src.plain_root().epoch);
     st = src.save_delta_into(d, base, touched);
     need(!st.empty && st.compared_bytes == payload_of(src).size() - xo::XWIRE_PAYLOAD_BEGIN,
          "touched: a reloaded buffer did not compare everything");
     need(bool(apply_entry(rep, d, cur)), "touched: delta after reload");
-    same_state(src.root(), src, rep, "touched: reload");
+    same_state(src.plain_root(), src, rep, "touched: reload");
     // A container that moves to a new block: touching it where it is now
     // suffices (the block it left is a hole, found by the hole tables).
-    auto& vals = src.root().items[1].vals;
+    auto& vals = src.plain_root().items[1].vals;
     for (int i = 0; i < 40; ++i) vals.push_back(std::uint16_t(i));
     src.touch(vals);
     st = src.save_delta_into(d, base, touched);
     need(!st.empty && st.compared_bytes < payload_of(src).size() - xo::XWIRE_PAYLOAD_BEGIN,
          "touched: a moved container compared everything");
     need(bool(apply_entry(rep, d, cur)), "touched: moved container");
-    same_state(src.root(), src, rep, "touched: moved container");
+    same_state(src.plain_root(), src, rep, "touched: moved container");
 }
 
 // The bytes past the baseline's used size are compared even where the
@@ -1396,8 +1396,8 @@ void touched_growth_case() {
     for (std::uint32_t count = 8; count < 80; ++count) {
         const std::string where = "touched growth, " + std::to_string(count) + " slots";
         auto src = xo::TypedXBuffer<dz::View>::create(4096, cap);
-        src.root().slots.reserve(count);  // one block, no holes
-        for (std::uint32_t i = 0; i < count; ++i) src.root().slots.emplace_back().id = i + 1;
+        src.plain_root().slots.reserve(count);  // one block, no holes
+        for (std::uint32_t i = 0; i < count; ++i) src.plain_root().slots.emplace_back().id = i + 1;
         need(holes_of(src).empty(), where + ": holes before the change");
         xo::XDeltaBaseline base;
         xo::TypedXBuffer<dz::View> rep(4096, xo::XBuffer::maximum_capacity(kLimit));
@@ -1405,7 +1405,7 @@ void touched_growth_case() {
         std::string d;
         (void)src.save_delta_into(d, base, touched);
         need(bool(rep.try_apply_delta_verified(d, cur)), where + ": key delta");
-        auto& name = src.root().slots[0].name;
+        auto& name = src.plain_root().slots[0].name;
         name = "a name too long to stay inline";  // a new block at the end
         need(holes_of(src).empty(), where + ": holes after the change");
         src.touch(&name, sizeof(name));  // the head only
@@ -1451,7 +1451,7 @@ void thread_scratch_case() {
             const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
             std::mt19937_64 rng(20261104u + std::uint64_t(t));
             auto src = xo::TypedXBuffer<dz::View>::create(4096, cap);
-            src.root().slots.reserve(64);
+            src.plain_root().slots.reserve(64);
             std::vector<xo::XDeltaBaseline> bases(replicas);
             std::vector<xo::XDeltaCursor> curs(replicas);
             std::vector<std::unique_ptr<xo::TypedXBuffer<dz::View>>> reps;
@@ -1459,7 +1459,7 @@ void thread_scratch_case() {
                 reps.push_back(std::make_unique<xo::TypedXBuffer<dz::View>>(4096, xo::XBuffer::maximum_capacity(kLimit)));
             std::string d;
             for (int step = 0; step < steps && errors[t].empty(); ++step) {
-                auto& v = src.root();
+                auto& v = src.plain_root();
                 v.tick = std::uint32_t(step + 1);
                 if (v.slots.size() < 48 || rng() % 4 == 0) v.slots.emplace_back().id = std::uint32_t(rng());
                 for (auto& u : v.slots) {
@@ -1502,7 +1502,7 @@ void thread_scratch_case() {
 void wrong_type_case() {
     const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
     auto view = xo::TypedXBuffer<dz::View>::create(4096, cap);
-    view.root().tick = 1;
+    view.plain_root().tick = 1;
     xo::XDeltaBaseline vbase;
     std::string vkey;
     (void)view.save_delta_into(vkey, vbase);

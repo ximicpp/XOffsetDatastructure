@@ -32,7 +32,7 @@ void check(detail::VmOperation fault, bool inject_os, bool inject_host, bool exc
     constexpr std::size_t maximum = 256 * 1024;
     auto b = TypedXBuffer<CandidateRoot>::create(4096,
         XBuffer::maximum_capacity(maximum).with_growth(XGrowPolicy::Automatic));
-    b.root().marker = 42;
+    b.plain_root().marker = 42;
     auto alloc = fixed_detail::allocator_ref_of(b.allocator_state());
     auto* cached = fixed_detail::allocate_dynamic_bytes(alloc, 512, 8);
     auto* tail = static_cast<char*>(fixed_detail::allocate_dynamic_bytes(alloc, 128, 8));
@@ -52,7 +52,7 @@ void check(detail::VmOperation fault, bool inject_os, bool inject_host, bool exc
     } catch (const XBadAlloc&) { threw = true; }
     fail_host_allocation = false;
     detail::clear_vm_failures();
-    assert(b.get_address() == base && b.root().marker == 42);
+    assert(b.get_address() == base && b.plain_root().marker == 42);
     for (unsigned i = 0; i < 128; ++i) assert(tail[i] == 0x5a);
     if (inject_os || exceed_max) {
         assert(!expanded && threw == inject_os);
@@ -68,9 +68,9 @@ void check(detail::VmOperation fault, bool inject_os, bool inject_host, bool exc
     assert(injected_host_failures - previous_failures ==
         unsigned(XOFFSET_CANDIDATE_TAIL_FLUSH && inject_host && !exceed_max));
     // Existing live values remain valid after each failure and subsequent work.
-    b.root().values.push_back(71);
+    b.plain_root().values.push_back(71);
     auto loaded = TypedXBuffer<CandidateRoot>::load(b.save_verified());
-    assert(loaded.root().marker == 42 && loaded.root().values[0] == 71);
+    assert(loaded.plain_root().marker == 42 && loaded.plain_root().values[0] == 71);
 }
 
 int main() {

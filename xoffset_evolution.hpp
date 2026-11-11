@@ -730,7 +730,7 @@ namespace XOffsetDatastructure {
     // Converts the root of a verified buffer into a new buffer of version To.
     template <typename To, typename From>
     TypedXBuffer<To> evolve(TypedXBuffer<From>& source, XEvolveOptions options = {}) {
-        const From& from = source.root();
+        const From& from = source.plain_root();
         const std::size_t cap = options.maximum_capacity ? options.maximum_capacity : source.maximum_capacity();
         std::size_t initial = options.initial_bytes;
         if (initial == 0) {

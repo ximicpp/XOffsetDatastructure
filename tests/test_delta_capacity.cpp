@@ -132,7 +132,7 @@ xo::XStatus admit(Buffer& rep, const std::string& d, xo::XDeltaCursor& cur) {
 
 void run(const char* name, xo::XStatus (*apply)(Buffer&, const std::string&, xo::XDeltaCursor&)) {
     auto src = Buffer::create(4096, xo::XBuffer::maximum_capacity(kReplicaCap));
-    fill(src.root(), 20);
+    fill(src.plain_root(), 20);
     xo::XDeltaBaseline base;
     std::string key;
     (void)src.save_delta_into(key, base);
@@ -150,15 +150,15 @@ void run(const char* name, xo::XStatus (*apply)(Buffer&, const std::string&, xo:
         Buffer rep(4096, xo::XBuffer::maximum_capacity(kReplicaCap));
         xo::XDeltaCursor cur;
         need(bool(apply(rep, key, cur)), std::string(name) + ": key delta");
-        src.root().epoch += 1;
-        src.root().items[3].vals.push_back(7);
+        src.plain_root().epoch += 1;
+        src.plain_root().items[3].vals.push_back(7);
         std::string d;
         (void)src.save_delta_into(d, base);
         for (std::size_t used : {kHuge, kReplicaCap + 4096, std::size_t(0x7ffffff8)})
             refused((std::string(name) + " delta used " + std::to_string(used)).c_str(), rep, cur,
                     announce(d, root, used), apply);
         need(bool(apply(rep, d, cur)), std::string(name) + ": the good delta after the refusals");
-        need(rep.root().items[3].vals.size() == src.root().items[3].vals.size(), std::string(name) + ": replica differs");
+        need(rep.plain_root().items[3].vals.size() == src.plain_root().items[3].vals.size(), std::string(name) + ": replica differs");
         base.reset();
         key.clear();
         (void)src.save_delta_into(key, base);

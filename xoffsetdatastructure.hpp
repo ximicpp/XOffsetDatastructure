@@ -10289,7 +10289,8 @@ namespace XOffsetDatastructure {
     // Usage:
     //   TypedXBuffer<GameData> buf(4096);
     //   auto* game = buf.make();         // no <GameData> needed
-    //   auto& g = buf.root();            // no <GameData> needed
+    //   auto g = buf.root();             // a proxy (XRef<GameData>): g.level() = 3
+    //   buf.edit([](GameData& g) { ... });   // plain references, pinned
     //   auto bytes = buf.save();          // standard save
     //   auto loaded = TypedXBuffer<GameData>::load(bytes);
     // ========================================================================
@@ -10313,11 +10314,19 @@ namespace XOffsetDatastructure {
         /// Creates the single root object of type T.
         T* make() { return XBuffer::make<T>(); }
 
-        /// Returns a reference to the root object.
-        T& root() { return XBuffer::root<T>(); }
-
-        /// A proxy of the root (valid across moves; see XBuffer::ref).
+        /// A proxy of the root: valid across moves of the payload and of this
+        /// buffer, fail-soft (see XBuffer::ref and xoffset_proxy.hpp). With a
+        /// field list (XOFFSET_RECORD) its fields have named accessors:
+        /// buf.root().units().emplace_back().hp() = 5.
+        XRef<T> root() noexcept { return XBuffer::ref<T>(); }
+        /// The same proxy.
         XRef<T> ref() noexcept { return XBuffer::ref<T>(); }
+        /// A plain reference to the root (what root() returned before the
+        /// growth policy), with no protection: it dangles when the payload
+        /// moves (a Relocating buffer growing past its reservation, grow() of
+        /// a movable buffer). Prefer root(), or a pin scope (edit / read),
+        /// whose plain references cannot dangle.
+        T& plain_root() { return XBuffer::root<T>(); }
         /// Pin scopes (see XBuffer::edit / read).
         template <typename F>
         bool edit(F&& f, size_type expected_growth = 0) { return XBuffer::edit<T>(std::forward<F>(f), expected_growth); }
@@ -10355,7 +10364,12 @@ namespace XOffsetDatastructure {
         std::string save_verified(XSaveOptions options = {}) { return XBuffer::save_verified<T>(options); }
         void reload_verified(const std::string& data) { XBuffer::reload_verified<T>(data); }
         void reload_verified(std::span<const std::byte> data) { XBuffer::reload_verified<T>(data); }
-        T& reset() { return XBuffer::reset<T>(); }
+        /// Empties the buffer and makes a new root; a proxy of it (proxies
+        /// of the old content become stale).
+        XRef<T> reset() {
+            (void)XBuffer::reset<T>();
+            return XBuffer::ref<T>();
+        }
 
         TypedXBuffer clone() const { return TypedXBuffer(XBuffer::clone()); }
         void clone_into(TypedXBuffer& dst) const { XBuffer::clone_into(dst); }

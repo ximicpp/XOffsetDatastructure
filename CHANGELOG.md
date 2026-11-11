@@ -106,6 +106,21 @@
   Without exceptions, allocating container operations inside a scope check
   their room first and return without effect when it is missing. New
   `XErrc::borrowed`, `stale`, `out_of_range`. Wire format unchanged.
+- Growth policy, part 3 (named accessors). Breaking: `TypedXBuffer<T>::root()`
+  and `reset()` return a proxy (`XRef<T>`) instead of `T&`; the old plain
+  reference is `plain_root()` (unprotected: it dangles when the payload
+  moves). `XOFFSET_RECORD` and `XOFFSET_RECORD_DERIVED` now also give the
+  record's proxy one accessor per listed field, `u.hp()` being
+  `u.field<&Unit::hp>()` (same instructions); a derived record also has its
+  described bases' accessors. They are ordinary member functions: MSVC,
+  no-exceptions builds and compilers without reflection get them too. The
+  proxy's own functions (`get`, `set`, `field`, `member`, `valid`, `error`)
+  win over a field of the same name (reach it with `field<&T::m>()`).
+  C array fields have a
+  proxy (`size()`, `[i]`, iteration; past the end an empty proxy and
+  `out_of_range`). Examples, README, USER_GUIDE (section 3.5) and the
+  mapstate demo use the new forms; tests that test plain references call
+  `plain_root()`. Wire format unchanged.
 
 ## 3.5.0: performance on the production platform
 

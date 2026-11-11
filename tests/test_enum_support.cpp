@@ -273,7 +273,7 @@ bool test_enum_spaceship_key_order() {
     std::cout << std::string(50, '-') << "\n";
 
     auto buffer = TypedXBuffer<RankedKeys>::create(65536, XBuffer::maximum_capacity(1u << 20));
-    auto& root = buffer.root();
+    auto& root = buffer.plain_root();
     for (auto r : {Rank::mid, Rank::low, Rank::high}) {
         root.ranks.insert(r);
         root.by_rank.insert_or_assign(r, static_cast<std::int32_t>(r));
@@ -310,7 +310,7 @@ bool test_enum_spaceship_key_order() {
 
     const auto wire = buffer.save_verified();
     auto loaded = TypedXBuffer<RankedKeys>::load(wire, XBuffer::maximum_capacity(1u << 20));
-    if (loaded.root().ranks.size() != 3 || loaded.save_verified() != wire) {
+    if (loaded.plain_root().ranks.size() != 3 || loaded.save_verified() != wire) {
         std::cout << "  verified round trip changed the keys ... [FAIL]\n";
         return false;
     }

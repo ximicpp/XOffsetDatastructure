@@ -325,7 +325,7 @@ void typed_and_links() {
     need(loaded.has_value() && checksum(*loaded) == checksum(expect), "load_typed admit");
     // Mutate in place after admit, as after a verified load.
     if (loaded) {
-        loaded->root().values.push_back(99);
+        loaded->plain_root().values.push_back(99);
         auto back = XBuffer::load_verified<RxRoot>(loaded->save_verified(), cap());
         need(back.root<RxRoot>().values.back() == 99, "mutate after admit");
     }

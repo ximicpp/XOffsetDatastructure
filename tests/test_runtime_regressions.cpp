@@ -55,8 +55,8 @@ void move_ownership() {
     auto loaded = TypedXBuffer<RuntimeRoot>::load(bytes);
     bool grew = loaded.grow(4096);
     assert(grew);
-    loaded.root().name = std::string(300, 'x');
-    assert(loaded.root().name.size() == 300);
+    loaded.plain_root().name = std::string(300, 'x');
+    assert(loaded.plain_root().name.size() == 300);
 }
 
 void strings_and_aliases() {

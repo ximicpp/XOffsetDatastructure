@@ -1,4 +1,5 @@
-// Growth policy part 2: proxies (XRef) and pin scopes (read / edit).
+// Growth policy parts 2 and 3: proxies (XRef), pin scopes (read / edit) and
+// the named field accessors XOFFSET_RECORD generates.
 // Proxies stay valid across payload moves and XBuffer moves, detect a
 // destroyed or replaced buffer, and fail soft; pin scopes give plain
 // references, refuse to move while open and defer block reuse.
@@ -46,6 +47,32 @@ struct Both : PartA, PartB {
     std::int32_t c{0};
 };
 XOFFSET_RECORD_DERIVED(Both, (PartA, PartB), c)
+
+// Part 3: named accessors. Field names that are also names of the proxy's
+// state (a, path) or functions (get, error), bases at a nonzero offset, and
+// C arrays.
+struct Odd {
+    std::int32_t get{0};
+    std::int32_t error{0};
+    std::int32_t path{0};
+    std::int32_t a{0};
+};
+XOFFSET_RECORD(Odd, get, error, path, a)
+struct BaseA {
+    std::int64_t x{0};
+};
+XOFFSET_RECORD(BaseA, x)
+struct BaseB {
+    std::int32_t y{0};
+    XString tag;
+};
+XOFFSET_RECORD(BaseB, y, tag)
+struct Derived : BaseA, BaseB {
+    std::int32_t z{0};
+    std::int32_t grid[2][3]{};
+    XVector<Odd> odds;
+};
+XOFFSET_RECORD_DERIVED(Derived, (BaseA, BaseB), z, grid, odds)
 
 #define CHECK(c)                                                                     \
     do {                                                                             \
@@ -321,6 +348,78 @@ bool test_scope_overflow_fails_soft() {
     return true;
 }
 
+bool test_named_accessors() {
+    // TypedXBuffer::root() is a proxy; each listed field has an accessor
+    // that is field<&T::m>().
+    auto t = TypedXBuffer<Root>::create(256, XBuffer::relocating().with_reserve(16384));
+    auto r = t.root();
+    static_assert(std::is_same_v<decltype(r), XRef<Root>>);
+    // The accessor chain is empty: a record proxy is its state only.
+    static_assert(sizeof(XRef<Root>) == sizeof(proxy_detail::RefBase<Root, proxy_detail::RootPath>));
+    static_assert(std::is_same_v<decltype(r.ints()), decltype(r.field<&Root::ints>())>);
+    static_assert(std::is_same_v<decltype(r.players()[0].name()),
+                                 decltype(r.players()[0].field<&Player::name>())>);
+    const char* first = t.data();
+    auto players = r.players();
+    for (int i = 0; i < 4000; ++i) {
+        auto p = players.emplace_back();
+        p.id() = i;
+        p.level() += 2;
+        p.name() = "accessor-player-" + std::to_string(i);
+        CHECK(p.items().push_back(i));
+    }
+    CHECK(t.data() != first);                 // moved; every proxy still works
+    CHECK(players[3999].name() == "accessor-player-3999");
+    CHECK(players[17].items().get(0) == 17 && players[17].level().get() == 2);
+    r.counter() = 7;
+    r.title() = "named";
+    r.named()["k"].a() = 3;                   // `a` is also the proxy's anchor
+    r.named()["k"].b() = 4;
+    CHECK(r.map().try_emplace(1, 2) && r.map().get(1) == 2);
+    CHECK(r.field<&Root::set>().insert(9));   // `set` is the proxy's set(const T&)
+    const auto& raw = t.plain_root();
+    CHECK(raw.counter == 7 && raw.title.view() == "named" && raw.players.size() == 4000u);
+    CHECK(raw.named.find(std::string("k"))->second.a == 3 && raw.named.find(std::string("k"))->second.b == 4);
+    // reset() gives a proxy of the new root; proxies of the old one are stale.
+    auto fresh = t.reset();
+    CHECK(!players.valid() && !r.counter().valid() && fresh.valid());
+    CHECK(fresh.counter().get() == 0 && fresh.players().size() == 0u);
+    CHECK(t.ok());
+
+    auto d = TypedXBuffer<Derived>::create(256, XBuffer::relocating());
+    auto v = d.root();
+    v.x() = 11;                               // BaseA, at offset 0
+    v.y() = 22;                               // BaseB, at a nonzero offset
+    v.tag() = "tagged";
+    v.z() = 33;
+    CHECK(v.field<&BaseB::y>().get() == 22);  // a base member through field<>
+    v.grid()[1][2] = 5;
+    v.grid()[0][0] += 1;
+    CHECK(v.grid().size() == 2u && v.grid()[1].size() == 3u);
+    CHECK(!v.grid()[2][0].set(1) && d.error() == XErrc::out_of_range);
+    d.clear_error();
+    CHECK(v.grid()[2][0].get() == 0);
+    std::int32_t sum = 0;
+    for (auto row : v.grid())
+        for (auto cell : row) sum += cell;
+    CHECK(sum == 6);
+    auto odd = v.odds().emplace_back();
+    odd.a() = 1;                              // field accessors win over the proxy state
+    odd.path() = 2;
+    odd.field<&Odd::get>() = 3;               // get / error keep the proxy's meaning
+    odd.field<&Odd::error>() = 4;
+    CHECK(odd.error() == XErrc::ok && odd.valid());
+    CHECK(odd.get().get == 3 && odd.get().error == 4 && odd.get().path == 2 && odd.get().a == 1);
+    const auto& dr = d.plain_root();
+    CHECK(dr.x == 11 && dr.y == 22 && dr.tag.view() == "tagged" && dr.z == 33);
+    CHECK(dr.grid[1][2] == 5 && dr.grid[0][0] == 1 && dr.odds[0].path == 2);
+    // A loaded buffer: the same accessors.
+    auto back = TypedXBuffer<Root>::load(TypedXBuffer<Root>::create().save_verified());
+    CHECK(back.root().players().emplace_back().name().assign("loaded"));
+    CHECK(back.root().players()[0].name() == "loaded" && back.ok());
+    return true;
+}
+
 bool test_failed_buffer_refuses_to_emit() {
     auto b = make_relocating();
     auto r = b.ref<Root>();
@@ -356,6 +455,7 @@ int main() {
     ok = test_pin_scopes() && ok;
     ok = g_scope_ok && ok;
     ok = test_scope_overflow_fails_soft() && ok;
+    ok = test_named_accessors() && ok;
     ok = test_failed_buffer_refuses_to_emit() && ok;
     std::cout << (ok ? "test_proxy_scopes: all passed" : "test_proxy_scopes: FAILED") << std::endl;
     return ok ? 0 : 1;

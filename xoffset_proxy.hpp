@@ -347,7 +347,24 @@ namespace proxy_detail {
         KeyPath copy() const noexcept { return {parent.copy(), key, hint, sub}; }
     };
 
-    enum class Kind { value, record, string, vector, set, map };
+    // Element `index` of the C array of N elements E at `parent` (+ `sub`
+    // bytes into it); an index past the end names nothing.
+    template <class Parent, class E, std::uint32_t N>
+    struct ArrayPath {
+        Parent parent;
+        std::size_t index = 0;
+        std::size_t sub = 0;
+        XOFFSET_PROXY_INLINE char* resolve(char* base) const noexcept {
+            if (index >= N) [[unlikely]] return nullptr;
+            char* at = parent.resolve(base);
+            if (!at) [[unlikely]] return nullptr;
+            return at + index * sizeof(E) + sub;
+        }
+        ArrayPath plus(std::uint32_t bytes) const noexcept { return {parent, index, sub + bytes}; }
+        ArrayPath copy() const noexcept { return {parent.copy(), index, sub}; }
+    };
+
+    enum class Kind { value, record, string, vector, set, map, array };
 
     template <class E> std::true_type is_vec_test(const XFixedVector<E>*);
     std::false_type is_vec_test(...);
@@ -363,6 +380,7 @@ namespace proxy_detail {
         else if constexpr (decltype(is_set_test(static_cast<T*>(nullptr)))::value) return Kind::set;
         else if constexpr (decltype(is_vec_test(static_cast<T*>(nullptr)))::value) return Kind::vector;
         else if constexpr (std::is_class_v<T> && schema::is_described_v<T>) return Kind::record;
+        else if constexpr (std::is_array_v<T> && std::extent_v<T> != 0) return Kind::array;
         else return Kind::value;
     }
 
@@ -379,10 +397,15 @@ template <class T, class Path = proxy_detail::RootPath,
           proxy_detail::Kind K = proxy_detail::kind_of<std::remove_cv_t<T>>()>
 class XRef;
 
-// Hook for named field accessors (growth policy part 3): XOFFSET_RECORD
-// specializes it for its record to give XRef<T> member functions.
-template <class T, class Self>
-struct XRecordAccess {};
+// Named field accessors (growth policy part 3; declared in
+// xoffset_schema_describe.hpp): XOFFSET_RECORD and XOFFSET_RECORD_DERIVED
+// specialize XRecordAccess<T, Self, Next> with one accessor per field. A
+// record without a field list (described by reflection only) has none: use
+// field<&T::m>().
+template <class T, class Self, class Next>
+struct XRecordAccess : Next {
+    using Next::Next;
+};
 
 namespace proxy_detail {
     // Common state of every proxy: the lineage and the path.
@@ -413,6 +436,36 @@ namespace proxy_detail {
             return XRef<M, Path>(a, path.plus(offset));
         }
     };
+} // namespace proxy_detail
+
+namespace proxy_detail {
+    // The accessor chain of a record proxy: T's accessors, then those of
+    // T's bases (depth first, in declaration order), then the proxy state.
+    template <class T, class Self, class Next>
+    struct access_chain;
+    template <class T, class Self, class Next, std::size_t I, std::size_t N>
+    struct base_access_chain {
+        using B = schema::base_t<T, I>;
+        using rest = typename base_access_chain<T, Self, Next, I + 1, N>::type;
+        using type = std::conditional_t<schema::is_described_v<B>,
+                                        typename access_chain<B, Self, rest>::type, rest>;
+    };
+    template <class T, class Self, class Next, std::size_t N>
+    struct base_access_chain<T, Self, Next, N, N> {
+        using type = Next;
+    };
+    template <class T, class Self, class Next>
+    struct access_chain {
+        using type = XRecordAccess<
+            T, Self, typename base_access_chain<T, Self, Next, 0, schema::base_count_v<T>>::type>;
+    };
+
+    // The object of a proxy, through its state (never a field accessor of
+    // the same name).
+    template <class T, class Path, Kind K>
+    XOFFSET_PROXY_INLINE const T* ptr_of(const XRef<T, Path, K>& ref) noexcept {
+        return static_cast<const RefBase<T, Path>&>(ref).get_ptr();
+    }
 } // namespace proxy_detail
 
 // ---- scalars, enums and other trivially copyable values ---------------------
@@ -482,15 +535,23 @@ private:
     XOFFSET_PROXY_INLINE void miss() const noexcept { Base::a.miss(); }
 };
 
-// ---- records: members by member pointer (named accessors: part 3) -----------
+// ---- records: members by member pointer or by name ------------------------
+// A record with a field list (XOFFSET_RECORD) has one accessor per field:
+// u.hp() is u.field<&Unit::hp>(). The proxy's own functions (get, set,
+// field, member, valid, error) keep their meaning; a field named like one of
+// them is reached with field<&T::m>().
 template <class T, class Path>
 class XRef<T, Path, proxy_detail::Kind::record>
-    : public proxy_detail::RefBase<T, Path>, public XRecordAccess<T, XRef<T, Path, proxy_detail::Kind::record>> {
+    : public proxy_detail::access_chain<T, XRef<T, Path, proxy_detail::Kind::record>,
+                                        proxy_detail::RefBase<T, Path>>::type {
     using Base = proxy_detail::RefBase<T, Path>;
+    using Chain = typename proxy_detail::access_chain<T, XRef, Base>::type;
 
 public:
     using value_type = T;
-    using Base::Base;
+    using Chain::Chain;
+    using Base::valid;
+    using Base::error;
 
     // The member `MP` of this record: buf.ref<Unit>().field<&Unit::hp>() = 5.
     template <auto MP>
@@ -713,6 +774,30 @@ namespace proxy_detail {
     };
 } // namespace proxy_detail
 
+// ---- C arrays (a field `int slots[2][3]`: u.slots()[1][2] = 5) ----------------
+template <class T, class Path>
+class XRef<T, Path, proxy_detail::Kind::array> : public proxy_detail::RefBase<T, Path> {
+    using Base = proxy_detail::RefBase<T, Path>;
+    using E = std::remove_extent_t<T>;
+    static constexpr std::uint32_t N = static_cast<std::uint32_t>(std::extent_v<T>);
+    using ElemPath = proxy_detail::ArrayPath<Path, E, N>;
+
+public:
+    using value_type = T;
+    using element_ref = XRef<E, ElemPath>;
+    using iterator = proxy_detail::Iter<T, Path, element_ref>;
+    using Base::Base;
+
+    static constexpr std::uint32_t size() noexcept { return N; }
+    // Element i (an empty proxy past the end: reads give E{}, writes fail
+    // with out_of_range).
+    XOFFSET_PROXY_INLINE element_ref operator[](std::uint32_t i) const noexcept {
+        return element_ref(Base::a, ElemPath{Base::path, i, 0});
+    }
+    iterator begin() const noexcept { return iterator(*this, 0); }
+    proxy_detail::IterEnd end() const noexcept { return {}; }
+};
+
 // ---- XVector -------------------------------------------------------------------
 template <class T, class Path>
 class XRef<T, Path, proxy_detail::Kind::vector> : public proxy_detail::RefBase<T, Path> {
@@ -812,11 +897,11 @@ public:
         if constexpr (plain) {
             return push_back(value.get());
         } else {
-            const E* src = value.get_ptr();
+            const E* src = proxy_detail::ptr_of(value);
             if (!src) return false;
             auto source = value;
             return take(append_slow(head_.anchor(Base::a), Base::path.copy(), proxy_detail::deep_bytes(*src), [&](T& v) {
-                if (const E* s = source.get_ptr()) v.push_back(*s);
+                if (const E* s = proxy_detail::ptr_of(source)) v.push_back(*s);
             }));
         }
     }
