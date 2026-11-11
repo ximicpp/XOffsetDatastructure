@@ -19,6 +19,15 @@
   (4 per bin) is replaced by `free_table_inline_entries` (16 holes of one
   size per table).
 
+- Shared deltas: `XRecordDelta::update` snapshots the hinted blocks with
+  copies of a constant size (unrolled per block) instead of a run-time length
+  per block. The bench's D3 server keeps a delivery's loop small: the first
+  use of a unit, march or tile in a tick (compare and encode) and key bodies
+  run out of line, and a march slot looks for the lowest live march id only
+  when another march holds the slot. Instructions (S scale, GCC 16, callgrind,
+  pub + send): S peace -7%, conflict -14%, siege -10%; M peace -4%,
+  conflict -18%, siege -19%. Bytes unchanged.
+
 - Shared deltas: changed members only. `XRecordDelta<T>::fields(members)`
   (bit i = member i, `XSyncFields`), `diff(now, before, out, fields)` and
   `update(rec, fields, out, set)`, which changes a record and writes its body
