@@ -583,10 +583,17 @@ public:
 #endif
     };
 
-    // Held views are small: slot storage (no VM reservation each), 32 KiB at most.
+    // Held views (client replicas, server view buffers): a fixed 128 KiB slot
+    // each, no VM reservation (3.6 memory gate, 2026-11-11). The largest view at
+    // scale M uses 93 KiB (NC replica, server layout with its free blocks); a
+    // view that outgrows the slot fails its receive or edit (an allocation
+    // failure) rather than moving. 128 KiB instead of SLOT_MAX
+    // (256 KiB) halves the address space of 6000 views, which is most of the
+    // page tables left once the players are relocating.
+    static constexpr std::size_t kHeldMax = (std::size_t(128) << 10) - 64;   // the 128 KiB slot's payload
     static XOffsetDatastructure::XBuffer::MaximumCapacity held_cap() {
         using XOffsetDatastructure::XBuffer;
-        return XBuffer::maximum_capacity(XBuffer::SLOT_MAX).with_growth(XOffsetDatastructure::XGrowPolicy::Automatic);
+        return XBuffer::maximum_capacity(kHeldMax).with_growth(XOffsetDatastructure::XGrowPolicy::Automatic);
     }
 
     struct BlockOps {
@@ -767,7 +774,7 @@ public:
         void n_view(int c, const MapWorld& w, const ViewRect& r) {
             auto& n = nb[std::size_t(c)];
             // One small buffer per client: the largest slot class, not a VM reservation.
-            n.buf.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, XBuffer::maximum_capacity(XBuffer::SLOT_MAX).with_growth(XOffsetDatastructure::XGrowPolicy::Automatic)));
+            n.buf.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, held_cap()));
             auto& v = n.buf->template root<xm::ViewSnapshot>();
             v.x0 = r.x0; v.y0 = r.y0; v.x1 = r.x1; v.y1 = r.y1;
             v.units.reserve(std::size_t(nucap));
@@ -785,7 +792,7 @@ public:
         static constexpr int32_t kRingC = kViewW / kTile + 1, kRingR = kViewH / kTile + 1;
         void n_bview(int c) {
             auto& n = nb[std::size_t(c)];
-            n.buf.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, XBuffer::maximum_capacity(XBuffer::SLOT_MAX).with_growth(XOffsetDatastructure::XGrowPolicy::Automatic)));
+            n.buf.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, held_cap()));
             auto& v = n.buf->template root<xm::ViewSnapshot>();
             v.units.reserve(std::size_t(nucap));
             v.marches.reserve(std::size_t(nmcap));
@@ -948,7 +955,7 @@ public:
             auto& h = nheld[std::size_t(c)];
             // The replica holds the server's non-compact view layout (free slots,
             // growth slack), which can pass 32 KiB: the largest slot class.
-            if (!h) h.emplace(XBuffer::create<xm::ViewSnapshot>(4096, XBuffer::maximum_capacity(XBuffer::SLOT_MAX).with_growth(XOffsetDatastructure::XGrowPolicy::Automatic)));
+            if (!h) h.emplace(XBuffer::create<xm::ViewSnapshot>(4096, held_cap()));
             return h;
         }
         void n_key_recv(int c, int, int b) {
@@ -1471,10 +1478,15 @@ private:
     static constexpr std::size_t kViewInitial = 16 * 1024;
     static constexpr std::size_t kUplinkInitial = 4 * 1024;   // UL orders (uplink.hpp)
 
-    // Every buffer reserves 256 MiB of address space. SLG_XOFFSET_CAP_MIB=N reserves N MiB
-    // for each player, battle and report buffer instead (the shard keeps 256 MiB): an
-    // iPhone gives a process about 3.4 GiB of address space, less than the 64 players of
-    // scale S reserve at 256 MiB each (docs/DEPLOYMENT.md, SC-12).
+    // Player, battle and report buffers are Relocating (growth policy, 3.6
+    // memory gate 2026-11-11): a slot first, a move when one outgrows it, so
+    // players no longer reserve a 256 MiB VM region each (page tables
+    // 13.1 -> 5.6 MiB at scale M with kHeldMax). Their maximum is
+    // 256 MiB, or SLG_XOFFSET_CAP_MIB=N MiB (an iPhone gives a process about
+    // 3.4 GiB of address space, docs/DEPLOYMENT.md, SC-12). The shard keeps a
+    // 256 MiB reservation of its own (Automatic, pooled under reuse).
+    // Verify passes in an XOFFSET_STRESS_RELOCATE build (a moved-from payload
+    // is poisoned and unmapped): no path verify runs reads a stale root.
     static XOffsetDatastructure::XBuffer::MaximumCapacity cap(bool shard = false) {
         using XOffsetDatastructure::XBuffer;
         static const std::size_t small = [] {
@@ -1482,7 +1494,8 @@ private:
             const long mib = v ? std::strtol(v, nullptr, 10) : 0;
             return mib > 0 ? std::size_t(mib) << 20 : std::size_t(256) << 20;
         }();
-        auto c = XBuffer::maximum_capacity(shard ? std::size_t(256) << 20 : small)
+        if (!shard) return XBuffer::relocating(small);
+        auto c = XBuffer::maximum_capacity(std::size_t(256) << 20)
                      .with_growth(XOffsetDatastructure::XGrowPolicy::Automatic);
         return use_pool() || reuse_mode() ? c.with_pool(pool()) : c;
     }

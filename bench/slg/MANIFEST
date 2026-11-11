@@ -234,8 +234,17 @@
 #   bench/xoffset_runner.hpp  2026-11-11 (small-server D3, round 2): first use of a unit, march
 #                        or tile in a tick and key bodies out of line; march slot checks the
 #                        lowest live id only when another march holds it. D3 bytes unchanged.
+#   bench/xoffset_runner.hpp, README.md  2026-11-11 (3.6 memory gate, page tables): cap()
+#                        gives player, battle and report buffers XBuffer::relocating(max)
+#                        (max 256 MiB or SLG_XOFFSET_CAP_MIB) instead of a 256 MiB VM region
+#                        each; the shard keeps its Automatic 256 MiB reservation. Held views
+#                        (held_cap(), all four sites) take a 128 KiB slot (kHeldMax = 128 KiB
+#                        - 64) instead of SLOT_MAX: the largest view at M uses 93 KiB. Same
+#                        wires and sums (verify in an XOFFSET_STRESS_RELOCATE build: S and M,
+#                        both case sets, native rows on). Scale M page tables 13.1 -> 5.6 MiB,
+#                        0.84% of RSS (gate 1%).
 ea55baa3f59a1719135b2b3187e2bc9fc91abe171d6cfebf8216780676960eb0  CMakeLists.txt
-035efa87a69963b1bd4e2c2f03d472d77a3ffba01ee782d763cafda0d322ec52  README.md
+53080bda20346f326be87c08c92289dbd52cb8a06cacdf9fc50ca3b19bfdac67  README.md
 ea141af841831b376028f48ab0d4c22e66ce2671f01d9e14c9f66814f5ebaa6e  adapters/cereal_format.hpp
 6441a0f51cf04424de67df98f6a3696b378f8ec3cd3d97c2bf5a6ec065db2768  adapters/flatbuffers_format.hpp
 677c3607ff9390c5a1b9d6a348da3dcd7aee4eef52740a35911d2ab041136ced  adapters/protobuf_format.hpp
@@ -246,7 +255,7 @@ fef3f268315b7383a8fe8ee2b45d9db70ba50ec201301ed8d58dd5ebc0ab9805  bench/runner.h
 168bf7d2b3ce419c8b001793ba64b64e31dc281041ae01e16cf622c40ef75c5f  bench/slg_bench.cpp
 730a66f677d9d20077175f629cf0b13919e66ccedaf880e4eb414c6bc94c0610  bench/small_msg_probe.cpp
 56cb184e9bbebd0a61e184a431fa9ede2e9d75a617ee7ce838e17e1a342aad76  bench/std_runner.hpp
-20d351e6f55b58d3df3e2572eb905c71eec28d2aeb99dd41ef95ed40101e4956  bench/xoffset_runner.hpp
+44c72a9b5a1caa93005d778976a6100dfa546877fc928887bfd8f330d90bcbfa  bench/xoffset_runner.hpp
 12cab27be9331a4a09ae66f444cf5852dd81e363df562748a4ea854932e35e44  include/slg/cista_free.hpp
 f901dd6b3534240a5038157eaf601d756c07557bcd7fad74b80f8615513b6ab8  include/slg/flat_held_index.hpp
 341ba037a01f807258b0a7527aa0ba0a763f60a32bab00f78f75834f0330cffe  include/slg/generic.hpp
