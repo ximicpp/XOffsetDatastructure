@@ -663,9 +663,14 @@ namespace XOffsetDatastructure::xsync {
             alignas(8) unsigned char snap[sizeof(T)];
             const auto* r = reinterpret_cast<const unsigned char*>(&rec);
             constexpr std::size_t nblocks = (sizeof(T) + 63) / 64;
-            for (std::size_t b = 0; b < nblocks; ++b)
-                if (fields.blocks[b / 64] >> (b % 64) & 1u)
-                    std::memcpy(snap + b * 64, r + b * 64, sizeof(T) - b * 64 >= 64 ? 64 : sizeof(T) - b * 64);
+            // One copy of a constant size per hinted block (unrolled: a few
+            // vector moves each, no length computed at run time).
+            [&]<std::size_t... B>(std::index_sequence<B...>) {
+                ((fields.blocks[B / 64] >> (B % 64) & 1u
+                      ? (void)std::memcpy(snap + B * 64, r + B * 64, sizeof(T) - B * 64 >= 64 ? 64 : sizeof(T) - B * 64)
+                      : (void)0),
+                 ...);
+            }(std::make_index_sequence<nblocks>{});
             [[maybe_unused]] std::array<std::uint32_t, container_count + 1> at{};
             [[maybe_unused]] std::array<std::uint32_t, container_count + 1> len{};
             XSyncOut& keep = scratch();
