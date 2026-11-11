@@ -1035,7 +1035,7 @@ public:
             csize_ = v->size_;
             return true;
         }
-        return take(fill_slow(Base::a, Path(Base::path), values.data(), count, E{}, false));
+        return take(fill_slow(head_.anchor(Base::a), Base::path.copy(), values.data(), count, E{}, false));
     }
     template <std::size_t N>
     bool append(const E (&values)[N]) noexcept requires plain {
@@ -1057,14 +1057,14 @@ public:
             csize_ = v->size_;
             return true;
         }
-        return take(fill_slow(Base::a, Path(Base::path), nullptr, count, value, false));
+        return take(fill_slow(head_.anchor(Base::a), Base::path.copy(), nullptr, count, value, false));
     }
     // Appends copies of records (strings and containers copied deeply). The
     // values must not live in this buffer.
     bool append(std::span<const E> values) noexcept requires (!plain) {
         std::size_t extra = std::size_t(values.size()) * sizeof(E);
         for (const E& value : values) extra += proxy_detail::deep_bytes(value);
-        return take(append_slow(Base::a, Base::path, extra, [&](T& w) {
+        return take(append_slow(head_.anchor(Base::a), Base::path.copy(), extra, [&](T& w) {
             w.reserve(std::size_t(w.size_) + values.size());
             for (const E& value : values) w.push_back(value);
         }));
@@ -1080,7 +1080,7 @@ public:
             csize_ = v->size_;
             return true;
         }
-        return take(fill_slow(Base::a, Path(Base::path), values.data(), values.size(), E{}, true));
+        return take(fill_slow(head_.anchor(Base::a), Base::path.copy(), values.data(), values.size(), E{}, true));
     }
     bool assign(std::initializer_list<E> values) noexcept requires plain {
         return assign(std::span<const E>(values.begin(), values.size()));
@@ -1156,7 +1156,7 @@ private:
     // append / assign past the capacity: `count` values from `src` (or
     // copies of `value` when src is null), appended or (replace) replacing.
     // A source inside the payload is copied out first: the payload may move.
-    static XOFFSET_DETAIL_NOINLINE Grow fill_slow(proxy_detail::Anchor a, const Path& path, const E* src, std::size_t count,
+    static XOFFSET_DETAIL_NOINLINE Grow fill_slow(proxy_detail::Anchor a, Path path, const E* src, std::size_t count,
                                                   E value, bool replace) noexcept requires plain {
         char* const base0 = a.sync();
         if (!base0) return {a.version, 0, false};
@@ -1434,7 +1434,9 @@ public:
             missing();
             return 0;
         }
-        if (!proxy_detail::reserve_at<T>(Base::a, Base::path, std::size_t(now->size_) + entries.size())) return 0;
+        const bool room = proxy_detail::reserve_at<T>(Base::a, Base::path, std::size_t(now->size_) + entries.size());
+        head_.forget();   // reserve_at may have moved the payload
+        if (!room) return 0;
         T* m = reinterpret_cast<T*>(Base::path.resolve(Base::a.ctl->base));
         if (!m) [[unlikely]] return 0;
         std::uint32_t inserted = 0;
@@ -1450,8 +1452,9 @@ public:
     }
     // Capacity for n entries (one regrow).
     bool reserve(std::uint32_t n) noexcept {
-        if (!proxy_detail::reserve_at<T>(Base::a, Base::path, n)) return false;
-        return true;
+        const bool room = proxy_detail::reserve_at<T>(Base::a, Base::path, n);
+        head_.forget();
+        return room;
     }
 
     // The value of `key`, inserted value-initialized when absent.
