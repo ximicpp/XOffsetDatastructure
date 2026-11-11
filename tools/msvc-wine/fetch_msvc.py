@@ -67,7 +67,7 @@ for p in picked:
                         shutil.copyfileobj(src, dst)
 
 sdk = next(p for p in packages if p["id"] == a.sdk)
-by_name = {pl["fileName"].split("\\")[-1]: pl for pl in sdk["payloads"]}
+by_name = {re.split(r"[\\/]", pl["fileName"])[-1]: pl for pl in sdk["payloads"]}
 msis = [n for n in by_name if re.match(
     r"(Windows SDK Desktop (Headers x64|Headers x86|Libs x64)|Universal CRT Headers Libraries and Sources|"
     r"Windows SDK for Windows Store Apps (Headers|Libs|Contracts|Headers OnecoreUap))-x86_en-us\.msi$", n)]
