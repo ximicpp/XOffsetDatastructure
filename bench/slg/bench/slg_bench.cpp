@@ -6,6 +6,10 @@
 //   slg_bench --mode bench --out raw.jsonl [--scale M] [--cycles 41] [--seed N] [--formats ...]
 //       Interleaves formats in a random order per cycle and writes one JSON line per
 //       (cycle, format, metric). Analyse with tools/analyze.py; cycle 0 is warm-up.
+//   slg_bench --mode proc --out proc.jsonl [--scale M] [--cycles 11] --formats <one format>
+//       Linux only. Runs the cycles untimed, then writes the process's memory from
+//       /proc/self (PROC.* rows: RSS, peak RSS, page tables, mappings), before setup
+//       ("base") and at the end. Run one format per process: the numbers are the process's.
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -205,6 +209,27 @@ void operator delete(void* p, std::size_t, std::align_val_t) noexcept { uncounte
 void operator delete[](void* p, std::size_t, std::align_val_t) noexcept { uncounted(p); }
 #endif
 
+namespace {
+// --mode proc: process memory from /proc/self/status (kB fields) and the mapping
+// count from /proc/self/maps. Empty on platforms without /proc.
+struct ProcMem { long long rss = -1, hwm = -1, pte = -1, anon = -1, vmas = -1; };
+ProcMem read_proc_mem() {
+    ProcMem m;
+    std::ifstream st("/proc/self/status");
+    std::string line;
+    auto field = [&](const char* key, long long& v) {
+        const std::size_t n = std::char_traits<char>::length(key);
+        if (line.compare(0, n, key) == 0) v = std::atoll(line.c_str() + n) * 1024;
+    };
+    while (std::getline(st, line)) {
+        field("VmRSS:", m.rss); field("VmHWM:", m.hwm); field("VmPTE:", m.pte); field("RssAnon:", m.anon);
+    }
+    std::ifstream maps("/proc/self/maps");
+    if (maps) { m.vmas = 0; while (std::getline(maps, line)) ++m.vmas; }
+    return m;
+}
+} // namespace
+
 int main(int argc, char** argv) {
     std::string mode = "verify", scale = "S", formats, out;
     int cycles = -1;
@@ -224,7 +249,8 @@ int main(int argc, char** argv) {
     if (!sc) { std::cerr << "unknown scale " << scale << "\n"; return 2; }
     if (demo_cases() && !reuse_mode()) { std::cerr << "SLG_CASES=demo needs SLG_REUSE=1\n"; return 2; }
     if (formats.empty()) formats = all_formats();
-    if (cycles < 0) cycles = mode == "verify" || mode == "mem" ? 2 : 41;
+    if (cycles < 0) cycles = mode == "verify" || mode == "mem" ? 2 : mode == "proc" ? 11 : 41;
+    const ProcMem proc_base = mode == "proc" ? read_proc_mem() : ProcMem{};
 
     std::vector<std::unique_ptr<Runner>> rs;
     for (const auto& n : split(formats)) {
@@ -246,6 +272,10 @@ int main(int argc, char** argv) {
     } else if (mode == "mem") {
         if (out.empty()) { std::cerr << "--out is required in mem mode\n"; return 2; }
         if (mem_live() < 0) { std::cerr << "--mode mem needs a -DSLG_MEMCOUNT=1 build\n"; return 2; }
+        jsonl.open(out);
+    } else if (mode == "proc") {
+        if (out.empty()) { std::cerr << "--out is required in proc mode\n"; return 2; }
+        if (proc_base.rss < 0 || proc_base.pte < 0) { std::cerr << "--mode proc needs /proc/self/status (Linux)\n"; return 2; }
         jsonl.open(out);
     } else if (mode != "verify") {
         std::cerr << "unknown mode " << mode << "\n"; return 2;
@@ -309,8 +339,22 @@ int main(int argc, char** argv) {
                 jsonl << "{\"format\":\"" << rs[i]->name() << "\",\"metric\":\"" << k << "\",\"bytes\":" << v << "}\n";
         }
     }
+    if (mode == "proc") {
+        const ProcMem end = read_proc_mem();
+        auto row = [&](const char* k, long long v) {
+            jsonl << "{\"format\":\"" << formats << "\",\"metric\":\"PROC." << k << "\",\"bytes\":" << v << "}\n";
+        };
+        row("base_rss", proc_base.rss); row("base_pte", proc_base.pte); row("base_vmas", proc_base.vmas);
+        row("rss", end.rss); row("hwm", end.hwm); row("pte", end.pte); row("rss_anon", end.anon); row("vmas", end.vmas);
+        // Diagnosis: SLG_PROC_SMAPS=<file> keeps a copy of /proc/self/smaps at the end.
+        if (const char* f = std::getenv("SLG_PROC_SMAPS")) {
+            std::ifstream in("/proc/self/smaps");
+            std::ofstream o(f);
+            o << in.rdbuf();
+        }
+    }
     if (mode == "verify") print_sizes(rs, last, keep, *sc);
     if (failures) { std::cerr << failures << " mismatches\n"; return 1; }
-    std::cerr << (mode == "verify" ? "verify: all formats agree\n" : "\nbench: done\n");
+    std::cerr << (mode == "verify" ? "verify: all formats agree\n" : "\n" + mode + ": done\n");
     return 0;
 }
