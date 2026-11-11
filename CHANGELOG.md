@@ -4,9 +4,12 @@
 
 - Growth policy, part 1 (storage): `XGrowPolicy::Relocating`
   (`XBuffer::relocating(maximum)`, default maximum 2 GiB - 8). A buffer
-  starts in a 1 MiB slot that is reserved, not zeroed
-  (`XOFFSET_RELOCATING_RESERVE_BYTES`; `MaximumCapacity::with_reserve` starts
-  smaller), container operations grow it in place inside that reservation, and
+  starts in a slot sized from its first content (create's initial size or
+  the loaded payload): twice that, a power of two from 64 KiB to 1 MiB
+  (`XBufferCore::relocating_first_reserve`; the top is
+  `XOFFSET_RELOCATING_RESERVE_BYTES`; `MaximumCapacity::with_reserve`
+  overrides it). The slot is reserved, not zeroed; small buffers take few
+  page-table pages. Container operations grow it in place inside that reservation, and
   `make_room(bytes)` / `grow()` move it to a larger one when it is full:
   servers in one move to a reservation of the whole maximum, phones to 16 MiB
   (iOS) or 64 MiB (Android) and then doubling (`XOFFSET_RELOCATE_STEP_BYTES`).

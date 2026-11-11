@@ -86,10 +86,11 @@ void test_first_reservation() {
     need(b.growth_policy() == XGrowPolicy::Relocating, "policy");
     need(b.maximum_capacity() == XBufferCore::MAX_PAYLOAD, "default maximum is the format limit");
     need(!b.address_stable(), "a relocating buffer is not address stable");
-    need(b.reservation_limit() >= kReserve, "first reservation holds RELOCATING_RESERVE");
+    const auto first = XBufferCore::relocating_first_reserve(b.get_size());
+    need(b.reservation_limit() >= first, "first reservation sized from the content");
     if (kSlots) {
         need(b.storage_kind() == XStorageKind::MovableSlot, "first reservation is a slot");
-        need(b.reservation_limit() == kReserve, "exactly the 1 MiB slot");
+        need(b.reservation_limit() == first, "exactly the sized slot");
     }
     // In place up to the reservation: no move, no epoch change.
     const char* base = b.data();
@@ -97,7 +98,7 @@ void test_first_reservation() {
     fill_misc(b);
     auto& r = b.root<RelocRoot>();
     std::uint32_t pushed = 0;
-    while (b.get_size() + 64 * 1024 < b.reservation_limit()) r.values.push_back(pushed++);
+    while (b.get_size() + 4 * 1024 < b.reservation_limit()) r.values.push_back(pushed++);
     need(b.data() == base && b.epoch() == epoch, "growth inside the reservation keeps the address");
     need(values_are(b, 0, pushed) && misc_ok(b), "content after in-place growth");
 #if !XOFFSET_NO_EXCEPTIONS
@@ -113,6 +114,40 @@ void test_first_reservation() {
     need(threw, "a raw push past the reservation fails");
     need(b.data() == base && values_are(b, 0, pushed) && misc_ok(b), "a failed raw push changes nothing");
 #endif
+}
+
+// The default first reservation: a slot of twice the content, a power of two
+// from 64 KiB to RELOCATING_RESERVE's slot, less the 64-byte header.
+void test_first_reserve_rule() {
+    std::cout << "first reservation rule\n";
+    constexpr std::size_t KiB = 1024;
+    static_assert(XBufferCore::relocating_first_reserve(0) == XBufferCore::RELOCATING_RESERVE_MIN);
+    static_assert(XBufferCore::relocating_first_reserve(XBufferCore::RELOCATING_RESERVE) ==
+                  XBufferCore::RELOCATING_RESERVE);
+    static_assert(XBufferCore::relocating_first_reserve(XBufferCore::MAX_PAYLOAD) == XBufferCore::RELOCATING_RESERVE);
+    if constexpr (XBufferCore::RELOCATING_RESERVE == 1024 * KiB - 64) {
+        static_assert(XBufferCore::RELOCATING_RESERVE_MIN == 64 * KiB - 64);
+        static_assert(XBufferCore::relocating_first_reserve(256) == 64 * KiB - 64);
+        static_assert(XBufferCore::relocating_first_reserve(32 * KiB) == 64 * KiB - 64);
+        static_assert(XBufferCore::relocating_first_reserve(32 * KiB + 1) == 128 * KiB - 64);
+        static_assert(XBufferCore::relocating_first_reserve(64 * KiB) == 128 * KiB - 64);
+        static_assert(XBufferCore::relocating_first_reserve(300 * KiB) == 1024 * KiB - 64);
+        static_assert(XBufferCore::relocating_first_reserve(512 * KiB) == 1024 * KiB - 64);
+    }
+    // create's initial size and a load's payload pick the slot.
+    auto b = XBuffer::create<RelocRoot>(64 * KiB, XBuffer::relocating());
+    need(b.reservation_limit() >= XBufferCore::relocating_first_reserve(64 * KiB), "sized from the initial size");
+    if (kSlots) need(b.reservation_limit() == XBufferCore::relocating_first_reserve(64 * KiB), "a 128 KiB slot");
+    auto big = XBuffer::create<RelocRoot>(256, XBuffer::relocating());
+    need(push_values(big, 0, 50000), "200 KB of values");
+    const auto w = big.save_verified<RelocRoot>();
+    auto l = XBuffer::load_verified<RelocRoot>(w, XBuffer::relocating());
+    need(l.reservation_limit() >= XBufferCore::relocating_first_reserve(l.get_size()), "load sized from the payload");
+    if (kSlots) need(l.reservation_limit() == XBufferCore::relocating_first_reserve(l.get_size()), "load slot");
+    need(values_are(l, 0, 50000), "loaded content");
+    // with_reserve still decides.
+    auto r = XBuffer::create<RelocRoot>(256, XBuffer::relocating().with_reserve(1024 * KiB));
+    if (kSlots) need(r.reservation_limit() == XBufferCore::RELOCATING_RESERVE, "with_reserve overrides the rule");
 }
 
 void test_make_room_moves() {
@@ -249,7 +284,8 @@ void test_wire_and_clone() {
     fill_misc(s);
     const auto ws = s.save_verified<RelocRoot>();
     auto ls = XBuffer::load_verified<RelocRoot>(ws, XBuffer::relocating());
-    if (kSlots) need(ls.storage_kind() == XStorageKind::MovableSlot && ls.reservation_limit() == kReserve, "small load in a slot");
+    if (kSlots) need(ls.storage_kind() == XStorageKind::MovableSlot && ls.reservation_limit() == XBufferCore::relocating_first_reserve(ls.get_size()),
+                    "small load in a slot");
     need(misc_ok(ls), "small load content");
 
     // Reload onto a relocating buffer whose reservation is too small moves it.
@@ -336,6 +372,7 @@ int main() {
     std::cout << "RELOCATING_RESERVE=" << kReserve << " RELOCATE_STEP=" << XBufferCore::RELOCATE_STEP
               << " SLOT_MAX=" << XBufferCore::SLOT_MAX << "\n";
     test_first_reservation();
+    test_first_reserve_rule();
     test_make_room_moves();
     test_small_reserve();
     test_small_maximum();
