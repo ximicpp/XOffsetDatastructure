@@ -4852,6 +4852,14 @@ namespace XOffsetDatastructure {
             size_ = n + 1u;
         }
 
+        // push_back's full case for a fast proxy, which keeps the size in a
+        // register: it restates the head from the result (as push_back does)
+        // and needs no extra call level on each growth.
+        auto push_back_full(const T& value) {
+            if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) return push_back_general<T>(value);
+            else return push_back_general<const T&>(value);
+        }
+
         void push_back(T&& value) {
             push_back(static_cast<const T&>(value));
         }

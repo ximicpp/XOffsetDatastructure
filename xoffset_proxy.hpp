@@ -54,7 +54,9 @@ namespace XOffsetDatastructure {
 #elif defined(__clang__)
 #define XOFFSET_PROXY_ASSUME(x) __builtin_assume(x)
 #elif defined(__GNUC__)
-#define XOFFSET_PROXY_ASSUME(x) __attribute__((assume(x)))
+// Not [[assume]]: GCC outlines its expression and passes the address of the
+// enclosing object, which keeps a proxy in memory (dead stores every op).
+#define XOFFSET_PROXY_ASSUME(x) do { if (!(x)) __builtin_unreachable(); } while (0)
 #else
 #define XOFFSET_PROXY_ASSUME(x) ((void)0)
 #endif
@@ -96,13 +98,20 @@ namespace proxy_detail {
 
         Anchor() noexcept = default;
         explicit Anchor(detail::XCtl* c) noexcept : ctl(c ? c : dead_ctl()), version(c ? c->version : 0) {}
+        XOFFSET_PROXY_INLINE static Anchor make(detail::XCtl* c, std::uint64_t v) noexcept {
+            Anchor a;
+            a.ctl = c;
+            a.version = v;
+            return a;
+        }
+        // A copy built from the fields (see copy() of the paths).
+        XOFFSET_PROXY_INLINE Anchor copy() const noexcept { return make(ctl, version); }
 
         // Two words, passed and returned in registers. The out-of-line
-        // helpers take the anchor by value and a copy of the path by
-        // reference (made on the slow path only; a path passed by value is
-        // packed into one register, and kept packed on the fast path), and
-        // return values, never `this`: a proxy whose address never escapes
-        // lives in registers. The base is read from
+        // helpers take the anchor and the path by value and return values,
+        // never `this` or a member's address: a proxy whose address never
+        // escapes lives in registers (GCC keeps a whole proxy in memory once
+        // a member's address reaches a call). The base is read from
         // the block (same cache line as the version) rather than carried:
         // a loop then carries only the version.
 
@@ -207,14 +216,19 @@ namespace proxy_detail {
 
     // ---- paths: where the object is, given the payload base ----------------
 
-    // Path fields are word-sized: a compiler packs two 32-bit fields of a
-    // copied struct into one register and unpacks them on every access.
+    // Path fields are word-sized: a compiler passes two 32-bit fields of a
+    // struct in one register and keeps them packed, unpacking on every
+    // access.
 
     // A fixed payload offset: the root and the members of fixed objects.
     struct RootPath {
         std::size_t off = 0;
         XOFFSET_PROXY_INLINE char* resolve(char* base) const noexcept { return base + off; }
         RootPath plus(std::uint32_t bytes) const noexcept { return {off + bytes}; }
+        // A copy built from the fields: what the proxies hand to an
+        // out-of-line call. (GCC passes a member copied as a whole from the
+        // proxy's own storage, and then keeps the whole proxy in memory.)
+        XOFFSET_PROXY_INLINE RootPath copy() const noexcept { return {off}; }
     };
 
     // Element `index` of the vector at `parent` (+ `sub` bytes into it).
@@ -233,6 +247,72 @@ namespace proxy_detail {
                        fixed_detail::resolve_rel32_live<E>(&vec->data_delta, vec->data_delta) + index) + sub;
         }
         IndexPath plus(std::uint32_t bytes) const noexcept { return {parent, index, sub + bytes}; }
+        XOFFSET_PROXY_INLINE IndexPath copy() const noexcept { return {parent.copy(), index, sub}; }
+    };
+
+    // Where a container proxy's container is now. A container at a fixed
+    // payload offset (a member of the root) caches its address with the
+    // version it was computed at, so a loop on it compares one word and
+    // carries the address in a register; any other path resolves on every
+    // access. Null with `absent` false: the proxy is stale; with `absent`
+    // true: the path names nothing (out of range, missing key).
+    template <class T, class Path>
+    struct Head {
+        XOFFSET_PROXY_INLINE T* find(Anchor& a, const Path& path, bool& absent) noexcept {
+            char* const base = a.sync();
+            if (!base) [[unlikely]] {
+                absent = false;
+                return nullptr;
+            }
+            T* const at = reinterpret_cast<T*>(path.resolve(base));
+            absent = at == nullptr;
+            return at;
+        }
+        XOFFSET_PROXY_INLINE Anchor anchor(const Anchor& a) const noexcept { return a.copy(); }
+        XOFFSET_PROXY_INLINE void forget() noexcept {}
+    };
+    template <class T>
+    struct Head<T, RootPath> {
+        T* at = nullptr;
+        std::uint64_t version = 0;   // never a block's version: the first use resolves
+
+        XOFFSET_PROXY_INLINE T* find(Anchor& a, const RootPath& path, bool& absent) noexcept {
+            absent = false;
+            if (a.ctl->version == version) [[likely]] {
+                T* const p = at;
+                XOFFSET_PROXY_ASSUME(p != nullptr);
+                return p;
+            }
+            // Both fields are set on every path (a stale proxy gets version
+            // 0, which never matches), so a loop carries them without copies.
+            const Found f = refind(a.copy(), path.off);
+            at = f.at;
+            version = f.version;
+            return f.at;
+        }
+        // The anchor to hand to an out-of-line path: the newer of the two
+        // versions seen live. (find does not update the proxy's own anchor,
+        // so a loop on this container carries one version, not two.)
+        XOFFSET_PROXY_INLINE Anchor anchor(const Anchor& a) const noexcept {
+            return Anchor::make(a.ctl, version > a.version ? version : a.version);
+        }
+        // The out-of-line path may have moved the payload: resolve again.
+        XOFFSET_PROXY_INLINE void forget() noexcept {
+            at = nullptr;
+            version = 0;
+        }
+
+    private:
+        struct Found {
+            T* at;
+            std::uint64_t version;
+        };
+        static XOFFSET_DETAIL_NOINLINE Found refind(Anchor a, std::size_t off) noexcept {
+            // A version this cache saw live is as good as the proxy's own.
+            char* const base = a.sync();
+            if (!base) return {nullptr, 0};
+            return {reinterpret_cast<T*>(base + off), a.version};
+        }
     };
 
     template <class K>
@@ -264,6 +344,7 @@ namespace proxy_detail {
             return reinterpret_cast<char*>(items + hint) + sub;
         }
         KeyPath plus(std::uint32_t bytes) const noexcept { return {parent, key, hint, sub + bytes}; }
+        KeyPath copy() const noexcept { return {parent.copy(), key, hint, sub}; }
     };
 
     enum class Kind { value, record, string, vector, set, map };
@@ -492,7 +573,7 @@ public:
             }
 #endif
         }
-        const Done done = assign_slow(Base::a, Path(Base::path), value);
+        const Done done = assign_slow(Base::a.copy(), Base::path.copy(), value);
         Base::a.version = done.version;
         return done.ok;
     }
@@ -536,7 +617,7 @@ public:
             }
 #endif
         }
-        const Done done = append_slow(Base::a, Path(Base::path), value);
+        const Done done = append_slow(Base::a.copy(), Base::path.copy(), value);
         Base::a.version = done.version;
         return done.ok;
     }
@@ -578,7 +659,7 @@ private:
         std::uint64_t version;
         bool ok;
     };
-    static XOFFSET_DETAIL_NOINLINE Done assign_slow(proxy_detail::Anchor a, const Path& path, std::string_view value) noexcept {
+    static XOFFSET_DETAIL_NOINLINE Done assign_slow(proxy_detail::Anchor a, Path path, std::string_view value) noexcept {
         char* const base0 = a.sync();
         if (!base0) return {a.version, false};
         if (!path.resolve(base0)) {
@@ -591,7 +672,7 @@ private:
         });
         return {a.version, ok};
     }
-    static XOFFSET_DETAIL_NOINLINE Done append_slow(proxy_detail::Anchor a, const Path& path, std::string_view value) noexcept {
+    static XOFFSET_DETAIL_NOINLINE Done append_slow(proxy_detail::Anchor a, Path path, std::string_view value) noexcept {
         char* const base0 = a.sync();
         if (!base0) return {a.version, false};
         const T* now = reinterpret_cast<const T*>(path.resolve(base0));
@@ -696,10 +777,9 @@ public:
     // The value is taken by value and the full case is one out-of-line call
     // (growth is rare), so the caller's value never has its address taken.
     XOFFSET_PROXY_INLINE bool push_back(E value) noexcept requires plain {
-        char* const base = Base::a.sync();
-        if (!base) [[unlikely]] return false;
-        T* v = reinterpret_cast<T*>(Base::path.resolve(base));
-        if (!v) [[unlikely]] return missing();
+        bool absent;
+        T* const v = head_.find(Base::a, Base::path, absent);
+        if (!v) [[unlikely]] return absent ? missing() : false;
         if (v->size_ != csize_) [[unlikely]] csize_ = reload_size(v);
         if (csize_ < v->capacity_) [[likely]] {
             fixed_detail::resolve_rel32_live<E>(&v->data_delta, v->data_delta)[csize_] = value;
@@ -707,20 +787,23 @@ public:
             return true;
         }
 #if !XOFFSET_NO_EXCEPTIONS
+        // Past the capacity: grow in place first (inside the reservation the
+        // payload cannot move; a throw changed nothing), else make room.
         try {
-            const E copy = value;   // only this copy's address escapes
-            v->push_back(copy);
-            csize_ = v->size_;
+            const auto g = v->push_back_full(value);
+            v->data_delta = g.data_delta;
+            v->capacity_ = g.capacity;
+            v->size_ = ++csize_;
             return true;
         } catch (...) {
         }
 #endif
-        return take(push_slow(Base::a, Path(Base::path), value));
+        return take(push_slow(head_.anchor(Base::a), Base::path.copy(), value));
     }
     // Appends a copy of a record (strings and containers copied deeply).
     // `value` must not live in this buffer: pass a proxy for that.
     bool push_back(const E& value) noexcept requires (!plain) {
-        return take(append_slow(Base::a, Path(Base::path), proxy_detail::deep_bytes(value),
+        return take(append_slow(head_.anchor(Base::a), Base::path.copy(), proxy_detail::deep_bytes(value),
                                 [&](T& v) { v.push_back(value); }));
     }
     // Appends a copy of another proxy's element (it may live in this buffer).
@@ -732,7 +815,7 @@ public:
             const E* src = value.get_ptr();
             if (!src) return false;
             auto source = value;
-            return take(append_slow(Base::a, Path(Base::path), proxy_detail::deep_bytes(*src), [&](T& v) {
+            return take(append_slow(head_.anchor(Base::a), Base::path.copy(), proxy_detail::deep_bytes(*src), [&](T& v) {
                 if (const E* s = source.get_ptr()) v.push_back(*s);
             }));
         }
@@ -740,11 +823,10 @@ public:
     // Appends a value-initialized element and returns its proxy. Inside
     // the capacity this allocates nothing (an empty record owns no blocks).
     XOFFSET_PROXY_INLINE element_ref emplace_back() noexcept {
-        char* const base = Base::a.sync();
-        if (!base) [[unlikely]] return element_ref();
-        T* v = reinterpret_cast<T*>(Base::path.resolve(base));
+        bool absent;
+        T* const v = head_.find(Base::a, Base::path, absent);
         if (!v) [[unlikely]] {
-            missing();
+            if (absent) missing();
             return element_ref();
         }
         if (v->size_ != csize_) [[unlikely]] csize_ = reload_size(v);
@@ -755,12 +837,12 @@ public:
         } else if (!grow_emplace(v)) {
             return element_ref();
         }
-        return element_ref(Base::a, ElemPath{Base::path, csize_ - 1u, 0});
+        return element_ref(head_.anchor(Base::a), ElemPath{Base::path, csize_ - 1u, 0});
     }
     template <class... Args>
     element_ref emplace_back(Args&&... args) noexcept requires (sizeof...(Args) > 0) {
         const std::size_t extra = (std::size_t(0) + ... + proxy_detail::deep_bytes(args));
-        if (!take(append_slow(Base::a, Path(Base::path), extra,
+        if (!take(append_slow(head_.anchor(Base::a), Base::path.copy(), extra,
                               [&](T& v) { (void)v.emplace_back(std::forward<Args>(args)...); })))
             return element_ref();
         return (*this)[csize_ - 1u];
@@ -817,13 +899,14 @@ public:
             return false;
         }
         const E copy = value_copy(value);
-        return take(append_slow(Base::a, Path(Base::path), proxy_detail::deep_bytes(value), [&](T& w) {
+        return take(append_slow(head_.anchor(Base::a), Base::path.copy(), proxy_detail::deep_bytes(value), [&](T& w) {
             w.insert(w.begin() + i, copy);
         }));
     }
 
 private:
     char32_t csize_ = 0;
+    proxy_detail::Head<T, Path> head_;
 
     static E value_copy(const E& value) noexcept requires plain { return value; }
     static const E& value_copy(const E& value) noexcept requires (!plain) { return value; }
@@ -853,15 +936,16 @@ private:
 #else
         (void)v;
 #endif
-        return take(append_slow(Base::a, Path(Base::path), 0, [](T& w) { (void)w.emplace_back(); }));
+        return take(append_slow(head_.anchor(Base::a), Base::path.copy(), 0, [](T& w) { (void)w.emplace_back(); }));
     }
 
     XOFFSET_PROXY_INLINE bool take(const Grow& g) noexcept {
         Base::a.version = g.version;
+        head_.forget();
         csize_ = g.csize;
         return g.ok;
     }
-    static XOFFSET_DETAIL_NOINLINE Grow push_slow(proxy_detail::Anchor a, const Path& path, E value) noexcept {
+    static XOFFSET_DETAIL_NOINLINE Grow push_slow(proxy_detail::Anchor a, Path path, E value) noexcept {
         T* v = a.template at<T>(path);
         const std::size_t bytes = proxy_detail::grow_bytes<E>(v ? v->capacity_ : 0);
         const bool ok = a.run_allocating(bytes, [&](char* base) {
@@ -871,7 +955,7 @@ private:
         return {a.version, w ? w->size_ : char32_t(0), ok};
     }
     template <class Op>
-    static XOFFSET_DETAIL_NOINLINE Grow append_slow(proxy_detail::Anchor a, const Path& path, std::size_t extra, Op&& op) noexcept {
+    static XOFFSET_DETAIL_NOINLINE Grow append_slow(proxy_detail::Anchor a, Path path, std::size_t extra, Op&& op) noexcept {
         char* const base0 = a.sync();
         if (!base0) return {a.version, 0, false};
         T* v = reinterpret_cast<T*>(path.resolve(base0));
@@ -1007,10 +1091,9 @@ public:
     template <class Key, class... Args>
     XOFFSET_PROXY_INLINE bool try_emplace(const Key& key, Args&&... args) noexcept {
         if constexpr (plain) {
-            char* const base = Base::a.sync();
-            if (!base) [[unlikely]] return false;
-            T* m = reinterpret_cast<T*>(Base::path.resolve(base));
-            if (!m) [[unlikely]] return missing();
+            bool absent;
+            T* const m = head_.find(Base::a, Base::path, absent);
+            if (!m) [[unlikely]] return absent ? missing() : false;
             if (m->size_ != csize_) [[unlikely]] csize_ = reload_size(m);
             // Key and value by value: the full case is one out-of-line call
             // (growth is rare) and the caller's values keep no address.
@@ -1031,13 +1114,15 @@ public:
                 return inserted != 0;
             }
 #endif
-            const Inserted r = emplace_slow_plain(Base::a, Path(Base::path), k, value);
+            const Inserted r = emplace_slow_plain(head_.anchor(Base::a), Base::path.copy(), k, value);
             Base::a.version = r.version;
+            head_.forget();
             csize_ = r.csize;
             return r.inserted;
         }
-        const Inserted r = emplace_slow(Base::a, Path(Base::path), key, std::forward<Args>(args)...);
+        const Inserted r = emplace_slow(head_.anchor(Base::a), Base::path.copy(), key, std::forward<Args>(args)...);
         Base::a.version = r.version;
+        head_.forget();
         csize_ = r.csize;
         return r.inserted;
     }
@@ -1105,6 +1190,7 @@ public:
 
 private:
     char32_t csize_ = 0;
+    proxy_detail::Head<T, Path> head_;
 
     mapped_ref value_ref(LookupKey key, std::uint32_t index) const noexcept {
         return mapped_ref(Base::a, ValuePath{Base::path, std::move(key), index,
@@ -1131,11 +1217,11 @@ private:
         }
     }
 #endif
-    static XOFFSET_DETAIL_NOINLINE Inserted emplace_slow_plain(proxy_detail::Anchor a, const Path& path, K key, V value) noexcept {
+    static XOFFSET_DETAIL_NOINLINE Inserted emplace_slow_plain(proxy_detail::Anchor a, Path path, K key, V value) noexcept {
         return emplace_slow(a, path, key, value);
     }
     template <class Key, class... Args>
-    static XOFFSET_DETAIL_NOINLINE Inserted emplace_slow(proxy_detail::Anchor a, const Path& path, const Key& key,
+    static XOFFSET_DETAIL_NOINLINE Inserted emplace_slow(proxy_detail::Anchor a, Path path, const Key& key,
                                                          Args&&... args) noexcept {
         char* const base0 = a.sync();
         if (!base0) return {a.version, 0, false};
