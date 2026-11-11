@@ -2,13 +2,17 @@
 // plain references, on the workloads of the design's fast-proxy prototype
 // (/mnt/project-files/grow-policy-20261110/fastproxy/).
 //
-//   raw    plain references into an Automatic buffer (64 MiB reservation,
-//          never moves): today's fastest write path
-//   proxy  XRef into a Relocating buffer (1 MiB reservation, moves when full)
-//   edit   plain references inside buf.edit on a Relocating buffer
+//   raw    plain references into a pooled Automatic buffer (64 MiB
+//          reservation, warm pages, never moves): today's fastest write path
+//   proxy  XRef into the same kind of buffer: what the access path costs
+//   edit   plain references inside buf.edit, same buffer
+//   relocating (report only): proxy and edit on a Relocating buffer (1 MiB
+//          first reservation, moves when full; edit is told the growth)
 //
 // Each sample builds a fresh buffer and times only the operations (the
-// timing rule: data writes only). Best of 7 rounds; ns per operation.
+// timing rule: data writes only). The variants alternate inside each round;
+// best of 11 rounds (5 with `quick`); ns per element. `cg` runs one pooled
+// raw and one pooled proxy pass per workload, for callgrind.
 // Gate: containers <= 1.15x raw, per-field record build <= 1.2x, edit <= 1.02x.
 #include <algorithm>
 #include <chrono>
@@ -107,12 +111,6 @@ NOINLINE std::int64_t levels_proxy(XRef<Root> r) {
     return s;
 }
 
-// raw / proxy_same: a pooled 64 MiB Automatic buffer (warm pages, never
-// moves), as the prototype's baseline; proxy / edit: a Relocating buffer.
-// raw / proxy / edit: a pooled 64 MiB Automatic buffer (warm pages, never
-// moves), the prototype's baseline: what the access path itself costs.
-// relocating: the same proxy / edit on a Relocating buffer (1 MiB first
-// reservation, moves when full; the edit scope is told the growth).
 enum class Mode { pooled, relocating };
 XBufferPool& pool() {
     static XBufferPool p({16, 16ull * (64u << 20), 64u << 20});
@@ -125,26 +123,23 @@ XBuffer make(Mode mode) {
     return XBuffer::create<Root>(256, XBuffer::relocating());
 }
 
+// One timed round: `iters` fresh buffers, nanoseconds per element.
 template <class Op>
-double run(Mode mode, int n, int iters, Op&& op) {
-    double best = 1e300;
-    for (int round = 0; round < 7; ++round) {
-        double total = 0;
-        for (int k = 0; k < iters; ++k) {
-            XBuffer b = make(mode);
-            auto t0 = std::chrono::steady_clock::now();
-            op(b);
-            auto t1 = std::chrono::steady_clock::now();
-            total += std::chrono::duration<double, std::nano>(t1 - t0).count();
-            if (!b.ok()) {
-                std::fprintf(stderr, "buffer failed: %s\n", to_string(b.error()));
-                std::exit(1);
-            }
-            g_sink = b.root<Root>().ints.size() + b.root<Root>().players.size() + b.root<Root>().map.size();
+double round_of(Mode mode, int n, int iters, Op&& op) {
+    double total = 0;
+    for (int k = 0; k < iters; ++k) {
+        XBuffer b = make(mode);
+        auto t0 = std::chrono::steady_clock::now();
+        op(b);
+        auto t1 = std::chrono::steady_clock::now();
+        total += std::chrono::duration<double, std::nano>(t1 - t0).count();
+        if (!b.ok()) {
+            std::fprintf(stderr, "buffer failed: %s\n", to_string(b.error()));
+            std::exit(1);
         }
-        best = std::min(best, total / iters / n);
+        g_sink = b.root<Root>().ints.size() + b.root<Root>().players.size() + b.root<Root>().map.size();
     }
-    return best;
+    return total / iters / n;
 }
 
 int g_fail = 0;
@@ -159,7 +154,9 @@ void row(const char* name, int n, double raw, double proxy, double edit, double 
 } // namespace
 
 int main(int argc, char** argv) {
-    const bool quick = argc > 1 && std::string(argv[1]) == "quick";
+    const std::string arg = argc > 1 ? argv[1] : "";
+    const bool quick = arg == "quick", cg = arg == "cg";
+    const int rounds = quick ? 5 : 11;
     for (int i = 0; i < 100000; ++i) g_names.push_back("player_" + std::to_string(i * 7919 % 100000));
     const int sizes[2] = {1000, 16000};
     for (int n : sizes) {
@@ -167,18 +164,29 @@ int main(int argc, char** argv) {
         for (int i = 0; i < n; ++i) asc[i] = i;
         std::mt19937 rng(42);
         for (int i = 0; i < n; ++i) rnd[i] = std::int32_t(rng() % (4u * n));
-        const int iters = (n <= 1000 ? 400 : 30) / (quick ? 4 : 1);
+        const int iters = (n <= 1000 ? 100 : 8) / (quick ? 2 : 1);
+        // The variants alternate inside each round (best of `rounds`), so a
+        // change in machine load hits all of them alike. `cg`: one pooled
+        // raw and one pooled proxy run each, for instruction counts.
         auto three = [&](const char* name, double gate, auto raw_op, auto proxy_op) {
-            const double raw = run(Mode::pooled, n, iters, [&](XBuffer& b) { raw_op(b.root<Root>()); });
-            const double proxy = run(Mode::pooled, n, iters, [&](XBuffer& b) { proxy_op(b.ref<Root>()); });
-            const double edit = run(Mode::pooled, n, iters, [&](XBuffer& b) {
-                b.edit<Root>([&](Root& r) { raw_op(r); });
-            });
-            const double rproxy = run(Mode::relocating, n, iters, [&](XBuffer& b) { proxy_op(b.ref<Root>()); });
-            const double redit = run(Mode::relocating, n, iters, [&](XBuffer& b) {
-                b.edit<Root>([&](Root& r) { raw_op(r); }, XBufferCore::size_type(n) * 96u);
-            });
-            row(name, n, raw, proxy, edit, rproxy, redit, gate);
+            if (cg) {
+                (void)round_of(Mode::pooled, n, 2, [&](XBuffer& b) { raw_op(b.root<Root>()); });
+                (void)round_of(Mode::pooled, n, 2, [&](XBuffer& b) { proxy_op(b.ref<Root>()); });
+                return;
+            }
+            double t[5] = {1e300, 1e300, 1e300, 1e300, 1e300};
+            for (int round = 0; round < rounds; ++round) {
+                t[0] = std::min(t[0], round_of(Mode::pooled, n, iters, [&](XBuffer& b) { raw_op(b.root<Root>()); }));
+                t[1] = std::min(t[1], round_of(Mode::pooled, n, iters, [&](XBuffer& b) { proxy_op(b.ref<Root>()); }));
+                t[2] = std::min(t[2], round_of(Mode::pooled, n, iters, [&](XBuffer& b) {
+                    b.edit<Root>([&](Root& r) { raw_op(r); });
+                }));
+                t[3] = std::min(t[3], round_of(Mode::relocating, n, iters, [&](XBuffer& b) { proxy_op(b.ref<Root>()); }));
+                t[4] = std::min(t[4], round_of(Mode::relocating, n, iters, [&](XBuffer& b) {
+                    b.edit<Root>([&](Root& r) { raw_op(r); }, XBufferCore::size_type(n) * 96u);
+                }));
+            }
+            row(name, n, t[0], t[1], t[2], t[3], t[4], gate);
         };
         three("ints push_back", 1.15, [&](Root& r) { ints_raw(r, n); }, [&](XRef<Root> r) { ints_proxy(r, n); });
         three("ints push_back+call", 1.15, [&](Root& r) { ints_raw_call(r, n); },
@@ -189,6 +197,7 @@ int main(int argc, char** argv) {
               [&](XRef<Root> r) { map_proxy(r, rnd.data(), n); });
         three("players build", 1.20, [&](Root& r) { players_raw(r, n); },
               [&](XRef<Root> r) { players_proxy(r, n); });
+        if (cg) continue;
         {   // reads: report only (the design keeps bulk reads in read scopes)
             auto b = make(Mode::relocating);
             players_raw(b.root<Root>(), n);
