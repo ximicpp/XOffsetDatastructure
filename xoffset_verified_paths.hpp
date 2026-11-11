@@ -64,8 +64,9 @@ namespace detail {
         static_assert(!has_implicit_padding_v<T>,
             "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");
 #endif
-        // A root cache hit is what root<T>() returns: make<T>() or a verified
-        // load of T admitted it at the current epoch, so typed access, the
+        // A root cache hit is what root<T>() returns: make<T>(), a verified
+        // load of T or root<T>()'s checked path admitted it at the current
+        // epoch, so typed access, the
         // schema binding and the root offset are as the checks below find
         // them. A miss runs those checks and the lookup.
         T* root = source.template cached_root<T>();
