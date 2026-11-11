@@ -453,6 +453,40 @@ bool test_build() {
         m.title = "first message";
     }));
     CHECK(c.save_verified<Root>() == first);
+
+    // Without any proxy the scope has no control block (a bare scope); what
+    // would need one inside it gets one that counts the scope.
+    auto d = make_relocating(16384);
+    CHECK(d.build<Root>([&](Root& m) {
+        m.counter = 1;
+        CHECK_SCOPE(d.pinned());
+        CHECK_SCOPE(d.read<Root>([](const Root& r) { return r.counter; }) == 1);   // nested scope
+        CHECK_SCOPE(d.edit<Root>([](Root& r) { r.counter = 2; }));
+        CHECK_SCOPE(d.pinned());
+    }));
+    CHECK(!d.pinned() && d.root<Root>().counter == 2);
+    CHECK(!d.build<Root>([&](Root&) {                 // a failure recorded through a proxy
+        (void)d.ref<Root>().field<&Root::players>()[3].field<&Player::level>().set(1);
+    }));
+    CHECK(d.error() == XErrc::out_of_range && !d.pinned());
+    CHECK(d.build<Root>([](Root& m) { m.counter = 3; }) && d.ok());
+    XBuffer moved;
+    CHECK(d.build<Root>([&](Root& m) {               // the buffer moves away inside its scope
+        m.counter = 4;
+        moved = std::move(d);
+        CHECK_SCOPE(moved.pinned());
+    }));
+    CHECK(!moved.pinned() && moved.root<Root>().counter == 4);
+    CHECK(moved.ref<Root>().field<&Root::ints>().append({1, 2, 3}) && moved.ok());
+    auto e = make_relocating(16384);
+    auto f = make_relocating(16384);
+    CHECK(e.build<Root>([&](Root& m) {               // and swaps with another
+        m.counter = 5;
+        e.swap(f);
+        CHECK_SCOPE(f.pinned() && !e.pinned());
+    }));
+    CHECK(!e.pinned() && !f.pinned() && f.root<Root>().counter == 5);
+    CHECK(f.build<Root>([](Root& m) { m.counter = 6; }) && f.root<Root>().counter == 6);
     return true;
 }
 } // namespace
@@ -470,6 +504,7 @@ int main() {
     ok = test_failed_buffer_refuses_to_emit() && ok;
     ok = test_batch_operations() && ok;
     ok = test_build() && ok;
+    ok = g_scope_ok && ok;
     std::cout << (ok ? "test_proxy_scopes: all passed" : "test_proxy_scopes: FAILED") << std::endl;
     return ok ? 0 : 1;
 }

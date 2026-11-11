@@ -926,6 +926,27 @@ namespace XOffsetDatastructure {
             }
         }
 
+        // XBuffer::build's scope: counted on this lineage's block, or, when
+        // there is none (no proxy was ever made), bare: only pinned_, and no
+        // block to renew per message. `*slot` is the block the scope counts
+        // on; a block made while a bare scope is open goes there (make_ctl).
+        // Close with pin_exit(*slot), or pin_close_bare() while it is null.
+        void pin_open_lean(detail::XCtl** slot) noexcept {
+            detail::XCtl* const ctl = ctl_;
+            *slot = ctl;
+            if (ctl) ++ctl->borrow;
+            else bare_slot_ = slot;
+            pinned_ = true;
+        }
+        void pin_close_bare() noexcept {
+            bare_slot_ = nullptr;
+            pinned_ = false;
+            release_quarantine();
+#if defined(XOFFSET_STRESS_RELOCATE)
+            stress_relocate();
+#endif
+        }
+
     private:
         void make_ctl() noexcept {
             XOFFSET_TRY {
@@ -936,7 +957,20 @@ namespace XOffsetDatastructure {
             if (ctl_) {
                 ctl_->core = this;
                 ctl_->base = buffer_.data();
+                if (pinned_) [[unlikely]] {
+                    // Made inside a bare scope (a nested scope, a recorded
+                    // failure, a move): the block counts that scope, which
+                    // now closes on it.
+                    ctl_->borrow = 1;
+                    if (bare_slot_) *bare_slot_ = ctl_;
+                    bare_slot_ = nullptr;
+                }
             }
+        }
+        // A bare scope that the content may leave (move, swap) gets its
+        // block first, so the scope follows the content as a counted one.
+        void promote_bare_pin() noexcept {
+            if (pinned_ && !ctl_) [[unlikely]] make_ctl();
         }
         // After ctl_ changed hands: point it at this owner, mirror its pins.
         void adopt_ctl() noexcept {
@@ -1040,6 +1074,8 @@ namespace XOffsetDatastructure {
 
         void swap(XBufferCore& other) noexcept {
             if (this == &other) return;
+            promote_bare_pin();
+            other.promote_bare_pin();
             std::swap(ctl_, other.ctl_);
             quarantine_.swap(other.quarantine_);
             buffer_.swap(other.buffer_);
@@ -2415,7 +2451,9 @@ namespace XOffsetDatastructure {
                 free_table_.swap(other.free_table_);
                 free_table_lost_ = std::exchange(other.free_table_lost_, false);
                 publish_host_owner();
-                if (ctl_ || other.ctl_) [[unlikely]] {
+                if (ctl_ || other.ctl_ || pinned_ || other.pinned_) [[unlikely]] {
+                    promote_bare_pin();
+                    other.promote_bare_pin();
                     retire_ctl();
                     ctl_ = std::exchange(other.ctl_, nullptr);
                     quarantine_.swap(other.quarantine_);
@@ -3176,6 +3214,9 @@ namespace XOffsetDatastructure {
         bool pinned_ = false;
         detail::XCtl* ctl_ = nullptr;
         std::vector<std::uint64_t> quarantine_;
+        // An open bare pin scope (pin_open_lean without a block): where the
+        // block goes if one is made before it closes.
+        detail::XCtl** bare_slot_ = nullptr;
     };
 
     // ========================================================================
@@ -9168,8 +9209,16 @@ namespace XOffsetDatastructure {
                 "use read(f) to compute a value)");
             T& fresh = reset<T>();
             if (expected_growth != 0 || this->pinned()) [[unlikely]] return edit<T>(f, expected_growth);
-            if (!this->pin_enter()) [[unlikely]] return false;
-            PinGuard guard(this->control());
+            // Lean scope: bare while this lineage has no control block.
+            struct Close {
+                XBufferCore* core;
+                detail::XCtl* ctl;
+                ~Close() {
+                    if (!ctl) core->pin_close_bare();
+                    else XBufferCore::pin_exit(ctl);
+                }
+            } close{this, nullptr};
+            this->pin_open_lean(&close.ctl);
 #if XOFFSET_NO_EXCEPTIONS
             detail::SoftFailScope soft;
             f(fresh);
@@ -9183,7 +9232,8 @@ namespace XOffsetDatastructure {
                 record_error(XErrc::host_allocation_failed);
             }
 #endif
-            return ok();
+            // A failure made a block (record_error); the block follows the content.
+            return !close.ctl || close.ctl->sticky == XErrc::ok;
         }
 
         // Read-only pin scope: returns f(const T& root). The result may not
