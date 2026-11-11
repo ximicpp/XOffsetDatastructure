@@ -285,6 +285,7 @@ public:
     void tick() {
         ++tick_;
         changed_.clear();
+        changed_tiles_.clear();
         Rng& r = tick_rng_;
         if (rate_ == Rate::Stress) {
             for (auto& u : units_) {
@@ -396,12 +397,16 @@ public:
     // changes the unit.
     uint64_t dirty(int32_t i) const { const WorldUnit& u = units_[std::size_t(i)]; return u.dirty_tick == tick_ ? u.dirty : 0; }
     const WorldMarch& march(int32_t i) const { return marches_[std::size_t(i)]; }
+    int32_t march_count() const { return int32_t(marches_.size()); }
     const WorldTile& tile(int32_t tx, int32_t ty) const { return tiles_[std::size_t(ty * kTiles + tx)]; }
     int64_t tick_no() const { return tick_; }
     const ViewScale& scale() const { return *vs_; }
     // World unit indices changed in the current tick, first change order
     // (server bookkeeping, as dirty(): a game server's dirty set). Untimed.
     const std::vector<int32_t>& changed_units() const { return changed_; }
+    // Tiles whose owner changed in the current tick (ty * kTiles + tx), the
+    // same kind of bookkeeping. Untimed.
+    const std::vector<int32_t>& changed_tiles() const { return changed_tiles_; }
 
 private:
     // A change to u in this tick (the fields `bits`; last_update always).
@@ -466,6 +471,7 @@ private:
     void take_tile(int32_t t, Rng& r) {
         auto& x = tiles_[std::size_t(t)];
         x.owner = r.below(4) ? 1 + r.below(5000) : 0;
+        if (x.changed != tick_) changed_tiles_.push_back(t);
         x.changed = tick_;
     }
     int duration() const { return rate_ == Rate::Peace ? 30 : rate_ == Rate::Combat ? 15 : 10; }
@@ -514,6 +520,7 @@ private:
     int32_t next_march_ = 1;
     std::vector<ViewClient> clients_;
     mutable std::vector<int32_t> changed_;
+    std::vector<int32_t> changed_tiles_;
     std::vector<std::vector<int32_t>> ucell_, mcell_;
     mutable std::vector<uint32_t> mstamp_;
     mutable uint32_t mgen_ = 0;
