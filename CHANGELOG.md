@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- `XReceiver::view` requests every cache line of a wire of at most 1 KiB
+  before it checks the header (a read prefetch: `__builtin_prefetch`, or
+  `_mm_prefetch` on MSVC x64). A view copies nothing, so before this the first
+  read of each line of a small message fell inside the caller's loops, one
+  miss after another; a receive that copies (cista, the old reload) brought
+  them in with one parallel `memcpy`. Cloud x86 GCC 16, 10 interleaved
+  batches: the client's warm peace view (UPW.recv) is 11% faster (0.888 of
+  its own base, [0.85, 0.93]); ÷ zpp_bits 0.859 -> 0.763, ÷ cista_unchecked
+  1.151 -> 1.022 (inside the cloud A/A spread). Larger wires are left to the
+  hardware prefetcher (UCW.recv -3%, USW.recv unchanged). Wire format and
+  checks unchanged.
+- Cloud x86 and client-uplink scorecard columns get thresholds
+  (`tools/perf_gate/x86_columns.sh` / `x86_columns.py`, docs/RELEASING.md
+  section 2a): a main cell passes at GM <= 1.00, warns up to 1.05 (the cloud
+  A/A spread) and fails above; UL.send has a ceiling until 4.0 clears it.
+
 - Growth policy, part 1 (storage): `XGrowPolicy::Relocating`
   (`XBuffer::relocating(maximum)`, default maximum 2 GiB - 8). A buffer
   starts in a 1 MiB slot that is reserved, not zeroed
