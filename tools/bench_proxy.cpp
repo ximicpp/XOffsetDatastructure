@@ -15,10 +15,14 @@
 // best of 11 rounds (5 with `quick`); ns per element. `cg` runs one pooled
 // raw and one pooled proxy pass per workload, for callgrind.
 // Gate: containers <= 1.15x raw, per-field record build <= 1.2x, edit <= 1.02x.
+// Batch rows (part 4): proxy = one batch call (append of a span, or
+// XRef::batch around the plain loop) against the plain bulk path; <= 1.05x.
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <span>
 #include <random>
 #include <string>
 #include <vector>
@@ -98,6 +102,27 @@ NOINLINE void players_proxy(XRef<Root> r, int n) {
         auto items = p.field<&Player::items>();
         for (int k = 0; k < 4; ++k) items.push_back(i + k);
     }
+}
+
+// ---- batch operations (part 4)
+NOINLINE void ints_bulk_raw(Root& r, const std::int32_t* src, int n) {
+    const auto at = r.ints.size();
+    r.ints.resize(at + std::size_t(n));
+    std::memcpy(r.ints.data() + at, src, std::size_t(n) * sizeof(std::int32_t));
+}
+NOINLINE void ints_bulk_proxy(XRef<Root> r, const std::int32_t* src, int n) {
+    (void)r.field<&Root::ints>().append(std::span<const std::int32_t>(src, std::size_t(n)));
+}
+NOINLINE void players_batch(XRef<Root> r, int n) {
+    (void)r.field<&Root::players>().batch([&](XVector<Player>& v) {
+        for (int i = 0; i < n; ++i) {
+            Player& p = v.emplace_back();
+            p.id = i;
+            p.level = i & 63;
+            p.name = g_names[i];
+            for (int k = 0; k < 4; ++k) p.items.push_back(i + k);
+        }
+    }, std::size_t(n) * 96u);
 }
 
 // The same through the named accessors XOFFSET_RECORD generates (growth
@@ -218,6 +243,10 @@ int main(int argc, char** argv) {
               [&](XRef<Root> r) { map_proxy(r, rnd.data(), n); });
         three("players build", 1.20, [&](Root& r) { players_raw(r, n); },
               [&](XRef<Root> r) { players_proxy(r, n); });
+        three("ints append (batch)", 1.05, [&](Root& r) { ints_bulk_raw(r, asc.data(), n); },
+              [&](XRef<Root> r) { ints_bulk_proxy(r, asc.data(), n); });
+        three("players batch", 1.05, [&](Root& r) { players_raw(r, n); },
+              [&](XRef<Root> r) { players_batch(r, n); });
         three("players build named", 1.20, [&](Root& r) { players_raw(r, n); },
               [&](XRef<Root> r) { players_named(r, n); });
         if (cg) continue;

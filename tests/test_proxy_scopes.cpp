@@ -8,6 +8,7 @@
 #include <cstring>
 #include <iostream>
 #include <string>
+#include <vector>
 #include "xoffsetdatastructure.hpp"
 using namespace XOffsetDatastructure;
 
@@ -301,7 +302,11 @@ bool test_pin_scopes() {
         CHECK_SCOPE(old_block != root.ints.data());
         for (int i = 0; i < 64; ++i) root.players.emplace_back().items.push_back(i);
         for (auto& p : root.players) CHECK_SCOPE(p.items.data() != old_block);
+#if defined(XOFFSET_STRESS_RELOCATE)
+        CHECK_SCOPE(old_block[0] == std::int32_t(0xDBDBDBDB));  // stress mode: poisoned
+#else
         CHECK_SCOPE(old_block[0] == 0 && old_block[3] == 3);   // still readable, not reused
+#endif
     });
     CHECK(ok);
     // On entry a Relocating buffer whose reservation is more than half used
@@ -443,6 +448,164 @@ bool test_failed_buffer_refuses_to_emit() {
     CHECK(!b.save_verified<Root>().empty());
     return true;
 }
+// Batch operations (growth policy part 4): one resolve per call, one regrow.
+bool test_batch_operations() {
+    auto b = make_relocating(4096);
+    auto r = b.ref<Root>();
+    auto ints = r.field<&Root::ints>();
+    std::vector<std::int32_t> src(70000);
+    for (int i = 0; i < 70000; ++i) src[std::size_t(i)] = i * 3;
+    const char* first = b.data();
+    CHECK(ints.append(std::span<const std::int32_t>(src)));   // 280 KB, past the 4 KiB reservation: moves
+    CHECK(b.data() != first);
+    CHECK(ints.size() == 70000u && ints.get(69999) == 69999 * 3);
+    CHECK(ints.append({1, 2, 3}) && ints.size() == 70003u && ints.get(70002) == 3);
+    CHECK(ints.append(5, 7) && ints.size() == 70008u && ints.get(70007) == 7);
+    // A source inside the payload (this very vector): copied out first.
+    const std::int32_t* own = b.root<Root>().ints.data();
+    CHECK(ints.append(std::span<const std::int32_t>(own, 70008)));
+    CHECK(ints.size() == 140016u && ints.get(70008 + 5) == 15 && ints.get(140015) == 7);
+    CHECK(ints.assign({9, 8}) && ints.size() == 2u && ints.get(1) == 8);
+    CHECK(ints.assign(std::span<const std::int32_t>(src)) && ints.size() == 70000u && ints.get(10) == 30);
+    // In capacity: memmove from itself (shift down by one).
+    const std::int32_t* now = b.root<Root>().ints.data();
+    CHECK(ints.assign(std::span<const std::int32_t>(now + 1, 100)) && ints.size() == 100u && ints.get(0) == 3);
+
+    auto players = r.field<&Root::players>();
+    const auto at = players.emplace_n(500);
+    CHECK(at == 0u && players.size() == 500u);
+    CHECK(players.emplace_n(10) == 500u && players.size() == 510u);
+    CHECK(players[509].field<&Player::id>().get() == 0);
+    // Batch scope over one container: plain references, resolved once.
+    CHECK(players.batch([&](XVector<Player>& v) {
+        for (std::uint32_t i = 0; i < v.size(); ++i) {
+            v[i].id = std::int32_t(i);
+            v[i].name = "batch-" + std::to_string(i);
+            v[i].items.push_back(std::int32_t(i));
+        }
+    }, 510u * 64u));
+    CHECK(players[300].field<&Player::name>().copy() == "batch-300");
+    CHECK(players[300].field<&Player::items>().get(0) == 300);
+    CHECK(!b.pinned());
+    // A batch on a record: the scope is the record.
+    CHECK(players[7].batch([](Player& p) { p.level = 77; }));
+    CHECK(players[7].field<&Player::level>().get() == 77);
+    // Past the end: nothing pinned, out_of_range recorded.
+    CHECK(!players[9999].batch([](Player& p) { p.level = 1; }));
+    CHECK(b.error() == XErrc::out_of_range && !b.pinned());
+    b.clear_error();
+
+    auto m = r.field<&Root::map>();
+    std::vector<std::pair<std::int32_t, std::int32_t>> kv;
+    for (int i = 0; i < 30000; ++i) kv.push_back({(i * 7919) % 30000, i});
+    CHECK(m.insert(kv) == 30000u && m.size() == 30000u);
+    CHECK(m.insert(kv) == 0u);
+    CHECK(m.get(7919 % 30000) == 1);
+    auto s = r.field<&Root::set>();
+    CHECK(s.insert({5, 3, 5, 1}) == 3u && s.size() == 3u && s.get(0) == 1);
+    CHECK(b.ok());
+
+    // Inside an edit scope a batch that would need the payload to move
+    // fails with `borrowed` and changes nothing.
+    auto small = make_relocating(8192);
+    CHECK(!small.edit<Root>([&](Root&) {
+        auto v = small.ref<Root>().field<&Root::ints>();
+        (void)v.append(std::span<const std::int32_t>(src));
+    }));
+    CHECK(small.error() == XErrc::borrowed && small.root<Root>().ints.size() == 0u);
+    return true;
+}
+// build<T>(f): reset + a pin scope in one step, one message after another.
+bool test_build() {
+    auto b = make_relocating(16384);
+    auto old = b.ref<Root>().field<&Root::counter>();
+    CHECK(b.build<Root>([](Root& m) {
+        m.counter = 5;
+        for (int i = 0; i < 10; ++i) m.ints.push_back(i);
+        m.title = "first message";
+    }));
+    CHECK(!old.valid());                      // the content was replaced
+    CHECK(!b.pinned() && b.root<Root>().counter == 5 && b.root<Root>().ints.size() == 10u);
+    const std::string first = b.save_verified<Root>();
+    CHECK(!first.empty());
+    // Outgrowing the reservation without asking: the scope cannot move the
+    // payload, so build starts over in a reservation twice as large, as
+    // often as it takes (f runs again each time).
+    int runs = 0;
+    const std::size_t small_limit = b.reservation_limit();
+    CHECK(b.build<Root>([&](Root& m) {
+        ++runs;
+        for (int i = 0; i < 100000; ++i) m.ints.push_back(i);
+    }));
+    CHECK(runs > 1 && b.ok() && !b.pinned());
+    CHECK(b.root<Root>().ints.size() == 100000u && b.root<Root>().ints[99999] == 99999);
+    CHECK(b.reservation_limit() > small_limit);
+    // The buffer keeps the larger reservation: the same message again runs once.
+    runs = 0;
+    CHECK(b.build<Root>([&](Root& m) {
+        ++runs;
+        for (int i = 0; i < 100000; ++i) m.ints.push_back(i);
+    }));
+    CHECK(runs == 1 && b.ok());
+    // At its maximum a buffer cannot start over larger: fails softly.
+    auto capped = XBuffer::create<Root>(256, XBuffer::relocating(65536).with_reserve(16384));
+    CHECK(!capped.build<Root>([](Root& m) {
+        for (int i = 0; i < 100000; ++i) m.ints.push_back(i);
+    }));
+    CHECK(!capped.ok() && !capped.pinned());
+    // The next message starts over: the failure goes with the old content.
+    CHECK(capped.build<Root>([](Root& m) { m.counter = 6; }));
+    CHECK(capped.ok() && capped.root<Root>().counter == 6 && capped.root<Root>().ints.size() == 0u);
+    CHECK(b.build<Root>([](Root& m) { m.counter = 6; }));
+    // Asking for the room up front: one move on entry, then plain speed.
+    CHECK(b.build<Root>([](Root& m) {
+        for (int i = 0; i < 100000; ++i) m.ints.push_back(i);
+    }, 100000u * 16u));   // the doublings' retired blocks wait for the scope's end
+    CHECK(b.ok() && b.root<Root>().ints.size() == 100000u && b.root<Root>().ints[99999] == 99999);
+    // Each message emits what a separate reset + fill would.
+    auto c = make_relocating(16384);
+    CHECK(c.build<Root>([](Root& m) {
+        m.counter = 5;
+        for (int i = 0; i < 10; ++i) m.ints.push_back(i);
+        m.title = "first message";
+    }));
+    CHECK(c.save_verified<Root>() == first);
+
+    // Without any proxy the scope has no control block (a bare scope); what
+    // would need one inside it gets one that counts the scope.
+    auto d = make_relocating(16384);
+    CHECK(d.build<Root>([&](Root& m) {
+        m.counter = 1;
+        CHECK_SCOPE(d.pinned());
+        CHECK_SCOPE(d.read<Root>([](const Root& r) { return r.counter; }) == 1);   // nested scope
+        CHECK_SCOPE(d.edit<Root>([](Root& r) { r.counter = 2; }));
+        CHECK_SCOPE(d.pinned());
+    }));
+    CHECK(!d.pinned() && d.root<Root>().counter == 2);
+    CHECK(!d.build<Root>([&](Root&) {                 // a failure recorded through a proxy
+        (void)d.ref<Root>().field<&Root::players>()[3].field<&Player::level>().set(1);
+    }));
+    CHECK(d.error() == XErrc::out_of_range && !d.pinned());
+    CHECK(d.build<Root>([](Root& m) { m.counter = 3; }) && d.ok());
+    XBuffer moved;
+    CHECK(d.build<Root>([&](Root& m) {               // the buffer moves away inside its scope
+        m.counter = 4;
+        moved = std::move(d);
+        CHECK_SCOPE(moved.pinned());
+    }));
+    CHECK(!moved.pinned() && moved.root<Root>().counter == 4);
+    CHECK(moved.ref<Root>().field<&Root::ints>().append({1, 2, 3}) && moved.ok());
+    auto e = make_relocating(16384);
+    auto f = make_relocating(16384);
+    CHECK(e.build<Root>([&](Root& m) {               // and swaps with another
+        m.counter = 5;
+        e.swap(f);
+        CHECK_SCOPE(f.pinned() && !e.pinned());
+    }));
+    CHECK(!e.pinned() && !f.pinned() && f.root<Root>().counter == 5);
+    CHECK(f.build<Root>([](Root& m) { m.counter = 6; }) && f.root<Root>().counter == 6);
+    return true;
+}
 } // namespace
 
 int main() {
@@ -457,6 +620,9 @@ int main() {
     ok = test_scope_overflow_fails_soft() && ok;
     ok = test_named_accessors() && ok;
     ok = test_failed_buffer_refuses_to_emit() && ok;
+    ok = test_batch_operations() && ok;
+    ok = test_build() && ok;
+    ok = g_scope_ok && ok;
     std::cout << (ok ? "test_proxy_scopes: all passed" : "test_proxy_scopes: FAILED") << std::endl;
     return ok ? 0 : 1;
 }

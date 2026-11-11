@@ -121,6 +121,25 @@
   `out_of_range`). Examples, README, USER_GUIDE (section 3.5) and the
   mapstate demo use the new forms; tests that test plain references call
   `plain_root()`. Wire format unchanged.
+- Growth policy, part 4 (batch operations, `XOFFSET_PROXY_BATCH_API`):
+  vector proxies gain `append` (span, array, initializer list, count copies),
+  `assign` and `emplace_n`; set and map proxies insert a span (or a vector of
+  pairs) in one call; `XRef::batch(f, expected_growth)` runs `f` on the
+  proxy's container or record as a pin scope (resolved once, plain
+  references). Each sizes the target once and moves the payload at most once;
+  a source inside the payload is copied out first. `XBuffer::build<T>(f,
+  expected_growth)` is `reset<T>()` plus a pin scope in one step, for senders
+  that make a new message each time. When a Relocating buffer's reservation is
+  too small, it starts over in one twice as large and runs f again (until the
+  buffer's maximum), so f must only write into the buffer. The SLG adapters now build every sent
+  message this way in a Relocating buffer. `test_proxy_fuzz` (also without
+  exceptions) interleaves proxies, scopes, batches, growth past 1 MiB, moves,
+  swaps, reloads, destruction and VM failure injection, and checks every
+  buffer against a model. CMake option `XOFFSET_STRESS_RELOCATE` (test builds
+  only): a Relocating buffer moves at every pin scope's end, its old storage
+  becomes inaccessible, containers always regrow into a fresh block and
+  retired blocks are poisoned, so a reference kept past its scope faults.
+  Wire format unchanged.
 
 ## 3.5.0: performance on the production platform
 
