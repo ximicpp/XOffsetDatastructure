@@ -1371,8 +1371,14 @@ private:
     // Relocating (1 MiB reserved, moved only when a message outgrows it) and
     // is filled inside a pin scope: plain references at plain speed, and no
     // move can leave one dangling. Received and resident buffers keep cap().
+    // The reservation is explicit: build<T> runs a fill again when the
+    // reservation is too small, and the case fills draw from the shared Rng,
+    // so a second run would change every later message (verify would show
+    // it). 1 MiB holds every SLG message; the senders are a few long-lived
+    // buffers, so it costs no page tables to speak of.
     static XOffsetDatastructure::XBuffer::MaximumCapacity build_cap() {
-        return XOffsetDatastructure::XBuffer::relocating();
+        using XOffsetDatastructure::XBuffer;
+        return XBuffer::relocating().with_reserve(XBuffer::size_type(1) << 20);   // a 1 MiB slot
     }
     // One message: XBuffer::build<T> (reset<T>(), then fill(T&) in a pin scope).
     template <class T, class Fill>
