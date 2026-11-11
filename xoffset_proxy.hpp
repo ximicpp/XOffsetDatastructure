@@ -43,6 +43,16 @@ namespace XOffsetDatastructure {
 #define XOFFSET_PROXY_INLINE inline
 #endif
 
+#if defined(_MSC_VER) && !defined(__clang__)
+#define XOFFSET_PROXY_ASSUME(x) __assume(x)
+#elif defined(__clang__)
+#define XOFFSET_PROXY_ASSUME(x) __builtin_assume(x)
+#elif defined(__GNUC__)
+#define XOFFSET_PROXY_ASSUME(x) __attribute__((assume(x)))
+#else
+#define XOFFSET_PROXY_ASSUME(x) ((void)0)
+#endif
+
 namespace proxy_detail {
     // The block of every empty proxy: odd version, never live.
     inline detail::XCtl* dead_ctl() noexcept {
@@ -98,6 +108,9 @@ namespace proxy_detail {
                 base = now.base;
                 version = now.version;
             }
+            // A live lineage always has a payload (resync_of refuses a null
+            // base, and a version match means it was seen live).
+            XOFFSET_PROXY_ASSUME(base != nullptr);
             return true;
         }
         // The current base and version, or a null base when the proxy's
