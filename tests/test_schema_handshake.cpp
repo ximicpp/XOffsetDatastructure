@@ -44,7 +44,7 @@ namespace {
 
 void peek() {
     auto b = TypedXBuffer<game::Player>::create();
-    b.root().hp = 7;
+    b.plain_root().hp = 7;
     const std::string wire = b.save_verified();
     auto p = peek_wire_fingerprint(wire);
     CHECK(p && p.fingerprint == wire_fingerprint_v<game::Player>);
@@ -67,7 +67,7 @@ void hello_round_trip() {
     const std::string hello = make_schema_hello<game::Player, game::Chat>("ios-1.12.0");
     CHECK(peek_wire_fingerprint(hello).fingerprint == wire_fingerprint_v<XSchemaHello>);
     auto h = TypedXBuffer<XSchemaHello>::load_verified(hello, XBuffer::maximum_capacity(XSCHEMA_HELLO_MAX_BYTES));
-    const auto& m = h.root();
+    const auto& m = h.plain_root();
     CHECK(m.wire_format == 0x0201 && m.role == 0 && m.label.view() == "ios-1.12.0");
     CHECK(m.entries.size() == 2);
     CHECK(m.entries[0].root_type_id == wire_root_type_id_v<game::Player>());
@@ -78,7 +78,7 @@ void hello_round_trip() {
     // The label is clipped to the limit, so the hello always passes it.
     const std::string long_hello = make_schema_hello<game::Player>(std::string(1000, 'L'));
     auto lh = TypedXBuffer<XSchemaHello>::load_verified(long_hello);
-    CHECK(lh.root().label.size() == XSCHEMA_HELLO_MAX_LABEL);
+    CHECK(lh.plain_root().label.size() == XSCHEMA_HELLO_MAX_LABEL);
 }
 
 struct AckLine { XWireFingerprint fp; XSchemaVerdict verdict; };
@@ -87,7 +87,7 @@ std::string make_ack(std::initializer_list<AckLine> lines, std::uint32_t format 
                      std::size_t padding_entries = 0) {
     auto b = TypedXBuffer<XSchemaHelloAck>::create(
         4096, XBuffer::maximum_capacity(1 << 20).with_growth(XGrowPolicy::Automatic));
-    auto& a = b.root();
+    auto& a = b.plain_root();
     a.wire_format = format;
     a.role = 1;
     for (const auto& l : lines)
@@ -121,8 +121,8 @@ void ack_outcomes() {
     // A verdict value the client does not know is a rejection.
     {
         auto b = TypedXBuffer<XSchemaHelloAck>::create();
-        b.root().wire_format = XSCHEMA_HELLO_WIRE_FORMAT;
-        b.root().entries.push_back({player.root_type_id, player.schema_hash, 77, 0});
+        b.plain_root().wire_format = XSCHEMA_HELLO_WIRE_FORMAT;
+        b.plain_root().entries.push_back({player.root_type_id, player.schema_hash, 77, 0});
         r = read_schema_ack<game::Player>(b.save_compact());
         CHECK(r.status == S::rejected && r.verdict == XSchemaVerdict::reject_unknown);
     }
@@ -169,7 +169,7 @@ void accept_exact() {
     CHECK((read_schema_ack<game::Player, game::Chat>(ack)));
     {
         auto a = TypedXBuffer<XSchemaHelloAck>::load_verified(ack);
-        CHECK(a.root().label.view() == "server-1" && a.root().role == 1);
+        CHECK(a.plain_root().label.view() == "server-1" && a.plain_root().role == 1);
     }
 
     // Same layout, swapped field names: reject_names on both ends.

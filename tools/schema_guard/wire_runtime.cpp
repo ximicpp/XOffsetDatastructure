@@ -116,7 +116,7 @@ template<class T> bool values_equal(const T& a, const T& b) {
 }
 template<class T> void run(const std::filesystem::path& dir, const char* name, bool write) {
     using Buffer=xo::TypedXBuffer<T>;
-    auto b=Buffer::create(1u<<20,cap()); fill(b.root());
+    auto b=Buffer::create(1u<<20,cap()); fill(b.plain_root());
     const auto expected=b.save_verified();
     const auto path=dir/(std::string(name)+".xwire");
     if(write) {
@@ -125,7 +125,7 @@ template<class T> void run(const std::filesystem::path& dir, const char* name, b
     } else {
         const auto wire=read_file(path);
         auto loaded=Buffer::load(wire,cap());
-        if(!values_equal(b.root(),loaded.root())) fail(std::string(name)+": loaded field values mismatch");
+        if(!values_equal(b.plain_root(),loaded.plain_root())) fail(std::string(name)+": loaded field values mismatch");
         if(wire!=expected || loaded.save_verified()!=wire) fail(std::string(name)+": SLG wire mismatch");
     }
     std::cout << name << (write ? " written" : " accepted and byte-identical") << std::endl;

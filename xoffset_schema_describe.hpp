@@ -169,6 +169,20 @@ namespace XOffsetDatastructure::schema {
     } // namespace describe_detail
 } // namespace XOffsetDatastructure::schema
 
+namespace XOffsetDatastructure {
+    // Named field accessors of a record proxy (growth policy part 3; the
+    // proxies are in xoffset_proxy.hpp): XOFFSET_RECORD and
+    // XOFFSET_RECORD_DERIVED specialize it for their record T with one
+    // member function per listed field, so that for a proxy `u` of T,
+    // `u.hp()` is `u.field<&T::hp>()`. Self is the record proxy (XRef<T, ...>),
+    // Next the rest of the chain (the accessors of T's bases, then the
+    // proxy's state); each level derives from Next, so a nearer name hides a
+    // farther one and nothing is ambiguous. No macros or reflection are
+    // needed at the call: the accessors work on MSVC and without exceptions.
+    template <class T, class Self, class Next>
+    struct XRecordAccess;
+} // namespace XOffsetDatastructure
+
 // ---- macros ------------------------------------------------------------------
 
 // Applies macro(T, x) to each x (up to 256), each result preceded by a comma.
@@ -230,6 +244,19 @@ namespace XOffsetDatastructure::schema {
         }                                                                      \
     };
 
+// The named accessor of member m: a proxy of it (see XRecordAccess).
+#define XOFFSET_SCHEMA_DETAIL_ACCESSOR(C, m)                                  \
+    XOFFSET_SCHEMA_INLINE auto m() const noexcept {                            \
+        return static_cast<const XOffsetSelf_&>(*this).template field<&C::m>(); \
+    }
+
+#define XOFFSET_SCHEMA_DETAIL_ACCESSORS(T, ...)                                \
+    template <class XOffsetSelf_, class XOffsetNext_>                          \
+    struct XOffsetDatastructure::XRecordAccess<T, XOffsetSelf_, XOffsetNext_> : XOffsetNext_ { \
+        using XOffsetNext_::XOffsetNext_;                                      \
+        XOFFSET_SCHEMA_DETAIL_FOR_EACH_PLAIN(XOFFSET_SCHEMA_DETAIL_ACCESSOR, T, __VA_ARGS__) \
+    };
+
 #define XOFFSET_SCHEMA_DETAIL_FIELD_OF(T, m) ::XOffsetDatastructure::schema::fields<T>::field_##m
 
 #define XOFFSET_SCHEMA_DETAIL_DESCRIPTION(T, ordinary, BASES, ...)              \
@@ -241,7 +268,8 @@ namespace XOffsetDatastructure::schema {
     template <> struct XOffsetDatastructure::schema::description<T>            \
         : ::XOffsetDatastructure::schema::describe_detail::record<T, ordinary, \
               ::XOffsetDatastructure::schema::describe_detail::bases<XOFFSET_SCHEMA_DETAIL_UNPAREN BASES> \
-              XOFFSET_SCHEMA_DETAIL_FOR_EACH(XOFFSET_SCHEMA_DETAIL_FIELD_OF, T, __VA_ARGS__)> {};
+              XOFFSET_SCHEMA_DETAIL_FOR_EACH(XOFFSET_SCHEMA_DETAIL_FIELD_OF, T, __VA_ARGS__)> {}; \
+    XOFFSET_SCHEMA_DETAIL_ACCESSORS(T, __VA_ARGS__)
 
 #define XOFFSET_SCHEMA_DETAIL_COMPLETE(macro, T)                               \
     static_assert(::std::is_class_v<T> && !::std::is_union_v<T>,              \
