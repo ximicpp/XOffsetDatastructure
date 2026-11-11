@@ -236,8 +236,9 @@ namespace XOffsetDatastructure {
     // Explicit: the payload grows only at grow(). Automatic: container
     // operations grow it in place up to the maximum (a reservation of the
     // whole maximum, so the address never changes). Relocating: it starts in
-    // a 1 MiB reservation (XBufferCore::RELOCATING_RESERVE, not zeroed),
-    // container operations grow it in place inside that reservation, and
+    // a reservation sized from its first content (twice it, a power of two
+    // from 64 KiB to 1 MiB: XBufferCore::relocating_first_reserve; not
+    // zeroed), container operations grow it in place inside that reservation, and
     // make_room() / grow() move it to a larger one when it is full (servers:
     // one move, to a reservation of the whole maximum; phones: 16 MiB on iOS,
     // 64 MiB on Android, then doubling). A move invalidates every pointer and
@@ -546,10 +547,11 @@ namespace XOffsetDatastructure {
             XBufferPool pool;
             XStorage storage = XStorage::Auto;
             // Relocating only: the first reservation in bytes, the 64-byte
-            // host header included (0: a 1 MiB slot, RELOCATING_RESERVE of
-            // payload). A type that lives in tens of thousands of small
-            // buffers can start at a few KiB (a power of two up to 1 MiB is
-            // a slot of that size); it moves to larger slots as it grows.
+            // host header included (0: sized from the first content, see
+            // relocating_first_reserve). A type that lives in tens of
+            // thousands of small buffers can start at a few KiB (a power of
+            // two up to 1 MiB is a slot of that size); it moves to larger
+            // slots as it grows.
             size_type reserve = 0;
 
             MaximumCapacity with_growth(XGrowPolicy policy) const noexcept {
@@ -577,9 +579,27 @@ namespace XOffsetDatastructure {
         static constexpr size_type SLOT_MAX = detail::SlotGeometry::max_payload;
         static MaximumCapacity maximum_capacity(size_type bytes) noexcept { return {bytes}; }
         size_type maximum_capacity() const noexcept { return buffer_.maximum_capacity(); }
-        // A relocating buffer's first reservation by default: a 1 MiB slot's
-        // payload (XOFFSET_RELOCATING_RESERVE_BYTES).
+        // The largest default first reservation of a relocating buffer: a
+        // 1 MiB slot's payload (XOFFSET_RELOCATING_RESERVE_BYTES).
         static constexpr size_type RELOCATING_RESERVE = detail::SlotGeometry::relocating_payload;
+        // The smallest: a 64 KiB slot's payload (or RELOCATING_RESERVE when
+        // that is smaller).
+        static constexpr size_type RELOCATING_RESERVE_MIN =
+            detail::SlotGeometry::relocating_slot_bytes < (size_type(64) << 10)
+                ? RELOCATING_RESERVE
+                : (size_type(64) << 10) - detail::SlotGeometry::header_bytes;
+        // A relocating buffer's first reservation (payload bytes) when it
+        // starts with `bytes` of content (create's initial size, or the
+        // payload it loads) and has no with_reserve: a slot of twice the
+        // content rounded up to a power of two, from 64 KiB to 1 MiB, less
+        // its 64-byte header. Small buffers take few page-table pages;
+        // moving a small payload is cheap, and doubling keeps moves rare.
+        static constexpr size_type relocating_first_reserve(size_type bytes) noexcept {
+            constexpr size_type largest = detail::SlotGeometry::relocating_slot_bytes;
+            if (bytes >= largest / 2) return RELOCATING_RESERVE;
+            const size_type slot = std::bit_ceil(std::max<size_type>(2 * bytes, size_type(64) << 10));
+            return slot >= largest ? RELOCATING_RESERVE : slot - detail::SlotGeometry::header_bytes;
+        }
         // Where a relocating buffer moves once its first reservation is full:
         // 0 means a reservation of the whole maximum (one move); otherwise
         // that many bytes, then doubling (XOFFSET_RELOCATE_STEP_BYTES).
@@ -2563,7 +2583,7 @@ namespace XOffsetDatastructure {
                 free_table_lost_ = false;
                 detail::VirtualMemoryStorage owner;
                 if (growth_policy_ == XGrowPolicy::Relocating) {
-                    if (!relocating_owner(owner, size, max_reserved, std::max(size, reserve_or_default(reserve))))
+                    if (!relocating_owner(owner, size, max_reserved, std::max(size, reserve_or_default(reserve, size))))
                         XOFFSET_VFAIL_BAD_ALLOC();
                     if (!owner.grow_to(size)) XOFFSET_VFAIL_BAD_ALLOC();
                 } else if (plans_slot(plan)) {
@@ -2595,7 +2615,7 @@ namespace XOffsetDatastructure {
             XOFFSET_VTRY(plan_storage(size, max_reserved, growth_policy_, pool.enabled(), request, plan));
             return init_from_storage(data, size, max_reserved, [&](detail::VirtualMemoryStorage& owner) -> detail::vstatus {
                 if (growth_policy_ == XGrowPolicy::Relocating) {
-                    if (!relocating_owner(owner, size, max_reserved, std::max(size, reserve_or_default(reserve))))
+                    if (!relocating_owner(owner, size, max_reserved, std::max(size, reserve_or_default(reserve, size))))
                         XOFFSET_VFAIL_BAD_ALLOC();
                     return owner.assign_bytes_v(data, size);
                 }
@@ -2616,7 +2636,7 @@ namespace XOffsetDatastructure {
             return init_from_storage(wire.stored, size, max_reserved,
                                      [&](detail::VirtualMemoryStorage& owner) -> detail::vstatus {
                 if (growth_policy_ == XGrowPolicy::Relocating && size <= max_reserved) {
-                    if (!relocating_owner(owner, size, max_reserved, std::max(size, reserve_or_default(reserve))))
+                    if (!relocating_owner(owner, size, max_reserved, std::max(size, reserve_or_default(reserve, size))))
                         XOFFSET_VFAIL_BAD_ALLOC();
                     if (wire.extent_count == 0)
                         XOFFSET_VTRY(owner.assign_bytes_v(wire.stored, size, sizeof(arena_header)));
@@ -3058,9 +3078,10 @@ namespace XOffsetDatastructure {
             }
         }
 
-        // MaximumCapacity::reserve as payload bytes.
-        static size_type reserve_or_default(size_type reserve) noexcept {
-            if (reserve == 0) return RELOCATING_RESERVE;
+        // MaximumCapacity::reserve as payload bytes, for a buffer that starts
+        // with `bytes` of content.
+        static size_type reserve_or_default(size_type reserve, size_type bytes) noexcept {
+            if (reserve == 0) return relocating_first_reserve(bytes);
             return reserve > detail::SlotGeometry::header_bytes ? reserve - detail::SlotGeometry::header_bytes : 1;
         }
 
