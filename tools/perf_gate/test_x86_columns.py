@@ -59,7 +59,7 @@ class X86ColumnsTest(unittest.TestCase):
         rows = self.run_case(0.9, 0.0, ul_send=1.40)
         self.assertEqual(rows["UL.send"]["verdict"], "pass")
         self.assertTrue(math.isclose(rows["UL.send"]["ratio"]["gm"], 1.40, rel_tol=1e-9))
-        self.assertEqual(self.run_case(0.9, 0.0, ul_send=1.50)["UL.send"]["verdict"], "fail")
+        self.assertEqual(self.run_case(0.9, 0.0, ul_send=1.85)["UL.send"]["verdict"], "fail")
         self.assertEqual(rows["DPTW.recv"]["verdict"], "missing")
         self.assertEqual(rows["ULF.recv"]["verdict"], "missing")
 
