@@ -202,7 +202,7 @@ struct Edited {
 
 Edited edited(const std::string& wire) {
     auto b = Buffer::load(wire, cap());
-    edit(b.root());
+    edit(b.plain_root());
     return {b.save_verified(), b.save_compact(kTight)};
 }
 
@@ -223,29 +223,29 @@ std::vector<Case> cases() {
         {"small", [] {
             Source in(0x5eed0001);
             auto b = Buffer::create(65536, cap());
-            fill(b.root(), in, 4);
+            fill(b.plain_root(), in, 4);
             return b.save_verified();
         }},
         {"medium_holes", [] {
             Source in(0x5eed0002);
             auto b = Buffer::create(1u << 20, cap());
-            fill(b.root(), in, 200);
-            churn(b.root(), in);
+            fill(b.plain_root(), in, 200);
+            churn(b.plain_root(), in);
             return b.save_verified();
         }},
         {"reloaded_mutated", [] {
             Source in(0x5eed0003);
             auto b = Buffer::create(1u << 20, cap());
-            fill(b.root(), in, 60);
+            fill(b.plain_root(), in, 60);
             auto again = Buffer::load(b.save_verified(), cap());
-            churn(again.root(), in);
-            fill(again.root(), in, 10); // reuses holes from the hole table
+            churn(again.plain_root(), in);
+            fill(again.plain_root(), in, 10); // reuses holes from the hole table
             return again.save_verified();
         }},
         {"sparse", [] {
             Source in(0x5eed0004);
             auto b = Buffer::create(1u << 20, cap());
-            auto& r = b.root();
+            auto& r = b.plain_root();
             fill(r, in, 8);
             r.labels.emplace_back(std::string(64 * 1024, 'x'));
             r.items.emplace_back().name = "after the large block";
@@ -255,7 +255,7 @@ std::vector<Case> cases() {
         {"elided", [] {
             Source in(0x5eed0005);
             auto b = Buffer::create(1u << 20, cap());
-            auto& r = b.root();
+            auto& r = b.plain_root();
             fill(r, in, 8);
             r.labels.emplace_back(std::string(64 * 1024, 'x'));
             r.items.emplace_back().name = "after the large block";
@@ -266,15 +266,15 @@ std::vector<Case> cases() {
         {"compact_slack0", [] {
             Source in(0x5eed0006);
             auto b = Buffer::create(1u << 20, cap());
-            fill(b.root(), in, 120);
-            churn(b.root(), in);
+            fill(b.plain_root(), in, 120);
+            churn(b.plain_root(), in);
             return b.save_compact(kTight);
         }, [](Buffer& b) { return b.save_compact(kTight); }},
         {"compact_slack8", [] {
             Source in(0x5eed0007);
             auto b = Buffer::create(1u << 20, cap());
-            fill(b.root(), in, 120);
-            churn(b.root(), in);
+            fill(b.plain_root(), in, 120);
+            churn(b.plain_root(), in);
             return b.save_compact(kSlack8);
         }, [](Buffer& b) { return b.save_compact(kSlack8); }},
     };

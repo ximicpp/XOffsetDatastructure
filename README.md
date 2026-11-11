@@ -62,22 +62,35 @@ struct Player {
     XString name;
     XVector<std::int32_t> items;
 };
+XOFFSET_RECORD(Player, level, name, items)   // field list: named accessors
 XOFFSET_REGISTER_SCHEMA_NAME(Player, "example.Player")
 
 int main() {
     constexpr std::size_t limit = 8 * 1024 * 1024;
     auto buffer = TypedXBuffer<Player>::create(4096,
         XBuffer::maximum_capacity(limit));
-    buffer.root().level = 10;
-    buffer.root().name = "Alice";
-    buffer.root().items.push_back(101);
+    auto player = buffer.root();      // a proxy: stays valid if the buffer moves
+    player.level() = 10;
+    player.name() = "Alice";
+    player.items().push_back(101);
+
+    // Hot loops: a pin scope hands out plain references at plain speed.
+    buffer.edit([](Player& p) { p.level += 1; });
 
     auto bytes = buffer.save_verified();
     auto restored = TypedXBuffer<Player>::load(bytes,
         XBuffer::maximum_capacity(limit));
-    return restored.root().level == 10 ? 0 : 1;
+    return restored.root().level() == 11 ? 0 : 1;
 }
 ```
+
+`TypedXBuffer<T>::root()` returns a proxy (`XRef<T>`): every access checks
+one version word, so it stays valid when the buffer moves to a larger
+reservation, and a failed allocation is recorded (`buffer.error()`) instead of
+throwing or aborting. `XOFFSET_RECORD` gives each field an accessor
+(`player.level()`); without a field list use `player.field<&Player::level>()`.
+`edit` / `read` run a callable with plain references while the buffer is
+pinned; `plain_root()` is the old unprotected reference.
 
 `TypedXBuffer<T>::load()` uses the verified path. Use library containers inside
 the arena, register each root schema, and satisfy both byte-copy safety and wire

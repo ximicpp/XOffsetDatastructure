@@ -4,7 +4,7 @@ Owner make_owner(const Pool& pool) {
 #ifdef XOFFSET_CONSUMER_FULL
     auto owner = Owner::create(4096, XBuffer::maximum_capacity(capacity)
         .with_growth(XGrowPolicy::Automatic).with_pool(pool));
-    owner.root().marker = 0x12345678;
+    owner.plain_root().marker = 0x12345678;
 #else
     Owner owner(4096, capacity, pool);
     owner.data()[0] = 42;

@@ -727,22 +727,26 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
             snap_buf = TypedXBuffer<ViewSnapshot>::create(4096 + hits.size() * 64, cap_snapshot());
             snap_ready_ = true;
         }
-        auto& s = snap_buf.root();
-        s.request_id = req.request_id;
-        s.tick = cur_root().tick;
-        s.scene_id = req.scene_id;
-        s.rect = req.rect;
-        s.scene_units = n;   // one scene: a ViewReq for another one was refused above
-        s.units.reserve(std::uint32_t(hits.size()));
-        for (std::uint32_t i : hits) {
-            const auto& u = units[i];
-            auto& v = s.units.emplace_back();
-            v.id = u.id;
-            v.hp = u.hp;
-            v.pos = u.pos;
-            v.behavior = u.behavior;
-            v.name = u.name.view();
-        }
+        // A pin scope: plain references at plain speed; a failure inside is
+        // recorded in the buffer (error()) instead of escaping.
+        const bool built = snap_buf.edit([&](ViewSnapshot& s) {
+            s.request_id = req.request_id;
+            s.tick = cur_root().tick;
+            s.scene_id = req.scene_id;
+            s.rect = req.rect;
+            s.scene_units = n;   // one scene: a ViewReq for another one was refused above
+            s.units.reserve(std::uint32_t(hits.size()));
+            for (std::uint32_t i : hits) {
+                const auto& u = units[i];
+                auto& v = s.units.emplace_back();
+                v.id = u.id;
+                v.hp = u.hp;
+                v.pos = u.pos;
+                v.behavior = u.behavior;
+                v.name = u.name.view();
+            }
+        });
+        if (!built) throw XBadAlloc(snap_buf.error(), to_string(snap_buf.error()));
     } catch (const XBadAlloc& e) {
         // Never drop units to fit: report the cap explicitly.
         reject(c, std::string("capacity: ViewSnapshot cap ") + std::to_string(kCapSnapshot >> 20) +
@@ -770,7 +774,9 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
                     v1_buf_ = TypedXBuffer<mapdemo_v1::ViewSnapshot>::create(4096 + hits.size() * 64, cap_snapshot());
                     v1_ready_ = true;
                 }
-                evolve_into(snap_buf.root(), v1_buf_.root());
+                // Both buffers are capped Automatic (address-stable): plain
+                // references do not dangle here.
+                evolve_into(snap_buf.plain_root(), v1_buf_.plain_root());
                 v1 = &v1_buf_;
             } else {
                 v1 = &v1_fresh.emplace(evolve<mapdemo_v1::ViewSnapshot>(snap_buf));
@@ -832,7 +838,8 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
     // it patches).
     if (!opt_.corpus_dir.empty() && corpus_written_ < opt_.corpus_max && enc != codec::Encoding::Delta)
         write_corpus(req.request_id, frame.flags, cat, enc, wire, wire_bytes, xwire_digest,
-                     checks::snapshot_digest(snap_buf.root()), hits.size());
+                     snap_buf.read([](const ViewSnapshot& s) { return checks::snapshot_digest(s); }),
+                     hits.size());
 
     // The payload moves into the connection; a converted wire is checked below.
     std::string v1_wire;
@@ -843,7 +850,7 @@ void ServerA::serve_view(Client& c, net::Frame frame) {
     c.last_served = req.request_id;
 
     // Checks and digest stay outside the timed regions.
-    const ViewSnapshot& snap = snap_buf.root();
+    const ViewSnapshot& snap = snap_buf.plain_root();   // address-stable (capped Automatic)
     const std::uint64_t digest = checks::snapshot_digest(snap);
     bool check_ok = true;
     if (opt_.check) {

@@ -587,7 +587,7 @@ void shrink_regrow_and_transport() {
     auto typed = TypedXBuffer<StableRoot>::load(verified,
         stable_capacity(static_cast<std::size_t>(header.used_bytes) + 1));
     assert(typed.grow(1) && !typed.grow(1));
-    check_root(typed.root(), 91);
+    check_root(typed.plain_root(), 91);
     require_rejection([&] {
         (void)XBuffer::load_verified<StableRoot>(verified,
             stable_capacity(static_cast<std::size_t>(header.used_bytes) - 1));
