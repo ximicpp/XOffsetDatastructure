@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- `root<T>()` fills its cache when it takes the checked path, so an `XBuffer`
+  that was moved (into a `std::vector`, by a swap) pays the checks once
+  instead of on every call. The cache hit is inlined (one compare and one
+  load; the checked path is out of line). `root<T>()` is a non-const member:
+  concurrent calls on one buffer need the caller's lock, as for every other
+  non-const member. (Redo of #223, reverted in 3.3.2.)
+
 - Free table: a buffer's table of holes is about 2.4 KiB instead of 12 KiB.
   Each of the 512 exact-size bins is now a 4-byte head that holds the bin's
   only hole itself, or names a contiguous segment in one word pool the table
