@@ -95,7 +95,7 @@ void need(bool b, const char* m) { if (!b) throw std::runtime_error(m); }
 auto make() {
     auto result = xo::TypedXBuffer<PathsRoot>::create(32768,
         xo::XBuffer::maximum_capacity(1024 * 1024).with_growth(xo::XGrowPolicy::Automatic));
-    auto& r = result.root();r.value = 0x1234567812345678ULL;r.enabled = true;
+    auto& r = result.plain_root();r.value = 0x1234567812345678ULL;r.enabled = true;
     r.name = "verified paths";r.blob.resize(80);
     for (std::size_t i=0;i<r.blob.size();++i) r.blob[i]=std::uint8_t(i+1);
     r.labels.push_back("nested");r.labels.push_back("values");return result;
@@ -116,7 +116,7 @@ xo::TypedXBuffer<PathsRoot>* typed{};
 void move_owner() { *to=std::move(*from); }
 void swap_owner() { from->swap(*to); }
 void release_owner() { *from=xo::XBufferCore{}; }
-void grow_payload() { typed->root().blob.resize(131072); }
+void grow_payload() { typed->plain_root().blob.resize(131072); }
 void grow_extent() { need(from->grow(4096),"callback extent growth failed"); }
 struct Arm {
     explicit Arm(void(*f)()=nullptr) {host::calls=0;host::callback=f;host::remaining=0;}
@@ -125,7 +125,7 @@ struct Arm {
 
 void into_exact_hot_and_oom() {
     auto source=make();auto* base=source.get_address();auto epoch=source.epoch();auto handle=source.handle();
-    auto* root=&source.root();const auto raw=source.copy_bytes();const auto logical=source.get_size();
+    auto* root=&source.plain_root();const auto raw=source.copy_bytes();const auto logical=source.get_size();
     std::string out="original destination value";
     bool oom=false;
     {Arm arm;try{source.save_verified_into(out);}catch(const std::bad_alloc&){oom=true;}}
@@ -220,13 +220,13 @@ void freeze_transaction_and_lease() {
     // A payload above 32 KiB takes one scratch block from the upstream (both
     // granule bitmaps); its failure must leave the source untouched.
     for(unsigned point=0;point<1;++point) {
-        auto candidate=make();candidate.root().blob.reserve(40000);
+        auto candidate=make();candidate.plain_root().blob.reserve(40000);
         const auto before=candidate.copy_bytes();const auto extent=candidate.get_size();const auto* address=candidate.get_address();
         FailingResource resource(point);bool failed=false;
         try{(void)xo::freeze_verified(std::move(candidate),&resource);}catch(const std::bad_alloc&){failed=true;}
         need(failed && resource.attempts==point+1 && resource.live==0 && candidate.get_address()==address &&
              candidate.copy_bytes()==before && candidate.get_size()==extent,"scratch OOM consumed or changed source");
-        check(candidate.root());
+        check(candidate.plain_root());
     }
     auto frozen=xo::freeze_verified(std::move(source));
     need(!source.get_address() && frozen.segments()[1].data()==reinterpret_cast<const std::byte*>(base)+xo::XWIRE_PAYLOAD_BEGIN,"freeze copied payload or failed to consume at commit");
@@ -250,7 +250,7 @@ xo::XWireHeaderV2 header_of(const std::string& wire) {
 }
 void hole_table_paths() {
     auto source=make();
-    source.root().name.reserve(64); // retires the 16-byte "verified paths" block
+    source.plain_root().name.reserve(64); // retires the 16-byte "verified paths" block
     const auto holes=source.free_block_count();const auto hole_bytes=source.free_block_bytes();
     need(holes!=0&&hole_bytes!=0,"hole fixture has no free block");
     std::string into;source.save_verified_into(into);
@@ -274,10 +274,10 @@ void hole_table_paths() {
     // An 8 KiB hole and 16 KiB of slack: zero-run elision skips both, the
     // default (free-run) emission skips only the hole, dense emission and the
     // snapshot skip nothing.
-    auto large=make();large.root().blob.resize(8192);
-    for(std::size_t i=0;i<80;++i)large.root().blob[i]=std::uint8_t(i+1);
-    large.root().labels.reserve(8); // keeps the blob block off the arena tail
-    large.root().blob.reserve(16384); // relocates: the old 8 KiB block becomes a hole
+    auto large=make();large.plain_root().blob.resize(8192);
+    for(std::size_t i=0;i<80;++i)large.plain_root().blob[i]=std::uint8_t(i+1);
+    large.plain_root().labels.reserve(8); // keeps the blob block off the arena tail
+    large.plain_root().blob.reserve(16384); // relocates: the old 8 KiB block becomes a hole
     const xo::XSaveOptions elide{.emission=xo::XWireEmission::zero_runs};
     const auto runs=large.save_verified();
     const auto dense_saved=large.save_verified(xo::XSaveOptions{.emission=xo::XWireEmission::dense});
@@ -301,17 +301,17 @@ void hole_table_paths() {
     // A lost retirement (host OOM in the free table) is recomputed before emission.
     auto lost=make();
     // A size class whose bin is full: retiring it needs a host allocation.
-    lost.root().name=std::string(300,'q');
-    lost.root().blob.reserve(lost.root().blob.capacity()+64); // name block leaves the tail
-    {   // A bin holds its first free_bin_inline_entries holes inline: fill the name block's bin.
-        const std::uint32_t name_block=static_cast<std::uint32_t>((lost.root().name.capacity()+1+7)/8*8);
-        std::array<void*,xo::XBufferCore::free_bin_inline_entries> fill{};
+    lost.plain_root().name=std::string(300,'q');
+    lost.plain_root().blob.reserve(lost.plain_root().blob.capacity()+64); // name block leaves the tail
+    {   // A bin holds its first free_table_inline_entries holes inline: fill the name block's bin.
+        const std::uint32_t name_block=static_cast<std::uint32_t>((lost.plain_root().name.capacity()+1+7)/8*8);
+        std::array<void*,xo::XBufferCore::free_table_inline_entries> fill{};
         const auto before=lost.free_block_count();
         for(auto& p:fill)p=lost.arena()->allocate_aligned(name_block,8);
         for(auto p:fill)lost.arena()->deallocate(p,name_block);
         need(lost.free_block_count()==before+fill.size(),"bin fixture differs");
     }
-    {Arm arm;lost.root().name.reserve(1000);need(host::remaining==-1,"free-table host failure not reached");}
+    {Arm arm;lost.plain_root().name.reserve(1000);need(host::remaining==-1,"free-table host failure not reached");}
     need(!lost.free_table_complete(),"lost retirement not recorded");
     std::string recomputed;lost.save_verified_into(recomputed);
     need(lost.free_table_complete()&&header_of(recomputed).hole_count!=0,"save_verified_into did not recompute holes");
@@ -325,12 +325,12 @@ void freeze_complete_header_and_graph() {
         if(action==0) source.arena()->magic[0]^=1;
         if(action==1) source.arena()->header_size=0;
         if(action==2) source.arena()->used_end=source.get_size()+1;
-        if(action==3) {auto* p=reinterpret_cast<unsigned char*>(&source.root().enabled);*p=2;}
+        if(action==3) {auto* p=reinterpret_cast<unsigned char*>(&source.plain_root().enabled);*p=2;}
         const auto invalid=source.copy_bytes();
         rejects([&]{(void)xo::freeze_verified(std::move(source));});
         need(source.get_address()==base && source.copy_bytes()==invalid,"failed freeze consumed or rewrote invalid source");
         // Restore via char storage; no bool lvalue is evaluated while invalid.
-        std::memcpy(source.data(),before.data(),before.size());check(source.root());
+        std::memcpy(source.data(),before.data(),before.size());check(source.plain_root());
     }
 }
 #endif

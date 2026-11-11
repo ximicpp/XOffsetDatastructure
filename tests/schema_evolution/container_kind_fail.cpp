@@ -10,5 +10,5 @@ int main() {
     TypedXBuffer<old_v::Bag> source(4096);
     (void)source.make();
     auto target = evolve<new_v::Bag>(source);
-    return target.root().items.empty() ? 0 : 1;
+    return target.plain_root().items.empty() ? 0 : 1;
 }

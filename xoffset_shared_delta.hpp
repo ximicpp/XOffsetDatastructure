@@ -377,9 +377,10 @@ namespace XOffsetDatastructure::xsync {
 
         // Bit b of the result: byte b of x is nonzero.
         inline unsigned byte_mask(std::uint64_t x) noexcept {
-            x |= x >> 4; x |= x >> 2; x |= x >> 1;
-            x &= 0x0101010101010101ull;
-            return unsigned((x * 0x0102040810204080ull) >> 56);
+            // Top bit of each nonzero byte (its low seven bits carried up,
+            // or its own top bit), then gathered into the top byte.
+            const std::uint64_t h = (((x & 0x7f7f7f7f7f7f7f7full) + 0x7f7f7f7f7f7f7f7full) | x) & 0x8080808080808080ull;
+            return unsigned((h * 0x0002040810204081ull) >> 56);
         }
         // Word a / 8 of p: rem = bytes left from a (zero fill past them).
         inline std::uint64_t load(const unsigned char* p, std::size_t rem) noexcept {
@@ -397,6 +398,13 @@ namespace XOffsetDatastructure::xsync {
             return t;
         }();
 
+        // Bits set in an 8-bit value (a table: std::popcount is a library call on
+        // baseline x86-64 builds).
+        inline constexpr auto kPop8 = [] {
+            std::array<std::uint8_t, 256> t{};
+            for (unsigned i = 0; i < 256; ++i) t[i] = std::uint8_t(std::popcount(i));
+            return t;
+        }();
         // Word a / 8 of the n bytes at p: whole words when N (n known at compile
         // time) is a multiple of 8, else zero filled past n.
         template <std::size_t N> inline std::uint64_t word_at(const unsigned char* p, std::size_t a, std::size_t n) noexcept {
@@ -410,66 +418,102 @@ namespace XOffsetDatastructure::xsync {
         // N != 0: n is N, known at compile time (a record); whole words are
         // loaded and stored when N is a multiple of 8. One capacity check for
         // the whole section, then plain stores.
-        template <std::size_t N = 0, class Plain>
-        std::uint32_t put_blocks(XSyncOut& out, const unsigned char* cur, unsigned char* old, std::size_t n,
-                                 Plain&& plain, bool sync) {
+        // only (when not null): a block mask, bit b of only[b / 64]; the other
+        // blocks are left out (neither compared nor synced).
+        // Room put_blocks_at needs for n bytes: per block at most 5 + 1 + 8 +
+        // 64 bytes; the masks and a run are stored as whole words (8 bytes of
+        // slack).
+        constexpr std::size_t blocks_room(std::size_t n) noexcept { return 1 + (n + 63) / 64 * (5 + 1 + 8 + 64) + 8; }
+
+        // put_blocks into d, which has blocks_room(n) bytes: returns where the
+        // section ends; count, the number of blocks.
+        template <std::size_t N, class Plain>
+        XOFFSET_SYNC_INLINE char* put_blocks_body(char* const d, const unsigned char* cur, unsigned char* old, std::size_t n,
+                                                  Plain& plain, bool sync, const std::uint64_t* only, std::uint32_t& count_out) {
             if constexpr (N != 0) n = N;
             constexpr bool whole = N != 0 && N % 8 == 0;
             const std::size_t blocks = (n + 63) / 64;
-            char* const d = out.tail(1 + blocks * (5 + 1 + 8 + 64));
             char* q = d + 1;
             std::uint32_t count = 0;
             std::size_t next = 0;
             for (std::size_t b = 0; b < blocks; ++b) {
-                unsigned masks[8];
-                unsigned sel = 0;
+                if (only && !(only[b / 64] >> (b % 64) & 1u)) continue;
+                XOFFSET_INDETERMINATE std::uint64_t cw[8];
+                XOFFSET_INDETERMINATE unsigned masks[8];
+                unsigned sel = 0, nm = 0;
+                std::uint64_t packed = 0;   // the block's masks, in order
                 const std::size_t words = n - b * 64 >= 64 ? 8 : (n - b * 64 + 7) / 8;
                 for (unsigned w = 0; w < words; ++w) {
                     const std::size_t a = b * 64 + w * 8;
-                    const std::uint64_t x = word_at<N>(cur, a, n) ^ (old ? word_at<N>(old, a, n) : 0);
+                    const std::uint64_t c = word_at<N>(cur, a, n);
+                    const std::uint64_t o = old ? word_at<N>(old, a, n) : 0;
+                    const std::uint64_t x = c ^ o;
                     if (!x) continue;
-                    const unsigned m = byte_mask(x) & plain(a / 8);
+                    const unsigned pl = plain(a / 8);
+                    const unsigned m = byte_mask(x) & pl;
+                    if (!m) continue;
+                    cw[w] = c;
                     masks[w] = m;
-                    sel |= unsigned(m != 0) << w;
+                    sel |= 1u << w;
+                    packed |= std::uint64_t(m) << (8 * nm++);
+                    if (sync) {   // the sent bytes into old, the others kept
+                        const std::uint64_t v = o ^ (x & kSpread[pl]);
+                        std::memcpy(old + a, &v, whole || n - a >= 8 ? 8 : n - a);
+                    }
                 }
                 if (!sel) continue;
                 // One block: varint skip, selector, masks, data.
                 q += encode_varint(q, std::uint32_t(b - next));
                 *q++ = char(sel);
-                for (unsigned s = sel; s; s &= s - 1) *q++ = char(masks[std::countr_zero(s)]);
+                std::memcpy(q, &packed, 8);
+                q += nm;
                 for (unsigned s = sel; s; s &= s - 1) {
                     const unsigned w = unsigned(std::countr_zero(s));
-                    const std::size_t a = b * 64 + w * 8;
                     const unsigned m = masks[w];
-                    const std::uint64_t c = word_at<N>(cur, a, n);
-                    if (m == 0xffu) {   // a whole word
-                        std::memcpy(q, &c, 8);
-                        q += 8;
-                        if (sync) std::memcpy(old + a, &c, 8);
+                    const std::uint64_t c = cw[w];
+                    const unsigned lo = unsigned(std::countr_zero(m));
+                    const unsigned r = m >> lo;
+                    if ((r & (r + 1)) == 0) {   // one run of bytes (a whole word included)
+                        const std::uint64_t v = c >> (8 * lo);
+                        std::memcpy(q, &v, 8);
+                        q += kPop8[m];
                         continue;
                     }
-                    for (unsigned r = m; r; r &= r - 1) *q++ = char(c >> (8 * std::countr_zero(r)));
-                    if (sync) {   // the sent bytes into old, the others kept
-                        const std::uint64_t keep = kSpread[m];
-                        const std::uint64_t o = (word_at<N>(old, a, n) & ~keep) | (c & keep);
-                        std::memcpy(old + a, &o, whole || n - a >= 8 ? 8 : n - a);
-                    }
+                    for (unsigned t = m; t; t &= t - 1) *q++ = char(c >> (8 * std::countr_zero(t)));
                 }
                 next = b + 1;
                 ++count;
             }
             d[0] = char(count);   // < 128 blocks: one varint byte
-            out.commit(std::size_t(q - d));
+            count_out = count;
+            return q;
+        }
+        template <std::size_t N, class Plain>
+        XOFFSET_DETAIL_NOINLINE char* put_blocks_far(char* const d, const unsigned char* cur, unsigned char* old, std::size_t n,
+                                                     Plain& plain, bool sync, const std::uint64_t* only, std::uint32_t& count_out) {
+            return put_blocks_body<N>(d, cur, old, n, plain, sync, only, count_out);
+        }
+        // Records of one block are written inline (a message's small records:
+        // its root fields, a tile, a march); larger ones and element arrays
+        // share one out-of-line copy per type, so the code a server runs per
+        // message stays small.
+        template <std::size_t N = 0, class Plain>
+        XOFFSET_SYNC_INLINE char* put_blocks_at(char* const d, const unsigned char* cur, unsigned char* old, std::size_t n,
+                                                Plain&& plain, bool sync, const std::uint64_t* only, std::uint32_t& count_out) {
+            if constexpr (N != 0 && N <= 64) return put_blocks_body<N>(d, cur, old, n, plain, sync, only, count_out);
+            else return put_blocks_far<N>(d, cur, old, n, plain, sync, only, count_out);
+        }
+        template <std::size_t N = 0, class Plain>
+        std::uint32_t put_blocks(XSyncOut& out, const unsigned char* cur, unsigned char* old, std::size_t n,
+                                 Plain&& plain, bool sync, const std::uint64_t* only = nullptr) {
+            if constexpr (N != 0) n = N;
+            char* const d = out.tail(blocks_room(n));
+            std::uint32_t count;
+            char* const e = put_blocks_at<N>(d, cur, old, n, plain, sync, only, count);
+            out.commit(std::size_t(e - d));
             return count;
         }
 
-        // Bits set in an 8-bit value (a table: std::popcount is a library call on
-        // baseline x86-64 builds).
-        inline constexpr auto kPop8 = [] {
-            std::array<std::uint8_t, 256> t{};
-            for (unsigned i = 0; i < 256; ++i) t[i] = std::uint8_t(std::popcount(i));
-            return t;
-        }();
         // The bytes of word a / 8 that lie inside [0, n) (a < n).
         inline unsigned inside(std::size_t a, std::size_t n) noexcept {
             return n - a >= 8 ? 0xffu : (1u << (n - a)) - 1u;
@@ -545,11 +589,46 @@ namespace XOffsetDatastructure::xsync {
         }
 
         // Plain / bool word masks of an element array of E (word w of the elements' bytes).
-        template <class E> unsigned elem_mask(std::size_t w, std::uint8_t which) noexcept {
+        // The masks repeat every S / gcd(S, 8) words: one table per E and which.
+        template <class E, std::uint8_t Which> inline constexpr auto kElemMasks = [] {
             constexpr std::size_t S = sizeof(E);
+            constexpr std::size_t P = S / (S % 8 == 0 ? 8 : S % 4 == 0 ? 4 : S % 2 == 0 ? 2 : 1);
+            std::array<std::uint8_t, P> t{};
+            for (std::size_t w = 0; w < P; ++w)
+                for (unsigned j = 0; j < 8; ++j)
+                    if (Info<E>::classes[(w * 8 + j) % S] & Which) t[w] = std::uint8_t(t[w] | (1u << j));
+            return t;
+        }();
+        template <class E> unsigned elem_mask(std::size_t w, std::uint8_t which) noexcept {
+            constexpr auto& pb = kElemMasks<E, kPlain | kBool>;
+            constexpr auto& b = kElemMasks<E, kBool>;
+            if (which == (kPlain | kBool)) return pb[pb.size() == 1 ? 0 : w % pb.size()];
+            if (which == kBool) return b[b.size() == 1 ? 0 : w % b.size()];
             unsigned m = 0;
             for (unsigned j = 0; j < 8; ++j)
-                if (Info<E>::classes[(w * 8 + j) % S] & which) m |= 1u << j;
+                if (Info<E>::classes[(w * 8 + j) % sizeof(E)] & which) m |= 1u << j;
+            return m;
+        }
+    } // namespace sd_detail
+
+    /// A part of a record for XRecordDelta<T>::diff(now, before, out, fields):
+    /// the 64-byte blocks of its plain bytes (bit b of blocks[b / 64]) and its
+    /// containers (bit k, schema order). XRecordDelta<T>::fields(members)
+    /// builds one from top-level members.
+    struct XSyncFields {
+        std::uint64_t blocks[2] = {0, 0};
+        std::uint64_t containers = 0;
+        constexpr XSyncFields& operator|=(const XSyncFields& o) noexcept {
+            blocks[0] |= o.blocks[0]; blocks[1] |= o.blocks[1]; containers |= o.containers;
+            return *this;
+        }
+    };
+
+    namespace sd_detail {
+        template <class... S> constexpr std::uint64_t containers_within(List<S...>, std::size_t lo, std::size_t hi) {
+            std::uint64_t m = 0;
+            std::uint32_t k = 0;
+            ((m |= (S::offset >= lo && S::offset < hi ? std::uint64_t(1) << k : 0), ++k), ...);
             return m;
         }
     } // namespace sd_detail
@@ -564,16 +643,142 @@ namespace XOffsetDatastructure::xsync {
 
         // Appends the change from before to now and copies it into before.
         // Appends nothing and returns false when nothing changed.
-        static bool diff(const T& now, T& before, XSyncOut& out) {
+        static bool diff(const T& now, T& before, XSyncOut& out) { return diff_in(now, before, out, nullptr); }
+
+        // The same over a part of the record only: the blocks and containers
+        // fields names (fields(members)). The rest is neither compared nor
+        // copied; when it is equal in now and before (the members a caller's
+        // dirty flags leave out), the body is the one diff(now, before, out)
+        // writes, for a fraction of the reads.
+        static bool diff(const T& now, T& before, XSyncOut& out, const XSyncFields& fields) { return diff_in(now, before, out, &fields); }
+
+        // Applies set(rec), which changes rec in place, and appends the change
+        // it made to the blocks and containers fields names (the body
+        // diff(now, before, out, fields) writes with before = rec as it was).
+        // Appends nothing and returns false when nothing there changed. One
+        // copy of the record instead of two (a baseline and a current image):
+        // the named blocks and containers are copied aside before set runs.
+        // set may change anything, but only the part fields names is
+        // compared, and it must not move rec.
+        template <class F> static bool update(T& rec, const XSyncFields& fields, XSyncOut& out, F&& set) {
+            XOFFSET_INDETERMINATE alignas(8) unsigned char snap[sizeof(T)];
+            const auto* r = reinterpret_cast<const unsigned char*>(&rec);
+            constexpr std::size_t nblocks = (sizeof(T) + 63) / 64;
+            // One copy of a constant size per hinted block (unrolled: a few
+            // vector moves each, no length computed at run time).
+            [&]<std::size_t... B>(std::index_sequence<B...>) {
+                ((fields.blocks[B / 64] >> (B % 64) & 1u
+                      ? (void)std::memcpy(snap + B * 64, r + B * 64, sizeof(T) - B * 64 >= 64 ? 64 : sizeof(T) - B * 64)
+                      : (void)0),
+                 ...);
+            }(std::make_index_sequence<nblocks>{});
+            [[maybe_unused]] std::array<std::uint32_t, container_count + 1> at{};
+            [[maybe_unused]] std::array<std::uint32_t, container_count + 1> len{};
+            XSyncOut& keep = scratch();
+            if constexpr (container_count > 0) {
+                keep.clear();
+                sd_detail::each(typename I::containers{}, [&]<class C, std::size_t Off>(std::uint32_t k) {
+                    if (!(fields.containers >> k & 1u)) return;
+                    const C& c = sd_detail::at<C, Off>(rec);
+                    at[k] = std::uint32_t(keep.size());
+                    if constexpr (sd_detail::is_fixed_string_v<C>) {
+                        len[k] = std::uint32_t(c.view().size());
+                        keep.append(c.view().data(), c.view().size());
+                    } else {
+                        len[k] = std::uint32_t(c.size());
+                        keep.append(reinterpret_cast<const char*>(c.data()), c.size() * sizeof(typename C::value_type));
+                    }
+                });
+            }
+            set(rec);
             const std::size_t start = out.size();
             const std::uint32_t nb = sd_detail::put_blocks<sizeof(T)>(
-                out, reinterpret_cast<const unsigned char*>(&now), reinterpret_cast<unsigned char*>(&before), sizeof(T),
-                [](std::size_t w) -> unsigned { return I::plain[w]; }, true);
+                out, reinterpret_cast<const unsigned char*>(&rec), snap, sizeof(T),
+                [](std::size_t w) -> unsigned { return I::plain[w]; }, false, fields.blocks);
             std::uint32_t nc = 0;
             if constexpr (container_count > 0) {
                 const std::size_t count_at = out.size();
                 out.push_back(0);
                 sd_detail::each(typename I::containers{}, [&]<class C, std::size_t Off>(std::uint32_t k) {
+                    if (!(fields.containers >> k & 1u)) return;
+                    const C& cur = sd_detail::at<C, Off>(rec);
+                    unsigned char* old = reinterpret_cast<unsigned char*>(keep.data()) + at[k];
+                    if constexpr (sd_detail::is_fixed_string_v<C>) {
+                        const std::string_view v = cur.view();
+                        if (v == std::string_view(reinterpret_cast<const char*>(old), len[k])) return;
+                        put_str(out, k, v);
+                        ++nc;
+                    } else {
+                        using E = typename C::value_type;
+                        const std::size_t n = cur.size();
+                        if (n != len[k] || n * sizeof(E) > 127 * 64) {
+                            put_vset(out, k, cur);
+                            ++nc;
+                            return;
+                        }
+                        if (n == 0) return;
+                        const std::size_t code_at = out.size();
+                        out.push_back(char(k << 2 | sd_detail::kVpatch));
+                        const std::uint32_t blocks = sd_detail::put_blocks(
+                            out, reinterpret_cast<const unsigned char*>(cur.data()), old, n * sizeof(E),
+                            [](std::size_t w) { return sd_detail::elem_mask<E>(w, sd_detail::kPlain | sd_detail::kBool); }, false);
+                        if (blocks == 0) out.truncate(code_at);
+                        else ++nc;
+                    }
+                });
+                out[count_at] = char(nc);
+            }
+            if (nb == 0 && nc == 0) { out.truncate(start); return false; }
+            return true;
+        }
+
+        /// Top-level members of T (std::size_t(-1) when T is not a described
+        /// record): fields(m) covers the members whose bit is set in m (bit i =
+        /// member i, declaration order; members from 64 on are not reachable).
+        static constexpr std::size_t member_count = [] {
+            if constexpr (std::is_class_v<T> && schema::is_described_v<T>) return std::size_t(schema::member_count_v<T>);
+            else return std::size_t(-1);
+        }();
+        static constexpr XSyncFields member_fields(std::size_t i) { return kMemberFields[i]; }
+        static constexpr XSyncFields fields(std::uint64_t members) noexcept {
+            XSyncFields f;
+            for (std::uint64_t m = members; m; m &= m - 1) {
+                const unsigned i = unsigned(std::countr_zero(m));
+                if (i < kMemberFields.size()) f |= kMemberFields[i];
+            }
+            return f;
+        }
+
+    private:
+        static constexpr auto kMemberFields = [] {
+            constexpr std::size_t n = member_count == std::size_t(-1) ? 0 : (member_count < 64 ? member_count : 64);
+            std::array<XSyncFields, n> a{};
+            if constexpr (n > 0) {
+                [&]<std::size_t... M>(std::index_sequence<M...>) {
+                    ((a[M] = [] {
+                         using F = schema::member_t<T, M>;
+                         XSyncFields f;
+                         constexpr std::size_t lo = F::offset, hi = F::offset + sizeof(typename F::type);
+                         for (std::size_t b = lo / 64; b <= (hi - 1) / 64; ++b) f.blocks[b / 64] |= std::uint64_t(1) << (b % 64);
+                         f.containers = sd_detail::containers_within(typename I::containers{}, lo, hi);
+                         return f;
+                     }()), ...);
+                }(std::make_index_sequence<n>{});
+            }
+            return a;
+        }();
+
+        static bool diff_in(const T& now, T& before, XSyncOut& out, const XSyncFields* only) {
+            const std::size_t start = out.size();
+            const std::uint32_t nb = sd_detail::put_blocks<sizeof(T)>(
+                out, reinterpret_cast<const unsigned char*>(&now), reinterpret_cast<unsigned char*>(&before), sizeof(T),
+                [](std::size_t w) -> unsigned { return I::plain[w]; }, true, only ? only->blocks : nullptr);
+            std::uint32_t nc = 0;
+            if constexpr (container_count > 0) {
+                const std::size_t count_at = out.size();
+                out.push_back(0);
+                sd_detail::each(typename I::containers{}, [&]<class C, std::size_t Off>(std::uint32_t k) {
+                    if (only && !(only->containers >> k & 1u)) return;
                     const C& cur = sd_detail::at<C, Off>(now);
                     C& old = sd_detail::at<C, Off>(before);
                     if constexpr (sd_detail::is_fixed_string_v<C>) {
@@ -607,6 +812,7 @@ namespace XOffsetDatastructure::xsync {
             return true;
         }
 
+    public:
         // Appends a body that turns a cleared record (clear()) into now.
         static void key(const T& now, XSyncOut& out) {
             sd_detail::put_blocks<sizeof(T)>(out, reinterpret_cast<const unsigned char*>(&now), nullptr, sizeof(T),
@@ -764,6 +970,10 @@ namespace XOffsetDatastructure::xsync {
         }
 
     private:
+        static XSyncOut& scratch() {
+            static thread_local XSyncOut s;
+            return s;
+        }
         static void put_str(XSyncOut& out, std::uint32_t k, std::string_view v) {
             out.push_back(char(k << 2 | sd_detail::kStr));
             put_varint(out, std::uint32_t(v.size()));
@@ -858,6 +1068,20 @@ namespace XOffsetDatastructure::xsync {
         // A change op of a record diffed here (now against before, which it
         // syncs); nothing when they are equal. Returns whether it wrote one.
         template <class T> bool change(unsigned table, std::uint32_t id, const T& now, T& before) {
+            if constexpr (XRecordDelta<T>::container_count == 0) {
+                // A record of plain bytes only: its body is one block section,
+                // written in place (the cursor never leaves the writer).
+                char* d = need(6 + sd_detail::blocks_room(sizeof(T)));
+                d[0] = char(table << 2 | unsigned(XSyncKind::change));
+                std::uint32_t nb;
+                char* const e = sd_detail::put_blocks_at<sizeof(T)>(
+                    d + 1 + encode_varint(d + 1, id), reinterpret_cast<const unsigned char*>(&now), reinterpret_cast<unsigned char*>(&before),
+                    sizeof(T), [](std::size_t w) -> unsigned { return sd_detail::Info<T>::plain[w]; }, true, nullptr, nb);
+                if (!nb) return false;
+                q_ = e;
+                ++count_;
+                return true;
+            }
             char* d = need(6);
             d[0] = char(table << 2 | unsigned(XSyncKind::change));
             const std::size_t at = std::size_t(d - out_->data());

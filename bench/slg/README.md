@@ -282,10 +282,14 @@ D3 shared deltas (2026-11-04, thread 设计共享增量原型, doc X5MZPWya7DWFz
 `xoffset_shared_delta.hpp`, XS 1.0 since 3.5, docs/SHARED_DELTA.md). XOffset only, class 3 only;
 `SLG_D3=1` runs D3 alone (no N*), `SLG_D3=2` both, unset none (keys and stage
 ranges as before); `SLG_NATIVE_OFF` turns D3 off too. Needs no
-`XOFFSET_DELTA_SYNC_API`. The server keeps one entity store and one shared
-baseline: every unit the world changed in a tick is copied in, compared and
-encoded once (`D*.pub`, once per tick); a delivery copies the bodies of its
-entities into one message (`D*.send`). Server per delivery =
+`XOFFSET_DELTA_SYNC_API`. The server keeps one image of every entity as its
+holders have it, shared by all connections. Once per tick (`D*.pub`) it notes
+the world's dirty flags and compares and encodes every changed unit some view
+holds, over its changed members only (`XRecordDelta::update`); a unit no view
+holds, and marches and tiles, are encoded on their first use in the tick (the
+entries they need are prefetched in `D*.pub`). A delivery copies the bodies of
+its entities into one message (`D*.send`). The bytes are those of comparing
+whole records. Server per delivery =
 (`D*.pub` + `D*.send`) / `U*.deliveries`. The client applies the message to
 its own view through `XReceiver<XLink::from_server>::apply_sync` (a `D3Target`
 over the view's unit, march and tile slots): `D*T.recv` with `XCheck::admit`
@@ -297,7 +301,8 @@ devices `D*W.recv` / `D*TW.recv` (count `U*W.deliveries`), streaming `D*ZS.send`
 `D*.delta_zs`; memory `MEM.D*.conn` (per connection), `MEM.D*.shared` (the
 store, baseline and arenas, whole server) and `MEM.D*.shared_per_conn`.
 Bookkeeping added for it, untimed: the tracker's fresh flags
-(`DeltaPlan::unew`, `mnew`) and the world's changed-unit list.
+(`DeltaPlan::unew`, `mnew`), the world's per-unit dirty flags and its
+changed-unit and changed-tile lists.
 
 Batches: `run_v5_split.sh` and `pool_v5.py` (project files,
 slg-cases-v3-20261102/).
