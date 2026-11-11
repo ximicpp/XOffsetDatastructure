@@ -22,6 +22,15 @@
 // zero_from_ and clears only what it exposes below it.
 //
 // XOFFSET_SLOT_MAX_BYTES=0 disables slots: every owner is VM.
+//
+// Relocating buffers (XGrowPolicy::Relocating) start in a slot of
+// XOFFSET_RELOCATING_RESERVE_BYTES (1 MiB by default): the slab's classes go up
+// to the larger of the two sizes. Only XOFFSET_SLOT_MAX_BYTES decides where
+// the other policies put a buffer (SLOT_MAX). Chunks of the classes above
+// XOFFSET_SLOT_MAX_BYTES are not backed by transparent huge pages (Linux):
+// a small buffer touches a page or two of its 1 MiB slot, and a huge page
+// would make it 2 MiB. The retention budget counts the bytes a free slot
+// has dirtied, not its nominal size.
 
 #include <atomic>
 #include <cstddef>
@@ -90,6 +99,27 @@
 
 #ifndef XOFFSET_SLOT_MAX_BYTES
 #  define XOFFSET_SLOT_MAX_BYTES (256u * 1024u)
+#endif
+#ifndef XOFFSET_RELOCATING_RESERVE_BYTES
+#  define XOFFSET_RELOCATING_RESERVE_BYTES (1024u * 1024u)
+#endif
+// Where a relocating buffer goes when its first reservation is full: 0 is a
+// reservation of its whole maximum (servers: one move), otherwise that many
+// bytes and then doubling (phones, whose address space is small: iOS
+// without the extended virtual addressing entitlement has about 7 GiB).
+#ifndef XOFFSET_RELOCATE_STEP_BYTES
+#  if defined(__ANDROID__)
+#    define XOFFSET_RELOCATE_STEP_BYTES (64u * 1024u * 1024u)
+#  elif defined(__APPLE__)
+#    include <TargetConditionals.h>
+#    if TARGET_OS_IPHONE
+#      define XOFFSET_RELOCATE_STEP_BYTES (16u * 1024u * 1024u)
+#    else
+#      define XOFFSET_RELOCATE_STEP_BYTES 0u
+#    endif
+#  else
+#    define XOFFSET_RELOCATE_STEP_BYTES 0u
+#  endif
 #endif
 #ifndef XOFFSET_SLOT_RETAIN_BYTES
 #  define XOFFSET_SLOT_RETAIN_BYTES (64u * 1024u * 1024u)
@@ -291,15 +321,30 @@ struct SlotGeometry {
     static constexpr std::size_t min_shift = 10;   // 1 KiB
     static constexpr std::size_t chunk_shift = 22; // 4 MiB
     static constexpr std::size_t chunk_bytes = std::size_t(1) << chunk_shift;
+    // The Auto storage rule's largest slot (SLOT_MAX + 64).
     static constexpr std::size_t max_slot_bytes = XOFFSET_SLOT_MAX_BYTES;
     static constexpr bool enabled = max_slot_bytes != 0;
     static_assert(max_slot_bytes == 0 ||
                   ((max_slot_bytes & (max_slot_bytes - 1)) == 0 &&
                    max_slot_bytes >= (std::size_t(1) << min_shift) && max_slot_bytes <= chunk_bytes),
                   "XOFFSET_SLOT_MAX_BYTES must be 0 or a power of two from 1 KiB to 4 MiB");
-    static constexpr std::size_t classes = enabled ? slot_log2(max_slot_bytes) - min_shift + 1 : 0;
-    // Largest payload a slot holds (SLOT_MAX).
+    // A relocating buffer's first reservation (its slot, payload + 64).
+    static constexpr std::size_t relocating_slot_bytes = XOFFSET_RELOCATING_RESERVE_BYTES;
+    static_assert((relocating_slot_bytes & (relocating_slot_bytes - 1)) == 0 &&
+                  relocating_slot_bytes >= (std::size_t(1) << min_shift) && relocating_slot_bytes <= chunk_bytes,
+                  "XOFFSET_RELOCATING_RESERVE_BYTES must be a power of two from 1 KiB to 4 MiB");
+    // The slab's largest slot: both of the above (none without slots).
+    static constexpr std::size_t slab_slot_bytes =
+        !enabled ? 0 : max_slot_bytes > relocating_slot_bytes ? max_slot_bytes : relocating_slot_bytes;
+    static constexpr std::size_t classes = enabled ? slot_log2(slab_slot_bytes) - min_shift + 1 : 0;
+    // The classes the Auto rule uses; the others serve relocating buffers only.
+    static constexpr std::size_t auto_classes = enabled ? slot_log2(max_slot_bytes) - min_shift + 1 : 0;
+    // Largest payload the Auto rule puts in a slot (SLOT_MAX).
     static constexpr std::size_t max_payload = enabled ? max_slot_bytes - header_bytes : 0;
+    // Largest payload any slot holds.
+    static constexpr std::size_t slab_max_payload = enabled ? slab_slot_bytes - header_bytes : 0;
+    // A relocating buffer's first payload reservation.
+    static constexpr std::size_t relocating_payload = relocating_slot_bytes - header_bytes;
     static constexpr std::size_t retain_bytes = XOFFSET_SLOT_RETAIN_BYTES;
 
     static constexpr std::size_t slot_bytes(std::size_t cls) noexcept {
@@ -308,9 +353,16 @@ struct SlotGeometry {
     static constexpr std::size_t payload_bytes(std::size_t cls) noexcept {
         return slot_bytes(cls) - header_bytes;
     }
-    // Smallest class whose payload holds `bytes`; `classes` if none does.
+    // Smallest Auto class whose payload holds `bytes`; `classes` if none does.
     static constexpr std::size_t class_for(std::size_t bytes) noexcept {
         if (!enabled || bytes > max_payload) return classes;
+        std::size_t cls = 0;
+        while (payload_bytes(cls) < bytes) ++cls;
+        return cls;
+    }
+    // Smallest slab class whose payload holds `bytes`; `classes` if none does.
+    static constexpr std::size_t slab_class_for(std::size_t bytes) noexcept {
+        if (!enabled || bytes > slab_max_payload) return classes;
         std::size_t cls = 0;
         while (payload_bytes(cls) < bytes) ++cls;
         return cls;
@@ -322,7 +374,7 @@ struct SlotHeader {
     SlotHeader* next;       // free-list link, only while free
     std::size_t dirty_end;  // payload offset from which every byte is zero
     std::uint32_t cls;
-    std::uint32_t reserved;
+    std::uint32_t accounted; // bytes it adds to the global free_dirty while listed
     char unused[SlotGeometry::header_bytes - 3 * sizeof(void*) - 2 * sizeof(std::uint32_t)];
     void* owner;            // payload - 8: the XBufferCore owner word
 
@@ -338,7 +390,8 @@ struct SlotStorageStats {
     std::size_t chunks{0};              // mapped 4 MiB chunks (address space)
     std::size_t carved_bytes{0};        // bytes of chunks handed out as slots so far
     std::size_t global_free_slots{0};   // free slots in the global lists
-    std::size_t global_free_bytes{0};
+    std::size_t global_free_bytes{0};   // nominal (slot sizes)
+    std::size_t global_free_dirty_bytes{0}; // dirtied bytes of those slots (the retention budget)
     std::uint64_t discarded_slots{0};   // slots whose tail pages were discarded
 };
 
@@ -403,10 +456,18 @@ public:
             for (auto* slot = state.free[cls]; slot; slot = slot->next) discard(state, slot);
     }
 
+    // Bytes a free slot has dirtied: its header and payload below dirty_end
+    // (what the retention budget counts).
+    static std::size_t dirty_bytes(const SlotHeader* slot) noexcept {
+        const auto payload = SlotGeometry::payload_bytes(slot->cls);
+        return SlotGeometry::header_bytes + (slot->dirty_end < payload ? slot->dirty_end : payload);
+    }
+
     static SlotStorageStats stats() noexcept {
         auto& state = global();
         std::lock_guard<std::mutex> lock(state.mutex);
         SlotStorageStats result = state.stats;
+        result.global_free_dirty_bytes = state.free_dirty;
         for (std::size_t cls = 0; cls < classes; ++cls) {
             result.global_free_slots += state.count[cls];
             result.global_free_bytes += state.count[cls] * SlotGeometry::slot_bytes(cls);
@@ -435,6 +496,7 @@ private:
         std::size_t count[classes ? classes : 1] = {};
         char* carve[classes ? classes : 1] = {};
         char* carve_end[classes ? classes : 1] = {};
+        std::size_t free_dirty = 0; // sum of `accounted` over the global lists
         SlotStorageStats stats;
     };
 
@@ -507,12 +569,14 @@ private:
         if (SlotHeader* slot = state.free[cls]) {
             state.free[cls] = slot->next;
             --state.count[cls];
+            state.free_dirty -= slot->accounted;
+            slot->accounted = 0;
             return slot;
         }
         const auto bytes = SlotGeometry::slot_bytes(cls);
         if (state.carve[cls] == state.carve_end[cls]) {
             if (!OwnerMap::ready()) return nullptr;
-            char* chunk = map_chunk();
+            char* chunk = map_chunk(cls);
             if (!chunk) return nullptr;
             if (!OwnerMap::reachable(chunk, SlotGeometry::chunk_bytes)) return nullptr;
             OwnerMap::set(chunk, SlotGeometry::chunk_bytes, static_cast<std::uint8_t>(
@@ -528,7 +592,7 @@ private:
         slot->next = nullptr;
         slot->dirty_end = 0;
         slot->cls = static_cast<std::uint32_t>(cls);
-        slot->reserved = 0;
+        slot->accounted = 0;
         slot->owner = nullptr;
         return slot;
     }
@@ -537,12 +601,15 @@ private:
                           std::size_t cls) noexcept {
         auto& state = global();
         std::lock_guard<std::mutex> lock(state.mutex);
+        for (auto* slot = first; ; slot = slot->next) {
+            slot->accounted = static_cast<std::uint32_t>(dirty_bytes(slot));
+            state.free_dirty += slot->accounted;
+            if (slot == last) break;
+        }
         last->next = state.free[cls];
         state.free[cls] = first;
         state.count[cls] += count;
-        std::size_t free_bytes = 0;
-        for (std::size_t c = 0; c < classes; ++c) free_bytes += state.count[c] * SlotGeometry::slot_bytes(c);
-        if (free_bytes > SlotGeometry::retain_bytes)
+        if (state.free_dirty > SlotGeometry::retain_bytes)
             for (auto* slot = first; slot != last->next; slot = slot->next) discard(state, slot);
     }
 
@@ -564,10 +631,16 @@ private:
 #else
         (void)::VirtualAlloc(from, length, MEM_RESET, PAGE_READWRITE);
 #endif
+        // The pages are gone (elsewhere dirty_end stays, for zeroing, but
+        // the memory is returned): only the header page still counts.
+        if (slot->accounted > page) {
+            state.free_dirty -= slot->accounted - page;
+            slot->accounted = static_cast<std::uint32_t>(page);
+        }
         ++state.stats.discarded_slots;
     }
 
-    static char* map_chunk() noexcept {
+    static char* map_chunk([[maybe_unused]] std::size_t cls) noexcept {
         constexpr auto bytes = SlotGeometry::chunk_bytes;
 #if defined(_WIN32)
         for (int attempt = 0; attempt < 8; ++attempt) {
@@ -589,6 +662,11 @@ private:
         if (aligned != start) ::munmap(raw, aligned - start);
         const auto tail = start + 2 * bytes - (aligned + bytes);
         if (tail) ::munmap(reinterpret_cast<void*>(aligned + bytes), tail);
+#if defined(__linux__) && defined(MADV_NOHUGEPAGE)
+        // Relocating-only classes: a buffer touches a page or two of its slot.
+        if (cls >= SlotGeometry::auto_classes)
+            (void)::madvise(reinterpret_cast<void*>(aligned), bytes, MADV_NOHUGEPAGE);
+#endif
         return reinterpret_cast<char*>(aligned);
 #endif
     }

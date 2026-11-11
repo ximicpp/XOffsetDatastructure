@@ -233,7 +233,16 @@ namespace XOffsetDatastructure {
     template <typename K, typename V> class XFixedFlatMap;
     template <typename K, typename V> struct XKeyValue;
 
-    enum class XGrowPolicy { Explicit, Automatic };
+    // Explicit: the payload grows only at grow(). Automatic: container
+    // operations grow it in place up to the maximum (a reservation of the
+    // whole maximum, so the address never changes). Relocating: it starts in
+    // a 1 MiB reservation (XBufferCore::RELOCATING_RESERVE, not zeroed),
+    // container operations grow it in place inside that reservation, and
+    // make_room() / grow() move it to a larger one when it is full (servers:
+    // one move, to a reservation of the whole maximum; phones: 16 MiB on iOS,
+    // 64 MiB on Android, then doubling). A move invalidates every pointer and
+    // reference into the payload (epoch); see make_room().
+    enum class XGrowPolicy { Explicit, Automatic, Relocating };
     using XBufferPool = detail::VmStoragePool;
     // Storage request of a MaximumCapacity (R1). Auto picks by the rule in
     // XBufferCore::plan_storage; Pinned is always a VM reservation (address
@@ -381,6 +390,12 @@ namespace XOffsetDatastructure {
             XGrowPolicy growth = XGrowPolicy::Explicit;
             XBufferPool pool;
             XStorage storage = XStorage::Auto;
+            // Relocating only: the first reservation in bytes, the 64-byte
+            // host header included (0: a 1 MiB slot, RELOCATING_RESERVE of
+            // payload). A type that lives in tens of thousands of small
+            // buffers can start at a few KiB (a power of two up to 1 MiB is
+            // a slot of that size); it moves to larger slots as it grows.
+            size_type reserve = 0;
 
             MaximumCapacity with_growth(XGrowPolicy policy) const noexcept {
                 auto result = *this;
@@ -397,11 +412,28 @@ namespace XOffsetDatastructure {
                 result.storage = request;
                 return result;
             }
+            MaximumCapacity with_reserve(size_type bytes) const noexcept {
+                auto result = *this;
+                result.reserve = bytes;
+                return result;
+            }
         };
         // Largest payload a slot holds (0: slots disabled at build time).
         static constexpr size_type SLOT_MAX = detail::SlotGeometry::max_payload;
         static MaximumCapacity maximum_capacity(size_type bytes) noexcept { return {bytes}; }
         size_type maximum_capacity() const noexcept { return buffer_.maximum_capacity(); }
+        // A relocating buffer's first reservation by default: a 1 MiB slot's
+        // payload (XOFFSET_RELOCATING_RESERVE_BYTES).
+        static constexpr size_type RELOCATING_RESERVE = detail::SlotGeometry::relocating_payload;
+        // Where a relocating buffer moves once its first reservation is full:
+        // 0 means a reservation of the whole maximum (one move); otherwise
+        // that many bytes, then doubling (XOFFSET_RELOCATE_STEP_BYTES).
+        static constexpr size_type RELOCATE_STEP = XOFFSET_RELOCATE_STEP_BYTES;
+        // A relocating buffer that may grow to `maximum` (default: the
+        // format limit, 2 GiB - 8).
+        static MaximumCapacity relocating(size_type maximum = MAX_PAYLOAD) noexcept {
+            return MaximumCapacity{maximum, XGrowPolicy::Relocating, {}, XStorage::Auto, 0};
+        }
         // Host-only canonical address recovery (public API kept unchanged from
         // R1+M2 for source compatibility). The exact numeric comparator uses
         // the declared flat-address ABI for search; returned pointers come
@@ -505,9 +537,23 @@ namespace XOffsetDatastructure {
         // must not move: a movable slot switched to Automatic first moves to a
         // VM reservation (pinned from then on). That move invalidates pointers
         // like grow(); it throws XBadAlloc on failure and changes nothing.
+        //
+        // Relocating needs storage without a pool. Leaving Relocating for
+        // Automatic moves a buffer whose reservation is smaller than its
+        // maximum to a reservation of the whole maximum, as above.
         void set_growth_policy(XGrowPolicy policy) {
-            if (policy == XGrowPolicy::Automatic && buffer_.movable() &&
-                !replace_storage(buffer_.size(), true, true)) XOFFSET_THROW(XBadAlloc());
+            if (policy == XGrowPolicy::Relocating && buffer_.pool().enabled())
+                XOFFSET_THROW(XException(XErrc::invalid_argument,
+                    "XGrowPolicy::Relocating needs storage without a pool"));
+            if (policy == XGrowPolicy::Automatic &&
+                (buffer_.movable() || buffer_.reservation_limit() < buffer_.maximum_capacity())) {
+                const auto previous = growth_policy_;
+                growth_policy_ = XGrowPolicy::Automatic;
+                if (!replace_storage(buffer_.size(), true, true)) {
+                    growth_policy_ = previous;
+                    XOFFSET_THROW(XBadAlloc());
+                }
+            }
             growth_policy_ = policy;
         }
         XStorageKind storage_kind() const noexcept {
@@ -515,7 +561,12 @@ namespace XOffsetDatastructure {
             return buffer_.movable() ? XStorageKind::MovableSlot : XStorageKind::PinnedSlot;
         }
         // False only on a movable slot, whose payload address can change.
-        bool address_stable() const noexcept { return !buffer_.movable(); }
+        bool address_stable() const noexcept {
+            return !buffer_.movable() && growth_policy_ != XGrowPolicy::Relocating;
+        }
+        // The largest payload this buffer reaches without moving (a
+        // relocating buffer's current reservation).
+        size_type reservation_limit() const noexcept { return buffer_.reservation_limit(); }
         // Discards the pages of free slots (see xoffset_slot_storage.hpp).
         static void trim_slot_storage() noexcept { detail::SlotSlab::trim(); }
         static XSlotStorageStats slot_storage_stats() noexcept { return detail::SlotSlab::stats(); }
@@ -549,7 +600,7 @@ namespace XOffsetDatastructure {
         }
 
         XBufferCore(size_type size, MaximumCapacity cap) : growth_policy_(cap.growth) {
-            XOFFSET_VREQUIRE(init_fresh(size, cap.value, cap.pool, cap.storage));
+            XOFFSET_VREQUIRE(init_fresh(size, cap.value, cap.pool, cap.storage, cap.reserve));
         }
 
         XBufferCore(const char* data, size_type size) {
@@ -561,7 +612,7 @@ namespace XOffsetDatastructure {
         }
 
         XBufferCore(const char* data, size_type size, MaximumCapacity cap) : growth_policy_(cap.growth) {
-            XOFFSET_VREQUIRE(init_from_bytes(data, size, cap.value, cap.pool, cap.storage));
+            XOFFSET_VREQUIRE(init_from_bytes(data, size, cap.value, cap.pool, cap.storage, cap.reserve));
         }
 
         // The payload of an admitted wire (see XWireHeaderV2): the payload
@@ -574,7 +625,7 @@ namespace XOffsetDatastructure {
             std::size_t extent_count;
         };
         XBufferCore(WirePayload wire, size_type size, MaximumCapacity cap) : growth_policy_(cap.growth) {
-            XOFFSET_VREQUIRE(init_from_wire(wire, size, cap.value, cap.pool, cap.storage));
+            XOFFSET_VREQUIRE(init_from_wire(wire, size, cap.value, cap.pool, cap.storage, cap.reserve));
         }
 
         uint64_t epoch() const noexcept { return m_epoch; }
@@ -586,12 +637,47 @@ namespace XOffsetDatastructure {
             // reopen, offset rewrite, or potentially throwing allocator update follows.
             const auto target = buffer_.size() + extra_bytes;
             if (buffer_.grow_to(target)) return true;
-            // A movable slot that is too small moves to a larger owner: every
-            // pointer into the payload is invalidated (epoch), XHandles re-resolve.
-            return buffer_.movable() && target > buffer_.accessible_bytes() &&
-                replace_storage(target, true);
+            // A movable slot or a relocating buffer that is too small moves to
+            // a larger owner: every pointer into the payload is invalidated
+            // (epoch), XHandles re-resolve.
+            return (buffer_.movable() || growth_policy_ == XGrowPolicy::Relocating) &&
+                target > buffer_.reservation_limit() && replace_storage(target, true);
         }
 
+        // Makes room for allocations of `bytes` in total (blocks of a
+        // multiple of 8 bytes, alignment at most 8; add alignment - 8 per
+        // block above that): when it returns XErrc::ok, they succeed without
+        // the payload growing or moving. Grows the payload in place where
+        // the reservation allows (Automatic, Relocating; Explicit up to its
+        // storage), otherwise moves a relocating buffer or a movable slot to
+        // a larger reservation, which invalidates every pointer and reference
+        // into the payload (epoch). Never throws and never aborts: the
+        // result is capacity_exceeded past the maximum, out_of_storage when
+        // the OS gives no memory or address space, invalid_state without a
+        // payload. On failure nothing changed.
+        XErrc make_room(size_type bytes) noexcept {
+            if (buffer_.empty()) [[unlikely]] return XErrc::invalid_state;
+            const size_type used = used_end_clamped();
+            if (bytes > MAX_PAYLOAD - used) return XErrc::capacity_exceeded;
+            const size_type need = used + bytes;
+            if (need <= buffer_.size()) [[likely]] return XErrc::ok;
+            return make_room_slow(need);
+        }
+
+    private:
+        XOFFSET_DETAIL_NOINLINE XErrc make_room_slow(size_type need) noexcept {
+            if (need > buffer_.maximum_capacity()) return XErrc::capacity_exceeded;
+            const size_type limit = buffer_.reservation_limit();
+            if (need <= limit) {
+                const size_type target = growth_policy_ == XGrowPolicy::Explicit
+                    ? need : extent_target(need, limit);
+                return buffer_.grow_to(target) || buffer_.grow_to(need) ? XErrc::ok : XErrc::out_of_storage;
+            }
+            if (!buffer_.movable() && growth_policy_ != XGrowPolicy::Relocating) return XErrc::out_of_storage;
+            return replace_storage(need, true) ? XErrc::ok : XErrc::out_of_storage;
+        }
+
+    public:
         void shrink_to_fit() {
             if (buffer_.empty()) return;
             auto used = used_end_clamped();
@@ -1759,6 +1845,13 @@ namespace XOffsetDatastructure {
             using Geometry = detail::SlotGeometry;
             constexpr StoragePlan vm{Geometry::classes, false};
             plan = vm;
+            if (growth == XGrowPolicy::Relocating) {
+                // Its storage is chosen by relocating_owner.
+                if (pooled || request == XStorage::Pinned)
+                    XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument,
+                        "XGrowPolicy::Relocating takes no pool and no XStorage::Pinned");
+                return detail::vok();
+            }
             if (request == XStorage::Pinned) return detail::vok();
             auto refuse = [&]() -> detail::vstatus {
                 if (request == XStorage::Movable)
@@ -1821,7 +1914,7 @@ namespace XOffsetDatastructure {
         }
 
         detail::vstatus init_fresh(size_type size, size_type max_reserved, const XBufferPool& pool = {},
-                                   XStorage request = XStorage::Auto) {
+                                   XStorage request = XStorage::Auto, size_type reserve = 0) {
             if (size > MAX_PAYLOAD || max_reserved > MAX_PAYLOAD)
                 XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, detail::payload_limit_message);
             size = std::max(size, min_payload_size());
@@ -1832,7 +1925,11 @@ namespace XOffsetDatastructure {
                 free_table_.reset();
                 free_table_lost_ = false;
                 detail::VirtualMemoryStorage owner;
-                if (plans_slot(plan)) {
+                if (growth_policy_ == XGrowPolicy::Relocating) {
+                    if (!relocating_owner(owner, size, max_reserved, std::max(size, reserve_or_default(reserve))))
+                        XOFFSET_VFAIL_BAD_ALLOC();
+                    if (!owner.grow_to(size)) XOFFSET_VFAIL_BAD_ALLOC();
+                } else if (plans_slot(plan)) {
                     XOFFSET_VTRY(detail::VirtualMemoryStorage::for_slot_v(owner, plan.slot_class, max_reserved,
                                                                           plan.movable));
                     if (!owner.grow_to(size)) XOFFSET_VFAIL_BAD_ALLOC();
@@ -1855,10 +1952,16 @@ namespace XOffsetDatastructure {
         }
 
         detail::vstatus init_from_bytes(const char* data, size_type size, size_type max_reserved,
-                                        const XBufferPool& pool = {}, XStorage request = XStorage::Auto) {
+                                        const XBufferPool& pool = {}, XStorage request = XStorage::Auto,
+                                        size_type reserve = 0) {
             StoragePlan plan;
             XOFFSET_VTRY(plan_storage(size, max_reserved, growth_policy_, pool.enabled(), request, plan));
             return init_from_storage(data, size, max_reserved, [&](detail::VirtualMemoryStorage& owner) -> detail::vstatus {
+                if (growth_policy_ == XGrowPolicy::Relocating) {
+                    if (!relocating_owner(owner, size, max_reserved, std::max(size, reserve_or_default(reserve))))
+                        XOFFSET_VFAIL_BAD_ALLOC();
+                    return owner.assign_bytes_v(data, size);
+                }
                 if (!plans_slot(plan) || size > max_reserved)
                     return detail::VirtualMemoryStorage::from_bytes_v(owner, data, size, max_reserved, pool);
                 XOFFSET_VTRY(detail::VirtualMemoryStorage::for_slot_v(owner, plan.slot_class, max_reserved,
@@ -1869,12 +1972,20 @@ namespace XOffsetDatastructure {
 
         // Wire payload: extents and sizes validated by the caller.
         detail::vstatus init_from_wire(const WirePayload& wire, size_type size, size_type max_reserved,
-                                       const XBufferPool& pool = {}, XStorage request = XStorage::Auto) {
+                                       const XBufferPool& pool = {}, XStorage request = XStorage::Auto,
+                                       size_type reserve = 0) {
             StoragePlan plan;
             XOFFSET_VTRY(plan_storage(size, max_reserved, growth_policy_, pool.enabled(), request, plan));
             return init_from_storage(wire.stored, size, max_reserved,
                                      [&](detail::VirtualMemoryStorage& owner) -> detail::vstatus {
-                if (!plans_slot(plan) || size > max_reserved) {
+                if (growth_policy_ == XGrowPolicy::Relocating && size <= max_reserved) {
+                    if (!relocating_owner(owner, size, max_reserved, std::max(size, reserve_or_default(reserve))))
+                        XOFFSET_VFAIL_BAD_ALLOC();
+                    if (wire.extent_count == 0)
+                        XOFFSET_VTRY(owner.assign_bytes_v(wire.stored, size, sizeof(arena_header)));
+                    else
+                        XOFFSET_VTRY(owner.assign_extents_v(wire.stored, wire.extents, wire.extent_count, size));
+                } else if (!plans_slot(plan) || size > max_reserved) {
                     if (wire.extent_count == 0)
                         XOFFSET_VTRY(detail::VirtualMemoryStorage::from_bytes_v(owner, wire.stored, size, max_reserved,
                                                                                 pool, sizeof(arena_header)));
@@ -2054,7 +2165,10 @@ namespace XOffsetDatastructure {
             PreparedOwner prepared;
             XOFFSET_TRY {
                 const auto cls = pin ? detail::SlotGeometry::classes : detail::SlotGeometry::class_for(logical);
-                if (cls != detail::SlotGeometry::classes) {
+                if (growth_policy_ == XGrowPolicy::Relocating && !pin) {
+                    if (!relocating_owner(next, logical, maximum, relocation_target(logical))) return false;
+                    if (copy) XOFFSET_VTRY_OR(false, next.assign_bytes_v(buffer_.data(), used_end_clamped()));
+                } else if (cls != detail::SlotGeometry::classes) {
                     XOFFSET_VTRY_OR(false, detail::VirtualMemoryStorage::for_slot_v(next, cls, maximum, true));
                     if (copy) XOFFSET_VTRY_OR(false, next.assign_bytes_v(buffer_.data(), used_end_clamped()));
                 } else if (copy) {
@@ -2180,9 +2294,20 @@ namespace XOffsetDatastructure {
 
         bool ensure_allocation_extent(size_type required, bool allow_growth = true) {
             if (required <= buffer_.size()) return true;
-            if (!allow_growth || growth_policy_ != XGrowPolicy::Automatic ||
-                buffer_.empty() || required > buffer_.maximum_capacity()) return false;
-            const auto maximum = buffer_.maximum_capacity();
+            if (!allow_growth || growth_policy_ == XGrowPolicy::Explicit || buffer_.empty()) return false;
+            // Relocating: in place up to the current reservation only.
+            const auto maximum = growth_policy_ == XGrowPolicy::Automatic
+                ? buffer_.maximum_capacity() : buffer_.reservation_limit();
+            if (required > maximum) return false;
+            // Throw on an OS/preparation failure. In particular, a container's
+            // failed tail expansion must not silently retry via a new allocation.
+            if (!buffer_.grow_to(extent_target(required, maximum))) XOFFSET_THROW(XBadAlloc());
+            return true;
+        }
+
+        // The logical length ensure_allocation_extent grows to for
+        // `required` bytes, at most `maximum`.
+        size_type extent_target(size_type required, size_type maximum) noexcept {
             const auto current = buffer_.size();
             const auto geometric = current > maximum / 2 ? maximum : current * 2;
             auto target = std::max<std::size_t>(required, geometric);
@@ -2206,10 +2331,80 @@ namespace XOffsetDatastructure {
                 target = std::max<std::size_t>(required, std::min<std::size_t>(geometric, std::size_t(current) + dirty_step_));
                 if (dirty_step_ < regrow_step) dirty_step_ *= 2;
             }
-            // Throw on an OS/preparation failure. In particular, a container's
-            // failed tail expansion must not silently retry via a new allocation.
-            if (!buffer_.grow_to(target)) XOFFSET_THROW(XBadAlloc());
-            return true;
+            return target;
+        }
+
+        // Relocating storage: an empty owner whose reservation holds `needed`
+        // bytes, aiming at `want`. A slot when one of the slab's classes
+        // holds `want` (or, failing that, any class down to `needed`);
+        // otherwise a VM reservation of `want`, halved down to `needed` while
+        // the OS refuses the address space. Its maximum is `maximum`.
+        // false (nothing taken) when nothing can hold `needed`.
+        static bool relocating_owner(detail::VirtualMemoryStorage& owner, size_type needed, size_type maximum,
+                                     size_type want) noexcept {
+            using Geometry = detail::SlotGeometry;
+            if (needed > maximum) return false;
+            want = std::min(std::max(want, needed), maximum);
+            if (needed <= Geometry::slab_max_payload && want <= Geometry::slab_max_payload) {
+                // The smallest class holding `bytes`: a slot of 2^(10 + cls).
+                constexpr auto class_of = [](size_type bytes) noexcept -> std::size_t {
+                    const auto width = static_cast<std::size_t>(std::bit_width(bytes + Geometry::header_bytes - 1));
+                    return width > Geometry::min_shift ? width - Geometry::min_shift : 0;
+                };
+                const auto low = class_of(needed);
+                for (auto cls = class_of(want) + 1; cls-- > low;)
+                    if (owner.take_slot(cls, maximum, true)) return true;
+            }
+            for (size_type reserve = want;;) {
+                detail::VirtualMemoryStorage next;
+                bool reserved = false;
+                XOFFSET_TRY {
+                    reserved = [&]() -> bool {
+                        XOFFSET_VTRY_OR(false, detail::VirtualMemoryStorage::create_v(next, 0, reserve));
+                        return true;
+                    }();
+                } XOFFSET_CATCH(...) {
+                    reserved = false;
+                }
+                if (reserved) {
+#if XOFFSET_NO_EXCEPTIONS
+                    (void)detail::take_pending_error(); // an earlier, larger attempt's failure
+#endif
+                    next.raise_maximum(maximum);
+                    owner.swap(next);
+                    return true;
+                }
+                if (reserve <= needed) return false;
+                reserve = std::max(needed, reserve / 2);
+            }
+        }
+
+        // Where a relocating buffer whose current reservation is full moves
+        // for `needed` bytes: a larger slot while the slot classes below
+        // RELOCATING_RESERVE grow (a buffer that started small, by
+        // with_reserve), else a reservation of the maximum (RELOCATE_STEP
+        // 0, servers) or RELOCATE_STEP, then doubling.
+        size_type relocation_target(size_type needed) const noexcept {
+            const size_type maximum = buffer_.maximum_capacity();
+            const size_type current = buffer_.reservation_limit();
+            if (buffer_.is_slot() && current < RELOCATING_RESERVE) {
+                size_type next = current > MAX_PAYLOAD / 2 ? MAX_PAYLOAD : current * 2 + 64;
+                if (next < needed) next = needed;
+                if (next <= RELOCATING_RESERVE) return next;
+            }
+            if constexpr (RELOCATE_STEP == 0) {
+                return maximum;
+            } else {
+                size_type next = std::max<size_type>(RELOCATE_STEP, current > MAX_PAYLOAD / 2 ? MAX_PAYLOAD : current * 2);
+                while (next < needed && next <= MAX_PAYLOAD / 2) next *= 2;
+                return std::min(std::max(next, needed), maximum);
+            }
+        }
+
+        // MaximumCapacity::reserve as payload bytes.
+        static size_type reserve_or_default(size_type reserve) noexcept {
+            if (reserve == 0) return RELOCATING_RESERVE;
+            return reserve > detail::SlotGeometry::header_bytes ? reserve - detail::SlotGeometry::header_bytes : 1;
         }
 
     protected:
@@ -2217,7 +2412,7 @@ namespace XOffsetDatastructure {
         // buffer: the non-throwing load entries report failure instead.
         detail::vstatus init_wire_v(const WirePayload& wire, size_type size, MaximumCapacity cap) {
             growth_policy_ = cap.growth;
-            return init_from_wire(wire, size, cap.value, cap.pool, cap.storage);
+            return init_from_wire(wire, size, cap.value, cap.pool, cap.storage, cap.reserve);
         }
 
         // In-place reload/reset (XBuffer::reload_verified / reset). The
@@ -2336,7 +2531,9 @@ namespace XOffsetDatastructure {
                 XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, detail::arena_failure_message);
             // A movable slot too small for the new content moves first; the
             // old content is discarded anyway, so nothing is copied.
-            if (buffer_.is_slot() && size > buffer_.accessible_bytes() && !replace_storage(size, false))
+            if ((buffer_.is_slot() ? size > buffer_.accessible_bytes()
+                                   : growth_policy_ == XGrowPolicy::Relocating && size > buffer_.reservation_limit()) &&
+                !replace_storage(size, false))
                 XOFFSET_VFAIL(XBadAlloc, XErrc::out_of_storage, detail::arena_failure_message);
             // Holes are unknown until verification supplies the hole table.
             free_table_lost_ = true;
@@ -2424,7 +2621,7 @@ namespace XOffsetDatastructure {
         void copy_clone_state(const XBufferCore& src) {
             const auto logical = std::min(src.buffer_.size(), buffer_.maximum_capacity());
             if (logical > buffer_.size() && !buffer_.grow_to(logical) &&
-                !(buffer_.movable() && replace_storage(logical, true)))
+                !((buffer_.movable() || growth_policy_ == XGrowPolicy::Relocating) && replace_storage(logical, true)))
                 XOFFSET_THROW(XBadAlloc());
             if (!src.free_table_lost_) {
                 XOFFSET_TRY {
@@ -2467,6 +2664,8 @@ namespace XOffsetDatastructure {
         // owner onto VM, a pinned slot onto a pinned slot (Auto picks one,
         // since its maximum fits a slot).
         MaximumCapacity clone_capacity() const noexcept {
+            if (growth_policy_ == XGrowPolicy::Relocating)
+                return MaximumCapacity{buffer_.maximum_capacity(), growth_policy_, {}, XStorage::Auto, 0};
             const auto storage = buffer_.movable() ? XStorage::Movable
                                  : buffer_.is_slot() ? XStorage::Auto
                                                      : XStorage::Pinned;
