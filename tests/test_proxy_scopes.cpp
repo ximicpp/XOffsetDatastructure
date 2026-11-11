@@ -311,8 +311,8 @@ bool test_pin_scopes() {
     CHECK(ok);
     // On entry a Relocating buffer whose reservation is more than half used
     // moves first.
-    auto half = make_relocating();
-    half.root<Root>().ints.resize(160000);   // 640 KB of the 1 MiB reservation, in place
+    auto half = make_relocating(1u << 20);
+    half.root<Root>().ints.resize(160000);   // 640 KB of a 1 MiB reservation, in place
     const char* before = half.data();
     CHECK(half.edit<Root>([](Root& root) { root.counter = 1; }));
     CHECK(half.data() != before && half.root<Root>().ints.size() == 160000u);
