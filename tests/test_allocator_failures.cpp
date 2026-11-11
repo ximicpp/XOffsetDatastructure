@@ -1,3 +1,4 @@
+#include <algorithm>
 // Real global-new failures, armed only around the allocator operation under test.
 #include <array>
 #include <cstdlib>
@@ -308,6 +309,36 @@ void load_into_emptied_table() {
     for(std::size_t i=small.size();i-->0;) require(b.arena()->allocate_aligned(40,8)==small[i],"40-byte bin order after load");
     require(b.free_block_count()==0,"load into an emptied table left extra holes");
 }
+// Holes of one size need not arrive in one run: an incremental delta's hole
+// list is in offset order, so a size's holes come in many short runs. Each
+// run after the first adds to the bin's segment; a segment with room must not
+// grow (it doubled per run, and 70 holes asked for 2^30 entries).
+void load_interleaved_runs() {
+    auto b=XBuffer::create<AllocatorFailureRoot>(1024*1024,XBuffer::maximum_capacity(1024*1024));
+    std::vector<void*> big, small;
+    for(int i=0;i<300;++i) { big.push_back(b.arena()->allocate_aligned(64,8)); small.push_back(b.arena()->allocate_aligned(40,8)); }
+    for(auto p:big) b.arena()->deallocate(p,64);
+    for(auto p:small) b.arena()->deallocate(p,40);
+    auto holes=holes_of(b);
+    std::sort(holes.begin(),holes.end(),[](const auto& x,const auto& y){return x.offset<y.offset;});
+    for(std::size_t i=0;i<big.size();++i) (void)b.arena()->allocate_aligned(64,8);
+    for(std::size_t i=0;i<small.size();++i) (void)b.arena()->allocate_aligned(40,8);
+    require(b.free_block_count()==0,"fixture: every hole taken again");
+    b.replace_free_blocks(holes);
+    require(b.free_block_count()==holes.size(),"interleaved load lost holes");
+    // Within a bin the holes keep their load order: the last loaded is taken first.
+    for(std::size_t i=holes.size();i-->0;) {
+        const auto h=holes[i];
+        if(h.bytes!=64) continue;
+        require(static_cast<char*>(b.arena()->allocate_aligned(64,8))==b.data()+h.offset,"64-byte bin order after an interleaved load");
+    }
+    for(std::size_t i=holes.size();i-->0;) {
+        const auto h=holes[i];
+        if(h.bytes!=40) continue;
+        require(static_cast<char*>(b.arena()->allocate_aligned(40,8))==b.data()+h.offset,"40-byte bin order after an interleaved load");
+    }
+    require(b.free_block_count()==0,"interleaved load left extra holes");
+}
 // More owners reload than the thread cache holds tables (4): each keeps its
 // own emptied table, so the first retire after its reload allocates nothing.
 void reloads_keep_their_tables() {
@@ -349,5 +380,5 @@ int main() {try {
             require(r.free<=normal.free,"failure invented free bytes");max_lost=std::max(max_lost,normal.free-r.free);++points;}
     }
     points+=hole_table_load();
-    lazy_load(); inline_paths_without_host_allocation(); inline_bin_transition(); load_into_emptied_table(); growth_probe_without_host_allocation(); growth_probe_keeps_cached_blocks(); std::cout<<"{\"status\":\"passed\",\"actual_failure_points\":"<<points+1<<",\"max_unreclaimed_bytes\":"<<max_lost<<"}\n";
+    lazy_load(); inline_paths_without_host_allocation(); inline_bin_transition(); load_into_emptied_table(); load_interleaved_runs(); growth_probe_without_host_allocation(); growth_probe_keeps_cached_blocks(); std::cout<<"{\"status\":\"passed\",\"actual_failure_points\":"<<points+1<<",\"max_unreclaimed_bytes\":"<<max_lost<<"}\n";
 } catch(const std::exception& e) {watch=false;std::cerr<<e.what()<<'\n';return 1;} }

@@ -1789,6 +1789,8 @@ namespace XOffsetDatastructure {
             // (may throw std::bad_alloc). Only for a table that is not
             // published (no owner reads it meanwhile).
             void reserve_in_bin(std::uint32_t bin, std::size_t more) {
+                // A segment (or an empty one) with room for them: nothing to do.
+                if (const auto h = head[bin]; h != 0 && !is_single(h) && seg_of(h)[1] - seg_of(h)[0] >= more) return;
                 if (more <= 0xffffffffu && make_room(bin, static_cast<std::uint32_t>(more))) return;
                 const auto words = grown_words(bin, more);
                 delete[] adopt_pool(new std::uint32_t[words], words);
@@ -1839,8 +1841,11 @@ namespace XOffsetDatastructure {
             }
 
         private:
-            // log2 of the capacity `bin` needs for `more` more entries (at
-            // least 4 and double the current capacity); -1 when too large.
+            // log2 of the capacity `bin` needs for `more` more entries: the
+            // current one when they fit, else at least 4 and double the
+            // current one; -1 when too large. (Doubling a segment that still
+            // has room would grow it on every call: a load whose holes of
+            // one size come in several runs calls it once per run.)
             int wanted_log2(std::uint32_t bin, std::size_t more) const noexcept {
                 const auto h = head[bin];
                 std::uint64_t size = 0, cap = 0;
@@ -1850,7 +1855,8 @@ namespace XOffsetDatastructure {
                     size = seg_of(h)[0];
                     cap = seg_of(h)[1];
                 }
-                const std::uint64_t want = (std::max)({size + more, cap * 2u, std::uint64_t(4)});
+                std::uint64_t want = size + more;
+                if (want > cap) want = (std::max)({want, cap * 2u, std::uint64_t(4)});
                 if (want > (std::uint64_t(1) << 30)) return -1;
                 return static_cast<int>(std::bit_width(want - 1u));
             }
