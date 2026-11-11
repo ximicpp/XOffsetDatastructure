@@ -65,50 +65,11 @@ namespace proxy_detail {
     };
 
     // Extra arena bytes an argument can need when it is copied in (an upper
-    // bound): strings and containers carry their payload.
-    template <class T>
-    std::size_t deep_bytes(const T& value) noexcept;
-
-    template <class T, std::size_t... I>
-    std::size_t deep_member_bytes(const T& value, std::index_sequence<I...>) noexcept {
-        return (std::size_t(0) + ... + deep_bytes(schema::member_t<T, I>::get(value)));
-    }
-    template <class T, std::size_t... I>
-    std::size_t deep_base_bytes(const T& value, std::index_sequence<I...>) noexcept {
-        return (std::size_t(0) + ... +
-                deep_bytes(static_cast<const schema::base_t<T, I>&>(value)));
-    }
-
-    template <class T>
-    std::size_t deep_bytes(const T& value) noexcept {
-        using U = std::remove_cvref_t<T>;
-        if constexpr (std::is_base_of_v<XFixedString, U>) {
-            return value.size() == 0 ? 0 : std::size_t(value.size()) + 24u;
-        } else if constexpr (std::is_convertible_v<const U&, std::string_view> && !std::is_arithmetic_v<U>) {
-            const std::string_view view = value;
-            return view.size() + 24u;
-        } else if constexpr (std::is_trivially_copyable_v<U>) {
-            return 0;
-        } else if constexpr (detail::is_fixed_vector_v<U>) {
-            using E = typename U::value_type;
-            std::size_t bytes = std::size_t(value.size()) * sizeof(E) + alignof(E) + 24u;
-            if constexpr (!std::is_trivially_copyable_v<E>)
-                for (const auto& element : value) bytes += deep_bytes(element);
-            return bytes;
-        } else if constexpr (std::is_class_v<U> && schema::is_described_v<U>) {
-            return deep_base_bytes(value, std::make_index_sequence<schema::base_count_v<U>>{}) +
-                   deep_member_bytes(value, std::make_index_sequence<schema::member_count_v<U>>{});
-        } else {
-            return 0;
-        }
-    }
-
-    // Arena bytes one more element can take: the regrown array (the
-    // container doubles, 4 when empty), alignment and block rounding.
+    // bound), and the bytes of one more element.
+    using fixed_detail::deep_bytes;
     template <class E>
     XOFFSET_PROXY_INLINE std::size_t grow_bytes(std::uint32_t capacity) noexcept {
-        const std::size_t next = capacity ? std::size_t(capacity) * 2u : 4u;
-        return next * sizeof(E) + alignof(E) + 24u;
+        return fixed_detail::grow_bytes<E>(capacity);
     }
 
     // The payload lineage a proxy belongs to, with the base and version it
