@@ -22,7 +22,9 @@ payload moves). Wire format unchanged (2.1; delta 1.0 and XS 1.0 unchanged).
 
 Judged in the cloud only (docs/RELEASING.md): VALIDATE_VERDICT_PENDING
 Pre-release fuzz (`tools/fuzz_prerelease.sh --budget hour`, ASan+UBSan) on
-the release candidate: FUZZ_VERDICT_PENDING
+the release candidate (7d16b44): PASS, no findings over GCC 16 differential
+and replay, libFuzzer on all five targets in the reflection build, the four
+field-list targets and the cross-build outcome diff.
 
 Known items (report only, explained):
 - Mac A.req_encode +6.3% after #266 (the `root<T>()` cache refill, redo of
