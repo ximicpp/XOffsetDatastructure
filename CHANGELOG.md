@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Shared deltas: the block encoder's scratch arrays and `update`'s snapshot
+  are `[[indeterminate]]` (`XOFFSET_INDETERMINATE`): GCC 16 no longer zeroes
+  them on every call (C++26 erroneous behaviour; 240 bytes per `update` of a
+  view unit). `byte_mask` takes six operations instead of nine. Instructions
+  of the bench's D3 server (S scale, GCC 16, pub + send): -5% in peace,
+  conflict and siege. Bytes unchanged; P2996 (Clang does not fill) unchanged.
+
 - Shared deltas: `XRecordDelta::update` snapshots the hinted blocks with
   copies of a constant size (unrolled per block) instead of a run-time length
   per block. The bench's D3 server keeps a delivery's loop small: the first
