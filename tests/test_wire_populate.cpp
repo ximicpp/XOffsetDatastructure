@@ -70,7 +70,7 @@ void need(bool ok, const std::string& what) { if (!ok) fail(what); }
 
 Buffer make(std::size_t words) {
     auto b = Buffer::create(1u << 16, xo::XBuffer::maximum_capacity(1u << 26).with_growth(xo::XGrowPolicy::Automatic));
-    auto& d = b.root().data;
+    auto& d = b.plain_root().data;
     d.reserve(words);
     for (std::size_t i = 0; i < words; ++i) d.push_back(0x9e3779b97f4a7c15ull * (i + 1));
     return b;

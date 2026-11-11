@@ -78,6 +78,8 @@ XOFFSET_RECORD_DERIVED(Player, (Entity), level, items)   // 基类按声明顺�
   所有可达记录的这几行（`bench/slg` 的 13 行就是它的输出，`describe_dump_slg` 测试保持一致）。
   写不了的类型（非聚合体、重叠的 `[[no_unique_address]]` 成员等）印成一行注释说明原因。
 - 发布前至少用一个 C++26 编译器把 schema 编一次，让反射核对字段表和承诺。
+- 字段表同时给记录的 proxy 生成按名字的访问函数（第 3.5 节）：`u.hp()` 就是
+  `u.field<&Unit::hp>()`。只靠反射描述、没写字段表的记录没有访问函数，用 `field<&T::m>()`。
 
 ### 2.2 可移植标量
 
@@ -129,7 +131,8 @@ p.scores.assign(v.begin(), v.end());   // 连续且平凡可复制：一次精�
   `XVector` 中间删除，不声明约是 `std::vector` 的 1.6 倍，声明后约 0.73 倍。
 - 能改什么、不能改什么（schema、写者、所有权）见第 3.3 节。
 - 也可以用带类型的包装 `TypedXBuffer<T>`：`create`、`root()`、`save_verified()`、
-  `load()`（走校验路径）。它属于便利接口（第 8 节 E2）。
+  `load()`（走校验路径）。它属于便利接口（第 8 节 E2）。`TypedXBuffer<T>::root()` 返回
+  proxy（`XRef<T>`），不是普通引用，写法见第 3.5 节。
 
 ### 3.1 删除与插入的性能
 
@@ -277,6 +280,52 @@ marches.stable_erase_if([](const March& m) { return m.eta <= 0; });
   结构（`XOFFSET_THREAD_CACHES` 默认 0，其他目标默认 1；Clang 编 MinGW 用原生 TLS，保留缓存）。
 - 默认构造的空 `XBuffer` 可以直接 `reload_verified` 或 `begin_verified_reload`，按
   `load_verified` 不带上限时的规则（64 MiB、Explicit）建存储。
+
+### 3.5 会搬家的 buffer：proxy、字段访问函数、钉住作用域
+
+`XBuffer::relocating()` 的 buffer 先预留 1 MiB，用完就搬到更大的预留，所以普通引用可能
+悬空。安全的访问方式有两种：
+
+```cpp
+struct Unit { std::uint32_t id; std::int32_t hp; XString name; XVector<std::int32_t> items; };
+XOFFSET_RECORD(Unit, id, hp, name, items)
+struct View { std::uint64_t tick; XVector<Unit> units; };
+XOFFSET_RECORD(View, tick, units)
+
+auto world = TypedXBuffer<View>::create(4096, XBuffer::relocating());
+auto v = world.root();                     // XRef<View>
+auto u = v.units().emplace_back();         // XRef<Unit>；可能搬家，u 仍然有效
+u.id() = 7;
+u.hp() -= 3;
+u.name() = "unit-7";
+u.items().push_back(42);
+std::int32_t hp = u.hp();                  // 读：转成值
+for (auto x : v.units()) total += x.hp();  // 迭代器也是 proxy
+if (!world.ok()) { /* world.error()：第一次失败的原因 */ }
+
+world.edit([&](View& w) {                  // 钉住作用域：普通引用，速度同普通结构体
+    for (Unit& x : w.units) x.hp -= dmg;
+});
+```
+
+- **proxy（`XRef<T>`）**：`TypedXBuffer<T>::root()`、`reset()` 和 `XBuffer::ref<T>()` 返回它。
+  它记着 buffer 的控制块和路径（根偏移；容器 + 下标；map + key），每次访问比较一次版本号，
+  buffer 搬家（包括 `XBuffer` 对象本身被 move）后照样有效；buffer 销毁或内容被
+  `reset`/`reload` 换掉后变成 stale，读得到值初始化的结果，写返回 false。
+- **字段访问函数**：`XOFFSET_RECORD` / `XOFFSET_RECORD_DERIVED` 为每个列出的字段生成一个
+  同名成员函数，返回该字段的 proxy；基类也写了字段表时，派生记录也有基类字段的访问函数。字段名和 proxy 自己的
+  函数同名时（`get`、`set`、`field`、`member`、`valid`、`error`）proxy 的函数优先，这个字段用
+  `field<&T::m>()`。C 数组字段的 proxy 有 `size()`、下标和迭代器，越界得到空 proxy。
+  访问函数是普通成员函数，不依赖反射和异常，MSVC 和关异常构建都能用。
+- **失败不抛、不崩**：会分配的操作做不到时没有效果，返回 false（或空 proxy），并在 buffer 里
+  记下第一个错误（`error()`：`capacity_exceeded`、`out_of_storage`、`borrowed`、`stale`、
+  `out_of_range`）；之后的分配类操作直接失败，buffer 拒绝发送，直到 `clear_error()`。
+- **钉住作用域** `edit(f)` / `read(f)`：f 拿到普通引用，速度和普通结构体相同。作用域内 buffer
+  不搬（需要搬的操作失败并记 `borrowed`），容器回收的块等作用域结束才复用，所以作用域里拿到的
+  引用不会指向被复用的内存。f 不能返回指针、引用、`string_view` 或 `span`（编译期检查）。
+  热路径和要交给接受 `T&` 的已有代码时用它。
+- `plain_root()` 是原来的 `root()`：没有保护的普通引用，buffer 搬家后悬空。只在确定不搬的
+  存储上用（钉住槽位、VM、Pinned），或者干脆不用。
 
 ## 4. 保存与加载
 

@@ -158,7 +158,7 @@ void check(const std::string& w, std::mt19937_64& rng) {
     }
     if (!typed) return;
     if (typed->save_verified() != w) fail("accepted wire does not re-save byte-identically");
-    edit(typed->root(), rng);
+    edit(typed->plain_root(), rng);
     const auto saved = typed->save_verified();
     auto again = typed_load<Root>(saved);
     if (!again) fail("re-saved wire after editing an accepted input was rejected");
@@ -169,7 +169,7 @@ template <class Root>
 std::string seed(std::mt19937_64& rng) {
     auto b = xo::TypedXBuffer<Root>::create(4096,
         xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic));
-    for (int i = int(1 + rng() % 12); i > 0; --i) edit(b.root(), rng);
+    for (int i = int(1 + rng() % 12); i > 0; --i) edit(b.plain_root(), rng);
     return b.save_verified();
 }
 // Seed corpus: 48 wires over the three schemas, each prefixed by its tag byte.

@@ -15,5 +15,5 @@ int main() {
     XOffsetDatastructure::TypedXBuffer<old_v::Account> source(4096);
     (void)source.make();
     auto target = XOffsetDatastructure::evolve<new_v::Account>(source);
-    return target.root().gold == 0 ? 0 : 1;
+    return target.plain_root().gold == 0 ? 0 : 1;
 }

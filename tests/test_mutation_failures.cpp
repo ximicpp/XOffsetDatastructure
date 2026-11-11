@@ -82,20 +82,20 @@ int main() {
                 release_filler();
                 auto expected = snapshot(r);
                 auto loaded = TypedXBuffer<RetryRoot>::load(buf.save_verified<RetryRoot>());
-                assert(snapshot(loaded.root()) == expected);
+                assert(snapshot(loaded.plain_root()) == expected);
                 ++succeeded;
             } catch (const XBadAlloc&) {
                 ++failed;
                 release_filler();
                 assert(snapshot(r) == before);
                 auto loaded = TypedXBuffer<RetryRoot>::load(buf.save_verified<RetryRoot>());
-                assert(snapshot(loaded.root()) == before);
+                assert(snapshot(loaded.plain_root()) == before);
                 bool grew = loaded.grow(65536);
                 assert(grew);
-                mutate(loaded.root(), operation);
-                auto expected = snapshot(loaded.root());
+                mutate(loaded.plain_root(), operation);
+                auto expected = snapshot(loaded.plain_root());
                 auto again = TypedXBuffer<RetryRoot>::load(loaded.save_verified());
-                assert(snapshot(again.root()) == expected);
+                assert(snapshot(again.plain_root()) == expected);
             }
         }
     }

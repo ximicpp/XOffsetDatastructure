@@ -293,14 +293,14 @@ void inside_root() {
     std::array<mkt::Quote, 4> qs;
     for (std::uint32_t i = 0; i < qs.size(); ++i) qs[i] = quote(i);
     auto b = TypedXBuffer<mkt::Snapshot>::create();
-    b.root().seq = 5;
-    b.root().quotes.assign_range(std::span<const mkt::Quote>(qs));
+    b.plain_root().seq = 5;
+    b.plain_root().quotes.assign_range(std::span<const mkt::Quote>(qs));
     const std::string wire = b.save_verified();
     auto l = TypedXBuffer<mkt::Snapshot>::load_verified(wire);
-    CHECK(l.root().quotes.size() == 4);
+    CHECK(l.plain_root().quotes.size() == 4);
     const std::size_t n = write_fixed_batch<mkt::Quote>(out(), qs);
     auto v = view_fixed_batch<mkt::Quote>(in(0, n));
-    CHECK(v && std::memcmp(v.records.data(), &l.root().quotes[0], 4 * sizeof(mkt::Quote)) == 0);
+    CHECK(v && std::memcmp(v.records.data(), &l.plain_root().quotes[0], 4 * sizeof(mkt::Quote)) == 0);
 }
 
 } // namespace

@@ -812,7 +812,7 @@ void test_schema_versions() {
     TypedXBuffer<mapdemo_v1::ViewSnapshot> s1 = evolve<mapdemo_v1::ViewSnapshot>(s2);
     const std::string w1 = s1.save_compact(XCompactOptions{0});
     XB back = XB::load_verified<mapdemo_v1::ViewSnapshot>(w1, cap_snapshot());
-    ex(checks::snapshot_digest_of(back.root<mapdemo_v1::ViewSnapshot>()) == checks::snapshot_digest(s2.root()),
+    ex(checks::snapshot_digest_of(back.root<mapdemo_v1::ViewSnapshot>()) == checks::snapshot_digest(s2.plain_root()),
        "the conversion changed the content");
     ex(back.root<mapdemo_v1::ViewSnapshot>().units.size() == 100, "the conversion lost units");
     ex(peek_wire_fingerprint(w1).fingerprint == wire_fingerprint_v<mapdemo_v1::ViewSnapshot>,
