@@ -20,13 +20,28 @@ Breaking API: `TypedXBuffer<T>::root()` and `reset()` return a proxy
 (`XRef<T>`); the old plain reference is `plain_root()` (it dangles when the
 payload moves). Wire format unchanged (2.1; delta 1.0 and XS 1.0 unchanged).
 
-Judged in the cloud only (docs/RELEASING.md): VALIDATE_VERDICT_PENDING
+Judged in the cloud only (docs/RELEASING.md). `tools/local_validate.sh
+--release --base v3.5.0` on the release candidate (7d16b44): all 27 steps
+pass, none not run (GCC 16 / ASan / TSan 209/209, P2996 209/209 and
+signatures, the C++20/C++23/C++26d matrix, Windows MSVC C++20/C++23,
+clang-cl and MinGW, and this time Android NDK r29/r30 under qemu-aarch64 and
+clang 18 ASan, 179/179 each with identical corpora; wire matrix 64 reads, 0
+failures). Ir against v3.5.0: GCC 16 totals 0.974-1.001; P2996 totals
+0.975-1.005, two warnings accepted by the performance thread (below).
+X86_VERDICT_PENDING
 Pre-release fuzz (`tools/fuzz_prerelease.sh --budget hour`, ASan+UBSan) on
 the release candidate (7d16b44): PASS, no findings over GCC 16 differential
 and replay, libFuzzer on all five targets in the reflection build, the four
 field-list targets and the cross-build outcome diff.
 
 Known items (report only, explained):
+- P2996 builds: allocation-heavy mutation paths +0.35-0.47% Ir
+  (formal.mutate 1.0035, slg.B 1.0047; the compact free table, #265); GCC 16
+  builds about -1.3% on the same totals.
+- `XBuffer` move and swap cost about 40-100 Ir more each (pin and control
+  checks on `XBufferCore::move_from`'s fast path, #256/#261): stages
+  slg.B.writeback / slg.C.replace 1.055 (GCC 16) and 1.192 (P2996), under 1%
+  of their scenes (report-only stages). Back to v3.5.0 is a 4.0 R7 item.
 - Mac A.req_encode +6.3% after #266 (the `root<T>()` cache refill, redo of
   #223; the same +6.3% as #223 in 3.3): accepted by the performance thread
   2026-11-11 as the cost of the checked-path refill; it is the new baseline.
