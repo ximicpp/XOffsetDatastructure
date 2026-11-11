@@ -453,9 +453,16 @@ public:
         if (!movable && maximum_capacity > SlotGeometry::payload_bytes(cls))
             XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument,
                               "pinned slot smaller than maximum capacity");
-        if (consume_vm_failure(VmOperation::Reserve)) XOFFSET_VFAIL_BAD_ALLOC();
+        if (!owner.take_slot(cls, maximum_capacity, movable)) XOFFSET_VFAIL_BAD_ALLOC();
+        return vok();
+    }
+    // for_slot_v without reporting: false (nothing changed) when no slot of
+    // class `cls` is available. The owner must be empty; the class valid.
+    bool take_slot(std::size_t cls, std::size_t maximum_capacity, bool movable) noexcept {
+        if (consume_vm_failure(VmOperation::Reserve)) return false;
         SlotHeader* slot = SlotSlab::acquire(cls);
-        if (!slot) XOFFSET_VFAIL_BAD_ALLOC();
+        if (!slot) return false;
+        VirtualMemoryStorage& owner = *this;
         owner.base_ = slot->payload();
         owner.reserved_bytes_ = SlotGeometry::slot_bytes(cls);
         owner.accessible_bytes_ = SlotGeometry::payload_bytes(cls);
@@ -465,7 +472,20 @@ public:
         owner.slot_class_ = static_cast<std::uint8_t>(cls);
         owner.movable_ = movable;
         owner.set_host_owner(nullptr);
-        return vok();
+        return true;
+    }
+
+    // The largest logical length this owner reaches without moving: a
+    // slot's payload, or a VM owner's reservation (at most the maximum).
+    std::size_t reservation_limit() const noexcept {
+        const std::size_t limit = is_slot() ? accessible_bytes_ : reserved_bytes_;
+        return limit < maximum_capacity_ ? limit : maximum_capacity_;
+    }
+    // A relocating buffer's VM owner: its maximum becomes `maximum`, above
+    // its reservation. Growth stops at the reservation (reservation_limit);
+    // past it the buffer moves. Only for an owner without a pool.
+    void raise_maximum(std::size_t maximum) noexcept {
+        if (!is_slot() && !pool_.enabled() && maximum > maximum_capacity_) maximum_capacity_ = maximum;
     }
 
     // In-place reload: replace the logical content of this owner with

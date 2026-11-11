@@ -131,6 +131,7 @@ set(REFLECTION_TESTS
     test_lower_bound_index
     test_stable_storage
     test_slot_storage
+    test_relocating_storage
     test_ordinary_records
     test_schema_describe
     test_vm_lifecycle
@@ -172,6 +173,16 @@ endforeach()
 
 find_package(Threads REQUIRED)
 target_link_libraries(test_owner_identity PRIVATE Threads::Threads)
+
+# Relocating storage under the phone rule: a 4 MiB first move, then doubling.
+if(TARGET test_relocating_storage)
+    add_executable(test_relocating_storage_step test_relocating_storage.cpp)
+    configure_xoffset_target(test_relocating_storage_step)
+    xoffset_enable_test_assertions(test_relocating_storage_step)
+    target_compile_definitions(test_relocating_storage_step PRIVATE XOFFSET_RELOCATE_STEP_BYTES=4194304u)
+    add_test(NAME test_relocating_storage_step COMMAND test_relocating_storage_step)
+    set_tests_properties(test_relocating_storage_step PROPERTIES LABELS "reflection")
+endif()
 
 # Schema handshake (xoffset_handshake.hpp) and schema evolution
 # (xoffset_evolution.hpp, server side).
@@ -307,6 +318,7 @@ set(NO_EXCEPTIONS_TESTS
     test_shared_delta
     test_shared_delta_sync
     test_shared_delta_format
+    test_relocating_storage
 )
 foreach(test_name ${NO_EXCEPTIONS_TESTS})
     if(NOT XOFFSET_TESTS_REFLECTION AND test_name IN_LIST XOFFSET_CXX26_ONLY_TESTS)

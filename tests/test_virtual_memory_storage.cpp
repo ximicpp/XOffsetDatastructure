@@ -694,8 +694,12 @@ void test_slot_owner() {
     static_assert(SlotGeometry::class_for(1) == 0, "smallest class");
     static_assert(SlotGeometry::class_for(1024 - 64) == 0 && SlotGeometry::class_for(1024 - 63) == 1,
                   "payload capacity is 2^k - 64");
-    static_assert(SlotGeometry::class_for(SlotGeometry::max_payload) == SlotGeometry::classes - 1, "SLOT_MAX");
+    static_assert(SlotGeometry::class_for(SlotGeometry::max_payload) == SlotGeometry::auto_classes - 1, "SLOT_MAX");
     static_assert(SlotGeometry::class_for(SlotGeometry::max_payload + 1) == SlotGeometry::classes, "beyond");
+    // The slab also holds the relocating classes (a 1 MiB slot by default).
+    static_assert(SlotGeometry::slab_class_for(SlotGeometry::slab_max_payload) == SlotGeometry::classes - 1, "slab max");
+    static_assert(SlotGeometry::slab_class_for(SlotGeometry::slab_max_payload + 1) == SlotGeometry::classes, "beyond slab");
+    static_assert(SlotGeometry::slab_max_payload >= SlotGeometry::relocating_payload, "relocating slot");
 
     const auto cls = SlotGeometry::class_for(3000);
     const void* first = nullptr;
