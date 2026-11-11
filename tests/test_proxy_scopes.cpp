@@ -254,6 +254,37 @@ bool test_pin_scopes() {
     return true;
 }
 
+// A scope that outgrows the reservation: the failing operations have no
+// effect (with exceptions the rest of the scope is skipped), edit returns
+// false and the failure is recorded; nothing crashes.
+bool test_scope_overflow_fails_soft() {
+    auto b = make_relocating(16384);
+    const char* where = b.data();
+    int reached = 0;
+    const bool ok = b.edit<Root>([&](Root& root) {
+        for (int i = 0; i < 100000; ++i) root.ints.push_back(i);
+        Player& p = root.players.emplace_back();   // a sink when it fails (no exceptions)
+        p.id = 5;
+        p.name = "a name that needs a heap block in the payload";
+        for (int i = 0; i < 1000; ++i) p.items.push_back(i);
+        root.map.try_emplace(1, 2);
+        root.title.append(std::string(100000, 'y'));
+        reached = 1;
+    });
+    CHECK(!ok && !b.ok() && b.data() == where);
+    CHECK(b.root<Root>().ints.size() < 100000u);
+#if XOFFSET_NO_EXCEPTIONS
+    CHECK(reached == 1);                    // every failing operation returned
+    CHECK(b.error() == XErrc::borrowed);
+#endif
+    // The buffer is intact and usable after clear_error().
+    b.clear_error();
+    CHECK(!b.save_verified<Root>().empty());
+    auto ints = b.ref<Root>().field<&Root::ints>();
+    CHECK(ints.push_back(1) && b.ok());
+    return true;
+}
+
 bool test_failed_buffer_refuses_to_emit() {
     auto b = make_relocating();
     auto r = b.ref<Root>();
@@ -287,6 +318,7 @@ int main() {
     ok = test_xbuffer_moves_and_lifetime() && ok;
     ok = test_pin_scopes() && ok;
     ok = g_scope_ok && ok;
+    ok = test_scope_overflow_fails_soft() && ok;
     ok = test_failed_buffer_refuses_to_emit() && ok;
     std::cout << (ok ? "test_proxy_scopes: all passed" : "test_proxy_scopes: FAILED") << std::endl;
     return ok ? 0 : 1;
