@@ -882,7 +882,7 @@ namespace XOffsetDatastructure {
         // The content is replaced (reload, reset, clone_into): proxies of the
         // old content become stale. An open pin scope keeps its block (the
         // scope closes on it), which starts a new lineage in place.
-        void end_lineage() noexcept {
+        XOFFSET_DETAIL_NOINLINE void end_lineage() noexcept {
             quarantine_.clear();
             ctl_->version += 2;
             ctl_->birth = ctl_->version;
@@ -2704,7 +2704,7 @@ namespace XOffsetDatastructure {
         // so neither needs a fresh 12 KiB table, whatever else this thread
         // reloaded in between. A reset keeps all its bin storage; a reload
         // keeps it within FreeTableRecycler's keep limits.
-        void begin_reinit(bool reset = false) noexcept {
+        XOFFSET_DETAIL_MOVE_INLINE void begin_reinit(bool reset = false) noexcept {
             if (ctl_) [[unlikely]] end_lineage();
             advance_epoch();
             empty_free_table(reset);
