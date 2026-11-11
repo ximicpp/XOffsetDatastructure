@@ -181,6 +181,11 @@ bool test_xbuffer_moves_and_lifetime() {
     b2.swap(other);
     CHECK(ints.size() == 2u && other_ints.size() == 1u);
     CHECK(other.root<Root>().ints.size() == 2u && b2.root<Root>().ints.size() == 1u);
+    // Proxies made after the swap name the content each buffer now holds.
+    CHECK(other.ref<Root>().field<&Root::ints>().get(1) == 2);
+    CHECK(b2.ref<Root>().field<&Root::ints>().get(0) == 7);
+    CHECK(other.ref<Root>().field<&Root::ints>().push_back(3) && other.root<Root>().ints.size() == 3u);
+    CHECK(b2.root<Root>().ints.size() == 1u);
     {
         XBuffer gone = std::move(other);
     }

@@ -109,13 +109,17 @@ NOINLINE std::int64_t levels_proxy(XRef<Root> r) {
 
 // raw / proxy_same: a pooled 64 MiB Automatic buffer (warm pages, never
 // moves), as the prototype's baseline; proxy / edit: a Relocating buffer.
-enum class Mode { raw, proxy_same, proxy, edit };
+// raw / proxy / edit: a pooled 64 MiB Automatic buffer (warm pages, never
+// moves), the prototype's baseline: what the access path itself costs.
+// relocating: the same proxy / edit on a Relocating buffer (1 MiB first
+// reservation, moves when full; the edit scope is told the growth).
+enum class Mode { pooled, relocating };
 XBufferPool& pool() {
     static XBufferPool p({16, 16ull * (64u << 20), 64u << 20});
     return p;
 }
 XBuffer make(Mode mode) {
-    if (mode == Mode::raw || mode == Mode::proxy_same)
+    if (mode == Mode::pooled)
         return XBuffer::create<Root>(
             256, XBuffer::maximum_capacity(64u << 20).with_growth(XGrowPolicy::Automatic).with_pool(pool()));
     return XBuffer::create<Root>(256, XBuffer::relocating());
@@ -144,12 +148,12 @@ double run(Mode mode, int n, int iters, Op&& op) {
 }
 
 int g_fail = 0;
-void row(const char* name, int n, double raw, double same, double proxy, double edit, double proxy_gate) {
-    const double rs = same / raw, rp = proxy / raw, re = edit / raw;
-    const bool pass = rs <= proxy_gate && re <= 1.02;
-    std::printf("n=%-6d %-20s raw %7.2f | proxy %7.2f %.3fx (gate %.2f) | relocating: proxy %7.2f %.3fx, "
-                "edit %7.2f %.3fx (gate 1.02) | %s\n",
-                n, name, raw, same, rs, proxy_gate, proxy, rp, edit, re, pass ? "pass" : "OVER");
+void row(const char* name, int n, double raw, double proxy, double edit, double rproxy, double redit, double gate) {
+    const double rp = proxy / raw, re = edit / raw;
+    const bool pass = rp <= gate && re <= 1.02;
+    std::printf("n=%-6d %-20s raw %7.2f | proxy %7.2f %.3fx (gate %.2f) | edit %7.2f %.3fx (gate 1.02) | "
+                "relocating: proxy %.3fx, edit %.3fx | %s\n",
+                n, name, raw, proxy, rp, gate, edit, re, rproxy / raw, redit / raw, pass ? "pass" : "OVER");
     if (!pass) ++g_fail;
 }
 } // namespace
@@ -165,15 +169,16 @@ int main(int argc, char** argv) {
         for (int i = 0; i < n; ++i) rnd[i] = std::int32_t(rng() % (4u * n));
         const int iters = (n <= 1000 ? 400 : 30) / (quick ? 4 : 1);
         auto three = [&](const char* name, double gate, auto raw_op, auto proxy_op) {
-            const double raw = run(Mode::raw, n, iters, [&](XBuffer& b) { raw_op(b.root<Root>()); });
-            const double same = run(Mode::proxy_same, n, iters, [&](XBuffer& b) { proxy_op(b.ref<Root>()); });
-            const double proxy = run(Mode::proxy, n, iters, [&](XBuffer& b) { proxy_op(b.ref<Root>()); });
-            // The scope is told how much the build adds, so it does not
-            // outgrow the first 1 MiB while pinned.
-            const double edit = run(Mode::edit, n, iters, [&](XBuffer& b) {
-                b.edit<Root>([&](Root& r) { raw_op(r); }, 8u << 20);
+            const double raw = run(Mode::pooled, n, iters, [&](XBuffer& b) { raw_op(b.root<Root>()); });
+            const double proxy = run(Mode::pooled, n, iters, [&](XBuffer& b) { proxy_op(b.ref<Root>()); });
+            const double edit = run(Mode::pooled, n, iters, [&](XBuffer& b) {
+                b.edit<Root>([&](Root& r) { raw_op(r); });
             });
-            row(name, n, raw, same, proxy, edit, gate);
+            const double rproxy = run(Mode::relocating, n, iters, [&](XBuffer& b) { proxy_op(b.ref<Root>()); });
+            const double redit = run(Mode::relocating, n, iters, [&](XBuffer& b) {
+                b.edit<Root>([&](Root& r) { raw_op(r); }, XBufferCore::size_type(n) * 96u);
+            });
+            row(name, n, raw, proxy, edit, rproxy, redit, gate);
         };
         three("ints push_back", 1.15, [&](Root& r) { ints_raw(r, n); }, [&](XRef<Root> r) { ints_proxy(r, n); });
         three("ints push_back+call", 1.15, [&](Root& r) { ints_raw_call(r, n); },
@@ -185,7 +190,7 @@ int main(int argc, char** argv) {
         three("players build", 1.20, [&](Root& r) { players_raw(r, n); },
               [&](XRef<Root> r) { players_proxy(r, n); });
         {   // reads: report only (the design keeps bulk reads in read scopes)
-            auto b = make(Mode::proxy);
+            auto b = make(Mode::relocating);
             players_raw(b.root<Root>(), n);
             auto time = [&](auto&& f) {
                 double best = 1e300;
