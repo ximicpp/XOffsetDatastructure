@@ -132,6 +132,7 @@ set(REFLECTION_TESTS
     test_stable_storage
     test_slot_storage
     test_relocating_storage
+    test_proxy_scopes
     test_retire_discard
     test_ordinary_records
     test_schema_describe
@@ -320,6 +321,7 @@ set(NO_EXCEPTIONS_TESTS
     test_shared_delta_sync
     test_shared_delta_format
     test_relocating_storage
+    test_proxy_scopes
     test_retire_discard
 )
 foreach(test_name ${NO_EXCEPTIONS_TESTS})
