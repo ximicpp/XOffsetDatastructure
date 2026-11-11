@@ -213,6 +213,11 @@
 #   bench/slg_bench.cpp  2026-11-11: `--mode proc` (process RSS, peak, page tables and
 #                        mappings from /proc/self, the 3.6 memory gate) and SLG_PROC_SMAPS; the
 #                        verify and bench modes are unchanged (no timing or sum change).
+#   bench/xoffset_runner.hpp, include/slg/view.hpp, README.md  2026-11-11 (small-server D3):
+#                        D3 server encodes held units in D*.pub over their dirty members
+#                        (XRecordDelta::update), others on first use; one image per entity;
+#                        prefetch of changed tiles / new marches (world: changed_tiles(),
+#                        march_count(), untimed). D3 bytes and all other rows unchanged.
 #   bench/xoffset_runner.hpp  2026-11-11 (growth policy part 4): when the library defines
 #                        XOFFSET_PROXY_BATCH_API, every buffer a sender builds messages in
 #                        (A.req, EB/U* snapshots and deltas, L patches, UL orders, SD modules,
@@ -227,7 +232,7 @@
 #                        reruns a fill whose reservation is too small, and the fills draw from
 #                        the shared Rng, so the senders must never start small.
 ea55baa3f59a1719135b2b3187e2bc9fc91abe171d6cfebf8216780676960eb0  CMakeLists.txt
-5bfbf9a2d6cd871ac1856b524f8cf0ab175180941bcb512df4919457b9e1e07e  README.md
+035efa87a69963b1bd4e2c2f03d472d77a3ffba01ee782d763cafda0d322ec52  README.md
 ea141af841831b376028f48ab0d4c22e66ce2671f01d9e14c9f66814f5ebaa6e  adapters/cereal_format.hpp
 6441a0f51cf04424de67df98f6a3696b378f8ec3cd3d97c2bf5a6ec065db2768  adapters/flatbuffers_format.hpp
 677c3607ff9390c5a1b9d6a348da3dcd7aee4eef52740a35911d2ab041136ced  adapters/protobuf_format.hpp
@@ -238,7 +243,7 @@ fef3f268315b7383a8fe8ee2b45d9db70ba50ec201301ed8d58dd5ebc0ab9805  bench/runner.h
 168bf7d2b3ce419c8b001793ba64b64e31dc281041ae01e16cf622c40ef75c5f  bench/slg_bench.cpp
 730a66f677d9d20077175f629cf0b13919e66ccedaf880e4eb414c6bc94c0610  bench/small_msg_probe.cpp
 56cb184e9bbebd0a61e184a431fa9ede2e9d75a617ee7ce838e17e1a342aad76  bench/std_runner.hpp
-ccee0daffb8e1da38cdba330aa71f3fa436451d22027d4641a12c32efbd18e8d  bench/xoffset_runner.hpp
+709782285b1d917786c69dab226b1ad9d8cbe56ee9a7faeaa3dfab2e7f5d15e8  bench/xoffset_runner.hpp
 12cab27be9331a4a09ae66f444cf5852dd81e363df562748a4ea854932e35e44  include/slg/cista_free.hpp
 f901dd6b3534240a5038157eaf601d756c07557bcd7fad74b80f8615513b6ab8  include/slg/flat_held_index.hpp
 341ba037a01f807258b0a7527aa0ba0a763f60a32bab00f78f75834f0330cffe  include/slg/generic.hpp
@@ -249,7 +254,7 @@ e4fc018d1aa4b6328d6d35199fbb8a0e385cb2f71aaf9103bae472448309e440  include/slg/mo
 3259eef215f98da7328da68bb5e7dd1f33141cdeb894511a039af075114c3391  include/slg/model_xoffset_optin.hpp
 36d5761eb46998e5040f7a19fb99f5ac1df5e31ee129a864e3872ba734e4a5db  include/slg/trace.hpp
 29d82f39560ffed67eec9a234c1c5d42323f15afb623931e848bfccc57f20b78  include/slg/uplink.hpp
-b78223142aad4813bb86b071fda4307d6d77e0ff7f678bb33955b355302adaa6  include/slg/view.hpp
+59786cf362f0eafa467024b9fa6c0f35f998aad2614eb27e3cf7eac67e4e1318  include/slg/view.hpp
 bf2ab42341c4db797200c2302cbcf3c62fc08030c98210e3270deb6d2d072605  schema/slg.fbs
 e7b20776bf0f93be063a8228ded1e15b00f50fd3be507e957a0033afd9f79761  schema/slg.proto
 cf948f2cf37c276e5f9d0734188fdc8ae9d4b0242cb676cfc4148573cec704a4  tests/flat_held_index_test.cpp

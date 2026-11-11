@@ -76,6 +76,16 @@
 #  endif
 #endif
 
+// A hint to bring the cache line at p in for reading; nothing where the
+// compiler has no prefetch intrinsic.
+#if defined(__GNUC__) || defined(__clang__)
+#define XOFFSET_RECEIVER_PREFETCH(p) __builtin_prefetch((p), 0, 3)
+#elif defined(_MSC_VER) && (defined(_M_X64) || defined(_M_AMD64))
+#define XOFFSET_RECEIVER_PREFETCH(p) _mm_prefetch(reinterpret_cast<const char*>(p), _MM_HINT_T0)
+#else
+#define XOFFSET_RECEIVER_PREFETCH(p) ((void)(p))
+#endif
+
 namespace XOffsetDatastructure {
 
 enum class XLink : std::uint8_t { server_peer, from_server, from_client };
@@ -513,6 +523,19 @@ public:
         constexpr std::size_t head = sizeof(XWireHeaderV2);
         std::array<std::uint64_t, 5> words;
         if (wire.size_bytes() < head) [[unlikely]] return framing_error<T>(wire, who);
+        // A view copies nothing, so the first read of each line of the wire
+        // falls in the caller's use of the view, one miss after another
+        // inside its loops. A small wire (one message, a few lines) has all
+        // its lines requested here, so those misses overlap each other and
+        // the checks below. Larger wires are left to the hardware's
+        // sequential prefetch.
+        if (wire.size_bytes() <= view_prefetch_bytes) {
+            // Every line after the first (the header read below loads it).
+            const auto first = reinterpret_cast<std::uintptr_t>(wire.data()) & ~std::uintptr_t(63);
+            const auto last = reinterpret_cast<std::uintptr_t>(wire.data()) + wire.size_bytes() - 1;
+            for (auto line = first + 64; line <= last; line += 64)
+                XOFFSET_RECEIVER_PREFETCH(reinterpret_cast<const void*>(line));
+        }
         std::memcpy(words.data(), wire.data(), head);
         const auto used = std::uint64_t(std::uint32_t(words[1]));
         const auto root = std::uint64_t(std::uint32_t(words[1] >> 32));
@@ -550,6 +573,9 @@ public:
     }
 
 private:
+    // The largest wire view() prefetches whole (16 lines).
+    static constexpr std::size_t view_prefetch_bytes = 1024;
+
     template <typename T>
     XError framing_error(std::span<const std::byte> wire, const char* who) const {
 #if XOFFSET_NO_EXCEPTIONS

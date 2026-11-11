@@ -93,6 +93,36 @@ server does not read a client's uplink as a shared delta). The tier follows
 the link (admit by default, section 3); `apply_sync<XCheck::full>` checks
 every body first.
 
+### Changed members only
+
+A server that keeps dirty flags (which members of a record changed this
+tick) need not compare whole records. `XRecordDelta<T>::fields(members)`
+turns a bit set of member indices (bit i is the i-th member in declaration
+order, `member_count` of them, at most 64) into an `XSyncFields`: the plain
+blocks and containers those members cover. Fields combine with `|=`.
+
+```cpp
+using RD = xs::XRecordDelta<Unit>;
+const xs::XSyncFields f = RD::fields(unit_dirty_bits(u));   // bit i: member i changed
+// Compare and sync only those members (the others must equal before already):
+RD::diff(u, baseline_of(u), body, f);
+// Or change the image every holder has and write the body in one step:
+RD::update(image_of(u), f, body, [&](Unit& r) { copy_changed_members(r, u); });
+```
+
+- `diff(now, before, out, fields)` compares and copies only the given blocks
+  and containers. When the other members of `now` and `before` are equal, it
+  writes the bytes of `diff(now, before, out)`.
+- `update(rec, fields, out, set)` keeps the given members' old bytes, calls
+  `set(rec)` (which may change only those members) and writes the body that
+  takes the old record to the new one: the bytes of `diff` against a copy of
+  the old record. It returns false and writes nothing when the members did
+  not change. There is no second record per entity to keep.
+- A record of plain bytes only (`container_count == 0`) is encoded by
+  `XSyncWriter::change` straight into the message.
+
+The format is unchanged: a receiver cannot tell which way a body was written.
+
 ### The target
 
 | Member | Called | Contract |
