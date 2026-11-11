@@ -429,17 +429,35 @@ bool test_build() {
     CHECK(!b.pinned() && b.root<Root>().counter == 5 && b.root<Root>().ints.size() == 10u);
     const std::string first = b.save_verified<Root>();
     CHECK(!first.empty());
-    // Outgrowing the reservation without asking: fails softly, nothing moves.
-    CHECK(!b.build<Root>([](Root& m) {
+    // Outgrowing the reservation without asking: the scope cannot move the
+    // payload, so build starts over in a reservation twice as large, as
+    // often as it takes (f runs again each time).
+    int runs = 0;
+    const std::size_t small_limit = b.reservation_limit();
+    CHECK(b.build<Root>([&](Root& m) {
+        ++runs;
         for (int i = 0; i < 100000; ++i) m.ints.push_back(i);
     }));
-    CHECK(!b.ok() && !b.pinned());
-#if XOFFSET_NO_EXCEPTIONS
-    CHECK(b.error() == XErrc::borrowed);
-#endif
+    CHECK(runs > 1 && b.ok() && !b.pinned());
+    CHECK(b.root<Root>().ints.size() == 100000u && b.root<Root>().ints[99999] == 99999);
+    CHECK(b.reservation_limit() > small_limit);
+    // The buffer keeps the larger reservation: the same message again runs once.
+    runs = 0;
+    CHECK(b.build<Root>([&](Root& m) {
+        ++runs;
+        for (int i = 0; i < 100000; ++i) m.ints.push_back(i);
+    }));
+    CHECK(runs == 1 && b.ok());
+    // At its maximum a buffer cannot start over larger: fails softly.
+    auto capped = XBuffer::create<Root>(256, XBuffer::relocating(65536).with_reserve(16384));
+    CHECK(!capped.build<Root>([](Root& m) {
+        for (int i = 0; i < 100000; ++i) m.ints.push_back(i);
+    }));
+    CHECK(!capped.ok() && !capped.pinned());
     // The next message starts over: the failure goes with the old content.
+    CHECK(capped.build<Root>([](Root& m) { m.counter = 6; }));
+    CHECK(capped.ok() && capped.root<Root>().counter == 6 && capped.root<Root>().ints.size() == 0u);
     CHECK(b.build<Root>([](Root& m) { m.counter = 6; }));
-    CHECK(b.ok() && b.root<Root>().counter == 6 && b.root<Root>().ints.size() == 0u);
     // Asking for the room up front: one move on entry, then plain speed.
     CHECK(b.build<Root>([](Root& m) {
         for (int i = 0; i < 100000; ++i) m.ints.push_back(i);

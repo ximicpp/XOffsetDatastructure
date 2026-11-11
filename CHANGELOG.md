@@ -51,7 +51,9 @@
   references). Each sizes the target once and moves the payload at most once;
   a source inside the payload is copied out first. `XBuffer::build<T>(f,
   expected_growth)` is `reset<T>()` plus a pin scope in one step, for senders
-  that make a new message each time. The SLG adapters now build every sent
+  that make a new message each time. When a Relocating buffer's reservation is
+  too small, it starts over in one twice as large and runs f again (until the
+  buffer's maximum), so f must only write into the buffer. The SLG adapters now build every sent
   message this way in a Relocating buffer. `test_proxy_fuzz` (also without
   exceptions) interleaves proxies, scopes, batches, growth past 1 MiB, moves,
   swaps, reloads, destruction and VM failure injection, and checks every

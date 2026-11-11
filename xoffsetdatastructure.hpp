@@ -9201,8 +9201,46 @@ namespace XOffsetDatastructure {
         // its smallest). Otherwise as edit<T>(f, expected_growth): the same
         // fail-soft result, and f must return void. A failed buffer starts
         // over (reset replaces its content and clears the failure).
+        //
+        // A Relocating buffer whose reservation turns out too small (the
+        // payload cannot move inside the scope) is built again: reset, a
+        // reservation of at least twice the size reached, and f once more,
+        // until it fits or the buffer is at its maximum. So f may run more
+        // than once: it must only write into the buffer (no side effects
+        // outside it that a second run would repeat). The larger reservation
+        // stays with the buffer, so a reused buffer pays this once.
         template<typename T, typename F>
         XOFFSET_DETAIL_MOVE_INLINE bool build(F&& f, size_type expected_growth = 0) {
+            if (build_once<T>(f, expected_growth)) [[likely]] return true;
+            return build_again<T>(f);
+        }
+
+    private:
+        // A failure a larger reservation can cure: the scope could not move
+        // the payload, and the buffer can still grow.
+        bool build_outgrew() const noexcept {
+            const XErrc e = error();
+            if (e != XErrc::out_of_storage && e != XErrc::borrowed) return false;
+            return !this->pinned() && !this->address_stable() && reservation_limit() < maximum_capacity();
+        }
+        template<typename T, typename F>
+        XOFFSET_DETAIL_NOINLINE bool build_again(F& f) {
+            for (int attempt = 0; attempt < 16 && build_outgrew(); ++attempt) {
+                const size_type limit = reservation_limit();
+                const size_type reached = arena() ? static_cast<size_type>(arena()->used_end) : 0;
+                (void)reset<T>();
+                const size_type target = std::min<size_type>(std::max(limit, reached) * 2u, maximum_capacity());
+                const size_type used = arena() ? static_cast<size_type>(arena()->used_end) : 0;
+                if (target <= used || make_room(target - used) != XErrc::ok || reservation_limit() <= limit) {
+                    record_error(XErrc::out_of_storage);
+                    return false;
+                }
+                if (build_once<T>(f, 0)) return true;
+            }
+            return false;
+        }
+        template<typename T, typename F>
+        XOFFSET_DETAIL_MOVE_INLINE bool build_once(F& f, size_type expected_growth) {
             using R = std::invoke_result_t<F&, T&>;
             static_assert(std::is_void_v<R>,
                 "build(f): f must return void (a value made inside may point into the payload; "
@@ -9235,6 +9273,8 @@ namespace XOffsetDatastructure {
             // A failure made a block (record_error); the block follows the content.
             return !close.ctl || close.ctl->sticky == XErrc::ok;
         }
+
+    public:
 
         // Read-only pin scope: returns f(const T& root). The result may not
         // be (or hold) a pointer, reference, string_view or span.
