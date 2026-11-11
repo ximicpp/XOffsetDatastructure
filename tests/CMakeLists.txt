@@ -132,6 +132,7 @@ set(REFLECTION_TESTS
     test_stable_storage
     test_slot_storage
     test_relocating_storage
+    test_retire_discard
     test_ordinary_records
     test_schema_describe
     test_vm_lifecycle
@@ -319,6 +320,7 @@ set(NO_EXCEPTIONS_TESTS
     test_shared_delta_sync
     test_shared_delta_format
     test_relocating_storage
+    test_retire_discard
 )
 foreach(test_name ${NO_EXCEPTIONS_TESTS})
     if(NOT XOFFSET_TESTS_REFLECTION AND test_name IN_LIST XOFFSET_CXX26_ONLY_TESTS)
