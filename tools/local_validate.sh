@@ -3,13 +3,23 @@
 # for good (susu 2026-10-23), so this is the merge evidence: it validates the checked-out
 # working tree (HEAD) against a base commit and writes REPORT.md for the PR description.
 #
-#   tools/local_validate.sh [--base REV] [--steps LIST | --release] [--clients] [--work DIR] [-j N]
-#                           [--columns K] [--fail-fast]
+#   tools/local_validate.sh [--base REV] [--tier TIER | --steps LIST | --release] [--clients]
+#                           [--work DIR] [-j N] [--columns K] [--fail-fast]
 #
-# Steps, in this order (default: every step the host can run except tsan and the client
-# columns, plus client-c++20; --release adds tsan and every client column; --clients adds
-# every client column; LIST may also name the groups "classic" = the steps up to asm,
-# "matrix" = the C++20/C++23 columns and "clients" = the client columns):
+# Tiers (susu 2026-11-11: tiered validation; the default is pr):
+#   pr       every PR that touches the library: meta gcc asan fuzz diff smoke ir p2996
+#            p2996-ir asm, plus diff-c++20 and client-c++20 (one C++20 client column)
+#   quick    PRs that leave the library alone (bench/, tools/, tests/, docs/): meta gcc smoke
+#            p2996; refuses to run when a top-level source file, CMakeLists.txt or cmake/
+#            differs from the base
+#   daily    once a day on the head of next_cpp26: tsan, the whole C++20/C++23 matrix, every
+#            client column and wire-matrix (the steps the pr tier leaves out)
+#   full     the default before 2026-11-11: pr plus the C++20/C++23 matrix and wire-matrix
+#   release  the same as --release: every step, tsan and every client column included
+#
+# Steps, in this order (--steps LIST picks them by name; --clients adds every client column;
+# LIST may also name the groups "classic" = the steps up to asm, "matrix" = the C++20/C++23
+# columns and "clients" = the client columns):
 #   meta      the library's own files (top-level *.hpp, *.cpp) use reflection (std::meta, ^^)
 #             only in xoffset_schema_reflect.hpp; every other walk goes through the schema
 #             interface (xoffset_schema.hpp), so the field-list builds see the same code
@@ -92,9 +102,13 @@ MATRIX_GROUP="gcc13-c++20 gcc13-c++20-asan clang18-c++20 clang18-c++20-asan gcc1
 MATRIX_STEPS="$MATRIX_GROUP $CLIENT_STEPS wire-matrix"
 ALL_STEPS="$CLASSIC_STEPS $MATRIX_STEPS client-c++20"
 RELEASE_STEPS="${ALL_STEPS/ client-c++20/}"
-DEFAULT_STEPS="${RELEASE_STEPS/ tsan / }"
-for c in $CLIENT_STEPS; do DEFAULT_STEPS=${DEFAULT_STEPS/ $c / }; done
-DEFAULT_STEPS="$DEFAULT_STEPS client-c++20"
+FULL_STEPS="${RELEASE_STEPS/ tsan / }"
+for c in $CLIENT_STEPS; do FULL_STEPS=${FULL_STEPS/ $c / }; done
+FULL_STEPS="$FULL_STEPS client-c++20"
+PR_STEPS="${CLASSIC_STEPS/ tsan / } diff-c++20 client-c++20"
+QUICK_STEPS="meta gcc smoke p2996"
+DAILY_STEPS="tsan $MATRIX_GROUP $CLIENT_STEPS wire-matrix"
+TIER=pr
 CLIENTS=0
 MSVC_ROOT=${XOFFSET_MSVC_ROOT:-/opt/msvc}
 NDK_R29=${XOFFSET_NDK_R29:-/opt/android-ndk-r29}
@@ -104,15 +118,26 @@ COLUMNS=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --base) BASE_REV=$2; shift 2 ;;
-        --steps) STEPS=${2//,/ }; shift 2 ;;
-        --release) STEPS=$RELEASE_STEPS; shift ;;
+        --steps) STEPS=${2//,/ }; TIER=custom; shift 2 ;;
+        --release) STEPS=$RELEASE_STEPS; TIER=release; shift ;;
+        --tier)
+            TIER=$2
+            case $2 in
+                pr) STEPS=$PR_STEPS ;;
+                quick) STEPS=$QUICK_STEPS ;;
+                daily) STEPS=$DAILY_STEPS ;;
+                full) STEPS=$FULL_STEPS ;;
+                release) STEPS=$RELEASE_STEPS ;;
+                *) echo "unknown tier: $2 (pr, quick, daily, full, release)" >&2; exit 2 ;;
+            esac
+            shift 2 ;;
         --clients) CLIENTS=1; shift ;;
         --work) WORK=$2; shift 2 ;;
         -j) JOBS=$2; shift 2 ;;
         --columns) COLUMNS=$2; shift 2 ;;
         --fail-fast) FAIL_FAST=1; shift ;;
         --asm-strict) ASM_STRICT=1; shift ;;
-        -h|--help) sed -n '2,71p' "$0"; exit 0 ;;
+        -h|--help) awk 'NR == 1 { next } /^#/ { print; next } { exit }' "$0"; exit 0 ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
 done
@@ -126,7 +151,15 @@ BASE_SHA=$(git rev-parse "$BASE_REV^{commit}") || exit 2
 WORK=${WORK:-$HOME/xo-validate-${HEAD_SHA:0:7}}
 mkdir -p "$WORK/logs" "$CACHE"
 WORK=$(cd "$WORK" && pwd)
-STEPS=${STEPS:-$DEFAULT_STEPS}
+STEPS=${STEPS:-$PR_STEPS}
+# The quick tier is evidence only for a PR that leaves the library alone.
+if [[ $TIER == quick ]]; then
+    lib=$(git diff --name-only "$BASE_SHA" -- | grep -E '^[^/]+\.(hpp|h|cpp)$|^CMakeLists\.txt$|^cmake/' | paste -sd ' ')
+    if [[ -n $lib ]]; then
+        echo "--tier quick is for PRs that leave the library alone; changed against ${BASE_SHA:0:12}: $lib (use --tier pr)" >&2
+        exit 2
+    fi
+fi
 STEPS=" $STEPS "
 STEPS=${STEPS// classic / $CLASSIC_STEPS }
 STEPS=${STEPS// matrix / $MATRIX_GROUP wire-matrix }
@@ -160,7 +193,7 @@ for s in $STEPS; do
         msvc-*|clang-cl-*|mingw-*|ndk*|client-*) want_gcc=1 ;; asm) need_gcc=1; need_p2996=1 ;; *) need_gcc=1 ;; esac
 done
 
-log "head $HEAD_SHA (uncommitted tracked changes: $DIRTY), base $BASE_SHA, work $WORK"
+log "head $HEAD_SHA (uncommitted tracked changes: $DIRTY), base $BASE_SHA, tier $TIER, work $WORK"
 git submodule update --init --depth 1 external/typelayout external/boost >/dev/null 2>&1
 for lib in container core config throw_exception static_assert container_hash type_traits winapi intrusive predef move assert; do
     [[ -e external/boost/libs/$lib/include ]] || git -C external/boost submodule update --init --depth 1 "libs/$lib" >/dev/null 2>&1
@@ -639,7 +672,7 @@ fi
 {
     echo "### Local validation (tools/local_validate.sh)"
     echo
-    echo "head \`${HEAD_SHA:0:12}\`$( (( DIRTY )) && echo " + $DIRTY uncommitted tracked files"), base \`${BASE_SHA:0:12}\`, $(nproc) cores, GCC image \`${IMG##*@}\`"
+    echo "head \`${HEAD_SHA:0:12}\`$( (( DIRTY )) && echo " + $DIRTY uncommitted tracked files"), base \`${BASE_SHA:0:12}\`, tier \`$TIER\`, $(nproc) cores, GCC image \`${IMG##*@}\`"
     (( P2996_OK )) && echo "P2996: \`$("$P2996_ROOT/bin/clang++" --version | head -n 1)\`"
     echo
     echo "| Step | Result | Minutes | Detail |"

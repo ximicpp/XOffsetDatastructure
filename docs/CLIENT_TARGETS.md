@@ -27,9 +27,9 @@ sparse，以及 `save_compact` 存出的 compact_slack0、compact_slack8），�
 
 防止回退：`tools/local_validate.sh` 带这些列（`msvc-c++20`、`msvc-c++23`、`clang-cl-c++20`、
 `mingw-c++20`、`ndk29-c++20`、`ndk30-c++20`），参照语料由同一提交的 GCC 16 C++26 构建现写。
-CTest 里包括关异常的 `*_noexc` 程序。默认运行里的 `client-c++20` 步骤保证每个 PR 至少跑一个
+CTest 里包括关异常的 `*_noexc` 程序。默认的 PR 层（`--tier pr`）里的 `client-c++20` 步骤保证每个 PR 至少跑一个
 C++20 客户端列：按 MSVC、clang-cl、NDK r29、NDK r30、MinGW 的顺序取本机能跑的第一个；一个都跑不了
-时这一步失败。`--clients` 和 `--release` 跑全部客户端列。云端新容器装 MSVC 用
+时这一步失败。`--clients`、`--tier daily`（每天一次，在 `next_cpp26` 上）和 `--release` 跑全部客户端列。云端新容器装 MSVC 用
 `tools/msvc-wine/fetch_msvc.py /opt/msvc`（再跑 `tools/msvc-wine/case_links.py /opt/msvc` 给 clang-cl 用）。
 
 | 目标 | 编译器 | 标准 | 实际运行方式 | 结果 |
@@ -41,7 +41,7 @@ C++20 客户端列：按 MSVC、clang-cl、NDK r29、NDK r30、MinGW 的顺序�
 | Windows x64 | MinGW-w64 GCC 13.2（posix 线程），`-static` | C++20 | CTest 经 wine | 129/129（含 21 个关异常测试）；语料全部接受，逐字节一致 |
 | macOS arm64 | Apple clang 21.0.0（Xcode 27.1，MacOSX 27.0 SDK，系统 libc++），部署目标 macOS 14.0 | C++20、C++23 | M4 Mac（macOS 27.2）上原生运行，`tools/native_targets.sh macos` | 提交 1108193d：两种标准都是 137/137（含 21 个关异常测试）；24 个参照 wire 全部接受，改出的字节与 Linux 相同，`diff -r` 一致 |
 | iOS 模拟器 | Apple clang 21.0.0（Xcode 27.1，iPhoneSimulator 27.1 SDK），部署目标 iOS 17.0 | C++20 | M4 Mac 上的 iOS 27.0 模拟器（iPhone 17），`ios-simulator.cmake`，CTest 经 `simctl spawn` | 129/129；语料全部接受，逐字节一致。模拟器进程用的是 Mac 的地址空间，真机上的地址空间实测仍待做 |
-| Linux x86-64 | GCC 13 / 16、Clang 18、P2996 Clang（各自 C++20，GCC 16 另有 C++23） | C++20、C++23 | `tools/local_validate.sh` 的矩阵列，含 ASan 列 | 都是 106/106；字段表构建与反射构建的校验结果逐条相同（差分 2×200000 例） |
+| Linux x86-64 | GCC 13 / 16、Clang 18、P2996 Clang（各自 C++20，GCC 16 另有 C++23） | C++20、C++23 | `tools/local_validate.sh` 的矩阵列，含 ASan 列（`--tier daily` 和 `--release` 跑，PR 层只跑 diff-c++20） | 都是 106/106；字段表构建与反射构建的校验结果逐条相同（差分 2×200000 例） |
 
 各目标需要注意的地方：
 

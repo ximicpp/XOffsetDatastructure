@@ -270,6 +270,13 @@ so earlier batches and the perf gate compare as before.
   application-level delta's `MEM.U*.interest` (the tracker) and
   `MEM.U*.held_index`, and the native delta's `MEM.N*.view`, `.baseline`,
   `.slots` and `MEM.LN.baseline`. Never time with this build.
+- Process memory, the 3.6 memory gate (2026-11-11): `--mode proc --out p.jsonl
+  --formats <one format>` (any build, Linux only) runs 11 cycles untimed and
+  writes the process's own numbers from `/proc/self`: `PROC.rss`, `PROC.hwm`
+  (peak RSS), `PROC.pte` (page tables, VmPTE), `PROC.rss_anon`, `PROC.vmas`
+  (mappings), and `PROC.base_*` sampled before any format's setup. Run one
+  format per process (the numbers belong to the process); `SLG_PROC_SMAPS=<file>`
+  also keeps a copy of `/proc/self/smaps` for diagnosis. Never time this run.
 
 D3 shared deltas (2026-11-04, thread 设计共享增量原型, doc X5MZPWya7DWFzdCughpZqL;
 `xoffset_shared_delta.hpp`, XS 1.0 since 3.5, docs/SHARED_DELTA.md). XOffset only, class 3 only;
