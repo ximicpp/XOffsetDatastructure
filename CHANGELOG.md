@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- Shared deltas: changed members only. `XRecordDelta<T>::fields(members)`
+  (bit i = member i, `XSyncFields`), `diff(now, before, out, fields)` and
+  `update(rec, fields, out, set)`, which changes a record and writes its body
+  in one step, with no baseline copy. Both write the bytes of the whole-record
+  `diff`. `XSyncWriter::change` encodes records of plain bytes in place, and
+  the block encoder writes a word's mask and its contiguous changed bytes with
+  single stores. The bench's D3 server (`bench/slg`) now encodes in `D*.pub`
+  only the changed units some view holds, over their dirty members, keeps one
+  image per entity (no second baseline) and prefetches the entries of the
+  tick's changed tiles and new marches. Small server (S scale, 64 clients,
+  cloud x86, GCC 16), server per delivery against zpp `U*.send`: peace 2.8x ->
+  1.9x, conflict 3.35x -> 1.33x, siege 1.38x -> 0.75x. M scale unchanged
+  (peace) or faster (conflict 1048 -> 780 ns, siege 4347 -> 2834 ns).
+  Bytes and wire format unchanged.
+
 - Growth policy, part 1 (storage): `XGrowPolicy::Relocating`
   (`XBuffer::relocating(maximum)`, default maximum 2 GiB - 8). A buffer
   starts in a 1 MiB slot that is reserved, not zeroed
