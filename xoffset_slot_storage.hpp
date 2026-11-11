@@ -35,6 +35,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <mutex>
 #include <new>
 
@@ -123,6 +124,13 @@
 #endif
 #ifndef XOFFSET_SLOT_RETAIN_BYTES
 #  define XOFFSET_SLOT_RETAIN_BYTES (64u * 1024u * 1024u)
+#endif
+// A retired arena block of at least this many bytes gives its whole pages
+// back to the OS instead of being cleared with memset (Linux; 0 disables).
+// Arena storage is always private anonymous memory (VM owner or slot), so the
+// pages read back as zero, which is what the M3 hole rule needs.
+#ifndef XOFFSET_RETIRE_DISCARD_BYTES
+#  define XOFFSET_RETIRE_DISCARD_BYTES (16u * 1024u)
 #endif
 
 namespace XOffsetDatastructure {
@@ -682,6 +690,27 @@ private:
 #endif
     }
 };
+
+// Clears [p, p + n) of a retired arena block by discarding the whole pages
+// inside it (they read back as zero) and clearing the partial pages at both
+// ends. Returns false, having changed nothing, where pages cannot be discarded
+// that way (not Linux, block too small, or madvise refused): the caller clears.
+inline bool discard_retired_pages(void* p, std::size_t n) noexcept {
+#if defined(__linux__) && XOFFSET_RETIRE_DISCARD_BYTES
+    if (n < XOFFSET_RETIRE_DISCARD_BYTES) return false;
+    const std::size_t page = SlotSlab::page_size();
+    const auto a = reinterpret_cast<std::uintptr_t>(p);
+    const auto lo = (a + page - 1) & ~std::uintptr_t(page - 1);
+    const auto hi = (a + n) & ~std::uintptr_t(page - 1);
+    if (hi <= lo || ::madvise(reinterpret_cast<void*>(lo), hi - lo, MADV_DONTNEED) != 0) return false;
+    std::memset(p, 0, lo - a);
+    std::memset(reinterpret_cast<void*>(hi), 0, a + n - hi);
+    return true;
+#else
+    (void)p; (void)n;
+    return false;
+#endif
+}
 
 } // namespace detail
 } // namespace XOffsetDatastructure

@@ -1730,7 +1730,12 @@ namespace XOffsetDatastructure {
             const auto offset = static_cast<std::uint32_t>(address - base);
             // M3 (threat model T5/P1): a block becomes a hole only after its old
             // contents are cleared, so emitted holes need no per-save scrub.
-            std::memset(ptr, 0, std::min<std::size_t>(bytes, buffer_.size() - offset));
+            // A large block's whole pages go back to the OS instead (Linux,
+            // XOFFSET_RETIRE_DISCARD_BYTES): a vector that outgrew its block in
+            // a long-lived buffer leaves a hole that later, larger requests do
+            // not reuse, and its dirty pages would stay resident.
+            const std::size_t cleared = std::min<std::size_t>(bytes, buffer_.size() - offset);
+            if (!detail::discard_retired_pages(ptr, cleared)) std::memset(ptr, 0, cleared);
             push_free_block(offset, bytes);
         }
 
