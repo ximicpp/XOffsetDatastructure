@@ -34,6 +34,19 @@ struct Root {
 XOFFSET_RECORD(Root, ints, players, map, set, title, named, counter)
 XOFFSET_REGISTER_SCHEMA_NAME(Root, "test.proxy.Root")
 
+struct PartA {
+    std::int32_t a{0};
+};
+XOFFSET_RECORD(PartA, a)
+struct PartB {
+    std::int64_t b{0};
+};
+XOFFSET_RECORD(PartB, b)
+struct Both : PartA, PartB {
+    std::int32_t c{0};
+};
+XOFFSET_RECORD_DERIVED(Both, (PartA, PartB), c)
+
 #define CHECK(c)                                                                     \
     do {                                                                             \
         if (!(c)) {                                                                  \
@@ -121,6 +134,18 @@ bool test_records_and_elements() {
     CHECK(players.push_back(players[0]));
     CHECK(players.back().field<&Player::name>().copy() == "player-name-long-0");
     CHECK(players.back().field<&Player::items>().size() == 4u);
+    return true;
+}
+
+// A member of a base at a nonzero offset is found at that offset.
+bool test_base_members() {
+    auto b = XBuffer::create<Both>(256, XBuffer::relocating());
+    auto r = b.ref<Both>();
+    r.field<&PartA::a>() = 1;
+    r.field<&PartB::b>() = 2;
+    r.field<&Both::c>() = 3;
+    const Both& raw = b.root<Both>();
+    CHECK(raw.a == 1 && raw.b == 2 && raw.c == 3);
     return true;
 }
 
@@ -319,6 +344,7 @@ int main() {
     bool ok = true;
     ok = test_proxy_survives_moves() && ok;
     ok = test_records_and_elements() && ok;
+    ok = test_base_members() && ok;
     ok = test_maps_sets_strings() && ok;
     ok = test_xbuffer_moves_and_lifetime() && ok;
     ok = test_pin_scopes() && ok;
