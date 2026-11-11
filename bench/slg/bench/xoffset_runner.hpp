@@ -1376,14 +1376,14 @@ private:
     }
     // One message: XBuffer::build<T> (reset<T>(), then fill(T&) in a pin scope).
     template <class T, class Fill>
-    static void build_in(XOffsetDatastructure::XBuffer& b, Fill&& fill) {
+    XOFFSET_DETAIL_MOVE_INLINE static void build_in(XOffsetDatastructure::XBuffer& b, Fill&& fill) {
         if (!b.template build<T>([&](T& m) { fill(m); })) [[unlikely]]
             throw std::runtime_error(std::string("message build failed: ") + XOffsetDatastructure::to_string(b.error()));
     }
 #else
     static XOffsetDatastructure::XBuffer::MaximumCapacity build_cap() { return cap(); }
     template <class T, class Fill>
-    static void build_in(XOffsetDatastructure::XBuffer& b, Fill&& fill) { fill(b.template reset<T>()); }
+    XOFFSET_DETAIL_MOVE_INLINE static void build_in(XOffsetDatastructure::XBuffer& b, Fill&& fill) { fill(b.template reset<T>()); }
 #endif
     // Diagnostic only (small-message probe): SLG_XOFFSET_POOL=1 reuses idle VM
     // owners through the public XBufferPool. Every load is still load_verified.
