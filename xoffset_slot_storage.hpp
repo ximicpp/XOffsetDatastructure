@@ -23,10 +23,11 @@
 //
 // XOFFSET_SLOT_MAX_BYTES=0 disables slots: every owner is VM.
 //
-// Relocating buffers (XGrowPolicy::Relocating) start in a slot of
-// XOFFSET_RELOCATING_RESERVE_BYTES (1 MiB by default): the slab's classes go up
-// to the larger of the two sizes. Only XOFFSET_SLOT_MAX_BYTES decides where
-// the other policies put a buffer (SLOT_MAX). Chunks of the classes above
+// Relocating buffers (XGrowPolicy::Relocating) start in a slot sized from
+// their first content, at most XOFFSET_RELOCATING_RESERVE_BYTES (1 MiB by
+// default): the slab's classes go up to the larger of the two sizes. Only
+// XOFFSET_SLOT_MAX_BYTES decides where the other policies put a buffer
+// (SLOT_MAX). Chunks of the classes above
 // XOFFSET_SLOT_MAX_BYTES are not backed by transparent huge pages (Linux):
 // a small buffer touches a page or two of its 1 MiB slot, and a huge page
 // would make it 2 MiB. The retention budget counts the bytes a free slot
