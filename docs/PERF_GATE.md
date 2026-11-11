@@ -4,6 +4,17 @@
 
 **合并规则（susu 2026-11-05 01:26Z）**：性能判定全部在云端。S 类和 L 类 PR 合并前都只过 GCC 16 和 P2996 两个 Ir 门（第 3 节的阈值），再在合并结果上跑 `tools/local_validate.sh`；L 类另附 cache-sim 的 D1/LL 缺失对比（第 5a 节），只作警告。Mac 批次只做合并后和发版后的复核，只报，不挡合并；复核发现的回退开修复 PR，进下一个补丁版本。下文凡是写“合并前跑 Mac L2”的地方，都按这条换成：带上函数差异表和 cache-sim 对比，由「性能优化」判断，结论写进 PR 正文。
 
+**分层验证（susu 2026-11-11 05:57Z）**：`tools/local_validate.sh` 默认按 PR 层跑（`--tier pr`），合并证据是这一层全部 pass，两个 Ir 门按第 3 节判：
+
+| 层 | 用在哪 | 步骤 |
+| --- | --- | --- |
+| `pr`（默认） | 改了库的 PR（S、L 类，以及改库源文件的 0 类） | meta、gcc、asan、fuzz、diff、smoke、ir、p2996、p2996-ir、asm，加 diff-c++20 和一个 C++20 客户端列（client-c++20，MSVC 优先） |
+| `quick` | 不碰库的 PR（只改 bench/、tools/、tests/、docs/） | meta、gcc、smoke、p2996；顶层源文件、CMakeLists.txt 或 cmake/ 和 base 不同时拒绝运行 |
+| `daily` | 每天一次，在 `next_cpp26` 的最新提交上 | tsan、整个 C++20/C++23 矩阵、全部客户端列、wire-matrix（`pr` 层省掉的部分） |
+| `release`（= `--release`） | 发版候选 | 全部步骤 |
+
+`daily` 发现的失败当天开修复 PR，修好之前不发版。`full` 是 11-11 之前的默认步骤，需要时仍可指定。
+
 设计依据：H3 设计 `beta2-20261022/H3_PERF_GATE_DESIGN_20261022.md` 第 5 节。本页是实现说明。
 
 **运行状态（2026-10-26）**：GitHub CI 已停用（susu 10-23 决定），`perf-gate.yml` 保留但不再自动运行，门禁改由本地验证脚本运行（命令见第 6 节）。实现验收：1（历史回放）、2（人为回归被拦）已通过；3（一周稳定）作废：GitHub CI 停用，门禁改由本地验证脚本运行。
