@@ -1,0 +1,11 @@
+t0 cf9b63e584247ca6c61f524591557d468062bb48 tree aa3418684e6eb23af02981d9556a115f0262cd21 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (next_cpp26 cf9b63e5 (first parent of #266))
+t1 bb537d0db6a7d629f10165e9cc68aadc745b5171 tree a52e26a113f33216c2a5009a95bb164dc2275468 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346 (PR266 head (bb537d0d, #266 merged))
+t1: diff over t0 sha256 3233cad543b8a9c06f9253ccae7ac3d8427ec36601b328bd2ee28cfb27327b3f ( 6 files changed, 113 insertions(+), 14 deletions(-))
+t1: library header diff over t0:  1 file changed, 41 insertions(+), 9 deletions(-)
+t1: first-parent commits over t0:
+  bb537d0d Merge #266: fix #265 free-table load growth (SLG M D3) + root<T>() cache refill, redo of #223 (L class)
+bench/reloc of t1: same tree as t0
+reloc_bench t0 sha256 68e3fd020ff33c782a01b02c56b7971de54da6b6c90a4d7ee37193305097b8e3
+reloc_bench t1 sha256 e8ee9dd2c490589797a5c4c9803817eb63db0e9d17d92ccc0202fa68d8897021
+reloc_bench t0a sha256 b36f3ab4d44bd7247743cc9572d5cdcb05b36f99b815d08a00f0fbc820ad4cf9
+reloc_bench t1a sha256 d5b8500dbfafd44e2f8cbf4e12062c6126d4a6f500ab00c841f98356a8155a69

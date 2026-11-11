@@ -1,0 +1,10 @@
+PR266 10
+anchor next_cpp26 cf9b63e5 (first parent of #266)
+screen watcher: 69 calls (dark.log)
+ABC: fail (max upper bound 1.0335; A 1.0335, B 1.0182, C 1.0137; 12 / 12 processes)
+GATE_D: head D÷flatbuffers 0.929 / 0.937 (O4 upper bound <= 1.0: met), D÷zpp_bits 1.047 / 1.055, D.read 67.9 µs; anc D÷flatbuffers 0.916 / 0.938, D÷zpp_bits 1.038 / 1.049, D.read 67.1 µs
+G8 met
+G9R rc 0 (0 done, 2 prep check, 5 quiet gate); G9: 17 of 19 comparisons have UB <= 1.05; above: vec.push_back, set.erase.fresh
+ctest 100% tests passed out of 209 (rc 0)
+HFT HFT head/anc: xo_nest/ptr 0.960, xo_nest/root 1.041, xo_pool/ptr 1.117, xo_pool/root 1.013
+D3M head rc 0 rejected 0 lines 747; anc rc 1 rejected 1 lines 186; 

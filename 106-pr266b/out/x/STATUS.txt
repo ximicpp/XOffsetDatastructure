@@ -1,0 +1,2 @@
+HFT HFT head/anc: xo_nest/ptr 0.960, xo_nest/root 1.041, xo_pool/ptr 1.117, xo_pool/root 1.013
+D3M head rc 0 rejected 0 lines 747; anc rc 1 rejected 1 lines 186; 
