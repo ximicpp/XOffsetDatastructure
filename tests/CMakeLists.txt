@@ -134,6 +134,7 @@ set(REFLECTION_TESTS
     test_relocating_storage
     test_proxy_scopes
     test_retire_discard
+    test_proxy_fuzz
     test_ordinary_records
     test_schema_describe
     test_vm_lifecycle
@@ -323,6 +324,7 @@ set(NO_EXCEPTIONS_TESTS
     test_relocating_storage
     test_proxy_scopes
     test_retire_discard
+    test_proxy_fuzz
 )
 foreach(test_name ${NO_EXCEPTIONS_TESTS})
     if(NOT XOFFSET_TESTS_REFLECTION AND test_name IN_LIST XOFFSET_CXX26_ONLY_TESTS)

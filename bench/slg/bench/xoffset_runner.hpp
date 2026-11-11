@@ -106,7 +106,7 @@ public:
         shard_.emplace(XBuffer::create<ShardState>(kShardInitial, cap(true)));
         copy_shard(shard_->root<ShardState>(), src);
         if (reuse_mode()) {
-            a_req_.emplace(XBuffer::create<BattleMsg>(kBattleInitial, cap()));
+            a_req_.emplace(XBuffer::create<BattleMsg>(kBattleInitial, build_cap()));
             a_m_.emplace(XBuffer::create<BattleMsg>(kBattleInitial, cap()));
             a_r_.emplace(XBuffer::create<BattleMsg>(kBattleInitial, cap()));
             b_m_.emplace(XBuffer::create<PlayerState>(kPlayerInitial, cap()));
@@ -146,17 +146,20 @@ public:
             std::string req, res;
             std::optional<XBuffer> m, r;
             timed(st, "A.req_encode", [&] {
-                XBuffer b = XBuffer::create<BattleMsg>(kBattleInitial, cap());
-                auto& msg = b.root<BattleMsg>();
-                msg.battle_id = pr.battle_id; msg.seed = pr.seed; msg.winner = 0;
+                XBuffer b = XBuffer::create<BattleMsg>(kBattleInitial, build_cap());
+                build_in<BattleMsg>(b, [&](BattleMsg& msg) {
+                    msg.battle_id = pr.battle_id; msg.seed = pr.seed; msg.winner = 0;
 #if defined(XOFFSET_SAVE_COMPOSED_API)
-                // Adapter v3: the request is composed from the two armies straight
-                // into the wire (tight save_compact layout); the draft holds only the root.
-                b.save_compact_into<BattleMsg>(req, XCompactOptions{.slack_div = 0},
-                                               xassign(msg.attacker, att), xassign(msg.defender, def));
+                    // Adapter v3: the request is composed from the two armies straight
+                    // into the wire (tight save_compact layout); the draft holds only the root.
+                    b.save_compact_into<BattleMsg>(req, XCompactOptions{.slack_div = 0},
+                                                   xassign(msg.attacker, att), xassign(msg.defender, def));
 #else
-                msg.attacker = att;  // T4 adapter (c): public copy assignment
-                msg.defender = def;
+                    msg.attacker = att;  // T4 adapter (c): public copy assignment
+                    msg.defender = def;
+#endif
+                });
+#if !defined(XOFFSET_SAVE_COMPOSED_API)
                 req = b.save_verified<BattleMsg>();
 #endif
             });
@@ -223,8 +226,8 @@ public:
         std::vector<std::string> wires;
         wires.reserve(reports.size());
         for (const auto& rep : reports) {
-            XBuffer b = XBuffer::create<Report>(kReportInitial, cap());
-            copy_report(b.root<Report>(), rep);
+            XBuffer b = XBuffer::create<Report>(kReportInitial, build_cap());
+            build_in<Report>(b, [&](Report& out) { copy_report(out, rep); });
             wires.push_back(b.save_verified<Report>());
         }
         for (const auto& w : wires) st.bytes["D.report"] += w.size();
@@ -256,15 +259,20 @@ public:
             timed(st, "A.req_encode", [&] {
 #if defined(XOFFSET_SAVE_COMPOSED_API)
                 // Adapter v3 (see above): a_req_'s armies stay empty, nothing is reset.
-                auto& msg = a_req_->root<BattleMsg>();
-                msg.battle_id = pr.battle_id; msg.seed = pr.seed; msg.winner = 0;
-                a_req_->save_compact_into<BattleMsg>(req_, XCompactOptions{.slack_div = 0},
-                                                     xassign(msg.attacker, att), xassign(msg.defender, def));
+                auto compose = [&](BattleMsg& msg) {
+                    msg.battle_id = pr.battle_id; msg.seed = pr.seed; msg.winner = 0;
+                    a_req_->save_compact_into<BattleMsg>(req_, XCompactOptions{.slack_div = 0},
+                                                         xassign(msg.attacker, att), xassign(msg.defender, def));
+                };
+                // Scalar stores only, nothing allocates: the payload cannot
+                // move, so the plain root reference needs no pin scope.
+                compose(a_req_->root<BattleMsg>());
 #else
-                auto& msg = a_req_->reset<BattleMsg>();
-                msg.battle_id = pr.battle_id; msg.seed = pr.seed; msg.winner = 0;
-                msg.attacker = att;  // T4 adapter (c): public copy assignment
-                msg.defender = def;
+                build_in<BattleMsg>(*a_req_, [&](BattleMsg& msg) {
+                    msg.battle_id = pr.battle_id; msg.seed = pr.seed; msg.winner = 0;
+                    msg.attacker = att;  // T4 adapter (c): public copy assignment
+                    msg.defender = def;
+                });
                 a_req_->save_verified_into<BattleMsg>(req_);
 #endif
             });
@@ -349,8 +357,8 @@ public:
         std::vector<std::string> wires;
         wires.reserve(reports.size());
         for (const auto& rep : reports) {
-            XBuffer b = XBuffer::create<Report>(kReportInitial, cap());
-            copy_report(b.root<Report>(), rep);
+            XBuffer b = XBuffer::create<Report>(kReportInitial, build_cap());
+            build_in<Report>(b, [&](Report& out) { copy_report(out, rep); });
             wires.push_back(b.save_verified<Report>());
         }
         for (const auto& w : wires) st.bytes["D.report"] += w.size();
@@ -409,7 +417,7 @@ public:
         std::string lw, pw;
         void setup() {
             hold.clear(); hold.resize(srv.size());
-            pm.emplace(XBuffer::create<xm::PlayerPatch>(kViewInitial, cap()));
+            pm.emplace(XBuffer::create<xm::PlayerPatch>(kViewInitial, build_cap()));
             pr.emplace(XBuffer::create<xm::PlayerPatch>(kViewInitial, cap()));
             for (auto& h : hw) h.reset();
 #ifdef XOFFSET_DELTA_SYNC_API
@@ -430,7 +438,7 @@ public:
         }
         PlayerState& held(int p) { return hold[std::size_t(p)]->template root<PlayerState>(); }
         template <class Fill> std::size_t patch_encode(Fill&& fill) {
-            fill(pm->template reset<xm::PlayerPatch>());
+            build_in<xm::PlayerPatch>(*pm, fill);
             pm->template save_verified_into<xm::PlayerPatch>(pw);
             return pw.size();
         }
@@ -454,8 +462,8 @@ public:
         std::optional<XBuffer> um, ur;
         std::string uw;
         template <class Fill> std::size_t up_encode(Fill&& fill) {
-            if (!um) um.emplace(XBuffer::create<xm::March>(kUplinkInitial, cap()));
-            fill(um->template reset<xm::March>());
+            if (!um) um.emplace(XBuffer::create<xm::March>(kUplinkInitial, build_cap()));
+            build_in<xm::March>(*um, fill);
             um->template save_verified_into<xm::March>(uw);
             return uw.size();
         }
@@ -542,8 +550,8 @@ public:
         std::string w;
         PlayerState& player(int p) { return r->players_[std::size_t(p)].template root<PlayerState>(); }
         template <class Fill> std::size_t modules_encode(Fill&& fill) {
-            if (!pm) { pm.emplace(XBuffer::create<xm::PlayerPatch>(kPlayerInitial, cap())); pr.emplace(XBuffer::create<xm::PlayerPatch>(kPlayerInitial, cap())); }
-            fill(pm->template reset<xm::PlayerPatch>());
+            if (!pm) { pm.emplace(XBuffer::create<xm::PlayerPatch>(kPlayerInitial, build_cap())); pr.emplace(XBuffer::create<xm::PlayerPatch>(kPlayerInitial, cap())); }
+            build_in<xm::PlayerPatch>(*pm, fill);
             pm->template save_verified_into<xm::PlayerPatch>(w);
             return w.size();
         }
@@ -595,8 +603,8 @@ public:
         // -DSLG_RP_CHECK checks every use against root<ViewSnapshot>() (off by default).
         std::vector<xm::ViewSnapshot*> held_roots;
         void setup(int clients, int units, int marches) {
-            es.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, cap()));
-            ds.emplace(XBuffer::create<xm::ViewDelta>(kViewInitial, cap()));
+            es.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, build_cap()));
+            ds.emplace(XBuffer::create<xm::ViewDelta>(kViewInitial, build_cap()));
             dr.emplace(XBuffer::create<xm::ViewDelta>(kViewInitial, cap()));
             snaps.assign(1, {});
             held_views.clear();
@@ -609,7 +617,7 @@ public:
 #endif
         }
         template <class Fill> std::size_t snap_encode(int b, Fill&& fill) {
-            fill(es->reset<xm::ViewSnapshot>());
+            build_in<xm::ViewSnapshot>(*es, fill);
             es->save_verified_into<xm::ViewSnapshot>(snaps[std::size_t(b)]);
             return snaps[std::size_t(b)].size();
         }
@@ -633,7 +641,7 @@ public:
             return *held_roots[i];
         }
         template <class Fill> std::size_t delta_encode(Fill&& fill) {
-            fill(ds->reset<xm::ViewDelta>());
+            build_in<xm::ViewDelta>(*ds, fill);
             ds->save_verified_into<xm::ViewDelta>(dw);
             return dw.size();
         }
@@ -1358,6 +1366,25 @@ private:
                      .with_growth(XOffsetDatastructure::XGrowPolicy::Automatic);
         return use_pool() || reuse_mode() ? c.with_pool(pool()) : c;
     }
+#if defined(XOFFSET_PROXY_BATCH_API)
+    // Growth policy (3.6): a buffer a sender builds its messages in is
+    // Relocating (1 MiB reserved, moved only when a message outgrows it) and
+    // is filled inside a pin scope: plain references at plain speed, and no
+    // move can leave one dangling. Received and resident buffers keep cap().
+    static XOffsetDatastructure::XBuffer::MaximumCapacity build_cap() {
+        return XOffsetDatastructure::XBuffer::relocating();
+    }
+    // One message: XBuffer::build<T> (reset<T>(), then fill(T&) in a pin scope).
+    template <class T, class Fill>
+    static void build_in(XOffsetDatastructure::XBuffer& b, Fill&& fill) {
+        if (!b.template build<T>([&](T& m) { fill(m); })) [[unlikely]]
+            throw std::runtime_error(std::string("message build failed: ") + XOffsetDatastructure::to_string(b.error()));
+    }
+#else
+    static XOffsetDatastructure::XBuffer::MaximumCapacity build_cap() { return cap(); }
+    template <class T, class Fill>
+    static void build_in(XOffsetDatastructure::XBuffer& b, Fill&& fill) { fill(b.template reset<T>()); }
+#endif
     // Diagnostic only (small-message probe): SLG_XOFFSET_POOL=1 reuses idle VM
     // owners through the public XBufferPool. Every load is still load_verified.
     static bool use_pool() { static const bool on = std::getenv("SLG_XOFFSET_POOL") != nullptr; return on; }

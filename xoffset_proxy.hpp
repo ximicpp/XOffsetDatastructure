@@ -39,6 +39,10 @@
 // against the size on every access: after the container changed they read
 // another element or nothing, never a retired block.
 
+// Growth policy part 4: batch operations (append, assign, emplace_n, batch
+// insert into maps and sets, XRef::batch scopes).
+#define XOFFSET_PROXY_BATCH_API 1
+
 namespace XOffsetDatastructure {
 
 #if defined(_MSC_VER) && !defined(__clang__)
@@ -347,6 +351,54 @@ namespace proxy_detail {
         KeyPath copy() const noexcept { return {parent.copy(), key, hint, sub}; }
     };
 
+    // The most elements a container of E can hold (XFixedVector::max_size).
+    template <class E>
+    inline constexpr std::size_t max_elements = (XBufferCore::MAX_PAYLOAD - 8u) / sizeof(E);
+
+    // A batch source that lives in the payload is copied out first (the
+    // payload may move or the block be retired by the batch itself): the
+    // source to read, or null (host_allocation_failed recorded).
+    template <class X>
+    const X* outside_payload(const Anchor& a, const X* src, std::size_t count, std::vector<X>& keep) noexcept {
+        auto* core = a.ctl->core;
+        if (!src || count == 0 || !core) return src;
+        const auto lo = reinterpret_cast<std::uintptr_t>(a.ctl->base);
+        const auto at = reinterpret_cast<std::uintptr_t>(src);
+        if (at < lo || at - lo >= core->get_buffer().size()) return src;
+        XOFFSET_TRY {
+            keep.assign(src, src + count);
+        } XOFFSET_CATCH(...) {
+            a.fail(XErrc::host_allocation_failed);
+            return nullptr;
+        }
+        return keep.data();
+    }
+
+    // Capacity for `need` elements in the container at `path` (one regrow,
+    // to at least twice the old capacity). False (error recorded) when it
+    // cannot be had.
+    template <class C, class Path>
+    bool reserve_at(Anchor& a, const Path& path, std::size_t need) noexcept {
+        char* const base = a.sync();
+        if (!base) return false;
+        const C* c = reinterpret_cast<const C*>(path.resolve(base));
+        if (!c) {
+            a.miss();
+            return false;
+        }
+        if (need <= c->capacity_) return true;
+        if (need > max_elements<typename C::value_type>) {
+            a.fail(XErrc::capacity_exceeded);
+            return false;
+        }
+        using E = typename C::value_type;
+        const std::size_t new_cap =
+            std::max(need, std::min<std::size_t>(max_elements<typename C::value_type>, std::size_t(c->capacity_) * 2u));
+        return a.run_allocating(new_cap * sizeof(E) + alignof(E) + 24u, [&](char* base) {
+            if (C* w = reinterpret_cast<C*>(path.resolve(base))) w->reserve(new_cap);
+        });
+    }
+
     enum class Kind { value, record, string, vector, set, map };
 
     template <class E> std::true_type is_vec_test(const XFixedVector<E>*);
@@ -411,6 +463,66 @@ namespace proxy_detail {
         template <class M>
         XRef<M, Path> member_at(std::uint32_t offset) const noexcept {
             return XRef<M, Path>(a, path.plus(offset));
+        }
+
+        // Batch scope over this object (growth policy part 4): f(T&) with a
+        // plain reference, the path resolved once. Room for `expected_growth`
+        // bytes is made first (the buffer may move then, while no reference
+        // exists); while f runs the payload is pinned as in XBuffer::edit
+        // (an operation that would move it fails with `borrowed`; retired
+        // blocks wait). False when the proxy names nothing, the buffer has a
+        // recorded failure, or an operation inside failed (the first failure
+        // is error()). f must return void.
+        template <class F>
+        bool batch(F&& f, std::size_t expected_growth = 0) {
+            static_assert(std::is_void_v<std::invoke_result_t<F&, T&>>,
+                          "batch(f): f must return void (a value made inside may point into the payload)");
+            T* p = batch_enter(expected_growth);
+            if (!p) [[unlikely]] return false;
+            BatchExit exit{a.ctl};
+#if XOFFSET_NO_EXCEPTIONS
+            detail::SoftFailScope soft;
+            f(*p);
+            if (soft.failed()) [[unlikely]] a.fail(soft.code());
+#else
+            try {
+                f(*p);
+            } catch (const XException& e) {
+                a.fail(e.code() == XErrc::unspecified ? XErrc::out_of_storage : e.code());
+            } catch (const std::bad_alloc&) {
+                a.fail(XErrc::host_allocation_failed);
+            }
+#endif
+            return a.ctl->sticky == XErrc::ok;
+        }
+
+    private:
+        struct BatchExit {
+            detail::XCtl* ctl;
+            ~BatchExit() { XBufferCore::pin_exit(ctl); }
+        };
+        // Resolves, makes room, pins: the object, or null (nothing pinned).
+        XOFFSET_DETAIL_NOINLINE T* batch_enter(std::size_t expected_growth) noexcept {
+            char* const base = a.sync();
+            if (!base || a.ctl->sticky != XErrc::ok) return nullptr;
+            auto* core = a.ctl->core;
+            if (!core || !path.resolve(base)) {
+                a.miss();
+                return nullptr;
+            }
+            if (expected_growth != 0 && !core->pinned() && !a.room(expected_growth)) {
+                const XErrc room = expected_growth > XBufferCore::MAX_PAYLOAD
+                    ? XErrc::capacity_exceeded
+                    : core->make_room(static_cast<XBufferCore::size_type>(expected_growth));
+                if (room != XErrc::ok) {
+                    a.fail(room);
+                    return nullptr;
+                }
+                a.version = a.ctl->version;
+            }
+            T* p = reinterpret_cast<T*>(path.resolve(a.ctl->base));
+            if (!p || !core->pin_enter()) return nullptr;
+            return p;
         }
     };
 } // namespace proxy_detail
@@ -904,6 +1016,93 @@ public:
         }));
     }
 
+    // ---- batch operations (growth policy part 4): one resolve, at most one
+    // make_room and one regrow per call, then a plain copy.
+
+    // Appends `values` (they may live in this buffer, even in this vector).
+    XOFFSET_PROXY_INLINE bool append(std::span<const E> values) noexcept requires plain {
+        char* const base = Base::a.sync();
+        if (!base) [[unlikely]] return false;
+        T* v = reinterpret_cast<T*>(Base::path.resolve(base));
+        if (!v) [[unlikely]] return missing();
+        const std::size_t n = v->size_;
+        const std::size_t count = values.size();
+        if (count <= std::size_t(v->capacity_) - n) [[likely]] {
+            if (count != 0)
+                std::memmove(fixed_detail::resolve_rel32_live<E>(&v->data_delta, v->data_delta) + n,
+                             values.data(), count * sizeof(E));
+            v->size_ = static_cast<char32_t>(n + count);
+            csize_ = v->size_;
+            return true;
+        }
+        return take(fill_slow(Base::a, Path(Base::path), values.data(), count, E{}, false));
+    }
+    template <std::size_t N>
+    bool append(const E (&values)[N]) noexcept requires plain {
+        return append(std::span<const E>(values, N));
+    }
+    bool append(std::initializer_list<E> values) noexcept requires plain {
+        return append(std::span<const E>(values.begin(), values.size()));
+    }
+    // Appends `count` copies of `value`.
+    bool append(std::uint32_t count, const E& value) noexcept requires plain {
+        char* const base = Base::a.sync();
+        if (!base) [[unlikely]] return false;
+        T* v = reinterpret_cast<T*>(Base::path.resolve(base));
+        if (!v) [[unlikely]] return missing();
+        const std::size_t n = v->size_;
+        if (count <= std::size_t(v->capacity_) - n) [[likely]] {
+            std::fill_n(fixed_detail::resolve_rel32_live<E>(&v->data_delta, v->data_delta) + n, count, value);
+            v->size_ = static_cast<char32_t>(n + count);
+            csize_ = v->size_;
+            return true;
+        }
+        return take(fill_slow(Base::a, Path(Base::path), nullptr, count, value, false));
+    }
+    // Appends copies of records (strings and containers copied deeply). The
+    // values must not live in this buffer.
+    bool append(std::span<const E> values) noexcept requires (!plain) {
+        std::size_t extra = std::size_t(values.size()) * sizeof(E);
+        for (const E& value : values) extra += proxy_detail::deep_bytes(value);
+        return take(append_slow(Base::a, Base::path, extra, [&](T& w) {
+            w.reserve(std::size_t(w.size_) + values.size());
+            for (const E& value : values) w.push_back(value);
+        }));
+    }
+    // Replaces the elements with `values` (they may live in this buffer).
+    bool assign(std::span<const E> values) noexcept requires plain {
+        char* const base = Base::a.sync();
+        if (!base) [[unlikely]] return false;
+        T* v = reinterpret_cast<T*>(Base::path.resolve(base));
+        if (!v) [[unlikely]] return missing();
+        if (values.size() <= v->capacity_) [[likely]] {
+            v->assign_range(values);
+            csize_ = v->size_;
+            return true;
+        }
+        return take(fill_slow(Base::a, Path(Base::path), values.data(), values.size(), E{}, true));
+    }
+    bool assign(std::initializer_list<E> values) noexcept requires plain {
+        return assign(std::span<const E>(values.begin(), values.size()));
+    }
+    // Appends `count` value-initialized elements (records own no blocks
+    // then): the index of the first, or npos on failure. Fill them with
+    // (*this)[i] or a batch scope.
+    static constexpr std::uint32_t npos = ~std::uint32_t(0);
+    std::uint32_t emplace_n(std::uint32_t count) noexcept {
+        const T* v = Base::get_ptr();
+        if (!v) {
+            missing();
+            return npos;
+        }
+        const std::uint32_t first = v->size_;
+        if (std::size_t(first) + count > proxy_detail::max_elements<E>) {
+            Base::a.fail(XErrc::capacity_exceeded);
+            return npos;
+        }
+        return resize(first + count) ? first : npos;
+    }
+
 private:
     char32_t csize_ = 0;
     proxy_detail::Head<T, Path> head_;
@@ -950,6 +1149,48 @@ private:
         const std::size_t bytes = proxy_detail::grow_bytes<E>(v ? v->capacity_ : 0);
         const bool ok = a.run_allocating(bytes, [&](char* base) {
             if (T* w = reinterpret_cast<T*>(path.resolve(base))) w->push_back(value);
+        });
+        const T* w = a.template at<const T>(path);
+        return {a.version, w ? w->size_ : char32_t(0), ok};
+    }
+    // append / assign past the capacity: `count` values from `src` (or
+    // copies of `value` when src is null), appended or (replace) replacing.
+    // A source inside the payload is copied out first: the payload may move.
+    static XOFFSET_DETAIL_NOINLINE Grow fill_slow(proxy_detail::Anchor a, const Path& path, const E* src, std::size_t count,
+                                                  E value, bool replace) noexcept requires plain {
+        char* const base0 = a.sync();
+        if (!base0) return {a.version, 0, false};
+        T* v = reinterpret_cast<T*>(path.resolve(base0));
+        if (!v) {
+            a.miss();
+            return {a.version, 0, false};
+        }
+        const std::size_t n = replace ? 0 : std::size_t(v->size_);
+        if (count > proxy_detail::max_elements<E> - n) {
+            a.fail(XErrc::capacity_exceeded);
+            return {a.version, v->size_, false};
+        }
+        std::vector<E> copy;
+        if (src) {
+            src = proxy_detail::outside_payload(a, src, count, copy);
+            if (!src) return {a.version, v->size_, false};
+        }
+        const std::size_t target = n + count;
+        const std::size_t doubled = std::min<std::size_t>(proxy_detail::max_elements<E>, std::size_t(v->capacity_) * 2u);
+        const std::size_t new_cap = std::max(target, doubled);
+        const bool ok = a.run_allocating(new_cap * sizeof(E) + alignof(E) + 24u, [&](char* base) {
+            T* w = reinterpret_cast<T*>(path.resolve(base));
+            if (!w) return;
+            if (replace && src) {
+                w->assign_range(std::span<const E>(src, count));
+                return;
+            }
+            if (replace) w->clear();
+            w->reserve(new_cap);
+            E* at = fixed_detail::resolve_rel32_live<E>(&w->data_delta, w->data_delta) + w->size_;
+            if (src) std::memcpy(at, src, count * sizeof(E));
+            else std::fill_n(at, count, value);
+            w->size_ = static_cast<char32_t>(std::size_t(w->size_) + count);
         });
         const T* w = a.template at<const T>(path);
         return {a.version, w ? w->size_ : char32_t(0), ok};
@@ -1015,6 +1256,28 @@ public:
             if (T* w = reinterpret_cast<T*>(Base::path.resolve(base))) inserted = w->insert(copy).second;
         });
         return inserted;
+    }
+    // Batch insert (growth policy part 4): every value not yet present, one
+    // resolve and at most one regrow. The number inserted; on failure
+    // nothing is inserted (error() tells).
+    std::uint32_t insert(std::span<const E> values) noexcept requires plain {
+        std::vector<E> keep;
+        const E* src = proxy_detail::outside_payload(Base::a, values.data(), values.size(), keep);
+        if (!src && !values.empty()) return 0;
+        const T* now = Base::get_ptr();
+        if (!now) {
+            missing();
+            return 0;
+        }
+        if (!proxy_detail::reserve_at<T>(Base::a, Base::path, std::size_t(now->size_) + values.size())) return 0;
+        T* s = reinterpret_cast<T*>(Base::path.resolve(Base::a.ctl->base));
+        if (!s) [[unlikely]] return 0;
+        std::uint32_t inserted = 0;
+        for (std::size_t i = 0; i < values.size(); ++i) inserted += s->insert(src[i]).second ? 1u : 0u;
+        return inserted;
+    }
+    std::uint32_t insert(std::initializer_list<E> values) noexcept requires plain {
+        return insert(std::span<const E>(values.begin(), values.size()));
     }
     template <class Key>
     bool erase(const Key& key) noexcept {
@@ -1155,6 +1418,42 @@ public:
         }
         return inserted;
     }
+    // Batch insert (growth policy part 4): every key -> value pair whose key
+    // is absent (pairs of any type with .first and .second, e.g. std::pair or
+    // this map's entries; any order, ascending is fastest). One resolve and
+    // at most one regrow. The number inserted; on failure nothing is
+    // inserted (error() tells).
+    template <class Pair>
+    std::uint32_t insert(std::span<const Pair> entries) noexcept
+        requires plain && requires(const Pair& e) { K(e.first); V(e.second); } {
+        std::vector<Pair> keep;
+        const Pair* src = proxy_detail::outside_payload(Base::a, entries.data(), entries.size(), keep);
+        if (!src && !entries.empty()) return 0;
+        const T* now = Base::get_ptr();
+        if (!now) {
+            missing();
+            return 0;
+        }
+        if (!proxy_detail::reserve_at<T>(Base::a, Base::path, std::size_t(now->size_) + entries.size())) return 0;
+        T* m = reinterpret_cast<T*>(Base::path.resolve(Base::a.ctl->base));
+        if (!m) [[unlikely]] return 0;
+        std::uint32_t inserted = 0;
+        for (std::size_t i = 0; i < entries.size(); ++i)
+            inserted += m->try_emplace(K(src[i].first), V(src[i].second)).second ? 1u : 0u;
+        csize_ = m->size_;
+        return inserted;
+    }
+    template <class Pair>
+    std::uint32_t insert(const std::vector<Pair>& entries) noexcept
+        requires plain && requires(const Pair& e) { K(e.first); V(e.second); } {
+        return insert(std::span<const Pair>(entries));
+    }
+    // Capacity for n entries (one regrow).
+    bool reserve(std::uint32_t n) noexcept {
+        if (!proxy_detail::reserve_at<T>(Base::a, Base::path, n)) return false;
+        return true;
+    }
+
     // The value of `key`, inserted value-initialized when absent.
     template <class Key>
     mapped_ref operator[](const Key& key) noexcept {
