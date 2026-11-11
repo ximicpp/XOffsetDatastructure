@@ -16,6 +16,10 @@ option(XOFFSET_BUILD_MESH_DEMO "Build the device mesh demo (demo/mesh)" OFF)
 option(XOFFSET_INSTALL "Generate XOffset install/export rules" ${XOFFSET_TOP_LEVEL})
 option(XOFFSET_BUILD_FUZZERS "Build libFuzzer targets (needs clang -fsanitize=fuzzer)" OFF)
 option(XOFFSET_FUZZ_INJECT_CRASH "Fuzz drill builds only: inputs starting with XOFFSET-INJECT crash the fuzz harnesses" OFF)
+# Growth policy stress mode (test builds only): every pin scope's end moves a
+# Relocating payload and makes the old storage inaccessible; containers always
+# regrow into fresh blocks and retired blocks are poisoned.
+option(XOFFSET_STRESS_RELOCATE "Test builds only: force moves at pin scope exit, poison retired storage" OFF)
 # 26: P2996 reflection describes every record (no boilerplate). 20 and 23: one
 # XOFFSET_RECORD line per record; no <meta>, no -freflection, no TypeLayout.
 set(XOFFSET_CXX_STANDARD 26 CACHE STRING "C++ standard of the full library targets: 20, 23 or 26")
@@ -93,6 +97,9 @@ if(NOT XOFFSET_STORAGE_ONLY)
     add_library(XOffset::xoffset ALIAS xoffset_common)
     set_target_properties(xoffset_common PROPERTIES EXPORT_NAME xoffset)
     xoffset_configure_full_interface(xoffset_common)
+    if(XOFFSET_STRESS_RELOCATE)
+        target_compile_definitions(xoffset_common INTERFACE XOFFSET_STRESS_RELOCATE=1)
+    endif()
 
     # An imported interface transfers the real settings to try_compile().
     add_library(xoffset_probe_settings INTERFACE IMPORTED)

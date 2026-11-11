@@ -308,6 +308,80 @@ namespace XOffsetDatastructure {
     }
 
     class XBufferCore;
+#if defined(XOFFSET_STRESS_RELOCATE)
+    namespace detail {
+        // Stress mode (growth policy part 4, test builds only): a pattern no
+        // live value is expected to hold, written over storage the library
+        // stopped using, so a stale plain reference reads garbage at once.
+        inline constexpr unsigned char stress_poison_byte = 0xDB;
+
+        // Storage a payload moved out of is not released at once: its whole
+        // pages become inaccessible (a stale plain reference faults), the rest
+        // is overwritten with the poison pattern, and it stays reserved until
+        // 32 later moves have happened (so the addresses are not reused by
+        // the next buffer meanwhile).
+        class StressGraveyard {
+        public:
+            static void bury(VirtualMemoryStorage&& old) noexcept {
+                if (!old.data()) return;
+                Grave grave;
+                grave.storage = std::move(old);
+                seal(grave);
+                std::lock_guard<std::mutex> lock(state().mutex);
+                auto& graves = state().graves;
+                if (graves.size() >= limit) {
+                    unseal(graves.front());
+                    graves.erase(graves.begin());   // released here
+                }
+                XOFFSET_TRY {
+                    graves.push_back(std::move(grave));
+                } XOFFSET_CATCH(...) {
+                    unseal(grave);
+                }
+            }
+
+        private:
+            static constexpr std::size_t limit = 32;
+            struct Grave {
+                VirtualMemoryStorage storage;
+                char* lo = nullptr;
+                std::size_t bytes = 0;
+            };
+            struct State {
+                std::mutex mutex;
+                std::vector<Grave> graves;
+            };
+            // Never destroyed: graves may outlive every other static.
+            static State& state() noexcept {
+                static State* s = new State;
+                return *s;
+            }
+            static void seal(Grave& grave) noexcept {
+                auto& st = grave.storage;
+                char* const data = st.data();
+                const std::size_t used = (std::max)(st.size(), st.accessible_bytes());
+                const std::size_t page = st.page_size() ? st.page_size() : 4096u;
+                const auto region = reinterpret_cast<std::uintptr_t>(data) - VirtualMemoryStorage::host_header;
+                const auto end = reinterpret_cast<std::uintptr_t>(data) + st.accessible_bytes();
+                const auto lo = (region + page - 1) & ~std::uintptr_t(page - 1);
+                const auto hi = end & ~std::uintptr_t(page - 1);
+                if (st.size() != 0) std::memset(data, stress_poison_byte, (std::min)(st.size(), used));
+#if !defined(_WIN32)
+                if (hi > lo && ::mprotect(reinterpret_cast<void*>(lo), hi - lo, PROT_NONE) == 0) {
+                    grave.lo = reinterpret_cast<char*>(lo);
+                    grave.bytes = hi - lo;
+                }
+#endif
+            }
+            static void unseal(Grave& grave) noexcept {
+#if !defined(_WIN32)
+                if (grave.bytes) (void)::mprotect(grave.lo, grave.bytes, PROT_READ | PROT_WRITE);
+#endif
+                grave.bytes = 0;
+            }
+        };
+    }
+#endif
     namespace detail {
         // A payload lineage's control block (growth policy, part 2). Proxies
         // (XRef) hold a pointer to it and a copy of `base` and `version`:
@@ -913,6 +987,13 @@ namespace XOffsetDatastructure {
             }
         }
 #if defined(XOFFSET_STRESS_RELOCATE)
+        void stress_poison_block(void* ptr, std::uint32_t bytes) noexcept {
+            const auto base = reinterpret_cast<std::uintptr_t>(buffer_.data());
+            const auto address = reinterpret_cast<std::uintptr_t>(ptr);
+            if (!ptr || bytes == 0 || address < base || address - base >= buffer_.size() ||
+                bytes > buffer_.size() - (address - base)) return;
+            std::memset(ptr, detail::stress_poison_byte, bytes);
+        }
         // Stress mode: every pin scope's end moves the payload, so a plain
         // reference kept past the scope points at released storage.
         void stress_relocate() noexcept {
@@ -1142,6 +1223,12 @@ namespace XOffsetDatastructure {
             const auto offset = static_cast<size_type>(address - base);
             if (std::uint64_t(offset) + old_bytes != arena()->used_end) return false;
             if (new_bytes <= old_bytes) return true;
+#if defined(XOFFSET_STRESS_RELOCATE)
+            // Stress mode: in a Relocating buffer a container always regrows
+            // into a fresh block (and the old one is poisoned when retired),
+            // as std::vector would. Other policies keep their layout.
+            if (growth_policy_ == XGrowPolicy::Relocating) return false;
+#endif
             if (new_bytes > MAX_PAYLOAD - offset || !ensure_allocation_extent(offset + new_bytes)) return false;
             arena()->used_end = offset + new_bytes;
             return true;
@@ -1154,6 +1241,11 @@ namespace XOffsetDatastructure {
         // needs no host allocation and runs no host callback; it is published
         // inline. Everything else takes retire_block_general unchanged.
         XOFFSET_DETAIL_MOVE_INLINE void retire_block(void* ptr, std::uint32_t bytes) noexcept {
+#if defined(XOFFSET_STRESS_RELOCATE)
+            // Stress mode: a retired block is poisoned, in a pin scope too (a
+            // reference the container's own rules invalidated reads garbage).
+            if (growth_policy_ == XGrowPolicy::Relocating) stress_poison_block(ptr, bytes);
+#endif
             // Inside a pin scope a retired block is not reused until the
             // scope closes: plain references into it stay harmless.
             if (pinned_) [[unlikely]] return quarantine_block(ptr, bytes);
@@ -2469,6 +2561,11 @@ namespace XOffsetDatastructure {
                 ctl_->base = buffer_.data();
                 ctl_->version += 2;
             }
+#if defined(XOFFSET_STRESS_RELOCATE)
+            // Stress mode: a Relocating buffer's old storage becomes
+            // inaccessible instead.
+            if (growth_policy_ == XGrowPolicy::Relocating) detail::StressGraveyard::bury(std::move(next));
+#endif
             return true;
             // `next` (the old storage) is released here.
         }
@@ -9048,6 +9145,38 @@ namespace XOffsetDatastructure {
 #else
             try {
                 f(*root_ptr);
+            } catch (const XException& e) {
+                record_error(e.code() == XErrc::unspecified ? XErrc::out_of_storage : e.code());
+            } catch (const std::bad_alloc&) {
+                record_error(XErrc::host_allocation_failed);
+            }
+#endif
+            return ok();
+        }
+
+        // A message in one step, for senders that fill a new one each time:
+        // reset<T>(), then f(T& root) in a pin scope entered with the fresh
+        // root (no root lookup and no entry move: the emptied payload is at
+        // its smallest). Otherwise as edit<T>(f, expected_growth): the same
+        // fail-soft result, and f must return void. A failed buffer starts
+        // over (reset replaces its content and clears the failure).
+        template<typename T, typename F>
+        XOFFSET_DETAIL_MOVE_INLINE bool build(F&& f, size_type expected_growth = 0) {
+            using R = std::invoke_result_t<F&, T&>;
+            static_assert(std::is_void_v<R>,
+                "build(f): f must return void (a value made inside may point into the payload; "
+                "use read(f) to compute a value)");
+            T& fresh = reset<T>();
+            if (expected_growth != 0 || this->pinned()) [[unlikely]] return edit<T>(f, expected_growth);
+            if (!this->pin_enter()) [[unlikely]] return false;
+            PinGuard guard(this->control());
+#if XOFFSET_NO_EXCEPTIONS
+            detail::SoftFailScope soft;
+            f(fresh);
+            if (soft.failed()) record_error(soft.code());
+#else
+            try {
+                f(fresh);
             } catch (const XException& e) {
                 record_error(e.code() == XErrc::unspecified ? XErrc::out_of_storage : e.code());
             } catch (const std::bad_alloc&) {
