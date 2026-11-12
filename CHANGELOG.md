@@ -2,6 +2,74 @@
 
 ## Unreleased
 
+## 3.6.0: losing cells and memory
+
+A minor release on 3.5.0 that clears losing cells on the production paths and
+caps memory. Buffers can grow by relocating (growth policy parts 1-4,
+`XGrowPolicy::Relocating`, proxies and pin scopes, named accessors, batch
+operations); the first reservation is sized from the first content. Memory
+(SLG demo M, app level, one format per process, cloud x86): xoffset_trusted
+process RSS 663.5 MiB, 0.98x the leanest rival (protobuf; was 1.20x on 3.5),
+page tables 0.44% of RSS (2.89 MiB; was 13.3 MiB), both within the new 3.6
+memory gate (RSS <= 1.10x the leanest rival, page tables <= 1% of RSS). The
+small-server D3 path (S scale, 64 clients, cloud x86) against zpp per
+delivery: peace 1.85x, conflict 1.30x (report only, susu 2026-11-11), siege
+0.69x; M scale and siege stay gated. Free tables 12 KiB -> 2.4 KiB per buffer.
+
+Breaking API: `TypedXBuffer<T>::root()` and `reset()` return a proxy
+(`XRef<T>`); the old plain reference is `plain_root()` (it dangles when the
+payload moves). Wire format unchanged (2.1; delta 1.0 and XS 1.0 unchanged).
+
+Judged in the cloud only (docs/RELEASING.md). `tools/local_validate.sh
+--release --base v3.5.0` on the release candidate (7d16b44): all 27 steps
+pass, none not run (GCC 16 / ASan / TSan 209/209, P2996 209/209 and
+signatures, the C++20/C++23/C++26d matrix, Windows MSVC C++20/C++23,
+clang-cl and MinGW, and this time Android NDK r29/r30 under qemu-aarch64 and
+clang 18 ASan, 179/179 each with identical corpora; wire matrix 64 reads, 0
+failures). Ir against v3.5.0: GCC 16 totals 0.974-1.001; P2996 totals
+0.975-1.005, two warnings accepted by the performance thread (below).
+Cloud x86 and uplink columns (docs/RELEASING.md 2a, GCC 16 -O3 `bench/slg`,
+M scale, native off, 20 interleaved batches): 0 fail, 2 warnings. Server
+sends ÷ zpp_bits L 0.32, EB 0.64, LD 0.71, UC 0.55, UP 1.028 (warning; the
+known small-message fixed cost, head ÷ v3.5.0 1.015 on the same machine);
+client hot views ÷ cista_unchecked EBW 0.81, LDW 0.69, UCW 0.76, USW 0.75,
+UPW 1.007 (warning, inside the cloud A/A spread); UL.recv 0.96-0.98, UL.send
+1.35x zpp_bits (ceiling 1.80). D3 at M scale (native on, 10 batches),
+XOffset `D*.send` per delivery ÷ the rival's `U*.send`: peace 0.80, conflict
+0.17 vs zpp_bits; client DPTW.recv 0.94 vs cista_unchecked.
+Pre-release fuzz (`tools/fuzz_prerelease.sh --budget hour`, ASan+UBSan) on
+the release candidate (7d16b44): PASS, no findings over GCC 16 differential
+and replay, libFuzzer on all five targets in the reflection build, the four
+field-list targets and the cross-build outcome diff.
+
+Known items (report only, explained):
+- P2996 builds: allocation-heavy mutation paths +0.35-0.47% Ir
+  (formal.mutate 1.0035, slg.B 1.0047; the compact free table, #265); GCC 16
+  builds about -1.3% on the same totals.
+- `XBuffer` move and swap cost about 40-100 Ir more each (pin and control
+  checks on `XBufferCore::move_from`'s fast path, #256/#261): stages
+  slg.B.writeback / slg.C.replace 1.055 (GCC 16) and 1.192 (P2996), under 1%
+  of their scenes (report-only stages). Back to v3.5.0 is a 4.0 R7 item.
+- Mac A.req_encode +6.3% after #266 (the `root<T>()` cache refill, redo of
+  #223; the same +6.3% as #223 in 3.3): accepted by the performance thread
+  2026-11-11 as the cost of the checked-path refill; it is the new baseline.
+- Remaining losses moved to the 4.0 measure list (not regressions): client
+  uplink UL.send ~1.5x zpp_bits on cloud x86 (ceiling 1.80x holds); under
+  memory pressure (cgroup limit + swap) xoffset vs zpp_bits UP.apply 1.7x,
+  UC.apply 1.3x, LD.apply 2.4x, B.out_encode 2.7x; small-server D3 peace and
+  conflict (above).
+- Bytes stay 11-33% above zpp_bits (wire format not changed for size).
+
+- Retired arena blocks of at least `XOFFSET_RETIRE_DISCARD_BYTES` (16 KiB;
+  0 disables) give their whole pages back with `MADV_DONTNEED` on Linux
+  instead of being cleared with `memset` (the partial pages at both ends are
+  cleared as before; arena storage is private anonymous memory, so the pages
+  read back as zero and the hole rule holds; other platforms keep the
+  `memset`). A vector that outgrows its block in a long-lived buffer leaves a
+  hole later requests may never reuse; its pages no longer stay dirty. SLG
+  demo M, xoffset_trusted process RSS 812 -> 717 MiB. Test
+  `test_retire_discard`.
+
 - `root<T>()` fills its cache when it takes the checked path, so an `XBuffer`
   that was moved (into a `std::vector`, by a swap) pays the checks once
   instead of on every call. The cache hit is inlined (one compare and one
