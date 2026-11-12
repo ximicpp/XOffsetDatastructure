@@ -3,6 +3,9 @@
 #include <chrono>
 #include <cstdlib>
 #include <cstdint>
+#include <cstring>
+#include <new>
+#include <vector>
 #include <map>
 #include <span>
 #include <string>
@@ -147,6 +150,44 @@ struct Runner {
 // reset/reload_verified/save_verified_into) and decoded std objects reused
 // across messages. Unset: every message builds and frees its own state.
 inline bool reuse_mode() { static const bool on = std::getenv("SLG_REUSE") != nullptr; return on; }
+
+// W3 step 0 (report only, SLG_XPORT=1): one transport model for every format.
+// A send ends with every wire byte copied into one reused transport buffer (the
+// kernel's socket buffer); a receive starts from that buffer and reads it into
+// memory the receiver owns: a read buffer it decodes from (std formats, XOffset
+// reload), or its final memory (cista's held buffer, XOffset direct receive).
+// The whole-block cells L, B, S, SD then record only <cell>.send+T and
+// <cell>.recv+T (the original keys come from processes without SLG_XPORT).
+inline bool xport_on() { static const bool on = std::getenv("SLG_XPORT") != nullptr; return on; }
+struct XportBuf {
+    uint8_t* p = nullptr; std::size_t cap = 0, n = 0;
+    void ensure(std::size_t want) {
+        if (want <= cap) return;
+        std::size_t c = cap ? cap : (std::size_t(16) << 20);
+        while (c < want) c *= 2;
+        auto* q = static_cast<uint8_t*>(::operator new(c));
+        std::memset(q, 0, c);   // prefault once, as a long-lived socket / read buffer is
+        if (p) { std::memcpy(q, p, n); ::operator delete(p); }
+        p = q; cap = c;
+    }
+};
+inline XportBuf& xport_t() { static XportBuf b; b.ensure(1); return b; }   // the transport
+inline XportBuf& xport_r() { static XportBuf b; b.ensure(1); return b; }   // the receiver's read buffer
+inline void xport_put(const void* d, std::size_t n) { auto& t = xport_t(); t.ensure(n); std::memcpy(t.p, d, n); t.n = n; }
+inline void xport_put(std::span<const uint8_t> b) { xport_put(b.data(), b.size()); }
+inline void xport_put(std::string_view b) { xport_put(b.data(), b.size()); }
+inline void xport_put(const std::vector<uint8_t>& b) { xport_put(b.data(), b.size()); }
+// Appending parts (a borrowed send): xport_begin, xport_add per part.
+inline uint8_t* xport_begin(std::size_t total) { auto& t = xport_t(); t.ensure(total); t.n = 0; return t.p; }
+inline void xport_add(const void* d, std::size_t n) { auto& t = xport_t(); std::memcpy(t.p + t.n, d, n); t.n += n; }
+inline std::span<const uint8_t> xport_view() { auto& t = xport_t(); return {t.p, t.n}; }
+inline std::string_view xport_sv() { auto& t = xport_t(); return {reinterpret_cast<const char*>(t.p), t.n}; }
+// read(): transport -> the receiver's read buffer.
+inline std::span<const uint8_t> xport_read() {
+    auto& t = xport_t(); auto& r = xport_r();
+    r.ensure(t.n); std::memcpy(r.p, t.p, t.n); r.n = t.n;
+    return {r.p, r.n};
+}
 
 // Message slots for the reuse protocol.
 enum Slot : int { kReq, kRes, kOut, kBack, kSnap, kSnap2, kView, kDelta, kSlots };

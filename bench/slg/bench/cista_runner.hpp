@@ -153,8 +153,13 @@ public:
         if (demo_cases()) for (std::size_t k = 0; k < migrants.size(); ++k) {
             if (!reuse) throw std::runtime_error("SLG_CASES=demo needs SLG_REUSE=1");
             auto& slot = players_[std::size_t(migrants[k])];
+            if (xport_on()) {   // W3 step 0: the transport model; cista reads the socket into its held buffer
+                timed(st, "B.send+T", [&] { save(out_, *slot); xport_put(out_); });
+                timed(st, "B.recv+T", [&] { b_m_.receive(xport_view()); });
+            } else {
             timed(st, "B.out_encode", [&] { save(out_, *slot); });
             recv(st, "B.in_decode", b_m_, out_);
+            }
             untimed(st, "B.scene_edits", [&] { season_edits(*b_m_, mix_seed(seed_, uint64_t(cycle) * 1000003u + k), sc.season_ops); });
             timed(st, "B.install", [&] { swap(slot, b_m_); });
             st.bytes["B.out"] += out_.size();
@@ -184,10 +189,18 @@ public:
         // Demo case set, S: scene <-> storage for players (see std_runner.hpp).
         if (demo_cases()) for (int p : pick_storage(seed_, cycle, sc.players, sc.migrants)) {
             auto& slot = players_[std::size_t(p)];
+            if (xport_on()) {   // W3 step 0: the transport model; the storage's resend of its bytes is untimed
+                timed(st, "S.send+T", [&] { save(back_, *slot); xport_put(back_); });
+                timed(st, "S.recv+T", [&] { b_r_.receive(xport_view()); });
+                store_ = back_;
+                xport_put(store_);
+                timed(st, "S.recv+T", [&] { b_m_.receive(xport_view()); });
+            } else {
             timed(st, "S.save_encode", [&] { save(back_, *slot); });
             recv(st, "S.store_recv", b_r_, back_);
             store_ = back_;
             recv(st, "S.load_recv", b_m_, store_);
+            }
             timed(st, "S.load_install", [&] { swap(slot, b_m_); });
             st.bytes["S.player"] += back_.size();
         }
@@ -292,6 +305,8 @@ public:
         cm::PlayerState& server(int p) { return *srv[std::size_t(p)]; }
         std::size_t login_encode(int p) { return save(lw, *srv[std::size_t(p)]).size(); }
         void login_recv(int p) { hold[std::size_t(p)].receive({lw.data(), lw.size()}); }
+        std::size_t login_send_x(int p) { save(lw, *srv[std::size_t(p)]); xport_put(lw); return lw.size(); }
+        void login_recv_x(int p) { hold[std::size_t(p)].receive(xport_view()); }
         cm::PlayerState& held(int p) { return *hold[std::size_t(p)]; }
         template <class Fill> std::size_t patch_encode(Fill&& fill) { fill(pm); return save(pw, pm).size(); }
         void patch_recv() { pr.receive({pw.data(), pw.size()}); }
@@ -312,6 +327,8 @@ public:
         cm::PlayerState& player(int p) { return *r->players_[std::size_t(p)]; }
         template <class Fill> std::size_t modules_encode(Fill&& fill) { fill(pm); return save(w, pm).size(); }
         void modules_recv() { pr.receive({w.data(), w.size()}); }
+        template <class Fill> std::size_t modules_send_x(Fill&& fill) { fill(pm); save(w, pm); xport_put(w); return w.size(); }
+        void modules_recv_x() { pr.receive(xport_view()); }
     };
 
     struct BlockOps {

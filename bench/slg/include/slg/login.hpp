@@ -163,14 +163,19 @@ template <class Ops> void run_login(Ops& ops, uint64_t seed, int cycle, int roun
     wq.assign(std::size_t(nw_dev), {}); nwq.assign(std::size_t(nw_dev), {});
     for (int p : logins) {
         std::size_t n = 0;
-        timed(st, "L.send", [&] { n = ops.login_encode(p); });
         uint64_t q = 0;
-        timed(st, "L.recv", [&] { ops.login_recv(p); q = query_self(ops.held(p)); });
+        if (xport_on()) {   // W3 step 0: the transport model (runner.hpp)
+            timed(st, "L.send+T", [&] { n = ops.login_send_x(p); });
+            timed(st, "L.recv+T", [&] { ops.login_recv_x(p); q = query_self(ops.held(p)); });
+        } else {
+            timed(st, "L.send", [&] { n = ops.login_encode(p); });
+            timed(st, "L.recv", [&] { ops.login_recv(p); q = query_self(ops.held(p)); });
+        }
         st.report_sum += q;
         st.bytes["L.player"] += n;
         st.bytes["L.logins"] += 1;
         if (p < nw_dev) wl.push_back({p, lz.size()});   // the warm device logs in too, after the loop
-        lz.add(ops.login_wire());
+        lz.add(xport_on() ? xport_sv() : ops.login_wire());
         if constexpr (native) if (native_on()) {
             std::size_t k = 0;
             timed(st, "LK.send", [&] { k = ops.n_login_key(p); });
@@ -269,8 +274,13 @@ template <class Ops> void run_dirty_save(Ops& ops, const std::vector<int>& who, 
     if constexpr (requires { ops.n_store_prime_all(); }) if (cycle == 0) ops.n_store_prime_all();
     for (int p : who) {
         std::size_t n = 0;
-        timed(st, "SD.save_encode", [&] { n = ops.modules_encode([&](auto& m) { fill_modules(m, ops.player(p), cycle); }); });
-        timed(st, "SD.store_recv", [&] { ops.modules_recv(); });
+        if (xport_on()) {   // W3 step 0: the transport model (runner.hpp)
+            timed(st, "SD.send+T", [&] { n = ops.modules_send_x([&](auto& m) { fill_modules(m, ops.player(p), cycle); }); });
+            timed(st, "SD.recv+T", [&] { ops.modules_recv_x(); });
+        } else {
+            timed(st, "SD.save_encode", [&] { n = ops.modules_encode([&](auto& m) { fill_modules(m, ops.player(p), cycle); }); });
+            timed(st, "SD.store_recv", [&] { ops.modules_recv(); });
+        }
         st.bytes["SD.modules"] += n;
         if constexpr (native) if (native_on()) {
             std::size_t k = 0;

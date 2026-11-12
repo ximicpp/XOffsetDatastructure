@@ -7965,6 +7965,21 @@ namespace XOffsetDatastructure {
         XWireEmission emission = XWireEmission::free_runs;
     };
 
+    // W3 step 0 PROTOTYPE (unmerged, bench only): borrowed wire parts.
+    // with_wire<T>() lends the wire save_verified_into would write as parts:
+    // header (+ extent table), payload extent(s) pointing into the arena,
+    // hole table. Valid only inside the callback. No pin, no debug checks.
+    struct XWirePart { const std::byte* data; std::size_t size; };
+    struct XWireParts {
+        std::span<const XWirePart> parts;
+        std::size_t bytes;
+    };
+    class XWireScratch {
+    public:
+        std::vector<std::byte> head, holes;
+        std::vector<XWirePart> parts;
+    };
+
     // Options of save_compact / save_compact_into.
     struct XCompactOptions {
         // Vectors of at least 8 elements (not strings) keep size / slack_div
@@ -9282,6 +9297,7 @@ namespace XOffsetDatastructure {
             // header<T>'s body, inlined into save_into's fast path.
             template<class T> XOFFSET_DETAIL_MOVE_INLINE static XWireHeaderV2 header_inline(XBufferCore&);
             template<class T> static void save_into(XBufferCore&, std::string&, XSaveOptions);
+            template<class T, class F> static void with_wire(XBufferCore&, XWireScratch&, F&&);
             template<class T> static bool save_small_into(XBufferCore&, std::string&, XWireEmission);
             template<class T> static void save_into_general(XBufferCore&, std::string&, XSaveOptions);
             template<class T> static void rebuild_free_table(T&, XBufferCore&);
@@ -9705,6 +9721,12 @@ namespace XOffsetDatastructure {
         void save_verified_into(std::string& out, XSaveOptions options = {}) {
             if (refuse_failed_emit(out)) return;
             detail::VerifiedPathsAccess::save_into<T>(*this, out, options);
+        }
+
+        // W3 step 0 PROTOTYPE: see XWireParts. free_runs emission only.
+        template <typename T, typename F>
+        void with_wire(XWireScratch& scratch, F&& f) {
+            detail::VerifiedPathsAccess::with_wire<T>(*this, scratch, std::forward<F>(f));
         }
 
         // Compacted wire written by direct traversal: preorder blocks, strings
@@ -10527,8 +10549,24 @@ namespace XOffsetDatastructure {
 #endif
         }
 
+        /// W3 step 0 PROTOTYPE: finish with the admit check (trusted links:
+        /// what XReceiver::reload does for server_peer / from_server).
+        XStatus try_finish_admit() {
+#if XOFFSET_NO_EXCEPTIONS
+            if (!finish_v(true)) return detail::take_pending_error();
+            return {};
+#else
+            try {
+                XOFFSET_VREQUIRE(finish_v(true));
+                return {};
+            } catch (...) {
+                return detail::current_exception_error();
+            }
+#endif
+        }
+
     private:
-        detail::vstatus finish_v() {
+        detail::vstatus finish_v(bool admit = false) {
             constexpr const char* who = "reload_verified<T>()";
             auto* buffer = std::exchange(buffer_, nullptr);
             if (!buffer) XOFFSET_VFAIL(XException, XErrc::invalid_state, "verified reload: token consumed");
@@ -10567,8 +10605,12 @@ namespace XOffsetDatastructure {
                 }
                 XBufferCore::write_payload_header(base, header.root_offset, header.used_bytes);
                 XOFFSET_VTRY(buffer->check_reinit_payload());
-                XOFFSET_VTRY(buffer->template finish_verified_load<T>(header, layout, std::pmr::new_delete_resource(),
-                                                                      who, &buffer->retained_reload_scratch()));
+                if (admit) {
+                    XOFFSET_VTRY(buffer->template finish_admitted_load<T>(header, layout.holes, layout.hole_count, who));
+                } else {
+                    XOFFSET_VTRY(buffer->template finish_verified_load<T>(header, layout, std::pmr::new_delete_resource(),
+                                                                          who, &buffer->retained_reload_scratch()));
+                }
             XOFFSET_ROLLBACK_END(buffer->reset_arena(0))
             return detail::vok();
         }

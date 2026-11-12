@@ -117,6 +117,46 @@ namespace detail {
         save_into_general<T>(source, out, options);
     }
 
+    // W3 step 0 PROTOTYPE: the parts of the free_runs wire, payload borrowed.
+    template<class T, class F>
+    void VerifiedPathsAccess::with_wire(XBufferCore& source, XWireScratch& scratch, F&& f) {
+        const auto header0 = header_inline<T>(source);
+        const auto used = static_cast<std::size_t>(header0.used_bytes);
+        const WireGaps gaps = wire_free_runs(source, header0.used_bytes);
+        auto header = header0;
+        header.extent_count = static_cast<std::uint32_t>(gaps.extent_count);
+        const auto* base = reinterpret_cast<const std::byte*>(source.get_address());
+        scratch.head.resize(sizeof(XWireHeaderV2) + gaps.extent_count * 8u);
+        scratch.parts.clear();
+        std::memcpy(scratch.head.data(), &header, sizeof(header));
+        scratch.parts.push_back({scratch.head.data(), scratch.head.size()});
+        std::size_t bytes = scratch.head.size();
+        if (gaps.extent_count == 0) {
+            scratch.parts.push_back({base + XWIRE_PAYLOAD_BEGIN, used - XWIRE_PAYLOAD_BEGIN});
+            bytes += used - XWIRE_PAYLOAD_BEGIN;
+        } else {
+            std::byte* at = scratch.head.data() + sizeof(XWireHeaderV2);
+            std::uint32_t begin = XWIRE_PAYLOAD_BEGIN;
+            auto extent = [&](std::uint32_t b, std::uint32_t n) {
+                const std::uint32_t entry[2] = {b, n};
+                std::memcpy(at, entry, sizeof(entry));
+                at += sizeof(entry);
+                scratch.parts.push_back({base + b, n});
+                bytes += n;
+            };
+            for (const auto& gap : gaps.runs) { extent(begin, gap.offset - begin); begin = gap.offset + gap.bytes; }
+            if (begin < used) extent(begin, static_cast<std::uint32_t>(used - begin));
+        }
+        const std::size_t hole_bytes = source.free_block_count() * sizeof(XBufferCore::WireHole);
+        if (hole_bytes) {
+            scratch.holes.resize(hole_bytes);
+            source.write_free_blocks(reinterpret_cast<char*>(scratch.holes.data()));
+            scratch.parts.push_back({scratch.holes.data(), hole_bytes});
+            bytes += hole_bytes;
+        }
+        f(XWireParts{std::span<const XWirePart>(scratch.parts.data(), scratch.parts.size()), bytes});
+    }
+
     // save_into_general's fast path for a payload below
     // wire_zero_scan_min_payload (far below the copier's prefault size): no
     // emission elides a byte there, so the wire is the header (extent_count
