@@ -1267,6 +1267,28 @@ namespace XOffsetDatastructure {
             return allocate_block_general(bytes, alignment, allow_growth);
         }
 
+        // allocate_block for a first storage (fixed_detail::allocate_first_storage):
+        // `bytes` is block_bytes_of(n) of a nonzero n, so a nonzero multiple of
+        // 8, and every caller's alignment is at most 8, which every block of
+        // the arena has. With no hole recorded (each message built anew after
+        // a reset) this is allocate_block's bump without the request checks
+        // the contract settles; anything else returns null and the caller
+        // takes allocate_block unchanged. Same placement either way.
+        XOFFSET_DETAIL_MOVE_INLINE void* try_bump_first(std::uint32_t bytes) noexcept {
+            if (bytes > FreeTable::small_max) return nullptr;
+            if (const FreeTable* table = free_table_.get(); table && table->count != 0) return nullptr;
+            const size_type size = buffer_.size();
+            if (size < min_payload_size()) return nullptr;
+            char* const data = buffer_.data();
+            auto* const sm = std::launder(reinterpret_cast<arena_header*>(data));
+            const std::uint64_t start = sm->used_end;
+            if (start < min_payload_size() || start + bytes > size ||
+                ((reinterpret_cast<std::uintptr_t>(data) + start) & 7u) != 0) [[unlikely]] return nullptr;
+            check_owner_resolves();
+            sm->used_end = start + bytes;
+            return payload_byte_address(static_cast<size_type>(start));
+        }
+
         bool try_expand_block(void* ptr, std::uint32_t old_bytes, std::uint32_t new_bytes) {
             if (!ptr || buffer_.empty() || old_bytes == 0 || new_bytes == 0 ||
                 ((old_bytes | new_bytes) & 7u) != 0 || new_bytes > MAX_PAYLOAD) return false;
@@ -3834,7 +3856,20 @@ namespace XOffsetDatastructure {
             auto* owner = XBufferCore::owner_from_arena_noexcept(segment);
             if (!owner || bytes > XBufferCore::MAX_PAYLOAD - 8u) [[unlikely]]
                 return allocate_dynamic_bytes(allocator_ref{segment}, bytes, alignment); // throws the usual error
-            return owner->allocate_block(block_bytes_of(bytes), alignment);
+            const std::uint32_t block = block_bytes_of(bytes);
+            if (void* fresh = owner->try_bump_first(block)) [[likely]] return fresh;
+            return owner->allocate_block(block, alignment);
+        }
+
+        // The same for a string's first out-of-line block (XFixedString::
+        // move_to_heap, alignment 1), whose head already holds its binding.
+        XOFFSET_DETAIL_NOINLINE inline void* allocate_first_chars(const allocator_ref& alloc_ref, std::uint32_t bytes) {
+            auto* owner = XBufferCore::owner_from_arena_noexcept(alloc_ref.segment);
+            if (!owner || bytes > XBufferCore::MAX_PAYLOAD - 8u) [[unlikely]]
+                return allocate_dynamic_bytes(alloc_ref, bytes, alignof(char)); // throws the usual error
+            const std::uint32_t block = block_bytes_of(bytes);
+            if (void* fresh = owner->try_bump_first(block)) [[likely]] return fresh;
+            return owner->allocate_block(block, alignof(char));
         }
 
         // Live block of old_bytes grows in place to new_bytes (tail only).
@@ -4771,8 +4806,8 @@ namespace XOffsetDatastructure {
         // the inline bytes: it is copied before the head is rewritten.
         void move_to_heap(const allocator_type& alloc, const char* src,
                           std::uint32_t count, std::uint32_t new_cap) {
-            auto* fresh = detail::begin_dynamic_array<char>(fixed_detail::allocate_dynamic_bytes(
-                alloc, static_cast<std::uint32_t>(new_cap + 1), alignof(char)), std::size_t(new_cap) + 1u);
+            auto* fresh = detail::begin_dynamic_array<char>(fixed_detail::allocate_first_chars(
+                alloc, static_cast<std::uint32_t>(new_cap + 1)), std::size_t(new_cap) + 1u);
             std::int32_t incoming_delta = 0;
             XOFFSET_TRY {
                 fixed_detail::set_rel32(incoming_delta, &data_delta, fresh);
