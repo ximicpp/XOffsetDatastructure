@@ -2,19 +2,25 @@
 """SLG scorecard from bench/slg JSONL: 20 main cells, XOffset ÷ the strongest rival.
 
 usage: scorecard.py RAW_DIR [--bytes-dir DIR] [--xo xoffset_trusted]
-                    [--rivals zpp_bits,cista_unchecked] [--main-tag head] [--d3-tag d3]
+                    [--rivals zpp_bits,cista_unchecked] [--shared-rivals zpp_bits,zpp_bits_dirty]
+                    [--main-tag head] [--d3-tag d3]
                     [--env env.json] [--baseline scorecard.json] [--json OUT]
 
 RAW_DIR holds one JSONL per process, <tag>_<format>_<batch>.jsonl
 (tools/perf_gate/repro_scorecard.sh writes them so):
   <main-tag>  every format, SLG_NATIVE_OFF=1 (application-level rows)
-  <d3-tag>    XOffset only, SLG_D3=1 with native on (the shared-delta D* rows)
+  <d3-tag>    SLG_D3=1 with native on (the shared-delta D* rows): XOffset, and the
+              rivals that have a shared encoding (--shared-rivals: zpp_bits, and the
+              diagnostic format zpp_bits_dirty, whose U rows are zpp_bits')
 Every process of one batch runs the same seed, so cycle c of batch b carries the
 same messages in every format. A cell's ratio is taken per (batch, cycle >= 1)
 on the per-cycle sum of the cell's keys, averaged in log space within a batch;
 the point estimate is the geometric mean over batches. The D cells pair
-XOffset's D* rows (d3 processes) with each rival's per-client U* rows (main
-processes): the rivals have no shared-delta path.
+XOffset's D* rows (d3 processes) with every approach a rival has (susu, 4.0
+plan: scored against the rival's strongest approach): each rival's per-client
+U* rows (main processes), and each shared-encoding rival's own D* rows (its d3
+processes, the same keys as XOffset's; column "<format> 共享"). A run without
+a rival's d3 processes (an older tree) scores the D cells against U* only.
 
 Per cell the scorecard names the strongest rival (the one XOffset is slowest
 against) and classes the ratio: win < 0.95, tie 0.95-1.05, loss > 1.05.
@@ -48,22 +54,22 @@ CELLS = [
     ("服务端发送", "LD.send", "自身增量", "main", ["LD.send"], ["LD.send"], "main"),
     ("服务端发送", "UP.send", "视野增量，和平", "main", ["UP.send"], ["UP.send"], "main"),
     ("服务端发送", "UC.send", "视野增量，冲突", "main", ["UC.send"], ["UC.send"], "main"),
-    ("服务端发送", "DP", "共享增量，和平：发布加发送 ÷ 对手 UP.send", "d3", ["DP.pub", "DP.send"], ["UP.send"], "main"),
-    ("服务端发送", "DC", "共享增量，冲突：发布加发送 ÷ 对手 UC.send", "d3", ["DC.pub", "DC.send"], ["UC.send"], "main"),
+    ("服务端发送", "DP", "共享增量，和平：发布加发送 ÷ 对手 UP.send 或其共享编码 DP", "d3", ["DP.pub", "DP.send"], ["UP.send"], "main"),
+    ("服务端发送", "DC", "共享增量，冲突：发布加发送 ÷ 对手 UC.send 或其共享编码 DC", "d3", ["DC.pub", "DC.send"], ["UC.send"], "main"),
     ("客户端接收", "L.recv", "登录全量", "main", ["L.recv"], ["L.recv"], "main"),
     ("客户端接收", "EBW.recv", "浏览全量（热视图）", "main", ["EBW.recv"], ["EBW.recv"], "main"),
     ("客户端接收", "LDW.recv", "自身增量（热视图）", "main", ["LDW.recv"], ["LDW.recv"], "main"),
     ("客户端接收", "UPW.recv", "视野增量，和平（热视图）", "main", ["UPW.recv"], ["UPW.recv"], "main"),
     ("客户端接收", "UCW.recv", "视野增量，冲突（热视图）", "main", ["UCW.recv"], ["UCW.recv"], "main"),
-    ("客户端接收", "DPTW.recv", "共享增量，和平 ÷ 对手 UPW.recv", "d3", ["DPTW.recv"], ["UPW.recv"], "main"),
-    ("客户端接收", "DCTW.recv", "共享增量，冲突 ÷ 对手 UCW.recv", "d3", ["DCTW.recv"], ["UCW.recv"], "main"),
+    ("客户端接收", "DPTW.recv", "共享增量，和平 ÷ 对手 UPW.recv 或其共享编码 DPTW", "d3", ["DPTW.recv"], ["UPW.recv"], "main"),
+    ("客户端接收", "DCTW.recv", "共享增量，冲突 ÷ 对手 UCW.recv 或其共享编码 DCTW", "d3", ["DCTW.recv"], ["UCW.recv"], "main"),
     ("上行", "UL.recv", "服务端收指令（边界检查）", "main", ["UL.recv"], ["UL.recv"], "main"),
     ("上行", "UL.send", "客户端发指令（只报）", "main", ["UL.send"], ["UL.send"], "report"),
     # Report-only rows outside the 20 cells.
     ("只报", "US.send", "视野增量，围城", "main", ["US.send"], ["US.send"], "report"),
-    ("只报", "DS", "共享增量，围城：发布加发送 ÷ 对手 US.send", "d3", ["DS.pub", "DS.send"], ["US.send"], "report"),
+    ("只报", "DS", "共享增量，围城：发布加发送 ÷ 对手 US.send 或其共享编码 DS", "d3", ["DS.pub", "DS.send"], ["US.send"], "report"),
     ("只报", "USW.recv", "视野增量，围城（热视图）", "main", ["USW.recv"], ["USW.recv"], "report"),
-    ("只报", "DSTW.recv", "共享增量，围城 ÷ 对手 USW.recv", "d3", ["DSTW.recv"], ["USW.recv"], "report"),
+    ("只报", "DSTW.recv", "共享增量，围城 ÷ 对手 USW.recv 或其共享编码 DSTW", "d3", ["DSTW.recv"], ["USW.recv"], "report"),
     ("只报", "EB.recv", "浏览全量（冷）", "main", ["EB.recv"], ["EB.recv"], "report"),
     ("只报", "LD recv+apply", "自身增量（冷）", "main", ["LD.recv", "LD.apply"], ["LD.recv", "LD.apply"], "report"),
     ("只报", "UP recv+apply", "视野增量，和平（冷）", "main", ["UP.recv", "UP.apply"], ["UP.recv", "UP.apply"], "report"),
@@ -162,9 +168,16 @@ def classify(gm):
 CLASS_ZH = {"win": "赢", "tie": "平", "loss": "输"}
 
 
-def evaluate(raw, xo_name, rivals, main_tag, d3_tag):
+def shared_col(r):
+    """Column name of rival r's shared-encoding approach (its D* rows)."""
+    return f"{r} 共享"
+
+
+def evaluate(raw, xo_name, rivals, main_tag, d3_tag, shared_rivals=()):
     xo = {"main": load(raw, main_tag, xo_name), "d3": load(raw, d3_tag, xo_name)}
     rv = {r: load(raw, main_tag, r) for r in rivals}
+    sv = {r: load(raw, d3_tag, r) for r in shared_rivals}
+    sv = {r: v for r, v in sv.items() if v}
     rows = []
     for group, name, label, xkind, xkeys, rkeys, kind in CELLS:
         per = {}
@@ -172,21 +185,29 @@ def evaluate(raw, xo_name, rivals, main_tag, d3_tag):
             res = ratio(xo[xkind], xkeys, rv[r], rkeys) if xo[xkind] and rv[r] else None
             if res:
                 per[r] = res
+        if xkind == "d3":
+            # The rival's shared encoding: its own D* rows, the same keys as XOffset's.
+            for r, run in sv.items():
+                res = ratio(xo["d3"], xkeys, run, xkeys) if xo["d3"] else None
+                if res:
+                    per[shared_col(r)] = res
         best = max(per, key=lambda r: per[r]["gm"]) if per else None
         cls = classify(per[best]["gm"]) if best else "missing"
         rows.append({"group": group, "cell": name, "label": label, "kind": kind,
                      "rivals": per, "best": best, "class": cls})
     batches = {"xoffset": len(xo["main"]), "xoffset_d3": len(xo["d3"])}
     batches.update({r: len(rv[r]) for r in rivals})
+    batches.update({shared_col(r): len(v) for r, v in sv.items()})
     return rows, batches
 
 
-def byte_rows(directory, xo_name, rivals, main_tag, d3_tag, zstd):
+def byte_rows(directory, xo_name, rivals, main_tag, d3_tag, zstd, shared_rivals=()):
     if not directory:
         return []
     z = "_zstd" if zstd else ""
     xo = {"main": load(directory, main_tag, xo_name), "d3": load(directory, d3_tag, xo_name)}
     rv = {r: load(directory, main_tag, r) for r in rivals}
+    sv = {r: load(directory, d3_tag, r) for r in shared_rivals}
 
     def med(run, key):
         xs = [v for b in run for v in run[b][1].get(key, {}).values()]
@@ -199,8 +220,10 @@ def byte_rows(directory, xo_name, rivals, main_tag, d3_tag, zstd):
         x = med(xo[xkind], xk)
         if x is None:
             continue
-        out.append({"label": label, "xo_key": xk, "rival_key": rk, "xo": x,
-                    "rivals": {r: med(rv[r], rk) for r in rivals}})
+        vals = {r: med(rv[r], rk) for r in rivals}
+        if xkind == "d3":
+            vals.update({shared_col(r): med(v, xk) for r, v in sv.items() if v and med(v, xk) is not None})
+        out.append({"label": label, "xo_key": xk, "rival_key": rk, "xo": x, "rivals": vals})
     return out
 
 
@@ -212,6 +235,8 @@ def fmt_ratio(res):
 
 def render(rows, batches, rivals, brows, zstd, env, baseline):
     out = []
+    # Shared-encoding columns (D cells only) after the rivals' own.
+    rivals = list(rivals) + sorted({c for r in rows for c in r["rivals"] if c not in rivals})
     main = [r for r in rows if r["kind"] == "main"]
     counts = {c: sum(1 for r in main if r["class"] == c) for c in ("win", "tie", "loss", "missing")}
     out.append("# SLG 计分卡\n")
@@ -229,6 +254,7 @@ def render(rows, batches, rivals, brows, zstd, env, baseline):
                    f"种子 {run.get('seed', '?')}，每个格式每批一个进程，批间交错")
     out.append(f"- 批数：" + "，".join(f"{k} {v}" for k, v in batches.items()))
     out.append(f"- 比值 = xoffset_trusted ÷ 最强对手（XOffset 比它慢得最多的那家），批间几何均值，方括号是批的最小–最大。"
+               f"D 格的对手包括它们的共享编码做法（「共享」列，4.0 W1）。"
                f"赢 < {WIN:.2f}，平 {WIN:.2f}–{LOSS:.2f}，输 > {LOSS:.2f}。\n")
     out.append(f"**主格 {len(main)}：赢 {counts['win']}，平 {counts['tie']}，输 {counts['loss']}"
                + (f"，缺 {counts['missing']}" if counts['missing'] else "") + "。** UL.send 只报，不计。\n")
@@ -275,6 +301,8 @@ def main(argv=None):
     ap.add_argument("--bytes-dir", help="run of the SLG_WITH_COMPRESSION=1 build (zstd-3 bytes)")
     ap.add_argument("--xo", default="xoffset_trusted")
     ap.add_argument("--rivals", default="zpp_bits,cista_unchecked")
+    ap.add_argument("--shared-rivals", default="zpp_bits,zpp_bits_dirty",
+                    help="formats whose d3-tag D* rows are a rival's shared encoding (absent ones are skipped)")
     ap.add_argument("--main-tag", default="head")
     ap.add_argument("--d3-tag", default="d3")
     ap.add_argument("--env", help="env.json written by repro_scorecard.sh")
@@ -282,9 +310,10 @@ def main(argv=None):
     ap.add_argument("--json")
     a = ap.parse_args(argv)
     rivals = [r for r in a.rivals.split(",") if r]
-    rows, batches = evaluate(a.raw, a.xo, rivals, a.main_tag, a.d3_tag)
+    shared = [r for r in a.shared_rivals.split(",") if r]
+    rows, batches = evaluate(a.raw, a.xo, rivals, a.main_tag, a.d3_tag, shared)
     zstd = bool(a.bytes_dir)
-    brows = byte_rows(a.bytes_dir or a.raw, a.xo, rivals, a.main_tag, a.d3_tag, zstd)
+    brows = byte_rows(a.bytes_dir or a.raw, a.xo, rivals, a.main_tag, a.d3_tag, zstd, shared)
     env = baseline = None
     if a.env:
         with open(a.env) as f:

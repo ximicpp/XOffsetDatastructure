@@ -8,6 +8,14 @@
   interleaved, pinned core; SCORECARD.md, scorecard.json, env.json, raw
   JSONL). `tools/perf_gate/scorecard.py` scores the 20 main cells against the
   strongest rival: win < 0.95, tie 0.95-1.05, loss > 1.05. docs/RELEASING.md 2b.
+- D3 rival (4.0 W1): bench/slg's zpp_bits has D rows under `SLG_D3=1`, a
+  shared encoding (each entity encoded whole once per tick, every connection
+  copies the bodies, the client decodes over the record it holds; same
+  tracker and holder-count rule as XOffset's D3), and the diagnostic format
+  `zpp_bits_dirty` the dirty-mask variant. `scorecard.py` scores the D cells
+  against the rival's strongest approach (per-client `U*` or the shared `D*`
+  rows, column "zpp_bits 共享"); `repro_scorecard.sh` runs the shared rivals'
+  `SLG_D3=1` processes (`SHARED`, skipped for an older ref).
 - UL.send (client uplink send) is report-only; the 1.80 ceiling is gone.
 - `tools/perf_gate/x86_columns.sh D3=1` produced no D rows (its D3 processes
   also set `SLG_NATIVE_OFF=1`); fixed, and `x86_columns.py --d3-tag` now pairs
