@@ -59,6 +59,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <functional>
 #include <memory>
 #include <new>
 #include <span>
@@ -1194,6 +1195,166 @@ namespace XOffsetDatastructure::xsync {
     inline bool is_key(std::span<const std::byte> msg) noexcept {
         return is_key(std::string_view(reinterpret_cast<const char*>(msg.data()), msg.size()));
     }
+
+    // ---- client index -----------------------------------------------------------
+
+    /// How XBasicSyncSlots picks a free slot for an id that enters: the one
+    /// freed last (no ordering work), or the lowest (a heap; slots stay packed
+    /// at the front, which keeps a per-client delta of the slots small).
+    enum class XSlotReuse : std::uint8_t { last, lowest };
+
+    /// A receiver's id -> slot index for one keyed table: the slot is where the
+    /// receiver keeps the entry (an element of its own vector). Open
+    /// addressing with linear probing and backward-shift erase, at most half
+    /// full, so an id that enters or leaves allocates and frees nothing once
+    /// the index has grown; a slot that leaves is reused before a new one is
+    /// taken. Every 32-bit id is valid (an empty cell is marked by its slot).
+    ///
+    /// A target of XReceiver::apply_sync keeps one per keyed table:
+    ///   find<K>(id)     -> slots.find(id)
+    ///   enter<K>(id)    -> slots.enter(id, [&](std::int64_t s) { records.resize(s + 1); })   // s == records.size()
+    ///   leave<K>(id, h) -> clear the record if the target wants that, then slots.leave(id, h)
+    /// and calls clear() before it applies a key message. The calls are forced
+    /// inline; a target's own find / enter / leave should be too (a large
+    /// translation unit can reach the compiler's inline growth limit, past
+    /// which whether they inline depends on unrelated code).
+    template <XSlotReuse Reuse = XSlotReuse::last>
+    class XBasicSyncSlots {
+    public:
+        /// The slot of id, or -1 when id is not held.
+        XOFFSET_SYNC_INLINE std::int64_t find(std::uint32_t id) const noexcept {
+            if (cells_.empty()) return -1;
+            const Cell& c = cells_[probe(id)];
+            return c.slot;   // the empty cell id would take has slot -1
+        }
+
+        /// Gives id a slot and returns it, or -1 when id is already held (its
+        /// slot unchanged). A free slot is reused first; with none,
+        /// grow(new_slot) is called with the next unused slot (size() before
+        /// the call; new_slot + 1 slots are given out after it), so the caller
+        /// can make room for it.
+        template <class Grow>
+        XOFFSET_SYNC_INLINE std::int64_t enter(std::uint32_t id, Grow&& grow) {
+            bool added;
+            const std::int64_t s = take(id, static_cast<Grow&&>(grow), added);
+            return added ? s : -1;
+        }
+
+        /// The slot of id, giving it one as enter does when it is not held
+        /// (then added is true): one lookup either way.
+        template <class Grow>
+        XOFFSET_SYNC_INLINE std::int64_t take(std::uint32_t id, Grow&& grow, bool& added) {
+            if (2 * (count_ + 1) > cells_.size()) [[unlikely]] rehash();
+            Cell& c = cells_[probe(id)];
+            if (c.slot >= 0) {
+                added = false;
+                return c.slot;
+            }
+            std::int32_t s;
+            if (nfree_ != 0) {
+                if constexpr (Reuse == XSlotReuse::lowest)
+                    std::pop_heap(free_.begin(), free_.begin() + std::ptrdiff_t(nfree_), std::greater<>{});
+                s = free_[--nfree_];
+            } else {
+                s = used_;
+                grow(std::int64_t(s));   // may throw: then nothing is given out
+                ++used_;
+            }
+            c = Cell{id, s};
+            ++count_;
+            added = true;
+            return s;
+        }
+
+        /// Removes id, which holds slot (from find or enter); the slot becomes
+        /// free. The caller clears or reuses its record as it likes.
+        XOFFSET_SYNC_INLINE void leave(std::uint32_t id, std::int64_t slot) {
+            erase(id);
+            if (nfree_ == free_.size()) [[unlikely]] grow_free();
+            free_[nfree_++] = std::int32_t(slot);
+            if constexpr (Reuse == XSlotReuse::lowest)
+                std::push_heap(free_.begin(), free_.begin() + std::ptrdiff_t(nfree_), std::greater<>{});
+        }
+
+        /// Holds nothing (before a key message): every slot given out so far
+        /// is free, size() is unchanged and grow is only called past it again.
+        /// The caller clears the records of the slots that were held.
+        void clear() {
+            for (Cell& c : cells_) c.slot = -1;
+            if (free_.size() < std::size_t(used_)) free_.resize(std::size_t(used_));
+            // The next enter takes slot 0 either way: lowest is a min-heap
+            // (ascending is one), last pops from the back.
+            nfree_ = std::size_t(used_);
+            for (std::int32_t s = 0; s < used_; ++s)
+                free_[std::size_t(s)] = Reuse == XSlotReuse::lowest ? s : used_ - 1 - s;
+            count_ = 0;
+        }
+
+        /// Slots given out so far (held or free): the size the caller's records need.
+        std::size_t size() const noexcept { return std::size_t(used_); }
+        /// Ids held.
+        std::size_t count() const noexcept { return count_; }
+        /// Bytes the index keeps (cells and free list).
+        std::size_t capacity_bytes() const noexcept {
+            return cells_.capacity() * sizeof(Cell) + free_.capacity() * sizeof(std::int32_t);
+        }
+
+    private:
+        struct Cell {
+            std::uint32_t id;
+            std::int32_t slot;   // < 0: empty
+        };
+        std::vector<Cell> cells_;
+        // Free slots: the first nfree_ entries (a min-heap for lowest). The
+        // vector's size is its capacity: a leave stores into it, no push_back
+        // (which a large translation unit may not inline).
+        std::vector<std::int32_t> free_;
+        std::size_t nfree_ = 0;
+        std::size_t count_ = 0;
+        std::int32_t used_ = 0;
+        unsigned shift_ = 32;
+
+        XOFFSET_SYNC_INLINE std::size_t home(std::uint32_t id) const noexcept { return std::size_t((id * 0x9E3779B1u) >> shift_); }
+        XOFFSET_SYNC_INLINE std::size_t mask() const noexcept { return cells_.size() - 1; }
+        // The cell of id, or the empty cell where it would go.
+        XOFFSET_SYNC_INLINE std::size_t probe(std::uint32_t id) const noexcept {
+            std::size_t i = home(id);
+            while (cells_[i].id != id && cells_[i].slot >= 0) i = (i + 1) & mask();
+            // A stale id in an empty cell may equal id: then the cell is the empty one.
+            return i;
+        }
+        // Doubles the free list's room, as push_back grows a vector (1, 2, 4, ...).
+        XOFFSET_DETAIL_NOINLINE void grow_free() {
+            std::vector<std::int32_t> next(free_.empty() ? 1 : free_.size() * 2);
+            std::copy(free_.begin(), free_.end(), next.begin());
+            free_.swap(next);
+        }
+        XOFFSET_DETAIL_NOINLINE void rehash() {
+            std::vector<Cell> old(cells_.empty() ? 32 : cells_.size() * 2, Cell{0, -1});
+            old.swap(cells_);
+            shift_ = 32;
+            for (std::size_t n = cells_.size(); n > 1; n >>= 1) --shift_;
+            for (const Cell& c : old)
+                if (c.slot >= 0) cells_[probe(c.id)] = c;
+        }
+        // Removes id (held): later cells of its run move back, so no tombstones are left.
+        XOFFSET_SYNC_INLINE void erase(std::uint32_t id) noexcept {
+            std::size_t i = probe(id);
+            for (std::size_t j = (i + 1) & mask(); cells_[j].slot >= 0; j = (j + 1) & mask()) {
+                const std::size_t h = home(cells_[j].id);
+                // cells_[j] may fill the hole at i unless its home lies in (i, j].
+                if (((j - h) & mask()) >= ((j - i) & mask())) {
+                    cells_[i] = cells_[j];
+                    i = j;
+                }
+            }
+            cells_[i].slot = -1;
+            --count_;
+        }
+    };
+
+    /// The index a client of XReceiver::apply_sync keeps per keyed table.
+    using XSyncSlots = XBasicSyncSlots<XSlotReuse::last>;
 
     namespace sd_detail {
         template <class Target, unsigned K>
