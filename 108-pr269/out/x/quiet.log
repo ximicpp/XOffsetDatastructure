@@ -1,0 +1,12 @@
+2026-11-12T10:37:01Z demo block 1 start: need 180s waited 180s load 1.30 WindowServer 1% remote 6
+2026-11-12T10:42:54Z demo block 1 done (6 runs)
+2026-11-12T10:43:24Z demo block 2 start: need 30s waited 30s load 1.93 WindowServer 1.1% remote 4
+2026-11-12T10:49:20Z demo block 2 done (12 runs)
+2026-11-12T10:49:50Z demo block 3 start: need 30s waited 30s load 1.91 WindowServer 1.3% remote 4
+2026-11-12T10:55:46Z demo block 3 done (18 runs)
+2026-11-12T10:56:16Z demo block 4 start: need 30s waited 30s load 1.41 WindowServer 1.3% remote 4
+2026-11-12T11:02:10Z demo block 4 done (24 runs)
+2026-11-12T11:02:41Z demo block 5 start: need 30s waited 30s load 1.75 WindowServer 1.4% remote 4
+2026-11-12T11:08:36Z demo block 5 done (30 runs)
+2026-11-12T11:09:06Z demo block 6 start: need 30s waited 30s load 1.86 WindowServer 1.2% remote 4
+2026-11-12T11:15:00Z demo block 6 done (36 runs)

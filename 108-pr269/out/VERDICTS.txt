@@ -1,0 +1,9 @@
+PR269 10
+anchor next_cpp26 30fb525c (v3.6.0 anchor, first parent of #269)
+screen watcher: 107 calls (dark.log)
+ABC: pass (max upper bound 1.0084; A 1.0057, B 1.0066, C 1.0084; 12 / 12 processes)
+GATE_D: head D÷flatbuffers 0.918 / 0.926 (O4 upper bound <= 1.0: met), D÷zpp_bits 1.028 / 1.038, D.read 67.0 µs; anc D÷flatbuffers 0.922 / 0.937, D÷zpp_bits 1.036 / 1.053, D.read 68.0 µs
+G8 met
+G9R rc 0 (0 done, 2 prep check, 5 quiet gate); G9: 17 of 19 comparisons have UB <= 1.05; above: vec.push_back, set.erase.fresh
+ctest 100% tests passed out of 209 (rc 0)
+demo demo: EB.send 0.977, EB.send/own 0.978, UC.send 0.975, UC.send/own 0.975, UP.send 0.989, UP.send/own 0.982, UL.send 0.964, UL.send/own 0.903

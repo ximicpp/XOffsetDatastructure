@@ -1,0 +1,5 @@
+PR269 L2 rc 10 at 2026-11-12T10:33:23Z (0 pass, 10 fail, 11 pending, 12 invalid, 13 incomplete, 14 n/a, 15 L2 failed and the bisection follows)
+ABC: pass (max upper bound 1.0084; A 1.0057, B 1.0066, C 1.0084; 12 / 12 processes)
+GATE_D: head D÷flatbuffers 0.918 / 0.926 (O4 upper bound <= 1.0: met), D÷zpp_bits 1.028 / 1.038, D.read 67.0 µs; anc D÷flatbuffers 0.922 / 0.937, D÷zpp_bits 1.036 / 1.053, D.read 68.0 µs
+G8 met
+G9R and ctest follow
