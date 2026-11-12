@@ -20,6 +20,12 @@
 - `tools/perf_gate/x86_columns.sh D3=1` produced no D rows (its D3 processes
   also set `SLG_NATIVE_OFF=1`); fixed, and `x86_columns.py --d3-tag` now pairs
   XOffset's `D*` rows with the rivals' `U*` rows (D cells were always missing).
+- `xsync::XSyncSlots` (`xoffset_shared_delta.hpp`): the id -> slot index a
+  client of `XReceiver::apply_sync` keeps per keyed table (open addressing,
+  backward-shift erase, free slots reused; `XBasicSyncSlots<XSlotReuse::lowest>`
+  reuses the lowest). Any 32-bit id is valid (the bench's index reserved
+  0x80000000). `bench/slg` D3 clients and native delta views use it; the
+  same slots and messages as before. Test `test_shared_delta_slots`.
 
 ## 3.6.0: losing cells and memory
 
