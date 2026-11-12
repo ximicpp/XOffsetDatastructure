@@ -286,7 +286,8 @@ so earlier batches and the perf gate compare as before.
   page tables went from 13.1 to 5.6 MiB (0.84% of RSS; the gate is 1%).
 
 D3 shared deltas (2026-11-04, thread 设计共享增量原型, doc X5MZPWya7DWFzdCughpZqL;
-`xoffset_shared_delta.hpp`, XS 1.0 since 3.5, docs/SHARED_DELTA.md). XOffset only, class 3 only;
+`xoffset_shared_delta.hpp`, XS 1.0 since 3.5, docs/SHARED_DELTA.md). XOffset and (since
+4.0 W1, below) zpp_bits, class 3 only;
 `SLG_D3=1` runs D3 alone (no N*), `SLG_D3=2` both, unset none (keys and stage
 ranges as before); `SLG_NATIVE_OFF` turns D3 off too. Needs no
 `XOFFSET_DELTA_SYNC_API`. The server keeps one image of every entity as its
@@ -310,6 +311,29 @@ store, baseline and arenas, whole server) and `MEM.D*.shared_per_conn`.
 Bookkeeping added for it, untimed: the tracker's fresh flags
 (`DeltaPlan::unew`, `mnew`), the world's per-unit dirty flags and its
 changed-unit and changed-tile lists.
+
+D3 rival (4.0 W1, 2026-11-12, `adapters/zpp_bits_shared.hpp`): the format
+`zpp_bits` has D rows too, the same keys under `SLG_D3=1`, so XOffset's D3 is
+compared with a rival that also encodes each entity once per tick instead of
+once per client. Same split as XOffset's D3: the shared tracker decides who
+sees what, and the holder count follows the same rule (+1 per enter sent, -1
+per leave). `D*.pub`: every changed unit some view holds is brought up to date
+in the server's image (its dirty members copied from the world) and encoded
+whole with zpp_bits, once; units no view holds only collect their dirty flags;
+marches, tiles and entering units are encoded on first use in the tick. An
+entering unit and a changed one use the same whole-record body. `D*.send`:
+header (request id, tick), the ids that left, then a copy of each entity's
+body. Client: zpp_bits' checked decoding straight into the held view, each
+body over the record its leading id finds through the client's id index (the
+`U*.apply` index type), or onto a new record; a leave swaps the last record
+in. zpp_bits has one check level, so `D*T.recv` and `D*.recv` run the same
+code, each into its own copy of the view; both are compared with the
+application-level view after every delivery. The diagnostic format
+`zpp_bits_dirty` (not in the default list; its U rows are zpp_bits') is the
+second variant: a held unit that changed gets a change body (id, uint64 dirty
+mask, only the masked members, each as zpp_bits writes it), entering units
+stay whole, and the client decodes the masked members over its record. No
+other row changes: without `SLG_D3` the zpp_bits runner runs no D code.
 
 Batches: `run_v5_split.sh` and `pool_v5.py` (project files,
 slg-cases-v3-20261102/).

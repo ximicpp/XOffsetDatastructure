@@ -55,14 +55,29 @@ class X86ColumnsTest(unittest.TestCase):
         self.assertGreater(r["ratio"]["upper"], 1.05)
         self.assertEqual(r["verdict"], "pass")
 
-    def test_ul_send_ceiling_and_missing(self):
+    def test_ul_send_report_only_and_missing(self):
         rows = self.run_case(0.9, 0.0, ul_send=1.40)
-        self.assertEqual(rows["UL.send"]["verdict"], "pass")
+        self.assertEqual(rows["UL.send"]["verdict"], "report")
         self.assertTrue(math.isclose(rows["UL.send"]["ratio"]["gm"], 1.40, rel_tol=1e-9))
-        self.assertEqual(self.run_case(0.9, 0.0, ul_send=1.85)["UL.send"]["verdict"], "fail")
-        self.assertEqual(rows["DPTW.recv"]["verdict"], "missing")
-        self.assertEqual(rows["ULF.recv"]["verdict"], "missing")
+        self.assertEqual(self.run_case(0.9, 0.0, ul_send=2.5)["UL.send"]["verdict"], "report")
+        self.assertEqual(rows["DPTW.recv / UPW.recv"]["verdict"], "missing")
+        self.assertEqual(rows["ULF.recv / UL.recv"]["verdict"], "missing")
 
+    def test_d3_rows_pair_with_rival_u_rows(self):
+        with tempfile.TemporaryDirectory() as d:
+            for b in range(1, 4):
+                cyc = {c: {"UP.send": 1000.0 * (1 + c), "UPW.recv": 500.0} for c in range(0, 4)}
+                write(d, "head", "zpp_bits", b, cyc)
+                write(d, "head", "xoffset_trusted", b, cyc)
+                # D3 process: publish 200 + send 600 against the rival's UP.send of 1000 * (1 + c).
+                d3 = {c: {"DP.pub": 0.2 * 1000.0 * (1 + c), "DP.send": 0.6 * 1000.0 * (1 + c),
+                          "DPTW.recv": 450.0} for c in range(0, 4)}
+                write(d, "headd3", "xoffset_trusted", b, d3)
+            rows = {r["key"]: r for r in xc.evaluate(d, "head", "xoffset_trusted", ["zpp_bits"], "headd3")}
+            self.assertAlmostEqual(rows["DP.pub+send / UP.send"]["ratio"]["gm"], 0.8, places=6)
+            self.assertAlmostEqual(rows["DPTW.recv / UPW.recv"]["ratio"]["gm"], 0.9, places=6)
+            self.assertEqual(rows["DP.pub+send / UP.send"]["verdict"], "pass")
+            self.assertEqual(rows["DC.pub+send / UC.send"]["verdict"], "missing")
 
 if __name__ == "__main__":
     unittest.main()
