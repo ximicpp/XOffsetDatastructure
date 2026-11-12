@@ -1,0 +1,4 @@
+STAGE360_F3 pending
+mode f3
+rebuild byte-identical to FREEZE.json (8 binaries, 8 wires)
+screen watcher: 12 calls (dark.log)

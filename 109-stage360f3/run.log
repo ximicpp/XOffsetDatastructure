@@ -1,0 +1,47 @@
+== 2026-11-12T11:31:26Z 0. tools
+selftest: 73 ok, 0 FAIL (cloud: 73 ok)
+cmake version 4.4.4
+1.13.2
+clang version 21.0.0git (https://github.com/bloomberg/clang-p2996.git d77eff1cbd78fd065668acf93b1f5f400d39134d)
+anchor: v3.5.0 0cbc130d (previous release tag)
+== 2026-11-12T11:31:45Z 1. export
+head 372c117e2a116d523796f0365a0ceb720ba010cc tree 081ab403d12ebca5dcab22114b48094f0b2fd692 typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+anc 0cbc130decd722fc1baaa4c96882c1085e5b20a3 tree e44176fae42c6a107169775060d5b1b61937c90d typelayout fe295929d0a5bfa7809fb737a6eb3db279599346
+== 2026-11-12T11:31:46Z 2. build
+slg init cache /Volumes/XOffsetCS/perf-gate/slg-init-p2996-d77eff1.cmake sha ed916a0cf280cedf798d20f523b09c055e24ba4da58723df5d51d5558ebedde9
+sc_xoffset head: bench/formal 80a3175f of the point (adapter.hpp 5cb0b8c4)
+slg head: -- slg_bench formats:xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+sc_xoffset anc: bench/formal 4bc228bc of the point (adapter.hpp b30e6ee3)
+slg anc: -- slg_bench formats:xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+== 2026-11-12T11:33:01Z 3c. r3v3 reference
+r3v3 reference /Volumes/XOffsetCS/perf-gate/refs/R3V3-formal-mac-v1 ok
+r3v3: reusing /Volumes/XOffsetCS/perf-gate/refs/R3V3-formal-mac-v1
+== 2026-11-12T11:33:01Z 4. wires and prep
+point	commit	sc_xoffset	slg_bench	wire
+head	372c117e2a116d523796f0365a0ceb720ba010cc	d0a9aefb6d3c4aad4780830c088a4ac86362b67a8e66c722031c0faf5b58a605	0dbadb915455be4112892b519dd20e2907ba467cfbd199da3f4ca8dd1ebe5b19	89fd02d2d36fce705cc519d1a6a6298ff23e595c01fb01211e360d6249d2edcc
+anc	0cbc130decd722fc1baaa4c96882c1085e5b20a3	74d0abb9b509a92398980dddfeaee24fd0c3858e9489f75a6a28b211abc5c9ce	4a64fea7c86651d07a489480fbe855c7335f4f3a20d6ba04ad11ec716b4ff0d7	89fd02d2d36fce705cc519d1a6a6298ff23e595c01fb01211e360d6249d2edcc
+reuse: cycle 0 xoffset      state=ddb6224bbbcecad3 reports=37196452043336
+default: cycle 0 xoffset      state=ddb6224bbbcecad3 reports=37196452043336
+reuse bytes head [1166 2358 12964 842240 712] anchor [1166 2358 12964 842240 712]
+default bytes head [1166 2358 12964 842240 712] anchor [1166 2358 12964 842240 712]
+== 2026-11-12T11:33:22Z 5. compare the rebuild with FREEZE.json
+head: binary same, wire same
+head_aa: binary same, wire same
+anchor: binary same, wire same
+r3: binary same, wire same
+cista: binary same, wire same
+flatbuffers: binary same, wire same
+capnproto: binary same, wire same
+cereal: binary same, wire same
+slg head: same (report only)
+slg anchor: same (report only)
+rebuild: byte-identical to FREEZE.json (8 binaries, 8 wires)
+== 2026-11-12T11:33:23Z 5a. restore bin/ and wire/ of /Volumes/XOffsetCS/perf-gate/runs/2026-11-12-stage360-372c117
+restored 24 binaries and 24 wires: all match FREEZE.json
+== 2026-11-12T11:33:23Z 5b. formal-3
+== formal-3 start 2026-11-12T11:33:23+00:00 {'waited_s': 241.1, 'load1': 1.11, 'quiet_s': 241.1, 'screen': {'WindowServer': 1.2, 'UURemoteServer': 0.0, 'parsecd': 0.0}, 'remote_active': [], 'screen_over': [], 'screen_gated': False}
+formal-3: this batch alone: max UB head/anchor 1.0195, A/A ok True, old 11/12, cpu {'samples': 214, 'other_busy_samples': 6, 'compile_samples': 0, 'other_busy_top': {'Codex (Aperitif Renderer)': 2, 'launchd': 1, 'UURemote': 1, 'mds_stores': 1, 'mediaanalysisd-access': 1}, 'chrome_busy_mean': 0.7, 'chrome_busy_max': 80.3, 'load1_max': 2.38}  (the gate verdict needs the pooled batches: run analyze)
+== 2026-11-12T11:44:39Z 5c. analyze (formal-1 + formal-2 + formal-3, SLG groups 1-2)
+RESULT.json / RESULT.md written: verdict pending
+STAGE360 with formal-3: pending (the third batch is the last one the rule allows; a remaining batch disagreement is judged in VERDICT.md)
+== 2026-11-12T11:44:40Z finish rc=11
