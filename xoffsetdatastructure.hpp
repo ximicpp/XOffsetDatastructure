@@ -3863,7 +3863,11 @@ namespace XOffsetDatastructure {
 
         // The same for a string's first out-of-line block (XFixedString::
         // move_to_heap, alignment 1), whose head already holds its binding.
-        XOFFSET_DETAIL_NOINLINE inline void* allocate_first_chars(const allocator_ref& alloc_ref, std::uint32_t bytes) {
+        // Inlined into move_to_heap: GCC inlines assign_general, and so
+        // move_to_heap, at every assign() caller, and a call here instead
+        // changed the registers of the caller's reuse loop (reloc
+        // str.assign_long one more instruction per assign).
+        XOFFSET_DETAIL_MOVE_INLINE void* allocate_first_chars(const allocator_ref& alloc_ref, std::uint32_t bytes) {
             auto* owner = XBufferCore::owner_from_arena_noexcept(alloc_ref.segment);
             if (!owner || bytes > XBufferCore::MAX_PAYLOAD - 8u) [[unlikely]]
                 return allocate_dynamic_bytes(alloc_ref, bytes, alignof(char)); // throws the usual error
