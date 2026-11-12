@@ -28,7 +28,15 @@ clang-cl and MinGW, and this time Android NDK r29/r30 under qemu-aarch64 and
 clang 18 ASan, 179/179 each with identical corpora; wire matrix 64 reads, 0
 failures). Ir against v3.5.0: GCC 16 totals 0.974-1.001; P2996 totals
 0.975-1.005, two warnings accepted by the performance thread (below).
-X86_VERDICT_PENDING
+Cloud x86 and uplink columns (docs/RELEASING.md 2a, GCC 16 -O3 `bench/slg`,
+M scale, native off, 20 interleaved batches): 0 fail, 2 warnings. Server
+sends ÷ zpp_bits L 0.32, EB 0.64, LD 0.71, UC 0.55, UP 1.028 (warning; the
+known small-message fixed cost, head ÷ v3.5.0 1.015 on the same machine);
+client hot views ÷ cista_unchecked EBW 0.81, LDW 0.69, UCW 0.76, USW 0.75,
+UPW 1.007 (warning, inside the cloud A/A spread); UL.recv 0.96-0.98, UL.send
+1.35x zpp_bits (ceiling 1.80). D3 at M scale (native on, 10 batches),
+XOffset `D*.send` per delivery ÷ the rival's `U*.send`: peace 0.80, conflict
+0.17 vs zpp_bits; client DPTW.recv 0.94 vs cista_unchecked.
 Pre-release fuzz (`tools/fuzz_prerelease.sh --budget hour`, ASan+UBSan) on
 the release candidate (7d16b44): PASS, no findings over GCC 16 differential
 and replay, libFuzzer on all five targets in the reflection build, the four
