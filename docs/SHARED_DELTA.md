@@ -54,29 +54,23 @@ struct ViewTarget {
     using tables = std::tuple<Head, Unit>;           // table K's record type
     template <unsigned K> static constexpr bool keyed = K == kUnit;   // units enter and leave
     XBuffer* buf;                                    // the client's view
-    std::unordered_map<std::uint32_t, std::int64_t> slot;   // unit id -> index in units
-    std::vector<std::int64_t> free;
+    xs::XSyncSlots slots;                            // unit id -> index in units
 
     View& v() { return buf->root<View>(); }
     template <unsigned K> std::int64_t find(std::uint32_t id) {
         if constexpr (K == kHead) return id == 0 ? 0 : -1;
-        else { auto it = slot.find(id); return it == slot.end() ? -1 : it->second; }
+        else return slots.find(id);                  // -1: not held
     }
     template <unsigned K> auto& record(std::int64_t h) {
         if constexpr (K == kHead) return v().head;
         else return v().units[std::size_t(h)];
     }
     template <unsigned K> std::int64_t enter(std::uint32_t id) {          // keyed tables
-        if (slot.count(id)) return -1;
-        std::int64_t h;
-        if (!free.empty()) { h = free.back(); free.pop_back(); }
-        else { h = std::int64_t(v().units.size()); v().units.resize(v().units.size() + 1); }
-        slot.emplace(id, h);
-        return h;
+        // A free slot is reused first; a new one (h == units.size()) grows units.
+        return slots.enter(id, [&](std::int64_t h) { v().units.resize(std::size_t(h) + 1); });
     }
     template <unsigned K> void leave(std::uint32_t id, std::int64_t h) {   // keyed tables
-        slot.erase(id);
-        free.push_back(h);
+        slots.leave(id, h);
     }
 };
 
@@ -143,6 +137,15 @@ The format is unchanged: a receiver cannot tell which way a body was written.
   other entries (no swap-with-last that changes another entry's handle).
 - Handles are the target's own numbers: slot indices, indices into a span
   (tiles inside the view), anything that fits an `int64_t`.
+- `xs::XSyncSlots` is the id -> slot index for a keyed table: open
+  addressing, at most half full, so entering and leaving allocate nothing
+  once it has grown; any 32-bit id; a slot that leaves is reused first
+  (`XBasicSyncSlots<XSlotReuse::lowest>` reuses the lowest free slot
+  instead). `find`, `enter(id, grow)`, `leave(id, h)` and `take(id, grow, added)`
+  (find or enter in one lookup) are forced inline; `clear()` before a key
+  message makes every slot free. Force the target's own `find`, `enter` and
+  `leave` inline too: in a large translation unit whether they inline can
+  depend on unrelated code.
 
 ### Streams, versions and key messages
 

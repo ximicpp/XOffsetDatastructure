@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- `xsync::XSyncSlots` (`xoffset_shared_delta.hpp`): the id -> slot index a
+  client of `XReceiver::apply_sync` keeps per keyed table (open addressing,
+  backward-shift erase, free slots reused; `XBasicSyncSlots<XSlotReuse::lowest>`
+  reuses the lowest). Any 32-bit id is valid (the bench's index reserved
+  0x80000000). `bench/slg` D3 clients and native delta views use it; the
+  same slots and messages as before. Test `test_shared_delta_slots`.
+
 ## 3.6.0: losing cells and memory
 
 A minor release on 3.5.0 that clears losing cells on the production paths and
