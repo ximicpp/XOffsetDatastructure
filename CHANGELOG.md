@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- `tools/perf_gate/repro_scorecard.sh <ref> <outdir>`: one command from a tag
+  or commit to the SLG scorecard (pinned gcc:16 image, zpp_bits v4.7.6 and
+  cista v0.16 by commit, one-TU `-O3` build, one process per format per batch,
+  interleaved, pinned core; SCORECARD.md, scorecard.json, env.json, raw
+  JSONL). `tools/perf_gate/scorecard.py` scores the 20 main cells against the
+  strongest rival: win < 0.95, tie 0.95-1.05, loss > 1.05. docs/RELEASING.md 2b.
+- UL.send (client uplink send) is report-only; the 1.80 ceiling is gone.
+- `tools/perf_gate/x86_columns.sh D3=1` produced no D rows (its D3 processes
+  also set `SLG_NATIVE_OFF=1`); fixed, and `x86_columns.py --d3-tag` now pairs
+  XOffset's `D*` rows with the rivals' `U*` rows (D cells were always missing).
+
 ## 3.6.0: losing cells and memory
 
 A minor release on 3.5.0 that clears losing cells on the production paths and

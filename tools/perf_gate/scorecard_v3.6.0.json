@@ -1,0 +1,819 @@
+{
+ "cells": [
+  {
+   "group": "服务端之间",
+   "cell": "A",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.46899047082536444,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.46899047082536444,
+     "lo": 0.41410260027675583,
+     "hi": 0.5041160006522173,
+     "upper": 0.48926484271708365,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.4116888361918762,
+     "lo": 0.39906236954966884,
+     "hi": 0.42646640301295596,
+     "upper": 0.41836807493258976,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "服务端之间",
+   "cell": "B",
+   "kind": "main",
+   "best": "cista_unchecked",
+   "gm": 0.3704605086679916,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.21497656422700895,
+     "lo": 0.20162327231243077,
+     "hi": 0.24158975335260377,
+     "upper": 0.22492740564644317,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.3704605086679916,
+     "lo": 0.3384292578952306,
+     "hi": 0.39952507154412426,
+     "upper": 0.3839173154710515,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "服务端之间",
+   "cell": "S",
+   "kind": "main",
+   "best": "cista_unchecked",
+   "gm": 0.39132484978594484,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.1655639328674129,
+     "lo": 0.15032379132863813,
+     "hi": 0.18528093248674235,
+     "upper": 0.17427697855864815,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.39132484978594484,
+     "lo": 0.3631021274124519,
+     "hi": 0.42842692211179495,
+     "upper": 0.40604241000901803,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "服务端之间",
+   "cell": "SD",
+   "kind": "main",
+   "best": "cista_unchecked",
+   "gm": 0.38570737928836424,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.3012865571007338,
+     "lo": 0.27232115508078947,
+     "hi": 0.33886688417918603,
+     "upper": 0.31571286880227684,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.38570737928836424,
+     "lo": 0.3554242702703277,
+     "hi": 0.42136708970945125,
+     "upper": 0.40068891452713923,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "服务端发送",
+   "cell": "L.send",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.3295845414182943,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.3295845414182943,
+     "lo": 0.3036473272235545,
+     "hi": 0.3774852322713775,
+     "upper": 0.34544768364962647,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.259775227007925,
+     "lo": 0.22755754847321483,
+     "hi": 0.30164793513898636,
+     "upper": 0.2770198633209217,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "服务端发送",
+   "cell": "EB.send",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.6531608963135225,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.6531608963135225,
+     "lo": 0.6013888417811087,
+     "hi": 0.6747602841587997,
+     "upper": 0.6699498693940419,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.4558924646110827,
+     "lo": 0.42179236834101236,
+     "hi": 0.484096530581744,
+     "upper": 0.47092939415114554,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "服务端发送",
+   "cell": "LD.send",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.7222379889350617,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.7222379889350617,
+     "lo": 0.6797405057445106,
+     "hi": 0.7480082779620288,
+     "upper": 0.7380605809664126,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.48292431114780265,
+     "lo": 0.45699171268040367,
+     "hi": 0.524575152142099,
+     "upper": 0.4999446854268165,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "服务端发送",
+   "cell": "UP.send",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 1.048138505735338,
+   "class": "tie",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 1.048138505735338,
+     "lo": 1.0080217860390346,
+     "hi": 1.0719653841851573,
+     "upper": 1.0640822132843943,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.6576922627632911,
+     "lo": 0.6232077107293701,
+     "hi": 0.7034613991242732,
+     "upper": 0.6778282478800054,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "服务端发送",
+   "cell": "UC.send",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.5394742502654077,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.5394742502654077,
+     "lo": 0.5087433333296735,
+     "hi": 0.5723388972690665,
+     "upper": 0.5521951127007529,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.41080961917591446,
+     "lo": 0.3864125672736646,
+     "hi": 0.43499473895756596,
+     "upper": 0.4231251806376899,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "服务端发送",
+   "cell": "DP",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.8384415214036042,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.8384415214036042,
+     "lo": 0.7644706168806328,
+     "hi": 0.8919385149759014,
+     "upper": 0.8660150257715544,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.5261103359806096,
+     "lo": 0.5076679692441471,
+     "hi": 0.5598822760008813,
+     "upper": 0.5394138509076023,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "服务端发送",
+   "cell": "DC",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.20295581264290052,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.20295581264290052,
+     "lo": 0.19669736148602185,
+     "hi": 0.22393629890281944,
+     "upper": 0.20913738677002938,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.15455084290000726,
+     "lo": 0.14485815048906822,
+     "hi": 0.16167755415682686,
+     "upper": 0.15834744885489588,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "客户端接收",
+   "cell": "L.recv",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.34296410056789467,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.34296410056789467,
+     "lo": 0.3160692311680236,
+     "hi": 0.3681940337865602,
+     "upper": 0.35468015471918657,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.2987567971086136,
+     "lo": 0.28503402973274894,
+     "hi": 0.33082273973886844,
+     "upper": 0.3100742125438886,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "客户端接收",
+   "cell": "EBW.recv",
+   "kind": "main",
+   "best": "cista_unchecked",
+   "gm": 0.8013738973553144,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.33687247481021215,
+     "lo": 0.3154450070647874,
+     "hi": 0.34434748695404976,
+     "upper": 0.34335843610128075,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.8013738973553144,
+     "lo": 0.7512140518790764,
+     "hi": 0.831750590121415,
+     "upper": 0.8193412035133896,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "客户端接收",
+   "cell": "LDW.recv",
+   "kind": "main",
+   "best": "cista_unchecked",
+   "gm": 0.6672176761371429,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.5894688670625791,
+     "lo": 0.553375792631973,
+     "hi": 0.6198084027341817,
+     "upper": 0.6068911374166137,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.6672176761371429,
+     "lo": 0.6063110858747057,
+     "hi": 0.7023108254809628,
+     "upper": 0.6898104741809458,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "客户端接收",
+   "cell": "UPW.recv",
+   "kind": "main",
+   "best": "cista_unchecked",
+   "gm": 0.996623994494244,
+   "class": "tie",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.8408738396766178,
+     "lo": 0.7903737874192113,
+     "hi": 0.8979273630500173,
+     "upper": 0.8699468386824273,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.996623994494244,
+     "lo": 0.9195061053725592,
+     "hi": 1.0719178329031562,
+     "upper": 1.026871105184652,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "客户端接收",
+   "cell": "UCW.recv",
+   "kind": "main",
+   "best": "cista_unchecked",
+   "gm": 0.7338903321214156,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.390018523227591,
+     "lo": 0.3672099299991967,
+     "hi": 0.4162993982919407,
+     "upper": 0.3998734108917128,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.7338903321214156,
+     "lo": 0.6968028454431416,
+     "hi": 0.7950127930023847,
+     "upper": 0.7543208266418565,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "客户端接收",
+   "cell": "DPTW.recv",
+   "kind": "main",
+   "best": "cista_unchecked",
+   "gm": 0.8159949923416683,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.6884731314495697,
+     "lo": 0.6416865789431052,
+     "hi": 0.7555500040341879,
+     "upper": 0.7166367462675335,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.8159949923416683,
+     "lo": 0.753843086438137,
+     "hi": 0.8681757397778027,
+     "upper": 0.8454401341612454,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "客户端接收",
+   "cell": "DCTW.recv",
+   "kind": "main",
+   "best": "cista_unchecked",
+   "gm": 0.6098737849208042,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.3241111955548712,
+     "lo": 0.30697058879009803,
+     "hi": 0.34261588221206074,
+     "upper": 0.3329864200114541,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.6098737849208042,
+     "lo": 0.5835623283677237,
+     "hi": 0.6476448135056534,
+     "upper": 0.6261069726462087,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "上行",
+   "cell": "UL.recv",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.9872307616308192,
+   "class": "tie",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.9872307616308192,
+     "lo": 0.9006551076259985,
+     "hi": 1.0424141171191859,
+     "upper": 1.0191135515123253,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.9403054095606375,
+     "lo": 0.8602863472145184,
+     "hi": 1.0128164667482014,
+     "upper": 0.9749626931643505,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "上行",
+   "cell": "UL.send",
+   "kind": "report",
+   "best": "zpp_bits",
+   "gm": 1.3642561868587444,
+   "class": "loss",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 1.3642561868587444,
+     "lo": 1.2299464800371906,
+     "hi": 1.4998296548001906,
+     "upper": 1.4264654090552713,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 1.0446541195761725,
+     "lo": 0.9820593743999267,
+     "hi": 1.1462745040301525,
+     "upper": 1.0834687359886241,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "只报",
+   "cell": "US.send",
+   "kind": "report",
+   "best": "zpp_bits",
+   "gm": 0.6796684699276271,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.6796684699276271,
+     "lo": 0.6271919184957894,
+     "hi": 0.7027280899921572,
+     "upper": 0.6974019223736944,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.4817006099293442,
+     "lo": 0.4592084485243478,
+     "hi": 0.5040392200845486,
+     "upper": 0.49290063669347217,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "只报",
+   "cell": "DS",
+   "kind": "report",
+   "best": "zpp_bits",
+   "gm": 0.19391763263746584,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.19391763263746584,
+     "lo": 0.18169346008265333,
+     "hi": 0.21875784867956988,
+     "upper": 0.20167477901690248,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.13743500846444792,
+     "lo": 0.12813557425208846,
+     "hi": 0.1525465362599039,
+     "upper": 0.1421816336728636,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "只报",
+   "cell": "USW.recv",
+   "kind": "report",
+   "best": "cista_unchecked",
+   "gm": 0.7394667038533681,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.423658444736821,
+     "lo": 0.3997084022495754,
+     "hi": 0.45826062039398124,
+     "upper": 0.4351685395963871,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.7394667038533681,
+     "lo": 0.6990157205752842,
+     "hi": 0.8045571353618658,
+     "upper": 0.7629491276304752,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "只报",
+   "cell": "DSTW.recv",
+   "kind": "report",
+   "best": "cista_unchecked",
+   "gm": 0.4407751897279587,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.2525308176630942,
+     "lo": 0.23795234264794302,
+     "hi": 0.2750766072451556,
+     "upper": 0.26062657059268657,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.4407751897279587,
+     "lo": 0.40870763095009827,
+     "hi": 0.47259757130784114,
+     "upper": 0.45441349344140386,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "只报",
+   "cell": "EB.recv",
+   "kind": "report",
+   "best": "cista_unchecked",
+   "gm": 0.8155087131001338,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.3986885265172273,
+     "lo": 0.37945283430804927,
+     "hi": 0.40825459050823104,
+     "upper": 0.4048568822592624,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.8155087131001338,
+     "lo": 0.7775778816440247,
+     "hi": 0.8405591772890713,
+     "upper": 0.830415077174028,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "只报",
+   "cell": "LD recv+apply",
+   "kind": "report",
+   "best": "cista_unchecked",
+   "gm": 0.7818224460499179,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.7005939834617486,
+     "lo": 0.6550307994830445,
+     "hi": 0.7474349925535126,
+     "upper": 0.7186338669253498,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.7818224460499179,
+     "lo": 0.7220396164846385,
+     "hi": 0.8463304842148682,
+     "upper": 0.8081980546347733,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "只报",
+   "cell": "UP recv+apply",
+   "kind": "report",
+   "best": "zpp_bits",
+   "gm": 1.033231295944131,
+   "class": "tie",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 1.033231295944131,
+     "lo": 0.9860045447564778,
+     "hi": 1.0988951738721926,
+     "upper": 1.0586652724240926,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 1.019516604268087,
+     "lo": 0.9833467345047014,
+     "hi": 1.0605165537505181,
+     "upper": 1.037295950911027,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "只报",
+   "cell": "UC recv+apply",
+   "kind": "report",
+   "best": "cista_unchecked",
+   "gm": 0.8625503538716904,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.3989197477172158,
+     "lo": 0.3831743343122082,
+     "hi": 0.4144859122758528,
+     "upper": 0.4053719513101351,
+     "batches": 8
+    },
+    "cista_unchecked": {
+     "gm": 0.8625503538716904,
+     "lo": 0.8252437591134767,
+     "hi": 0.8943064011825345,
+     "upper": 0.8803972259886651,
+     "batches": 8
+    }
+   }
+  }
+ ],
+ "batches": {
+  "xoffset": 8,
+  "xoffset_d3": 8,
+  "zpp_bits": 8,
+  "cista_unchecked": 8
+ },
+ "bytes": [
+  {
+   "label": "A 请求",
+   "xo_key": "A.req",
+   "rival_key": "A.req",
+   "xo": 586340.0,
+   "rivals": {
+    "zpp_bits": 437165.5,
+    "cista_unchecked": 711064.0
+   }
+  },
+  {
+   "label": "A 结果",
+   "xo_key": "A.res",
+   "rival_key": "A.res",
+   "xo": 744936.0,
+   "rivals": {
+    "zpp_bits": 510254.5,
+    "cista_unchecked": 781424.0
+   }
+  },
+  {
+   "label": "B 迁服",
+   "xo_key": "B.out",
+   "rival_key": "B.out",
+   "xo": 3357584.0,
+   "rivals": {
+    "zpp_bits": 1625870.0,
+    "cista_unchecked": 2493912.0
+   }
+  },
+  {
+   "label": "S 存盘",
+   "xo_key": "S.player",
+   "rival_key": "S.player",
+   "xo": 3345596.0,
+   "rivals": {
+    "zpp_bits": 1628905.5,
+    "cista_unchecked": 2500712.0
+   }
+  },
+  {
+   "label": "SD 增量存盘",
+   "xo_key": "SD.modules",
+   "rival_key": "SD.modules",
+   "xo": 1077448.0,
+   "rivals": {
+    "zpp_bits": 697570.0,
+    "cista_unchecked": 1065944.0
+   }
+  },
+  {
+   "label": "L 登录",
+   "xo_key": "L.player_zstd",
+   "rival_key": "L.player_zstd",
+   "xo": 210581.5,
+   "rivals": {
+    "zpp_bits": 179842.5,
+    "cista_unchecked": 208482.5
+   }
+  },
+  {
+   "label": "EB 浏览",
+   "xo_key": "EB.window_zstd",
+   "rival_key": "EB.window_zstd",
+   "xo": 119795995.0,
+   "rivals": {
+    "zpp_bits": 108183134.5,
+    "cista_unchecked": 119292492.5
+   }
+  },
+  {
+   "label": "LD 自身增量",
+   "xo_key": "LD.patch_zstd",
+   "rival_key": "LD.patch_zstd",
+   "xo": 337870.5,
+   "rivals": {
+    "zpp_bits": 265660.5,
+    "cista_unchecked": 305976.0
+   }
+  },
+  {
+   "label": "UP 视野和平",
+   "xo_key": "UP.delta_zstd",
+   "rival_key": "UP.delta_zstd",
+   "xo": 1086986.5,
+   "rivals": {
+    "zpp_bits": 816191.0,
+    "cista_unchecked": 956475.0
+   }
+  },
+  {
+   "label": "UC 视野冲突",
+   "xo_key": "UC.delta_zstd",
+   "rival_key": "UC.delta_zstd",
+   "xo": 7531022.0,
+   "rivals": {
+    "zpp_bits": 6615436.5,
+    "cista_unchecked": 7396538.5
+   }
+  },
+  {
+   "label": "DP 共享和平 ÷ 对手 UP",
+   "xo_key": "DP.delta_zstd",
+   "rival_key": "UP.delta_zstd",
+   "xo": 453310.5,
+   "rivals": {
+    "zpp_bits": 816191.0,
+    "cista_unchecked": 956475.0
+   }
+  },
+  {
+   "label": "DC 共享冲突 ÷ 对手 UC",
+   "xo_key": "DC.delta_zstd",
+   "rival_key": "UC.delta_zstd",
+   "xo": 1446062.5,
+   "rivals": {
+    "zpp_bits": 6615436.5,
+    "cista_unchecked": 7396538.5
+   }
+  },
+  {
+   "label": "UL 上行指令",
+   "xo_key": "UL.order_zstd",
+   "rival_key": "UL.order_zstd",
+   "xo": 107670.0,
+   "rivals": {
+    "zpp_bits": 75391.0,
+    "cista_unchecked": 80354.5
+   }
+  }
+ ],
+ "zstd_bytes": true,
+ "thresholds": {
+  "win_below": 0.95,
+  "loss_above": 1.05
+ }
+}
