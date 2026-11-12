@@ -4,7 +4,7 @@
 Apple M4 和同一个游戏服务器负载（SLG），不要拿来推断别的机器、别的负载或别的适配写法。
 Linux、Windows 上没有正式计时结论，手机上只有一台 iPhone 的同机对比（第 4 节）；云端的指令数只用来拦截回退
 （[PERF_GATE.md](PERF_GATE.md)），不作为快慢的证据。3.5.0 起另有一组云端 x86-64 的计时（第 6 节），
-机器不安静，只报，不作发版判定。
+机器不安静；3.5.0 只报，3.6.0 起按点估计设门槛（第 6a 节，[RELEASING.md](RELEASING.md) 第 2a 节）。
 
 ## 1. 测法
 
@@ -282,6 +282,27 @@ Apple clang 21.0.0，C++20：macOS arm64 和 iOS 模拟器（iPhone 17，iOS 27.
 - #255（1 MiB 起步预留）对这几格没有影响：3.5 的库 `7a0d3d96` ÷ `d8c5018d` 是 UPW 0.996、UCW 1.033、USW 1.037。
 - str.append（STAGE350 的 3.6 观察项，Mac 对齐构建 1.035）：v3.4.0 和 v3.5.0 的 `reloc_bench` str.append
   在 GCC 16 和 P2996 上 Ir、Dr、Dw、D1 缺失逐项相同，是 Mac 上的代码摆放，不改代码。
+
+## 6a. 3.6.0：云端 x86-64 计分列（有门槛）和内存
+
+候选 7d16b44（发版提交的库代码与它相同），云端 Xeon 2.3 GHz，GCC 16 `-O3` 编 `bench/slg`（zpp_bits v4.7.6、
+cista 015b94e），M 规模，native 关，每个格式每批一个进程，20 批交错，钉一个核
+（`tools/perf_gate/x86_columns.sh`）。比值是 xoffset_trusted ÷ 对手，批间几何均值；判点估计，上界只报。
+
+| 列 | 格 | ÷ zpp_bits | ÷ cista_unchecked | 判定 |
+| --- | --- | ---: | ---: | --- |
+| 服务端发送 | L / EB / LD / UC | 0.32 / 0.64 / 0.71 / 0.55 | 0.25 / 0.46 / 0.50 / 0.42 | 通过 |
+| 服务端发送 | UP.send | 1.028 | 0.665 | 警告（对 v3.5.0 1.015，小消息固定开销，4.0 R5） |
+| 客户端热视图 | EBW / LDW / UCW / USW | 0.33 / 0.57 / 0.40 / 0.42 | 0.81 / 0.69 / 0.76 / 0.75 | 通过 |
+| 客户端热视图 | UPW.recv | 0.83 | 1.007 | 警告（在 A/A 噪声内） |
+| 上行 | UL.recv / UL.send | 0.98 / 1.35 | 0.96 / 1.08 | 通过（UL.send 上限 1.80） |
+
+D3（共享增量，M 规模，native 开，10 批）：XOffset 每次投递的 `D*.send` ÷ 对手的 `U*.send`，和平 0.80、冲突 0.17
+（zpp_bits）；客户端 DPTW.recv ÷ cista_unchecked 0.94。S 规模（64 个客户端）的和平 1.85、冲突 1.30 按 susu 的决定只报。
+
+内存（SLG demo M，应用层，每个格式一个进程，`slg_bench --mode proc`）：xoffset_trusted 进程 RSS 663.5 MiB，
+最省的对手（protobuf）的 0.98 倍（3.5 是 1.20 倍）；页表 2.89 MiB，占 RSS 0.44%（门槛 ≤ 1%）。原始数据
+`release-3.6.0/x86-7d16b44/`、`mem-gate-20261111/`（project files）。
 
 ## 7. 局限
 
