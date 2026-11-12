@@ -157,7 +157,10 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   same read, in the same process (order alternating by message), for the
   bounds / full ratio. Bytes `UL.order`, `UL.order_zstd` (`ULZ.send`), count
   `UL.orders`. Runs after the login case; `SLG_UL_OFF=1` drops it. New keys
-  only.
+  only. Each client keeps one order and refills it: the std and cista
+  runners `clear()` one `March`, XOffset builds its buffer for the first order
+  and edits it in place after that (2026-11-12, 3.6 perf P2), so `troops`
+  keeps its capacity in each and the XOffset wire carries that spare capacity.
 
 XOffset's A adapter (both case sets) calls `prefetch_for_update()` on the two
 players' buffers when the battle result starts arriving, inside the timed

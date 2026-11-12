@@ -462,8 +462,15 @@ public:
         std::optional<XBuffer> um, ur;
         std::string uw;
         template <class Fill> std::size_t up_encode(Fill&& fill) {
-            if (!um) um.emplace(XBuffer::create<xm::March>(kUplinkInitial, build_cap()));
-            build_in<xm::March>(*um, fill);
+            // The client keeps one order and refills it in place, as the std
+            // formats keep one March and clear() it: the first order builds
+            // the buffer, every later one edits it (troops keeps its capacity).
+            if (!um) {
+                um.emplace(XBuffer::create<xm::March>(kUplinkInitial, build_cap()));
+                build_in<xm::March>(*um, fill);
+            } else {
+                edit_in<xm::March>(*um, fill);
+            }
             um->template save_verified_into<xm::March>(uw);
             return uw.size();
         }
@@ -1519,10 +1526,18 @@ private:
         if (!b.template build<T>([&](T& m) { fill(m); })) [[unlikely]]
             throw std::runtime_error(std::string("message build failed: ") + XOffsetDatastructure::to_string(b.error()));
     }
+    // A message refilled in place: fill(T&) in a pin scope on the root.
+    template <class T, class Fill>
+    [[gnu::always_inline]] static inline void edit_in(XOffsetDatastructure::XBuffer& b, Fill&& fill) {
+        if (!b.template edit<T>([&](T& m) { fill(m); })) [[unlikely]]
+            throw std::runtime_error(std::string("message edit failed: ") + XOffsetDatastructure::to_string(b.error()));
+    }
 #else
     static XOffsetDatastructure::XBuffer::MaximumCapacity build_cap() { return cap(); }
     template <class T, class Fill>
     [[gnu::always_inline]] static inline void build_in(XOffsetDatastructure::XBuffer& b, Fill&& fill) { fill(b.template reset<T>()); }
+    template <class T, class Fill>
+    [[gnu::always_inline]] static inline void edit_in(XOffsetDatastructure::XBuffer& b, Fill&& fill) { fill(b.template root<T>()); }
 #endif
     // Diagnostic only (small-message probe): SLG_XOFFSET_POOL=1 reuses idle VM
     // owners through the public XBufferPool. Every load is still load_verified.
