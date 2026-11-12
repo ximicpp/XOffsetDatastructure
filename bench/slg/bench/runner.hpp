@@ -151,11 +151,13 @@ struct Runner {
 // across messages. Unset: every message builds and frees its own state.
 inline bool reuse_mode() { static const bool on = std::getenv("SLG_REUSE") != nullptr; return on; }
 
-// W3 step 0 (report only, SLG_XPORT=1): one transport model for every format.
+// W3 (report only, SLG_XPORT=1): one transport model for every format.
 // A send ends with every wire byte copied into one reused transport buffer (the
 // kernel's socket buffer); a receive starts from that buffer and reads it into
 // memory the receiver owns: a read buffer it decodes from (std formats, XOffset
-// reload), or its final memory (cista's held buffer, XOffset direct receive).
+// reload), or its final memory (cista's held buffer).
+// W3 step 0 (2026-11-12) measured XOffset's borrowed send / direct receive
+// prototypes with these columns; neither met the 20% gate, so only the columns stay.
 // The whole-block cells L, B, S, SD then record only <cell>.send+T and
 // <cell>.recv+T (the original keys come from processes without SLG_XPORT).
 inline bool xport_on() { static const bool on = std::getenv("SLG_XPORT") != nullptr; return on; }
@@ -177,9 +179,6 @@ inline void xport_put(const void* d, std::size_t n) { auto& t = xport_t(); t.ens
 inline void xport_put(std::span<const uint8_t> b) { xport_put(b.data(), b.size()); }
 inline void xport_put(std::string_view b) { xport_put(b.data(), b.size()); }
 inline void xport_put(const std::vector<uint8_t>& b) { xport_put(b.data(), b.size()); }
-// Appending parts (a borrowed send): xport_begin, xport_add per part.
-inline uint8_t* xport_begin(std::size_t total) { auto& t = xport_t(); t.ensure(total); t.n = 0; return t.p; }
-inline void xport_add(const void* d, std::size_t n) { auto& t = xport_t(); std::memcpy(t.p + t.n, d, n); t.n += n; }
 inline std::span<const uint8_t> xport_view() { auto& t = xport_t(); return {t.p, t.n}; }
 inline std::string_view xport_sv() { auto& t = xport_t(); return {reinterpret_cast<const char*>(t.p), t.n}; }
 // read(): transport -> the receiver's read buffer.
