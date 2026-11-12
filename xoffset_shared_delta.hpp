@@ -1290,6 +1290,13 @@ namespace XOffsetDatastructure::xsync {
             count_ = 0;
         }
 
+        /// Room for n ids held and n free slots without growing (a client
+        /// that knows its view's size calls this before the first message).
+        void reserve(std::size_t n) {
+            while (cells_.size() < 2 * n) rehash();
+            if (free_.size() < n) free_.resize(n);
+        }
+
         /// Slots given out so far (held or free): the size the caller's records need.
         std::size_t size() const noexcept { return std::size_t(used_); }
         /// Ids held.
