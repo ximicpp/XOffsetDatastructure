@@ -44,19 +44,44 @@
 12 格），所以云端只判点估计、留出这段噪声；4.0 换安静的 x86 机器后再按上界收紧（路线图 R2）。
 
 - 跑法：GCC 16 `-O3` 编 `bench/slg`，`tools/perf_gate/x86_columns.sh <slg_bench> <目录> 10`：M 规模，native 关，
-  每个格式每批一个进程，10 批交错，钉在一个核上；`D3=1` 另跑 D3 行。判定由 `tools/perf_gate/x86_columns.py`
+  每个格式每批一个进程，10 批交错，钉在一个核上；`D3=1` 每批另跑一个 XOffset 的 `SLG_D3=1` 进程（native 开：
+  native 关时 bench 连 D 行也不跑），它的 `D*` 行对同一批对手的 `U*` 行（`x86_columns.py --d3-tag`）。判定由 `tools/perf_gate/x86_columns.py`
   给出：同一批同一周期的消息在各格式里相同，比值按（批，周期）配对，周期 0 不算；批内取对数平均，
   批间取几何均值，上界照印（t 分布，自由度 批数−1），不参与判定。
 - 主格（XOffset 取 `xoffset_trusted`，对手 zpp_bits、cista_unchecked；有 FlatBuffers 构建时加
-  flatbuffers_noverify）：服务端 L / EB / LD / UP / UC（D3 加 DP / DC）的 `*.send`，客户端单设备热视图
-  EBW / LDW / UPW / UCW / USW（D3 加 DPTW）的 `*.recv`，上行列的服务端接收 UL.recv（边界档）。
+  flatbuffers_noverify）：服务端 L / EB / LD / UP / UC 的 `*.send`（D3 加 DP / DC：XOffset 的发布加发送
+  `D*.pub + D*.send` ÷ 对手的 `U*.send`），客户端单设备热视图 EBW / LDW / UPW / UCW / USW 的 `*.recv`
+  （D3 加 DPTW / DCTW ÷ 对手的 UPW / UCW），上行列的服务端接收 UL.recv（边界档）。
   - 通过：几何均值 ≤ 1.00。
   - 警告：1.00 < 几何均值 ≤ 1.05（在 A/A 噪声里）。再跑 10 批，按 20 批判；仍是警告就写进发版 PR。
   - 不通过：几何均值 > 1.05。和 Ir 门一样，要么修，要么带数据找 susu。
-- 上行 UL.send（客户端发上行）：几何均值 ≤ 1.80 × zpp_bits（`x86_columns.py` 的 `UL_SEND_CEILING`）。
-  2026-11-11 这台云端机器上 3.5 的库和 3.6 开发头都是 1.55–1.66（3.5 W1 那台 2.1 GHz 机器上 1.40），同一代码
-  两个进程组之间差到 7%；上限是不回退线，追平归 4.0 R5（小消息的固定开销：reset、首次分配、save，
-  约每条 350 条指令）。ULF.recv（完整校验）和字节只报。
+- 上行 UL.send（客户端发上行）只报，不判（susu 2026-11-12，4.0 计划：不再为它优化）。3.6.0 在云端是
+  1.35 × zpp_bits（3.6 的上限 1.80 撤掉）；差额是小消息每条的固定开销（reset、首次分配、save）。
+  ULF.recv（完整校验，对对手的 UL.recv）和字节只报。
+
+## 2b. 一条命令复现计分卡（4.0 起）
+
+`tools/perf_gate/repro_scorecard.sh <ref> <目录> [批数=8] [周期=21]` 从一个 tag 或提交出发，在任何有
+docker、git、python3 和网络的 x86-64 Linux 上复现 SLG 计分卡：
+
+- 固定的输入：gcc:16 镜像按摘要（与 `local_validate.sh` 同一个），对手 zpp_bits v4.7.6（`4a57ecd`）、
+  cista v0.16（`015b94e`），压缩用 zstd v1.5.7、lz4 v1.10.0，都按提交取并核对；`<ref>` 的树用
+  `git archive` 导出（不要子模块）；`bench/slg/bench/slg_bench.cpp` 单翻译单元 `-O3` 编。
+- 跑法：M 规模，种子 20261021，`SLG_REUSE=1 SLG_CASES=demo`；每批每个格式一个 `SLG_NATIVE_OFF=1`
+  进程（tag `head`），再一个 XOffset 的 `SLG_D3=1` 进程（native 开，tag `d3`）；批间交错，钉一个核
+  （`CPU=`，默认 2），每个进程是一个不联网的新容器。另编一份 `SLG_WITH_COMPRESSION=1` 的二进制跑 1 批，
+  只取 zstd-3 字节（`ZSTD=0` 跳过）。计时只含数据读写和收发，压缩不计时（项目规则）。
+- 输出：`SCORECARD.md`（计分卡）、`scorecard.json`、`env.json`（提交、镜像摘要、编译器、参数、二进制
+  sha256、CPU 型号、起止时间和负载）、`raw/` 和 `rawz/`（每个进程一个 JSONL）、`logs/`。
+- 计分（`tools/perf_gate/scorecard.py`，用脚本所在检出的规则，所以老 tag 也按今天的规则计）：20 个主格
+  ——服务端之间 A / B / S / SD（各阶段之和），服务端发送 L / EB / LD / UP / UC 和 D3 的 DP / DC（发布加发送 ÷ 对手
+  `U*.send`），客户端 L.recv 和热视图 EBW / LDW / UPW / UCW、D3 的 DPTW / DCTW，上行 UL.recv、UL.send。
+  每格是 xoffset_trusted ÷ 最强对手（XOffset 比它慢得最多的那家），按（批，周期 ≥ 1）配对、批内对数平均、
+  批间几何均值。**赢 < 0.95，平 0.95–1.05，输 > 1.05。** UL.send 只报，所以计入的是 19 格。字节只报。
+- 用时：4 核云端容器上编两份二进制约 5 分钟，8 批约 25 分钟。跑的时候别在同一台机器上编别的。
+- 对比：`BASELINE=tools/perf_gate/scorecard_v3.6.0.json` 在每格后面印出基线和差。这个基线是干净副本里
+  对 v3.6.0 的复现（{{REPRO_NOTE}}）。云端机器不安静，同一份代码两轮之间单格差到 10% 左右是常态，
+  所以计分卡看赢/平/输的类别，不看小数点后第三位。
 
 ## 3. 发版前：云端本地验证
 
