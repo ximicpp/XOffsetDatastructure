@@ -11,11 +11,14 @@
 #include <zpp_bits.h>
 #include "slg/model_std.hpp"
 #include "runner.hpp"
+#include "zpp_bits_shared.hpp"
 
 namespace slg {
 
 struct ZppBitsFormat {
     static constexpr const char* name = "zpp_bits";
+    // The rival's shared encoding of the static view cases (keys D*, SLG_D3=1).
+    using SharedView = ZppSharedView;
     using Wire = std::vector<std::byte>;
     static std::span<const uint8_t> bytes(const Wire& w) { return {reinterpret_cast<const uint8_t*>(w.data()), w.size()}; }
 
@@ -62,6 +65,13 @@ struct ZppBitsFormat {
         }
         template <class T> void decode(std::span<const uint8_t> in, T& v) { ZppBitsFormat::decode(in, v); }
     };
+};
+
+// The same format with the second shared-encoding variant (D* rows only;
+// diagnostic, not in the default list): dirty-flag change bodies.
+struct ZppBitsDirtyFormat : ZppBitsFormat {
+    static constexpr const char* name = "zpp_bits_dirty";
+    using SharedView = ZppSharedDirtyView;
 };
 
 } // namespace slg
