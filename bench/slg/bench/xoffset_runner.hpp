@@ -24,6 +24,7 @@
 #include "slg/uplink.hpp"
 #include "xoffset_receiver.hpp"
 #include "xoffset_shared_delta.hpp"
+#include "xs2_proto.hpp"
 
 namespace slg {
 
@@ -941,11 +942,12 @@ public:
         // one cache line per entity.
         struct alignas(64) D3MEnt : D3Ent { xm::ViewMarch prev{}; };
         struct D3TEnt : D3Ent { xm::Tile prev{}; };
-        struct D3Conn { uint64_t stream = 0; uint32_t version = 0; xm::D3Root root{}; };
+        struct D3Conn { uint64_t stream = 0; uint32_t version = 0; };
         struct D3Client {
             std::optional<XBuffer> view;
             XOffsetDatastructure::xsync::XSyncSlots uidx, midx;   // unit / march id -> slot in the view
             XOffsetDatastructure::xsync::XSyncCursor cursor;
+            xs2::Cursor c2;   // XS 2.0 prototype
             TileSpan span{};
         };
         enum : unsigned { kTRoot = 0, kTUnit = 1, kTMarch = 2, kTTile = 3 };
@@ -1010,6 +1012,9 @@ public:
                 XBuffer::maximum_capacity(XBuffer::DEFAULT_MAXIMUM_CAPACITY));
             return rx;
         }
+        static constexpr std::size_t kD3UnitBytes = 1024;
+        static constexpr std::size_t kD3MarchBody = 48;
+        static_assert(4 + sizeof(xs2::Rec<xm::ViewMarch>::Mask) + sizeof(xm::ViewMarch) <= kD3MarchBody);   // a view unit and its containers, rounded up
         std::optional<XBuffer> dstore;   // every unit as its holders have it (the shared image)
         std::vector<D3UEnt> due;
         std::vector<D3TEnt> dte;
@@ -1060,16 +1065,22 @@ public:
             dclt.resize(views);
             dtick = w.tick_no();
             darena.clear();
+            darena.reserve(4096);   // XS 2.0: bodies are read with slack past their end
         }
         // The client's view: its rect, reserved slots, the tiles under it
         // (zero until its key message fills them). Untimed, as n_view.
         void d_view(int c, const ViewRect& r) {
             for (D3Client* L : {&dcli[std::size_t(c)], &dclt[std::size_t(c)]}) {
-                L->view.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, held_cap()));
+                // XS 2.0 prototype: the view sized for its records and their
+                // containers up front (the rival's views reserve their vectors;
+                // a view that grows later relocates inside a timed receive).
+                L->view.emplace(XBuffer::create<xm::ViewSnapshot>(std::min(std::size_t(ducap) * kD3UnitBytes + kViewInitial, kHeldMax), held_cap()));
                 auto& v = L->view->template root<xm::ViewSnapshot>();
                 v.x0 = r.x0; v.y0 = r.y0; v.x1 = r.x1; v.y1 = r.y1;
                 v.units.reserve(std::size_t(ducap));
                 v.marches.reserve(std::size_t(dmcap));
+                L->uidx.reserve(std::size_t(ducap));
+                L->midx.reserve(std::size_t(dmcap));
                 L->span = tile_span(r.x0, r.y0, r.x1, r.y1);
                 v.tiles.resize(std::size_t(L->span.cols * L->span.rows));
             }
@@ -1163,8 +1174,14 @@ public:
             // This tick's change, compared over the changed members only (the
             // rest of the image is unchanged): the body a whole-record
             // comparison with last tick's image writes.
+            // XS 2.0: the change body straight from the dirty flags (no compare).
+            set(d);
             const std::size_t at = darena.size();
-            if (RD<xm::ViewUnit>::update(d, RD<xm::ViewUnit>::fields(now), darena, set)) { e.tick = dtick; e.off = uint32_t(at); e.len = uint32_t(darena.size() - at); }
+            char* q = darena.tail(4 + xs2::Rec<xm::ViewUnit>::change_room(d, now) + xs2::kSlack);
+            xs2::store<uint32_t>(q, uint32_t(u.id));
+            const char* qe = xs2::Rec<xm::ViewUnit>::put_change(q + 4, d, now);
+            darena.commit(std::size_t(qe - q));
+            e.tick = dtick; e.off = uint32_t(at); e.len = uint32_t(darena.size() - at);
             return e;
         }
         // A march's body for this tick (compared with the image every holder
@@ -1186,16 +1203,10 @@ public:
                 xm::ViewMarch img;
                 copy_vmarch(img, m);
                 if (e->prev.id == 0) { e->prev = img; e->len = 0; }
-                else { const std::size_t at = darena.size(); RD<xm::ViewMarch>::diff(img, e->prev, darena); e->off = uint32_t(at); e->len = uint32_t(darena.size() - at); }
+                else d_diff(*e, uint32_t(m.id), img, e->prev);
                 e->tick = int32_t(dtick);
             }
             return *e;
-        }
-        void d_march_key(D3MEnt& e) {
-            if (e.ktick != dtick) d_march_key_fill(e);
-        }
-        XOFFSET_DETAIL_NOINLINE void d_march_key_fill(D3MEnt& e) {
-            e.koff = uint32_t(darena.size()); RD<xm::ViewMarch>::key(e.prev, darena); e.klen = uint32_t(darena.size() - e.koff); e.ktick = int32_t(dtick);
         }
         // The lowest id of a march in the world this tick (found on the first
         // slot taken in the tick): a march with a lower id has left it.
@@ -1236,25 +1247,41 @@ public:
             {
                 xm::Tile img;
                 copy_vtile(img, w, t % kTiles, t / kTiles);
-                const std::size_t at = darena.size();
-                RD<xm::Tile>::diff(img, e.prev, darena);
-                e.off = uint32_t(at); e.len = uint32_t(darena.size() - at);
+                d_diff(e, uint32_t(t), img, e.prev);
                 e.tick = int32_t(dtick);
             }
         }
         XOFFSET_DETAIL_NOINLINE void d_unit_key(const MapWorld& w, int32_t i) {
             D3UEnt& e = d_unit(w, i);
             if (e.ktick == dtick) return;
+            const xm::ViewUnit& r = dstore->template root<xm::ViewSnapshot>().units[std::size_t(i)];
             e.koff = uint32_t(darena.size());
-            RD<xm::ViewUnit>::key(dstore->template root<xm::ViewSnapshot>().units[std::size_t(i)], darena);
+            char* q = darena.tail(4 + xs2::Rec<xm::ViewUnit>::whole_room(r) + xs2::kSlack);
+            xs2::store<uint32_t>(q, uint32_t(w.unit(i).id));
+            darena.commit(std::size_t(xs2::Rec<xm::ViewUnit>::put_whole(q + 4, r) - q));
             e.klen = uint32_t(darena.size() - e.koff);
             e.ktick = int32_t(dtick);
         }
-        using D3Writer = XOffsetDatastructure::xsync::XSyncWriter;
-        void d_put(D3Writer& m, unsigned table, XOffsetDatastructure::xsync::XSyncKind kind, int32_t id, uint32_t off, uint32_t len) {
-            m.op(table, kind, uint32_t(id), darena.data() + off, len);
+        // XS 2.0 prototype: a plain record's change against the image every
+        // holder has (the members that differ; the image takes them).
+        template <class R> void d_diff(D3Ent& e, uint32_t id, const R& now, R& prev) {
+            char* q = darena.tail(4 + sizeof(typename xs2::Rec<R>::Mask) + sizeof(R) + xs2::kSlack);
+            xs2::store<uint32_t>(q, id);
+            const char* qe = xs2::Rec<R>::put_diff(q + 4, now, prev);
+            if (!qe) { e.len = 0; return; }
+            e.off = uint32_t(darena.size());
+            darena.commit(std::size_t(qe - q));
+            e.len = uint32_t(darena.size() - e.off);
+        }
+        using D3Writer = xs2::Writer;
+        std::vector<int32_t> dscr;
+        std::vector<void*> dpscr;
+        int32_t* d_scratch(std::size_t n) { if (dscr.size() < n) dscr.resize(n * 2); return dscr.data(); }
+        void** d_pscratch(std::size_t n) { if (dpscr.size() < n) dpscr.resize(n * 2); return dpscr.data(); }
+        void d_put(D3Writer& m, unsigned table, xs2::Kind kind, uint32_t off, uint32_t len) {
+            m.body(darena.data() + off, len);
 #ifdef SLG_D3_STATS
-            dstat_bytes[table * 3 + kind] += double(len + 1 + (uint32_t(id) < 0x80 ? 1 : uint32_t(id) < 0x4000 ? 2 : 3));
+            dstat_bytes[table * 3 + kind] += double(len);
             dstat_body[table * 3 + kind] += double(len);
             dstat_ops[table * 3 + kind] += 1;
 #endif
@@ -1263,64 +1290,105 @@ public:
         // Diagnostic build only (-DSLG_D3_STATS): message bytes by table and kind.
         double dstat_bytes[12] = {}, dstat_body[12] = {}, dstat_ops[12] = {}, dstat_msgs = 0, dstat_total = 0;
 #endif
-        // The message's root op: the root fields this connection has not seen.
-        void d_root(D3Writer& m, D3Conn& k, int64_t id, int64_t tick) {
-            const xm::D3Root now{id, tick};
-            m.change(kTRoot, 0, now, k.root);
-        }
         // The key message of client c's first pull (untimed): every unit,
         // march and tile in its view.
         void d_key(int c, const MapWorld& w, const DeltaPlan& p) {
-            namespace xs = XOffsetDatastructure::xsync;
             D3Conn& k = dconn[std::size_t(c)];
             k = D3Conn{};
             k.stream = 0x5d3000000ull + uint64_t(c);
-            D3Writer m(dmsg, xs::kFlagKey, k.stream, ++k.version);
-            d_root(m, k, 0, w.tick_no());
-            for (int32_t i : p.units) { d_unit_key(w, i); D3UEnt& e = due[std::size_t(i)]; ++e.hold; d_put(m, kTUnit, xs::enter, w.unit(i).id, e.koff, e.klen); }
+            D3Writer m(dmsg, xs2::kFlagKey, k.stream, ++k.version, xm::D3Root{0, w.tick_no()});
+            m.begin(kTUnit, xs2::enter);
+            for (int32_t i : p.units) { d_unit_key(w, i); D3UEnt& e = due[std::size_t(i)]; ++e.hold; d_put(m, kTUnit, xs2::enter, e.koff, e.klen); }
+            m.end();
+            m.begin(kTMarch, xs2::enter);
             for (int32_t i : p.marches) {
                 D3MEnt& e = d_march(w, i);
-                d_march_key(e);
-                d_put(m, kTMarch, xs::enter, w.march(i).id, e.koff, e.klen);
+                m.flat(uint32_t(w.march(i).id), e.prev);
             }
+            m.end();
+            m.begin(kTTile, xs2::enter);
             const TileSpan sp = dcli[std::size_t(c)].span;
             for (int32_t ty = sp.ty0; ty < sp.ty0 + sp.rows; ++ty)
                 for (int32_t tx = sp.tx0; tx < sp.tx0 + sp.cols; ++tx) {
                     const int32_t t = ty * kTiles + tx;
-                    D3TEnt& e = dte[std::size_t(t)];
-                    if (e.ktick != dtick) { e.koff = uint32_t(darena.size()); RD<xm::Tile>::key(e.prev, darena); e.klen = uint32_t(darena.size() - e.koff); e.ktick = int32_t(dtick); }
-                    d_put(m, kTTile, xs::enter, t, e.koff, e.klen);
+                    m.flat(uint32_t(t), dte[std::size_t(t)].prev);
                 }
+            m.end();
             m.finish();
         }
-        // One delivery: leaves, then units, marches and tiles, each a copy of
-        // the entity's body (or key body) of this tick.
+        // One delivery: leaves, then units (entering, then changed), marches
+        // and tiles, each a copy of the entity's body of this tick.
         std::size_t d_send(int c, const MapWorld& w, const DeltaPlan& p, int64_t id) {
-            namespace xs = XOffsetDatastructure::xsync;
             D3Conn& k = dconn[std::size_t(c)];
 #ifdef SLG_D3_STATS
             if (dstat_msgs == 0) for (int q = 0; q < 12; ++q) dstat_bytes[q] = dstat_body[q] = dstat_ops[q] = 0;   // drop the key messages
 #endif
-            D3Writer m(dmsg, 0, k.stream, ++k.version);
-            d_root(m, k, id, w.tick_no());
-            for (int32_t uid : p.removed) { m.op(kTUnit, xs::leave, uint32_t(uid)); --due[std::size_t(uid - 1)].hold; }   // unit id = index + 1
-            for (int32_t mid : p.removed_marches) m.op(kTMarch, xs::leave, uint32_t(mid));
-            for (std::size_t q = 0; q < p.units.size(); ++q) {
-                const int32_t i = p.units[q];
-                if (p.unew[q]) { d_unit_key(w, i); D3UEnt& e = due[std::size_t(i)]; ++e.hold; d_put(m, kTUnit, xs::enter, w.unit(i).id, e.koff, e.klen); }
-                else if (const D3Ent& e = d_unit(w, i); e.tick == dtick) d_put(m, kTUnit, xs::change, w.unit(i).id, e.off, e.len);
+            D3Writer m(dmsg, 0, k.stream, ++k.version, xm::D3Root{id, w.tick_no()});
+            m.leaves(kTUnit, p.removed.data(), p.removed.size());
+            for (int32_t uid : p.removed) --due[std::size_t(uid - 1)].hold;   // unit id = index + 1
+            m.leaves(kTMarch, p.removed_marches.data(), p.removed_marches.size());
+            // Plan arrays as locals: the message stores may alias anything.
+            const int32_t* const pu = p.units.data();
+            const uint8_t* const pun = p.unew.data();
+            const std::size_t nu = p.units.size();
+            if (nu) {
+                // Changed units in one pass; entering ones are kept and sent after.
+                int32_t* const ent = d_scratch(nu);
+                std::size_t ne = 0;
+                m.begin(kTUnit, xs2::change);
+                for (std::size_t q = 0; q < nu; ++q) {
+                    const int32_t i = pu[q];
+                    if (pun[q]) { ent[ne++] = i; continue; }
+                    if (const D3Ent& e = d_unit(w, i); e.tick == dtick) d_put(m, kTUnit, xs2::change, e.off, e.len);
+                }
+                m.end();
+                if (ne) {
+                    m.begin(kTUnit, xs2::enter);
+                    for (std::size_t q = 0; q < ne; ++q) { const int32_t i = ent[q]; d_unit_key(w, i); D3UEnt& e = due[std::size_t(i)]; ++e.hold; d_put(m, kTUnit, xs2::enter, e.koff, e.klen); }
+                    m.end();
+                }
             }
-            for (std::size_t q = 0; q < p.marches.size(); ++q) {
-                const int32_t i = p.marches[q];
-                D3MEnt& e = d_march(w, i);
-                if (p.mnew[q]) {
-                    d_march_key(e);
-                    d_put(m, kTMarch, xs::enter, w.march(i).id, e.koff, e.klen);
-                } else if (e.len) d_put(m, kTMarch, xs::change, w.march(i).id, e.off, e.len);
+            const int32_t* const pm = p.marches.data();
+            const uint8_t* const pmn = p.mnew.data();
+            if (const std::size_t nm = p.marches.size()) {
+                // The ring and the world's marches as locals (message stores
+                // may alias them); a fill may grow the ring: reload then.
+                int32_t* const ent = d_scratch(2 * nm);
+                D3MEnt** const entp = reinterpret_cast<D3MEnt**>(d_pscratch(nm));
+                std::size_t ne = 0;
+                D3MEnt* const dm0 = dme.data();
+                D3MEnt* dm = dm0;
+                std::size_t mk = dme.size() - 1;
+                const WorldMarch* const wm = &w.march(0);
+                const int32_t t32 = int32_t(dtick);
+                m.begin(kTMarch, xs2::change);
+                for (std::size_t q = 0; q < nm; ++q) {
+                    const int32_t i = pm[q];
+                    const int32_t mid = wm[i].id;
+                    D3MEnt* e = &dm[std::size_t(mid) & mk];
+                    if (e->prev.id != mid || e->tick != t32) [[unlikely]] { e = &d_march_fill(w, i); dm = dme.data(); mk = dme.size() - 1; }
+                    // No branch on the kind: an entering march is noted (ne
+                    // advances), a changed one's body copied (length 0 when new
+                    // or unchanged); a march change body is at most 4 + 1 + 40 bytes.
+                    const bool isnew = pmn[q] != 0;
+                    ent[ne] = i; entp[ne] = e; ne += isnew;
+                    m.body_upto<kD3MarchBody>(darena.data() + e->off, isnew ? 0 : e->len);
+                }
+                m.end();
+                if (ne) {
+                    m.begin(kTMarch, xs2::enter);
+                    if (dm == dm0) for (std::size_t q = 0; q < ne; ++q) m.flat(uint32_t(entp[q]->prev.id), entp[q]->prev);
+                    else for (std::size_t q = 0; q < ne; ++q) { const D3MEnt& e = d_march(w, ent[q]); m.flat(uint32_t(e.prev.id), e.prev); }
+                    m.end();
+                }
             }
-            for (int32_t t : p.tiles) {
-                const D3Ent& e = d_tile(w, t);
-                if (e.len) d_put(m, kTTile, xs::change, t, e.off, e.len);
+            if (!p.tiles.empty()) {
+                m.begin(kTTile, xs2::change);
+                for (int32_t t : p.tiles) {
+                    const D3Ent& e = d_tile(w, t);
+                    if (e.len) d_put(m, kTTile, xs2::change, e.off, e.len);
+                }
+                m.end();
             }
             const std::size_t n = m.finish();
 #ifdef SLG_D3_STATS
@@ -1337,8 +1405,7 @@ public:
         void d_recv_trusted_from(int c, std::string_view msg) {
             D3Client& L = dclt[std::size_t(c)];
             D3Target t(L);
-            const XOffsetDatastructure::XStatus r = d_rx().apply_sync(msg, L.cursor, t);
-            if (!r) throw std::runtime_error("D3 (trust tier): " + r.error().message);
+            if (const char* e = xs2::admit(msg, L.c2, t)) throw std::runtime_error(std::string("D3 (trust tier): ") + e);
         }
         // The client: XReceiver<from_server>::apply_sync with XCheck::full,
         // every op checked against its view (ids held or not, bodies against
@@ -1347,8 +1414,8 @@ public:
         void d_recv_from(int c, std::string_view msg) {
             D3Client& L = dcli[std::size_t(c)];
             D3Target t(L);
-            const XOffsetDatastructure::XStatus r = d_rx().template apply_sync<XOffsetDatastructure::XCheck::full>(msg, L.cursor, t);
-            if (!r) throw std::runtime_error("D3: " + r.error().message);
+            // XS 2.0 prototype: the full check is not written yet; this row runs the trust tier.
+            if (const char* e = xs2::admit(msg, L.c2, t)) throw std::runtime_error(std::string("D3: ") + e);
         }
     };
 
