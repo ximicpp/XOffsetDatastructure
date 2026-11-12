@@ -72,6 +72,33 @@ class ScorecardTest(unittest.TestCase):
             self.assertEqual(rows["DPTW.recv"]["class"], "tie")  # 0.97
             self.assertEqual(rows["DCTW.recv"]["class"], "loss")  # 1.2
 
+    def test_d_cells_take_the_rivals_shared_encoding(self):
+        # 4.0 W1: a rival's own D* rows (d3 tag) are one more approach; the strongest counts.
+        with tempfile.TemporaryDirectory() as d:
+            self.make(d, 0.5)
+            for b in range(1, 4):
+                cyc = {c: {"DP.pub": 0.05 * 1000.0 * (1 + c), "DP.send": 0.25 * 1000.0 * (1 + c),
+                           "DPTW.recv": 2.0 * 1000.0 * (1 + c)} for c in range(0, 5)}
+                write(d, "d3", "zpp_bits", b, cyc, {"DP.delta_zstd": 60})
+            rows, batches = sc.evaluate(d, "xoffset_trusted", ["zpp_bits", "cista_unchecked"], "head", "d3",
+                                        ["zpp_bits", "zpp_bits_dirty"])
+            rows = {r["cell"]: r for r in rows}
+            self.assertEqual(batches["zpp_bits 共享"], 3)
+            self.assertNotIn("zpp_bits_dirty 共享", batches)  # no d3 processes: skipped
+            self.assertAlmostEqual(rows["DP"]["rivals"]["zpp_bits 共享"]["gm"], 2.0, places=9)  # 0.6 / 0.3
+            self.assertEqual(rows["DP"]["best"], "zpp_bits 共享")
+            self.assertEqual(rows["DP"]["class"], "loss")
+            # Slower shared receive: the per-client row stays the strongest.
+            self.assertEqual(rows["DPTW.recv"]["best"], "zpp_bits")
+            # No shared D keys for DC: U rows only.
+            self.assertNotIn("zpp_bits 共享", rows["DC"]["rivals"])
+            self.assertNotIn("zpp_bits 共享", rows["A"]["rivals"])
+            brows = {b["label"]: b for b in sc.byte_rows(d, "xoffset_trusted", ["zpp_bits"], "head", "d3", True,
+                                                         ["zpp_bits"])}
+            self.assertEqual(brows["DP 共享和平 ÷ 对手 UP"]["rivals"]["zpp_bits 共享"], 60)
+            text = sc.render(list(rows.values()), batches, ["zpp_bits", "cista_unchecked"], [], True, None, None)
+            self.assertIn("÷ zpp_bits 共享", text)
+
     def test_tie_bounds(self):
         self.assertEqual(sc.classify(0.9499), "win")
         self.assertEqual(sc.classify(0.95), "tie")

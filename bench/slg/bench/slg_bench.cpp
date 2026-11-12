@@ -71,6 +71,8 @@ std::unique_ptr<Runner> make_runner(const std::string& n) {
 #endif
 #if SLG_WITH_ZPP_BITS
     if (n == "zpp_bits") return std::make_unique<StdRunner<ZppBitsFormat>>();
+    // Diagnostic (4.0 W1): the D* rows with dirty-flag change bodies; U* rows as zpp_bits.
+    if (n == "zpp_bits_dirty") return std::make_unique<StdRunner<ZppBitsDirtyFormat>>();
 #endif
 #if SLG_WITH_CISTA
     if (n == "cista") return std::make_unique<CistaRunner<cista::mode::DEEP_CHECK>>();
