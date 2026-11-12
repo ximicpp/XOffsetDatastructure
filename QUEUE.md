@@ -1,6 +1,6 @@
 # Mac queue
 
-Updated 2026-11-12T08:25:19Z after 107-stage360: running 2026-11-12T08:25:16Z
+Updated 2026-11-12T09:37:57Z after 107-stage360: done 11 2026-11-12T09:37:53Z
 
 ```
 runner: pid 4651 (version 2)
@@ -111,5 +111,6 @@ free: 25 GB on /Volumes/XOffsetCS, 25 GB on /Users/ximi
 104-stage350                             done 12 2026-11-10T20:51:52Z
 105-pr266                                done 2 2026-11-11T15:30:45Z
 106-pr266b                               done 10 2026-11-11T17:00:14Z
-107-stage360                             running 2026-11-12T08:25:16Z
+107-stage360                             done 11 2026-11-12T09:37:53Z
+108-pr269                                queued
 ```

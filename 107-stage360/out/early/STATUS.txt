@@ -1,0 +1,5 @@
+STAGE360 L2 rc 11 at 2026-11-12T09:21:45Z (0 pass, 10 fail, 11 pending, 12 invalid, 13 incomplete, 14 n/a, 15 L2 failed and the bisection follows)
+ABC: pass (max upper bound 1.0104; A 1.0094, B 0.9928, C 1.0104; 12 / 12 processes)
+GATE_D: head D÷flatbuffers 0.916 / 0.926 (O4 upper bound <= 1.0: met), D÷zpp_bits 1.039 / 1.046, D.read 67.0 µs; anc D÷flatbuffers 0.933 / 0.947, D÷zpp_bits 1.027 / 1.039, D.read 68.3 µs
+G8 met
+G9R and ctest follow

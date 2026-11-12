@@ -1,0 +1,7 @@
+9e636300c28c732c4a44785258b23ecd7361adbb|#255 merged (growth policy part 1: relocating storage); #253 (anchor file) before it
+1f9a8e92205a85d11dcc0c2ef27ee42c195700d0|#262 merged (x86 client); #258 #257 #259 (memory: retire/discard) before it
+ce658e8e71cfc662d74658c292252062c6b0e4ae|#260 merged (D3 changed-member encoding, class L)
+9e173149587cbabd08cb410d522daed18cec7f3a|#264 merged (shared deltas, no EB fill); #261 (fast proxy) #263 (D3 snapshots) before it
+aad6cd86a19e654c8af09da919bd199f4a57a3da|#265 merged (free table over a shared word pool, class L)
+cf9b63e584247ca6c61f524591557d468062bb48|#256 merged (batch operations, build<T>); #254 (proxy root) before it
+bb537d0db6a7d629f10165e9cc68aadc745b5171|#266 merged (#265 fix + root<T>() refill: Mac A.req_encode +6.3%, accepted 11-11); the last range holds #268 #267 #270

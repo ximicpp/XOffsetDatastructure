@@ -1,0 +1,8 @@
+STAGE360 11
+anchor v3.5.0 0cbc130d (previous release tag)
+screen watcher: 66 calls (dark.log)
+ABC: pass (max upper bound 1.0104; A 1.0094, B 0.9928, C 1.0104; 12 / 12 processes)
+GATE_D: head D÷flatbuffers 0.916 / 0.926 (O4 upper bound <= 1.0: met), D÷zpp_bits 1.039 / 1.046, D.read 67.0 µs; anc D÷flatbuffers 0.933 / 0.947, D÷zpp_bits 1.027 / 1.039, D.read 68.3 µs
+G8 met
+G9R rc 0 (0 done, 2 prep check, 5 quiet gate); G9: 17 of 19 comparisons have UB <= 1.05; above: vec.push_back, set.erase.fresh
+ctest 100% tests passed out of 209 (rc 0)
