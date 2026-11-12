@@ -2,12 +2,14 @@
 """Cloud x86 and client-uplink columns of the SLG scorecard: paired ratios and
 the 3.6 thresholds (docs/RELEASING.md section 2a).
 
-usage: x86_columns.py DIR [--tag TAG] [--xo xoffset_trusted]
+usage: x86_columns.py DIR [--tag TAG] [--d3-tag D3TAG] [--xo xoffset_trusted]
                           [--rivals zpp_bits,cista_unchecked] [--json OUT]
 
 DIR holds one bench/slg JSONL per process, named <TAG>_<format>_<batch>.jsonl
 (tools/perf_gate/x86_columns.sh writes them so: every format of a batch runs
-in its own process, the batches interleaved). Every format of one batch runs
+in its own process, the batches interleaved). With --d3-tag, the XOffset
+processes <D3TAG>_<xo>_<batch>.jsonl (SLG_D3=1, native on) give the D cells,
+paired with each rival's U* rows of the same batch. Every format of one batch runs
 the same seed, so cycle c of batch b carries the same messages in every
 format; the ratio of a cell is taken per (batch, cycle >= 1) and the cycle
 ratios of a batch are averaged in log space. The geometric mean over batches
@@ -18,13 +20,13 @@ Student t with nb - 1 degrees of freedom.
 Verdict per cell and rival (XOffset ÷ rival, below 1 = XOffset faster):
   main cells   pass: GM <= 1.00; warn: 1.00 < GM <= 1.05 (inside the cloud A/A
                spread: run 10 more batches and judge all of them); fail: GM > 1.05
-  UL.send      ceiling (4.0 R5 owns the loss): pass GM <= UL_SEND_CEILING, else fail
-  report       printed, no verdict
+  report       printed, no verdict: UL.send (client uplink send; report-only
+               from 4.0, susu 2026-11-12) and ULF.recv (full check)
 The upper bound is printed, not judged: on the cloud machine an A/A run (the
 same code built twice, 10 batches) gave GMs 0.98-1.04 and upper bounds up to
 1.12 (docs/RELEASING.md section 2a).
 Exit status 1 when any cell fails, else 0. A cell missing from the data is
-listed as missing (the run lacked that case, e.g. D3 without SLG_D3=1).
+listed as missing (the run lacked that case, e.g. D cells without --d3-tag).
 """
 import argparse
 import glob
@@ -35,27 +37,31 @@ import re
 import statistics
 import sys
 
-# (column, key, kind). Server cells time *.send, client cells the warm single
-# device's receive + apply (*W.recv), as the SLG scorecard's main columns.
+# (column, cell, kind, xo run, xo keys, rival keys). Server cells time *.send,
+# client cells the warm single device's receive + apply (*W.recv), as the SLG
+# scorecard's main columns (tools/perf_gate/scorecard.py). The D cells pair
+# XOffset's shared-delta rows (the SLG_D3=1 processes, --d3-tag) with each
+# rival's per-client U* rows from the main processes: rivals have no D3 path.
 CELLS = [
-    ("x86 server", "L.send", "main"),
-    ("x86 server", "EB.send", "main"),
-    ("x86 server", "LD.send", "main"),
-    ("x86 server", "UP.send", "main"),
-    ("x86 server", "UC.send", "main"),
-    ("x86 server", "DP.send", "main"),
-    ("x86 server", "DC.send", "main"),
-    ("x86 client", "EBW.recv", "main"),
-    ("x86 client", "LDW.recv", "main"),
-    ("x86 client", "UPW.recv", "main"),
-    ("x86 client", "UCW.recv", "main"),
-    ("x86 client", "USW.recv", "main"),
-    ("x86 client", "DPTW.recv", "main"),
-    ("uplink", "UL.recv", "main"),
-    ("uplink", "UL.send", "ceiling"),
-    ("uplink", "ULF.recv", "report"),
+    ("x86 server", "L.send", "main", "main", ["L.send"], ["L.send"]),
+    ("x86 server", "EB.send", "main", "main", ["EB.send"], ["EB.send"]),
+    ("x86 server", "LD.send", "main", "main", ["LD.send"], ["LD.send"]),
+    ("x86 server", "UP.send", "main", "main", ["UP.send"], ["UP.send"]),
+    ("x86 server", "UC.send", "main", "main", ["UC.send"], ["UC.send"]),
+    ("x86 server", "DP.pub+send / UP.send", "main", "d3", ["DP.pub", "DP.send"], ["UP.send"]),
+    ("x86 server", "DC.pub+send / UC.send", "main", "d3", ["DC.pub", "DC.send"], ["UC.send"]),
+    ("x86 client", "EBW.recv", "main", "main", ["EBW.recv"], ["EBW.recv"]),
+    ("x86 client", "LDW.recv", "main", "main", ["LDW.recv"], ["LDW.recv"]),
+    ("x86 client", "UPW.recv", "main", "main", ["UPW.recv"], ["UPW.recv"]),
+    ("x86 client", "UCW.recv", "main", "main", ["UCW.recv"], ["UCW.recv"]),
+    ("x86 client", "USW.recv", "main", "main", ["USW.recv"], ["USW.recv"]),
+    ("x86 client", "DPTW.recv / UPW.recv", "main", "d3", ["DPTW.recv"], ["UPW.recv"]),
+    ("x86 client", "DCTW.recv / UCW.recv", "main", "d3", ["DCTW.recv"], ["UCW.recv"]),
+    ("uplink", "UL.recv", "main", "main", ["UL.recv"], ["UL.recv"]),
+    ("uplink", "UL.send", "report", "main", ["UL.send"], ["UL.send"]),
+    ("uplink", "ULF.recv / UL.recv", "report", "main", ["ULF.recv"], ["UL.recv"]),
 ]
-MAIN_PASS, MAIN_FAIL, UL_SEND_CEILING = 1.00, 1.05, 1.80
+MAIN_PASS, MAIN_FAIL = 1.00, 1.05
 # One-sided 95% Student t quantiles by degrees of freedom (>= 30: normal).
 T95 = {1: 6.314, 2: 2.920, 3: 2.353, 4: 2.132, 5: 2.015, 6: 1.943, 7: 1.895, 8: 1.860,
        9: 1.833, 10: 1.812, 11: 1.796, 12: 1.782, 13: 1.771, 14: 1.761, 15: 1.753,
@@ -93,12 +99,27 @@ def batches(directory, tag, fmt):
     return found
 
 
-def cell_ratio(xo, rival, key):
-    """Per-batch mean log ratio over paired cycles."""
+def cycle_sum(run, keys, c):
+    total = 0
+    for k in keys:
+        v = run.get(k, {}).get(c)
+        if v is None or v <= 0:
+            return None
+        total += v
+    return total
+
+
+def cell_ratio(xo, rival, xkeys, rkeys=None):
+    """Per-batch mean log ratio over paired cycles of the summed keys."""
+    rkeys = rkeys or xkeys
     logs = []
     for b in sorted(set(xo) & set(rival)):
-        a, r = xo[b].get(key, {}), rival[b].get(key, {})
-        pairs = [math.log(a[c] / r[c]) for c in a if c in r and a[c] > 0 and r[c] > 0]
+        cyc = set(xo[b].get(xkeys[0], {})) & set(rival[b].get(rkeys[0], {}))
+        pairs = []
+        for c in sorted(cyc):
+            a, r = cycle_sum(xo[b], xkeys, c), cycle_sum(rival[b], rkeys, c)
+            if a and r:
+                pairs.append(math.log(a / r))
         if pairs:
             logs.append(statistics.fmean(pairs))
     if not logs:
@@ -115,20 +136,19 @@ def verdict(kind, r):
         return "missing"
     if kind == "report":
         return "report"
-    if kind == "ceiling":
-        return "pass" if r["gm"] <= UL_SEND_CEILING else "fail"
     if r["gm"] > MAIN_FAIL:
         return "fail"
     return "pass" if r["gm"] <= MAIN_PASS else "warn"
 
 
-def evaluate(directory, tag, xo_name, rivals):
-    xo = batches(directory, tag, xo_name)
+def evaluate(directory, tag, xo_name, rivals, d3_tag=None):
+    xo = {"main": batches(directory, tag, xo_name),
+          "d3": batches(directory, d3_tag, xo_name) if d3_tag else {}}
     rows = []
     for rival in rivals:
         rv = batches(directory, tag, rival)
-        for column, key, kind in CELLS:
-            r = cell_ratio(xo, rv, key) if xo and rv else None
+        for column, key, kind, run, xkeys, rkeys in CELLS:
+            r = cell_ratio(xo[run], rv, xkeys, rkeys) if xo[run] and rv else None
             rows.append({"column": column, "key": key, "kind": kind, "rival": rival,
                          "ratio": r, "verdict": verdict(kind, r)})
     return rows
@@ -138,11 +158,12 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("dir")
     ap.add_argument("--tag", default="head")
+    ap.add_argument("--d3-tag", help="tag of the SLG_D3=1 XOffset processes (the D cells)")
     ap.add_argument("--xo", default="xoffset_trusted")
     ap.add_argument("--rivals", default="zpp_bits,cista_unchecked")
     ap.add_argument("--json")
     a = ap.parse_args(argv)
-    rows = evaluate(a.dir, a.tag, a.xo, [r for r in a.rivals.split(",") if r])
+    rows = evaluate(a.dir, a.tag, a.xo, [r for r in a.rivals.split(",") if r], a.d3_tag)
     print(f"| column | key | ÷ rival | GM | one-sided 95% upper | batches | verdict |")
     print(f"| --- | --- | --- | ---: | ---: | ---: | --- |")
     for row in rows:
@@ -155,7 +176,7 @@ def main(argv=None):
     failed = [r for r in rows if r["verdict"] == "fail"]
     warned = [r for r in rows if r["verdict"] == "warn"]
     print(f"\n{'FAIL' if failed else 'PASS'}: {len(failed)} fail, {len(warned)} warn "
-          f"(main: pass GM <= {MAIN_PASS:.2f}, fail GM > {MAIN_FAIL:.2f}; UL.send GM <= {UL_SEND_CEILING:.2f})")
+          f"(main: pass GM <= {MAIN_PASS:.2f}, fail GM > {MAIN_FAIL:.2f}; UL.send and ULF.recv report only)")
     if a.json:
         with open(a.json, "w") as f:
             json.dump(rows, f, indent=1)
