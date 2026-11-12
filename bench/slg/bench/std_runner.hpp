@@ -14,6 +14,11 @@
 
 namespace slg {
 
+// A format's shared encoding of the static view cases (keys D*), if it has one.
+struct NoSharedView {};
+template <class F> struct SharedViewOf { using type = NoSharedView; };
+template <class F> requires requires { typename F::SharedView; } struct SharedViewOf<F> { using type = typename F::SharedView; };
+
 template <class F> class StdRunner final : public Runner {
 public:
     std::string name() const override { return F::name; }
@@ -284,7 +289,7 @@ public:
         void modules_recv_x() { store_check(r->rz_, xport_read(), pr); }
     };
 
-    struct BlockOps {
+    struct BlockOps : SharedViewOf<F>::type {
         typename F::Reuse* rz = nullptr;
         std::vector<std::span<const uint8_t>> snaps;   // each pull's wire, where the format wrote it (its reuse slot)
         std::vector<stdm::ViewSnapshot> held_views;
