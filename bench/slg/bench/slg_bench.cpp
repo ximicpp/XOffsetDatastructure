@@ -54,8 +54,6 @@ std::unique_ptr<Runner> make_runner(const std::string& n) {
     if (n == "xoffset") return std::make_unique<XOffsetRunner>();
     // Trust tier (3.4 P1): whole-wire receives through XReceiver admit; scoring main column.
     if (n == "xoffset_trusted") return std::make_unique<XOffsetTrustedRunner>();
-    if (n == "xoffset_wire") return std::make_unique<XOffsetWireRunner>();   // W3 step 0, SLG_XPORT=1 only
-    if (n == "xoffset_ideal_recv") return std::make_unique<XOffsetIdealRecvRunner>();   // W3 step 0 diagnostic, SLG_XPORT=1 only
     // Diagnostic formats (not in the default list): the model with wire_record_layout
     // declared, received with reload_verified / with direct receive (SLG_REUSE=1 only).
     if (n == "xoffset_optin") return std::make_unique<XOffsetRunnerT<XoOptinModel, false>>();

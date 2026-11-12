@@ -164,7 +164,7 @@ template <class Ops> void run_login(Ops& ops, uint64_t seed, int cycle, int roun
     for (int p : logins) {
         std::size_t n = 0;
         uint64_t q = 0;
-        if (xport_on()) {   // W3 step 0: the transport model (runner.hpp)
+        if (xport_on()) {   // W3: the transport model (runner.hpp)
             timed(st, "L.send+T", [&] { n = ops.login_send_x(p); });
             timed(st, "L.recv+T", [&] { ops.login_recv_x(p); q = query_self(ops.held(p)); });
         } else {
@@ -274,7 +274,7 @@ template <class Ops> void run_dirty_save(Ops& ops, const std::vector<int>& who, 
     if constexpr (requires { ops.n_store_prime_all(); }) if (cycle == 0) ops.n_store_prime_all();
     for (int p : who) {
         std::size_t n = 0;
-        if (xport_on()) {   // W3 step 0: the transport model (runner.hpp)
+        if (xport_on()) {   // W3: the transport model (runner.hpp)
             timed(st, "SD.send+T", [&] { n = ops.modules_send_x([&](auto& m) { fill_modules(m, ops.player(p), cycle); }); });
             timed(st, "SD.recv+T", [&] { ops.modules_recv_x(); });
         } else {

@@ -41,20 +41,6 @@ struct XoTrustedModel : XoModel {
     static constexpr const char* name = "xoffset_trusted";
     static constexpr bool trusted = true;
 };
-// W3 step 0 (SLG_XPORT=1 only, report only): the trusted model with the
-// prototype borrowed send (XBuffer::with_wire) and trusted direct receive
-// (VerifiedReloadToken::try_finish_admit) on the whole-block cells L, B, S, SD.
-struct XoWireModel : XoTrustedModel {
-    static constexpr const char* name = "xoffset_wire";
-    static constexpr bool wire = true;
-};
-// W3 step 0 diagnostic: the trusted path, but the receive reloads straight from
-// the transport buffer (no read() copy). Not a real transport; the floor a tuned
-// direct receive could reach (one copy + the reload small fast path).
-struct XoIdealRecvModel : XoTrustedModel {
-    static constexpr const char* name = "xoffset_ideal_recv";
-    static constexpr bool ideal_recv = true;
-};
 struct XoOptinModel {
     static constexpr const char* name = "xoffset_optin";
     using PlayerState = xmr::PlayerState; using BattleMsg = xmr::BattleMsg;
@@ -101,83 +87,27 @@ template <class M, bool Direct> class XOffsetRunnerT final : public Runner {
     static constexpr auto kPeer = XOffsetDatastructure::XLink::server_peer;
     static constexpr auto kClient = XOffsetDatastructure::XLink::from_server;
 
-    // W3 step 0 transport model (runner.hpp). Wire: borrowed send straight into
-    // the transport, direct receive from it with the admit check. Otherwise the
-    // product path: save_verified_into + write(), read() + XReceiver::reload.
-    static constexpr bool Wire = requires { M::wire; };
-    static XOffsetDatastructure::XWireScratch& wscratch() { static XOffsetDatastructure::XWireScratch s; return s; }
+    // W3 transport model (runner.hpp, SLG_XPORT=1, report only): the product
+    // path with the socket write and read: save_verified_into + write(), then
+    // read() into the receiver's read buffer + XReceiver::reload.
     template <class T>
     static std::size_t send_x(XOffsetDatastructure::XBuffer& src, std::string& out) {
-        if constexpr (Wire) {
-            std::size_t n = 0;
-            src.template with_wire<T>(wscratch(), [&](const XOffsetDatastructure::XWireParts& w) {
-                xport_begin(w.bytes);
-                for (const auto& part : w.parts) xport_add(part.data, part.size);
-                n = w.bytes;
-            });
-            static const bool check = std::getenv("SLG_WIRE_CHECK") != nullptr;   // diagnostic: parts == save_verified_into
-            if (check) {
-                src.template save_verified_into<T>(out);
-                if (out != xport_sv()) throw std::runtime_error("with_wire: parts differ from save_verified_into");
-            }
-            return n;
-        } else {
-            src.template save_verified_into<T>(out);
-            xport_put(out);
-            return out.size();
-        }
+        src.template save_verified_into<T>(out);
+        xport_put(out);
+        return out.size();
     }
     template <class T, XOffsetDatastructure::XLink L>
     static void recv_x(XOffsetDatastructure::XBuffer& dst) {
-        using namespace XOffsetDatastructure;
-        if constexpr (Wire) {
-            const auto wire = xport_view();
-            XWireHeaderV2 h{};
-            if (wire.size() < sizeof(h)) throw std::runtime_error("direct receive: short wire");
-            std::memcpy(&h, wire.data(), sizeof(h));
-            const std::size_t payload = h.used_bytes, holes = h.hole_count, extents = h.extent_count;
-            if (payload > XBuffer::DEFAULT_MAXIMUM_CAPACITY) throw std::runtime_error("direct receive: too large");
-            auto tok = dst.template begin_verified_reload<T>(payload, holes, extents);
-            auto head = tok.header_bytes(), body = tok.payload_bytes(), hole = tok.hole_bytes(), table = tok.extent_bytes();
-            std::size_t at = 0;
-            auto take = [&](std::byte* to, std::size_t n) {
-                if (at + n > wire.size()) throw std::runtime_error("direct receive: wire framing");
-                if (n) std::memcpy(to, wire.data() + at, n);
-                at += n;
-            };
-            take(head.data(), head.size());
-            take(table.data(), table.size());
-            const std::size_t begin = payload - body.size();
-            if (extents == 0) take(body.data(), body.size());
-            else
-                for (std::size_t e = 0; e < extents; ++e) {
-                    uint32_t ext[2];
-                    std::memcpy(ext, table.data() + e * 8, 8);
-                    if (ext[0] < begin || std::size_t(ext[0]) - begin + ext[1] > body.size())
-                        throw std::runtime_error("direct receive: extent bounds");
-                    take(body.data() + (ext[0] - begin), ext[1]);
-                }
-            take(hole.data(), hole.size());
-            if (at != wire.size()) throw std::runtime_error("direct receive: trailing bytes");
-            tok.complete(head.size(), body.size(), hole.size(), table.size());
-            const XStatus r = tok.try_finish_admit();
-            if (!r) throw std::runtime_error("direct receive rejected: " + std::string(r.error().message));
-        } else if constexpr (requires { M::ideal_recv; }) {
-            reload_wire<T, L>(dst, std::as_bytes(xport_view()));
-        } else {
-            const auto in = xport_read();
-            reload_wire<T, L>(dst, std::as_bytes(in));
-        }
+        const auto in = xport_read();
+        reload_wire<T, L>(dst, std::as_bytes(in));
     }
 
 public:
     std::string name() const override { return Direct ? "xoffset_direct" : M::name; }
-    // (xoffset_wire needs SLG_XPORT=1; checked in setup)
 
     void setup(const Scale& sc, uint64_t seed) override {
         using namespace XOffsetDatastructure;
         sc_ = &sc; seed_ = seed;
-        if ((Wire || requires { M::ideal_recv; }) && !xport_on()) throw std::runtime_error("xoffset_wire runs only with SLG_XPORT=1");
         players_.clear();
         armies_.clear();
         for (int i = 0; i < sc.players; ++i) {
@@ -384,16 +314,13 @@ public:
         // hop sends it again as it is (no return trip).
         if (demo_cases()) for (std::size_t k = 0; k < migrants.size(); ++k) {
             XBuffer& slot = players_[std::size_t(migrants[k])];
-            std::size_t bn = 0;
-            if (xport_on()) {   // W3 step 0: the transport model (runner.hpp)
-                timed(st, "B.send+T", [&] { bn = send_x<PlayerState>(slot, out_); });
+            if (xport_on()) {   // W3: the transport model (runner.hpp)
+                timed(st, "B.send+T", [&] { send_x<PlayerState>(slot, out_); });
                 timed(st, "B.recv+T", [&] { recv_x<PlayerState, kPeer>(*b_m_); });
-                if (Wire) out_.assign(xport_sv());
             } else {
             timed(st, "B.out_encode", [&] { slot.save_verified_into<PlayerState>(out_); });
             recv<PlayerState>(st, "B.in_decode", out_, b_m_);
             }
-            (void)bn;
             untimed(st, "B.scene_edits", [&] {
                 season_edits(b_m_->root<PlayerState>(), mix_seed(seed_, uint64_t(cycle) * 1000003u + k), sc.season_ops);
             });
@@ -420,9 +347,8 @@ public:
         // Demo case set, S: scene <-> storage for players (see std_runner.hpp).
         if (demo_cases()) for (int p : pick_storage(seed_, cycle, sc.players, sc.migrants)) {
             XBuffer& slot = players_[std::size_t(p)];
-            if (xport_on()) {   // W3 step 0: the transport model; the storage's resend of its bytes is untimed
+            if (xport_on()) {   // W3: the transport model; the storage's resend of its bytes is untimed
                 timed(st, "S.send+T", [&] { send_x<PlayerState>(slot, back_); });
-                if (Wire) back_.assign(xport_sv());
                 timed(st, "S.recv+T", [&] { recv_x<PlayerState, kPeer>(*b_r_); });
                 store_ = back_;
                 xport_put(store_);
@@ -1653,7 +1579,5 @@ private:
 
 using XOffsetRunner = XOffsetRunnerT<XoModel, false>;
 using XOffsetTrustedRunner = XOffsetRunnerT<XoTrustedModel, false>;
-using XOffsetWireRunner = XOffsetRunnerT<XoWireModel, false>;
-using XOffsetIdealRecvRunner = XOffsetRunnerT<XoIdealRecvModel, false>;
 
 } // namespace slg

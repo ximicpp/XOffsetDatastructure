@@ -152,7 +152,7 @@ public:
         if (demo_cases()) for (std::size_t k = 0; k < migrants.size(); ++k) {
             auto& slot = players_[std::size_t(migrants[k])];
             std::span<const uint8_t> out;
-            if (xport_on()) {   // W3 step 0: the transport model (runner.hpp)
+            if (xport_on()) {   // W3: the transport model (runner.hpp)
                 timed(st, "B.send+T", [&] { out = rz_.encode(kOut, slot); xport_put(out); });
                 timed(st, "B.recv+T", [&] { rz_.decode(xport_read(), bm_); });
             } else {
@@ -186,7 +186,7 @@ public:
         if (demo_cases()) for (int p : pick_storage(seed_, cycle, sc.players, sc.migrants)) {
             auto& slot = players_[std::size_t(p)];
             std::span<const uint8_t> w;
-            if (xport_on()) {   // W3 step 0: the transport model; the storage's resend of its bytes is untimed
+            if (xport_on()) {   // W3: the transport model; the storage's resend of its bytes is untimed
                 timed(st, "S.send+T", [&] { w = rz_.encode(kBack, slot); xport_put(w); });
                 timed(st, "S.recv+T", [&] { store_check(rz_, xport_read(), br_); });
                 store_.assign(w.begin(), w.end());

@@ -153,7 +153,7 @@ public:
         if (demo_cases()) for (std::size_t k = 0; k < migrants.size(); ++k) {
             if (!reuse) throw std::runtime_error("SLG_CASES=demo needs SLG_REUSE=1");
             auto& slot = players_[std::size_t(migrants[k])];
-            if (xport_on()) {   // W3 step 0: the transport model; cista reads the socket into its held buffer
+            if (xport_on()) {   // W3: the transport model; cista reads the socket into its held buffer
                 timed(st, "B.send+T", [&] { save(out_, *slot); xport_put(out_); });
                 timed(st, "B.recv+T", [&] { b_m_.receive(xport_view()); });
             } else {
@@ -189,7 +189,7 @@ public:
         // Demo case set, S: scene <-> storage for players (see std_runner.hpp).
         if (demo_cases()) for (int p : pick_storage(seed_, cycle, sc.players, sc.migrants)) {
             auto& slot = players_[std::size_t(p)];
-            if (xport_on()) {   // W3 step 0: the transport model; the storage's resend of its bytes is untimed
+            if (xport_on()) {   // W3: the transport model; the storage's resend of its bytes is untimed
                 timed(st, "S.send+T", [&] { save(back_, *slot); xport_put(back_); });
                 timed(st, "S.recv+T", [&] { b_r_.receive(xport_view()); });
                 store_ = back_;
