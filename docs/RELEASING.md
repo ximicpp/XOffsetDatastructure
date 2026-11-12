@@ -68,14 +68,18 @@ docker、git、python3 和网络的 x86-64 Linux 上复现 SLG 计分卡：
   cista v0.16（`015b94e`），压缩用 zstd v1.5.7、lz4 v1.10.0，都按提交取并核对；`<ref>` 的树用
   `git archive` 导出（不要子模块）；`bench/slg/bench/slg_bench.cpp` 单翻译单元 `-O3` 编。
 - 跑法：M 规模，种子 20261021，`SLG_REUSE=1 SLG_CASES=demo`；每批每个格式一个 `SLG_NATIVE_OFF=1`
-  进程（tag `head`），再一个 XOffset 的 `SLG_D3=1` 进程（native 开，tag `d3`）；批间交错，钉一个核
+  进程（tag `head`），再一个 XOffset 的 `SLG_D3=1` 进程（native 开，tag `d3`），以及对手的共享编码
+  （`SHARED`，默认 zpp_bits 和诊断格式 zpp_bits_dirty，4.0 W1；`<ref>` 的 bench 没有就跳过）各一个
+  `SLG_D3=1` 进程；批间交错，钉一个核
   （`CPU=`，默认 2），每个进程是一个不联网的新容器。另编一份 `SLG_WITH_COMPRESSION=1` 的二进制跑 1 批，
   只取 zstd-3 字节（`ZSTD=0` 跳过）。计时只含数据读写和收发，压缩不计时（项目规则）。
 - 输出：`SCORECARD.md`（计分卡）、`scorecard.json`、`env.json`（提交、镜像摘要、编译器、参数、二进制
   sha256、CPU 型号、起止时间和负载）、`raw/` 和 `rawz/`（每个进程一个 JSONL）、`logs/`。
 - 计分（`tools/perf_gate/scorecard.py`，用脚本所在检出的规则，所以老 tag 也按今天的规则计）：20 个主格
   ——服务端之间 A / B / S / SD（各阶段之和），服务端发送 L / EB / LD / UP / UC 和 D3 的 DP / DC（发布加发送 ÷ 对手
-  `U*.send`），客户端 L.recv 和热视图 EBW / LDW / UPW / UCW、D3 的 DPTW / DCTW，上行 UL.recv、UL.send。
+  `U*.send` 或对手共享编码的 `D*.pub + D*.send`），客户端 L.recv 和热视图 EBW / LDW / UPW / UCW、D3 的
+  DPTW / DCTW（÷ 对手 `U*W.recv` 或其共享编码的 `D*TW.recv`），上行 UL.recv、UL.send。D 格按对手最强的做法计分
+  （susu，4.0 计划）：逐客户端和共享编码两种做法各是一列（「zpp_bits 共享」），取 XOffset 比它慢得最多的一列。
   每格是 xoffset_trusted ÷ 最强对手（XOffset 比它慢得最多的那家），按（批，周期 ≥ 1）配对、批内对数平均、
   批间几何均值。**赢 < 0.95，平 0.95–1.05，输 > 1.05。** UL.send 只报，所以计入的是 19 格。字节只报。
 - 用时：4 核云端容器上编两份二进制约 5 分钟，8 批约 25 分钟。跑的时候别在同一台机器上编别的。

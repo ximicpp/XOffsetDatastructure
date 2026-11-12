@@ -13,7 +13,9 @@
 #   - the run: M scale, seed 20261021, SLG_REUSE=1, SLG_CASES=demo, every
 #     format of a batch in a process of its own, batches interleaved, one
 #     pinned core. Per batch: one SLG_NATIVE_OFF=1 process per format (tag
-#     head) and one SLG_D3=1 XOffset process with native on (tag d3, the D rows).
+#     head) and one SLG_D3=1 process with native on (tag d3, the D rows) for
+#     XOffset and for each rival shared encoding in SHARED (4.0 W1), when the
+#     ref's bench has it.
 # The bench and library come from <ref>; the scoring (scorecard.py) comes from
 # the checkout this script is in, so an old tag is scored by today's rules.
 #
@@ -21,13 +23,15 @@
 #   SCORECARD.md     the scorecard (tools/perf_gate/scorecard.py)
 #   scorecard.json   the same, machine-readable
 #   env.json         commits, image digest, compiler, flags, binary sha256, CPU, times
-#   raw/             one JSONL per process: head_<format>_<batch>.jsonl, d3_xoffset_trusted_<batch>.jsonl
+#   raw/             one JSONL per process: head_<format>_<batch>.jsonl, d3_<format>_<batch>.jsonl
 #   rawz/            the compressed build's run (zstd-3 bytes, report-only)
 #   logs/            build and run logs
 #   src/ deps/ bin/  the exported tree, the pinned dependencies, the binaries
 #
 # env CPU=2           core to pin (keep other heavy work off it)
 #     FORMATS="xoffset_trusted zpp_bits cista_unchecked"
+#     SHARED="zpp_bits zpp_bits_dirty"   rivals' shared encodings, run as d3 processes
+#                     (4.0 W1); skipped for a ref whose bench lacks them
 #     ZSTD=1          also build with SLG_WITH_COMPRESSION=1 and run ZBATCHES (default 1)
 #                     batch(es) of it for zstd-3 bytes; 0 skips it (bytes then raw)
 #     BASELINE=FILE   scorecard.json to diff against (tools/perf_gate/scorecard_v3.6.0.json
@@ -41,6 +45,7 @@ OUT=$(readlink -f -m "${2:?usage: repro_scorecard.sh <ref> <outdir> [batches] [c
 NB=${3:-8}; CY=${4:-21}
 CPU=${CPU:-2}; ZSTD=${ZSTD:-1}; ZBATCHES=${ZBATCHES:-1}; JOBS=${JOBS:-4}
 FORMATS=${FORMATS:-"xoffset_trusted zpp_bits cista_unchecked"}
+SHARED=${SHARED-"zpp_bits zpp_bits_dirty"}
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO=${REPO:-$(git -C "$HERE" rev-parse --show-toplevel)}
 SEED=20261021; SCALE=M
@@ -114,11 +119,21 @@ if [[ $ZSTD == 1 ]]; then
     > "$OUT/logs/build_z.log" 2>&1 || { tail -30 "$OUT/logs/build_z.log" >&2; exit 4; }
 fi
 
+# The rivals' shared encodings this ref's bench has (4.0 W1; older trees have none):
+# the format must be built (its name in the binary) and have D rows (the shared
+# view's own error text).
+SHARED_RUN=""
+for f in $SHARED; do
+  if grep -aq "zpp_bits shared" "$OUT/bin/slg_bench" && grep -aq -- "$f" "$OUT/bin/slg_bench"; then SHARED_RUN="$SHARED_RUN $f"; fi
+done
+SHARED_RUN=${SHARED_RUN# }
+log "shared-encoding rivals: ${SHARED_RUN:-none}"
+
 # 5. Environment record.
 GXX=$(docker run --rm --network none "$IMAGE" g++ --version | head -1)
 LIBC=$(docker run --rm --network none "$IMAGE" ldd --version 2>&1 | head -1)
 REPO_HEAD=$(git -C "$REPO" rev-parse HEAD)
-export OUT REF COMMIT IMAGE GXX LIBC CXXFLAGS INCLUDES NB CY CPU SEED SCALE FORMATS ZSTD ZBATCHES START REPO_HEAD
+export OUT REF COMMIT IMAGE GXX LIBC CXXFLAGS INCLUDES NB CY CPU SEED SCALE FORMATS ZSTD ZBATCHES START REPO_HEAD SHARED_RUN
 export DEPS_TXT=$(printf '%s\n' "${DEPS[@]}")
 python3 - <<'PY'
 import hashlib, json, os, platform, re, subprocess
@@ -144,8 +159,9 @@ env = {
   "run": {"scale": e["SCALE"], "seed": int(e["SEED"]), "batches": int(e["NB"]), "cycles": int(e["CY"]),
           "cpu": e["CPU"], "formats": e["FORMATS"].split(),
           "env_head": "SLG_REUSE=1 SLG_CASES=demo SLG_NATIVE_OFF=1",
-          "env_d3": "SLG_REUSE=1 SLG_CASES=demo SLG_D3=1 (native on), xoffset_trusted only",
-          "order": "per batch: head process per format in FORMATS order, then the d3 process",
+          "env_d3": "SLG_REUSE=1 SLG_CASES=demo SLG_D3=1 (native on), XOffset and the shared rivals",
+          "shared": e["SHARED_RUN"].split(),
+          "order": "per batch: head process per format in FORMATS order, then the d3 processes",
           "zstd_pass": {"enabled": e["ZSTD"] == "1", "batches": int(e["ZBATCHES"])}},
   "host": {"cpu_model": field("Model name"), "nproc": os.cpu_count(), "kernel": platform.release(),
            "machine": platform.machine(), "mem_total": sh("grep MemTotal /proc/meminfo"),
@@ -171,6 +187,7 @@ batch() {  # bin rawdir batch
   for f in $FORMATS; do
     if [[ $f == xoffset* ]]; then run "$1" "$2" d3 "$f" "$3" SLG_D3=1; fi
   done
+  for f in $SHARED_RUN; do run "$1" "$2" d3 "$f" "$3" SLG_D3=1; done
 }
 for b in $(seq 1 "$NB"); do
   batch slg_bench raw "$b"
@@ -190,7 +207,8 @@ e = json.load(open(p)); e["time"]["end"] = end
 e["host"]["loadavg_end"] = open("/proc/loadavg").read().split()[:3]
 json.dump(e, open(p, "w"), indent=1)
 PY
-ARGS=("$OUT/raw" --env "$OUT/env.json" --json "$OUT/scorecard.json" --rivals "$(echo $FORMATS | tr ' ' '\n' | grep -v '^xoffset' | paste -sd,)")
+ARGS=("$OUT/raw" --env "$OUT/env.json" --json "$OUT/scorecard.json" --rivals "$(echo $FORMATS | tr ' ' '\n' | grep -v '^xoffset' | paste -sd,)"
+      --shared-rivals "$(echo $SHARED_RUN | tr ' ' ',')")
 [[ $ZSTD == 1 ]] && ARGS+=(--bytes-dir "$OUT/rawz")
 [[ -n ${BASELINE:-} ]] && ARGS+=(--baseline "$BASELINE")
 python3 "$HERE/scorecard.py" "${ARGS[@]}" > "$OUT/SCORECARD.md"
