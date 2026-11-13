@@ -346,6 +346,25 @@ other row changes: without `SLG_D3` the zpp_bits runner runs no D code.
 Batches: `run_v5_split.sh` and `pool_v5.py` (project files,
 slg-cases-v3-20261102/).
 
+## Transport-model columns (`SLG_XPORT=1`, report only)
+
+```
+SLG_REUSE=1 SLG_CASES=demo SLG_NATIVE_OFF=1 SLG_XPORT=1 slg_bench --mode bench --scale M --cycles 21 --formats xoffset_trusted --out x_xoffset_trusted_1.jsonl
+python3 tools/perf_gate/xport_columns.py <dir>       # or: XPORT=1 tools/perf_gate/repro_scorecard.sh ...
+```
+
+The whole-block cells L, B, S, SD then record `<cell>.send+T` and `<cell>.recv+T`
+instead of their usual keys, with one transport model for every format
+(`bench/runner.hpp`): a send ends with every wire byte copied into one reused,
+prefaulted transport buffer (the socket's kernel buffer); a receive starts by
+reading that buffer into memory the receiver owns: a read buffer it then decodes
+or reloads from (std formats, XOffset `XReceiver::reload`), or cista's held
+buffer, which it deserializes in place. S's storage resend of its kept bytes is
+untimed. Without `SLG_XPORT` nothing changes. These columns are not scored;
+4.0 W3 step 0 (2026-11-12) used them to measure a borrowed send and a trusted
+direct receive for XOffset, which missed the 20% gate (send +10%, receive -2%),
+so only the columns were kept.
+
 ## Instruction counts (CI performance gate)
 
 `-DSLG_IR_COUNT=ON` (or `-DSLG_IR_COUNT=1` on a direct compile) builds a

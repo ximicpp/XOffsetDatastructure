@@ -87,6 +87,21 @@ template <class M, bool Direct> class XOffsetRunnerT final : public Runner {
     static constexpr auto kPeer = XOffsetDatastructure::XLink::server_peer;
     static constexpr auto kClient = XOffsetDatastructure::XLink::from_server;
 
+    // W3 transport model (runner.hpp, SLG_XPORT=1, report only): the product
+    // path with the socket write and read: save_verified_into + write(), then
+    // read() into the receiver's read buffer + XReceiver::reload.
+    template <class T>
+    static std::size_t send_x(XOffsetDatastructure::XBuffer& src, std::string& out) {
+        src.template save_verified_into<T>(out);
+        xport_put(out);
+        return out.size();
+    }
+    template <class T, XOffsetDatastructure::XLink L>
+    static void recv_x(XOffsetDatastructure::XBuffer& dst) {
+        const auto in = xport_read();
+        reload_wire<T, L>(dst, std::as_bytes(in));
+    }
+
 public:
     std::string name() const override { return Direct ? "xoffset_direct" : M::name; }
 
@@ -299,8 +314,13 @@ public:
         // hop sends it again as it is (no return trip).
         if (demo_cases()) for (std::size_t k = 0; k < migrants.size(); ++k) {
             XBuffer& slot = players_[std::size_t(migrants[k])];
+            if (xport_on()) {   // W3: the transport model (runner.hpp)
+                timed(st, "B.send+T", [&] { send_x<PlayerState>(slot, out_); });
+                timed(st, "B.recv+T", [&] { recv_x<PlayerState, kPeer>(*b_m_); });
+            } else {
             timed(st, "B.out_encode", [&] { slot.save_verified_into<PlayerState>(out_); });
             recv<PlayerState>(st, "B.in_decode", out_, b_m_);
+            }
             untimed(st, "B.scene_edits", [&] {
                 season_edits(b_m_->root<PlayerState>(), mix_seed(seed_, uint64_t(cycle) * 1000003u + k), sc.season_ops);
             });
@@ -327,10 +347,18 @@ public:
         // Demo case set, S: scene <-> storage for players (see std_runner.hpp).
         if (demo_cases()) for (int p : pick_storage(seed_, cycle, sc.players, sc.migrants)) {
             XBuffer& slot = players_[std::size_t(p)];
+            if (xport_on()) {   // W3: the transport model; the storage's resend of its bytes is untimed
+                timed(st, "S.send+T", [&] { send_x<PlayerState>(slot, back_); });
+                timed(st, "S.recv+T", [&] { recv_x<PlayerState, kPeer>(*b_r_); });
+                store_ = back_;
+                xport_put(store_);
+                timed(st, "S.recv+T", [&] { recv_x<PlayerState, kPeer>(*b_m_); });
+            } else {
             timed(st, "S.save_encode", [&] { slot.save_verified_into<PlayerState>(back_); });
             recv<PlayerState>(st, "S.store_recv", back_, b_r_);
             store_ = back_;
             recv<PlayerState>(st, "S.load_recv", store_, b_m_);
+            }
             timed(st, "S.load_install", [&] { slot.swap(*b_m_); });
             st.bytes["S.player"] += back_.size();
         }
@@ -435,6 +463,12 @@ public:
             auto& h = hold[std::size_t(p)];
             if (!h) h.emplace(XBuffer::create<PlayerState>(kPlayerInitial, cap()));
             reload_wire<PlayerState, kClient>(*h, lw);
+        }
+        std::size_t login_send_x(int p) { return send_x<PlayerState>(srv[std::size_t(p)], lw); }
+        void login_recv_x(int p) {
+            auto& h = hold[std::size_t(p)];
+            if (!h) h.emplace(XBuffer::create<PlayerState>(kPlayerInitial, cap()));
+            recv_x<PlayerState, kClient>(*h);
         }
         PlayerState& held(int p) { return hold[std::size_t(p)]->template root<PlayerState>(); }
         template <class Fill> std::size_t patch_encode(Fill&& fill) {
@@ -563,6 +597,12 @@ public:
             return w.size();
         }
         void modules_recv() { reload_wire<xm::PlayerPatch, kPeer>(*pr, w); }
+        template <class Fill> std::size_t modules_send_x(Fill&& fill) {
+            if (!pm) { pm.emplace(XBuffer::create<xm::PlayerPatch>(kPlayerInitial, build_cap())); pr.emplace(XBuffer::create<xm::PlayerPatch>(kPlayerInitial, cap())); }
+            build_in<xm::PlayerPatch>(*pm, fill);
+            return send_x<xm::PlayerPatch>(*pm, w);
+        }
+        void modules_recv_x() { recv_x<xm::PlayerPatch, kPeer>(*pr); }
 #ifdef XOFFSET_DELTA_SYNC_API
         std::unordered_map<int, XOffsetDatastructure::XDeltaBaseline> nb;
         std::unordered_map<int, XOffsetDatastructure::XDeltaCursor> nc;
