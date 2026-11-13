@@ -1228,6 +1228,16 @@ namespace XOffsetDatastructure::xsync {
             return c.slot;   // the empty cell id would take has slot -1
         }
 
+        /// Starts fetching the index cell id's lookup reads first (a receiver
+        /// that knows a batch of ids prefetches them all, then looks them up).
+        XOFFSET_SYNC_INLINE void prefetch(std::uint32_t id) const noexcept {
+#if defined(__GNUC__) || defined(__clang__)
+            if (!cells_.empty()) __builtin_prefetch(&cells_[home(id)]);
+#else
+            (void)id;
+#endif
+        }
+
         /// Gives id a slot and returns it, or -1 when id is already held (its
         /// slot unchanged). A free slot is reused first; with none,
         /// grow(new_slot) is called with the next unused slot (size() before
@@ -1297,6 +1307,17 @@ namespace XOffsetDatastructure::xsync {
             if (free_.size() < n) free_.resize(n);
         }
 
+#ifdef SLG_XS2_DIAG
+        // Diagnostic build only: read every cell and free-list entry (cache warm-up).
+        std::uint64_t diag_touch(std::size_t stride) const noexcept {
+            std::uint64_t h = 0;
+            const auto* c = reinterpret_cast<const volatile unsigned char*>(cells_.data());
+            for (std::size_t i = 0; i < cells_.size() * sizeof(Cell); i += stride) h += c[i];
+            const auto* f = reinterpret_cast<const volatile unsigned char*>(free_.data());
+            for (std::size_t i = 0; i < free_.size() * sizeof(std::int32_t); i += stride) h += f[i];
+            return h + cells_.size() + free_.size();
+        }
+#endif
         /// Slots given out so far (held or free): the size the caller's records need.
         std::size_t size() const noexcept { return std::size_t(used_); }
         /// Ids held.

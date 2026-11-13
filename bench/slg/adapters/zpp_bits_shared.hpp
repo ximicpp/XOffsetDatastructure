@@ -181,6 +181,18 @@ public:
         return msg_.n;
     }
 
+#ifdef SLG_XS2_DIAG
+    // Diagnostic build only (not in scoring builds): XOffset's d_diag_touch, same bits.
+    uint64_t d_diag_touch(int c, std::string_view msg) {
+        static const int bits = [] { const char* e = std::getenv("SLG_XS2_DIAG"); return e ? std::atoi(e) : 0; }();
+        Client& L = clt_[std::size_t(c)];
+        uint64_t h = 0;
+        if (bits & 1) h += L.at.units.diag_touch(64) + L.at.marches.diag_touch(64);
+        if (bits & 8) h += L.at.units.diag_touch(4096) + L.at.marches.diag_touch(4096);
+        if (bits & 4) for (std::size_t i = 0; i < msg.size(); i += 64) h += uint64_t(uint8_t(msg[i]));
+        return h;
+    }
+#endif
     void d_recv(int c) { apply(cli_[std::size_t(c)], d_wire()); }
     void d_recv_trusted(int c) { apply(clt_[std::size_t(c)], d_wire()); }
     void d_recv_from(int c, std::string_view m) { apply(cli_[std::size_t(c)], m); }

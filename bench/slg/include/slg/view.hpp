@@ -1210,6 +1210,9 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
                 };
                 const auto trusted = [&] {
                     warm_sink = query_view(ops.d_held_trusted(wv));
+#ifdef SLG_XS2_DIAG
+                    if constexpr (requires { ops.d_diag_touch(wv, dw); }) warm_sink += ops.d_diag_touch(wv, dw);
+#endif
                     timed(st, k.dtwrecv.c_str(), [&] { ops.d_recv_trusted_from(wv, dw); });
                 };
                 if (m++ & 1) { full(); trusted(); } else { trusted(); full(); }
