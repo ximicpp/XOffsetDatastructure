@@ -1,8 +1,8 @@
-// XS 1.0, the shared delta message format (docs/SHARED_DELTA.md section 2),
-// frozen: the bytes of a key message and of the delta after it are pinned
-// here, for the sender (XSyncWriter, XRecordDelta) and for the receiver
-// (XReceiver::apply_sync with XCheck::full and XCheck::admit). A change to
-// any of these bytes is a new format, with its own format byte.
+// XS 2.0, the shared delta message format (docs/SHARED_DELTA.md section 2):
+// the bytes of a key message and of the delta after it are pinned here, for
+// the sender (XSyncWriter, XRecordBody, the shared op encoders) and for the
+// receiver (XReceiver::apply_sync with XCheck::full and XCheck::admit). A
+// change to any of these bytes is a new format, with its own format byte.
 //
 // Built with XOFFSET_FORCE_FULL_CHECK=0 so admit is the real admit path. No
 // exception of its own: also built as test_shared_delta_format_noexc.
@@ -107,33 +107,37 @@ bool holds(Target& t, std::uint32_t id, std::uint32_t hp, bool on, std::int16_t 
     return true;
 }
 
-// XS 1.0: 'X' 'S' 01 flags [stream u64 LE if KEY] varint version, count
-// as three varint bytes, then ops: u8 (table << 2 | kind), varint id, body.
-// Key: stream 0x0102030405060708, version 1, three ops: the head enters
-// {tick 5, seq 1}; item 7 enters {hp 100, on, pos -2, "ab", [1, 2]}; item
-// 300 enters {hp 1}.
+// XS 2.0: 'X' 'S' 02 flags u32 version [u64 stream if KEY], the root
+// record (table 0, sdf::Head: its 12 plain bytes), then sections: u32
+// (count << 8 | table << 2 | kind) and count ops, each u32 id and a body.
+// Key: stream 0x0102030405060708, version 1, root {tick 5, seq 1}; one
+// enter section of items: 7 {hp 100, on, pos -2, "ab", [1, 2]} and 300
+// {hp 1}.
 constexpr unsigned char kKey[] = {
-    'X', 'S', 0x01, 0x01, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x01, 0x83, 0x80, 0x00,
-    // head, enter, id 0: one block (skip 0, words 0 and 1, one byte each): 05, 01
-    0x00, 0x00, 0x01, 0x00, 0x03, 0x01, 0x01, 0x05, 0x01,
-    // item, enter, id 7: one block (word 0: bytes 0, 4, 6, 7): 64 01 fe ff;
-    // two container ops: name STR "ab", marks VSET [1, 2]
-    0x04, 0x07, 0x01, 0x00, 0x01, 0xd1, 0x64, 0x01, 0xfe, 0xff, 0x02, 0x00, 0x02, 'a', 'b', 0x05, 0x02, 0x01, 0x00, 0x02, 0x00,
-    // item, enter, id 300: one block (word 0: byte 0): 01; no container op
-    0x04, 0xac, 0x02, 0x01, 0x00, 0x01, 0x01, 0x01, 0x00,
+    'X', 'S', 0x02, 0x01, 0x01, 0x00, 0x00, 0x00, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01,
+    // root: tick (8 bytes), seq (4)
+    0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+    // section: 2 ops, table 1, enter
+    0x04, 0x02, 0x00, 0x00,
+    // id 7; whole body: hp, on, pos (plain bytes, padding skipped), container
+    // mask 03, name u32 2 "ab", marks u32 2 [1, 2]
+    0x07, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x00, 0x01, 0xfe, 0xff, 0x03,
+    0x02, 0x00, 0x00, 0x00, 'a', 'b', 0x02, 0x00, 0x00, 0x00, 0x01, 0x00, 0x02, 0x00,
+    // id 300; hp 1, on 0, pos 0, no container
+    0x2c, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
-// Delta: version 2, four ops: the head changes (tick 6, seq 2); item 300
-// leaves; item 7 changes (hp 90, name "abc"); item 9 enters {hp 3, pos 4}.
+// Delta: version 2, root {tick 6, seq 2}; item 300 leaves; item 7 changes
+// (hp 90, name "abc"); item 9 enters {hp 3, pos 4}.
 constexpr unsigned char kDelta[] = {
-    'X', 'S', 0x01, 0x00, 0x02, 0x84, 0x80, 0x00,
-    // head, change, id 0: words 0 and 1, one byte each: 06, 02
-    0x01, 0x00, 0x01, 0x00, 0x03, 0x01, 0x01, 0x06, 0x02,
-    // item, leave, id 300
-    0x06, 0xac, 0x02,
-    // item, change, id 7: word 0 byte 0: 5a; one container op: name STR "abc"
-    0x05, 0x07, 0x01, 0x00, 0x01, 0x01, 0x5a, 0x01, 0x00, 0x03, 'a', 'b', 'c',
-    // item, enter, id 9: word 0 bytes 0 and 6: 03, 04
-    0x04, 0x09, 0x01, 0x00, 0x01, 0x41, 0x03, 0x04, 0x00,
+    'X', 'S', 0x02, 0x00, 0x02, 0x00, 0x00, 0x00,
+    0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
+    // section: 1 op, table 1, leave; id 300
+    0x06, 0x01, 0x00, 0x00, 0x2c, 0x01, 0x00, 0x00,
+    // section: 1 op, table 1, change; id 7; member mask 09 (hp, name): hp,
+    // then name u32 3 "abc"
+    0x05, 0x01, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x09, 0x5a, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 'a', 'b', 'c',
+    // section: 1 op, table 1, enter; id 9; hp 3, on 0, pos 4, no container
+    0x04, 0x01, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00,
 };
 
 std::string_view bytes(const unsigned char* p, std::size_t n) { return {reinterpret_cast<const char*>(p), n}; }
@@ -151,18 +155,20 @@ int main() {
     S.head.seq = 1;
     set(S.items[0], 100, true, -2, "ab", {1, 2});
     set(S.items[1], 1, false, 0, "", {});
-    xs::XSyncOut msg, body;
+    xs::XSyncOut msg, store;
+    using IB = xs::XRecordBody<sdf::Item>;
     {
-        xs::XSyncWriter m(msg, xs::kFlagKey, 0x0102030405060708ull, 1);
-        auto key = [&](unsigned table, std::uint32_t id, const auto& now, auto& before) {
-            body.clear();
-            xs::XRecordDelta<std::remove_cvref_t<decltype(now)>>::key(now, body);
-            m.op(table, xs::enter, id, body.data(), body.size());
-            xs::XRecordDelta<std::remove_cvref_t<decltype(now)>>::apply(body.data(), before);
-        };
-        key(0, 0, S.head, B.head);
-        key(1, 7, S.items[0], B.items[0]);
-        key(1, 300, S.items[1], B.items[1]);
+        // Item bodies through the body store a server shares between
+        // clients (written under id 0, sent under the item's id).
+        xs::XSyncWriter m(msg, S.head, 1, 0x0102030405060708ull);
+        m.begin(1, xs::enter);
+        for (std::size_t s = 0; s < 2; ++s) {
+            store.clear();
+            const std::size_t n = xs::put_whole_op(store, 0, S.items[s]);
+            m.op(store.data(), n, s == 0 ? 7 : 300);
+            IB::apply_whole(store.data() + 4, B.items[s]);
+        }
+        m.end();
         m.finish();
     }
     const std::string key_msg(msg.view());
@@ -172,19 +178,31 @@ int main() {
     S.items[0].hp = 90;
     S.items[0].name = std::string_view("abc");
     {
-        xs::XSyncWriter m(msg, 0, 0, 2);
-        if (!m.change(0, 0, S.head, B.head)) fail("head unchanged");
-        m.op(1, xs::leave, 300);
-        if (!m.change(1, 7, S.items[0], B.items[0])) fail("item 7 unchanged");
+        xs::XSyncWriter m(msg, S.head, 2);
+        const std::uint32_t gone = 300;
+        m.leaves(1, &gone, 1);
+        m.begin(1, xs::change);
+        if (IB::changed(S.items[0], B.items[0]) != 0x09) fail("item 7: changed members");
+        if (!m.change(7, S.items[0], IB::changed(S.items[0], B.items[0]))) fail("item 7 unchanged");
+        m.end();
         sdf::Item& nine = S.items[1];   // the slot item 300 left
-        xs::XRecordDelta<sdf::Item>::clear(nine);
         set(nine, 3, false, 4, "", {});
-        body.clear();
-        xs::XRecordDelta<sdf::Item>::key(nine, body);
-        m.op(1, xs::enter, 9, body.data(), body.size());
+        m.begin(1, xs::enter);
+        m.whole(9, nine);
+        m.end();
         m.finish();
     }
     same_bytes(msg.view(), bytes(kDelta, sizeof kDelta), "delta message bytes");
+    {
+        // finish(version) writes the head's version late: the same bytes as
+        // the version given at construction.
+        xs::XSyncOut early, late;
+        xs::XSyncWriter a(early, S.head, 5);
+        a.finish();
+        xs::XSyncWriter b(late, S.head, 0);
+        b.finish(5);
+        same_bytes(late.view(), early.view(), "finish(version)");
+    }
     if (!xs::is_key(bytes(kKey, sizeof kKey)) || xs::is_key(bytes(kDelta, sizeof kDelta))) fail("is_key");
 
     // Receiver, both tiers.
@@ -204,15 +222,15 @@ int main() {
         if (cur.version() != 2 || t.view().head.tick != 6 || t.view().head.seq != 2) fail("head after the delta");
         if (!holds(t, 7, 90, true, -2, "abc", {1, 2}) || !holds(t, 9, 3, false, 4, "", {}) || t.find<1>(300) >= 0)
             fail("items after the delta");
-        // Another format byte is another format: a 1.0 receiver refuses it.
+        // Another format byte is another format: a 2.0 receiver refuses XS 1.0.
         std::string other(bytes(kDelta, sizeof kDelta));
-        other[2] = 0x02;
-        if (apply(other).code() != xo::XErrc::unsupported_version) fail("format byte 2 not refused");
         other[2] = 0x01;
+        if (apply(other).code() != xo::XErrc::unsupported_version) fail("format byte 1 not refused");
+        other[2] = 0x02;
         other[3] = 0x02;
         if (apply(other).code() != xo::XErrc::unsupported_flags) fail("unknown flag not refused");
     }
-    std::printf("test_shared_delta_format: XS 1.0 key (%zu bytes) and delta (%zu bytes) pinned, full and admit apply them\n",
+    std::printf("test_shared_delta_format: XS 2.0 key (%zu bytes) and delta (%zu bytes) pinned, full and admit apply them\n",
                 sizeof kKey, sizeof kDelta);
     return 0;
 }

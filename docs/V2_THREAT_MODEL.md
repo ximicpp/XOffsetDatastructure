@@ -164,7 +164,7 @@ M1–M6 已在 0.3.0-beta.1 实施，行为变化见 CHANGELOG。M3 的修改路
 | schema 演进：`evolve_load_verified`、`XPeerSchemas` 握手、`read_schema_ack` | `fuzz_schema_evolution` |
 | 增量 apply：`try_apply_delta_verified` / `apply_delta_verified`（3.3） | `fuzz_delta_sync`（反射和字段表两种构建）：快路径（none、in_place）与克隆副本上的全量校验比较结论、错误和结果；拒绝时副本和游标不变；接受的结果能再校验加载 |
 | 信任档（3.4）：`XReceiver<server_peer / from_server>` 的 `reload`、`load`、`apply_delta`（admit） | 整块：`v2_fuzz_core.hpp` 第 8 列（`fuzz_v2_wire`、`test_v2_fuzz`），完整档接受的必须接受且结果逐字节相同，oracle 在线头阶段拒绝的必须拒绝；增量：`fuzz_delta_sync` 在另一份克隆上走 admit，完整档接受的必须接受且结果相同，解析阶段的错误必须相同，拒绝时副本和游标不变。admit 多接受的输入不读 |
-| 共享增量（3.5）：`XReceiver<server_peer / from_server>::apply_sync`（XS 1.0，full 和 admit） | `fuzz_shared_delta`（反射和字段表两种构建）：原始操作段、真实消息流加篡改、整条消息、关键消息四种输入；每条先走 full，拒绝时记录和游标不变，接受的结果能再校验加载；full 接受的再在副本上走 admit，记录和游标必须相同。admit 不读 full 拒绝的输入（消息体信任发送方） |
+| 共享增量（3.5）：`XReceiver<server_peer / from_server>::apply_sync`（4.0 起 XS 2.0，full 和 admit） | `fuzz_shared_delta`（反射和字段表两种构建）：原始根记录和操作段、真实消息流加篡改、整条消息、关键消息四种输入；每条先走 full，拒绝时记录和游标不变，接受的结果能再校验加载；full 接受的再在副本上走 admit，记录和游标必须相同。admit 不读 full 拒绝的输入（消息体信任发送方） |
 | 边界档（3.5）：`XReceiver<from_client>::view`（bounds） | `v2_fuzz_core.hpp` 第 9 列（`fuzz_v2_wire`、`test_v2_fuzz`）：wire 复制进一个大小正好的堆块，完整档接受的稠密 wire 必须接受且读出的每个字段相同，稀疏 wire 和 oracle 在线头阶段拒绝的必须拒绝；多接受的输入通过视图读完全部字段，不能越界（ASan）。`test_receiver_view`：构造的越界块、超长内联字符串、缺 NUL、bool 2、重叠放大和随机变异 |
 | 客户端字段表构建、关异常构建 | `fuzz_v2_wire`、`fuzz_wire_schemas` 的 C++20 字段表构建（libFuzzer），`tools/fuzz_outcome_diff.sh`（三种构建逐条比较结果和错误文字） |
 

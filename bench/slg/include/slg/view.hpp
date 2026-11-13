@@ -71,10 +71,6 @@
 // stages keep their range; SLG_NATIVE_OFF=1 drops it.
 #pragma once
 #include <algorithm>
-#ifdef SLG_XS2_DIAG
-#include <cstdio>
-#include <sys/resource.h>
-#endif
 #include <cstdint>
 #include <cstdlib>
 #include <map>
@@ -596,21 +592,22 @@ struct DeltaPlan {
     std::vector<int32_t> tiles;            // tiles changed this tick: ty * kTiles + tx
     std::vector<uint8_t> unew, mnew;       // units[k] / marches[k] is new to the client's view (bookkeeping the
                                            // server has anyway; only the D3 prototype uses it)
-    // XS 2.0 prototype (slot A/B, only the D3 prototype reads them): the slot
-    // the client keeps units[k] / marches[k] / removed[k] / removed_marches[k]
-    // in. A slot that leaves is reused, last freed first; leaves are freed
-    // (in removed order) before entering records take slots (in units order).
+    // D3 only (XS 2.0 slots): the slot the client keeps units[k] / marches[k] /
+    // removed[k] / removed_marches[k] in, as the tracker's record of what the
+    // client holds stores it (-1 for one that is new: the D3 sender gives it a
+    // slot, timed, and stores it through uref / mref).
     std::vector<int32_t> uslot, mslot, rslot, rmslot;
+    std::vector<int32_t*> uref, mref;
     bool empty() const { return units.empty() && removed.empty() && marches.empty() && removed_marches.empty() && tiles.empty(); }
 };
 
 class ViewTracker {
 public:
-    void setup(int clients) { u_.assign(std::size_t(clients), {}); m_.assign(std::size_t(clients), {}); us_.assign(std::size_t(clients), {}); ms_.assign(std::size_t(clients), {}); }
+    void setup(int clients) { u_.assign(std::size_t(clients), {}); m_.assign(std::size_t(clients), {}); }
     void plan(const MapWorld& w, int c, const ViewRect& r, DeltaPlan& p) {
         p.units.clear(); p.removed.clear(); p.marches.clear(); p.removed_marches.clear(); p.tiles.clear();
         p.unew.clear(); p.mnew.clear();
-        p.uslot.clear(); p.mslot.clear(); p.rslot.clear(); p.rmslot.clear();
+        p.uslot.clear(); p.mslot.clear(); p.rslot.clear(); p.rmslot.clear(); p.uref.clear(); p.mref.clear();
         ++gen_;
         auto& lu = u_[std::size_t(c)];
         w.units_in(r, tmp_);
@@ -618,8 +615,7 @@ public:
             const WorldUnit& u = w.unit(i);
             auto [it, fresh] = lu.try_emplace(u.id);
             SentU& s = it->second;
-            if (fresh) s.slot = -1;
-            if (fresh || s.ver != u.ver) { s.ver = u.ver; p.units.push_back(i); p.unew.push_back(fresh ? 1 : 0); p.uslot.push_back(s.slot); }
+            if (fresh || s.ver != u.ver) { s.ver = u.ver; p.units.push_back(i); p.unew.push_back(fresh ? 1 : 0); p.uslot.push_back(s.slot); p.uref.push_back(&s.slot); }
             s.gen = gen_;
         }
         pairs_.clear();
@@ -627,23 +623,17 @@ public:
             if (it->second.gen != gen_) { pairs_.push_back({it->first, it->second.slot}); it = lu.erase(it); }
             else ++it;
         }
+        // Deterministic order (unordered_map iteration order is the same code in
+        // every runner, but sorting keeps the messages independent of it).
         std::sort(pairs_.begin(), pairs_.end());
-        auto& su = us_[std::size_t(c)];
-        for (auto [id, sl] : pairs_) { p.removed.push_back(id); p.rslot.push_back(sl); su.free.push_back(sl); }
-        for (std::size_t k = 0; k < p.units.size(); ++k)
-            if (p.unew[k]) {
-                int32_t sl;
-                if (!su.free.empty()) { sl = su.free.back(); su.free.pop_back(); } else sl = su.used++;
-                p.uslot[k] = sl; lu[w.unit(p.units[k]).id].slot = sl;
-            }
+        for (auto [id, sl] : pairs_) { p.removed.push_back(id); p.rslot.push_back(sl); }
         auto& lm = m_[std::size_t(c)];
         w.marches_in(r, tmp_);
         for (int32_t i : tmp_) {
             const WorldMarch& m = w.march(i);
             auto [it, fresh] = lm.try_emplace(m.id);
             SentM& s = it->second;
-            if (fresh) s.slot = -1;
-            if (fresh || s.x1 != m.x1 || s.y1 != m.y1 || s.t1 != m.t1) { s.x1 = m.x1; s.y1 = m.y1; s.t1 = m.t1; p.marches.push_back(i); p.mnew.push_back(fresh ? 1 : 0); p.mslot.push_back(s.slot); }
+            if (fresh || s.x1 != m.x1 || s.y1 != m.y1 || s.t1 != m.t1) { s.x1 = m.x1; s.y1 = m.y1; s.t1 = m.t1; p.marches.push_back(i); p.mnew.push_back(fresh ? 1 : 0); p.mslot.push_back(s.slot); p.mref.push_back(&s.slot); }
             s.gen = gen_;
         }
         pairs_.clear();
@@ -652,28 +642,17 @@ public:
             else ++it;
         }
         std::sort(pairs_.begin(), pairs_.end());
-        auto& sm = ms_[std::size_t(c)];
-        for (auto [id, sl] : pairs_) { p.removed_marches.push_back(id); p.rmslot.push_back(sl); sm.free.push_back(sl); }
-        for (std::size_t k = 0; k < p.marches.size(); ++k)
-            if (p.mnew[k]) {
-                int32_t sl;
-                if (!sm.free.empty()) { sl = sm.free.back(); sm.free.pop_back(); } else sl = sm.used++;
-                p.mslot[k] = sl; lm[w.march(p.marches[k]).id].slot = sl;
-            }
+        for (auto [id, sl] : pairs_) { p.removed_marches.push_back(id); p.rmslot.push_back(sl); }
         // The client's tiles never change place; a tile is sent when its owner changed this tick.
         const TileSpan sp = tile_span(r.x0, r.y0, r.x1, r.y1);
         for (int32_t ty = sp.ty0; ty < sp.ty0 + sp.rows; ++ty)
             for (int32_t tx = sp.tx0; tx < sp.tx0 + sp.cols; ++tx)
                 if (w.tile(tx, ty).changed == w.tick_no()) p.tiles.push_back(ty * kTiles + tx);
-        // Deterministic order (unordered_map iteration order is the same code in
-        // every runner, but sorting keeps the messages independent of it).
-        // (removed and removed_marches are in id order above)
     }
 private:
+    // slot: where the client keeps the record (D3 only; -1 until its sender gives one).
     struct SentU { uint32_t ver{}; int32_t slot = -1; uint64_t gen{}; };
     struct SentM { int32_t x1{}, y1{}; int64_t t1{}; int32_t slot = -1; uint64_t gen{}; };
-    struct Slots { std::vector<int32_t> free; int32_t used = 0; };
-    std::vector<Slots> us_, ms_;
     std::vector<std::pair<int32_t, int32_t>> pairs_;
     std::vector<std::unordered_map<int32_t, SentU>> u_;
     std::vector<std::unordered_map<int32_t, SentM>> m_;
@@ -1244,18 +1223,7 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
                 };
                 const auto trusted = [&] {
                     warm_sink = query_view(ops.d_held_trusted(wv));
-#ifdef SLG_XS2_DIAG
-                    if constexpr (requires { ops.d_diag_touch(wv, dw); }) warm_sink += ops.d_diag_touch(wv, dw);
-#endif
-#ifdef SLG_XS2_DIAG
-                    struct rusage r0, r1; getrusage(RUSAGE_SELF, &r0);
-#endif
                     timed(st, k.dtwrecv.c_str(), [&] { ops.d_recv_trusted_from(wv, dw); });
-#ifdef SLG_XS2_DIAG
-                    getrusage(RUSAGE_SELF, &r1);
-                    static long flt = 0, n = 0; flt += r1.ru_minflt - r0.ru_minflt;
-                    if (++n % 1323 == 0) std::fprintf(stderr, "DPTW minflt %ld over %ld recv\n", flt, n);
-#endif
                 };
                 if (m++ & 1) { full(); trusted(); } else { trusted(); full(); }
             }

@@ -60,9 +60,10 @@ K0–K9 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 `fuzz_delta_sync`（发版前 ASan fuzz，服务端和客户端两种构建，admit 与 full 差分）、`test_receiver`（`apply_delta`
 按链路的默认档）。条件全文见 [USER_GUIDE.md](USER_GUIDE.md) 第 8 节。
 
-视口增量走共享增量（XS 1.0，`XReceiver::apply_sync`，3.5 起）：`test_shared_delta_sync`（1500 条消息的随机流，
+视口增量走共享增量（4.0 起 XS 2.0，`XReceiver::apply_sync`，3.5 起）：`test_shared_delta`（记录编码：变化体、
+整条体、篡改体、布尔和掩码越界、写入器字节）、`test_shared_delta_sync`（1500 条消息的随机流，
 full 和 admit 两个客户端每条之后都与服务端模型比较；拒绝用例、篡改消息、重复条目；含关异常构建）、
-`test_shared_delta_format`（XS 1.0 逐字节的金标准，发送端和两档接收）、`fuzz_shared_delta`（发版前 ASan fuzz）、
+`test_shared_delta_format`（XS 2.0 逐字节的金标准，发送端和两档接收）、`fuzz_shared_delta`（发版前 ASan fuzz）、
 `receiver_from_client_sync_fail`（`from_client` 上 `apply_sync` 编译不过）。
 
 ## 不在 CTest 里的部分
