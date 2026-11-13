@@ -269,13 +269,28 @@ void iterator_assign_paths() {
     need(v.empty(),"iterator assign empty generic source");
     v.assign(linked.begin(),linked.end()); roundtrip(b);
 }
+void unaligned_byte_source() {
+    // assign_bytes reads the elements' bytes from a source not aligned for T
+    // (a message buffer): in place and into a fresh block.
+    auto b=make_buffer(); auto& v=b.root<BulkRoot>().numbers;
+    alignas(8) unsigned char raw[1+8*4]{};
+    const std::uint32_t src[8]{21,22,23,24,25,26,27,28}; std::memcpy(raw+1,src,sizeof src);
+    v.assign_bytes(raw+1,3);
+    need(values(v)==std::vector<std::uint32_t>({21,22,23}),"unaligned bytes into a fresh block");
+    auto* p=v.data(); const auto cap=v.capacity();
+    v.assign_bytes(raw+1+4,2);
+    need(values(v)==std::vector<std::uint32_t>({22,23}) && v.data()==p && v.capacity()==cap,"unaligned bytes in place");
+    v.assign_bytes(raw+1,8);
+    need(values(v)==std::vector<std::uint32_t>(src,src+8),"unaligned bytes regrow");
+    v.assign_bytes(nullptr,0); need(v.empty(),"no bytes"); roundtrip(b);
+}
 }
 int main() {
     try {
         self_subrange_overlap_and_empty(); fresh_same_foreign_and_nested_sources();
         no_default_constructor_and_no_alias_staging(); failed_growth_keeps_old_descriptor_and_source();
         no_host_staging_under_host_oom(); bulk_workload_operation_gate_and_lifecycle();
-        iterator_assign_paths(); copy_assign_in_place_and_regrow();
-        std::cout<<"8 bulk assignment groups passed; no timing\n";
+        iterator_assign_paths(); copy_assign_in_place_and_regrow(); unaligned_byte_source();
+        std::cout<<"9 bulk assignment groups passed; no timing\n";
     } catch(const std::exception& e) { std::cerr<<e.what()<<'\n'; return 1; }
 }
