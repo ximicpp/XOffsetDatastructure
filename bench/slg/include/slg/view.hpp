@@ -598,6 +598,11 @@ struct DeltaPlan {
     // slot, timed, and stores it through uref / mref).
     std::vector<int32_t> uslot, mslot, rslot, rmslot;
     std::vector<int32_t*> uref, mref;
+    // D3 only: the same units and marches as two lists each, changed and
+    // entering (the tracker knows which when it finds one): world index and
+    // the client's slot, or where the tracker keeps the slot the sender gives.
+    std::vector<int32_t> uci, ucs, uei, mci, mcs, mei;
+    std::vector<int32_t*> uer, mer;
     bool empty() const { return units.empty() && removed.empty() && marches.empty() && removed_marches.empty() && tiles.empty(); }
 };
 
@@ -608,6 +613,7 @@ public:
         p.units.clear(); p.removed.clear(); p.marches.clear(); p.removed_marches.clear(); p.tiles.clear();
         p.unew.clear(); p.mnew.clear();
         p.uslot.clear(); p.mslot.clear(); p.rslot.clear(); p.rmslot.clear(); p.uref.clear(); p.mref.clear();
+        p.uci.clear(); p.ucs.clear(); p.uei.clear(); p.uer.clear(); p.mci.clear(); p.mcs.clear(); p.mei.clear(); p.mer.clear();
         ++gen_;
         auto& lu = u_[std::size_t(c)];
         w.units_in(r, tmp_);
@@ -615,7 +621,8 @@ public:
             const WorldUnit& u = w.unit(i);
             auto [it, fresh] = lu.try_emplace(u.id);
             SentU& s = it->second;
-            if (fresh || s.ver != u.ver) { s.ver = u.ver; p.units.push_back(i); p.unew.push_back(fresh ? 1 : 0); p.uslot.push_back(s.slot); p.uref.push_back(&s.slot); }
+            if (fresh || s.ver != u.ver) { s.ver = u.ver; p.units.push_back(i); p.unew.push_back(fresh ? 1 : 0); p.uslot.push_back(s.slot); p.uref.push_back(&s.slot);
+                if (fresh) { p.uei.push_back(i); p.uer.push_back(&s.slot); } else { p.uci.push_back(i); p.ucs.push_back(s.slot); } }
             s.gen = gen_;
         }
         pairs_.clear();
@@ -633,7 +640,8 @@ public:
             const WorldMarch& m = w.march(i);
             auto [it, fresh] = lm.try_emplace(m.id);
             SentM& s = it->second;
-            if (fresh || s.x1 != m.x1 || s.y1 != m.y1 || s.t1 != m.t1) { s.x1 = m.x1; s.y1 = m.y1; s.t1 = m.t1; p.marches.push_back(i); p.mnew.push_back(fresh ? 1 : 0); p.mslot.push_back(s.slot); p.mref.push_back(&s.slot); }
+            if (fresh || s.x1 != m.x1 || s.y1 != m.y1 || s.t1 != m.t1) { s.x1 = m.x1; s.y1 = m.y1; s.t1 = m.t1; p.marches.push_back(i); p.mnew.push_back(fresh ? 1 : 0); p.mslot.push_back(s.slot); p.mref.push_back(&s.slot);
+                if (fresh) { p.mei.push_back(i); p.mer.push_back(&s.slot); } else { p.mci.push_back(i); p.mcs.push_back(s.slot); } }
             s.gen = gen_;
         }
         pairs_.clear();
