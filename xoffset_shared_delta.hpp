@@ -386,7 +386,7 @@ namespace XOffsetDatastructure::xsync {
                 return p + n;
             } else {
                 using E = typename C::value_type;
-                c.assign_range(std::span<const E>(reinterpret_cast<const E*>(p), n));   // copied as bytes (memmove)
+                c.assign_bytes(p, n);   // the wire's bytes need not be aligned for E: no E* to them
                 return p + std::size_t(n) * sizeof(E);
             }
         }

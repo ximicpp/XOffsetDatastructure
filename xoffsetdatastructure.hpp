@@ -5202,27 +5202,38 @@ namespace XOffsetDatastructure {
                       std::is_trivially_copyable_v<T> &&
                       std::is_trivially_copy_constructible_v<T> &&
                       std::is_trivially_destructible_v<T>) {
-            if (values.size() > capacity_)
-                XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::array_bytes<T>(values.size()), );
-            const auto count = checked_count(values.size());
-            if (count == 0) { clear(); return; }
-            // count <= capacity_ means a live block, so the head is bound; only
+            assign_bytes(values.data(), values.size());
+        }
+        // assign_range from the object representations of count elements at
+        // src, which need not be aligned for T (a message or file buffer): the
+        // bytes are copied as they are (memmove) and no T* to src is formed.
+        // The same overlap rules as assign_range.
+        void assign_bytes(const void* src, std::size_t count)
+            requires (!std::is_const_v<T> && !std::is_volatile_v<T> &&
+                      std::is_trivially_copyable_v<T> &&
+                      std::is_trivially_copy_constructible_v<T> &&
+                      std::is_trivially_destructible_v<T>) {
+            if (count > capacity_)
+                XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::array_bytes<T>(count), );
+            const auto n = checked_count(count);
+            if (n == 0) { clear(); return; }
+            // n <= capacity_ means a live block, so the head is bound; only
             // assign_range_regrow looks the binding up.
-            const auto bytes = static_cast<std::uint32_t>(count * sizeof(T));
-            if (count <= capacity_) {
+            const auto bytes = static_cast<std::uint32_t>(n * sizeof(T));
+            if (n <= capacity_) {
                 const auto old_size = size_;
-                std::memmove(data(), values.data(), bytes);
-                size_ = count;
-                scrub(count, old_size);
+                std::memmove(data(), src, bytes);
+                size_ = n;
+                scrub(n, old_size);
                 return;
             }
-            XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::array_bytes<T>(std::max<std::size_t>(count, 2u * capacity_)), );
-            assign_range_regrow(values, count, bytes);
+            XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::array_bytes<T>(std::max<std::size_t>(n, 2u * capacity_)), );
+            assign_range_regrow(src, n, bytes);
         }
 
-        // assign_range into a fresh block; out of line, so the in-capacity
+        // assign_bytes into a fresh block; out of line, so the in-capacity
         // path above stays small enough to inline at the caller.
-        XOFFSET_DETAIL_NOINLINE void assign_range_regrow(std::span<const T> values, size_type count,
+        XOFFSET_DETAIL_NOINLINE void assign_range_regrow(const void* src, size_type count,
                                                          std::uint32_t bytes) {
             const auto alloc = bound_binding();
             // D8a: a container that already has capacity regrows to
@@ -5241,7 +5252,7 @@ namespace XOffsetDatastructure {
                 auto* fresh = detail::begin_dynamic_array<T>(block, new_cap);
                 // An unreachable block is never published and is retired as "old".
                 if (!fixed_detail::rel32_reaches(&data_delta, fresh)) [[unlikely]] return block;
-                std::memmove(fresh, values.data(), bytes);
+                std::memmove(fresh, src, bytes);
                 void* old = data();
                 fixed_detail::set_rel32(data_delta, &data_delta, fresh);
                 size_ = count;
@@ -6343,6 +6354,7 @@ namespace XOffsetDatastructure {
         using Base::clear;
         using Base::reserve;
         using Base::assign_range;
+        using Base::assign_bytes;
         using Base::assign;
         using Base::pop_back;
         using Base::emplace_back;
