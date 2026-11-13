@@ -303,7 +303,14 @@ cache lines, `D3Conn`), takes the last freed one for every entity that
 enters the view and gives back the slots of those that left after the
 message (both timed in `D*.send`; the connection's lines are prefetched when
 the send starts and first used by the enter sections, which come last); the
-tracker keeps each entity's slot next to what the client holds (untimed). Server per delivery =
+tracker keeps each entity's slot next to what the client holds (untimed).
+The send is written by hand in the XS 2.0 format (the baseline the library's
+publisher takes over in 4.0 W2 step 3): the tracker hands it the changed and
+the entering records as separate lists (`DeltaPlan::uci`/`uei`,
+`mci`/`mei`), the message's room is taken once, sections are written with
+local cursors and each list's unit entries are prefetched before its loop.
+`-DSLG_D3_NEXT_PF` also prefetches the next connection's two lines at the end
+of a send (off by default). Server per delivery =
 (`D*.pub` + `D*.send`) / `U*.deliveries`. The client applies the message to
 its own view through `XReceiver<XLink::from_server>::apply_sync` (a `D3Target`
 over the view's units and marches at the slots the server gave them, and
@@ -340,8 +347,10 @@ application-level view after every delivery. The diagnostic format
 `zpp_bits_dirty` (not in the default list; its U rows are zpp_bits') is the
 second variant: a held unit that changed gets a change body (id, uint64 dirty
 mask, only the masked members, each as zpp_bits writes it), entering units
-stay whole, and the client decodes the masked members over its record. No
-other row changes: without `SLG_D3` the zpp_bits runner runs no D code.
+stay whole, and the client decodes the masked members over its record; its
+send takes the tracker's two unit lists and prefetches their entries first,
+as XOffset's does (2026-11-13). No other row changes: without `SLG_D3` the
+zpp_bits runner runs no D code.
 
 Batches: `run_v5_split.sh` and `pool_v5.py` (project files,
 slg-cases-v3-20261102/).
