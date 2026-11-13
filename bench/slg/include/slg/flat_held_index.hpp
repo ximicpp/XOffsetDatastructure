@@ -43,6 +43,15 @@ class FlatHeldIndexMap {
 public:
     using iterator = Cell*;
 
+#ifdef SLG_XS2_DIAG
+    // Diagnostic build only (not in scoring builds): read every line of the cells.
+    std::uint64_t diag_touch(std::size_t stride) const {
+        std::uint64_t h = 0;
+        const auto* c = reinterpret_cast<const volatile unsigned char*>(cells_.data());
+        for (std::size_t i = 0; i < cells_.size() * sizeof(Cell); i += stride) h += c[i];
+        return h + cells_.size();
+    }
+#endif
     std::size_t size() const { return count_; }
     iterator end() { return nullptr; }
 

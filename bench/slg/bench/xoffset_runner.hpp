@@ -1401,6 +1401,28 @@ public:
         // check, admit (header, stream and version, every op's table, kind
         // and id; bodies are the sender's). Same view layout and id index as
         // d_recv.
+#ifdef SLG_XS2_DIAG
+        // Diagnostic (untimed, before a warm device's trusted receive): warm
+        // what the receive touches besides the view. SLG_XS2_DIAG bits:
+        // 1 slot tables (every line), 8 slot tables (one line per 4 KiB page),
+        // 2 client struct + buffer object + cursor, 4 the message.
+        uint64_t d_diag_touch(int c, std::string_view msg) {
+            static const int bits = [] { const char* e = std::getenv("SLG_XS2_DIAG"); return e ? std::atoi(e) : 0; }();
+            D3Client& L = dclt[std::size_t(c)];
+            uint64_t h = 0;
+            if (bits & 1) h += L.uidx.diag_touch(64) + L.midx.diag_touch(64);
+            if (bits & 8) h += L.uidx.diag_touch(4096) + L.midx.diag_touch(4096);
+            if (bits & 2) { volatile const char* p = reinterpret_cast<const char*>(&L); for (std::size_t i = 0; i < sizeof(L); i += 64) h += uint64_t(p[i]); h += uint64_t(&L.view->template root<xm::ViewSnapshot>() != nullptr); }
+            if (bits & 4) for (std::size_t i = 0; i < msg.size(); i += 64) h += uint64_t(uint8_t(msg[i]));
+            if (bits & 16) {
+                static int n = 0;
+                if (n++ % 500 == 0)
+                    std::fprintf(stderr, "diag c=%d ducap=%d dmcap=%d uidx count=%zu bytes=%zu midx count=%zu bytes=%zu view size=%zu msg=%zu\n", c, ducap, dmcap,
+                                 L.uidx.count(), L.uidx.capacity_bytes(), L.midx.count(), L.midx.capacity_bytes(), L.view->get_size(), msg.size());
+            }
+            return h;
+        }
+#endif
         void d_recv_trusted(int c) { d_recv_trusted_from(c, dmsg.view()); }
         void d_recv_trusted_from(int c, std::string_view msg) {
             D3Client& L = dclt[std::size_t(c)];
