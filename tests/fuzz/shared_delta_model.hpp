@@ -1,11 +1,13 @@
-// A small shared-delta (XS 1.0) model for test_shared_delta_sync and
+// A small shared-delta (XS 2.0) model for test_shared_delta_sync and
 // fuzz_shared_delta: a server that writes messages with XSyncWriter and a
 // receiver target for XReceiver::apply_sync.
 //
-// Tables: 0 the view's head (fixed, id 0), 1 units (keyed by id), 2 cells
-// (fixed, id = index). The server keeps its records in one buffer and its
-// baseline (what the client was last sent) in another; a Replica is a client
-// view (its own buffer, slots and id index) with its cursor.
+// Tables: 0 the view's head (the root record), 1 units (keyed by id), 2
+// cells (fixed, id = index). The server keeps its records in one buffer and
+// its baseline (what the client was last sent) in another, and writes unit
+// bodies into a body store first (as a server shares them between clients);
+// a Replica is a client view (its own buffer, slots and id index) with its
+// cursor.
 #ifndef XOFFSET_TESTS_SHARED_DELTA_MODEL_HPP
 #define XOFFSET_TESTS_SHARED_DELTA_MODEL_HPP
 
@@ -89,7 +91,7 @@ struct Target {
         else return view().cells[std::size_t(h)];
     }
     template <unsigned K> std::int64_t enter(std::uint32_t id) {
-        if (idx.count(id)) return -1;
+        if (idx.count(id)) return -1;   // admit asks enter() for an id held
         std::int64_t s;
         if (!free.empty()) { s = free.back(); free.pop_back(); }
         else { s = std::int64_t(view().units.size()); view().units.resize(view().units.size() + 1); }
@@ -114,7 +116,7 @@ struct Replica {
     // Empties the keyed table (before a key message): every slot is free.
     void reset() {
         View& v = t.view();
-        for (const auto& e : t.idx) xs::XRecordDelta<Unit>::clear(v.units[std::size_t(e.second)]);
+        for (const auto& e : t.idx) xs::XRecordBody<Unit>::clear(v.units[std::size_t(e.second)]);
         t.idx.clear();
         t.free.clear();
         for (std::size_t s = v.units.size(); s-- > 0;) t.free.push_back(std::int64_t(s));
@@ -126,7 +128,7 @@ struct Replica {
     }
 };
 
-template <class T> bool same(const T& a, const T& b) { return xs::XRecordDelta<T>::same(a, b); }
+template <class T> bool same(const T& a, const T& b) { return xs::XRecordBody<T>::same(a, b); }
 
 // Whether two replicas hold the same records (by id; slots may differ).
 inline bool same_state(Replica& a, Replica& b) {
@@ -153,6 +155,7 @@ struct Server {
     std::uint32_t version = 0;
     std::uint32_t next_id = 1;
     xs::XSyncOut msg, body;
+    bool changes_first = false;   // section order of the next delta (any order applies)
 
     View& v() { return now.root<View>(); }
     View& b() { return base.root<View>(); }
@@ -201,7 +204,7 @@ struct Server {
             v().units.resize(ids.size());
             b().units.resize(ids.size());
             Unit& u = v().units[ids.size() - 1];
-            xs::XRecordDelta<Unit>::clear(u);
+            xs::XRecordBody<Unit>::clear(u);
             u.id = id;
             mutate_unit(u, pick);
             entered.push_back(id);
@@ -213,14 +216,8 @@ struct Server {
             else left.push_back(id);
             const std::size_t last = ids.size() - 1;
             if (s != last) {
-                xs::XRecordDelta<Unit>::clear(v().units[s]);
-                xs::XRecordDelta<Unit>::clear(b().units[s]);
-                body.clear();
-                xs::XRecordDelta<Unit>::key(v().units[last], body);
-                xs::XRecordDelta<Unit>::apply(body.data(), v().units[s]);
-                body.clear();
-                xs::XRecordDelta<Unit>::key(b().units[last], body);
-                xs::XRecordDelta<Unit>::apply(body.data(), b().units[s]);
+                copy(v().units[s], v().units[last]);
+                copy(b().units[s], b().units[last]);
                 ids[s] = ids[last];
             }
             ids.pop_back();
@@ -234,42 +231,76 @@ struct Server {
         } else if (what == 3) {
             v().head.tick += 1;
             v().head.paused = pick(2);
+            changes_first = pick(2);
         } else if (!ids.empty()) {
             mutate_unit(v().units[pick(unsigned(ids.size()))], pick);
         }
     }
     bool is_entered(std::uint32_t id) const { return std::find(entered.begin(), entered.end(), id) != entered.end(); }
-    // The key body of rec, and the baseline record synced to it.
-    template <class T> void put_key(xs::XSyncWriter& m, unsigned table, std::uint32_t id, const T& rec, T& base_rec) {
+    // dst := src through a whole body (every plain byte and container).
+    template <class T> void copy(T& dst, const T& src) {
         body.clear();
-        xs::XRecordDelta<T>::key(rec, body);
-        m.op(table, xs::enter, id, body.data(), body.size());
-        xs::XRecordDelta<T>::clear(base_rec);
-        xs::XRecordDelta<T>::apply(body.data(), base_rec);
+        xs::put_whole_op(body, 0, src);
+        xs::XRecordBody<T>::apply_whole(body.data() + 4, dst);
     }
-    // A key message: every record enters.
+    // Unit s's enter op, shared: written into the body store, then copied
+    // into the message under its id; the baseline takes the record.
+    void put_enter(xs::XSyncWriter& m, std::size_t s) {
+        body.clear();
+        const std::size_t n = xs::put_whole_op(body, 0xffffffffu, v().units[s]);
+        m.op(body.data(), n, ids[s]);
+        xs::XRecordBody<Unit>::apply_whole(body.data() + 4, b().units[s]);
+    }
+    // Unit s's change op of the members that differ from the baseline (none:
+    // no op); the baseline takes them.
+    void put_change(xs::XSyncWriter& m, std::size_t s) {
+        const std::uint64_t mask = xs::XRecordBody<Unit>::changed(v().units[s], b().units[s]);
+        if (!mask) return;
+        body.clear();
+        const std::size_t n = xs::put_change_op(body, ids[s], v().units[s], mask);
+        m.op(body.data(), n);
+        xs::XRecordBody<Unit>::apply_change(body.data() + 4, b().units[s]);
+    }
+    // A key message: the head, then every record enters.
     std::string_view key() {
-        xs::XSyncWriter m(msg, xs::kFlagKey, stream, ++version);
-        v().head.seq = version;
-        put_key(m, kHead, 0, v().head, b().head);
-        for (std::size_t s = 0; s < ids.size(); ++s) put_key(m, kUnit, ids[s], v().units[s], b().units[s]);
-        for (std::size_t i = 0; i < kCells; ++i) put_key(m, kCell, std::uint32_t(i), v().cells[i], b().cells[i]);
+        v().head.seq = version + 1;
+        xs::XSyncWriter m(msg, v().head, ++version, stream);
+        b().head = v().head;
+        m.begin(kUnit, xs::enter);
+        for (std::size_t s = 0; s < ids.size(); ++s) put_enter(m, s);
+        m.end();
+        m.begin(kCell, xs::enter);
+        for (std::size_t i = 0; i < kCells; ++i) {
+            m.whole(std::uint32_t(i), v().cells[i]);
+            b().cells[i] = v().cells[i];
+        }
+        m.end();
         m.finish();
         left.clear();
         entered.clear();
         return msg.view();
     }
-    // The next message: head, leaves, units (enter or change), cells.
+    // The next message: the head, leaves, units (enter, change), cells.
     std::string_view delta() {
-        xs::XSyncWriter m(msg, 0, stream, ++version);
-        v().head.seq = version;
-        m.change(kHead, 0, v().head, b().head);
-        for (std::uint32_t id : left) m.op(kUnit, xs::leave, id);
-        for (std::size_t s = 0; s < ids.size(); ++s) {
-            if (is_entered(ids[s])) put_key(m, kUnit, ids[s], v().units[s], b().units[s]);
-            else m.change(kUnit, ids[s], v().units[s], b().units[s]);
-        }
-        for (std::size_t i = 0; i < kCells; ++i) m.change(kCell, std::uint32_t(i), v().cells[i], b().cells[i]);
+        v().head.seq = version + 1;
+        xs::XSyncWriter m(msg, v().head, ++version);
+        b().head = v().head;
+        m.leaves(kUnit, left.data(), left.size());
+        const auto enters = [&] {
+            m.begin(kUnit, xs::enter);
+            for (std::size_t s = 0; s < ids.size(); ++s) if (is_entered(ids[s])) put_enter(m, s);
+            m.end();
+        };
+        const auto changes = [&] {
+            m.begin(kUnit, xs::change);
+            for (std::size_t s = 0; s < ids.size(); ++s) if (!is_entered(ids[s])) put_change(m, s);
+            m.end();
+        };
+        if (changes_first) { changes(); enters(); }
+        else { enters(); changes(); }
+        m.begin(kCell, xs::change);
+        for (std::size_t i = 0; i < kCells; ++i) m.diff(std::uint32_t(i), v().cells[i], b().cells[i]);
+        m.end();
         m.finish();
         left.clear();
         entered.clear();

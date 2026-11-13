@@ -958,19 +958,19 @@ public:
         }
 #endif
 
-        // ---- D3 prototype (EXPERIMENTAL, xoffset_shared_delta.hpp), keys D* ----
+        // ---- D3: shared deltas (xoffset_shared_delta.hpp, XS 2.0), keys D* ----
         // Server: one image of every entity as its holders have it (units in
         // dstore by world index, tiles and marches next to their entries),
         // shared by all connections. Every changed unit some view holds is
         // compared and encoded once per tick (d_publish); other units, marches
         // and tiles on their first use in the tick; key bodies (an entity
         // entering a view) are built once per tick on first use. A delivery
-        // copies those bodies into
-        // its message (d_send). Per connection the server keeps its stream,
-        // message version and the root fields it last sent, nothing per entity
-        // beyond the tracker every format shares. Client: its own view buffer
-        // and slots, an id -> slot index; d_recv checks the whole message,
-        // then applies it.
+        // copies those bodies into its message under the client's slot
+        // (d_send). Per connection the server keeps the message version and
+        // the client's free slots (two cache lines), and cold, the stream and
+        // free slots past them; per entity, the client's slot in the tracker
+        // every format shares. Client: its own view buffer, indexed by slot
+        // (no id index); d_recv checks the whole message, then applies it.
         // A shared body of this tick and the key body of this tick (ticks fit 32 bits).
         struct D3Ent { int32_t tick = -1, ktick = -1; uint32_t off = 0, len = 0, koff = 0, klen = 0; };
         // Units (d_unit): dirty flags of tick ptick (now) and of earlier ticks
@@ -981,25 +981,86 @@ public:
         // one cache line per entity.
         struct alignas(64) D3MEnt : D3Ent { xm::ViewMarch prev{}; };
         struct D3TEnt : D3Ent { xm::Tile prev{}; };
-        struct D3Conn { uint64_t stream = 0; uint32_t version = 0; xm::D3Root root{}; };
+        // The server gives each client's records their slots (the client
+        // indexes its view by them, no id index). A slot that leaves is free
+        // from the next message on (an entry appears at most once in a
+        // message); an entering record takes the last freed slot, else a new
+        // one.
+        // Free slots below 256 are bytes in the connection's two cache lines
+        // (the lines d_send reads for the version anyway; at scale M a client
+        // has at most 36 unit and 48 march slots free); the rest go to the
+        // connection's cold spill list.
+        static constexpr unsigned kD3UFree = 48, kD3MFree = 64;
+        // Per connection, hot: the message version and both tables' free slots.
+        struct alignas(128) D3Conn {
+            uint32_t version = 0;
+            uint32_t uused = 0, mused = 0;     // slots given out so far
+            uint8_t un = 0, mn = 0;            // uf[0, un) / mf[0, mn) free, the last taken first
+            uint8_t uspill = 0, mspill = 0;    // the spill list is not empty
+            uint8_t uf[kD3UFree]{}, mf[kD3MFree]{};
+        };
+        static_assert(sizeof(D3Conn) == 128);
+        // Per connection, cold: the stream (key messages only) and the spill lists.
+        struct D3Cold { uint64_t stream = 0; std::vector<int32_t> us, ms; };
+        // Takes slots with its counters in registers (the message stores may
+        // alias the connection): construct, take() per entering record, then done().
+        struct D3Taker {
+            const uint8_t* const f; uint8_t& n_at; uint32_t& used_at; uint8_t& spill_at; std::vector<int32_t>& sp;
+            uint32_t n, used; bool spill;
+            D3Taker(const uint8_t* fr, uint8_t& n0, uint32_t& u, uint8_t& s, std::vector<int32_t>& v)
+                : f(fr), n_at(n0), used_at(u), spill_at(s), sp(v), n(n0), used(u), spill(s != 0) {}
+            [[gnu::always_inline]] int32_t take() {
+                if (n) return int32_t(f[--n]);
+                if (spill) [[unlikely]] return from_spill();
+                return int32_t(used++);
+            }
+            XOFFSET_DETAIL_NOINLINE int32_t from_spill() noexcept {
+                const int32_t v = sp.back();
+                sp.pop_back();
+                spill = !sp.empty();
+                return v;
+            }
+            void done() noexcept { n_at = uint8_t(n); used_at = used; spill_at = uint8_t(spill); }
+        };
+        static D3Taker d_utaker(D3Conn& k, D3Cold& kc) { return {k.uf, k.un, k.uused, k.uspill, kc.us}; }
+        static D3Taker d_mtaker(D3Conn& k, D3Cold& kc) { return {k.mf, k.mn, k.mused, k.mspill, kc.ms}; }
+        // Gives back the k slots at x.
+        template <unsigned Cap>
+        [[gnu::always_inline]] static void d_give(uint8_t* f, uint8_t& n_at, uint8_t& spill, std::vector<int32_t>& sp, const int32_t* x, std::size_t k) {
+            uint32_t n = n_at;
+            for (std::size_t i = 0; i < k; ++i) {
+                const uint32_t v = uint32_t(x[i]);
+                if (n < Cap && v < 256) f[n++] = uint8_t(v);
+                else [[unlikely]] { d_spill(sp, x[i]); spill = 1; }
+            }
+            n_at = uint8_t(n);
+        }
+        XOFFSET_DETAIL_NOINLINE static void d_spill(std::vector<int32_t>& sp, int32_t v) { sp.push_back(v); }
+        // A client: its view (units and marches at the slots the server gave
+        // them, no id index), its cursor, and for the full check which slots
+        // it holds.
         struct D3Client {
             std::optional<XBuffer> view;
-            XOffsetDatastructure::xsync::XSyncSlots uidx, midx;   // unit / march id -> slot in the view
             XOffsetDatastructure::xsync::XSyncCursor cursor;
+            std::vector<uint8_t> uheld, mheld;   // full check only: slot held
             TileSpan span{};
         };
         enum : unsigned { kTRoot = 0, kTUnit = 1, kTMarch = 2, kTTile = 3 };
+        template <class T> using RD = XOffsetDatastructure::xsync::XRecordBody<T>;
         // A client's view as the records XReceiver::apply_sync writes: the
-        // root fields (through a D3Root copy), units and marches by id -> slot
-        // (a slot that leaves is reused), tiles by tile id inside the view's
-        // span. Adding a slot may move the slots; the view root is re-read if
-        // the buffer moved.
+        // root fields (through a D3Root copy), units and marches at the slots
+        // the server gave them (an op's id is the slot), tiles by tile id
+        // inside the view's span. Full: find() also answers whether the slot
+        // is held (the full check rejects an op on a slot not held and an
+        // enter of one held); the trust tier takes the sender's word. Adding a
+        // slot may move the view; its root is re-read if the buffer moved.
         // The target's calls on the receive path are forced inline: this
         // translation unit (every format, every case) reaches GCC's
         // inline-unit-growth limit, past which whether they inline depends on
         // unrelated code.
 #define SLG_D3_HOT [[gnu::always_inline]]
 #define SLG_D3_FLAT [[gnu::always_inline, gnu::flatten]]
+        template <bool Full>
         struct D3Target {
             using tables = std::tuple<xm::D3Root, xm::ViewUnit, xm::ViewMarch, xm::Tile>;
             template <unsigned K> static constexpr bool keyed = K == kTUnit || K == kTMarch;
@@ -1017,8 +1078,12 @@ public:
                     const uint32_t tx = id % uint32_t(kTiles) - uint32_t(L->span.tx0), ty = id / uint32_t(kTiles) - uint32_t(L->span.ty0);
                     if (tx >= uint32_t(L->span.cols) || ty >= uint32_t(L->span.rows)) return -1;
                     return int64_t(ty) * L->span.cols + tx;
+                } else if constexpr (Full) {
+                    const std::vector<uint8_t>& h = K == kTUnit ? L->uheld : L->mheld;
+                    return id < h.size() && h[id] ? int64_t(id) : -1;
                 } else {
-                    return (K == kTUnit ? L->uidx : L->midx).find(id);
+                    if constexpr (K == kTUnit) return id < v->units.size() ? int64_t(id) : -1;
+                    else return id < v->marches.size() ? int64_t(id) : -1;
                 }
             }
             template <unsigned K> SLG_D3_HOT auto& record(int64_t h) {
@@ -1028,16 +1093,24 @@ public:
                 else return v->tiles[std::size_t(h)];
             }
             template <unsigned K> SLG_D3_HOT int64_t enter(uint32_t id) {
-                // A new slot grows the view's vector; the view root is re-read if the buffer moved.
-                return (K == kTUnit ? L->uidx : L->midx).enter(id, [this](int64_t s) XOFFSET_SYNC_LAMBDA_INLINE {
-                    if constexpr (K == kTUnit) v->units.resize(std::size_t(s + 1));
-                    else v->marches.resize(std::size_t(s + 1));
+                // A slot past the end grows the view's vector.
+                const std::size_t n = K == kTUnit ? v->units.size() : v->marches.size();
+                if (id >= n) [[unlikely]] {
+                    if constexpr (K == kTUnit) v->units.resize(std::size_t(id) + 1);
+                    else v->marches.resize(std::size_t(id) + 1);
                     if (L->view->get_address() != base) { base = L->view->get_address(); v = &L->view->template root<xm::ViewSnapshot>(); }
-                });
+                }
+                if constexpr (Full) {
+                    std::vector<uint8_t>& h = K == kTUnit ? L->uheld : L->mheld;
+                    if (id >= h.size()) h.resize(std::size_t(id) + 1);
+                    h[id] = 1;
+                }
+                return int64_t(id);
             }
             template <unsigned K> SLG_D3_HOT void leave(uint32_t id, int64_t h) {
                 RD<std::tuple_element_t<K, tables>>::clear(record<K>(h));   // free slots stay zeroed (query_view)
-                (K == kTUnit ? L->uidx : L->midx).leave(id, h);
+                if constexpr (Full) (K == kTUnit ? L->uheld : L->mheld)[id] = 0;
+                else (void)id;
             }
             template <unsigned K> SLG_D3_HOT void applied(uint32_t, int64_t) {
                 if constexpr (K == kTRoot) { v->request_id = root.request_id; v->tick = root.tick; }
@@ -1050,6 +1123,12 @@ public:
                 XBuffer::maximum_capacity(XBuffer::DEFAULT_MAXIMUM_CAPACITY));
             return rx;
         }
+        static constexpr std::size_t kD3UnitBytes = 1024;
+        // Section room per unit op: a body up to kD3OpBody bytes plus slack.
+        static constexpr std::size_t kD3OpBody = 224, kD3OpRoom = kD3OpBody + XOffsetDatastructure::xsync::kSyncSlack;
+        // A march change op (id, member mask, members) fits in this.
+        static constexpr std::size_t kD3MarchBody = 48;
+        static_assert(4 + RD<xm::ViewMarch>::diff_room <= kD3MarchBody);
         std::optional<XBuffer> dstore;   // every unit as its holders have it (the shared image)
         std::vector<D3UEnt> due;
         std::vector<D3TEnt> dte;
@@ -1062,15 +1141,15 @@ public:
         int64_t dtick = -1;   // the world's tick (entries keep it as int32_t)
         int32_t ducap = 0, dmcap = 0;   // view capacity, as NP's (n_setup)
         std::vector<D3Conn> dconn;
+        std::vector<D3Cold> dcold;
         std::vector<D3Client> dcli;
         std::vector<D3Client> dclt;   // the same clients in the trust tier (d_recv_trusted)
-        template <class T> using RD = XOffsetDatastructure::xsync::XRecordDelta<T>;
         // A dirty flag's bit is its ViewUnit member's index (d_publish).
 #define SLG_X(f) static_assert(XOffsetDatastructure::schema::member_t<xm::ViewUnit, dbit::f>::offset == offsetof(xm::ViewUnit, f));
         SLG_VUNIT_SCALARS(SLG_X)
         SLG_X(name) SLG_X(alliance_tag) SLG_X(owner_name) SLG_X(commander) SLG_X(heroes) SLG_X(troops) SLG_X(buffs)
 #undef SLG_X
-        static_assert(RD<xm::ViewUnit>::member_count == std::size_t(dbit::buffs) + 1);
+        static_assert(RD<xm::ViewUnit>::members::N == std::size_t(dbit::buffs) + 1);
 
 #if defined(__GNUC__) || defined(__clang__)
 #define SLG_PREFETCH(p) __builtin_prefetch(p)
@@ -1094,22 +1173,30 @@ public:
             dnext = 0;
             for (int32_t j = 0; j < w.march_count(); ++j) dnext = std::max(dnext, w.march(j).id + 1);
             dconn.assign(std::size_t(vs.clients), {});
+            dcold.clear();
+            dcold.resize(std::size_t(vs.clients));
             dcli.clear();
             dcli.resize(views);
             dclt.clear();
             dclt.resize(views);
             dtick = w.tick_no();
             darena.clear();
+            darena.reserve(4096);
         }
         // The client's view: its rect, reserved slots, the tiles under it
         // (zero until its key message fills them). Untimed, as n_view.
         void d_view(int c, const ViewRect& r) {
             for (D3Client* L : {&dcli[std::size_t(c)], &dclt[std::size_t(c)]}) {
-                L->view.emplace(XBuffer::create<xm::ViewSnapshot>(kViewInitial, held_cap()));
+                // The view sized for its records and their containers up front
+                // (the rival's views reserve their vectors; a view that grows
+                // later relocates inside a timed receive).
+                L->view.emplace(XBuffer::create<xm::ViewSnapshot>(std::min(std::size_t(ducap) * kD3UnitBytes + kViewInitial, kHeldMax), held_cap()));
                 auto& v = L->view->template root<xm::ViewSnapshot>();
                 v.x0 = r.x0; v.y0 = r.y0; v.x1 = r.x1; v.y1 = r.y1;
                 v.units.reserve(std::size_t(ducap));
                 v.marches.reserve(std::size_t(dmcap));
+                L->uheld.assign(std::size_t(ducap), 0);
+                L->mheld.assign(std::size_t(dmcap), 0);
                 L->span = tile_span(r.x0, r.y0, r.x1, r.y1);
                 v.tiles.resize(std::size_t(L->span.cols * L->span.rows));
             }
@@ -1120,7 +1207,11 @@ public:
 
         // Server memory (--mode mem, MEM.D*): per connection, and the image,
         // entries and arenas every connection shares.
-        std::size_t d_conn_bytes() const { return sizeof(D3Conn); }
+        std::size_t d_conn_bytes() const {
+            std::size_t spill = 0;
+            for (const D3Cold& k : dcold) spill += (k.us.capacity() + k.ms.capacity()) * sizeof(int32_t);
+            return sizeof(D3Conn) + sizeof(D3Cold) + (dcold.empty() ? 0 : spill / dcold.size());
+        }
         std::size_t d_shared_bytes() const {
             if (!dstore) return 0;
             return dstore->get_size() + due.capacity() * sizeof(D3UEnt) + dte.capacity() * sizeof(D3TEnt) + dme.capacity() * sizeof(D3MEnt) +
@@ -1203,8 +1294,12 @@ public:
             // This tick's change, compared over the changed members only (the
             // rest of the image is unchanged): the body a whole-record
             // comparison with last tick's image writes.
-            const std::size_t at = darena.size();
-            if (RD<xm::ViewUnit>::update(d, RD<xm::ViewUnit>::fields(now), darena, set)) { e.tick = dtick; e.off = uint32_t(at); e.len = uint32_t(darena.size() - at); }
+            // The change body straight from the dirty flags (a dirty flag's
+            // bit is its member's): no compare.
+            set(d);
+            e.off = uint32_t(darena.size());
+            e.len = uint32_t(XOffsetDatastructure::xsync::put_change_op(darena, uint32_t(u.id), d, now));
+            e.tick = dtick;
             return e;
         }
         // A march's body for this tick (compared with the image every holder
@@ -1226,16 +1321,10 @@ public:
                 xm::ViewMarch img;
                 copy_vmarch(img, m);
                 if (e->prev.id == 0) { e->prev = img; e->len = 0; }
-                else { const std::size_t at = darena.size(); RD<xm::ViewMarch>::diff(img, e->prev, darena); e->off = uint32_t(at); e->len = uint32_t(darena.size() - at); }
+                else d_diff(*e, uint32_t(m.id), img, e->prev);
                 e->tick = int32_t(dtick);
             }
             return *e;
-        }
-        void d_march_key(D3MEnt& e) {
-            if (e.ktick != dtick) d_march_key_fill(e);
-        }
-        XOFFSET_DETAIL_NOINLINE void d_march_key_fill(D3MEnt& e) {
-            e.koff = uint32_t(darena.size()); RD<xm::ViewMarch>::key(e.prev, darena); e.klen = uint32_t(darena.size() - e.koff); e.ktick = int32_t(dtick);
         }
         // The lowest id of a march in the world this tick (found on the first
         // slot taken in the tick): a march with a lower id has left it.
@@ -1266,6 +1355,9 @@ public:
                 return dme[std::size_t(id) & (n - 1)];
             }
         }
+        XOFFSET_DETAIL_NOINLINE void d_march_refind(const MapWorld& w, const int32_t* pm, const int32_t* ent, D3MEnt** entp, std::size_t ne) {
+            for (std::size_t r = 0; r < ne; ++r) entp[r] = &d_march(w, pm[ent[r]]);
+        }
         D3TEnt& d_tile(const MapWorld& w, int32_t t) {
             D3TEnt& e = dte[std::size_t(t)];
             if (e.tick != dtick) d_tile_fill(w, t);
@@ -1276,25 +1368,34 @@ public:
             {
                 xm::Tile img;
                 copy_vtile(img, w, t % kTiles, t / kTiles);
-                const std::size_t at = darena.size();
-                RD<xm::Tile>::diff(img, e.prev, darena);
-                e.off = uint32_t(at); e.len = uint32_t(darena.size() - at);
+                d_diff(e, uint32_t(t), img, e.prev);
                 e.tick = int32_t(dtick);
             }
         }
         XOFFSET_DETAIL_NOINLINE void d_unit_key(const MapWorld& w, int32_t i) {
             D3UEnt& e = d_unit(w, i);
             if (e.ktick == dtick) return;
+            const xm::ViewUnit& r = dstore->template root<xm::ViewSnapshot>().units[std::size_t(i)];
             e.koff = uint32_t(darena.size());
-            RD<xm::ViewUnit>::key(dstore->template root<xm::ViewSnapshot>().units[std::size_t(i)], darena);
-            e.klen = uint32_t(darena.size() - e.koff);
+            e.klen = uint32_t(XOffsetDatastructure::xsync::put_whole_op(darena, uint32_t(w.unit(i).id), r));
             e.ktick = int32_t(dtick);
         }
+        // A plain record's change against the image every holder has (the
+        // members that differ; the image takes them).
+        template <class R> void d_diff(D3Ent& e, uint32_t id, const R& now, R& prev) {
+            e.off = uint32_t(darena.size());
+            e.len = uint32_t(XOffsetDatastructure::xsync::put_diff_op(darena, id, now, prev));
+        }
         using D3Writer = XOffsetDatastructure::xsync::XSyncWriter;
-        void d_put(D3Writer& m, unsigned table, XOffsetDatastructure::xsync::XSyncKind kind, int32_t id, uint32_t off, uint32_t len) {
-            m.op(table, kind, uint32_t(id), darena.data() + off, len);
+        static constexpr auto kEnter = XOffsetDatastructure::xsync::enter, kChange = XOffsetDatastructure::xsync::change;
+        std::vector<int32_t> dscr;
+        std::vector<void*> dpscr;
+        int32_t* d_scratch(std::size_t n) { if (dscr.size() < n) dscr.resize(n * 2); return dscr.data(); }
+        void** d_pscratch(std::size_t n) { if (dpscr.size() < n) dpscr.resize(n * 2); return dpscr.data(); }
+        void d_put(D3Writer& m, unsigned table, XOffsetDatastructure::xsync::XSyncKind kind, uint32_t off, uint32_t len) {
+            m.op(darena.data() + off, len);
 #ifdef SLG_D3_STATS
-            dstat_bytes[table * 3 + kind] += double(len + 1 + (uint32_t(id) < 0x80 ? 1 : uint32_t(id) < 0x4000 ? 2 : 3));
+            dstat_bytes[table * 3 + kind] += double(len);
             dstat_body[table * 3 + kind] += double(len);
             dstat_ops[table * 3 + kind] += 1;
 #endif
@@ -1303,66 +1404,152 @@ public:
         // Diagnostic build only (-DSLG_D3_STATS): message bytes by table and kind.
         double dstat_bytes[12] = {}, dstat_body[12] = {}, dstat_ops[12] = {}, dstat_msgs = 0, dstat_total = 0;
 #endif
-        // The message's root op: the root fields this connection has not seen.
-        void d_root(D3Writer& m, D3Conn& k, int64_t id, int64_t tick) {
-            const xm::D3Root now{id, tick};
-            m.change(kTRoot, 0, now, k.root);
-        }
         // The key message of client c's first pull (untimed): every unit,
         // march and tile in its view.
         void d_key(int c, const MapWorld& w, const DeltaPlan& p) {
-            namespace xs = XOffsetDatastructure::xsync;
             D3Conn& k = dconn[std::size_t(c)];
+            D3Cold& kc = dcold[std::size_t(c)];
             k = D3Conn{};
-            k.stream = 0x5d3000000ull + uint64_t(c);
-            D3Writer m(dmsg, xs::kFlagKey, k.stream, ++k.version);
-            d_root(m, k, 0, w.tick_no());
-            for (int32_t i : p.units) { d_unit_key(w, i); D3UEnt& e = due[std::size_t(i)]; ++e.hold; d_put(m, kTUnit, xs::enter, w.unit(i).id, e.koff, e.klen); }
-            for (int32_t i : p.marches) {
-                D3MEnt& e = d_march(w, i);
-                d_march_key(e);
-                d_put(m, kTMarch, xs::enter, w.march(i).id, e.koff, e.klen);
+            kc.us.clear();
+            kc.ms.clear();
+            kc.stream = 0x5d3000000ull + uint64_t(c);
+            D3Writer m(dmsg, xm::D3Root{0, w.tick_no()}, ++k.version, kc.stream);
+            m.begin(kTUnit, kEnter);
+            auto tu = d_utaker(k, kc);
+            for (std::size_t q = 0; q < p.units.size(); ++q) {
+                const int32_t i = p.units[q]; d_unit_key(w, i); D3UEnt& e = due[std::size_t(i)]; ++e.hold;
+                const int32_t s = tu.take(); *p.uref[q] = s;
+                m.op(darena.data() + e.koff, e.klen, uint32_t(s));
             }
+            tu.done();
+            m.end();
+            m.begin(kTMarch, kEnter);
+            auto tm = d_mtaker(k, kc);
+            for (std::size_t q = 0; q < p.marches.size(); ++q) {
+                D3MEnt& e = d_march(w, p.marches[q]);
+                const int32_t s = tm.take(); *p.mref[q] = s;
+                m.whole(uint32_t(s), e.prev);
+            }
+            tm.done();
+            m.end();
+            m.begin(kTTile, kEnter);
             const TileSpan sp = dcli[std::size_t(c)].span;
             for (int32_t ty = sp.ty0; ty < sp.ty0 + sp.rows; ++ty)
                 for (int32_t tx = sp.tx0; tx < sp.tx0 + sp.cols; ++tx) {
                     const int32_t t = ty * kTiles + tx;
-                    D3TEnt& e = dte[std::size_t(t)];
-                    if (e.ktick != dtick) { e.koff = uint32_t(darena.size()); RD<xm::Tile>::key(e.prev, darena); e.klen = uint32_t(darena.size() - e.koff); e.ktick = int32_t(dtick); }
-                    d_put(m, kTTile, xs::enter, t, e.koff, e.klen);
+                    m.whole(uint32_t(t), dte[std::size_t(t)].prev);
                 }
+            m.end();
             m.finish();
         }
-        // One delivery: leaves, then units, marches and tiles, each a copy of
-        // the entity's body (or key body) of this tick.
+        // One delivery: leaves, the changes of units, marches and tiles, then
+        // the units and marches entering the view, each a copy of the
+        // entity's body of this tick. The connection's lines are fetched at
+        // the start and first used by the enters (and the version, written
+        // at the end).
         std::size_t d_send(int c, const MapWorld& w, const DeltaPlan& p, int64_t id) {
-            namespace xs = XOffsetDatastructure::xsync;
             D3Conn& k = dconn[std::size_t(c)];
+            __builtin_prefetch(&k, 1);
+            __builtin_prefetch(reinterpret_cast<const char*>(&k) + 64, 1);
 #ifdef SLG_D3_STATS
             if (dstat_msgs == 0) for (int q = 0; q < 12; ++q) dstat_bytes[q] = dstat_body[q] = dstat_ops[q] = 0;   // drop the key messages
 #endif
-            D3Writer m(dmsg, 0, k.stream, ++k.version);
-            d_root(m, k, id, w.tick_no());
-            for (int32_t uid : p.removed) { m.op(kTUnit, xs::leave, uint32_t(uid)); --due[std::size_t(uid - 1)].hold; }   // unit id = index + 1
-            for (int32_t mid : p.removed_marches) m.op(kTMarch, xs::leave, uint32_t(mid));
-            for (std::size_t q = 0; q < p.units.size(); ++q) {
-                const int32_t i = p.units[q];
-                if (p.unew[q]) { d_unit_key(w, i); D3UEnt& e = due[std::size_t(i)]; ++e.hold; d_put(m, kTUnit, xs::enter, w.unit(i).id, e.koff, e.klen); }
-                else if (const D3Ent& e = d_unit(w, i); e.tick == dtick) d_put(m, kTUnit, xs::change, w.unit(i).id, e.off, e.len);
+            D3Writer m(dmsg, xm::D3Root{id, w.tick_no()}, 0);   // the version: at finish
+            if (!p.rslot.empty()) {
+                m.leaves(kTUnit, p.rslot.data(), p.rslot.size());
+                for (int32_t uid : p.removed) --due[std::size_t(uid - 1)].hold;   // unit id = index + 1
             }
-            for (std::size_t q = 0; q < p.marches.size(); ++q) {
-                const int32_t i = p.marches[q];
-                D3MEnt& e = d_march(w, i);
-                if (p.mnew[q]) {
-                    d_march_key(e);
-                    d_put(m, kTMarch, xs::enter, w.march(i).id, e.koff, e.klen);
-                } else if (e.len) d_put(m, kTMarch, xs::change, w.march(i).id, e.off, e.len);
+            if (!p.rmslot.empty()) m.leaves(kTMarch, p.rmslot.data(), p.rmslot.size());
+            // Plan arrays as locals: the message stores may alias anything.
+            const int32_t* const pu = p.units.data();
+            const uint8_t* const pun = p.unew.data();
+            const int32_t* const pus = p.uslot.data();
+            int32_t* const* const pur = p.uref.data();
+            const int32_t* const pm = p.marches.data();
+            const uint8_t* const pmn = p.mnew.data();
+            const int32_t* const pms = p.mslot.data();
+            int32_t* const* const pmr = p.mref.data();
+            const std::size_t nu = p.units.size(), nm = p.marches.size();
+            // Entering units and marches: their places in the plan.
+            int32_t* const uent = d_scratch(nu + nm);
+            int32_t* const ment = uent + nu;
+            std::size_t une = 0, mne = 0;
+            if (nu) {
+                // Room for the section up front (kD3OpRoom per op); an op past
+                // kD3OpBody re-reserves for itself and the rest.
+                m.begin(kTUnit, kChange);
+                m.reserve(nu * kD3OpRoom);
+                for (std::size_t q = 0; q < nu; ++q) {
+                    const int32_t i = pu[q];
+                    if (pun[q]) { uent[une++] = int32_t(q); continue; }
+                    if (const D3Ent& e = d_unit(w, i); e.tick == dtick) {
+                        if (e.len > kD3OpBody) [[unlikely]] m.reserve((nu - q) * kD3OpRoom + e.len);
+                        m.op_in_room(darena.data() + e.off, e.len, uint32_t(pus[q]));
+                    }
+                }
+                m.end();
             }
-            for (int32_t t : p.tiles) {
-                const D3Ent& e = d_tile(w, t);
-                if (e.len) d_put(m, kTTile, xs::change, t, e.off, e.len);
+            D3MEnt** const mentp = reinterpret_cast<D3MEnt**>(d_pscratch(nm));
+            bool moved = false;   // a fill grew the ring: the noted entries moved
+            if (nm) {
+                // The ring and the world's marches as locals (message stores
+                // may alias them); a fill may grow the ring: reload then.
+                D3MEnt* const dm0 = dme.data();
+                D3MEnt* dm = dm0;
+                std::size_t mk = dme.size() - 1;
+                const WorldMarch* const wm = &w.march(0);
+                const int32_t t32 = int32_t(dtick);
+                m.begin(kTMarch, kChange);
+                for (std::size_t q = 0; q < nm; ++q) {
+                    const int32_t i = pm[q];
+                    const int32_t mid = wm[i].id;
+                    D3MEnt* e = &dm[std::size_t(mid) & mk];
+                    if (e->prev.id != mid || e->tick != t32) [[unlikely]] { e = &d_march_fill(w, i); dm = dme.data(); mk = dme.size() - 1; }
+                    // No branch on the kind: an entering march is noted (mne
+                    // advances), a changed one's body copied (length 0 when new
+                    // or unchanged); a march change body is at most 4 + 1 + 40 bytes.
+                    const bool isnew = pmn[q] != 0;
+                    ment[mne] = int32_t(q); mentp[mne] = e; mne += isnew;
+                    m.op_upto<kD3MarchBody>(darena.data() + e->off, isnew ? 0 : e->len, uint32_t(pms[q]));
+                }
+                m.end();
+                moved = dm != dm0;
             }
-            const std::size_t n = m.finish();
+            if (!p.tiles.empty()) {
+                m.begin(kTTile, kChange);
+                for (int32_t t : p.tiles) {
+                    const D3Ent& e = d_tile(w, t);
+                    if (e.len) d_put(m, kTTile, kChange, e.off, e.len);
+                }
+                m.end();
+            }
+            if (une) {
+                m.begin(kTUnit, kEnter);
+                m.reserve(une * kD3OpRoom);
+                auto tk = d_utaker(k, dcold[std::size_t(c)]);
+                for (std::size_t r = 0; r < une; ++r) {
+                    const std::size_t q = std::size_t(uent[r]); const int32_t i = pu[q];
+                    d_unit_key(w, i); D3UEnt& e = due[std::size_t(i)]; ++e.hold;
+                    if (e.klen > kD3OpBody) [[unlikely]] m.reserve((une - r) * kD3OpRoom + e.klen);
+                    const int32_t s = tk.take(); *pur[q] = s;
+                    m.op_in_room(darena.data() + e.koff, e.klen, uint32_t(s));
+                }
+                tk.done();
+                m.end();
+            }
+            if (mne) {
+                if (moved) [[unlikely]] d_march_refind(w, pm, ment, mentp, mne);
+                m.begin(kTMarch, kEnter);
+                auto tk = d_mtaker(k, dcold[std::size_t(c)]);
+                for (std::size_t r = 0; r < mne; ++r) { const int32_t s = tk.take(); *pmr[ment[r]] = s; m.whole(uint32_t(s), mentp[r]->prev); }
+                tk.done();
+                m.end();
+            }
+            // The slots that left are free from the next message on (an entry
+            // appears at most once in a message).
+            d_give<kD3UFree>(k.uf, k.un, k.uspill, dcold[std::size_t(c)].us, p.rslot.data(), p.rslot.size());
+            d_give<kD3MFree>(k.mf, k.mn, k.mspill, dcold[std::size_t(c)].ms, p.rmslot.data(), p.rmslot.size());
+            const std::size_t n = m.finish(++k.version);
 #ifdef SLG_D3_STATS
             dstat_msgs += 1; dstat_total += double(n);
 #endif
@@ -1370,23 +1557,23 @@ public:
         }
         // Trust tier (susu 2026-11-04: server -> client over a trusted
         // transport): XReceiver<from_server>::apply_sync with its default
-        // check, admit (header, stream and version, every op's table, kind
-        // and id; bodies are the sender's). Same view layout and id index as
+        // check, admit (head, stream and version, every section's table and
+        // kind, every op's id; bodies are the sender's). Same view layout as
         // d_recv.
         void d_recv_trusted(int c) { d_recv_trusted_from(c, dmsg.view()); }
         void d_recv_trusted_from(int c, std::string_view msg) {
             D3Client& L = dclt[std::size_t(c)];
-            D3Target t(L);
+            D3Target<false> t(L);
             const XOffsetDatastructure::XStatus r = d_rx().apply_sync(msg, L.cursor, t);
             if (!r) throw std::runtime_error("D3 (trust tier): " + r.error().message);
         }
         // The client: XReceiver<from_server>::apply_sync with XCheck::full,
-        // every op checked against its view (ids held or not, bodies against
-        // their records), then applied. A rejected message changes nothing.
+        // every op checked against its view (slots held or not, bodies against
+        // their record types), then applied. A rejected message changes nothing.
         void d_recv(int c) { d_recv_from(c, dmsg.view()); }
         void d_recv_from(int c, std::string_view msg) {
             D3Client& L = dcli[std::size_t(c)];
-            D3Target t(L);
+            D3Target<true> t(L);
             const XOffsetDatastructure::XStatus r = d_rx().template apply_sync<XOffsetDatastructure::XCheck::full>(msg, L.cursor, t);
             if (!r) throw std::runtime_error("D3: " + r.error().message);
         }

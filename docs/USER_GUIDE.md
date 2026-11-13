@@ -555,19 +555,26 @@ const View& v = held.root<View>();                     // 就地读
 ### 4.6 共享增量：视口同步
 
 服务端给每个客户端发它看得到的那部分共享世界（视口里的单位、行军、地块）时，4.5 节的增量要给每个客户端
-各存一份基线、各比较一遍。共享增量（`xoffset_shared_delta.hpp`，XS 1.0）按记录写：服务端每个实体每 tick
-只和一份共享基线比较、编码一次，看得到它的连接都收同一段字节；客户端按 id 在自己的槽位里找到记录就地写入，
-布局是自己的。格式、目标接口、检查和保证见 [SHARED_DELTA.md](SHARED_DELTA.md)，完整的收发循环见
-`examples/shared_delta.cpp`。
+各存一份基线、各比较一遍。共享增量（`xoffset_shared_delta.hpp`，XS 2.0）按记录写：服务端每个实体每 tick
+只编码一次，看得到它的连接都收同一段字节的拷贝；客户端按操作的 id 在自己的存储里找到记录就地写入，布局是
+自己的。id 可以是服务端替这个客户端分配的槽号（客户端直接按槽号取记录，不用查表），也可以是实体 id（客户端
+用 `xsync::XSyncSlots` 查）。格式、目标接口、检查和保证见 [SHARED_DELTA.md](SHARED_DELTA.md)，完整的收发
+循环见 `examples/shared_delta.cpp`。
 
 ```cpp
 namespace xs = XOffsetDatastructure::xsync;
-// 服务端：每 tick 每个变了的实体只比较一次（基线随之更新），再给每个客户端拼一条消息。
-xs::XRecordDelta<Unit>::diff(unit, baseline, bodies);            // 这段字节发给所有持有者
-xs::XSyncWriter m(msg, need_key ? xs::kFlagKey : 0, stream, ++version);
-m.op(kUnit, xs::leave, gone_id);                                  // 离开视口
-m.op(kUnit, xs::enter, new_id, key.data(), key.size());           // 进入视口：XRecordDelta::key 写的整条记录
-m.op(kUnit, xs::change, id, body, len);                           // 留在视口：共享的那段变化
+// 服务端：每 tick 每个变了的实体只编码一次（按脏成员掩码），写进共享的操作存储。
+const std::size_t at = store.size();
+const std::size_t len = xs::put_change_op(store, unit.id, unit, dirty_members);
+// 每个客户端一条消息：根记录（表 0）随每条消息整条带上，然后是各段操作。
+xs::XSyncWriter m(msg, head, ++version);                          // 关键消息：(msg, head, version, stream)
+m.leaves(kUnit, gone_slots.data(), gone_slots.size());            // 离开视口
+m.begin(kUnit, xs::enter);
+m.whole(slot_of_new, new_unit);                                   // 进入视口：整条记录
+m.end();
+m.begin(kUnit, xs::change);
+m.op(store.data() + at, len, slot);                               // 留在视口：共享的那段变化，换成这个客户端的槽号
+m.end();
 m.finish();
 
 // 客户端：目标把 id 映射到自己的记录（SHARED_DELTA.md 第 1 节），接收器按链路建（第 8 节 K4）。
@@ -577,15 +584,16 @@ if (xs::is_key(msg)) target.empty_units();                        // 关键消�
 if (XStatus r = rx.apply_sync(msg, cursor, target); !r) ask_for_key();
 ```
 
-- 目标说明有哪些表、每张表的记录类型，按 id 找记录（`find`、`record`）；单位、行军这类会进出视口的表
-  再加 `enter`、`leave`。进入时库先把记录清零再写入；离开时记录原样交给目标，要让空槽读出来是空的就在
-  `leave` 里清。
+- 目标说明有哪些表、每张表的记录类型，按 id 找记录（`find`、`record`）；表 0 是根记录（不含容器，每条
+  消息整条带上）；单位、行军这类会进出视口的表再加 `enter`、`leave`。进入时整条记录写入（每个普通字节和
+  每个容器，不用先清零）；离开时记录原样交给目标，要让空槽读出来是空的就在 `leave` 里清
+  （`XRecordBody<R>::clear`）。
 - 丢消息、乱序或客户端重启后版本对不上，返回 `delta_base_mismatch`，什么都不改；请服务端发关键消息。
-- 档位跟链路走：`from_server`、`server_peer` 默认 admit，查消息头、流和版本、每条操作的表、种类和 id，
-  消息体信任发送方；`apply_sync<XCheck::full>` 先逐条检查消息体再写，拒绝的消息什么都不改。
+- 档位跟链路走：`from_server`、`server_peer` 默认 admit，查消息头、流和版本、每段的表和种类、每条操作的
+  id，消息体信任发送方；`apply_sync<XCheck::full>` 先逐条检查消息体再写，拒绝的消息什么都不改。
   `from_client` 上 `apply_sync` 编译不过：服务端不把客户端上行当共享增量读。
-- XS 1.0 从 3.5.0 起在 3.x 内冻结（SHARED_DELTA.md 第 2 节），`tests/test_shared_delta_format.cpp`
-  逐字节固定了一条关键消息和其后的一条增量。
+- XS 2.0 从 4.0 起取代 XS 1.0（不带旧格式），`tests/test_shared_delta_format.cpp` 逐字节固定了一条关键消息
+  和其后的一条增量；改这些字节就是新格式、新格式字节。
 
 ## 5. 必须遵守的约束
 
@@ -684,7 +692,7 @@ XStatus done = token ? token->try_finish() : XStatus(token.error());
 | K6 | schema 指纹精确匹配，不同就拒绝；版本不同的两端走演进握手和转换（E0） | wire 头 `schema_hash` |
 | K7 | 跨编译器、跨平台的对象表示一致 | 用户 schema：`XOFFSET_PIN_SCHEMA`；库自带类型：`tools/sigs/` 签名基线；跨编译器 wire 语料比对（`tools/platform_matrix.sh`） |
 | K8 | 客户端与服务端用同一套库、同一 wire：客户端（iOS、Android、Windows，64 位小端）用字段表后端，按 C++20 用各平台原生编译器构建，能接收、读写、校验、再发（3.2.0 交付，2026-11-04 升为核心承诺） | 字段表后端（`XOFFSET_RECORD`，第 2.1 节）；`tools/native_targets.sh` |
-| K9 | 原生增量同步：程序改完工作状态后只发改过的字节；接收方把增量合并进自己的副本，按链路的档检查后接着读写。整份状态用增量 1.0（`XReceiver<L>::apply_delta`，3.4 起冻结），视口用共享增量 XS 1.0（`XReceiver<L>::apply_sync`，3.5 起冻结），两种格式在 3.x 内都不变；schema 版本不同时按握手回落整份 wire。增量 apply 在每次发版前的 ASan fuzz 里（K4）（3.5.0 升为核心承诺） | `apply_delta`、`XDeltaCursor`、`apply_sync`、`xsync::XSyncCursor`（[DELTA_SYNC.md](DELTA_SYNC.md)、[SHARED_DELTA.md](SHARED_DELTA.md)） |
+| K9 | 原生增量同步：程序改完工作状态后只发改过的字节；接收方把增量合并进自己的副本，按链路的档检查后接着读写。整份状态用增量 1.0（`XReceiver<L>::apply_delta`，3.4 起冻结），视口用共享增量（`XReceiver<L>::apply_sync`，3.5 起；4.0 起格式为 XS 2.0，取代 XS 1.0）；schema 版本不同时按握手回落整份 wire。增量 apply 在每次发版前的 ASan fuzz 里（K4）（3.5.0 升为核心承诺） | `apply_delta`、`XDeltaCursor`、`apply_sync`、`xsync::XSyncCursor`（[DELTA_SYNC.md](DELTA_SYNC.md)、[SHARED_DELTA.md](SHARED_DELTA.md)） |
 
 K0 的边界：搬的单位是整个区域，不是其中单个对象（容器头禁止拷贝和移动）。正在使用的
 buffer 地址固定（在 VM 预留内增长），只在显式时间点搬：输出、接收、reload、`XCompactor`
@@ -777,7 +785,7 @@ iOS 的地址空间和最低部署目标（系统 libc++ 的 `std::pmr` 在 macO
 [DEPLOYMENT.md](DEPLOYMENT.md)。客户端在手机上的速度数字等真机复核后再对外宣传（Android 还没有计时）。
 3.1.0 没有这条构建路径：Android、iOS 和 MSVC 编不了。
 
-K9 的现状（3.5.0 起为核心承诺）：整份状态的增量（格式 1.0，3.4.0 冻结）和视口的共享增量（XS 1.0，3.5.0 冻结）
+K9 的现状（3.5.0 起为核心承诺）：整份状态的增量（格式 1.0，3.4.0 冻结）和视口的共享增量（3.5.0 起 XS 1.0，4.0 起 XS 2.0）
 都有拒绝用例、随机流测试和逐字节的金标准测试（[STABILITY_TESTS.md](STABILITY_TESTS.md)）；两种增量的 apply 都在发版前
 ASan fuzz 的目标里（`fuzz_delta_sync`、`fuzz_shared_delta`，服务端和客户端两种构建），3.5.0 和 3.6.0 在发版前各跑过一轮、
 没有发现；地图 demo 端到端用原生增量。schema 版本不同的两端不发增量：连接时握手答 `convert` 就发转换后的整份
