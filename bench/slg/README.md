@@ -286,23 +286,31 @@ so earlier batches and the perf gate compare as before.
   page tables went from 13.1 to 5.6 MiB (0.84% of RSS; the gate is 1%).
 
 D3 shared deltas (2026-11-04, thread 设计共享增量原型, doc X5MZPWya7DWFzdCughpZqL;
-`xoffset_shared_delta.hpp`, XS 1.0 since 3.5, docs/SHARED_DELTA.md). XOffset and (since
+`xoffset_shared_delta.hpp`, XS 1.0 in 3.5-3.6, XS 2.0 since 4.0, docs/SHARED_DELTA.md). XOffset and (since
 4.0 W1, below) zpp_bits, class 3 only;
 `SLG_D3=1` runs D3 alone (no N*), `SLG_D3=2` both, unset none (keys and stage
 ranges as before); `SLG_NATIVE_OFF` turns D3 off too. Needs no
 `XOFFSET_DELTA_SYNC_API`. The server keeps one image of every entity as its
 holders have it, shared by all connections. Once per tick (`D*.pub`) it notes
-the world's dirty flags and compares and encodes every changed unit some view
-holds, over its changed members only (`XRecordDelta::update`); a unit no view
-holds, and marches and tiles, are encoded on their first use in the tick (the
-entries they need are prefetched in `D*.pub`). A delivery copies the bodies of
-its entities into one message (`D*.send`). The bytes are those of comparing
-whole records. Server per delivery =
+the world's dirty flags and encodes every changed unit some view holds, its
+change body straight from the dirty members (`put_change_op`, no compare); a
+unit no view holds, and marches and tiles, are encoded on their first use in
+the tick (marches and tiles against the image, `put_diff_op`; the entries
+they need are prefetched in `D*.pub`). A delivery copies the ops of its
+entities into one message under the client's slots (`D*.send`): the server
+keeps each client's free unit and march slots (bytes in the connection's two
+cache lines, `D3Conn`), takes the last freed one for every entity that
+enters the view and gives back the slots of those that left after the
+message (both timed in `D*.send`; the connection's lines are prefetched when
+the send starts and first used by the enter sections, which come last); the
+tracker keeps each entity's slot next to what the client holds (untimed). Server per delivery =
 (`D*.pub` + `D*.send`) / `U*.deliveries`. The client applies the message to
 its own view through `XReceiver<XLink::from_server>::apply_sync` (a `D3Target`
-over the view's unit, march and tile slots): `D*T.recv` with `XCheck::admit`
-(header, stream and version, every op's table, kind and id; one pass),
-`D*.recv` with `XCheck::full` (every body checked, then applied), each into
+over the view's units and marches at the slots the server gave them, and
+tiles inside the view's span; no id index): `D*T.recv` with `XCheck::admit`
+(head, stream and version, every section's table and kind, every op's id;
+one pass), `D*.recv` with `XCheck::full` (every body checked, slots held or
+not, then applied), each into
 its own copy of the view, the order alternating by delivery; both are compared with the application-level view
 after every delivery. Bytes `D*.delta`, `D*.delta_zstd` (`D*Z.send`); warm
 devices `D*W.recv` / `D*TW.recv` (count `U*W.deliveries`), streaming `D*ZS.send`,
