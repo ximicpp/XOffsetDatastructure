@@ -370,6 +370,32 @@ public:
         q_ = d + len;
         n_ += len != 0;
     }
+    // Slot A/B: as body / body_upto, with the op's leading u32 (the shared
+    // body's id) replaced by this client's slot.
+    XS2_INLINE void body_slot(const char* body, std::size_t len, std::uint32_t slot) {
+        char* d = need(len + kSlack);
+        copy_body(d, body, len);
+        store<std::uint32_t>(d, slot);
+        q_ = d + len;
+        ++n_;
+    }
+    // Room for n more bytes now (a section's ops then skip the check).
+    XS2_INLINE void reserve(std::size_t n) { (void)need(n); }
+    // body_slot without the capacity check: the caller reserved len + kSlack.
+    XS2_INLINE void body_slot_in_room(const char* body, std::size_t len, std::uint32_t slot) {
+        char* d = q_;
+        copy_body(d, body, len);
+        store<std::uint32_t>(d, slot);
+        q_ = d + len;
+        ++n_;
+    }
+    template <std::size_t N> XS2_INLINE void body_upto_slot(const char* body, std::size_t len, std::uint32_t slot) {
+        char* d = need(N + kSlack);
+        std::memcpy(d, body, N);
+        store<std::uint32_t>(d, slot);   // past q_ when len == 0: overwritten later
+        q_ = d + len;
+        n_ += len != 0;
+    }
     // An op of a flat record: the id, then the record's bytes.
     template <class R> XS2_INLINE void flat(std::uint32_t id, const R& r) {
         static_assert(Rec<R>::flat);

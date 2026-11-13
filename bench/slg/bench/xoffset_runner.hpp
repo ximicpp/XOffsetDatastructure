@@ -980,7 +980,9 @@ public:
                     if (tx >= uint32_t(L->span.cols) || ty >= uint32_t(L->span.rows)) return -1;
                     return int64_t(ty) * L->span.cols + tx;
                 } else {
-                    return (K == kTUnit ? L->uidx : L->midx).find(id);
+                    // Slot A/B: the op's id is the client's slot (the server keeps it).
+                    if constexpr (K == kTUnit) return id < v->units.size() ? int64_t(id) : -1;
+                    else return id < v->marches.size() ? int64_t(id) : -1;
                 }
             }
             template <unsigned K> SLG_D3_HOT auto& record(int64_t h) {
@@ -991,15 +993,18 @@ public:
             }
             template <unsigned K> SLG_D3_HOT int64_t enter(uint32_t id) {
                 // A new slot grows the view's vector; the view root is re-read if the buffer moved.
-                return (K == kTUnit ? L->uidx : L->midx).enter(id, [this](int64_t s) XOFFSET_SYNC_LAMBDA_INLINE {
-                    if constexpr (K == kTUnit) v->units.resize(std::size_t(s + 1));
-                    else v->marches.resize(std::size_t(s + 1));
+                // Slot A/B: id is the slot the server gave; a new slot past the end grows the vector.
+                const std::size_t n = K == kTUnit ? v->units.size() : v->marches.size();
+                if (id >= n) [[unlikely]] {
+                    if constexpr (K == kTUnit) v->units.resize(std::size_t(id) + 1);
+                    else v->marches.resize(std::size_t(id) + 1);
                     if (L->view->get_address() != base) { base = L->view->get_address(); v = &L->view->template root<xm::ViewSnapshot>(); }
-                });
+                }
+                return int64_t(id);
             }
             template <unsigned K> SLG_D3_HOT void leave(uint32_t id, int64_t h) {
                 RD<std::tuple_element_t<K, tables>>::clear(record<K>(h));   // free slots stay zeroed (query_view)
-                (K == kTUnit ? L->uidx : L->midx).leave(id, h);
+                (void)id;
             }
             template <unsigned K> SLG_D3_HOT void applied(uint32_t, int64_t) {
                 if constexpr (K == kTRoot) { v->request_id = root.request_id; v->tick = root.tick; }
@@ -1013,6 +1018,8 @@ public:
             return rx;
         }
         static constexpr std::size_t kD3UnitBytes = 1024;
+        // Section room per unit op: a body up to kD3OpBody bytes plus slack.
+        static constexpr std::size_t kD3OpBody = 224, kD3OpRoom = kD3OpBody + xs2::kSlack;
         static constexpr std::size_t kD3MarchBody = 48;
         static_assert(4 + sizeof(xs2::Rec<xm::ViewMarch>::Mask) + sizeof(xm::ViewMarch) <= kD3MarchBody);   // a view unit and its containers, rounded up
         std::optional<XBuffer> dstore;   // every unit as its holders have it (the shared image)
@@ -1298,12 +1305,12 @@ public:
             k.stream = 0x5d3000000ull + uint64_t(c);
             D3Writer m(dmsg, xs2::kFlagKey, k.stream, ++k.version, xm::D3Root{0, w.tick_no()});
             m.begin(kTUnit, xs2::enter);
-            for (int32_t i : p.units) { d_unit_key(w, i); D3UEnt& e = due[std::size_t(i)]; ++e.hold; d_put(m, kTUnit, xs2::enter, e.koff, e.klen); }
+            for (std::size_t q = 0; q < p.units.size(); ++q) { const int32_t i = p.units[q]; d_unit_key(w, i); D3UEnt& e = due[std::size_t(i)]; ++e.hold; m.body_slot(darena.data() + e.koff, e.klen, uint32_t(p.uslot[q])); }
             m.end();
             m.begin(kTMarch, xs2::enter);
-            for (int32_t i : p.marches) {
-                D3MEnt& e = d_march(w, i);
-                m.flat(uint32_t(w.march(i).id), e.prev);
+            for (std::size_t q = 0; q < p.marches.size(); ++q) {
+                D3MEnt& e = d_march(w, p.marches[q]);
+                m.flat(uint32_t(p.mslot[q]), e.prev);
             }
             m.end();
             m.begin(kTTile, xs2::enter);
@@ -1324,36 +1331,50 @@ public:
             if (dstat_msgs == 0) for (int q = 0; q < 12; ++q) dstat_bytes[q] = dstat_body[q] = dstat_ops[q] = 0;   // drop the key messages
 #endif
             D3Writer m(dmsg, 0, k.stream, ++k.version, xm::D3Root{id, w.tick_no()});
-            m.leaves(kTUnit, p.removed.data(), p.removed.size());
+            m.leaves(kTUnit, p.rslot.data(), p.rslot.size());
             for (int32_t uid : p.removed) --due[std::size_t(uid - 1)].hold;   // unit id = index + 1
-            m.leaves(kTMarch, p.removed_marches.data(), p.removed_marches.size());
+            m.leaves(kTMarch, p.rmslot.data(), p.rmslot.size());
             // Plan arrays as locals: the message stores may alias anything.
             const int32_t* const pu = p.units.data();
             const uint8_t* const pun = p.unew.data();
+            const int32_t* const pus = p.uslot.data();
             const std::size_t nu = p.units.size();
             if (nu) {
                 // Changed units in one pass; entering ones are kept and sent after.
                 int32_t* const ent = d_scratch(nu);
                 std::size_t ne = 0;
+                // Room for the section up front (kD3OpRoom per op); an op past
+                // kD3OpBody re-reserves for itself and the rest.
                 m.begin(kTUnit, xs2::change);
+                m.reserve(nu * kD3OpRoom);
                 for (std::size_t q = 0; q < nu; ++q) {
                     const int32_t i = pu[q];
-                    if (pun[q]) { ent[ne++] = i; continue; }
-                    if (const D3Ent& e = d_unit(w, i); e.tick == dtick) d_put(m, kTUnit, xs2::change, e.off, e.len);
+                    if (pun[q]) { ent[ne++] = int32_t(q); continue; }
+                    if (const D3Ent& e = d_unit(w, i); e.tick == dtick) {
+                        if (e.len > kD3OpBody) [[unlikely]] m.reserve((nu - q) * kD3OpRoom + e.len);
+                        m.body_slot_in_room(darena.data() + e.off, e.len, uint32_t(pus[q]));
+                    }
                 }
                 m.end();
                 if (ne) {
                     m.begin(kTUnit, xs2::enter);
-                    for (std::size_t q = 0; q < ne; ++q) { const int32_t i = ent[q]; d_unit_key(w, i); D3UEnt& e = due[std::size_t(i)]; ++e.hold; d_put(m, kTUnit, xs2::enter, e.koff, e.klen); }
+                    m.reserve(ne * kD3OpRoom);
+                    for (std::size_t r = 0; r < ne; ++r) {
+                        const std::size_t q = std::size_t(ent[r]); const int32_t i = pu[q];
+                        d_unit_key(w, i); D3UEnt& e = due[std::size_t(i)]; ++e.hold;
+                        if (e.klen > kD3OpBody) [[unlikely]] m.reserve((ne - r) * kD3OpRoom + e.klen);
+                        m.body_slot_in_room(darena.data() + e.koff, e.klen, uint32_t(pus[q]));
+                    }
                     m.end();
                 }
             }
             const int32_t* const pm = p.marches.data();
             const uint8_t* const pmn = p.mnew.data();
+            const int32_t* const pms = p.mslot.data();
             if (const std::size_t nm = p.marches.size()) {
                 // The ring and the world's marches as locals (message stores
                 // may alias them); a fill may grow the ring: reload then.
-                int32_t* const ent = d_scratch(2 * nm);
+                int32_t* const ent = d_scratch(nm);   // entering marches' slots
                 D3MEnt** const entp = reinterpret_cast<D3MEnt**>(d_pscratch(nm));
                 std::size_t ne = 0;
                 D3MEnt* const dm0 = dme.data();
@@ -1371,14 +1392,15 @@ public:
                     // advances), a changed one's body copied (length 0 when new
                     // or unchanged); a march change body is at most 4 + 1 + 40 bytes.
                     const bool isnew = pmn[q] != 0;
-                    ent[ne] = i; entp[ne] = e; ne += isnew;
-                    m.body_upto<kD3MarchBody>(darena.data() + e->off, isnew ? 0 : e->len);
+                    const int32_t sl = pms[q];
+                    ent[ne] = sl; entp[ne] = e; ne += isnew;
+                    m.body_upto_slot<kD3MarchBody>(darena.data() + e->off, isnew ? 0 : e->len, uint32_t(sl));
                 }
                 m.end();
                 if (ne) {
                     m.begin(kTMarch, xs2::enter);
-                    if (dm == dm0) for (std::size_t q = 0; q < ne; ++q) m.flat(uint32_t(entp[q]->prev.id), entp[q]->prev);
-                    else for (std::size_t q = 0; q < ne; ++q) { const D3MEnt& e = d_march(w, ent[q]); m.flat(uint32_t(e.prev.id), e.prev); }
+                    if (dm == dm0) for (std::size_t r = 0; r < ne; ++r) m.flat(uint32_t(ent[r]), entp[r]->prev);
+                    else for (std::size_t q = 0; q < nm; ++q) if (pmn[q]) { const D3MEnt& e = d_march(w, pm[q]); m.flat(uint32_t(pms[q]), e.prev); }
                     m.end();
                 }
             }
