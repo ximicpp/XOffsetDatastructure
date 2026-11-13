@@ -38,12 +38,15 @@
 #                     is the v3.6.0 reproduction this script was accepted on)
 #     REPO=DIR        git repository to read <ref> from (default: this checkout)
 #     JOBS=N          make -j for zstd/lz4 (default 4)
+#     XPORT=1         also run one SLG_XPORT=1 process per format and batch (tag x, raw/x_*)
+#                     and append the transport-model columns L/B/S/SD .send+T/.recv+T
+#                     (tools/perf_gate/xport_columns.py, report only) to SCORECARD.md
 set -euo pipefail
 
 REF=${1:?usage: repro_scorecard.sh <ref> <outdir> [batches] [cycles]}
 OUT=$(readlink -f -m "${2:?usage: repro_scorecard.sh <ref> <outdir> [batches] [cycles]}")
 NB=${3:-8}; CY=${4:-21}
-CPU=${CPU:-2}; ZSTD=${ZSTD:-1}; ZBATCHES=${ZBATCHES:-1}; JOBS=${JOBS:-4}
+CPU=${CPU:-2}; ZSTD=${ZSTD:-1}; ZBATCHES=${ZBATCHES:-1}; JOBS=${JOBS:-4}; XPORT=${XPORT:-0}
 FORMATS=${FORMATS:-"xoffset_trusted zpp_bits cista_unchecked"}
 SHARED=${SHARED-"zpp_bits zpp_bits_dirty"}
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -188,6 +191,9 @@ batch() {  # bin rawdir batch
     if [[ $f == xoffset* ]]; then run "$1" "$2" d3 "$f" "$3" SLG_D3=1; fi
   done
   for f in $SHARED_RUN; do run "$1" "$2" d3 "$f" "$3" SLG_D3=1; done
+  if [[ $XPORT == 1 && $2 == raw ]]; then
+    for f in $FORMATS; do run "$1" "$2" x "$f" "$3" SLG_NATIVE_OFF=1 SLG_XPORT=1; done
+  fi
 }
 for b in $(seq 1 "$NB"); do
   batch slg_bench raw "$b"
@@ -212,5 +218,10 @@ ARGS=("$OUT/raw" --env "$OUT/env.json" --json "$OUT/scorecard.json" --rivals "$(
 [[ $ZSTD == 1 ]] && ARGS+=(--bytes-dir "$OUT/rawz")
 [[ -n ${BASELINE:-} ]] && ARGS+=(--baseline "$BASELINE")
 python3 "$HERE/scorecard.py" "${ARGS[@]}" > "$OUT/SCORECARD.md"
+if [[ $XPORT == 1 ]]; then
+  { echo; python3 "$HERE/xport_columns.py" "$OUT/raw" --json "$OUT/xport.json" \
+      --xo "$(echo $FORMATS | tr ' ' '\n' | grep '^xoffset' | head -1)" \
+      --rivals "$(echo $FORMATS | tr ' ' '\n' | grep -v '^xoffset' | paste -sd,)"; } >> "$OUT/SCORECARD.md"
+fi
 cat "$OUT/SCORECARD.md"
 log "done: $OUT/SCORECARD.md"
