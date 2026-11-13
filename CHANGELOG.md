@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+- Shared deltas: format XS 2.0 replaces XS 1.0 (4.0 W2; no XS 1.0 reader is
+  kept). A message is the head (`'X' 'S' 02 flags u32 version`, the stream on
+  a key), the root record (table 0, carried whole by every message), then
+  sections (`u32 count << 8 | table << 2 | kind`) of ops (`u32 id` and a
+  body). A whole body is the record's plain bytes, a container mask and the
+  containers (`u32` length and bytes); a change body is a member mask and the
+  members it names. No varints, no byte masks: a server encodes each entity
+  once per tick from its dirty members and every message copies the bytes.
+  The op's id is what the receiver's `find` takes: an entity id, or the slot
+  the server gave this client (the client then needs no index;
+  `XSyncWriter::op(op, len, id)` copies a shared op under the client's
+  slot). New API: `XRecordBody<T>` (whole and change bodies, `changed`,
+  `put_diff`, checks, `clear`, `same`), `put_whole_op` / `put_change_op` /
+  `put_diff_op`, and a new `XSyncWriter` (sections, `op`, `op_upto<N>`,
+  `reserve` / `op_in_room`, `whole`, `change`, `diff`, `leaves`,
+  `finish(version)`). Removed: `XRecordDelta`, `XSyncFields`, `XSyncHeader`,
+  `put_header`, `get_header`, `put_op`, varint helpers.
+  `XReceiver::apply_sync` keeps its signature and
+  target contract; table 0 is now the root record. `full` checks bools, mask
+  bits and lengths of every body and that no entry appears twice; a rejected
+  message changes nothing. docs/SHARED_DELTA.md, `examples/shared_delta.cpp`,
+  tests `test_shared_delta` / `_sync` / `_format` and `fuzz_shared_delta`
+  rewritten for XS 2.0. bench/slg D3: the server gives each client's units
+  and marches their slots (timed in `D*.send`), clients index their views by
+  slot.
 - `tools/perf_gate/repro_scorecard.sh <ref> <outdir>`: one command from a tag
   or commit to the SLG scorecard (pinned gcc:16 image, zpp_bits v4.7.6 and
   cista v0.16 by commit, one-TU `-O3` build, one process per format per batch,

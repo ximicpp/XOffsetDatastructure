@@ -1,4 +1,4 @@
-// libFuzzer target for the shared delta receiver (XS 1.0,
+// libFuzzer target for the shared delta receiver (XS 2.0,
 // xoffset_shared_delta.hpp, docs/SHARED_DELTA.md):
 // XReceiver<from_server>::apply_sync on a client view that holds a server's
 // records (tests/fuzz/shared_delta_model.hpp), the entry a client feeds with
@@ -15,15 +15,16 @@
 //
 // The first input byte picks the mode (bits 0-1), the second the replica's
 // state (a server built from it, its key message applied):
-//   0 raw: the rest is the op section of the stream's next delta, behind a
-//     header the harness writes (count: the third byte), so the input
-//     passes the header, stream and version checks.
+//   0 raw: the rest is the root record and the sections of the stream's
+//     next delta, behind a head the harness writes, so the input passes the
+//     head, stream and version checks.
 //   1 stream: the input drives the server (units enter, change and leave;
 //     cells and the head change); each real delta is applied after up to a
 //     few input-chosen corruptions of it are applied first. Real deltas
 //     must apply with both tiers and leave the server's records.
-//   2 bare: the rest is a whole message (header included).
-//   3 key: the rest is the op section of a key message, applied to the
+//   2 bare: the rest is a whole message (head included).
+//   3 key: the rest is the root record and the sections of a key message
+//     (stream and version: the third and fourth bytes), applied to the
 //     replica after it empties its units.
 //
 // Build: -DXOFFSET_BUILD_FUZZERS=ON (libFuzzer); fuzz_shared_delta_replay is
@@ -119,15 +120,18 @@ struct World {
     }
 };
 
-std::string header(bool key, std::uint64_t stream, std::uint32_t version, std::uint32_t count) {
-    xs::XSyncOut out;
-    xs::put_header(out, xs::XSyncHeader{std::uint8_t(key ? xs::kFlagKey : 0), stream, version, count});
-    return std::string(out.view());
+// The head of a message (with the stream after it for a key).
+std::string head(bool key, std::uint64_t stream, std::uint32_t version) {
+    std::string h("XS", 2);
+    h += char(xs::kFormat);
+    h += char(key ? xs::kFlagKey : 0);
+    h.append(reinterpret_cast<const char*>(&version), 4);
+    if (key) h.append(reinterpret_cast<const char*>(&stream), 8);
+    return h;
 }
 
 void run_raw(World& w, In& in) {
-    const std::uint32_t count = in.u8();
-    apply_checked(w.r, header(false, 0, w.r.cur.version() + 1, count) + in.rest());
+    apply_checked(w.r, head(false, 0, w.r.cur.version() + 1) + in.rest());
 }
 
 void run_bare(World& w, In& in) {
@@ -139,9 +143,10 @@ void run_bare(World& w, In& in) {
 }
 
 void run_key(World& w, In& in) {
-    const std::uint32_t count = in.u8();
     w.r.reset();
-    apply_checked(w.r, header(true, 0x5d3 + in.u8(), 1 + in.u8(), count) + in.rest());
+    const std::uint64_t stream = 0x5d3 + in.u8();
+    const std::uint32_t version = 1 + in.u8();
+    apply_checked(w.r, head(true, stream, version) + in.rest());
 }
 
 std::string corrupt(std::string m, In& in) {
@@ -198,8 +203,8 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
 }
 
 // Seeds: random inputs for every mode, and every fixture's real next delta
-// as a raw op section (mode 0) and a bare message (mode 2), its key message
-// as a key op section (mode 3).
+// without its head (mode 0) and whole (mode 2), its key message without its
+// head and stream (mode 3).
 extern "C" int XOffsetFuzzWriteSeeds(const char* dir) {
     std::filesystem::create_directories(dir);
     std::size_t count = 0;
@@ -225,15 +230,10 @@ extern "C" int XOffsetFuzzWriteSeeds(const char* dir) {
         auto pick = [&](unsigned n) { return unsigned(step_rng() % n); };
         for (int i = 0; i < 3; ++i) w.s.step(pick);
         const std::string m(w.s.delta());
-        xs::XSyncHeader h;
-        const char* ops = xs::get_header(m.data(), m.data() + m.size(), h);
-        if (!ops || h.count > 255) continue;
-        put(std::string{char(0), char(seed), char(h.count)} + std::string(ops, m.data() + m.size()));
+        put(std::string{char(0), char(seed)} + m.substr(xs::kSyncHead));
         put(std::string{char(2), char(seed)} + m);
         const std::string k(w.s.key());
-        const char* kops = xs::get_header(k.data(), k.data() + k.size(), h);
-        if (kops && h.count <= 255)
-            put(std::string{char(3), char(seed), char(h.count), char(0), char(0)} + std::string(kops, k.data() + k.size()));
+        put(std::string{char(3), char(seed), char(0), char(0)} + k.substr(xs::kSyncHead + 8));
     }
     std::cout << "fuzz_shared_delta: wrote " << count << " seeds to " << dir << "\n";
     return 0;

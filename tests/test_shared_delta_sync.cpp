@@ -1,4 +1,4 @@
-// Shared deltas through the receiver (XReceiver::apply_sync, XS 1.0,
+// Shared deltas through the receiver (XReceiver::apply_sync, XS 2.0,
 // docs/SHARED_DELTA.md): a server writes a stream of messages (units enter,
 // change and leave; the head and fixed cells change) and two clients apply
 // each one, with XCheck::full and with XCheck::admit. Both hold exactly the
@@ -6,10 +6,10 @@
 // Corrupted copies (bits flipped, cut, extended, two messages spliced) go
 // to the full client first: rejected, they change nothing (records and
 // cursor); accepted, admit on a copy gives the same result. Then the rules:
-// no key yet or a version gap (delta_base_mismatch), header errors, unknown
-// tables, kinds a table does not take, ids not held or already held, an
-// entry twice in a message, bytes after the last op, and the cursor after a
-// partly applied admit.
+// no key yet or a version gap (delta_base_mismatch), head errors, sections
+// on the root or on unknown tables, kinds a table does not take, ids not held
+// or already held, an entry twice in a message, sections cut short, bodies
+// that do not check, and the cursor after a partly applied admit.
 //
 // Built with XOFFSET_FORCE_FULL_CHECK=0 so admit is the real admit path. No
 // exception of its own: also built as test_shared_delta_sync_noexc.
@@ -39,13 +39,31 @@ void expect(const xo::XStatus& r, XErrc code, const char* what, int step) {
     }
 }
 
-// A message with the header the stream's next delta has and ops from text.
-std::string next_delta(const Replica& r, std::uint32_t count, std::string_view ops) {
-    xs::XSyncOut out;
-    xs::put_header(out, xs::XSyncHeader{0, 0, r.cur.version() + 1, count});
-    std::string m(out.view());
-    m.append(ops);
-    return m;
+std::string u32(std::uint32_t v) { return std::string(reinterpret_cast<const char*>(&v), 4); }
+std::string section(unsigned table, unsigned kind, std::uint32_t count) { return u32(count << 8 | table << 2 | kind); }
+// The head record's whole body.
+std::string root(const Head& h) {
+    xs::XSyncOut o;
+    xs::put_whole_op(o, 0, h);
+    return std::string(o.view().substr(4));
+}
+// A message with the head and root the stream's next delta has, then sections from text.
+std::string next_delta(const Replica& r, std::string_view sections, const Head& h = Head{}) {
+    return std::string("XS\x02\x00", 4) + u32(r.cur.version() + 1) + root(h) + std::string(sections);
+}
+std::string key_head(std::uint64_t stream, std::uint32_t version) {
+    return std::string("XS\x02\x01", 4) + u32(version) + std::string(reinterpret_cast<const char*>(&stream), 8) + root(Head{});
+}
+// Unit u's whole body and the change body of the members in mask.
+std::string whole(const Unit& u) {
+    xs::XSyncOut o;
+    xs::put_whole_op(o, 0, u);
+    return std::string(o.view().substr(4));
+}
+std::string change(const Unit& u, std::uint64_t mask) {
+    xs::XSyncOut o;
+    xs::put_change_op(o, 0, u, mask);
+    return std::string(o.view().substr(4));
 }
 
 void rules() {
@@ -76,59 +94,76 @@ void rules() {
     r.reset();
     expect(apply_admit(r, s.key()), XErrc::ok, "recovery key", -1);
     if (!s.matches(r)) fail("recovery result", -1);
-    // Header errors.
+    // Head errors.
     expect(apply_full(r, std::string_view()), XErrc::truncated, "empty message", -1);
-    expect(apply_full(r, "XS\x01"), XErrc::truncated, "short header", -1);
-    expect(apply_full(r, std::string_view("XT\x01\x00\x01\x00\x00\x00", 8)), XErrc::bad_magic, "magic", -1);
-    expect(apply_full(r, std::string_view("XS\x02\x00\x01\x00\x00\x00", 8)), XErrc::unsupported_version, "format byte", -1);
-    expect(apply_admit(r, std::string_view("XS\x01\x02\x01\x00\x00\x00", 8)), XErrc::unsupported_flags, "flags", -1);
-    expect(apply_full(r, std::string_view("XS\x01\x01\x00\x00", 6)), XErrc::truncated, "key without its stream", -1);
+    expect(apply_full(r, "XS\x02"), XErrc::truncated, "short head", -1);
+    expect(apply_full(r, std::string_view("XT\x02\x00\x01\x00\x00\x00", 8)), XErrc::bad_magic, "magic", -1);
+    expect(apply_full(r, std::string_view("XS\x01\x00\x01\x00\x00\x00", 8)), XErrc::unsupported_version, "format byte (XS 1.0)", -1);
+    expect(apply_admit(r, std::string_view("XS\x02\x02\x01\x00\x00\x00", 8)), XErrc::unsupported_flags, "flags", -1);
+    expect(apply_full(r, std::string_view("XS\x02\x01\x01\x00\x00\x00\x00\x00", 10)), XErrc::truncated, "key without its stream", -1);
+    expect(apply_full(r, next_delta(r, "").substr(0, 12)), XErrc::truncated, "delta cut inside its root", -1);
+    expect(apply_admit(r, key_head(9, 1).substr(0, 20)), XErrc::truncated, "key cut inside its root", -1);
     const std::uint32_t v = r.cur.version();
-    // An empty delta applies and advances the version.
-    expect(apply_full(r, next_delta(r, 0, "")), XErrc::ok, "empty delta", -1);
-    if (r.cur.version() != v + 1) fail("empty delta version", -1);
+    // A delta of the root only applies and advances the version.
+    expect(apply_full(r, next_delta(r, "", Head{77, 5, true})), XErrc::ok, "root-only delta", -1);
+    if (r.cur.version() != v + 1 || r.t.view().head.tick != 77 || !r.t.view().head.paused) fail("root-only delta result", -1);
+    // An empty section applies too.
+    expect(apply_admit(r, next_delta(r, section(kUnit, xs::change, 0))), XErrc::ok, "empty section", -1);
     s.version = r.cur.version();
-    // Op errors, for both tiers; none of them changes anything.
-    const std::uint32_t held = s.ids.empty() ? 0 : s.ids[0];
+    s.v().head = r.t.view().head;
+    // Op errors, for both tiers; none of them changes anything under full.
     if (s.ids.empty()) fail("model has no units", -1);
-    std::string held_id;
-    {
-        char b[5];
-        held_id.assign(b, xs::encode_varint(b, held));
-    }
-    struct Bad { std::uint32_t count; std::string ops; XErrc code; const char* what; };
-    const std::string leave_held = std::string(1, char(kUnit << 2 | xs::leave)) + held_id;
-    const std::string empty_body = std::string(1, '\0') + std::string(1, '\0');   // no blocks, no containers
+    const std::uint32_t held = s.ids[0];
+    const Unit& hu = s.v().units[0];
+    const std::string leave_held = section(kUnit, xs::leave, 1) + u32(held);
+    struct Bad { std::string sections; XErrc code; const char* what; bool admit_rejects; };
     const Bad bad[] = {
-        {1, std::string("\x0c\x00", 2), XErrc::invalid_payload, "unknown table"},
-        {1, std::string(1, char(kCell << 2 | xs::leave)) + std::string(1, '\0'), XErrc::invalid_payload, "leave on a fixed table"},
-        {1, std::string(1, char(kCell << 2 | 3)) + std::string(1, '\0'), XErrc::invalid_payload, "kind 3"},
-        {1, std::string(1, char(kCell << 2 | xs::change)) + "\x09" + std::string(1, '\0'), XErrc::invalid_payload, "cell not held"},
-        {1, std::string(1, char(kHead << 2 | xs::change)) + "\x01" + std::string(1, '\0'), XErrc::invalid_payload, "head id 1"},
-        {1, std::string(1, char(kUnit << 2 | xs::change)) + "\x7f" + empty_body, XErrc::invalid_payload, "change of a unit not held"},
-        {1, std::string(1, char(kUnit << 2 | xs::leave)) + "\x7f", XErrc::invalid_payload, "leave of a unit not held"},
-        {1, std::string(1, char(kUnit << 2 | xs::enter)) + held_id + empty_body, XErrc::invalid_payload, "enter of a unit held"},
-        {2, leave_held + leave_held, XErrc::invalid_payload, "a unit twice"},
-        {1, leave_held + std::string(1, '\0'), XErrc::invalid_payload, "bytes after the last op"},
-        {2, leave_held, XErrc::truncated, "fewer ops than counted"},
+        {section(5, xs::change, 1) + u32(0) + std::string(1, '\0'), XErrc::invalid_payload, "unknown table", true},
+        {section(kHead, xs::change, 1) + u32(0) + std::string(1, '\0'), XErrc::invalid_payload, "an op on the root", true},
+        {section(kCell, xs::leave, 1) + u32(0), XErrc::invalid_payload, "leave on a fixed table", true},
+        {section(kCell, 3, 1) + u32(0), XErrc::invalid_payload, "kind 3", true},
+        {section(kUnit, 3, 1) + u32(held), XErrc::invalid_payload, "kind 3 on a keyed table", true},
+        {section(kCell, xs::change, 1) + u32(9) + std::string(1, '\0'), XErrc::invalid_payload, "cell not held", true},
+        {section(kUnit, xs::change, 1) + u32(0x7f) + change(hu, 1), XErrc::invalid_payload, "change of a unit not held", true},
+        {section(kUnit, xs::leave, 1) + u32(0x7f), XErrc::invalid_payload, "leave of a unit not held", true},
+        {section(kUnit, xs::enter, 1) + u32(held) + whole(hu), XErrc::invalid_payload, "enter of a unit held", true},
+        {section(kUnit, xs::leave, 2) + u32(held) + u32(held), XErrc::invalid_payload, "a unit twice in a section", true},
+        {leave_held + section(kUnit, xs::change, 1) + u32(held) + change(hu, 1), XErrc::invalid_payload, "a unit in two sections", true},
+        {section(kUnit, xs::leave, 2) + u32(held), XErrc::truncated, "fewer ops than counted", true},
+        {leave_held + std::string(3, '\0'), XErrc::truncated, "bytes after the last section", true},
+        {section(kUnit, xs::change, 1) + u32(held) + std::string("\x00\x02", 2), XErrc::invalid_payload, "member mask past the members", false},
+        {section(kCell, xs::change, 1) + u32(0) + std::string("\x04\x02", 2), XErrc::invalid_payload, "a bool of 2 (plain member)", false},
+        {section(kCell, xs::enter, 1) + u32(0) + std::string(12, '\0') + std::string(1, '\x03'), XErrc::invalid_payload, "a bool of 3 (whole body)", false},
+        {section(kUnit, xs::change, 1) + u32(held) + std::string("\x10\x00", 2) + u32(1000) + "abc", XErrc::invalid_payload, "string past the end", false},
+        {section(kUnit, xs::change, 1) + u32(held) + std::string("\x20\x00", 2) + u32(3) + "abcd", XErrc::invalid_payload, "vector past the end", false},
+        {section(kCell, xs::change, 1) + u32(0) + std::string(1, '\x01'), XErrc::invalid_payload, "member cut short", false},
     };
     for (const Bad& b : bad) {
-        const std::string m = next_delta(r, b.count, b.ops);
+        const std::string m = next_delta(r, b.sections);
         Replica before(r);
         expect(apply_full(r, m), b.code, b.what, -1);
         if (!same_state(r, before)) fail("a rejected message changed the full client", -1);
-        Replica twin(r);
-        const xo::XStatus a = apply_admit(twin, m);
-        if (a) fail("admit accepted a bad message", -1);
+        if (b.admit_rejects) {
+            Replica twin(r);
+            if (apply_admit(twin, m)) fail("admit accepted a bad message", -1);
+        }
+    }
+    // A root bool that is not 0 or 1: full rejects it.
+    {
+        std::string m = next_delta(r, "");
+        m[8 + 12] = 2;   // Head::paused, after tick and seq
+        Replica before(r);
+        expect(apply_full(r, m), XErrc::invalid_payload, "root bool of 2", -1);
+        if (!same_state(r, before)) fail("a rejected root changed the full client", -1);
     }
     // admit applies op by op: an op it rejects after others applied leaves
     // the cursor empty (only a key applies next).
     {
-        const std::string m = next_delta(r, 2, leave_held + std::string(1, char(kUnit << 2 | xs::leave)) + "\x7f");
+        const std::string m = next_delta(r, section(kUnit, xs::leave, 2) + u32(held) + u32(0x7f));
         Replica twin(r);
         expect(apply_admit(twin, m), XErrc::invalid_payload, "partly applied admit", -1);
         if (!twin.cur.empty()) fail("cursor after a partly applied admit", -1);
-        expect(apply_admit(twin, next_delta(r, 0, "")), XErrc::delta_base_mismatch, "delta after a partly applied admit", -1);
+        expect(apply_admit(twin, next_delta(r, "")), XErrc::delta_base_mismatch, "delta after a partly applied admit", -1);
         // full on the same message changes nothing.
         Replica before(r);
         expect(apply_full(r, m), XErrc::invalid_payload, "full on the same message", -1);
@@ -138,49 +173,46 @@ void rules() {
     // (an op whose bit is set is compared with the ops before it), longer
     // ones in the cursor's table.
     {
-        auto key_msg = [&](const std::vector<std::uint32_t>& ids) {
-            xs::XSyncOut out;
-            xs::put_header(out, xs::XSyncHeader{xs::kFlagKey, 0x77, 1, std::uint32_t(ids.size())});
-            std::string m(out.view());
-            for (const std::uint32_t id : ids) {
-                char b[5];
-                m += char(kUnit << 2 | xs::enter);
-                m.append(b, xs::encode_varint(b, id));
-                m += empty_body;
+        const std::string empty_unit(xs::XRecordBody<Unit>::whole_body::fixed, '\0');   // plain bytes and container mask zero
+        auto key_msg = [&](const std::vector<std::uint32_t>& ids, std::size_t split) {
+            std::string m = key_head(0x77, 1);
+            // Two sections (the second from split on): the check spans them.
+            for (std::size_t a = 0; a < ids.size();) {
+                const std::size_t b = a < split ? std::min(split, ids.size()) : ids.size();
+                m += section(kUnit, xs::enter, std::uint32_t(b - a));
+                for (std::size_t i = a; i < b; ++i) m += u32(ids[i]) + empty_unit;
+                a = b;
             }
             return m;
         };
         std::vector<std::uint32_t> many;
-        for (std::uint32_t i = 0; i < 70; ++i) many.push_back(1000 + i);
+        for (std::uint32_t i = 0; i < 300; ++i) many.push_back(1000 + i * 7);
         Replica k;
-        expect(apply_full(k, key_msg(many)), XErrc::ok, "70 entries", -1);
-        if (k.t.idx.size() != 70) fail("70 entries held", -1);
-        many.push_back(1035);
-        Replica k2, fresh;
-        expect(apply_full(k2, key_msg(many)), XErrc::invalid_payload, "an entry twice in 71 ops", -1);
-        if (!same_state(k2, fresh)) fail("71 ops with an entry twice changed the client", -1);
+        expect(apply_full(k, key_msg(many, 40)), XErrc::ok, "300 entries", -1);
+        if (k.t.idx.size() != 300) fail("300 entries held", -1);
+        Replica fresh;
+        for (const std::size_t at : {std::size_t(10), std::size_t(64), std::size_t(65), std::size_t(299)}) {
+            std::vector<std::uint32_t> twice = many;
+            twice.insert(twice.begin() + std::ptrdiff_t(at), many[at / 2]);
+            Replica k2;
+            expect(apply_full(k2, key_msg(twice, 40)), XErrc::invalid_payload, "an entry twice", -1);
+            if (!same_state(k2, fresh)) fail("a message with an entry twice changed the client", -1);
+        }
         // Two entries on the same filter bit are two entries.
         auto bit = [](std::uint32_t id) { return unsigned((((std::uint64_t(kUnit) << 32) | id) * 0x9E3779B97F4A7C15ull) >> 56); };
         std::uint32_t a = 1, b = 2;
         while (bit(b) != bit(a)) ++b;
         Replica k3;
-        expect(apply_full(k3, key_msg({a, b})), XErrc::ok, "two entries on one filter bit", -1);
+        expect(apply_full(k3, key_msg({a, b}, 1)), XErrc::ok, "two entries on one filter bit", -1);
         if (k3.t.idx.size() != 2) fail("two entries on one filter bit held", -1);
         Replica k4;
-        expect(apply_full(k4, key_msg({a, b, a})), XErrc::invalid_payload, "an entry twice behind a filter hit", -1);
+        expect(apply_full(k4, key_msg({a, b, a}, 2)), XErrc::invalid_payload, "an entry twice behind a filter hit", -1);
         if (!same_state(k4, fresh)) fail("an entry twice behind a filter hit changed the client", -1);
-    }
-    // A record body that does not check: a VSET of more elements than bytes.
-    {
-        std::string ops(1, char(kUnit << 2 | xs::change));
-        ops += held_id;
-        ops += std::string(1, '\0');               // no blocks
-        ops += std::string(1, '\x01');             // one container op
-        ops += std::string(1, char(1 << 2 | 1));   // container 1 (buffs), VSET
-        ops += std::string(1, '\x7f');             // 127 elements, no bytes
-        Replica before(r);
-        expect(apply_full(r, next_delta(r, 1, ops)), XErrc::invalid_payload, "body that does not check", -1);
-        if (!same_state(r, before)) fail("a rejected body changed the client", -1);
+        // The same id in two tables is two entries.
+        Replica k5;
+        expect(apply_full(k5, key_head(0x77, 1) + section(kUnit, xs::enter, 1) + u32(1) + empty_unit +
+                                  section(kCell, xs::change, 1) + u32(1) + std::string(1, '\0')),
+               XErrc::ok, "id 1 in two tables", -1);
     }
 }
 
