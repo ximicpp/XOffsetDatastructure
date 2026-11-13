@@ -1444,116 +1444,194 @@ public:
         }
         // One delivery: leaves, the changes of units, marches and tiles, then
         // the units and marches entering the view, each a copy of the
-        // entity's body of this tick. The connection's lines are fetched at
-        // the start and first used by the enters (and the version, written
-        // at the end).
+        // entity's body of this tick. EXPERIMENT (design thread, not merged):
+        // the plan's changed and entering lists come apart from the tracker,
+        // the message's room is taken once, sections are written with local
+        // cursors, slots are taken and given through locals.
+        static constexpr std::size_t kD3HeadRoom = 128;
+        // Room per entering unit: a whole body up to kD3KeyBody bytes plus slack.
+        static constexpr std::size_t kD3KeyBody = 992, kD3KeyRoom = kD3KeyBody + XOffsetDatastructure::xsync::kSyncSlack;
+        static constexpr std::size_t kD3MarchRoom = kD3MarchBody + XOffsetDatastructure::xsync::kSyncSlack;
+        static constexpr std::size_t kD3MarchWholeRoom = 4 + sizeof(xm::ViewMarch) + 16 + XOffsetDatastructure::xsync::kSyncSlack;
+        static constexpr std::size_t kD3TileRoom = 4 + RD<xm::Tile>::diff_room + XOffsetDatastructure::xsync::kSyncSlack;
+        struct D3QS { char* q; char* sec; };
+        // Out of line: room for n more bytes at q (an op larger than its share).
+        XOFFSET_DETAIL_NOINLINE D3QS d_room(char* q, char* sec, std::size_t n) {
+            char* const old = dmsg.data();
+            dmsg.commit(std::size_t(q - old) - dmsg.size());
+            dmsg.tail(n);
+            return {dmsg.data() + (q - old), dmsg.data() + (sec - old)};
+        }
+        XOFFSET_DETAIL_NOINLINE static int32_t d_unspill(std::vector<int32_t>& sp) noexcept { const int32_t v = sp.back(); sp.pop_back(); return v; }
+        template <unsigned Cap>
+        XOFFSET_DETAIL_NOINLINE static void d_give_slow(uint8_t* f, uint8_t& n_at, uint8_t& spill, std::vector<int32_t>& sp, const int32_t* x, std::size_t k) {
+            d_give<Cap>(f, n_at, spill, sp, x, k);
+        }
+        [[noreturn]] XOFFSET_DETAIL_NOINLINE static void d_too_many() { throw std::length_error("d3: more than 2^24 - 1 ops in one section"); }
+        static constexpr uint32_t d_code(unsigned table, XOffsetDatastructure::xsync::XSyncKind kind) noexcept { return uint32_t(table << 2 | unsigned(kind)); }
         std::size_t d_send(int c, const MapWorld& w, const DeltaPlan& p, int64_t id) {
+            namespace xs = XOffsetDatastructure::xsync;
+            using xs::sd_detail::store;
             D3Conn& k = dconn[std::size_t(c)];
             __builtin_prefetch(&k, 1);
             __builtin_prefetch(reinterpret_cast<const char*>(&k) + 64, 1);
-#ifdef SLG_D3_STATS
-            if (dstat_msgs == 0) for (int q = 0; q < 12; ++q) dstat_bytes[q] = dstat_body[q] = dstat_ops[q] = 0;   // drop the key messages
-#endif
-            D3Writer m(dmsg, xm::D3Root{id, w.tick_no()}, 0);   // the version: at finish
-            if (!p.rslot.empty()) {
-                m.leaves(kTUnit, p.rslot.data(), p.rslot.size());
-                for (int32_t uid : p.removed) --due[std::size_t(uid - 1)].hold;   // unit id = index + 1
+            const int32_t* const rs = p.rslot.data();
+            const int32_t* const rms = p.rmslot.data();
+            const std::size_t nrs = p.rslot.size(), nrm = p.rmslot.size(), nuc = p.uci.size(), nue = p.uei.size(),
+                              nmc = p.mci.size(), nme = p.mei.size(), nt = p.tiles.size();
+            if ((nrs | nrm | nuc | nue | nmc | nme | nt) > xs::kSyncSectionMax) [[unlikely]] d_too_many();
+            // One capacity check: every op of the message has its room.
+            dmsg.clear();
+            char* const b = dmsg.tail(kD3HeadRoom + 4 * (nrs + nrm) + nuc * kD3OpRoom + nue * kD3KeyRoom + nmc * kD3MarchRoom + nme * kD3MarchWholeRoom + nt * kD3TileRoom);
+            b[0] = 'X'; b[1] = 'S'; b[2] = char(xs::kFormat); b[3] = 0;
+            char* q = RD<xm::D3Root>::put_whole(b + xs::kSyncHead, xm::D3Root{id, w.tick_no()});
+            char* sec = q;
+            if (nrs) {
+                store<std::uint32_t>(q, uint32_t(nrs) << 8 | d_code(kTUnit, xs::leave));
+#pragma GCC novector
+                for (std::size_t i = 0; i < nrs; ++i) store<std::uint32_t>(q + 4 + 4 * i, uint32_t(rs[i]));
+                q += 4 + 4 * nrs;
+                const int32_t* const rid = p.removed.data();
+#pragma GCC novector
+                for (std::size_t i = 0; i < nrs; ++i) --due[std::size_t(rid[i] - 1)].hold;   // unit id = index + 1
             }
-            if (!p.rmslot.empty()) m.leaves(kTMarch, p.rmslot.data(), p.rmslot.size());
-            // Plan arrays as locals: the message stores may alias anything.
-            const int32_t* const pu = p.units.data();
-            const uint8_t* const pun = p.unew.data();
-            const int32_t* const pus = p.uslot.data();
-            int32_t* const* const pur = p.uref.data();
-            const int32_t* const pm = p.marches.data();
-            const uint8_t* const pmn = p.mnew.data();
-            const int32_t* const pms = p.mslot.data();
-            int32_t* const* const pmr = p.mref.data();
-            const std::size_t nu = p.units.size(), nm = p.marches.size();
-            // Entering units and marches: their places in the plan.
-            int32_t* const uent = d_scratch(nu + nm);
-            int32_t* const ment = uent + nu;
-            std::size_t une = 0, mne = 0;
-            if (nu) {
-                // Room for the section up front (kD3OpRoom per op); an op past
-                // kD3OpBody re-reserves for itself and the rest.
-                m.begin(kTUnit, kChange);
-                m.reserve(nu * kD3OpRoom);
-                for (std::size_t q = 0; q < nu; ++q) {
-                    const int32_t i = pu[q];
-                    if (pun[q]) { uent[une++] = int32_t(q); continue; }
-                    if (const D3Ent& e = d_unit(w, i); e.tick == dtick) {
-                        if (e.len > kD3OpBody) [[unlikely]] m.reserve((nu - q) * kD3OpRoom + e.len);
-                        m.op_in_room(darena.data() + e.off, e.len, uint32_t(pus[q]));
+            if (nrm) {
+                store<std::uint32_t>(q, uint32_t(nrm) << 8 | d_code(kTMarch, xs::leave));
+#pragma GCC novector
+                for (std::size_t i = 0; i < nrm; ++i) store<std::uint32_t>(q + 4 + 4 * i, uint32_t(rms[i]));
+                q += 4 + 4 * nrm;
+            }
+            if (nuc) {
+                const int32_t* const ui = p.uci.data();
+                const int32_t* const us = p.ucs.data();
+#ifdef SLG_D3_LIST_PF
+                // The whole list is in hand: its entries are fetched first, so their misses overlap.
+                { const D3UEnt* const du = due.data();
+#pragma GCC novector
+                  for (std::size_t r = 0; r < nuc; ++r) __builtin_prefetch(&du[std::size_t(ui[r])]); }
+#endif
+                sec = q; q += 4;
+                uint32_t n = 0;
+                for (std::size_t r = 0; r < nuc; ++r) {
+                    if (const D3Ent& e = d_unit(w, ui[r]); e.tick == dtick) {
+                        if (e.len > kD3OpBody) [[unlikely]] { const D3QS x = d_room(q, sec, (nuc - r) * kD3OpRoom + e.len + nue * kD3KeyRoom + nmc * kD3MarchRoom + nme * kD3MarchWholeRoom + nt * kD3TileRoom + kD3HeadRoom); q = x.q; sec = x.sec; }
+                        xs::sd_detail::copy_body(q, darena.data() + e.off, e.len);
+                        store<std::uint32_t>(q, uint32_t(us[r]));
+                        q += e.len; ++n;
                     }
                 }
-                m.end();
+                store<std::uint32_t>(sec, n << 8 | d_code(kTUnit, xs::change));
+                q = n ? q : sec;
             }
-            D3MEnt** const mentp = reinterpret_cast<D3MEnt**>(d_pscratch(nm));
-            bool moved = false;   // a fill grew the ring: the noted entries moved
-            if (nm) {
-                // The ring and the world's marches as locals (message stores
-                // may alias them); a fill may grow the ring: reload then.
-                D3MEnt* const dm0 = dme.data();
-                D3MEnt* dm = dm0;
+            const WorldMarch* const wm = nmc | nme ? &w.march(0) : nullptr;
+            const int32_t t32 = int32_t(dtick);
+            if (nmc) {
+                const int32_t* const mi = p.mci.data();
+                const int32_t* const ms = p.mcs.data();
+                D3MEnt* dm = dme.data();
                 std::size_t mk = dme.size() - 1;
-                const WorldMarch* const wm = &w.march(0);
-                const int32_t t32 = int32_t(dtick);
-                m.begin(kTMarch, kChange);
-                for (std::size_t q = 0; q < nm; ++q) {
-                    const int32_t i = pm[q];
+                sec = q; q += 4;
+                uint32_t n = 0;
+                for (std::size_t r = 0; r < nmc; ++r) {
+                    const int32_t i = mi[r];
                     const int32_t mid = wm[i].id;
                     D3MEnt* e = &dm[std::size_t(mid) & mk];
                     if (e->prev.id != mid || e->tick != t32) [[unlikely]] { e = &d_march_fill(w, i); dm = dme.data(); mk = dme.size() - 1; }
-                    // No branch on the kind: an entering march is noted (mne
-                    // advances), a changed one's body copied (length 0 when new
-                    // or unchanged); a march change body is at most 4 + 1 + 40 bytes.
-                    const bool isnew = pmn[q] != 0;
-                    ment[mne] = int32_t(q); mentp[mne] = e; mne += isnew;
-                    m.op_upto<kD3MarchBody>(darena.data() + e->off, isnew ? 0 : e->len, uint32_t(pms[q]));
+                    std::memcpy(q, darena.data() + e->off, kD3MarchBody);
+                    store<std::uint32_t>(q, uint32_t(ms[r]));
+                    q += e->len; n += e->len != 0;
                 }
-                m.end();
-                moved = dm != dm0;
+                store<std::uint32_t>(sec, n << 8 | d_code(kTMarch, xs::change));
+                q = n ? q : sec;
             }
-            if (!p.tiles.empty()) {
-                m.begin(kTTile, kChange);
-                for (int32_t t : p.tiles) {
-                    const D3Ent& e = d_tile(w, t);
-                    if (e.len) d_put(m, kTTile, kChange, e.off, e.len);
+            if (nt) {
+                const int32_t* const ti = p.tiles.data();
+                sec = q; q += 4;
+                uint32_t n = 0;
+                for (std::size_t r = 0; r < nt; ++r) {
+                    const D3Ent& e = d_tile(w, ti[r]);
+                    if (e.len) { xs::sd_detail::copy_body(q, darena.data() + e.off, e.len); q += e.len; ++n; }
                 }
-                m.end();
+                store<std::uint32_t>(sec, n << 8 | d_code(kTTile, xs::change));
+                q = n ? q : sec;
             }
-            if (une) {
-                m.begin(kTUnit, kEnter);
-                m.reserve(une * kD3OpRoom);
-                auto tk = d_utaker(k, dcold[std::size_t(c)]);
-                for (std::size_t r = 0; r < une; ++r) {
-                    const std::size_t q = std::size_t(uent[r]); const int32_t i = pu[q];
+            if (nue) {
+                const int32_t* const ui = p.uei.data();
+                int32_t* const* const ur = p.uer.data();
+#ifdef SLG_D3_LIST_PF
+                { const D3UEnt* const du = due.data();
+#pragma GCC novector
+                  for (std::size_t r = 0; r < nue; ++r) __builtin_prefetch(&du[std::size_t(ui[r])], 1); }
+#endif
+                uint32_t fn = k.un, used = k.uused;
+                sec = q; q += 4;
+                for (std::size_t r = 0; r < nue; ++r) {
+                    const int32_t i = ui[r];
                     d_unit_key(w, i); D3UEnt& e = due[std::size_t(i)]; ++e.hold;
-                    if (e.klen > kD3OpBody) [[unlikely]] m.reserve((une - r) * kD3OpRoom + e.klen);
-                    const int32_t s = tk.take(); *pur[q] = s;
-                    m.op_in_room(darena.data() + e.koff, e.klen, uint32_t(s));
+                    if (e.klen > kD3KeyBody) [[unlikely]] { const D3QS x = d_room(q, sec, (nue - r) * kD3KeyRoom + e.klen + nme * kD3MarchWholeRoom + kD3HeadRoom); q = x.q; sec = x.sec; }
+                    int32_t s;
+                    if (fn) s = int32_t(k.uf[--fn]);
+                    else if (k.uspill) [[unlikely]] { auto& sp = dcold[std::size_t(c)].us; s = d_unspill(sp); k.uspill = uint8_t(!sp.empty()); }
+                    else s = int32_t(used++);
+                    *ur[r] = s;
+                    xs::sd_detail::copy_body(q, darena.data() + e.koff, e.klen);
+                    store<std::uint32_t>(q, uint32_t(s));
+                    q += e.klen;
                 }
-                tk.done();
-                m.end();
+                k.un = uint8_t(fn); k.uused = used;
+                store<std::uint32_t>(sec, uint32_t(nue) << 8 | d_code(kTUnit, xs::enter));
             }
-            if (mne) {
-                if (moved) [[unlikely]] d_march_refind(w, pm, ment, mentp, mne);
-                m.begin(kTMarch, kEnter);
-                auto tk = d_mtaker(k, dcold[std::size_t(c)]);
-                for (std::size_t r = 0; r < mne; ++r) { const int32_t s = tk.take(); *pmr[ment[r]] = s; m.whole(uint32_t(s), mentp[r]->prev); }
-                tk.done();
-                m.end();
+            if (nme) {
+                const int32_t* const mi = p.mei.data();
+                int32_t* const* const mr = p.mer.data();
+                D3MEnt* dm = dme.data();
+                std::size_t mk = dme.size() - 1;
+                uint32_t fn = k.mn, used = k.mused;
+                store<std::uint32_t>(q, uint32_t(nme) << 8 | d_code(kTMarch, xs::enter));
+                q += 4;
+                for (std::size_t r = 0; r < nme; ++r) {
+                    const int32_t i = mi[r];
+                    const int32_t mid = wm[i].id;
+                    D3MEnt* e = &dm[std::size_t(mid) & mk];
+                    if (e->prev.id != mid || e->tick != t32) [[unlikely]] { e = &d_march_fill(w, i); dm = dme.data(); mk = dme.size() - 1; }
+                    int32_t s;
+                    if (fn) s = int32_t(k.mf[--fn]);
+                    else if (k.mspill) [[unlikely]] { auto& sp = dcold[std::size_t(c)].ms; s = d_unspill(sp); k.mspill = uint8_t(!sp.empty()); }
+                    else s = int32_t(used++);
+                    *mr[r] = s;
+                    store<std::uint32_t>(q, uint32_t(s));
+                    q = RD<xm::ViewMarch>::put_whole(q + 4, e->prev);
+                }
+                k.mn = uint8_t(fn); k.mused = used;
             }
             // The slots that left are free from the next message on (an entry
             // appears at most once in a message).
-            d_give<kD3UFree>(k.uf, k.un, k.uspill, dcold[std::size_t(c)].us, p.rslot.data(), p.rslot.size());
-            d_give<kD3MFree>(k.mf, k.mn, k.mspill, dcold[std::size_t(c)].ms, p.rmslot.data(), p.rmslot.size());
-            const std::size_t n = m.finish(++k.version);
-#ifdef SLG_D3_STATS
-            dstat_msgs += 1; dstat_total += double(n);
+            if (nrs) {
+                const uint32_t n = k.un;
+                if (n + nrs <= kD3UFree && k.uused <= 256) [[likely]] {
+#pragma GCC novector
+                    for (std::size_t i = 0; i < nrs; ++i) k.uf[n + i] = uint8_t(rs[i]);
+                    k.un = uint8_t(n + nrs);
+                } else d_give_slow<kD3UFree>(k.uf, k.un, k.uspill, dcold[std::size_t(c)].us, rs, nrs);
+            }
+            if (nrm) {
+                const uint32_t n = k.mn;
+                if (n + nrm <= kD3MFree && k.mused <= 256) [[likely]] {
+#pragma GCC novector
+                    for (std::size_t i = 0; i < nrm; ++i) k.mf[n + i] = uint8_t(rms[i]);
+                    k.mn = uint8_t(n + nrm);
+                } else d_give_slow<kD3MFree>(k.mf, k.mn, k.mspill, dcold[std::size_t(c)].ms, rms, nrm);
+            }
+#ifdef SLG_D3_NEXT_PF
+            // The connection served next (the server's loop goes through them
+            // in order): its lines arrive while the caller plans its delta.
+            __builtin_prefetch(&k + 1, 1);
+            __builtin_prefetch(reinterpret_cast<const char*>(&k + 1) + 64, 1);
 #endif
-            return n;
+            char* const b1 = dmsg.data();
+            store<std::uint32_t>(b1 + 4, ++k.version);
+            dmsg.commit(std::size_t(q - b1) - dmsg.size());
+            return dmsg.size();
         }
         // Trust tier (susu 2026-11-04: server -> client over a trusted
         // transport): XReceiver<from_server>::apply_sync with its default
