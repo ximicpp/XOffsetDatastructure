@@ -71,6 +71,10 @@
 // stages keep their range; SLG_NATIVE_OFF=1 drops it.
 #pragma once
 #include <algorithm>
+#ifdef SLG_XS2_DIAG
+#include <cstdio>
+#include <sys/resource.h>
+#endif
 #include <cstdint>
 #include <cstdlib>
 #include <map>
@@ -1213,7 +1217,15 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
 #ifdef SLG_XS2_DIAG
                     if constexpr (requires { ops.d_diag_touch(wv, dw); }) warm_sink += ops.d_diag_touch(wv, dw);
 #endif
+#ifdef SLG_XS2_DIAG
+                    struct rusage r0, r1; getrusage(RUSAGE_SELF, &r0);
+#endif
                     timed(st, k.dtwrecv.c_str(), [&] { ops.d_recv_trusted_from(wv, dw); });
+#ifdef SLG_XS2_DIAG
+                    getrusage(RUSAGE_SELF, &r1);
+                    static long flt = 0, n = 0; flt += r1.ru_minflt - r0.ru_minflt;
+                    if (++n % 1323 == 0) std::fprintf(stderr, "DPTW minflt %ld over %ld recv\n", flt, n);
+#endif
                 };
                 if (m++ & 1) { full(); trusted(); } else { trusted(); full(); }
             }

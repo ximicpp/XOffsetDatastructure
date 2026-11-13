@@ -1414,6 +1414,7 @@ public:
             if (bits & 8) h += L.uidx.diag_touch(4096) + L.midx.diag_touch(4096);
             if (bits & 2) { volatile const char* p = reinterpret_cast<const char*>(&L); for (std::size_t i = 0; i < sizeof(L); i += 64) h += uint64_t(p[i]); h += uint64_t(&L.view->template root<xm::ViewSnapshot>() != nullptr); }
             if (bits & 4) for (std::size_t i = 0; i < msg.size(); i += 64) h += uint64_t(uint8_t(msg[i]));
+            if (bits & 32) { L.uidx.diag_flush(); L.midx.diag_flush(); }
             if (bits & 16) {
                 static int n = 0;
                 if (n++ % 500 == 0)
