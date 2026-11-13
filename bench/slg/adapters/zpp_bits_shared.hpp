@@ -189,6 +189,7 @@ public:
         uint64_t h = 0;
         if (bits & 1) h += L.at.units.diag_touch(64) + L.at.marches.diag_touch(64);
         if (bits & 8) h += L.at.units.diag_touch(4096) + L.at.marches.diag_touch(4096);
+        if (bits & 32) { L.at.units.diag_flush(); L.at.marches.diag_flush(); }
         if (bits & 4) for (std::size_t i = 0; i < msg.size(); i += 64) h += uint64_t(uint8_t(msg[i]));
         return h;
     }

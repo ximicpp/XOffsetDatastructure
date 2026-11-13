@@ -1308,6 +1308,12 @@ namespace XOffsetDatastructure::xsync {
         }
 
 #ifdef SLG_XS2_DIAG
+        // Diagnostic build only: evict every line of the index (clflush).
+        void diag_flush() const noexcept {
+            for (std::size_t i = 0; i < cells_.size() * sizeof(Cell); i += 64) __builtin_ia32_clflush(reinterpret_cast<const char*>(cells_.data()) + i);
+            for (std::size_t i = 0; i < free_.size() * sizeof(std::int32_t); i += 64) __builtin_ia32_clflush(reinterpret_cast<const char*>(free_.data()) + i);
+            __builtin_ia32_mfence();
+        }
         // Diagnostic build only: read every cell and free-list entry (cache warm-up).
         std::uint64_t diag_touch(std::size_t stride) const noexcept {
             std::uint64_t h = 0;
