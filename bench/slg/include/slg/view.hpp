@@ -596,15 +596,21 @@ struct DeltaPlan {
     std::vector<int32_t> tiles;            // tiles changed this tick: ty * kTiles + tx
     std::vector<uint8_t> unew, mnew;       // units[k] / marches[k] is new to the client's view (bookkeeping the
                                            // server has anyway; only the D3 prototype uses it)
+    // XS 2.0 prototype (slot A/B, only the D3 prototype reads them): the slot
+    // the client keeps units[k] / marches[k] / removed[k] / removed_marches[k]
+    // in. A slot that leaves is reused, last freed first; leaves are freed
+    // (in removed order) before entering records take slots (in units order).
+    std::vector<int32_t> uslot, mslot, rslot, rmslot;
     bool empty() const { return units.empty() && removed.empty() && marches.empty() && removed_marches.empty() && tiles.empty(); }
 };
 
 class ViewTracker {
 public:
-    void setup(int clients) { u_.assign(std::size_t(clients), {}); m_.assign(std::size_t(clients), {}); }
+    void setup(int clients) { u_.assign(std::size_t(clients), {}); m_.assign(std::size_t(clients), {}); us_.assign(std::size_t(clients), {}); ms_.assign(std::size_t(clients), {}); }
     void plan(const MapWorld& w, int c, const ViewRect& r, DeltaPlan& p) {
         p.units.clear(); p.removed.clear(); p.marches.clear(); p.removed_marches.clear(); p.tiles.clear();
         p.unew.clear(); p.mnew.clear();
+        p.uslot.clear(); p.mslot.clear(); p.rslot.clear(); p.rmslot.clear();
         ++gen_;
         auto& lu = u_[std::size_t(c)];
         w.units_in(r, tmp_);
@@ -612,26 +618,48 @@ public:
             const WorldUnit& u = w.unit(i);
             auto [it, fresh] = lu.try_emplace(u.id);
             SentU& s = it->second;
-            if (fresh || s.ver != u.ver) { s.ver = u.ver; p.units.push_back(i); p.unew.push_back(fresh ? 1 : 0); }
+            if (fresh) s.slot = -1;
+            if (fresh || s.ver != u.ver) { s.ver = u.ver; p.units.push_back(i); p.unew.push_back(fresh ? 1 : 0); p.uslot.push_back(s.slot); }
             s.gen = gen_;
         }
+        pairs_.clear();
         for (auto it = lu.begin(); it != lu.end();) {
-            if (it->second.gen != gen_) { p.removed.push_back(it->first); it = lu.erase(it); }
+            if (it->second.gen != gen_) { pairs_.push_back({it->first, it->second.slot}); it = lu.erase(it); }
             else ++it;
         }
+        std::sort(pairs_.begin(), pairs_.end());
+        auto& su = us_[std::size_t(c)];
+        for (auto [id, sl] : pairs_) { p.removed.push_back(id); p.rslot.push_back(sl); su.free.push_back(sl); }
+        for (std::size_t k = 0; k < p.units.size(); ++k)
+            if (p.unew[k]) {
+                int32_t sl;
+                if (!su.free.empty()) { sl = su.free.back(); su.free.pop_back(); } else sl = su.used++;
+                p.uslot[k] = sl; lu[w.unit(p.units[k]).id].slot = sl;
+            }
         auto& lm = m_[std::size_t(c)];
         w.marches_in(r, tmp_);
         for (int32_t i : tmp_) {
             const WorldMarch& m = w.march(i);
             auto [it, fresh] = lm.try_emplace(m.id);
             SentM& s = it->second;
-            if (fresh || s.x1 != m.x1 || s.y1 != m.y1 || s.t1 != m.t1) { s.x1 = m.x1; s.y1 = m.y1; s.t1 = m.t1; p.marches.push_back(i); p.mnew.push_back(fresh ? 1 : 0); }
+            if (fresh) s.slot = -1;
+            if (fresh || s.x1 != m.x1 || s.y1 != m.y1 || s.t1 != m.t1) { s.x1 = m.x1; s.y1 = m.y1; s.t1 = m.t1; p.marches.push_back(i); p.mnew.push_back(fresh ? 1 : 0); p.mslot.push_back(s.slot); }
             s.gen = gen_;
         }
+        pairs_.clear();
         for (auto it = lm.begin(); it != lm.end();) {
-            if (it->second.gen != gen_) { p.removed_marches.push_back(it->first); it = lm.erase(it); }
+            if (it->second.gen != gen_) { pairs_.push_back({it->first, it->second.slot}); it = lm.erase(it); }
             else ++it;
         }
+        std::sort(pairs_.begin(), pairs_.end());
+        auto& sm = ms_[std::size_t(c)];
+        for (auto [id, sl] : pairs_) { p.removed_marches.push_back(id); p.rmslot.push_back(sl); sm.free.push_back(sl); }
+        for (std::size_t k = 0; k < p.marches.size(); ++k)
+            if (p.mnew[k]) {
+                int32_t sl;
+                if (!sm.free.empty()) { sl = sm.free.back(); sm.free.pop_back(); } else sl = sm.used++;
+                p.mslot[k] = sl; lm[w.march(p.marches[k]).id].slot = sl;
+            }
         // The client's tiles never change place; a tile is sent when its owner changed this tick.
         const TileSpan sp = tile_span(r.x0, r.y0, r.x1, r.y1);
         for (int32_t ty = sp.ty0; ty < sp.ty0 + sp.rows; ++ty)
@@ -639,12 +667,14 @@ public:
                 if (w.tile(tx, ty).changed == w.tick_no()) p.tiles.push_back(ty * kTiles + tx);
         // Deterministic order (unordered_map iteration order is the same code in
         // every runner, but sorting keeps the messages independent of it).
-        std::sort(p.removed.begin(), p.removed.end());
-        std::sort(p.removed_marches.begin(), p.removed_marches.end());
+        // (removed and removed_marches are in id order above)
     }
 private:
-    struct SentU { uint32_t ver{}; uint64_t gen{}; };
-    struct SentM { int32_t x1{}, y1{}; int64_t t1{}; uint64_t gen{}; };
+    struct SentU { uint32_t ver{}; int32_t slot = -1; uint64_t gen{}; };
+    struct SentM { int32_t x1{}, y1{}; int64_t t1{}; int32_t slot = -1; uint64_t gen{}; };
+    struct Slots { std::vector<int32_t> free; int32_t used = 0; };
+    std::vector<Slots> us_, ms_;
+    std::vector<std::pair<int32_t, int32_t>> pairs_;
     std::vector<std::unordered_map<int32_t, SentU>> u_;
     std::vector<std::unordered_map<int32_t, SentM>> m_;
     std::vector<int32_t> tmp_;
