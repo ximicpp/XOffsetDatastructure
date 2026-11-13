@@ -144,25 +144,14 @@ public:
         msg_.u32(uint32_t(p.removed_marches.size()));
         for (int32_t mid : p.removed_marches) msg_.i32(mid);
         if constexpr (kDirty) {
-            // Entering units whole, then the changed ones' change bodies.
-            const std::size_t at = msg_.n;
-            msg_.u32(0);
-            uint32_t ne = 0;
-            for (std::size_t q = 0; q < p.units.size(); ++q) {
-                if (!p.unew[q]) continue;
-                const int32_t i = p.units[q];
-                const Ent& e = unit_body(w, i);
-                ++ue_[std::size_t(i)].hold;
-                msg_.put(arena_.data() + e.off, e.len);
-                ++ne;
-            }
-            std::memcpy(msg_.buf.data() + at, &ne, sizeof ne);
-            msg_.u32(uint32_t(p.units.size()) - ne);
-            for (std::size_t q = 0; q < p.units.size(); ++q) {
-                if (p.unew[q]) continue;
-                const UEnt& e = change_body(w, p.units[q]);
-                msg_.put(arena_.data() + e.coff, e.clen);
-            }
+            // The tracker's two lists, entering and changed (the same units in the
+            // same order); the whole list's entries are fetched first.
+            for (int32_t i : p.uei) __builtin_prefetch(&ue_[std::size_t(i)], 1);
+            for (int32_t i : p.uci) __builtin_prefetch(&ue_[std::size_t(i)]);
+            msg_.u32(uint32_t(p.uei.size()));
+            for (int32_t i : p.uei) { const Ent& e = unit_body(w, i); ++ue_[std::size_t(i)].hold; msg_.put(arena_.data() + e.off, e.len); }
+            msg_.u32(uint32_t(p.uci.size()));
+            for (int32_t i : p.uci) { const UEnt& e = change_body(w, i); msg_.put(arena_.data() + e.coff, e.clen); }
         } else {
             // Every unit in the plan has a body: a changed one changed this tick,
             // an entering one is sent whole anyway.
