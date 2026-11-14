@@ -64,7 +64,10 @@ K0–K9 是 V2 的稳定 API 范围（见 [USER_GUIDE.md](USER_GUIDE.md)）。�
 整条体、篡改体、布尔和掩码越界、写入器字节）、`test_shared_delta_sync`（1500 条消息的随机流，
 full 和 admit 两个客户端每条之后都与服务端模型比较；拒绝用例、篡改消息、重复条目；含关异常构建）、
 `test_shared_delta_format`（XS 2.0 逐字节的金标准，发送端和两档接收）、`fuzz_shared_delta`（发版前 ASan fuzz）、
-`receiver_from_client_sync_fail`（`from_client` 上 `apply_sync` 编译不过）。
+`receiver_from_client_sync_fail`（`from_client` 上 `apply_sync` 编译不过）；发布器（4.0 起，`xoffset_shared_publisher.hpp`）：
+`test_shared_delta_publisher`（随机世界跑若干 tick，每条消息由 full 和 admit 两个客户端接收并与服务端比较；槽号的取用顺序、
+同一条消息里不复用、溢出到冷区和槽号超过 255、行军环的复用和扩容；含关异常构建）、`test_shared_delta_publisher_errors`
+（每条约定和槽号检查各一个报错用例）。
 
 ## 不在 CTest 里的部分
 

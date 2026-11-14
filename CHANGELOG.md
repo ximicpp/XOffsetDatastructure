@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+- Shared delta publisher (4.0 W2 step 3): `xoffset_shared_publisher.hpp`
+  moves the server side of shared deltas into the library. `XSyncPublisher`
+  (the tick and its body store), `XSyncConn<XSyncFreeSlots<K, Hot>...>` (per
+  connection: version and free-slot stacks, a hot part pinned by
+  `static_assert`, aligned to its size) with `Conn::cold_type` (stream,
+  spilled slots), `XSyncMessage<Conn>` (head and root at construction, one
+  call per table and kind, `finish()` gives back the slots that left and
+  writes the version), `XSyncDirtyTable<K, T>` (dirty bits per member, change
+  and enter bodies encoded once per tick on first use, holder counts) and
+  `XSyncImageTable<K, T, Index, Keyed>` (records diffed against a kept image;
+  `XSyncRing<&T::id>` or `XSyncDense`). `XSyncConn::prefetch` for the next
+  connection. Four contracts (publish first, every holder gets every body,
+  release on close or key, store the slot `enters` reports);
+  `XOFFSET_SYNC_CHECKS` (default on without `NDEBUG`) checks them and every
+  slot. `XOFFSET_DETAIL_NOVECTOR` for short loops. Wire format unchanged.
+  bench/slg D3 sends through the publisher (`-DSLG_D3_HANDWRITTEN` builds the
+  hand-written baseline it replaced; same bytes). Tests
+  `test_shared_delta_publisher` (differential against full and admit
+  receivers, slot order, spill, ring reuse and growth) and
+  `test_shared_delta_publisher_errors`; docs/SHARED_DELTA.md and
+  `examples/shared_delta.cpp` lead with the publisher.
 - Shared deltas: format XS 2.0 replaces XS 1.0 (4.0 W2; no XS 1.0 reader is
   kept). A message is the head (`'X' 'S' 02 flags u32 version`, the stream on
   a key), the root record (table 0, carried whole by every message), then
