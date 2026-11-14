@@ -309,8 +309,13 @@ publisher takes over in 4.0 W2 step 3): the tracker hands it the changed and
 the entering records as separate lists (`DeltaPlan::uci`/`uei`,
 `mci`/`mei`), the message's room is taken once, sections are written with
 local cursors and each list's unit entries are prefetched before its loop.
-`-DSLG_D3_NEXT_PF` also prefetches the next connection's two lines at the end
-of a send (off by default). Server per delivery =
+At the end of each message the send also prefetches the next connection's two
+lines (`SLG_D3_NEXT_PF`, on by default since susu's decision of 2026-11-14;
+`-DSLG_D3_NEXT_PF=0` turns it off): the prefetch instructions are inside the
+timed `D*.send`, while the wait they save falls between two messages, which
+the bench does not time and a real server always has (it plans the next
+delta there). The rival has no per-connection server state to prefetch.
+Server per delivery =
 (`D*.pub` + `D*.send`) / `U*.deliveries`. The client applies the message to
 its own view through `XReceiver<XLink::from_server>::apply_sync` (a `D3Target`
 over the view's units and marches at the slots the server gave them, and
