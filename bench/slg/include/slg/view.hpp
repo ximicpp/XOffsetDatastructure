@@ -72,6 +72,7 @@
 #pragma once
 #include <algorithm>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <map>
 #include <memory>
@@ -603,6 +604,7 @@ struct DeltaPlan {
     // the client's slot, or where the tracker keeps the slot the sender gives.
     std::vector<int32_t> uci, ucs, uei, mci, mcs, mei;
     std::vector<int32_t*> uer, mer;
+    std::vector<int32_t> rui;              // D3 only: removed[k]'s world index (unit id - 1)
     bool empty() const { return units.empty() && removed.empty() && marches.empty() && removed_marches.empty() && tiles.empty(); }
 };
 
@@ -613,7 +615,7 @@ public:
         p.units.clear(); p.removed.clear(); p.marches.clear(); p.removed_marches.clear(); p.tiles.clear();
         p.unew.clear(); p.mnew.clear();
         p.uslot.clear(); p.mslot.clear(); p.rslot.clear(); p.rmslot.clear(); p.uref.clear(); p.mref.clear();
-        p.uci.clear(); p.ucs.clear(); p.uei.clear(); p.uer.clear(); p.mci.clear(); p.mcs.clear(); p.mei.clear(); p.mer.clear();
+        p.rui.clear(); p.uci.clear(); p.ucs.clear(); p.uei.clear(); p.uer.clear(); p.mci.clear(); p.mcs.clear(); p.mei.clear(); p.mer.clear();
         ++gen_;
         auto& lu = u_[std::size_t(c)];
         w.units_in(r, tmp_);
@@ -633,7 +635,7 @@ public:
         // Deterministic order (unordered_map iteration order is the same code in
         // every runner, but sorting keeps the messages independent of it).
         std::sort(pairs_.begin(), pairs_.end());
-        for (auto [id, sl] : pairs_) { p.removed.push_back(id); p.rslot.push_back(sl); }
+        for (auto [id, sl] : pairs_) { p.removed.push_back(id); p.rslot.push_back(sl); p.rui.push_back(id - 1); }
         auto& lm = m_[std::size_t(c)];
         w.marches_in(r, tmp_);
         for (int32_t i : tmp_) {
@@ -906,6 +908,17 @@ struct ViewSession {
     }
 };
 
+// SLG_D3_DUMP=<file> (untimed, off by default): every D3 message (key and
+// delta, in send order) appended to file as u32 length + bytes, so two builds
+// (the library publisher and SLG_D3_HANDWRITTEN) can be compared byte for byte.
+inline void d3_dump(std::string_view m) {
+    static std::FILE* f = [] { const char* p = std::getenv("SLG_D3_DUMP"); return p ? std::fopen(p, "wb") : nullptr; }();
+    if (!f) return;
+    const uint32_t n = uint32_t(m.size());
+    std::fwrite(&n, 4, 1, f);
+    std::fwrite(m.data(), 1, m.size(), f);
+}
+
 template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys& k, int cycle, CycleStats& st, std::string* keep_view, std::string* keep_delta) {
     MapWorld& w = s.world;
     const ViewScale& vs = w.scale();
@@ -1074,6 +1087,7 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
                 ops.d_recv_trusted(c);
                 if (query_view(ops.d_held_trusted(c)) != query_view(ops.held(c, 0))) throw std::runtime_error("D3 key (trust tier): view differs from the snapshot");
                 if (c < warm_devices(vs.clients)) s.dkey[std::size_t(c)] = std::string(ops.d_wire());
+                d3_dump(ops.d_wire());
             }
             if constexpr (native) if (run_n) {
                 ops.n_view(c, w, rect);
@@ -1159,6 +1173,7 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
                 if ((c + r) & 1) { full(); trusted(); } else { trusted(); full(); }
                 st.bytes[k.ddelta] += dd;
                 const auto dw = ops.d_wire();
+                d3_dump(dw);
                 dzoff.push_back(dzbuf.size()); dzbuf.append(dw.data(), dw.size());
                 if (c < nw_dev) dwq[std::size_t(c)].emplace_back(dw);
             }

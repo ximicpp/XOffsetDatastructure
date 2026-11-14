@@ -12,14 +12,94 @@ payload offsets, applied to a copy with the sender's layout (one baseline per
 receiver). Use it for a player's own state and between servers that keep a
 replica; use shared deltas for views of a shared world.
 
-Header: `xoffset_shared_delta.hpp` (sender side, record codec) and
-`xoffset_receiver.hpp` (`XReceiver::apply_sync`). Both schema backends (C++26
-reflection, C++20 `XOFFSET_RECORD` field lists) and builds without
-exceptions. Example: `examples/shared_delta.cpp`.
+Headers: `xoffset_shared_publisher.hpp` (the publisher: per-connection
+state and one message per connection and tick), `xoffset_shared_delta.hpp`
+(the record codec and the low-level writer) and `xoffset_receiver.hpp`
+(`XReceiver::apply_sync`). Both schema backends (C++26 reflection, C++20
+`XOFFSET_RECORD` field lists) and builds without exceptions. Example:
+`examples/shared_delta.cpp`.
 
 ## 1. Use
 
-### Sender
+### Sender: the publisher
+
+The publisher keeps what a server needs to send views: per entity the
+tick's change and enter bodies (encoded once, on first use) and how many
+connections hold it; per connection its version and the client's free slots.
+The application keeps its world and says, per connection and message, which
+entities leave, stay and enter.
+
+```cpp
+#include "xoffset_shared_publisher.hpp"
+namespace xs = XOffsetDatastructure::xsync;
+
+using Conn = xs::XSyncConn<xs::XSyncFreeSlots<kUnit, 48>, xs::XSyncFreeSlots<kMarch, 64>>;
+static_assert(sizeof(Conn) == 128);                    // the hot part: version and free-slot stacks
+xs::XSyncPublisher pub;
+xs::XSyncDirtyTable<kUnit, Unit> units;                // dirty bits per member; images are the application's
+xs::XSyncImageTable<kMarch, March, xs::XSyncRing<&March::id>, true> marches;   // diffed against an image
+xs::XSyncImageTable<kTile, Tile, xs::XSyncDense, false> tiles;                 // fixed ids, no enters
+std::vector<Conn> conns;  std::vector<Conn::cold_type> colds;  xs::XSyncOut out;
+
+// Once per tick, before its first message (contract 1).
+pub.begin_tick(tick);
+units.publish(pub, changed_units, src);
+
+// Per connection: one call per table and kind, with the whole list.
+xs::XSyncMessage<Conn> m(pub, conns[c], colds[c], out, head);   // a key message: (..., head, stream)
+units.leaves(m, left_index, left_slot);
+marches.leaves(m, left_march_slot);
+units.changes(m, src, kept_index, kept_slot);
+marches.changes(m, src, kept_march, kept_march_slot);
+tiles.changes(m, src, tiles_in_view);
+units.enters(m, src, new_index, [&](std::size_t r, std::uint32_t slot) { held_slot[r] = slot; });
+marches.enters(m, src, new_march, [&](std::size_t r, std::uint32_t slot) { march_slot[r] = slot; });
+m.finish();                                            // the length; the message is out.view()
+send(c, out.view());
+Conn::prefetch(&conns[c] + 1);                          // the connection served next, if known
+```
+
+- **Tables.** `XSyncDirtyTable<K, T>`: entities the application marks
+  member by member (`Src::dirty(i)`, a bit per member); the images are the
+  application's (`Src::image(i)`, `Src::load(i, image, mask)`).
+  `XSyncImageTable<K, T, Index, Keyed>`: plain records diffed against an
+  image the table keeps; `XSyncRing<&T::id>` finds entries by the record's
+  id (a ring that doubles when a live id needs a taken place),
+  `XSyncDense` by a fixed id. Keyed tables have enters, leaves and slots;
+  fixed ones only changes (and enters on key messages).
+- **Connections.** `XSyncConn<XSyncFreeSlots<K, Hot>...>`: the hot part
+  (the version, a stack of up to `Hot` free slots per keyed table, slots
+  below 256), aligned to its size. `Conn::cold_type`: the stream, the
+  spilled free slots and, in checks builds, the slot shadows. A slot is
+  never refused: past the hot stack it comes from the cold part.
+- **Messages.** `XSyncMessage<Conn>` writes the head and the root record at
+  construction, each table call writes one section (a change section with
+  no body is dropped), `finish()` gives the slots that left back to the
+  connection (free from the next message on), writes the version and
+  returns the length. Sections go in the order leaves, changes, enters.
+- **Src** is the application's view of its world for one table: a small
+  object (two pointers at most and trivially copyable, so the publisher
+  passes it to its slow paths by value). Methods per table kind are listed
+  in the header.
+
+Four contracts (`XOFFSET_SYNC_CHECKS`, on by default without `NDEBUG`,
+checks each of them and every slot; release builds check the first):
+
+1. `publish` for the tick before its first message.
+2. Every connection that holds an entity gets every change body of it:
+   pass every held entity that stays to `changes`.
+3. A connection that closes or gets a key message releases the entities it
+   held (`units.release(i)`; image tables need nothing).
+4. Store the slot `enters` reports with the entity's holder record; pass it
+   back to `changes` and `leaves`.
+
+Errors (a tick that does not grow, publish after a message, a contract
+broken in a checks build) throw `XException(invalid_state)`; a section of
+more than 2^24 - 1 ops throws `std::length_error`. Without
+exceptions they terminate. After an error the connection's state is not
+defined: close it (or send it a key message).
+
+### Sender by hand
 
 Once per tick, each changed entity's ops go into a body store (`XSyncOut`):
 a change op from the entity's dirty members, and a whole op for clients the
