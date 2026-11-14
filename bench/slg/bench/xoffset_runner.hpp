@@ -1044,6 +1044,11 @@ public:
         // translation unit (every format, every case) reaches GCC's
         // inline-unit-growth limit, past which whether they inline depends on
         // unrelated code.
+// D3 send: prefetch the next connection's D3Conn at the end of a message (on by
+// default since susu's decision 2026-11-14; -DSLG_D3_NEXT_PF=0 turns it off).
+#ifndef SLG_D3_NEXT_PF
+#define SLG_D3_NEXT_PF 1
+#endif
 #define SLG_D3_HOT [[gnu::always_inline]]
 #define SLG_D3_FLAT [[gnu::always_inline, gnu::flatten]]
         template <bool Full>
@@ -1588,12 +1593,12 @@ public:
                     k.mn = uint8_t(n + nrm);
                 } else d_give_slow<kD3MFree>(k.mf, k.mn, k.mspill, dcold[std::size_t(c)].ms, rms, nrm);
             }
-#ifdef SLG_D3_NEXT_PF
-            // Off unless built with -DSLG_D3_NEXT_PF (pending a decision: it
-            // moves the wait for the next connection's lines into the untimed
-            // gap between two messages). The connection served next (the
-            // server's loop goes through them in order): its lines arrive
-            // while the caller plans its delta.
+#if SLG_D3_NEXT_PF
+            // The connection served next (the server's loop goes through them
+            // in order): its two lines arrive while the caller plans its
+            // delta. The instructions are timed; the wait they save falls in
+            // the gap between two messages (susu 2026-11-14: accepted, stated
+            // in README and MANIFEST).
             __builtin_prefetch(&k + 1, 1);
             __builtin_prefetch(reinterpret_cast<const char*>(&k + 1) + 64, 1);
 #endif
