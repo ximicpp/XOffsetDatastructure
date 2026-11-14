@@ -304,11 +304,15 @@ enters the view and gives back the slots of those that left after the
 message (both timed in `D*.send`; the connection's lines are prefetched when
 the send starts and first used by the enter sections, which come last); the
 tracker keeps each entity's slot next to what the client holds (untimed).
-The send is written by hand in the XS 2.0 format (the baseline the library's
-publisher takes over in 4.0 W2 step 3): the tracker hands it the changed and
-the entering records as separate lists (`DeltaPlan::uci`/`uei`,
-`mci`/`mei`), the message's room is taken once, sections are written with
-local cursors and each list's unit entries are prefetched before its loop.
+The send goes through the library's publisher (`xoffset_shared_publisher.hpp`,
+4.0 W2 step 3): a dirty-bit table for units, a ring image table for marches,
+a dense one for tiles, `XSyncConn` as `D3Conn` and one `XSyncMessage` per
+delivery, one call per table and kind with the tracker's lists
+(`DeltaPlan::rui`/`rslot`, `uci`/`ucs`, `uei`, `mci`/`mcs`, `mei`); each
+section's room is checked once and each list's unit entries are prefetched
+before its loop. `-DSLG_D3_HANDWRITTEN` builds the hand-written XS 2.0 send
+it replaced (one room check per message; same bytes), kept as the baseline
+until the 4.0 release.
 At the end of each message the send also prefetches the next connection's two
 lines (`SLG_D3_NEXT_PF`, on by default since susu's decision of 2026-11-14;
 `-DSLG_D3_NEXT_PF=0` turns it off): the prefetch instructions are inside the

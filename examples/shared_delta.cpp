@@ -5,11 +5,15 @@
 // each client's units their slots in that client's view and writes the slot
 // as the op's id, so the client indexes its view directly (no id lookup);
 // it applies the messages with XReceiver<XLink::from_server>::apply_sync.
+// The server side is the publisher (xoffset_shared_publisher.hpp): a
+// dirty-bit table for the units, a connection state per client, and one
+// message per client and tick.
 //
 // Client B joins two ticks late (a key message), then loses a message: the
 // next one is rejected with delta_base_mismatch, B asks for a key message and
 // is back in step one tick later.
 #include "../xoffset_receiver.hpp"
+#include "../xoffset_shared_publisher.hpp"
 
 #include <cstdint>
 #include <cstdio>
@@ -56,33 +60,48 @@ static XBuffer make_view() {
 
 // ---- server -------------------------------------------------------------------
 
+// The publisher (xoffset_shared_publisher.hpp) keeps what the server needs
+// per connection: the version and the client's free slots (a hot part of a
+// cache line or two, and a cold part for the stream and the rest).
+using Conn = xs::XSyncConn<xs::XSyncFreeSlots<kUnit, 16>>;   // up to 16 free slots in the hot part
+using Units = xs::XSyncDirtyTable<kUnit, Unit>;
+using Message = xs::XSyncMessage<Conn>;
+
 struct ClientState {
     std::int32_t x0, x1;                    // the client sees units with x0 <= x < x1
     std::uint64_t stream;                   // one stream per connection
-    std::uint32_t version = 0;
     bool need_key = true;                   // joining, or asked for one
-    std::map<std::uint32_t, std::uint32_t> held;   // unit id -> its slot in the client's view
-    std::vector<std::uint32_t> free;        // slots free in the client's view
-    std::uint32_t used = 0;                 // slots given out so far
+    Conn conn{};
+    Conn::cold_type cold;
+    std::map<std::int32_t, std::int32_t> held;   // world index -> the slot enters() gave (contract 4)
     ClientState(std::int32_t lo, std::int32_t hi, std::uint64_t s) : x0(lo), x1(hi), stream(s) {}
-
-    std::uint32_t take() {
-        if (free.empty()) return used++;
-        const std::uint32_t s = free.back();
-        free.pop_back();
-        return s;
-    }
 };
 
 struct Server {
     XBuffer world = make_view();
-    XBuffer base = make_view();   // the shared baseline: what every holder of a unit holds (same slots)
-    xs::XSyncOut bodies, msg;     // this tick's ops (id, body), shared by every message
-    struct Ops { std::size_t change_at = 0, change_len = 0, whole_at = 0, whole_len = 0; };
-    std::vector<Ops> ops;         // per world slot: this tick's ops
+    XBuffer base = make_view();   // the images: what every holder of a unit has
+    xs::XSyncPublisher pub;
+    Units units;
+    xs::XSyncOut msg;
+    std::vector<std::uint64_t> dirty;   // per world index: this tick's dirty members (bit i: member i)
 
     View& w() { return world.root<View>(); }
     View& b() { return base.root<View>(); }
+
+    // The world as the table's source. A light view: the publisher passes it
+    // to its slow paths by value.
+    struct Src {
+        Server* s;
+        std::uint64_t dirty(std::uint32_t i) const { return s->dirty[i]; }
+        Unit& image(std::uint32_t i) const { return s->b().units[i]; }
+        void load(std::uint32_t i, Unit& r, std::uint64_t m) const {
+            const Unit& u = s->w().units[i];
+            if (m & 1) r.id = u.id;
+            if (m & 2) r.x = u.x;
+            if (m & 4) r.hp = u.hp;
+            if (m & 8) r.name = std::string_view(u.name);
+        }
+    };
 
     void spawn(std::uint32_t id, std::int32_t x, const char* name) {
         w().units.emplace_back();
@@ -91,73 +110,56 @@ struct Server {
         u.x = x;
         u.hp = 100;
         u.name = name;
-        b().units.emplace_back();   // cleared: nobody holds the unit yet
+        b().units.emplace_back();   // the image starts empty: nobody holds the unit yet
+        dirty.push_back(0xF);       // its four members differ from the empty image
+        units.resize(w().units.size());
+    }
+    void set_x(std::size_t i, std::int32_t x) { w().units[i].x = x; dirty[i] |= 2; }
+    void set_hp(std::size_t i, std::int32_t hp) { w().units[i].hp = hp; dirty[i] |= 4; }
+    void set_name(std::size_t i, const char* n) { w().units[i].name = n; dirty[i] |= 8; }
+
+    // Once per tick, before its first message, whatever the number of
+    // clients: each changed unit that somebody holds is encoded once.
+    void publish(std::uint64_t tick) {
+        w().head.tick = tick;
+        pub.begin_tick(std::uint32_t(tick));
+        std::vector<std::int32_t> changed;
+        for (std::size_t i = 0; i < dirty.size(); ++i)
+            if (dirty[i]) changed.push_back(std::int32_t(i));
+        units.publish(pub, changed, Src{this});
+        dirty.assign(dirty.size(), 0);   // taken: publish reads each bit once
     }
 
-    // Once per tick, whatever the number of clients: each unit's change (the
-    // members that differ from the baseline) and its whole body are encoded
-    // once, and the baseline catches up.
-    void encode_all() {
-        bodies.clear();
-        ops.assign(w().units.size(), Ops{});
-        for (std::size_t i = 0; i < w().units.size(); ++i) {
-            Unit& u = w().units[i];
-            Ops& o = ops[i];
-            if (const std::uint64_t mask = UnitBody::changed(u, b().units[i])) {
-                o.change_at = bodies.size();
-                o.change_len = xs::put_change_op(bodies, u.id, u, mask);
-                UnitBody::apply_change(bodies.data() + o.change_at + 4, b().units[i]);
-            }
-            o.whole_at = bodies.size();
-            o.whole_len = xs::put_whole_op(bodies, u.id, u);
-        }
-    }
-
-    // The client's message for this tick: leaves, changes and enters (whole
-    // bodies), each a copy of the shared op under the client's slot.
+    // The client's message for this tick: leaves, changes, enters, each a
+    // copy of the shared op under the client's slot. The publisher gives the
+    // slots, writes the sections and the version.
     std::string message(ClientState& c) {
-        View& v = w();
-        std::optional<xs::XSyncWriter> m;
-        if (c.need_key) {
-            m.emplace(msg, v.head, ++c.version, c.stream);
+        const bool key = c.need_key;
+        if (key) {
+            // A key message: the connection starts over, so it releases every
+            // unit it held (contract 3) and every unit in range enters.
+            for (const auto& held : c.held) units.release(std::uint32_t(held.first));
             c.held.clear();
-            c.free.clear();
-            c.used = 0;
-        } else {
-            m.emplace(msg, v.head, ++c.version);
         }
-        std::set<std::uint32_t> now;
-        for (const Unit& u : v.units)
-            if (u.x >= c.x0 && u.x < c.x1) now.insert(u.id);
-        std::vector<std::uint32_t> gone;   // slots of the units that left
-        for (auto it = c.held.begin(); it != c.held.end();) {
-            if (now.count(it->first)) { ++it; continue; }
-            gone.push_back(it->second);
-            it = c.held.erase(it);
+        std::vector<std::int32_t> stay, stay_slot, gone, gone_slot, enter;
+        for (const auto& [i, slot] : c.held) {
+            const Unit& u = w().units[std::size_t(i)];
+            const bool in = u.x >= c.x0 && u.x < c.x1;
+            (in ? stay : gone).push_back(i);
+            (in ? stay_slot : gone_slot).push_back(slot);
         }
-        m->leaves(kUnit, gone.data(), gone.size());
-        // Units that stay and changed: the shared change op.
-        m->begin(kUnit, xs::change);
-        for (std::size_t i = 0; i < v.units.size(); ++i) {
-            const auto it = c.held.find(v.units[i].id);
-            if (it == c.held.end() || !ops[i].change_len) continue;
-            m->op(bodies.data() + ops[i].change_at, ops[i].change_len, it->second);
+        for (const std::int32_t i : gone) c.held.erase(i);
+        for (std::size_t i = 0; i < w().units.size(); ++i) {
+            const Unit& u = w().units[i];
+            if (u.x >= c.x0 && u.x < c.x1 && !c.held.count(std::int32_t(i))) enter.push_back(std::int32_t(i));
         }
-        m->end();
-        // Units that entered the client's range: the shared whole op, in a slot of its own.
-        m->begin(kUnit, xs::enter);
-        for (std::size_t i = 0; i < v.units.size(); ++i) {
-            const Unit& u = v.units[i];
-            if (!now.count(u.id) || c.held.count(u.id)) continue;
-            const std::uint32_t slot = c.take();
-            c.held.emplace(u.id, slot);
-            m->op(bodies.data() + ops[i].whole_at, ops[i].whole_len, slot);
-        }
-        m->end();
+        std::optional<Message> m;
+        if (key) m.emplace(pub, c.conn, c.cold, msg, w().head, c.stream);
+        else m.emplace(pub, c.conn, c.cold, msg, w().head);
+        units.leaves(*m, gone, gone_slot);
+        units.changes(*m, Src{this}, stay, stay_slot);
+        units.enters(*m, Src{this}, enter, [&](std::size_t r, std::uint32_t slot) { c.held[enter[r]] = std::int32_t(slot); });
         m->finish();
-        // A slot that left is given out again from the next message on: an
-        // entry appears at most once in a message.
-        c.free.insert(c.free.end(), gone.begin(), gone.end());
         c.need_key = false;
         return std::string(msg.view());
     }
@@ -249,13 +251,12 @@ int main() {
 
     bool ok = true;
     for (int tick = 1; tick <= 8; ++tick) {
-        // Server: units move and fight, in place.
+        // Server: units move and fight, in place; each change marks its member dirty.
         View& v = server.w();
-        v.head.tick = std::uint64_t(tick);
-        for (std::size_t i = 0; i < v.units.size(); ++i) v.units[i].x += (i % 2) ? 4 : -3;
-        v.units[std::size_t(tick % 6)].hp -= 9;
-        if (tick == 4) v.units[2].name = "knight-captain";
-        server.encode_all();
+        for (std::size_t i = 0; i < v.units.size(); ++i) server.set_x(i, v.units[i].x + ((i % 2) ? 4 : -3));
+        server.set_hp(std::size_t(tick % 6), v.units[std::size_t(tick % 6)].hp - 9);
+        if (tick == 4) server.set_name(2, "knight-captain");
+        server.publish(std::uint64_t(tick));
 
         std::string ma = server.message(sa);
         const XStatus ra = a.receive(rx, ma);
