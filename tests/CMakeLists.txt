@@ -169,6 +169,8 @@ set(REFLECTION_TESTS
     test_shared_delta_sync
     test_shared_delta_format
     test_shared_delta_slots
+    test_shared_delta_publisher
+    test_shared_delta_publisher_errors
 )
 
 foreach(test_name ${REFLECTION_TESTS})
@@ -323,6 +325,7 @@ set(NO_EXCEPTIONS_TESTS
     test_shared_delta_sync
     test_shared_delta_format
     test_shared_delta_slots
+    test_shared_delta_publisher
     test_relocating_storage
     test_proxy_scopes
     test_retire_discard

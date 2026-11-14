@@ -24,6 +24,7 @@
 #include "slg/uplink.hpp"
 #include "xoffset_receiver.hpp"
 #include "xoffset_shared_delta.hpp"
+#include "xoffset_shared_publisher.hpp"
 
 namespace slg {
 
@@ -957,6 +958,7 @@ public:
         // free slots past them; per entity, the client's slot in the tracker
         // every format shares. Client: its own view buffer, indexed by slot
         // (no id index); d_recv checks the whole message, then applies it.
+#ifdef SLG_D3_HANDWRITTEN
         // A shared body of this tick and the key body of this tick (ticks fit 32 bits).
         struct D3Ent { int32_t tick = -1, ktick = -1; uint32_t off = 0, len = 0, koff = 0, klen = 0; };
         // Units (d_unit): dirty flags of tick ptick (now) and of earlier ticks
@@ -1022,6 +1024,19 @@ public:
             n_at = uint8_t(n);
         }
         XOFFSET_DETAIL_NOINLINE static void d_spill(std::vector<int32_t>& sp, int32_t v) { sp.push_back(v); }
+#else
+        // The library publisher (xoffset_shared_publisher.hpp, 4.0 W2 step 3;
+        // -DSLG_D3_HANDWRITTEN builds the hand-written baseline above, which
+        // sends the same bytes). Per connection, hot: the message version and
+        // the client's free unit and march slots (one-byte stacks of 48 and
+        // 64, the hand-written D3Conn's layout); cold: the stream and the
+        // slots past them.
+        static constexpr unsigned kD3UFree = 48, kD3MFree = 64;
+        using D3Conn = XOffsetDatastructure::xsync::XSyncConn<XOffsetDatastructure::xsync::XSyncFreeSlots<1, kD3UFree>,
+                                                               XOffsetDatastructure::xsync::XSyncFreeSlots<2, kD3MFree>>;
+        using D3Cold = D3Conn::cold_type;
+        static_assert(sizeof(D3Conn) == 128 && alignof(D3Conn) == 128, "the hot part stays two cache lines");
+#endif
         // A client: its view (units and marches at the slots the server gave
         // them, no id index), its cursor, and for the full check which slots
         // it holds.
@@ -1121,6 +1136,7 @@ public:
         static constexpr std::size_t kD3MarchBody = 48;
         static_assert(4 + RD<xm::ViewMarch>::diff_room <= kD3MarchBody);
         std::optional<XBuffer> dstore;   // every unit as its holders have it (the shared image)
+#ifdef SLG_D3_HANDWRITTEN
         std::vector<D3UEnt> due;
         std::vector<D3TEnt> dte;
         // Marches by id in a ring of a power-of-two size (slot id & (size - 1);
@@ -1130,6 +1146,22 @@ public:
         std::vector<D3MEnt> dme;
         XOffsetDatastructure::xsync::XSyncOut darena, dmsg;   // this tick's bodies; the message being built
         int64_t dtick = -1;   // the world's tick (entries keep it as int32_t)
+#else
+        // Units: dirty bits from the world, images in dstore by world index.
+        // Marches: a ring by id, images inline (one line each). Tiles: by tile
+        // id, images inline.
+        static constexpr std::size_t kD3KeyOp = 992;   // a unit's enter op (id and whole body) a section reserves
+        using D3Units = XOffsetDatastructure::xsync::XSyncDirtyTable<1, xm::ViewUnit, kD3OpBody, kD3KeyOp>;
+        using D3Marches = XOffsetDatastructure::xsync::XSyncImageTable<2, xm::ViewMarch, XOffsetDatastructure::xsync::XSyncRing<&xm::ViewMarch::id>, true, 64>;
+        using D3Tiles = XOffsetDatastructure::xsync::XSyncImageTable<3, xm::Tile, XOffsetDatastructure::xsync::XSyncDense, false>;
+        static_assert(D3Units::entry_size == 56 && D3Marches::entry_size == 64 && D3Tiles::entry_size == 48, "the hand-written entries' sizes");
+        XOffsetDatastructure::xsync::XSyncPublisher dpub;
+        D3Units dunits;
+        D3Marches dmarches;
+        D3Tiles dtiles;
+        XOffsetDatastructure::xsync::XSyncOut dmsg;   // the message being built
+        std::vector<int32_t> dktiles;                 // a key message's tiles
+#endif
         int32_t ducap = 0, dmcap = 0;   // view capacity, as NP's (n_setup)
         std::vector<D3Conn> dconn;
         std::vector<D3Cold> dcold;
@@ -1157,10 +1189,17 @@ public:
             auto& s = dstore->template root<xm::ViewSnapshot>();
             s.units.resize(std::size_t(vs.units));
             for (int32_t i = 0; i < vs.units; ++i) copy_unit(s.units[std::size_t(i)], w.unit(i));
+#ifdef SLG_D3_HANDWRITTEN
             dte.assign(std::size_t(kTiles) * kTiles, {});
             for (int32_t t = 0; t < kTiles * kTiles; ++t) copy_vtile(dte[std::size_t(t)].prev, w, t % kTiles, t / kTiles);
             due.assign(std::size_t(vs.units), {});
             dme.assign(std::bit_ceil(std::size_t(vs.marches) * 4 + 64), {});
+#else
+            // Tile images fill on first use (the key messages).
+            dtiles.resize(std::size_t(kTiles) * kTiles);
+            dunits.resize(std::size_t(vs.units));
+            dmarches.resize(std::size_t(vs.marches) * 4 + 64);
+#endif
             dnext = 0;
             for (int32_t j = 0; j < w.march_count(); ++j) dnext = std::max(dnext, w.march(j).id + 1);
             dconn.assign(std::size_t(vs.clients), {});
@@ -1170,9 +1209,15 @@ public:
             dcli.resize(views);
             dclt.clear();
             dclt.resize(views);
+#ifdef SLG_D3_HANDWRITTEN
             dtick = w.tick_no();
             darena.clear();
             darena.reserve(4096);
+#else
+            dpub = {};
+            dpub.begin_tick(uint32_t(w.tick_no()));
+            dpub.reserve(4096);
+#endif
         }
         // The client's view: its rect, reserved slots, the tiles under it
         // (zero until its key message fills them). Untimed, as n_view.
@@ -1198,6 +1243,7 @@ public:
 
         // Server memory (--mode mem, MEM.D*): per connection, and the image,
         // entries and arenas every connection shares.
+#ifdef SLG_D3_HANDWRITTEN
         std::size_t d_conn_bytes() const {
             std::size_t spill = 0;
             for (const D3Cold& k : dcold) spill += (k.us.capacity() + k.ms.capacity()) * sizeof(int32_t);
@@ -1208,8 +1254,20 @@ public:
             return dstore->get_size() + due.capacity() * sizeof(D3UEnt) + dte.capacity() * sizeof(D3TEnt) + dme.capacity() * sizeof(D3MEnt) +
                    darena.capacity() + dmsg.capacity();
         }
+#else
+        std::size_t d_conn_bytes() const {
+            std::size_t spill = 0;
+            for (const D3Cold& k : dcold) spill += k.bytes();
+            return sizeof(D3Conn) + sizeof(D3Cold) + (dcold.empty() ? 0 : spill / dcold.size());
+        }
+        std::size_t d_shared_bytes() const {
+            if (!dstore) return 0;
+            return dstore->get_size() + dunits.bytes() + dtiles.bytes() + dmarches.bytes() + dpub.bytes() + dmsg.capacity();
+        }
+#endif
 
 
+#ifdef SLG_D3_HANDWRITTEN
         // Once per tick: the dirty flags of every unit the world changed are
         // noted, and every changed unit some connection holds is copied,
         // compared and encoded (each once, for all its holders). A unit no
@@ -1607,6 +1665,96 @@ public:
             dmsg.commit(std::size_t(q - b1) - dmsg.size());
             return dmsg.size();
         }
+#else
+        // The world as the three tables' source (one light view, which the
+        // library passes to its slow paths by value): a unit's dirty bits,
+        // image (in dstore) and members; a march's id and record; a tile's
+        // record.
+        struct D3Src {
+            const MapWorld& w;
+            XBuffer& store;
+            uint64_t dirty(uint32_t i) const { return w.dirty(int32_t(i)); }
+            xm::ViewUnit& image(uint32_t i) const { return store.template root<xm::ViewSnapshot>().units[i]; }
+            xm::ViewUnit* images() const { return &store.template root<xm::ViewSnapshot>().units[0]; }
+            void load(uint32_t i, xm::ViewUnit& r, uint64_t m) const {
+                const WorldUnit& u = w.unit(int32_t(i));
+#define SLG_X(f) if (m & SLG_D(f)) r.f = u.f;
+                SLG_VUNIT_SCALARS(SLG_X)
+#undef SLG_X
+                if (m & SLG_D(name)) set_str(r.name, u.name);
+                if (m & SLG_D(alliance_tag)) set_str(r.alliance_tag, u.alliance_tag);
+                if (m & SLG_D(owner_name)) set_str(r.owner_name, u.owner_name);
+                if (m & SLG_D(commander)) copy_uhero(r.commander, u.commander);
+                if (m & SLG_D(heroes)) copy_list(r.heroes, u.heroes, [](auto& a, const auto& x) { copy_uhero(a, x); });
+                if (m & SLG_D(troops)) copy_list(r.troops, u.troops, [](auto& a, const auto& x) { a.type = x.type; a.count = x.count; a.wounded = x.wounded; });
+                if (m & SLG_D(buffs)) copy_list(r.buffs, u.buffs, [](auto& a, const auto& x) { a.id = x.id; a.stacks = x.stacks; a.expire_ms = x.expire_ms; });
+            }
+            uint32_t id(uint32_t i) const { return uint32_t(w.march(int32_t(i)).id); }
+            void load(uint32_t i, xm::ViewMarch& r) const { copy_vmarch(r, w.march(int32_t(i))); }
+            int32_t min_live() const {
+                int32_t v = std::numeric_limits<int32_t>::max();
+                for (int32_t j = 0; j < w.march_count(); ++j) v = std::min(v, w.march(j).id);
+                return v;
+            }
+            void load(uint32_t t, xm::Tile& r) const { copy_vtile(r, w, int32_t(t) % kTiles, int32_t(t) / kTiles); }
+        };
+        // Once per tick: the units the world changed (held ones encoded now,
+        // once for all holders); the entries of changed tiles and new marches
+        // fetched (encoded on first use).
+        void d_publish(const MapWorld& w) {
+            dpub.begin_tick(uint32_t(w.tick_no()));
+            dunits.publish(dpub, w.changed_units(), D3Src{w, *dstore});
+            for (int32_t t : w.changed_tiles()) dtiles.prefetch(uint32_t(t));
+            // The marches that started this tick (the world appends them: the ids from dnext on, at the end).
+            for (int32_t j = w.march_count() - 1; j >= 0 && w.march(j).id >= dnext; --j) dmarches.prefetch(uint32_t(w.march(j).id));
+            if (const int32_t n = w.march_count()) dnext = std::max(dnext, w.march(n - 1).id + 1);
+        }
+        int32_t dnext = 0;   // the lowest march id d_publish has not seen
+        // The key message of client c's first pull (untimed): every unit,
+        // march and tile in its view.
+        void d_key(int c, const MapWorld& w, const DeltaPlan& p) {
+            XOffsetDatastructure::xsync::XSyncMessage<D3Conn> m(dpub, dconn[std::size_t(c)], dcold[std::size_t(c)], dmsg,
+                                                                xm::D3Root{0, w.tick_no()}, 0x5d3000000ull + uint64_t(c));
+            int32_t* const* const ur = p.uref.data();
+            int32_t* const* const mr = p.mref.data();
+            const D3Src src{w, *dstore};
+            dunits.enters(m, src, p.units, [ur](std::size_t r, uint32_t s) { *ur[r] = int32_t(s); });
+            dmarches.enters(m, src, p.marches, [mr](std::size_t r, uint32_t s) { *mr[r] = int32_t(s); });
+            const TileSpan sp = dcli[std::size_t(c)].span;
+            dktiles.clear();
+            for (int32_t ty = sp.ty0; ty < sp.ty0 + sp.rows; ++ty)
+                for (int32_t tx = sp.tx0; tx < sp.tx0 + sp.cols; ++tx) dktiles.push_back(ty * kTiles + tx);
+            dtiles.enters(m, src, dktiles);
+            m.finish();
+        }
+        // One delivery: leaves, the changes of units, marches and tiles, then
+        // the units and marches entering the view, one library call per table
+        // and kind with the tracker's lists.
+        std::size_t d_send(int c, const MapWorld& w, const DeltaPlan& p, int64_t id) {
+            D3Conn& k = dconn[std::size_t(c)];
+            XOffsetDatastructure::xsync::XSyncMessage<D3Conn> m(dpub, k, dcold[std::size_t(c)], dmsg, xm::D3Root{id, w.tick_no()});
+            const D3Src src{w, *dstore};
+            dunits.leaves(m, p.rui, p.rslot);
+            dmarches.leaves(m, p.rmslot);
+            dunits.changes(m, src, p.uci, p.ucs);
+            dmarches.changes(m, src, p.mci, p.mcs);
+            dtiles.changes(m, src, p.tiles);
+            int32_t* const* const ur = p.uer.data();
+            int32_t* const* const mr = p.mer.data();
+            dunits.enters(m, src, p.uei, [ur](std::size_t r, uint32_t s) { *ur[r] = int32_t(s); });
+            dmarches.enters(m, src, p.mei, [mr](std::size_t r, uint32_t s) { *mr[r] = int32_t(s); });
+            const std::size_t n = m.finish();
+#if SLG_D3_NEXT_PF
+            // The connection served next (the server's loop goes through them
+            // in order): its two lines arrive while the caller plans its
+            // delta. The instructions are timed; the wait they save falls in
+            // the gap between two messages (susu 2026-11-14: accepted, stated
+            // in README and MANIFEST).
+            D3Conn::prefetch(&k + 1);
+#endif
+            return n;
+        }
+#endif
         // Trust tier (susu 2026-11-04: server -> client over a trusted
         // transport): XReceiver<from_server>::apply_sync with its default
         // check, admit (head, stream and version, every section's table and
