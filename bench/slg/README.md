@@ -96,6 +96,9 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
     root reference, refreshed in snap_recv, the only point where the view's
     epoch changes, so U*.apply starts at the root rather than looking it up in
     the arena for every delta (-DSLG_RP_CHECK checks each use, off by default).
+    On macOS, deltas that both remove and upsert marches can reuse vacated
+    slots in held views with more than 16 marches. The ordinary swap-and-erase
+    update handles shorter lists and deltas with a single kind of march change.
   M: 10,000 units, 1,500 clients, 1,000 marches, 4 ticks per cycle. Bytes
   include zstd-3 and, for XOffset, the save_compact pull.
 - native delta (XOffset only, built when the library has
