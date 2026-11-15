@@ -67,6 +67,24 @@ def main():
         out.append(f"| {lib} | {Y2024[lib][2]:,} | {Y2024[lib][3]:,} | {g(lib, 'bytes'):,.0f} | {g(lib, 'bytes_zstd3'):,.0f} |")
     out.append(f"\nXOffset after the read/write rounds (report-only): save_verified {g('xoffset 4.0', 'bytes_after_rw'):,.0f} B, "
                f"save_compact {g('xoffset 4.0', 'bytes_after_rw_compact'):,.0f} B.")
+    inline = "xoffset inline"
+    if g(inline, "rw") is not None:
+        out.extend(["", "### XOffset Character with inline equipment attributes", "",
+                    "| Metric | Original | Inline | Inline ÷ fastest rival |",
+                    "| --- | ---: | ---: | ---: |"])
+        for metric, rivals in (
+            ("sr_reuse", ORDER[1:]),
+            ("sr_fresh", ORDER[1:]),
+            ("rw", ("std (shared)", "Protocol Buffers", "cista raw", "cista offset")),
+        ):
+            original = g("xoffset 4.0", metric)
+            value = g(inline, metric)
+            best = min(g(lib, metric) for lib in rivals)
+            out.append(f"| {metric} (ns) | {original:.1f} | {value:.1f} | {value / best:.3f} |")
+        for metric in ("bytes", "bytes_zstd3", "bytes_after_rw_zstd3"):
+            original = g("xoffset 4.0", metric)
+            value = g(inline, metric)
+            out.append(f"| {metric} (B) | {original:.0f} | {value:.0f} | |")
     print("\n".join(out))
 
 

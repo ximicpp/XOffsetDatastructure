@@ -326,13 +326,15 @@ void test_map_erase_at() {
     const auto next = map.erase_at(map.find(2));
     assert(next != map.end() && next->first == 3);
     assert(map.size() == 2 && !map.contains(2));
-    assert(map.erase_at(map.find(3)) == map.end());
+    const auto after_last = map.erase_at(map.find(3));
+    assert(after_last == map.end());
     assert(map.size() == 1 && map.begin()->first == 1);
 
     auto round_trip = TypedXBuffer<BridgeAssocRoot>::load(buffer.save_verified());
     const auto& copy = round_trip.plain_root().by_id;
     assert(copy.size() == 1 && copy.begin()->second.view() == "one");
-    assert(map.erase_at(map.begin()) == map.end());
+    const auto after_only = map.erase_at(map.begin());
+    assert(after_only == map.end());
     assert(map.empty());
 }
 
