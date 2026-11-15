@@ -761,7 +761,9 @@ namespace detail {
 
     // Owns the output so a stable-layout wire can retain its framing across
     // messages. The record and generated values are copied into its payload.
-    template <class Root, std::size_t Member, class Element>
+    enum class FlatRecordFraming { retained, sized_slots = 2 };
+
+    template <class Root, std::size_t Member, class Element, FlatRecordFraming Framing = FlatRecordFraming::retained>
     class FlatRecordWriter {
         using Field = schema::member_t<Root, Member>;
         static_assert(is_v1_wire_admitted_v<Root> && compact_direct_supported<Root>());
@@ -783,6 +785,48 @@ namespace detail {
         std::size_t wire_size_ = 0;
         std::uint32_t capacity_ = 0;
         std::uint32_t size_ = 0;
+        struct NoSlots {};
+        // A slot keeps the V2 header and vector head for one troop count.
+        // Larger records reuse a dynamically sized compact buffer.
+        struct Slots {
+            std::array<std::unique_ptr<char, Delete>, 5> wires;
+            const char* current = nullptr;
+        };
+#if defined(_MSC_VER) && !defined(__clang__)
+        [[msvc::no_unique_address]]
+#else
+        [[no_unique_address]]
+#endif
+        std::conditional_t<Framing == FlatRecordFraming::sized_slots, Slots, NoSlots> slots_;
+
+        static constexpr std::size_t payload_extent(std::size_t count) noexcept {
+            return (count * sizeof(Element) + 7u) & ~std::size_t(7u);
+        }
+        static constexpr std::size_t wire_bytes(std::size_t count) noexcept {
+            return sizeof(XWireHeaderV2) + root_bytes + payload_extent(count);
+        }
+        static constexpr auto nonempty_delta = static_cast<std::int32_t>(root_bytes - Field::offset);
+
+        static std::span<const std::byte> sized_wire(const char* data) noexcept {
+            if (!data) return {};
+            std::uint32_t used;
+            std::memcpy(&used, data + offsetof(XWireHeaderV2, used_bytes), sizeof(used));
+            return {reinterpret_cast<const std::byte*>(data), sizeof(XWireHeaderV2) + used - XWIRE_PAYLOAD_BEGIN};
+        }
+
+        XOFFSET_DETAIL_WIRE_NOINLINE static char* open_slot(
+                std::unique_ptr<char, Delete>& slot, std::size_t count) {
+            const auto used = XWIRE_PAYLOAD_BEGIN + root_bytes + payload_extent(count);
+            std::unique_ptr<char, Delete> data(static_cast<char*>(::operator new(wire_bytes(count), wire_alignment)));
+            std::memset(data.get(), 0, wire_bytes(count));
+            const auto head = compact_wire_header<Root>(used);
+            std::memcpy(data.get(), &head, sizeof(head));
+            const auto size = static_cast<std::uint32_t>(count);
+            write_container_head(data.get() + sizeof(XWireHeaderV2), Field::offset,
+                                 size == 0 ? 0 : nonempty_delta, size, size);
+            slot = std::move(data);
+            return slot.get();
+        }
 
         XOFFSET_DETAIL_WIRE_NOINLINE void resize_wire(std::size_t count) {
             if (count > max_bytes / sizeof(Element))
@@ -794,8 +838,13 @@ namespace detail {
             const auto head = compact_wire_header<Root>(XWIRE_PAYLOAD_BEGIN + root_bytes + extent);
             std::memcpy(next.get(), &head, sizeof(head));
             wire_ = std::move(next);
-            wire_size_ = bytes;
-            capacity_ = static_cast<std::uint32_t>(count);
+            if constexpr (Framing == FlatRecordFraming::retained) {
+                wire_size_ = bytes;
+                capacity_ = static_cast<std::uint32_t>(count);
+            } else {
+                // Adding one reserves zero for the unallocated state.
+                capacity_ = static_cast<std::uint32_t>(count + 1);
+            }
         }
 
     public:
@@ -804,7 +853,10 @@ namespace detail {
         FlatRecordWriter& operator=(const FlatRecordWriter&) = delete;
 
         std::span<const std::byte> wire() const noexcept {
-            return {reinterpret_cast<const std::byte*>(wire_.get()), wire_size_};
+            if constexpr (Framing == FlatRecordFraming::sized_slots)
+                return sized_wire(slots_.current);
+            else
+                return {reinterpret_cast<const std::byte*>(wire_.get()), wire_size_};
         }
 
         template <class Prefix = Root, class Prepare, class Generate>
@@ -821,8 +873,20 @@ namespace detail {
             }
             Prefix root{};
             const auto count = std::size_t(prepare(root));
-            if (count > capacity_ || !wire_) [[unlikely]] resize_wire(count);
-            char* body = wire_.get() + sizeof(XWireHeaderV2);
+            char* output;
+            if constexpr (Framing == FlatRecordFraming::retained) {
+                if (count > capacity_ || !wire_) [[unlikely]] resize_wire(count);
+                output = wire_.get();
+            } else {
+                if (count < slots_.wires.size()) [[likely]] {
+                    auto& slot = slots_.wires[count];
+                    output = slot ? slot.get() : open_slot(slot, count);
+                } else {
+                    if (count >= capacity_) [[unlikely]] resize_wire(count);
+                    output = wire_.get();
+                }
+            }
+            char* body = output + sizeof(XWireHeaderV2);
             const auto* source = reinterpret_cast<const char*>(&root);
             std::memcpy(body, source, Field::offset);
             if constexpr (after_field < sizeof(Root))
@@ -831,23 +895,37 @@ namespace detail {
             if constexpr (root_bytes != sizeof(Root))
                 std::memset(body + sizeof(Root), 0, root_bytes - sizeof(Root));
             const auto size = static_cast<std::uint32_t>(count);
-            const auto delta = capacity_ == 0 ? 0 : static_cast<std::int32_t>(root_bytes - Field::offset);
-            write_container_head(body, Field::offset, delta, size, capacity_);
+            if constexpr (Framing == FlatRecordFraming::retained) {
+                const auto delta = capacity_ == 0 ? 0 : nonempty_delta;
+                write_container_head(body, Field::offset, delta, size, capacity_);
+            } else if (count >= slots_.wires.size()) {
+                write_container_head(body, Field::offset, nonempty_delta, size, size);
+            }
             char* data = body + root_bytes;
             for (std::size_t i = 0; i < count; ++i) {
                 const Element value = generate(i);
                 std::memcpy(data + i * sizeof(Element), &value, sizeof(Element));
                 zero_padding_bytes<Element>(data + i * sizeof(Element));
             }
-            if (size_ > size) {
-                char* unused = data + count * sizeof(Element);
-                const auto removed = size_ - size;
-                if (removed == 1) std::memset(unused, 0, sizeof(Element));
-                else if (removed == 2) std::memset(unused, 0, 2 * sizeof(Element));
-                else std::memset(unused, 0, removed * sizeof(Element));
+            if constexpr (Framing == FlatRecordFraming::retained) {
+                if (size_ > size) {
+                    char* unused = data + count * sizeof(Element);
+                    const auto removed = size_ - size;
+                    if (removed == 1) std::memset(unused, 0, sizeof(Element));
+                    else if (removed == 2) std::memset(unused, 0, 2 * sizeof(Element));
+                    else std::memset(unused, 0, removed * sizeof(Element));
+                }
+                size_ = size;
+                return wire_size_;
+            } else {
+                if constexpr (sizeof(Element) % 8 != 0)
+                    std::memset(data + count * sizeof(Element), 0, payload_extent(count) - count * sizeof(Element));
+                const auto used = static_cast<std::uint32_t>(XWIRE_PAYLOAD_BEGIN + root_bytes + payload_extent(count));
+                if (count >= slots_.wires.size())
+                    std::memcpy(output + offsetof(XWireHeaderV2, used_bytes), &used, sizeof(used));
+                slots_.current = output;
+                return wire_bytes(count);
             }
-            size_ = size;
-            return wire_size_;
         }
     };
 
