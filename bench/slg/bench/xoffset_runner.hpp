@@ -26,6 +26,14 @@
 #include "xoffset_shared_delta.hpp"
 #include "xoffset_shared_publisher.hpp"
 
+#if defined(_WIN32)
+namespace slg::xm {
+inline void append_patch_army(XOffsetDatastructure::XVector<Army>& armies, const Army& source) {
+    armies.emplace_back(source);
+}
+} // namespace slg::xm
+#endif
+
 namespace slg {
 
 struct XoModel {
@@ -483,9 +491,10 @@ public:
         // it; the server receives it through XReceiver<from_client>: xoffset reloads it
         // with the full check into a reused buffer, xoffset_trusted views it in place
         // with the bounds check (and times the full check as ULF.recv).
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(_WIN32)
         std::optional<XBuffer> ur;
         XOffsetDatastructure::detail::FlatRecordWriter<xm::March, 7, xm::Troop> ul_writer;
+#if defined(__APPLE__)
         struct UplinkSource {
             int64_t player_id = 0;
             using Army = std::remove_pointer_t<decltype(std::declval<const PlayerState&>().armies.data())>;
@@ -502,6 +511,10 @@ public:
                 source.player_id = state.player_id;
                 source.armies = {state.armies.data(), state.armies.size()};
             }
+#else
+        std::size_t up_encode_order(int player, int, Rng& rng, int64_t seq) {
+            const auto& source = held(player);
+#endif
             static_assert(XOffsetDatastructure::schema::member_t<xm::March, 7>::offset == offsetof(xm::March, troops));
             using SourceTroops = decltype(std::declval<const PlayerState&>().armies[0].troops.data());
             SourceTroops troops = nullptr;
@@ -541,7 +554,7 @@ public:
         }
         uint64_t up_recv_checked() {
             if (!ur) ur.emplace(XBuffer::create<xm::March>(kUplinkInitial, cap()));
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(_WIN32)
             const XOffsetDatastructure::XStatus r = uplink_rx().template reload<xm::March>(*ur, ul_writer.wire());
 #else
             const XOffsetDatastructure::XStatus r = uplink_rx().template reload<xm::March>(*ur, uw);
@@ -551,7 +564,7 @@ public:
         }
         uint64_t up_recv() {
             if constexpr (Trusted) {
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(_WIN32)
                 const auto v = uplink_rx().template view<xm::March>(ul_writer.wire());
 #else
                 const auto v = uplink_rx().template view<xm::March>(uw);
@@ -563,7 +576,7 @@ public:
             }
         }
         uint64_t up_recv_full() requires Trusted { return up_recv_checked(); }
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(_WIN32)
         std::string_view up_wire() const {
             const auto wire = ul_writer.wire();
             return {reinterpret_cast<const char*>(wire.data()), wire.size()};
@@ -762,7 +775,7 @@ public:
             else return dr->root<xm::ViewDelta>();
         }
 
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(_WIN32)
         // One scratch vector for all deliveries processed by this runner.
         std::vector<int32_t> vacant_marches;
 

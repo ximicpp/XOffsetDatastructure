@@ -40,7 +40,7 @@ namespace slg {
 
 inline bool ul_on() { static const bool on = std::getenv("SLG_UL_OFF") == nullptr; return on; }
 
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(_WIN32)
 // Fixed fields and source army for an order from the player a client holds.
 template <class M, class P, class Reset>
 auto fill_order_head(M& m, const P& p, Rng& rng, int64_t seq, Reset reset) {
@@ -118,7 +118,7 @@ template <class Ops> void run_uplink(Ops& ops, uint64_t seed, int cycle, int rou
             Rng rng(mix_seed(seed, (uint64_t(cycle) * 64 + uint64_t(r)) * 100019 + uint64_t(p)));
             const int64_t seq = (int64_t(cycle) * 64 + r) * 1000003 + p;
             std::size_t n = 0;
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(_WIN32)
             timed(st, "UL.send", [&] {
                 if constexpr (requires { ops.up_encode_order(p, r, rng, seq); })
                     n = ops.up_encode_order(p, r, rng, seq);

@@ -96,7 +96,7 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
     root reference, refreshed in snap_recv, the only point where the view's
     epoch changes, so U*.apply starts at the root rather than looking it up in
     the arena for every delta (-DSLG_RP_CHECK checks each use, off by default).
-    On macOS, deltas that both remove and upsert marches can reuse vacated
+    On macOS and Windows, deltas that remove and upsert marches can reuse vacated
     slots in held views with more than 16 marches. The ordinary swap-and-erase
     update handles shorter lists and deltas with a single kind of march change.
   M: 10,000 units, 1,500 clients, 1,000 marches, 4 ticks per cycle. Bytes
@@ -144,6 +144,7 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   each cycle); LD, the server then changes the player every tick (troops,
   items, buildings, resources) and sends a PlayerPatch with only the changed
   parts (dirty marks recorded by the edit); the client applies it in place.
+  On Windows, the XOffset runner copies dirty armies as XOffset records.
   SD, the dirty-module save to storage (all armies and items as a PlayerPatch).
   XOffset native: LK login key delta, LN self deltas, SN delta to what storage
   holds; every native receiver is checked equal to the application-level one.
@@ -163,10 +164,10 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   bounds / full ratio. Bytes `UL.order`, `UL.order_zstd` (`ULZ.send`), count
   `UL.orders`. Runs after the login case; `SLG_UL_OFF=1` drops it. New keys
   only. Each client keeps one order and refills it: the std and cista
-  runners `clear()` one `March`. On macOS, XOffset writes the order directly
-  into an aligned dense V2 output buffer and reuses the client player ID and
-  army span for the read-only uplink rounds. When an order shrinks, the writer
-  clears the inactive troop slots. Other builds fill the order in an
+  runners `clear()` one `March`. On macOS and Windows, XOffset writes the
+  order directly into an aligned dense V2 output buffer and clears inactive
+  troop slots when an order shrinks. The macOS runner reuses the client player
+  ID and army span across read-only uplink rounds. Other builds fill the order in an
   `Automatic` XBuffer and save it into the reused output.
 
 XOffset's A adapter (both case sets) calls `prefetch_for_update()` on the two
