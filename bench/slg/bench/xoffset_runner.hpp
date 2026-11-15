@@ -762,6 +762,79 @@ public:
             else return dr->root<xm::ViewDelta>();
         }
 
+#if defined(__APPLE__)
+        // One scratch vector for all deliveries processed by this runner.
+        std::vector<int32_t> vacant_marches;
+
+        XOFFSET_DETAIL_NOINLINE static void append_held_march(
+                XOffsetDatastructure::XVector<xm::ViewMarch>& marches,
+                FlatHeldIndexMap& index, FlatHeldIndexMap::iterator entry,
+                const xm::ViewMarch& record) {
+            const auto pos = int32_t(marches.size());
+            try {
+                marches.push_back(record);
+            } catch (...) {
+                index.erase(entry);
+                throw;
+            }
+            entry->second = pos;
+        }
+
+        XOFFSET_DETAIL_NOINLINE void apply_held_delta(xm::ViewSnapshot& view, HeldIndex& at) {
+            apply_delta(view, at, delta(), [this](auto& marches, auto& index, const auto& d) {
+                // Use the swap-and-erase path for short lists or a one-way change.
+                constexpr std::size_t small_march_list = 16;
+                if (d.removed_marches.empty() || d.marches.empty() || marches.size() <= small_march_list)
+                    apply_march_delta(marches, index, d);
+                else
+                    apply_packed_marches(marches, index, d);
+            });
+        }
+
+        XOFFSET_DETAIL_NOINLINE void apply_packed_marches(
+                XOffsetDatastructure::XVector<xm::ViewMarch>& marches, FlatHeldIndexMap& index,
+                const xm::ViewDelta& d) {
+            auto& vacant = vacant_marches;
+            vacant.clear();
+            vacant.reserve(std::min<std::size_t>(d.removed_marches.size(), marches.size()));
+            // Remove IDs first. New records can occupy the vacated slots without
+            // copying the tail or repairing that tail record's index.
+            for (const auto id : d.removed_marches) {
+                if (auto* entry = index.find(id)) {
+                    vacant.push_back(entry->second);
+                    index.erase(entry);
+                }
+            }
+            for (const auto& record : d.marches) {
+                auto [entry, inserted] = index.emplace(record.id, 0);
+                if (!inserted) {
+                    marches[std::size_t(entry->second)] = record;
+                } else if (!vacant.empty()) {
+                    const auto pos = vacant.back();
+                    vacant.pop_back();
+                    entry->second = pos;
+                    marches[std::size_t(pos)] = record;
+                } else {
+                    append_held_march(marches, index, entry, record);
+                }
+            }
+            if (vacant.empty()) return;
+            // Compact only leftover vacancies, from highest slot to lowest
+            // so each tail record we move has a live index entry.
+            std::sort(vacant.rbegin(), vacant.rend());
+            auto end = marches.size();
+            for (const auto pos : vacant) {
+                if (std::size_t(pos) != --end) {
+                    auto& moved = marches[std::size_t(pos)];
+                    moved = marches[end];
+                    index[moved.id] = pos;
+                }
+            }
+            marches.truncate(end);
+        }
+
+#endif
+
 #ifdef XOFFSET_DELTA_SYNC_API
         // Native delta (N*): the server keeps each static client's view in an
         // XBuffer with stable slots (a record that leaves zeroes its slot, a new
