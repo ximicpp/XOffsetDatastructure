@@ -483,15 +483,14 @@ public:
         std::optional<XBuffer> um, ur;
         std::string uw;
         template <class Fill> std::size_t up_encode(Fill&& fill) {
-            // The client keeps one order and refills it in place, as the std
-            // formats keep one March and clear() it: the first order builds
-            // the buffer, every later one edits it (troops keeps its capacity).
+            // Keep one outgoing order. Automatic growth keeps its root at
+            // the same address while the troop list grows.
             if (!um) {
-                um.emplace(XBuffer::create<xm::March>(kUplinkInitial, build_cap()));
-                build_in<xm::March>(*um, fill);
-            } else {
-                edit_in<xm::March>(*um, fill);
+                um.emplace(XBuffer::create<xm::March>(kUplinkInitial,
+                    XBuffer::maximum_capacity(XBuffer::MAX_PAYLOAD).with_growth(
+                        XOffsetDatastructure::XGrowPolicy::Automatic)));
             }
+            fill(um->template root<xm::March>());
             um->template save_verified_into<xm::March>(uw);
             return uw.size();
         }
