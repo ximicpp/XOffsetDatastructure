@@ -505,7 +505,7 @@ public:
             static_assert(XOffsetDatastructure::schema::member_t<xm::March, 7>::offset == offsetof(xm::March, troops));
             using SourceTroops = decltype(std::declval<const PlayerState&>().armies[0].troops.data());
             SourceTroops troops = nullptr;
-            const auto prepare = [&](xm::March& order) -> std::size_t {
+            const auto prepare = [&](xm::MarchOrderPrefix& order) -> std::size_t {
                 const auto* army = fill_order_head(order, source, rng, seq, [] {});
                 if (!army) return 0;
                 troops = army->troops.data();
@@ -516,7 +516,7 @@ public:
                 fill_order_troop(troop, troops[i], rng);
                 return troop;
             };
-            return ul_writer.write(prepare, generate);
+            return ul_writer.template write<xm::MarchOrderPrefix>(prepare, generate);
         }
 #else
         std::optional<XBuffer> um, ur;

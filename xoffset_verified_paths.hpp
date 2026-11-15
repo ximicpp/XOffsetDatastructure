@@ -753,6 +753,12 @@ namespace detail {
         return ((!compact_has_heads<typename schema::member_t<Root, I>::type>() || I == Member) && ...);
     }
 
+    template <class Root, class Prefix, std::size_t... I>
+    consteval bool flat_prefix_matches(std::index_sequence<I...>) {
+        return ((std::is_same_v<schema::member_type_t<Root, I>, schema::member_type_t<Prefix, I>> &&
+                 schema::member_t<Root, I>::offset == schema::member_t<Prefix, I>::offset) && ...);
+    }
+
     // Owns the output so a stable-layout wire can retain its framing across
     // messages. The record and generated values are copied into its payload.
     template <class Root, std::size_t Member, class Element>
@@ -801,11 +807,19 @@ namespace detail {
             return {reinterpret_cast<const std::byte*>(wire_.get()), wire_size_};
         }
 
-        template <class Prepare, class Generate>
-            requires std::is_invocable_r_v<std::size_t, Prepare&, Root&> &&
+        template <class Prefix = Root, class Prepare, class Generate>
+            requires std::is_invocable_r_v<std::size_t, Prepare&, Prefix&> &&
                      std::is_nothrow_invocable_r_v<Element, Generate&, std::size_t>
         XOFFSET_DETAIL_WIRE_INLINE std::size_t write(Prepare prepare, Generate generate) {
-            Root root{};
+            // A plain prefix can prepare the scalar fields without constructing
+            // the vector whose head is emitted separately below.
+            if constexpr (!std::is_same_v<Prefix, Root>) {
+                static_assert(std::is_standard_layout_v<Prefix> && std::is_trivially_copyable_v<Prefix>);
+                static_assert(Member + 1 == schema::member_count_v<Root> && after_field == sizeof(Root));
+                static_assert(schema::member_count_v<Prefix> == Member && sizeof(Prefix) >= Field::offset);
+                static_assert(flat_prefix_matches<Root, Prefix>(std::make_index_sequence<Member>{}));
+            }
+            Prefix root{};
             const auto count = std::size_t(prepare(root));
             if (count > capacity_ || !wire_) [[unlikely]] resize_wire(count);
             char* body = wire_.get() + sizeof(XWireHeaderV2);
@@ -825,8 +839,13 @@ namespace detail {
                 std::memcpy(data + i * sizeof(Element), &value, sizeof(Element));
                 zero_padding_bytes<Element>(data + i * sizeof(Element));
             }
-            if (size_ > size)
-                std::memset(data + count * sizeof(Element), 0, (size_ - size) * sizeof(Element));
+            if (size_ > size) {
+                char* unused = data + count * sizeof(Element);
+                const auto removed = size_ - size;
+                if (removed == 1) std::memset(unused, 0, sizeof(Element));
+                else if (removed == 2) std::memset(unused, 0, 2 * sizeof(Element));
+                else std::memset(unused, 0, removed * sizeof(Element));
+            }
             size_ = size;
             return wire_size_;
         }
