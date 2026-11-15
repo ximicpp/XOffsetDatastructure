@@ -58,8 +58,10 @@ namespace slg {
 
 #if defined(__GNUC__) || defined(__clang__)
 #define SLG_ZS_PREFETCH(p) __builtin_prefetch(p)
+#define SLG_ZS_PREFETCH_WRITE(p) __builtin_prefetch((p), 1)
 #else
 #define SLG_ZS_PREFETCH(p) ((void)(p))
+#define SLG_ZS_PREFETCH_WRITE(p) ((void)(p))
 #endif
 
 template <bool kDirty> class ZppSharedViewT {
@@ -146,8 +148,8 @@ public:
         if constexpr (kDirty) {
             // The tracker's two lists, entering and changed (the same units in the
             // same order); the whole list's entries are fetched first.
-            for (int32_t i : p.uei) __builtin_prefetch(&ue_[std::size_t(i)], 1);
-            for (int32_t i : p.uci) __builtin_prefetch(&ue_[std::size_t(i)]);
+            for (int32_t i : p.uei) SLG_ZS_PREFETCH_WRITE(&ue_[std::size_t(i)]);
+            for (int32_t i : p.uci) SLG_ZS_PREFETCH(&ue_[std::size_t(i)]);
             msg_.u32(uint32_t(p.uei.size()));
             for (int32_t i : p.uei) { const Ent& e = unit_body(w, i); ++ue_[std::size_t(i)].hold; msg_.put(arena_.data() + e.off, e.len); }
             msg_.u32(uint32_t(p.uci.size()));
@@ -396,6 +398,7 @@ private:
     int32_t ucap_ = 0, mcap_ = 0;   // view capacity, as XOffset's D3 views
 };
 #undef SLG_ZS_PREFETCH
+#undef SLG_ZS_PREFETCH_WRITE
 using ZppSharedView = ZppSharedViewT<false>;
 using ZppSharedDirtyView = ZppSharedViewT<true>;
 

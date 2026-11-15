@@ -20,7 +20,9 @@ cmake --build build/slg --target slg_bench
 ```
 
 - `XOFFSET_ROOT` defaults to this repository; pass it to measure another checkout.
-- GCC 16 or P2996 Clang. Formats are found, never downloaded: cereal (header),
+- GCC 16 or P2996 Clang for the default reflection build. On native Windows,
+  use MSVC with `-DXOFFSET_CXX_STANDARD=23` for the field-list build.
+  Formats are found, never downloaded: cereal (header),
   protobuf (`find_package`), FlatBuffers (`flatc`), and optionally zpp_bits
   (`-DZPP_BITS_INCLUDE`) and cista (`-DCISTA_INCLUDE`). A format that is not
   found is left out of the build and named in the configure output.
