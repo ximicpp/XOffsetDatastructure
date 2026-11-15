@@ -42,23 +42,7 @@
 using namespace cc24;
 
 // ============================ XOffset 4.0 model ============================
-namespace xo {
-using namespace XOffsetDatastructure;
-struct Skill { uint32_t id, level; };
-struct Item { uint32_t id; uint32_t number; uint64_t uuid; uint64_t timestamp; };
-struct Position { float x, y, z; };
-struct Equip { uint32_t id; uint32_t number; uint64_t uuid; uint64_t timestamp; uint32_t level; XVector<float> attributes; };
-struct Character {
-  uint64_t id; XString name; uint32_t level; float healthpoint, manapoint, speed; Position pos;
-  XMap<uint64_t, Item> items; XVector<Position> path; XVector<float> attributes; XVector<Equip> equips; XVector<Skill> skills;
-};
-}  // namespace xo
-XOFFSET_RECORD(xo::Skill, id, level)
-XOFFSET_RECORD(xo::Item, id, number, uuid, timestamp)
-XOFFSET_RECORD(xo::Position, x, y, z)
-XOFFSET_RECORD(xo::Equip, id, number, uuid, timestamp, level, attributes)
-XOFFSET_RECORD(xo::Character, id, name, level, healthpoint, manapoint, speed, pos, items, path, attributes, equips, skills)
-XOFFSET_REGISTER_SCHEMA_NAME(xo::Character, "bench.cppcon2024.Character")
+#include "character.hpp"
 
 // ============================ cista models (as 2024: raw and offset) ============================
 #define CC24_CISTA_MODEL(NS)                                                                                   \
@@ -132,27 +116,19 @@ static void bench_std_rw() {
 }
 
 // ============================ XOffset 4.0 ============================
-static void fill_xo(xo::Character& r, const stdm::Character& c) {
-  r.id = c.id; r.name = c.name.c_str(); r.level = c.level; r.healthpoint = c.healthpoint; r.manapoint = c.manapoint; r.speed = c.speed;
-  r.pos = {c.pos.x, c.pos.y, c.pos.z};
-  for (const auto& [k, it] : c.items) r.items[k] = xo::Item{it.id, it.number, it.uuid, it.timestamp};
-  for (const auto& p : c.path) r.path.push_back(xo::Position{p.x, p.y, p.z});
-  for (float a : c.attributes) r.attributes.push_back(a);
-  for (const auto& e : c.equips) {
-    auto& x = r.equips.emplace_back(); x.id = e.id; x.number = e.number; x.uuid = e.uuid; x.timestamp = e.timestamp; x.level = e.level;
-    for (float a : e.attributes) x.attributes.push_back(a);
-  }
-  for (const auto& s : c.skills) r.skills.push_back(xo::Skill{s.id, s.level});
-}
 // Same Character and mutations as rw_once, using typed range assignment and
 // reducing the number of independently checked path and attribute operations.
-static void rw_xoffset_bulk(xo::Character& r, const OpSet& o) {
+template<class C>
+static void rw_xoffset_bulk(C& r, const OpSet& o) {
   r.level += 1; r.healthpoint += 1; r.manapoint += 1; r.speed += 1;
   r.pos = {o.pos[0], o.pos[1], o.pos[2]};
   for (const auto& eo : o.equip) {
     auto& e = r.equips.emplace_back();
     e.id = eo.id; e.uuid = eo.uuid; e.number = eo.number; e.timestamp = eo.timestamp; e.level = eo.level;
-    e.attributes.assign_range(eo.attr);
+    if constexpr (std::is_same_v<C, xo::Character>)
+      e.attributes.assign_range(eo.attr);
+    else
+      e.attributes.assign(eo.attr);
     observe(e);
     r.equips.pop_back();
   }
@@ -161,10 +137,11 @@ static void rw_xoffset_bulk(xo::Character& r, const OpSet& o) {
   auto* tail = r.path.data() + old_path_size;
   for (const auto& p : o.path) *tail++ = {p[0], p[1], p[2]};
   r.attributes.push_back(o.attribute);
-  auto [it, inserted] = r.items.try_emplace(o.key, xo::Item{o.item_id, o.item_number, o.item_uuid, o.item_timestamp});
-  if (!inserted) it->second = {o.item_id, o.item_number, o.item_uuid, o.item_timestamp};
+  const xo::Item item{o.item_id, o.item_number, o.item_uuid, o.item_timestamp};
+  auto [it, inserted] = r.items.try_emplace(o.key, item);
+  if (!inserted) it->second = item;
   observe(r);
-  r.items.erase(o.key);
+  r.items.erase_at(it);
   r.attributes.pop_back();
   r.path.resize(old_path_size);
   r.speed -= 1; r.manapoint -= 1; r.healthpoint -= 1; r.level -= 1;
@@ -176,7 +153,7 @@ static void bench_xoffset() {
   const auto cap = XBuffer::maximum_capacity(1 << 24);
   auto make = [&] {
     auto b = TypedXBuffer<C>::create(16 * 1024, cap);
-    b.edit([&](C& r) { fill_xo(r, g_char); });
+    b.edit([&](C& r) { xo::fill(r, g_char); });
     if (!b.ok()) throw std::runtime_error("xoffset fill failed");
     return b;
   };
@@ -203,7 +180,8 @@ static void bench_xoffset() {
   // report-only: the full check (what an untrusted link uses)
   put("xoffset 4.0 full", "sr_reuse", time_sr([&](size_t) {
     src.save_verified_into(w);
-    if (!held.reload_verified(w)) throw std::runtime_error("full reload rejected");
+    held.reload_verified(w);
+    if (!held.ok()) throw std::runtime_error("full reload rejected");
     return held.plain_root().id; }));
   put("xoffset 4.0 full", "sr_fresh", time_sr([&](size_t) {
     std::string wf = src.save_verified(); auto r = TypedXBuffer<C>::load(wf, cap); return r.plain_root().id; }));
@@ -234,6 +212,50 @@ static void bench_xoffset() {
   put("xoffset 4.0", "bytes_after_rw_zstd3", double(zstd3(after.data(), after.size())));
   put("xoffset 4.0", "bytes_after_rw_compact", double(compact.size()));
   put("xoffset 4.0", "bytes_after_rw_compact_zstd3", double(zstd3(compact.data(), compact.size())));
+}
+
+template<class C>
+static void bench_xoffset_layout(const char* name) {
+  using namespace XOffsetDatastructure;
+  const auto cap = XBuffer::maximum_capacity(1 << 24);
+  auto src = TypedXBuffer<C>::create(16 * 1024, cap);
+  src.edit([&](C& r) { xo::fill(r, g_char); });
+  if (!src.ok()) throw std::runtime_error("xoffset layout fill failed");
+  const auto wire = src.save_verified();
+  put_bytes(name, wire.data(), wire.size());
+  XReceiver<XLink::server_peer> rx(cap);
+  auto held = TypedXBuffer<C>::load(wire, cap);
+  expect(name, checksum(held.plain_root()), g_sum);
+  auto trusted = rx.load<C>(wire);
+  if (!trusted) throw std::runtime_error("trusted layout load rejected");
+  expect(name, checksum(trusted->template root<C>()), g_sum);
+
+  std::string w;
+  put(name, "sr_reuse", time_sr([&](size_t) {
+    src.save_verified_into(w);
+    if (!rx.reload(held, w)) throw std::runtime_error("trusted layout reload rejected");
+    return held.plain_root().id;
+  }));
+  put(name, "sr_fresh", time_sr([&](size_t) {
+    auto fresh = rx.load<C>(src.save_verified());
+    if (!fresh) throw std::runtime_error("trusted layout load rejected");
+    return fresh->template root<C>().id;
+  }));
+  put(name, "rw", time_rw([&](const OpSet& o) {
+    if (!src.edit([&](C& r) { rw_xoffset_bulk(r, o); }))
+      throw std::runtime_error("xoffset layout edit failed");
+  }));
+  expect(name, checksum(src.plain_root()), g_rw_sum);
+  const auto after = src.save_verified();
+  put(name, "bytes_after_rw", double(after.size()));
+  put(name, "bytes_after_rw_zstd3", double(zstd3(after.data(), after.size())));
+  const auto compact = src.save_compact();
+  put(name, "bytes_after_rw_compact", double(compact.size()));
+  put(name, "bytes_after_rw_compact_zstd3", double(zstd3(compact.data(), compact.size())));
+  auto recovered = TypedXBuffer<C>::load(after, cap);
+  expect(name, checksum(recovered.plain_root()), g_rw_sum);
+  auto recovered_compact = TypedXBuffer<C>::load(compact, cap);
+  expect(name, checksum(recovered_compact.plain_root()), g_rw_sum);
 }
 
 // ============================ zpp::bits ============================
@@ -484,6 +506,7 @@ int main(int argc, char** argv) {
   std::printf("# cppcon2024 rerun: rw %zu iters, send+recv %zu msgs, median of %d rounds, ns per iteration/message\n", kRwIters, kSrIters, kRounds);
   bench_std_rw();   // first: its end state is the reference for every other rw
   bench_xoffset();
+  bench_xoffset_layout<xo::CharacterInline>("xoffset inline");
   bench_zpp();
   bench_msgpack();
   bench_protobuf();

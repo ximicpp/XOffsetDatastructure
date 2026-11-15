@@ -6232,12 +6232,21 @@ namespace XOffsetDatastructure {
             return it->second;
         }
 
+        // Erase a position returned by this map. As with other flat-map
+        // mutations, the erased position and later positions are invalidated.
+        // Passing end() leaves the map unchanged.
+        iterator erase_at(const_iterator pos) {
+            if (pos == value_base::end()) return value_base::end();
+            const auto index = static_cast<std::uint32_t>(pos - value_base::begin());
+            value_base::erase_index(index);
+            return value_base::data() + index;
+        }
+
         template <typename KeyLike>
         std::uint32_t erase(const KeyLike& key) {
             auto it = find(key);
             if (it == value_base::end()) return 0;
-            auto index = static_cast<std::uint32_t>(it - value_base::begin());
-            value_base::erase_index(index);
+            erase_at(it);
             return 1;
         }
 
