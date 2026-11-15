@@ -1,147 +1,71 @@
 // ============================================================================
-// XOffsetDatastructure Hello World Demo (C++26 Reflection Version)
-// Purpose: Simple introduction to basic usage
+// XOffsetDatastructure Hello World
+// The recommended style (README.md, docs/USER_GUIDE.md section 3): one
+// XOFFSET_RECORD line per record, TypedXBuffer<T>, the root() proxy and its
+// field accessors, edit() for hot loops, save_verified() and load().
+// Builds the same with C++20, C++23 and C++26.
 // ============================================================================
 
-#include <iostream>
-#include <iomanip>
 #include "../xoffsetdatastructure.hpp"
-#if __has_include(<boost/typelayout.hpp>) // C++26 builds: TypeLayout prints the signature
-#include <boost/typelayout.hpp>
-#define XOFFSET_HELLO_TYPELAYOUT 1
-#endif
-#include "player.hpp"
+
+#include <cstddef>
+#include <cstdint>
+#include <iostream>
+#include <string>
 
 using namespace XOffsetDatastructure;
 
+// A plain aggregate with library containers inside: the bytes of the buffer
+// that holds it are its wire form.
+struct Player {
+    std::int32_t id{};
+    std::int32_t level{};
+    XString name;
+    XVector<std::int32_t> items;
+};
+// Global scope, after the type: the field list (needed without C++26
+// reflection; checked against reflection with it) and the schema name.
+XOFFSET_RECORD(Player, id, level, name, items)
 XOFFSET_REGISTER_SCHEMA_NAME(Player, "example.Player")
 
 int main() {
-    std::cout << "\n=== XOffsetDatastructure Hello World (C++26) ===\n\n";
-    
-    // 1. Create buffer
-    std::cout << "1. Creating buffer...\n";
-    XBuffer xbuf(4096);
-    
-    // 2. Create an object
-    std::cout << "2. Creating player...\n";
-    auto* player = xbuf.make<Player>();
-    player->id = 1;
-    player->level = 10;
-    player->name = "Alice";
-    
-    // 3. Add some data
-    std::cout << "3. Adding items...\n";
-    player->items.push_back(101);
-    player->items.push_back(102);
-    player->items.push_back(103);
-    
-    // 4. Display data
-    std::cout << "4. Player info:\n";
-    std::cout << "   Name: " << player->name << "\n";
-    std::cout << "   ID: " << player->id << ", Level: " << player->level << "\n";
-    std::cout << "   Items: ";
-    for (int item : player->items) {
-        std::cout << item << " ";
+    constexpr std::size_t limit = 8 * 1024 * 1024;   // hard per-buffer limit
+
+    // 1. A buffer whose root is a Player.
+    auto buffer = TypedXBuffer<Player>::create(4096, XBuffer::maximum_capacity(limit));
+
+    // 2. Write through the proxy: it stays valid if the buffer moves to a
+    //    larger reservation, and a failed allocation is recorded in
+    //    buffer.error() instead of throwing.
+    auto player = buffer.root();
+    player.id() = 1;
+    player.level() = 10;
+    player.name() = "Alice";
+    for (std::int32_t item : {101, 102, 103}) player.items().push_back(item);
+
+    // 3. Hot loops: a pin scope hands out plain references at plain speed.
+    buffer.edit([](Player& p) {
+        p.level += 1;
+        for (std::int32_t& item : p.items) item += 1000;
+    });
+    if (!buffer.ok()) {
+        std::cerr << "write failed: " << static_cast<int>(buffer.error()) << "\n";
+        return 1;
     }
-    std::cout << "\n";
-    
-    // 5. Serialize to string (shrinks first for compact output)
-    std::cout << "\n5. Serializing...\n";
-    auto data = xbuf.save_verified<Player>();
-    std::cout << "   Serialized size: " << data.size() << " bytes\n";
-    
-    // 6. Deserialize from string
-    std::cout << "6. Deserializing...\n";
-    XBuffer loaded = XBuffer::load_verified<Player>(data);
-    if (loaded.has_root<Player>()) {
-        auto& loaded_player = loaded.root<Player>();
-        std::cout << "   Loaded player: " << loaded_player.name 
-                  << " (Level " << loaded_player.level << ")\n";
-        std::cout << "   Items count: " << loaded_player.items.size() << "\n";
-    }
-    
-    // 7. Memory Statistics
-    std::cout << "\n7. Memory statistics before compaction:\n";
-    auto stats_before = xbuf.stats();
-    std::cout << "   Total size: " << stats_before.total_size << " bytes\n";
-    std::cout << "   Used size: " << stats_before.used_size << " bytes\n";
-    std::cout << "   Free size: " << stats_before.free_size << " bytes\n";
-    std::cout << "   Usage: " << std::fixed << std::setprecision(1) 
-              << stats_before.usage_percent() << "%\n";
-    
-    // 8. Memory Compaction Demo (C++26 only)
-    std::cout << "\n8. Memory Compaction:\n";
-    std::cout << "   [OK] C++26 reflection: ENABLED\n";
-    std::cout << "   [OK] Automatic memory compaction available\n\n";
-    
-    // Create some fragmentation by adding and removing data
-    std::cout << "   Creating fragmentation...\n";
-    // Saving normalized the logical length; expose more bytes before mutation.
-    // On a movable slot (the default here) grow() may move the payload:
-    // take the root again afterwards.
-    if (!xbuf.grow(4096)) throw XBadAlloc();
-    player = &xbuf.root<Player>();
-    player->items.push_back(201);
-    player->items.push_back(202);
-    player->items.push_back(203);
-    player->items.pop_back();
-    player->items.pop_back();
-    
-    // Show stats after fragmentation
-    auto stats_frag = xbuf.stats();
-    std::cout << "   After operations - Used: " << stats_frag.used_size 
-              << " bytes (" << std::setprecision(1) << stats_frag.usage_percent() << "%)\n";
-    
-    // Compact the buffer — returns XBuffer directly
-    std::cout << "\n   Compacting buffer...\n";
-    XBuffer compacted = XCompactor::compact<Player>(xbuf);
-    
-    // Show stats after compaction
-    auto stats_after = compacted.stats();
-    long long size_delta =
-        static_cast<long long>(stats_before.total_size) -
-        static_cast<long long>(stats_after.total_size);
-    std::cout << "   After compaction:\n";
-    std::cout << "   - Total size: " << stats_after.total_size << " bytes\n";
-    std::cout << "   - Used size: " << stats_after.used_size << " bytes\n";
-    if (size_delta >= 0) {
-        std::cout << "   - Saved: " << size_delta << " bytes\n";
-    } else {
-        std::cout << "   - Size change: +" << -size_delta << " bytes\n";
-    }
-    std::cout << "   - Efficiency: " << std::setprecision(1) 
-              << stats_after.usage_percent() << "%\n";
-    
-    // Verify data integrity after compaction
-    if (compacted.has_root<Player>()) {
-        auto& compacted_player = compacted.root<Player>();
-        std::cout << "\n   [OK] Data integrity verified:\n";
-        std::cout << "     Name: " << compacted_player.name << "\n";
-        std::cout << "     Level: " << compacted_player.level << "\n";
-        std::cout << "     Items: ";
-        for (int item : compacted_player.items) {
-            std::cout << item << " ";
-        }
+
+    // 4. The wire: an owning copy of the arena bytes, no per-field encoding.
+    std::string wire = buffer.save_verified();
+    std::cout << "wire: " << wire.size() << " bytes\n";
+
+    // 5. The receiver checks the whole wire, then reads plain members.
+    auto restored = TypedXBuffer<Player>::load(wire, XBuffer::maximum_capacity(limit));
+    const bool same = restored.read([](const Player& p) {
+        std::cout << "loaded: " << std::string(p.name.view()) << ", id " << p.id
+                  << ", level " << p.level << ", items";
+        for (std::int32_t item : p.items) std::cout << " " << item;
         std::cout << "\n";
-    }
-    
-#ifdef XOFFSET_HELLO_TYPELAYOUT
-    // 9. Show type signature (compile-time calculated via boost::typelayout)
-    std::cout << "\n9. Type Signature (compile-time, zero runtime cost):\n";
-    std::cout << "   Player definition signature:\n   ";
-    constexpr auto sig = boost::typelayout::get_layout_signature<Player>();
-    std::cout << sig.value;
-    std::cout << "\n\n   Explanation:\n";
-    std::cout << "   - [64-le]: 64-bit little-endian platform\n";
-    std::cout << "   - record[s:72,a:8]: Size 72 bytes, aligned to 8 bytes\n";
-    std::cout << "   - @0[id]:i32:  Field 'id' at offset 0\n";
-    std::cout << "   - @4[level]:i32:  Field 'level' at offset 4\n";
-    std::cout << "   - @8[name]:...:  Field 'name' (XString) at offset 8\n";
-    std::cout << "   - @40[items]:...: Field 'items' (XVector) at offset 40\n";
-    std::cout << "\n   [OK] Type signature matches memory layout!\n";
-#endif
-    
-    std::cout << "\n=== Done! ===\n\n";
-    return 0;
+        return p.id == 1 && p.level == 11 && p.items.size() == 3 && p.items[0] == 1101;
+    });
+    std::cout << (same ? "OK\n" : "MISMATCH\n");
+    return same ? 0 : 1;
 }
