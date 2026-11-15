@@ -98,6 +98,13 @@ inline std::vector<OpSet> make_ops() {
   return v;
 }
 
+// Make the temporary objects visible to the optimizer before removal.
+// The GCC/Clang benchmark uses a compiler barrier with no runtime call.
+template <class T>
+inline void observe(const T& value) {
+  asm volatile("" : : "g"(&value) : "memory");
+}
+
 // The loop body for every model with the 2024 member names (std, cista, XOffset).
 // items_set / items_erase are found by argument-dependent lookup on the model's map type.
 template <class Ch, class ItemT, class SetFn, class EraseFn>
@@ -108,12 +115,15 @@ inline void rw_once(Ch& r, const OpSet& o, SetFn&& set, EraseFn&& erase) {
     auto& e = r.equips.emplace_back();
     e.id = eo.id; e.uuid = eo.uuid; e.number = eo.number; e.timestamp = eo.timestamp; e.level = eo.level;
     for (float a : eo.attr) e.attributes.push_back(a);
+    observe(e);
     r.equips.pop_back();
   }
   for (const auto& p : o.path) { r.path.emplace_back(); auto& b = r.path.back(); b.x = p[0]; b.y = p[1]; b.z = p[2]; }
   r.attributes.push_back(o.attribute);
   ItemT it{}; it.id = o.item_id; it.uuid = o.item_uuid; it.number = o.item_number; it.timestamp = o.item_timestamp;
-  set(r.items, o.key, it); erase(r.items, o.key);
+  set(r.items, o.key, it);
+  observe(r);
+  erase(r.items, o.key);
   r.attributes.pop_back();
   for (int i = 0; i < 8; ++i) r.path.pop_back();
   r.speed -= 1; r.manapoint -= 1; r.healthpoint -= 1; r.level -= 1;
@@ -128,6 +138,7 @@ template <class S> inline std::string_view sv(const S& s) {
 }
 template <class Ch> inline uint64_t checksum(const Ch& c) {
   uint64_t h = mix(0, c.id);
+  h = mix(h, sv(c.name).size());
   for (char ch : sv(c.name)) h = mix(h, uint8_t(ch));
   h = mix(h, c.level); h = mix(h, fbits(c.healthpoint)); h = mix(h, fbits(c.manapoint)); h = mix(h, fbits(c.speed));
   h = mix(h, fbits(c.pos.x)); h = mix(h, fbits(c.pos.y)); h = mix(h, fbits(c.pos.z));
@@ -137,12 +148,17 @@ template <class Ch> inline uint64_t checksum(const Ch& c) {
     items += mix(mix(mix(mix(mix(1, kv.first), it.id), it.uuid), it.number), it.timestamp);
   }
   h = mix(h, items); h = mix(h, c.items.size());
+  h = mix(h, c.path.size());
   for (const auto& p : c.path) { h = mix(h, fbits(p.x)); h = mix(h, fbits(p.y)); h = mix(h, fbits(p.z)); }
+  h = mix(h, c.attributes.size());
   for (float a : c.attributes) h = mix(h, fbits(a));
+  h = mix(h, c.equips.size());
   for (const auto& e : c.equips) {
     h = mix(mix(mix(mix(mix(h, e.id), e.uuid), e.number), e.timestamp), e.level);
+    h = mix(h, e.attributes.size());
     for (float a : e.attributes) h = mix(h, fbits(a));
   }
+  h = mix(h, c.skills.size());
   for (const auto& s : c.skills) h = mix(mix(h, s.id), s.level);
   return h;
 }
