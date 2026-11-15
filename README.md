@@ -1,6 +1,6 @@
 # XOffsetDatastructure
 
-**3.6.0** is a C++20/C++26 library for objects and offset containers stored in
+**4.0.0** is a C++20/C++26 library for objects and offset containers stored in
 one contiguous, position-independent arena. Any C++20 compiler builds it with
 one `XOFFSET_RECORD` line per record (the build every client uses: Windows,
 Android, iOS); servers can use C++26 reflection (GCC 16 or the P2996 Clang),
@@ -165,8 +165,8 @@ An installed full-library consumer uses:
 cmake_minimum_required(VERSION 3.30)
 project(MyConsumer LANGUAGES CXX)
 find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
-if(NOT XOffsetDatastructure_VERSION STREQUAL "3.6.0")
-    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 3.6.0")
+if(NOT XOffsetDatastructure_VERSION STREQUAL "4.0.0")
+    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 4.0.0")
 endif()
 add_executable(my_app main.cpp)
 target_link_libraries(my_app PRIVATE XOffset::xoffset)

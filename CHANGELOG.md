@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 4.0.0: shared deltas in the library
+
+A major release on 3.6.0. The server side of shared deltas (one encode per
+entity per tick, every connection copies the bodies) moves from bench code
+into the library (`xoffset_shared_publisher.hpp`), on a new shared-delta
+format XS 2.0 (no XS 1.0 reader is kept; 4.0 makes no promise to read older
+wire or delta formats). The D3 cells are now scored against the rival's own
+shared encoding (zpp_bits, 4.0 W1), and a plain configure falls back to
+C++20 with a note instead of failing.
+Pre-release scorecard (`repro_scorecard.sh`, cloud Xeon, 8 x 21, M scale,
+vs zpp_bits / cista_unchecked / zpp_bits' shared encoding): 19 main cells,
+14 win, 5 tie, 0 loss; UL.send 1.33 report-only. DP (1.041) and DC (1.024)
+fell in the 1.02-1.08 band and were re-judged over three code layouts
+(docs/RELEASING.md 2c): DP 1.031 / 0.965 / 1.016, median 1.016, tie; DC
+0.977 / 0.967 / 1.014, median 0.977, tie. Validation: `local_validate
+--release --base v3.6.0` 27/27 pass (both Ir gates pass); pre-release fuzz
+(hour budget) PASS, 0 findings.
+
 - First use (4.0 W7): a configure that does not give `XOFFSET_CXX_STANDARD`
   picks 26 when the toolchain has C++26 reflection (CMake 3.30+, GCC 16+ or
   the P2996 Clang; a small probe decides) and otherwise builds C++20 and
@@ -60,6 +78,11 @@
   rewritten for XS 2.0. bench/slg D3: the server gives each client's units
   and marches their slots (timed in `D*.send`), clients index their views by
   slot.
+- `tools/perf_gate/repro_scorecard.sh`: `EXTRA_CXXFLAGS` appends flags to
+  both binaries (every format alike) and records them in `env.json`
+  (`toolchain.extra_cxxflags`) and SCORECARD.md. docs/RELEASING.md 2c: a D3
+  main cell between 1.02 and 1.08 on the pre-release scorecard is re-judged
+  on the median of three code layouts (`-falign-functions=16/32/64`).
 - `tools/perf_gate/repro_scorecard.sh <ref> <outdir>`: one command from a tag
   or commit to the SLG scorecard (pinned gcc:16 image, zpp_bits v4.7.6 and
   cista v0.16 by commit, one-TU `-O3` build, one process per format per batch,
