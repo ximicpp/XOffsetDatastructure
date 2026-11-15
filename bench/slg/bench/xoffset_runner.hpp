@@ -432,6 +432,9 @@ public:
         std::string lw, pw;
         void setup() {
             hold.clear(); hold.resize(srv.size());
+#if defined(__APPLE__)
+            uplink_sources.resize(srv.size());
+#endif
             pm.emplace(XBuffer::create<xm::PlayerPatch>(kViewInitial, build_cap()));
             pr.emplace(XBuffer::create<xm::PlayerPatch>(kViewInitial, cap()));
             for (auto& h : hw) h.reset();
@@ -480,6 +483,42 @@ public:
         // it; the server receives it through XReceiver<from_client>: xoffset reloads it
         // with the full check into a reused buffer, xoffset_trusted views it in place
         // with the bounds check (and times the full check as ULF.recv).
+#if defined(__APPLE__)
+        std::optional<XBuffer> ur;
+        XOffsetDatastructure::detail::FlatRecordWriter<xm::March, 7, xm::Troop> ul_writer;
+        struct UplinkSource {
+            int64_t player_id = 0;
+            using Army = std::remove_pointer_t<decltype(std::declval<const PlayerState&>().armies.data())>;
+            std::span<Army> armies;
+        };
+        std::vector<UplinkSource> uplink_sources;
+
+        std::size_t up_encode_order(int player, int round, Rng& rng, int64_t seq) {
+            auto& source = uplink_sources[std::size_t(player)];
+            if (round == 0) {
+                // Login and patches finished before UL. This read-only view
+                // remains valid until the last round sends its order.
+                const auto& state = held(player);
+                source.player_id = state.player_id;
+                source.armies = {state.armies.data(), state.armies.size()};
+            }
+            static_assert(XOffsetDatastructure::schema::member_t<xm::March, 7>::offset == offsetof(xm::March, troops));
+            using SourceTroops = decltype(std::declval<const PlayerState&>().armies[0].troops.data());
+            SourceTroops troops = nullptr;
+            const auto prepare = [&](xm::March& order) -> std::size_t {
+                const auto* army = fill_order_head(order, source, rng, seq, [] {});
+                if (!army) return 0;
+                troops = army->troops.data();
+                return army->troops.size();
+            };
+            const auto generate = [&](std::size_t i) noexcept {
+                xm::Troop troop;
+                fill_order_troop(troop, troops[i], rng);
+                return troop;
+            };
+            return ul_writer.write(prepare, generate);
+        }
+#else
         std::optional<XBuffer> um, ur;
         std::string uw;
         template <class Fill> std::size_t up_encode(Fill&& fill) {
@@ -494,6 +533,7 @@ public:
             um->template save_verified_into<xm::March>(uw);
             return uw.size();
         }
+#endif
         static XOffsetDatastructure::XReceiver<XOffsetDatastructure::XLink::from_client>& uplink_rx() {
             static XOffsetDatastructure::XReceiver<XOffsetDatastructure::XLink::from_client> rx(
                 XBuffer::maximum_capacity(XBuffer::DEFAULT_MAXIMUM_CAPACITY));
@@ -501,13 +541,21 @@ public:
         }
         uint64_t up_recv_checked() {
             if (!ur) ur.emplace(XBuffer::create<xm::March>(kUplinkInitial, cap()));
+#if defined(__APPLE__)
+            const XOffsetDatastructure::XStatus r = uplink_rx().template reload<xm::March>(*ur, ul_writer.wire());
+#else
             const XOffsetDatastructure::XStatus r = uplink_rx().template reload<xm::March>(*ur, uw);
+#endif
             if (!r) throw std::runtime_error("uplink receive rejected: " + std::string(r.error().message));
             return query_order(ur->template root<xm::March>());
         }
         uint64_t up_recv() {
             if constexpr (Trusted) {
+#if defined(__APPLE__)
+                const auto v = uplink_rx().template view<xm::March>(ul_writer.wire());
+#else
                 const auto v = uplink_rx().template view<xm::March>(uw);
+#endif
                 if (!v) throw std::runtime_error("uplink view rejected: " + std::string(v.error().message));
                 return query_order(v->root());
             } else {
@@ -515,7 +563,14 @@ public:
             }
         }
         uint64_t up_recv_full() requires Trusted { return up_recv_checked(); }
+#if defined(__APPLE__)
+        std::string_view up_wire() const {
+            const auto wire = ul_writer.wire();
+            return {reinterpret_cast<const char*>(wire.data()), wire.size()};
+        }
+#else
         std::string_view up_wire() const { return uw; }
+#endif
 #ifdef XOFFSET_DELTA_SYNC_API
         std::vector<XOffsetDatastructure::XDeltaBaseline> nb;
         std::vector<XOffsetDatastructure::XDeltaCursor> nc;

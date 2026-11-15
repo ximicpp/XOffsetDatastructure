@@ -160,9 +160,11 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   bounds / full ratio. Bytes `UL.order`, `UL.order_zstd` (`ULZ.send`), count
   `UL.orders`. Runs after the login case; `SLG_UL_OFF=1` drops it. New keys
   only. Each client keeps one order and refills it: the std and cista
-  runners `clear()` one `March`, XOffset fills the same record in an
-  `Automatic` buffer whose root stays at a fixed address, so `troops`
-  keeps its capacity in each and the XOffset wire carries that spare capacity.
+  runners `clear()` one `March`. On macOS, XOffset writes the order directly
+  into an aligned dense V2 output buffer and reuses the client player ID and
+  army span for the read-only uplink rounds. When an order shrinks, the writer
+  clears the inactive troop slots. Other builds fill the order in an
+  `Automatic` XBuffer and save it into the reused output.
 
 XOffset's A adapter (both case sets) calls `prefetch_for_update()` on the two
 players' buffers when the battle result starts arriving, inside the timed
