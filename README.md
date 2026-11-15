@@ -23,7 +23,9 @@ cmake --build build --config Release --target helloworld
 ```
 
 [`examples/helloworld.cpp`](examples/helloworld.cpp) is the recommended style,
-the same as the example below. Without `-DXOFFSET_CXX_STANDARD`, configure
+the same as the example below. Next, [GETTING_STARTED.md](docs/GETTING_STARTED.md)
+walks through the core use cases (server to client, client uplink, server to
+server) with one runnable example each. Without `-DXOFFSET_CXX_STANDARD`, configure
 picks C++26 when the toolchain has reflection (CMake 3.30+, GCC 16+ or the
 P2996 Clang) and otherwise builds C++20 and says so.
 
@@ -122,8 +124,10 @@ the arena, register each root schema, and satisfy both byte-copy safety and wire
 admission. A schema name alone does not establish compatibility: the reader's
 type layout must match the writer's exactly (see
 [schema changes](docs/USER_GUIDE.md#7-schema-变更)).
-See `examples/helloworld.cpp`, `examples/stable_storage.cpp` and
-`examples/demo.cpp` for more examples.
+See `examples/helloworld.cpp`, the use-case examples in
+[GETTING_STARTED.md](docs/GETTING_STARTED.md) (`server_to_client.cpp`,
+`client_uplink.cpp`, `server_to_server.cpp`, `delta_sync.cpp`,
+`shared_delta.cpp`), `examples/stable_storage.cpp` and `examples/demo.cpp`.
 
 ## Build and consume
 
