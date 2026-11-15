@@ -166,8 +166,10 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   only. Each client keeps one order and refills it: the std and cista
   runners `clear()` one `March`. On macOS and Windows, XOffset writes the
   order directly into an aligned dense V2 output buffer and clears inactive
-  troop slots when an order shrinks. The macOS runner reuses the client player
-  ID and army span across read-only uplink rounds. Other builds fill the order in an
+  troop slots when an order shrinks on Windows. On macOS the writer retains
+  an aligned output slot for each order length up to four troops and uses a
+  compact output buffer for longer orders. The macOS runner reuses the client
+  player ID and army span across read-only uplink rounds. Other builds fill it in an
   `Automatic` XBuffer and save it into the reused output.
 
 XOffset's A adapter (both case sets) calls `prefetch_for_update()` on the two

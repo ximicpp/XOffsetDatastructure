@@ -493,7 +493,12 @@ public:
         // with the bounds check (and times the full check as ULF.recv).
 #if defined(__APPLE__) || defined(_WIN32)
         std::optional<XBuffer> ur;
+#if defined(__APPLE__)
+        XOffsetDatastructure::detail::FlatRecordWriter<xm::March, 7, xm::Troop,
+            XOffsetDatastructure::detail::FlatRecordFraming::sized_slots> ul_writer;
+#else
         XOffsetDatastructure::detail::FlatRecordWriter<xm::March, 7, xm::Troop> ul_writer;
+#endif
 #if defined(__APPLE__)
         struct UplinkSource {
             int64_t player_id = 0;
