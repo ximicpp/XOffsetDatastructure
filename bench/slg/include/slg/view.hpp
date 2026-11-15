@@ -705,7 +705,7 @@ template <class V> void build_index(const V& v, HeldIndex& at) {
 // Apply a received delta to a held view (any model) through its index. A record
 // that left is replaced by the last one (order is not kept); a changed one is
 // updated in place; a new one is appended. Tiles are updated at their place.
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(_WIN32)
 template <class V, class D, class ApplyMarches>
 void apply_delta(V& v, HeldIndex& at, const D& d, ApplyMarches&& apply_marches) {
 #else
@@ -736,7 +736,7 @@ template <class V, class D> void apply_delta(V& v, HeldIndex& at, const D& d) {
             copy_unit(v.units.emplace_back(), u);
         }
     }
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(_WIN32)
     apply_marches(v.marches, at.marches, d);
 #else
     for (const auto& id : d.removed_marches) {
@@ -765,7 +765,7 @@ template <class V, class D> void apply_delta(V& v, HeldIndex& at, const D& d) {
     }
 }
 
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(_WIN32)
 template <class Marches, class D>
 void apply_march_delta(Marches& marches, FlatHeldIndexMap& index, const D& d) {
     for (const auto& id : d.removed_marches) {
@@ -1200,7 +1200,7 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
             if (keep_delta && c == 0) *keep_delta = std::string(ops.delta_wire());
             timed(st, k.urecv.c_str(), [&] { ops.delta_recv(); });
             HeldIndex& at = s.index[std::size_t(c)];
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(_WIN32)
             timed(st, k.uapply.c_str(), [&] { apply_held_delta(ops, ops.held(c, 0), at); });
 #else
             timed(st, k.uapply.c_str(), [&] { apply_delta(ops.held(c, 0), at, ops.delta()); });
@@ -1276,7 +1276,7 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
         auto& hw = ops.held(vs.clients + d, 0);
         for (const std::string& dw : wq[std::size_t(d)]) {
             warm_sink = query_view(hw);
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(_WIN32)
             timed(st, k.uwrecv.c_str(), [&] { ops.delta_recv_from(dw); apply_held_delta(ops, hw, s.windex[std::size_t(d)]); });
 #else
             timed(st, k.uwrecv.c_str(), [&] { ops.delta_recv_from(dw); apply_delta(hw, s.windex[std::size_t(d)], ops.delta()); });

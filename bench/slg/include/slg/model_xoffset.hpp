@@ -69,7 +69,7 @@ struct alignas(8) BattleMsg {
 
 struct alignas(8) Tile { int32_t x{}; int32_t y{}; int32_t terrain{}; int32_t level{}; int64_t owner{}; };
 
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(_WIN32)
 struct MarchOrderPrefix {
     int64_t march_id{};
     int64_t owner{};
@@ -150,7 +150,7 @@ XOFFSET_RECORD(slg::xm::Event, round, hero_id, skill_id, target, damage)
 XOFFSET_RECORD(slg::xm::Report, battle_id, summary, events)
 XOFFSET_RECORD(slg::xm::BattleMsg, battle_id, seed, winner, attacker, defender, report)
 XOFFSET_RECORD(slg::xm::Tile, x, y, terrain, level, owner)
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(_WIN32)
 XOFFSET_RECORD(slg::xm::MarchOrderPrefix, march_id, owner, from_x, from_y, to_x, to_y, eta)
 #endif
 XOFFSET_RECORD(slg::xm::March, march_id, owner, from_x, from_y, to_x, to_y, eta, troops)
