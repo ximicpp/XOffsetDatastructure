@@ -314,7 +314,30 @@ bool test_main_containers_assoc_rejects_corrupt_map() {
     return true;
 }
 
+void test_map_erase_at() {
+    auto buffer = TypedXBuffer<BridgeAssocRoot>::create(8192);
+    auto& map = buffer.plain_root().by_id;
+    assert(map.erase_at(map.end()) == map.end());
+    map.try_emplace(1, "one");
+    const auto [middle, inserted] = map.try_emplace(2, "out-of-line value to retire");
+    assert(inserted && middle->first == 2);
+    map.try_emplace(3, "three");
+
+    const auto next = map.erase_at(map.find(2));
+    assert(next != map.end() && next->first == 3);
+    assert(map.size() == 2 && !map.contains(2));
+    assert(map.erase_at(map.find(3)) == map.end());
+    assert(map.size() == 1 && map.begin()->first == 1);
+
+    auto round_trip = TypedXBuffer<BridgeAssocRoot>::load(buffer.save_verified());
+    const auto& copy = round_trip.plain_root().by_id;
+    assert(copy.size() == 1 && copy.begin()->second.view() == "one");
+    assert(map.erase_at(map.begin()) == map.end());
+    assert(map.empty());
+}
+
 int main() {
+    test_map_erase_at();
     bool all_passed = true;
     all_passed &= test_main_containers_basic();
     all_passed &= test_main_containers_round_trip();

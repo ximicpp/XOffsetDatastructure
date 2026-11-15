@@ -2,6 +2,7 @@
 // the plain std model the std-based rivals use, timing and a checksum.
 #pragma once
 #include <algorithm>
+#include <atomic>
 #include <bit>
 #include <chrono>
 #include <cstdint>
@@ -102,7 +103,12 @@ inline std::vector<OpSet> make_ops() {
 // The GCC/Clang benchmark uses a compiler barrier with no runtime call.
 template <class T>
 inline void observe(const T& value) {
+#if defined(__clang__) || defined(__GNUC__)
   asm volatile("" : : "g"(&value) : "memory");
+#else
+  (void)value;
+  std::atomic_signal_fence(std::memory_order_seq_cst);
+#endif
 }
 
 // The loop body for every model with the 2024 member names (std, cista, XOffset).
