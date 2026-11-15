@@ -747,6 +747,91 @@ namespace detail {
         return sizeof(XWireHeaderV2) + w.cursor;
     }
 
+
+    template <class Root, std::size_t Member, std::size_t... I>
+    consteval bool flat_projection_members(std::index_sequence<I...>) {
+        return ((!compact_has_heads<typename schema::member_t<Root, I>::type>() || I == Member) && ...);
+    }
+
+    // Owns the output so a stable-layout wire can retain its framing across
+    // messages. The record and generated values are copied into its payload.
+    template <class Root, std::size_t Member, class Element>
+    class FlatRecordWriter {
+        using Field = schema::member_t<Root, Member>;
+        static_assert(is_v1_wire_admitted_v<Root> && compact_direct_supported<Root>());
+        static_assert(std::is_same_v<typename Field::type, XVector<Element>>);
+        static_assert(std::is_trivially_copyable_v<Element> && !compact_has_heads<Element>());
+        static_assert(flat_projection_members<Root, Member>(
+            std::make_index_sequence<schema::member_count_v<Root>>{}));
+#ifdef XOFFSET_REJECT_IMPLICIT_PADDING
+        static_assert(!has_implicit_padding_v<Root>);
+#endif
+        static constexpr auto root_bytes = compact_root_end<Root>() - XWIRE_PAYLOAD_BEGIN;
+        static constexpr auto max_bytes = (XBufferCore::MAX_PAYLOAD - compact_root_end<Root>()) & ~std::size_t(7u);
+        static constexpr auto after_field = Field::offset + sizeof(typename Field::type);
+        static constexpr std::align_val_t wire_alignment{64};
+        struct Delete {
+            void operator()(char* wire) const noexcept { ::operator delete(wire, wire_alignment); }
+        };
+        std::unique_ptr<char, Delete> wire_;
+        std::size_t wire_size_ = 0;
+        std::uint32_t capacity_ = 0;
+        std::uint32_t size_ = 0;
+
+        XOFFSET_DETAIL_WIRE_NOINLINE void resize_wire(std::size_t count) {
+            if (count > max_bytes / sizeof(Element))
+                XOFFSET_THROW(XException(XErrc::capacity_exceeded, "flat projection exceeds the wire limit"));
+            const auto extent = (count * sizeof(Element) + 7u) & ~std::size_t(7u);
+            const auto bytes = sizeof(XWireHeaderV2) + root_bytes + extent;
+            std::unique_ptr<char, Delete> next(static_cast<char*>(::operator new(bytes, wire_alignment)));
+            std::memset(next.get(), 0, bytes);
+            const auto head = compact_wire_header<Root>(XWIRE_PAYLOAD_BEGIN + root_bytes + extent);
+            std::memcpy(next.get(), &head, sizeof(head));
+            wire_ = std::move(next);
+            wire_size_ = bytes;
+            capacity_ = static_cast<std::uint32_t>(count);
+        }
+
+    public:
+        FlatRecordWriter() = default;
+        FlatRecordWriter(const FlatRecordWriter&) = delete;
+        FlatRecordWriter& operator=(const FlatRecordWriter&) = delete;
+
+        std::span<const std::byte> wire() const noexcept {
+            return {reinterpret_cast<const std::byte*>(wire_.get()), wire_size_};
+        }
+
+        template <class Prepare, class Generate>
+            requires std::is_invocable_r_v<std::size_t, Prepare&, Root&> &&
+                     std::is_nothrow_invocable_r_v<Element, Generate&, std::size_t>
+        std::size_t write(Prepare prepare, Generate generate) {
+            Root root{};
+            const auto count = std::size_t(prepare(root));
+            if (count > capacity_ || !wire_) [[unlikely]] resize_wire(count);
+            char* body = wire_.get() + sizeof(XWireHeaderV2);
+            const auto* source = reinterpret_cast<const char*>(&root);
+            std::memcpy(body, source, Field::offset);
+            if constexpr (after_field < sizeof(Root))
+                std::memcpy(body + after_field, source + after_field, sizeof(Root) - after_field);
+            zero_padding_bytes<Root>(body);
+            if constexpr (root_bytes != sizeof(Root))
+                std::memset(body + sizeof(Root), 0, root_bytes - sizeof(Root));
+            const auto size = static_cast<std::uint32_t>(count);
+            const auto delta = capacity_ == 0 ? 0 : static_cast<std::int32_t>(root_bytes - Field::offset);
+            write_container_head(body, Field::offset, delta, size, capacity_);
+            char* data = body + root_bytes;
+            for (std::size_t i = 0; i < count; ++i) {
+                const Element value = generate(i);
+                std::memcpy(data + i * sizeof(Element), &value, sizeof(Element));
+                zero_padding_bytes<Element>(data + i * sizeof(Element));
+            }
+            if (size_ > size)
+                std::memset(data + count * sizeof(Element), 0, (size_ - size) * sizeof(Element));
+            size_ = size;
+            return wire_size_;
+        }
+    };
+
     template<class T>
     void VerifiedPathsAccess::save_compact_into(XBufferCore& source, std::string& out, XCompactOptions options) {
         static_assert(compact_direct_supported<T>(),
