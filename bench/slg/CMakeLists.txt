@@ -1,8 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(slg_prototype LANGUAGES CXX)
 
-# XOffset needs a P2996 Clang with its libc++ and the XOffset checkout (next_cpp26).
-option(SLG_WITH_XOFFSET "Build the XOffset V2 path (needs P2996 Clang or GCC 16)" OFF)
+option(SLG_WITH_XOFFSET "Build the XOffset V2 path" OFF)
 # In the repository the library is two levels up (bench/slg -> root).
 get_filename_component(_slg_repo_root "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 if(EXISTS "${_slg_repo_root}/xoffsetdatastructure.hpp")
@@ -20,7 +19,9 @@ option(SLG_MEMCOUNT "Count live heap bytes for --mode mem" OFF)
 # Diagnostic programs (not part of any measurement).
 option(SLG_BUILD_PROBES "Build erase_probe and small_msg_probe" OFF)
 
-if(SLG_WITH_XOFFSET)
+if(SLG_WITH_XOFFSET AND DEFINED XOFFSET_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD ${XOFFSET_CXX_STANDARD})
+elseif(SLG_WITH_XOFFSET)
   set(CMAKE_CXX_STANDARD 26)
 else()
   set(CMAKE_CXX_STANDARD 20)
@@ -32,6 +33,9 @@ endif()
 
 add_executable(slg_bench bench/slg_bench.cpp)
 target_include_directories(slg_bench PRIVATE include adapters bench)
+if(MSVC)
+  target_compile_options(slg_bench PRIVATE /EHsc /utf-8)
+endif()
 if(SLG_IR_COUNT)
   find_path(VALGRIND_INCLUDE valgrind/callgrind.h REQUIRED)
   target_include_directories(slg_bench SYSTEM PRIVATE ${VALGRIND_INCLUDE})
@@ -115,6 +119,9 @@ endif()
 # bench/ci_smoke.sh runs it. Asserts stay on in every build type.
 add_executable(flat_held_index_test tests/flat_held_index_test.cpp)
 target_include_directories(flat_held_index_test PRIVATE include/slg)
+if(MSVC)
+  target_compile_options(flat_held_index_test PRIVATE /EHsc)
+endif()
 
 message(STATUS "slg_bench formats:xoffset=${SLG_WITH_XOFFSET} ir_count=${SLG_IR_COUNT} cereal=${CEREAL_INCLUDE} protobuf=${Protobuf_FOUND} flatbuffers=${FLATC} zpp_bits=${ZPP_BITS_INCLUDE} cista=${CISTA_INCLUDE} compression=${ZSTD_LIB}")
 if(SLG_BUILD_PROBES)
