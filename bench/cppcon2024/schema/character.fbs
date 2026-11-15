@@ -1,0 +1,50 @@
+namespace flatbuffers_test;
+
+struct Skill {
+    id: uint32;
+    level: uint32;
+}
+
+struct Item {
+    id: uint32;
+    uuid: ulong;
+    number: uint32;
+    timestamp: ulong;
+}
+
+struct ItemsEntry {
+    key: ulong;
+    value: Item;
+}
+
+table Equip {
+    id: uint32;
+    uuid: ulong;
+    number: uint32;
+    timestamp: ulong;
+    level: uint32;
+    attributes: [float];
+}
+
+struct Position {
+    x: float;
+    y: float;
+    z: float;
+}
+
+table Character {
+    id: ulong;
+    name: string;
+    level: uint32;
+    healthpoint: float;
+    manapoint: float;
+    speed: float;
+    pos: Position;
+    path: [Position];
+    attributes: [float];
+    items: [ItemsEntry];
+    equips: [Equip];
+    skills: [Skill];
+}
+
+root_type Character;
