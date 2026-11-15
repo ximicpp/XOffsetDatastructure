@@ -245,6 +245,8 @@ def render(rows, batches, rivals, brows, zstd, env, baseline):
         out.append(f"- 提交：`{src.get('ref', '?')}` = `{src.get('commit', '?')}`")
         tc = env.get("toolchain", {})
         out.append(f"- 编译：{tc.get('compiler', '?')}，镜像 `{tc.get('image', '?')}`")
+        if tc.get("extra_cxxflags"):
+            out.append(f"- 追加编译参数：`{tc['extra_cxxflags']}`（EXTRA_CXXFLAGS，所有格式同样）")
         deps = env.get("deps", {})
         out.append("- 对手：" + "，".join(f"{k} `{v.get('commit', '?')[:12]}`" for k, v in deps.items()))
         host = env.get("host", {})

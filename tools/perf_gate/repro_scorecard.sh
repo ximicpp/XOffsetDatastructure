@@ -41,6 +41,10 @@
 #     XPORT=1         also run one SLG_XPORT=1 process per format and batch (tag x, raw/x_*)
 #                     and append the transport-model columns L/B/S/SD .send+T/.recv+T
 #                     (tools/perf_gate/xport_columns.py, report only) to SCORECARD.md
+#     EXTRA_CXXFLAGS="..."  appended to CXXFLAGS for both binaries (every format alike) and
+#                     recorded in env.json (toolchain.extra_cxxflags) and SCORECARD.md; used by
+#                     the D3 at-the-line re-judge, e.g. EXTRA_CXXFLAGS=-falign-functions=32
+#                     (docs/RELEASING.md section 2c)
 set -euo pipefail
 
 REF=${1:?usage: repro_scorecard.sh <ref> <outdir> [batches] [cycles]}
@@ -62,6 +66,8 @@ DEPS=(
   "lz4 https://github.com/lz4/lz4 ebb370ca83af193212df4dcbadcc5d87bc0de2f0 v1.10.0"
 )
 CXXFLAGS="-std=c++26 -freflection -O3 -DNDEBUG -DSLG_WITH_XOFFSET=1 -DSLG_WITH_ZPP_BITS=1 -DSLG_WITH_CISTA=1"
+EXTRA_CXXFLAGS=${EXTRA_CXXFLAGS:-}
+if [ -n "$EXTRA_CXXFLAGS" ]; then CXXFLAGS="$CXXFLAGS $EXTRA_CXXFLAGS"; fi
 INCLUDES="-I/src -I/src/bench/slg/include -I/src/bench/slg/adapters -I/src/bench/slg/bench -isystem /deps/zpp_bits -isystem /deps/cista/include"
 
 log() { echo "[$(date -u +%H:%M:%SZ)] $*"; }
@@ -136,7 +142,7 @@ log "shared-encoding rivals: ${SHARED_RUN:-none}"
 GXX=$(docker run --rm --network none "$IMAGE" g++ --version | head -1)
 LIBC=$(docker run --rm --network none "$IMAGE" ldd --version 2>&1 | head -1)
 REPO_HEAD=$(git -C "$REPO" rev-parse HEAD)
-export OUT REF COMMIT IMAGE GXX LIBC CXXFLAGS INCLUDES NB CY CPU SEED SCALE FORMATS ZSTD ZBATCHES START REPO_HEAD SHARED_RUN
+export OUT REF COMMIT IMAGE GXX LIBC CXXFLAGS EXTRA_CXXFLAGS INCLUDES NB CY CPU SEED SCALE FORMATS ZSTD ZBATCHES START REPO_HEAD SHARED_RUN
 export DEPS_TXT=$(printf '%s\n' "${DEPS[@]}")
 python3 - <<'PY'
 import hashlib, json, os, platform, re, subprocess
@@ -154,7 +160,7 @@ for line in e["DEPS_TXT"].splitlines():
 env = {
   "source": {"ref": e["REF"], "commit": e["COMMIT"], "scored_by": e["REPO_HEAD"]},
   "toolchain": {"image": e["IMAGE"], "compiler": e["GXX"], "libc": e["LIBC"],
-                "cxxflags": e["CXXFLAGS"], "includes": e["INCLUDES"],
+                "cxxflags": e["CXXFLAGS"], "extra_cxxflags": e["EXTRA_CXXFLAGS"], "includes": e["INCLUDES"],
                 "translation_unit": "bench/slg/bench/slg_bench.cpp",
                 "binary_sha256": sha(os.path.join(e["OUT"], "bin/slg_bench")),
                 "binary_z_sha256": sha(os.path.join(e["OUT"], "bin/slg_bench_z"))},
