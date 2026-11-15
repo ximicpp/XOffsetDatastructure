@@ -19,3 +19,19 @@ if(XOFFSET_CXX_STANDARD STREQUAL "26" AND NOT XOFFSET_SCHEMA_BACKEND STREQUAL "d
     add_executable(xoffsetdatastructure_demo demo.cpp)
     configure_xoffset_target(xoffsetdatastructure_demo)
 endif()
+
+# Getting-started use cases (docs/GETTING_STARTED.md). Each is also built
+# without exceptions (-fno-exceptions, MSVC /EHs-c-), as client engines are,
+# and runs under CTest.
+foreach(use_case server_to_client client_uplink server_to_server)
+    add_executable(${use_case} ${use_case}.cpp)
+    configure_xoffset_target(${use_case})
+    add_executable(${use_case}_noexc ${use_case}.cpp)
+    configure_xoffset_target(${use_case}_noexc)
+    xoffset_disable_exceptions(${use_case}_noexc)
+    if(XOFFSET_BUILD_TESTS)
+        add_test(NAME example_${use_case} COMMAND ${use_case})
+        add_test(NAME example_${use_case}_noexc COMMAND ${use_case}_noexc)
+        set_tests_properties(example_${use_case} example_${use_case}_noexc PROPERTIES LABELS "examples")
+    endif()
+endforeach()

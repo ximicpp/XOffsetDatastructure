@@ -1,6 +1,8 @@
 # XOffsetDatastructure 用户指南（4.0.0，wire 格式 2.1）
 
 本文面向使用者，说明怎么定义类型、构建、修改、保存、加载，以及必须遵守的约束。
+第一次用先看 [GETTING_STARTED.md](GETTING_STARTED.md)：按场景（服务端发往客户端、客户端上行、服务端之间）
+各有一个能运行的推荐写法示例。
 部署要求见 [DEPLOYMENT.md](DEPLOYMENT.md)，格式细节见 [V2_FORMAT.md](V2_FORMAT.md)，输入与兼容边界见
 [ALPHA_COMPATIBILITY.md](ALPHA_COMPATIBILITY.md)。
 
