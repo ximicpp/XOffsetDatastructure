@@ -176,7 +176,9 @@ static void bench_xoffset() {
     return r->root<C>().id; }));
   // report-only: the full check (what an untrusted link uses)
   put("xoffset 4.0 full", "sr_reuse", time_sr([&](size_t) {
-    src.save_verified_into(w); held.reload_verified(w); return held.plain_root().id; }));
+    src.save_verified_into(w);
+    if (!held.reload_verified(w)) throw std::runtime_error("full reload rejected");
+    return held.plain_root().id; }));
   put("xoffset 4.0 full", "sr_fresh", time_sr([&](size_t) {
     std::string wf = src.save_verified(); auto r = TypedXBuffer<C>::load(wf, cap); return r.plain_root().id; }));
   // read/write in place: one pin scope (edit) per iteration, the recommended hot-loop
@@ -194,8 +196,12 @@ static void bench_xoffset() {
   expect("xoffset rw", checksum(rwb.plain_root()), g_rw_sum);
   expect("xoffset rw plain_root", checksum(rwp.plain_root()), g_rw_sum);
   // report-only: what a send after the loop carries (free blocks travel with the wire)
-  put("xoffset 4.0", "bytes_after_rw", double(rwb.save_verified().size()));
-  put("xoffset 4.0", "bytes_after_rw_compact", double(rwb.save_compact().size()));
+  auto after = rwb.save_verified();
+  auto compact = rwb.save_compact();
+  put("xoffset 4.0", "bytes_after_rw", double(after.size()));
+  put("xoffset 4.0", "bytes_after_rw_zstd3", double(zstd3(after.data(), after.size())));
+  put("xoffset 4.0", "bytes_after_rw_compact", double(compact.size()));
+  put("xoffset 4.0", "bytes_after_rw_compact_zstd3", double(zstd3(compact.data(), compact.size())));
 }
 
 // ============================ zpp::bits ============================
@@ -251,11 +257,13 @@ static void pb_rw(protobuf_test::Character& r, const OpSet& o) {
   for (const auto& eo : o.equip) {
     auto* e = r.add_equips(); e->set_id(eo.id); e->set_uuid(eo.uuid); e->set_number(eo.number); e->set_timestamp(eo.timestamp); e->set_level(eo.level);
     for (float a : eo.attr) e->add_attributes(a);
+    observe(*e);
     r.mutable_equips()->RemoveLast();
   }
   for (const auto& q : o.path) { auto* x = r.add_path(); x->set_x(q[0]); x->set_y(q[1]); x->set_z(q[2]); }
   r.add_attributes(o.attribute);
   { auto& it = (*r.mutable_items())[o.key]; it.set_id(o.item_id); it.set_uuid(o.item_uuid); it.set_number(o.item_number); it.set_timestamp(o.item_timestamp); }
+  observe(r);
   r.mutable_items()->erase(o.key);
   r.mutable_attributes()->RemoveLast();
   for (int i = 0; i < 8; ++i) r.mutable_path()->RemoveLast();
@@ -263,14 +271,21 @@ static void pb_rw(protobuf_test::Character& r, const OpSet& o) {
 }
 static void bench_protobuf() {
   protobuf_test::Character src; fill_pb(src, g_char);
-  std::string w0; src.SerializeToString(&w0);
+  std::string w0;
+  if (!src.SerializeToString(&w0)) throw std::runtime_error("pb serialize");
   put_bytes("Protocol Buffers", w0.data(), w0.size());
   { protobuf_test::Character d; if (!d.ParseFromString(w0)) throw std::runtime_error("pb parse"); expect("protobuf", checksum_pb(d), g_sum); }
   std::string w; protobuf_test::Character held;
   put("Protocol Buffers", "sr_reuse", time_sr([&](size_t) {
-    src.SerializeToString(&w); held.ParseFromString(w); return held.id(); }));
+    if (!src.SerializeToString(&w) || !held.ParseFromString(w))
+      throw std::runtime_error("pb reuse round trip");
+    return held.id(); }));
   put("Protocol Buffers", "sr_fresh", time_sr([&](size_t) {
-    std::string wf; src.SerializeToString(&wf); protobuf_test::Character d; d.ParseFromString(wf); return d.id(); }));
+    std::string wf;
+    protobuf_test::Character d;
+    if (!src.SerializeToString(&wf) || !d.ParseFromString(wf))
+      throw std::runtime_error("pb fresh round trip");
+    return d.id(); }));
   protobuf_test::Character r; fill_pb(r, g_char);
   put("Protocol Buffers", "rw", time_rw([&](const OpSet& o) { pb_rw(r, o); }));
   expect("protobuf rw", checksum_pb(r), g_rw_sum);
