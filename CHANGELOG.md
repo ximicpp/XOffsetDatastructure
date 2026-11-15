@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Docs and examples only, no library change: `docs/GETTING_STARTED.md` walks
+  newcomers through the core use cases, each with a runnable example in the
+  recommended style sharing one protocol header (`examples/game_protocol.hpp`,
+  field lists, schema names and layout pins): `server_to_client` (whole
+  state, trusted receive into a reused buffer), `client_uplink` (bounds-tier
+  view plus game-rule checks, full check and `save_compact` to forward),
+  `server_to_server` (player hand-off over `server_peer`, in-place changes).
+  Each also builds without exceptions (`*_noexc`); all six run under CTest
+  (label `examples`).
+
 ## 4.0.0: shared deltas in the library
 
 A major release on 3.6.0. The server side of shared deltas (one encode per
