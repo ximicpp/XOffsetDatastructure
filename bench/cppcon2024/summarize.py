@@ -24,11 +24,11 @@ STD_RW = {"zpp::bits", "MessagePack", "FlatBuffers", "Cap'n Proto"}
 def load(paths):
     vals = {}
     for p in paths:
-        for line in open(p):
-            if line.startswith("#") or len(line) < 50:
+        for line in open(p, encoding="utf-8"):
+            if line.startswith("#") or not line.strip():
                 continue
-            lib, metric, v = line[:22].strip(), line[23:49].strip(), float(line[49:])
-            vals.setdefault((lib, metric), []).append(v)
+            lib, metric, value = line.rsplit(maxsplit=2)
+            vals.setdefault((lib, metric), []).append(float(value))
     return {k: statistics.median(v) for k, v in vals.items()}, len(paths)
 
 
