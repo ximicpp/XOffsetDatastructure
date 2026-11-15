@@ -1,15 +1,40 @@
 # XOffsetDatastructure
 
-**3.6.0** is a C++26/P2996 library for reflected objects
-and offset containers stored in one contiguous, position-independent arena. It is
-for users who can pin an experimental compiler and validate their own schemas.
-The independent OS storage header can also be used with C++17.
+**3.6.0** is a C++20/C++26 library for objects and offset containers stored in
+one contiguous, position-independent arena. Any C++20 compiler builds it with
+one `XOFFSET_RECORD` line per record (the build every client uses: Windows,
+Android, iOS); servers can use C++26 reflection (GCC 16 or the P2996 Clang),
+which also checks those lines. Both builds write the same wire bytes. The
+independent OS storage header can also be used with C++17.
+
+## Quick start (C++20)
+
+Needs Git, CMake 3.20+ and GCC 12+, Clang 16+, Apple clang 15+ or MSVC 19.38+
+on a 64-bit little-endian target:
+
+```sh
+git clone -b next_cpp26 https://github.com/ximicpp/xoffsetdatastructure.git
+cd xoffsetdatastructure
+git -c core.autocrlf=false -c core.eol=lf submodule update --init -- external/boost
+git -c core.autocrlf=false -c core.eol=lf -C external/boost submodule update --init -- libs/container libs/core libs/config libs/throw_exception libs/static_assert libs/container_hash libs/type_traits libs/winapi libs/intrusive libs/predef
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DXOFFSET_CXX_STANDARD=20
+cmake --build build --config Release --target helloworld
+./build/bin/Release/helloworld        # Windows: build\bin\Release\helloworld.exe
+```
+
+[`examples/helloworld.cpp`](examples/helloworld.cpp) is the recommended style,
+the same as the example below. Without `-DXOFFSET_CXX_STANDARD`, configure
+picks C++26 when the toolchain has reflection (CMake 3.30+, GCC 16+ or the
+P2996 Clang) and otherwise builds C++20 and says so.
+
+## What it does
 
 Objects live in one contiguous arena and refer to each other through relative
 offsets, so the arena bytes are the serialized form: there is no per-field
 encoding or decoding. Saving produces an owning byte copy; loading validates the
 whole object graph and copies the bytes into a new reservation. Save and load
-are not zero-copy operations.
+are not zero-copy operations: sending a buffer costs one copy on each end and
+no encode or decode pass.
 
 This release uses the **V2 storage and wire format** ([format specification](docs/V2_FORMAT.md)).
 V1 wires are rejected with `unsupported wire format version 1`; there is no V1
@@ -23,8 +48,8 @@ release; [RELEASING.md](docs/RELEASING.md) is how one is made.
 
 | Use | Requirements |
 | --- | --- |
-| Full library, `XOffset::xoffset` | P2996 Clang with `<experimental/meta>` and matching libc++, or GCC 16+ (`-freflection`, `<meta>`, libstdc++); CMake 3.30+; 64-bit little-endian target; Linux, macOS or Windows VM APIs |
-| Client build, field-list backend (since 3.2.0) | C++20 or C++23 with the platform's native compiler (Android NDK Clang, MSVC 19.44 with `/Zc:preprocessor`, clang-cl, MinGW GCC, Apple clang for iOS 17+ and macOS 14+); one `XOFFSET_RECORD` line per record; CMake 3.30+; 64-bit little-endian target |
+| Full library, C++26 reflection build (servers), `XOffset::xoffset` | P2996 Clang with `<experimental/meta>` and matching libc++, or GCC 16+ (`-freflection`, `<meta>`, libstdc++); CMake 3.30+; 64-bit little-endian target; Linux, macOS or Windows VM APIs |
+| Client build, field-list backend (since 3.2.0) | C++20 or C++23 with the platform's native compiler (Android NDK Clang, MSVC 19.44 with `/Zc:preprocessor`, clang-cl, MinGW GCC, Apple clang for iOS 17+ and macOS 14+); one `XOFFSET_RECORD` line per record; CMake 3.20+; 64-bit little-endian target |
 | OS storage only, `XOffset::storage` | C++17 compiler; CMake 3.13+; Linux, macOS or Windows VM APIs and threads |
 | Maintained validation tools and their tests | Python 3.10+; CMake/CTest 3.21+ for storage, 3.30+ for full; the C++ library has no Python runtime dependency |
 
@@ -49,7 +74,7 @@ recipes are in [toolchains/README.md](toolchains/README.md),
 [toolchains/vm-validation.json](toolchains/vm-validation.json), and the
 [package guide](docs/PACKAGING.md#fixed-inputs).
 
-## Minimal full-library example
+## Minimal example
 
 ```cpp
 #include "xoffsetdatastructure.hpp"

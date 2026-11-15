@@ -22,7 +22,15 @@ option(XOFFSET_FUZZ_INJECT_CRASH "Fuzz drill builds only: inputs starting with X
 option(XOFFSET_STRESS_RELOCATE "Test builds only: force moves at pin scope exit, poison retired storage" OFF)
 # 26: P2996 reflection describes every record (no boilerplate). 20 and 23: one
 # XOFFSET_RECORD line per record; no <meta>, no -freflection, no TypeLayout.
-set(XOFFSET_CXX_STANDARD 26 CACHE STRING "C++ standard of the full library targets: 20, 23 or 26")
+# Not given on the first configure: 26 when the toolchain has C++26 reflection,
+# else 20 with a note (cmake/XOffsetDefaultStandard.cmake), so a plain
+# `cmake -S . -B build` works with any supported compiler.
+set(xoffset_default_cxx_standard 26)
+if(NOT DEFINED XOFFSET_CXX_STANDARD AND NOT XOFFSET_STORAGE_ONLY)
+    include(cmake/XOffsetDefaultStandard.cmake)
+    xoffset_default_cxx_standard(xoffset_default_cxx_standard)
+endif()
+set(XOFFSET_CXX_STANDARD ${xoffset_default_cxx_standard} CACHE STRING "C++ standard of the full library targets: 20, 23 or 26")
 set_property(CACHE XOFFSET_CXX_STANDARD PROPERTY STRINGS 20 23 26)
 # describe: XOFFSET_RECORD field lists under every standard, also C++26 (the
 # same-compiler control M26D); auto: reflection whenever the compiler has it.
