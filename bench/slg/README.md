@@ -169,8 +169,10 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   troop slots when an order shrinks on Windows. On macOS the writer retains
   an aligned output slot for each order length up to four troops and uses a
   compact output buffer for longer orders. The macOS runner reuses the client
-  player ID and army span across read-only uplink rounds. Other builds fill it in an
-  `Automatic` XBuffer and save it into the reused output.
+  player ID and army span across read-only uplink rounds. It finds the order
+  length before preparing the fixed fields and generates up to four troop
+  records without loop control. Other builds fill it in an `Automatic` XBuffer
+  and save it into the reused output.
 
 XOffset's A adapter (both case sets) calls `prefetch_for_update()` on the two
 players' buffers when the battle result starts arriving, inside the timed

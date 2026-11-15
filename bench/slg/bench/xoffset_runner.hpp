@@ -522,6 +522,40 @@ public:
 #endif
             static_assert(XOffsetDatastructure::schema::member_t<xm::March, 7>::offset == offsetof(xm::March, troops));
             using SourceTroops = decltype(std::declval<const PlayerState&>().armies[0].troops.data());
+#if defined(__APPLE__)
+            const auto state = rng.state;
+            const auto n = int32_t(source.armies.size());
+            const auto* army = source.armies.data();
+            if (n > 0) {
+                const auto word = Rng::mix_word(state + 4 * Rng::step);
+                army += std::size_t(word % static_cast<uint64_t>(n));
+                rng.state = state + 4 * Rng::step;
+            } else {
+                rng.state = state + 3 * Rng::step;
+            }
+            const bool has_army = !source.armies.empty();
+            const std::size_t count = has_army ? army->troops.size() : 0;
+            SourceTroops troops = count != 0 ? &army->troops.front() : nullptr;
+            const auto prepare = [&](xm::MarchOrderPrefix& order) noexcept {
+                order.march_id = seq;
+                order.owner = source.player_id;
+                order.from_x = has_army ? army->x : 0;
+                order.from_y = has_army ? army->y : 0;
+                order.to_x = int32_t(Rng::mix_word(state + Rng::step) & 4095u);
+                order.to_y = int32_t(Rng::mix_word(state + 2 * Rng::step) & 4095u);
+                order.eta = 30 + int32_t(Rng::mix_word(state + 3 * Rng::step) % 571u);
+            };
+            const auto troop_seed = rng.state;
+            const auto generate = [&](std::size_t i) noexcept {
+                const auto& source_troop = troops[i];
+                const auto divisor = std::uint64_t((std::max)(source_troop.count, 1));
+                const auto word = Rng::mix_word(troop_seed + Rng::step * (i + 1));
+                return xm::Troop{source_troop.type, 1 + int32_t(word % divisor), 0};
+            };
+            const auto bytes = ul_writer.template write_counted<xm::MarchOrderPrefix>(count, prepare, generate);
+            rng.state = troop_seed + Rng::step * count;
+            return bytes;
+#else
             SourceTroops troops = nullptr;
             const auto prepare = [&](xm::MarchOrderPrefix& order) -> std::size_t {
                 const auto* army = fill_order_head(order, source, rng, seq, [] {});
@@ -535,6 +569,7 @@ public:
                 return troop;
             };
             return ul_writer.template write<xm::MarchOrderPrefix>(prepare, generate);
+#endif
         }
 #else
         std::optional<XBuffer> um, ur;
