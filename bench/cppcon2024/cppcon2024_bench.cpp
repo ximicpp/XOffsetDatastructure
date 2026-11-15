@@ -144,6 +144,32 @@ static void fill_xo(xo::Character& r, const stdm::Character& c) {
   }
   for (const auto& s : c.skills) r.skills.push_back(xo::Skill{s.id, s.level});
 }
+// Same Character and mutations as rw_once, using typed range assignment and
+// reducing the number of independently checked path and attribute operations.
+static void rw_xoffset_bulk(xo::Character& r, const OpSet& o) {
+  r.level += 1; r.healthpoint += 1; r.manapoint += 1; r.speed += 1;
+  r.pos = {o.pos[0], o.pos[1], o.pos[2]};
+  for (const auto& eo : o.equip) {
+    auto& e = r.equips.emplace_back();
+    e.id = eo.id; e.uuid = eo.uuid; e.number = eo.number; e.timestamp = eo.timestamp; e.level = eo.level;
+    e.attributes.assign_range(eo.attr);
+    observe(e);
+    r.equips.pop_back();
+  }
+  const auto old_path_size = r.path.size();
+  r.path.resize(old_path_size + std::size(o.path));
+  auto* tail = r.path.data() + old_path_size;
+  for (const auto& p : o.path) *tail++ = {p[0], p[1], p[2]};
+  r.attributes.push_back(o.attribute);
+  auto [it, inserted] = r.items.try_emplace(o.key, xo::Item{o.item_id, o.item_number, o.item_uuid, o.item_timestamp});
+  if (!inserted) it->second = {o.item_id, o.item_number, o.item_uuid, o.item_timestamp};
+  observe(r);
+  r.items.erase(o.key);
+  r.attributes.pop_back();
+  r.path.resize(old_path_size);
+  r.speed -= 1; r.manapoint -= 1; r.healthpoint -= 1; r.level -= 1;
+}
+
 static void bench_xoffset() {
   using namespace XOffsetDatastructure;
   using C = xo::Character;
@@ -192,6 +218,12 @@ static void bench_xoffset() {
   auto rwp = make(); C& pr = rwp.plain_root();
   put("xoffset 4.0 plain_root", "rw", time_rw([&](const OpSet& o) { body(pr, o); }));
   if (!rwp.ok()) throw std::runtime_error("xoffset rw (plain_root) failed");
+  auto bulk = make();
+  put("xoffset bulk", "rw", time_rw([&](const OpSet& o) {
+    bulk.edit([&](C& r) { rw_xoffset_bulk(r, o); });
+  }));
+  if (!bulk.ok()) throw std::runtime_error("xoffset bulk rw failed");
+  expect("xoffset bulk rw", checksum(bulk.plain_root()), g_rw_sum);
   put("xoffset 4.0", "rw", rw);
   expect("xoffset rw", checksum(rwb.plain_root()), g_rw_sum);
   expect("xoffset rw plain_root", checksum(rwp.plain_root()), g_rw_sum);
