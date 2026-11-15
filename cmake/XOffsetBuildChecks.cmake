@@ -28,14 +28,17 @@ function(xoffset_check_full_toolchain)
     endif()
     if(XOFFSET_CXX_STANDARD STREQUAL "26")
         if(CMAKE_VERSION VERSION_LESS 3.30)
-            message(FATAL_ERROR "The full XOffset C++26 target requires CMake 3.30 or newer")
+            message(FATAL_ERROR "The full XOffset C++26 target requires CMake 3.30 or newer.\n"
+                "Without it, configure the C++20 build: -DXOFFSET_CXX_STANDARD=20")
         endif()
         if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
             if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 16)
-                message(FATAL_ERROR "The full XOffset target requires GCC 16 or newer for P2996 reflection")
+                message(FATAL_ERROR "The full XOffset C++26 target requires GCC 16 or newer for P2996 reflection.\n"
+                    "Without it, configure the C++20 build: -DXOFFSET_CXX_STANDARD=20")
             endif()
         elseif(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-            message(FATAL_ERROR "This project requires GCC 16+ or Clang with P2996 reflection support")
+            message(FATAL_ERROR "The full XOffset C++26 target requires GCC 16+ or Clang with P2996 reflection support.\n"
+                "Without it, configure the C++20 build: -DXOFFSET_CXX_STANDARD=20")
         endif()
         message(STATUS "Using C++26 with reflection (schema backend: ${XOFFSET_SCHEMA_BACKEND})")
         return()
@@ -149,8 +152,9 @@ function(xoffset_require_reflection)
     if(NOT compiles)
         message(FATAL_ERROR
             "Full-library reflection compile/link probe failed. Use a P2996 Clang "
-            "toolchain with matching libc++, Boost and TypeLayout, or configure "
-            "-DXOFFSET_STORAGE_ONLY=ON for the independent C++17 OS layer.\n"
+            "toolchain with matching libc++, Boost and TypeLayout, configure the C++20 "
+            "build (-DXOFFSET_CXX_STANDARD=20), or configure -DXOFFSET_STORAGE_ONLY=ON "
+            "for the independent C++17 OS layer.\n"
             "See ${PROJECT_BINARY_DIR}/compile-checks/reflection.log\n${output}")
     endif()
     set_property(GLOBAL APPEND PROPERTY XOFFSET_CONFIGURE_CHECKS reflection_compile_link)

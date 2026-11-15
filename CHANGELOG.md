@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- First use (4.0 W7): a configure that does not give `XOFFSET_CXX_STANDARD`
+  picks 26 when the toolchain has C++26 reflection (CMake 3.30+, GCC 16+ or
+  the P2996 Clang; a small probe decides) and otherwise builds C++20 and
+  prints why and how to get the C++26 build, so a plain `cmake -S . -B build`
+  no longer fails on CMake below 3.30 or a compiler without reflection. An
+  explicit `-DXOFFSET_CXX_STANDARD=26` still fails, now naming
+  `-DXOFFSET_CXX_STANDARD=20`. README starts with a working C++20 quick
+  start; `examples/helloworld.cpp` and the user guide (sections 2-4) use one
+  recommended style (`XOFFSET_RECORD`, `TypedXBuffer<T>`, the `root()`
+  proxy, `edit`/`read`); user guide 4.6 shows the library publisher; docs say
+  plainly that sending copies once on each end (no encode or decode pass,
+  not zero-copy). No library change.
 - Shared delta publisher (4.0 W2 step 3): `xoffset_shared_publisher.hpp`
   moves the server side of shared deltas into the library. `XSyncPublisher`
   (the tick and its body store), `XSyncConn<XSyncFreeSlots<K, Hot>...>` (per
