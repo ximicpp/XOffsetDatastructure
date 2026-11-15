@@ -804,7 +804,7 @@ namespace detail {
         template <class Prepare, class Generate>
             requires std::is_invocable_r_v<std::size_t, Prepare&, Root&> &&
                      std::is_nothrow_invocable_r_v<Element, Generate&, std::size_t>
-        std::size_t write(Prepare prepare, Generate generate) {
+        XOFFSET_DETAIL_WIRE_INLINE std::size_t write(Prepare prepare, Generate generate) {
             Root root{};
             const auto count = std::size_t(prepare(root));
             if (count > capacity_ || !wire_) [[unlikely]] resize_wire(count);
