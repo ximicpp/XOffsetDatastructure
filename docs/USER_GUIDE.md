@@ -13,6 +13,8 @@
   可以继续修改原 buffer。
 - `load_verified` 先完整校验 wire，再把字节复制进新的 arena。校验通过之后，读取
   就是普通的成员访问。
+- 所以发送不需要编码和解码，但不是零拷贝：发送方保存时拷贝一次，接收方装载时拷贝一次
+  （直接读进最终 arena 的接收入口也是这一次拷贝）。
 
 ## 2. 定义类型
 
@@ -28,10 +30,14 @@ struct Profile {
     XSet<std::int32_t>     tags;
     XMap<XString, std::int32_t> stats;
 };
+XOFFSET_RECORD(Profile, id, name, bio, scores, tags, stats)   // 字段表（2.1 节）
 XOFFSET_REGISTER_SCHEMA_NAME(Profile, "example.Profile")
 ```
 
-- 普通聚合体即可，布局和 schema 身份由 P2996 反射自动得出，不需要 IDL 或宏描述字段。
+- 普通聚合体即可，不需要 IDL。推荐每个记录都在全局作用域写一行 `XOFFSET_RECORD`（2.1 节）：
+  C++20/C++23 构建（客户端）靠它知道记录的形状，C++26 构建用反射逐条核对它，所以同一份源码在
+  两种构建下都能编、wire 字节相同，字段还有同名的访问函数（第 3.5 节）。只在 C++26 下编的代码可以
+  不写，布局和 schema 身份由 P2996 反射得出。
 - 成员只能是标量、枚举、定长数组、库容器（`XString`、`XVector`、`XFixedVector`、
   `XSet`、`XMap`）和递归满足这些条件的结构体。原生指针、引用、`union`、多态类型、
   `std::string`/`std::vector` 等都会在编译期被拒绝。
@@ -95,20 +101,28 @@ XOFFSET_RECORD_DERIVED(Player, (Entity), level, items)   // 基类按声明顺�
 
 ## 3. 构建与修改
 
-```cpp
-auto cap = XBuffer::maximum_capacity(32u << 20).with_growth(XGrowPolicy::Automatic);
-XBuffer buf = XBuffer::create<Profile>(1u << 20, cap);
-Profile& p = buf.root<Profile>();
-p.id = 7;
-p.name = "Alice";
-p.bio = "a much longer biography text";
-p.scores.push_back(90);
-p.tags.insert(3);
-p.stats.insert_or_assign("hp", 100);
+推荐写法（README 和 `examples/helloworld.cpp` 用的也是它）：
 
-std::vector<std::int32_t> v{1, 2, 3, 4};
-p.scores.assign(v.begin(), v.end());   // 连续且平凡可复制：一次精确分配
+```cpp
+auto cap = XBuffer::maximum_capacity(32u << 20);   // 硬上限
+auto buf = TypedXBuffer<Profile>::create(4096, cap);
+auto p = buf.root();                    // proxy（XRef<Profile>）：buffer 搬家后照样有效（第 3.5 节）
+p.id() = 7;
+p.name() = "Alice";
+p.bio() = "a much longer biography text";
+p.scores().push_back(90);
+p.tags().insert(3);
+p.stats().insert_or_assign("hp", 100);
+
+buf.edit([](Profile& r) {               // 热循环：钉住作用域里是普通引用，速度同普通结构体
+    std::vector<std::int32_t> v{1, 2, 3, 4};
+    r.scores.assign(v.begin(), v.end());   // 连续且平凡可复制：一次精确分配
+});
+if (!buf.ok()) { /* buf.error()：第一次失败的原因；失败不抛异常 */ }
 ```
+
+不用包装时写 `XBuffer::create<Profile>(initial, cap)` 和 `buf.root<Profile>()`，拿到的是普通引用：
+没有 proxy 的保护，buffer 搬家后悬空，空间不够时抛异常。下面几条增长规则说的是这种写法。
 
 - 默认增长策略是 `XGrowPolicy::Explicit`，空间不够时抛 `XBadAlloc`；需要自动增长时
   显式选择 `XGrowPolicy::Automatic`。`maximum_capacity` 始终是硬上限。
@@ -130,9 +144,9 @@ p.scores.assign(v.begin(), v.end());   // 连续且平凡可复制：一次精�
   云端 GCC 16 微基准里（只看比例，不是正式测量），元素带字符串和向量成员的
   `XVector` 中间删除，不声明约是 `std::vector` 的 1.6 倍，声明后约 0.73 倍。
 - 能改什么、不能改什么（schema、写者、所有权）见第 3.3 节。
-- 也可以用带类型的包装 `TypedXBuffer<T>`：`create`、`root()`、`save_verified()`、
-  `load()`（走校验路径）。它属于便利接口（第 8 节 E2）。`TypedXBuffer<T>::root()` 返回
-  proxy（`XRef<T>`），不是普通引用，写法见第 3.5 节。
+- 带类型的包装 `TypedXBuffer<T>` 有 `create`、`root()`、`edit`/`read`、`save_verified()`、
+  `load()`（走校验路径）。`root()` 返回 proxy（`XRef<T>`），不是普通引用，写法见第 3.5 节；
+  需要普通引用时用 `edit`/`read`，或者 `plain_root()`。
 
 ### 3.1 删除与插入的性能
 
@@ -330,11 +344,11 @@ world.edit([&](View& w) {                  // 钉住作用域：普通引用，�
 ## 4. 保存与加载
 
 ```cpp
-std::string wire = buf.save_verified<Profile>();
+std::string wire = buf.save_verified();                 // 不用包装时：buf.save_verified<Profile>()
 
-XBuffer in = XBuffer::load_verified<Profile>(wire, cap);
-const Profile& r = in.root<Profile>();
-std::string_view who = r.name.view();
+auto in = TypedXBuffer<Profile>::load(wire, cap);       // 先完整校验；同 XBuffer::load_verified<Profile>(wire, cap)
+std::int32_t id = in.root().id();                       // proxy 读出来是值
+in.read([](const Profile& r) { print(r.name.view()); });   // 钉住作用域里读普通成员
 ```
 
 - wire 由 40 字节头、payload 和空洞表组成（稀疏 wire 在头后多一张段表，见
@@ -561,21 +575,29 @@ const View& v = held.root<View>();                     // 就地读
 用 `xsync::XSyncSlots` 查）。格式、目标接口、检查和保证见 [SHARED_DELTA.md](SHARED_DELTA.md)，完整的收发
 循环见 `examples/shared_delta.cpp`。
 
+服务端用库里的发布器（`xoffset_shared_publisher.hpp`，4.0 起）：它按实体记着这个 tick 的变化和进入的编码
+（第一次用到时编码一次）以及有几个连接持有它，按连接记着版本和客户端的空闲槽号。应用只管自己的世界，
+每条消息告诉它哪些实体离开、留下、进入。
+
 ```cpp
+#include "xoffset_shared_publisher.hpp"
 namespace xs = XOffsetDatastructure::xsync;
-// 服务端：每 tick 每个变了的实体只编码一次（按脏成员掩码），写进共享的操作存储。
-const std::size_t at = store.size();
-const std::size_t len = xs::put_change_op(store, unit.id, unit, dirty_members);
-// 每个客户端一条消息：根记录（表 0）随每条消息整条带上，然后是各段操作。
-xs::XSyncWriter m(msg, head, ++version);                          // 关键消息：(msg, head, version, stream)
-m.leaves(kUnit, gone_slots.data(), gone_slots.size());            // 离开视口
-m.begin(kUnit, xs::enter);
-m.whole(slot_of_new, new_unit);                                   // 进入视口：整条记录
-m.end();
-m.begin(kUnit, xs::change);
-m.op(store.data() + at, len, slot);                               // 留在视口：共享的那段变化，换成这个客户端的槽号
-m.end();
+using Conn = xs::XSyncConn<xs::XSyncFreeSlots<kUnit, 16>>;        // 每连接：版本和空闲槽号（热的部分）
+xs::XSyncPublisher pub;
+xs::XSyncDirtyTable<kUnit, Unit> units;                           // 应用按成员标脏
+xs::XSyncOut out;
+
+// 服务端：每 tick 在第一条消息之前，不论有几个客户端，每个变了的实体只编码一次。
+pub.begin_tick(tick);
+units.publish(pub, changed, src);                                 // src：应用对自己世界的视图（SHARED_DELTA.md 第 1 节）
+
+// 每个客户端一条消息：根记录（表 0）随每条消息整条带上，然后每张表、每种操作调一次。
+xs::XSyncMessage<Conn> m(pub, conn, cold, out, head);             // 关键消息：(..., head, stream)
+units.leaves(m, left_index, left_slot);                           // 离开视口
+units.changes(m, src, kept_index, kept_slot);                     // 留在视口：共享的那段变化，换成这个客户端的槽号
+units.enters(m, src, new_index, [&](std::size_t r, std::uint32_t slot) { held_slot[r] = slot; });   // 进入：整条记录
 m.finish();
+send(client, out.view());
 
 // 客户端：目标把 id 映射到自己的记录（SHARED_DELTA.md 第 1 节），接收器按链路建（第 8 节 K4）。
 XReceiver<XLink::from_server> rx(XBuffer::maximum_capacity(1 << 20));
@@ -797,8 +819,8 @@ wire（DELTA_SYNC.md 第 5 节）。性能只报：Mac SLG340 上客户端原生
 | # | 接口 | 说明 |
 | --- | --- | --- |
 | E0 | schema 演进：`xoffset_evolution.hpp`（版本链、`evolve_load_verified`、`XPeerSchemas` 握手）、freeze 工具 | 版本不同的两端互通（3.2.0 起，[SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)）；转换在服务端，客户端不含转换代码 |
-| E1 | `freeze_verified`、`begin_verified_receive` / `finish_verified` | 零拷贝分段发送、直接收进最终 arena |
-| E2 | `save_verified_into`、`TypedXBuffer<T>` | 便利接口 |
+| E1 | `freeze_verified`、`begin_verified_receive` / `finish_verified` | 冻结的快照按段交给发送调用（不先拼成 wire 串）、接收直接读进最终 arena；两端仍各拷贝一次，不是零拷贝 |
+| E2 | `save_verified_into`、`TypedXBuffer<T>` | `TypedXBuffer<T>` 是第 3 节的推荐写法；两者的形状可能还会调整 |
 | E3 | `XBufferPool`、预留与增长策略细节、`XStorage` / `storage_kind()`、`SLOT_MAX`、`trim_slot_storage` | 小 buffer 高频场景 |
 | E4 | `load_unverified` | 只用于调用方已信任的数据 |
 | E5 | `XCompactor` | 同类型压缩整理 |
