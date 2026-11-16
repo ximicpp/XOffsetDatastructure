@@ -1,0 +1,26 @@
+**********************************************************************
+** Visual Studio 2022 Developer Command Prompt v17.14.44
+** Copyright (c) 2025 Microsoft Corporation
+**********************************************************************
+[vcvarsall.bat] Environment initialized for: 'x64'
+test_main_containers.cpp
+
+[TEST] main containers basic mutation
+  [OK]
+
+[TEST] main containers save/load + verified load
+  [OK]
+
+[TEST] main containers compaction
+  [OK]
+
+[TEST] main containers map/set basic mutation
+  [OK]
+
+[TEST] main containers map/set verified load + compaction
+  [OK]
+
+[TEST] main containers verified load rejects corrupt map payload
+  [OK]
+
+[PASS] Frozen main container tests passed
