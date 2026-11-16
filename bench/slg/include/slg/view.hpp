@@ -71,6 +71,7 @@
 // stages keep their range; SLG_NATIVE_OFF=1 drops it.
 #pragma once
 #include <algorithm>
+#include <functional>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -702,15 +703,87 @@ template <class V> void build_index(const V& v, HeldIndex& at) {
     for (std::size_t i = 0; i < v.marches.size(); ++i) at.marches.emplace(v.marches[i].id, int32_t(i));
 }
 
-// Apply a received delta to a held view (any model) through its index. A record
+// Marches of a delta into a held list through its index (every model). Short
+// lists, or a delta that only removes or only adds, take swap-and-erase: a
+// record that left is replaced by the last one. Otherwise removed ids are
+// dropped first, new records take the vacated slots, and only the slots left
+// over are filled from the tail (no tail copy and index repair per removal).
+// Order is not kept either way; query_view does not depend on it.
+#if defined(_MSC_VER) && !defined(__clang__)
+#define SLG_APPLY_INLINE __forceinline
+#else
+#define SLG_APPLY_INLINE [[gnu::always_inline]] inline
+#endif
+// Inlined into apply_delta: as a call it costs every model ~15% of the march
+// update (callgrind, S scale).
+template <class Marches, class D>
+SLG_APPLY_INLINE void apply_march_delta(Marches& marches, FlatHeldIndexMap& index, const D& d) {
+    constexpr std::size_t small_march_list = 16;
+    if (d.removed_marches.empty() || d.marches.empty() || marches.size() <= small_march_list) {
+        for (const auto& id : d.removed_marches) {
+            const auto it = index.find(id);
+            if (it == index.end()) continue;
+            const int32_t pos = it->second, last = int32_t(marches.size()) - 1;
+            if (pos != last) {
+                copy_vmarch(marches[std::size_t(pos)], marches[std::size_t(last)]);
+                index[marches[std::size_t(pos)].id] = pos;
+            }
+            marches.pop_back();
+            index.erase(it);
+        }
+        for (const auto& m : d.marches) {
+            const auto it = index.find(m.id);
+            if (it != index.end()) copy_vmarch(marches[std::size_t(it->second)], m);
+            else {
+                index.emplace(m.id, int32_t(marches.size()));
+                copy_vmarch(marches.emplace_back(), m);
+            }
+        }
+        return;
+    }
+    static thread_local std::vector<int32_t> vacant;
+    vacant.clear();
+    for (const auto& id : d.removed_marches) {
+        if (const auto it = index.find(id); it != index.end()) {
+            vacant.push_back(it->second);
+            index.erase(it);
+        }
+    }
+    for (const auto& m : d.marches) {
+        const auto [it, inserted] = index.emplace(m.id, 0);
+        if (!inserted) {
+            copy_vmarch(marches[std::size_t(it->second)], m);
+        } else if (!vacant.empty()) {
+            it->second = vacant.back();
+            vacant.pop_back();
+            copy_vmarch(marches[std::size_t(it->second)], m);
+        } else {
+            const auto pos = int32_t(marches.size());
+            try {
+                copy_vmarch(marches.emplace_back(), m);
+            } catch (...) {
+                index.erase(it);   // a full fixed-size arena: drop the new key
+                throw;
+            }
+            it->second = pos;
+        }
+    }
+    // Leftover vacancies, highest first, so each tail record moved is live.
+    std::sort(vacant.begin(), vacant.end(), std::greater<>());
+    for (const int32_t pos : vacant) {
+        const int32_t last = int32_t(marches.size()) - 1;
+        if (pos != last) {
+            copy_vmarch(marches[std::size_t(pos)], marches[std::size_t(last)]);
+            index[marches[std::size_t(pos)].id] = pos;
+        }
+        marches.pop_back();
+    }
+}
+
+// Apply a received delta to a held view (any model) through its index. A unit
 // that left is replaced by the last one (order is not kept); a changed one is
 // updated in place; a new one is appended. Tiles are updated at their place.
-#if defined(__APPLE__) || defined(_WIN32)
-template <class V, class D, class ApplyMarches>
-void apply_delta(V& v, HeldIndex& at, const D& d, ApplyMarches&& apply_marches) {
-#else
 template <class V, class D> void apply_delta(V& v, HeldIndex& at, const D& d) {
-#endif
     v.request_id = d.request_id; v.tick = d.tick; v.x0 = d.x0; v.y0 = d.y0; v.x1 = d.x1; v.y1 = d.y1;
     for (const auto& id : d.removed) {
         const auto it = at.units.find(id);
@@ -719,13 +792,12 @@ template <class V, class D> void apply_delta(V& v, HeldIndex& at, const D& d) {
         if (pos != last) {
             auto& dst = v.units[std::size_t(pos)];
             auto& src = v.units[std::size_t(last)];
-#if defined(__APPLE__)
-            if constexpr (requires { relocate_held_unit(dst, src); }) {
-                relocate_held_unit(dst, src);
-            } else
-#endif
-            {
-                // Other models can copy through a plain, independent unit.
+            if constexpr (requires { dst = std::move(src); }) {
+                // Both are elements of the same held list and the last one is
+                // removed next: every model moves it into the vacant slot (the
+                // std and cista containers' and XOffset's same-arena move).
+                dst = std::move(src);
+            } else {
                 static thread_local WorldUnit tmp;
                 copy_unit(tmp, src);
                 copy_unit(dst, tmp);
@@ -744,71 +816,12 @@ template <class V, class D> void apply_delta(V& v, HeldIndex& at, const D& d) {
             copy_unit(v.units.emplace_back(), u);
         }
     }
-#if defined(__APPLE__) || defined(_WIN32)
-    apply_marches(v.marches, at.marches, d);
-#else
-    for (const auto& id : d.removed_marches) {
-        const auto it = at.marches.find(id);
-        if (it == at.marches.end()) continue;
-        const int32_t pos = it->second, last = int32_t(v.marches.size()) - 1;
-        if (pos != last) {
-            copy_vmarch(v.marches[std::size_t(pos)], v.marches[std::size_t(last)]);
-            at.marches[v.marches[std::size_t(pos)].id] = pos;
-        }
-        v.marches.pop_back();
-        at.marches.erase(it);
-    }
-    for (const auto& m : d.marches) {
-        const auto it = at.marches.find(m.id);
-        if (it != at.marches.end()) copy_vmarch(v.marches[std::size_t(it->second)], m);
-        else {
-            at.marches.emplace(m.id, int32_t(v.marches.size()));
-            copy_vmarch(v.marches.emplace_back(), m);
-        }
-    }
-#endif
+    apply_march_delta(v.marches, at.marches, d);
     for (const auto& t : d.tiles) {
         auto& dst = v.tiles[tile_pos(v, t.x, t.y)];
         dst.terrain = t.terrain; dst.level = t.level; dst.owner = t.owner;
     }
 }
-
-#if defined(__APPLE__) || defined(_WIN32)
-template <class Marches, class D>
-void apply_march_delta(Marches& marches, FlatHeldIndexMap& index, const D& d) {
-    for (const auto& id : d.removed_marches) {
-        const auto it = index.find(id);
-        if (it == index.end()) continue;
-        const int32_t pos = it->second, last = int32_t(marches.size()) - 1;
-        if (pos != last) {
-            copy_vmarch(marches[std::size_t(pos)], marches[std::size_t(last)]);
-            index[marches[std::size_t(pos)].id] = pos;
-        }
-        marches.pop_back();
-        index.erase(it);
-    }
-    for (const auto& m : d.marches) {
-        const auto it = index.find(m.id);
-        if (it != index.end()) copy_vmarch(marches[std::size_t(it->second)], m);
-        else {
-            index.emplace(m.id, int32_t(marches.size()));
-            copy_vmarch(marches.emplace_back(), m);
-        }
-    }
-}
-template <class V, class D> void apply_delta(V& v, HeldIndex& at, const D& d) {
-    apply_delta(v, at, d, [](auto& marches, auto& index, const auto& d) {
-        apply_march_delta(marches, index, d);
-    });
-}
-
-template <class Ops, class V> void apply_held_delta(Ops& ops, V& view, HeldIndex& index) {
-    if constexpr (requires { ops.apply_held_delta(view, index); })
-        ops.apply_held_delta(view, index);
-    else
-        apply_delta(view, index, ops.delta());
-}
-#endif
 
 // ---- the driver ---------------------------------------------------------------
 //
@@ -1208,11 +1221,7 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
             if (keep_delta && c == 0) *keep_delta = std::string(ops.delta_wire());
             timed(st, k.urecv.c_str(), [&] { ops.delta_recv(); });
             HeldIndex& at = s.index[std::size_t(c)];
-#if defined(__APPLE__) || defined(_WIN32)
-            timed(st, k.uapply.c_str(), [&] { apply_held_delta(ops, ops.held(c, 0), at); });
-#else
             timed(st, k.uapply.c_str(), [&] { apply_delta(ops.held(c, 0), at, ops.delta()); });
-#endif
             const uint64_t q = query_view(ops.held(c, 0));
             st.report_sum += q;
             if constexpr (d3) if (run_d) {
@@ -1284,11 +1293,7 @@ template <class Ops> void run_view_case(ViewSession& s, Ops& ops, const ViewKeys
         auto& hw = ops.held(vs.clients + d, 0);
         for (const std::string& dw : wq[std::size_t(d)]) {
             warm_sink = query_view(hw);
-#if defined(__APPLE__) || defined(_WIN32)
-            timed(st, k.uwrecv.c_str(), [&] { ops.delta_recv_from(dw); apply_held_delta(ops, hw, s.windex[std::size_t(d)]); });
-#else
             timed(st, k.uwrecv.c_str(), [&] { ops.delta_recv_from(dw); apply_delta(hw, s.windex[std::size_t(d)], ops.delta()); });
-#endif
             st.bytes[k.uwmsg] += 1;
         }
         if (query_view(ops.held(vs.clients + d, 0)) != query_view(ops.held(d, 0))) throw std::runtime_error("warm view differs from the client's view");

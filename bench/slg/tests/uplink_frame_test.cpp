@@ -1,4 +1,4 @@
-#include "slg/model_xoffset.hpp"
+#include "xoffset_runner.hpp"   // slg::xm::MarchOrderPrefix
 #include "xoffset_receiver.hpp"
 #include <algorithm>
 #include <array>

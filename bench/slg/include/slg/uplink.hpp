@@ -4,7 +4,8 @@
 // server. A client builds an order from the player it holds (login.hpp): one
 // of its armies, a target tile, an arrival time and the troops it sends (each
 // of the army's troop types, part of its count); 4 rounds per cycle, every
-// online client one order per round. UL.send is the client's fill + encode,
+// online client one order per round. UL.send is the client's write of the order
+// (its values drawn before the timer from the held player) + encode,
 // UL.recv the server's receive with the checks it runs on data from a client
 // plus the read of every field of the order (the order is then handled by game
 // logic, not timed). Bytes UL.order (wire), UL.order_zstd (zstd-3 per message,
@@ -26,6 +27,7 @@
 //
 // Ops (provided by each runner's LoginOps):
 //   std::size_t up_encode(auto fill)   fill(March&) then encode into the uplink wire
+//   (or std::size_t up_encode_input(const OrderInput&): write the order into the wire)
 //   uint64_t up_recv()                 the server receives the wire and returns query_order
 //   std::string_view up_wire()
 // Optional: uint64_t up_recv_full()   (ULF.recv, xoffset_trusted)
@@ -33,6 +35,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <stdexcept>
+#include <vector>
 #include "generic.hpp"
 #include "login.hpp"
 
@@ -40,42 +43,6 @@ namespace slg {
 
 inline bool ul_on() { static const bool on = std::getenv("SLG_UL_OFF") == nullptr; return on; }
 
-#if defined(__APPLE__) || defined(_WIN32)
-// Fixed fields and source army for an order from the player a client holds.
-template <class M, class P, class Reset>
-auto fill_order_head(M& m, const P& p, Rng& rng, int64_t seq, Reset reset) {
-    m.march_id = seq;
-    m.owner = p.player_id;
-    m.to_x = int32_t(rng.below(4096));
-    m.to_y = int32_t(rng.below(4096));
-    m.eta = int32_t(rng.range(30, 600));
-    reset();
-    if (p.armies.size() == 0) {
-        m.from_x = 0;
-        m.from_y = 0;
-        return static_cast<decltype(&p.armies[0])>(nullptr);
-    }
-    const auto& army = p.armies[std::size_t(rng.below(int32_t(p.armies.size())))];
-    m.from_x = army.x;
-    m.from_y = army.y;
-    return &army;
-}
-
-template <class D, class T> void fill_order_troop(D& dst, const T& troop, Rng& rng) noexcept {
-    dst.type = troop.type;
-    dst.count = 1 + int32_t(rng.below(troop.count > 1 ? troop.count : 1));
-    dst.wounded = 0;
-}
-
-template <class M, class P> void fill_order(M& m, const P& p, Rng& rng, int64_t seq) {
-    const auto* army = fill_order_head(m, p, rng, seq, [&] { m.troops.clear(); });
-    if (!army) return;
-    m.troops.reserve(army->troops.size());
-    for (const auto& troop : army->troops)
-        fill_order_troop(m.troops.emplace_back(), troop, rng);
-}
-
-#else
 // A march order from the player a client holds.
 template <class M, class P> void fill_order(M& m, const P& p, Rng& rng, int64_t seq) {
     m.march_id = seq;
@@ -97,7 +64,28 @@ template <class M, class P> void fill_order(M& m, const P& p, Rng& rng, int64_t 
     }
 }
 
-#endif
+// The order's values, drawn before UL.send from the held player (choosing an
+// army, a target and the troops is game logic, not timed: timing rule
+// 2026-11-03). UL.send copies them into the format's message and encodes it.
+struct OrderTroop { int32_t type{}; int32_t count{}; int32_t wounded{}; };
+struct OrderInput {
+    int64_t march_id{}; int64_t owner{};
+    int32_t from_x{}; int32_t from_y{}; int32_t to_x{}; int32_t to_y{}; int32_t eta{};
+    std::vector<OrderTroop> troops;
+};
+
+// UL.send's write for a format that fills a message object.
+template <class M> void copy_order(M& m, const OrderInput& in) {
+    m.march_id = in.march_id; m.owner = in.owner;
+    m.from_x = in.from_x; m.from_y = in.from_y; m.to_x = in.to_x; m.to_y = in.to_y; m.eta = in.eta;
+    m.troops.clear();
+    m.troops.reserve(in.troops.size());
+    for (const auto& t : in.troops) {
+        auto& d = m.troops.emplace_back();
+        d.type = t.type; d.count = t.count; d.wounded = t.wounded;
+    }
+}
+
 // What the server reads from an order (every field).
 template <class M> uint64_t query_order(const M& m) {
     uint64_t h = uint64_t(m.march_id) * 31u + uint64_t(m.owner) * 7u;
@@ -118,18 +106,12 @@ template <class Ops> void run_uplink(Ops& ops, uint64_t seed, int cycle, int rou
             Rng rng(mix_seed(seed, (uint64_t(cycle) * 64 + uint64_t(r)) * 100019 + uint64_t(p)));
             const int64_t seq = (int64_t(cycle) * 64 + r) * 1000003 + p;
             std::size_t n = 0;
-#if defined(__APPLE__) || defined(_WIN32)
+            static thread_local OrderInput in;
+            fill_order(in, ops.held(p), rng, seq);
             timed(st, "UL.send", [&] {
-                if constexpr (requires { ops.up_encode_order_from_seed(p, r, rng.state, seq); })
-                    n = ops.up_encode_order_from_seed(p, r, rng.state, seq);
-                else if constexpr (requires { ops.up_encode_order(p, r, rng, seq); })
-                    n = ops.up_encode_order(p, r, rng, seq);
-                else
-                    n = ops.up_encode([&](auto& m) { fill_order(m, ops.held(p), rng, seq); });
+                if constexpr (requires { ops.up_encode_input(in); }) n = ops.up_encode_input(in);
+                else n = ops.up_encode([&](auto& m) { copy_order(m, in); });
             });
-#else
-            timed(st, "UL.send", [&] { n = ops.up_encode([&](auto& m) { fill_order(m, ops.held(p), rng, seq); }); });
-#endif
             uint64_t q = 0, qf = 0;
             const bool full_first = full_too && ((r * online + p) & 1) != 0;
             if constexpr (full_too) if (full_first) timed(st, "ULF.recv", [&] { qf = ops.up_recv_full(); });
