@@ -35,8 +35,10 @@ zstd 1.5.7），在主机上按记分卡固定的提交拉 zpp_bits v4.7.6 和 c
   - cista raw / offset：和 4.0 记分卡的 cista 一样，接收方把 wire 复制进自己的 buffer 再原地反序列化
     （raw 用 `mode::UNCHECKED`，offset 用 `mode::CAST`，都不校验），对象留在 buffer 里可以改。
 - 两种发送+接收模式：reuse（收发两端都复用 buffer 和对象，服务器循环的常态）和 fresh（每条消息新建，2024 的写法）。
-- std 模型的 map 用有序 vector（和 XOffset 的 `XMap` 一样是扁平的）：2024 的对手用 `std::map`，
-  2026-11-03 的公平性审查已把所有 std 模型改成扁平的。cista 用自己的 `hash_map`（2024 也是）。
+- 物品 map 的容器种类各家相同：std 模型和 cista 都用按 key 排序的 vector（和 XOffset 的 `XMap` 一样是
+  扁平的），插入、删除走同一段代码（`common.hpp` 的 `items_upsert` / `items_erase_at`）。2024 的 std 对手用
+  `std::map`，cista 用 `hash_map`；前者在 2026-11-03 的公平性审查里改成扁平的，后者在这一版去掉，不再拿
+  hash map 和有序 map 比。Protocol Buffers 用 2024 原样的 `.proto`，物品是它的 `map<>` 字段。
 - 每种格式解码出的状态都和发送的状态逐字段比对一次（不计时），读写循环结束后的状态也和 std 模型比对。
 - 字节数：原始大小和 zstd level 3（压缩不计时）。wire 格式不为缩小字节调整，字节只报告。
 - 两组读写行。“2024 原样”：2024 的数据布局和逐个元素的写法（`rw_once`），所有库相同。“调优写法”：
@@ -49,45 +51,49 @@ zstd 1.5.7），在主机上按记分卡固定的提交拉 zpp_bits v4.7.6 和 c
 - XOffset 的两组读写行都是每次迭代一个 `edit()`。一个 `edit()` 包住一轮全部迭代的写法只报告
   （`rw_one_scope`）。
 
-## 结果（云端 x86-64，GCC 16.2，7 个进程取中位数，2026-11-16，next_cpp26 5c3b6817 + 本目录这次的改动）
+## 结果（云端 x86-64，GCC 16.2，15 个进程取中位数，2026-11-16，next_cpp26 3f25b76c + 本目录这次的改动）
 
 “2024” 列是 2024 README 的数换算成每次的纳秒（10 万次的毫秒数 × 10）。2024 的 XOffset 发送+接收
 0.5 ns 是测错的：循环第一次就把发送方的 buffer move 走了，之后计的是空 move；2024 FlatBuffers 和
 Cap'n Proto 的那一行还把随机数和构建都算在里面。所以 2024 列只用来对照，不能和 4.0 列直接相除。
+2024 列里 cista 的读写和大小是它用 `hash_map` 时的数。
+
+这一版的云端机器比上一版（PR #289）那台慢约 1.3 倍，所有行都在这台机器上重跑过；绝对纳秒数不能和
+上一版相比，比值可以。
 
 ### Send + receive (ns per message)
 
 | Library | 2024 encode+decode | 4.0 reuse | 4.0 fresh | XOffset ÷ lib (reuse) | XOffset ÷ lib (fresh) |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| xoffset 4.0 | 0.5 | 81.3 | 192.0 | 1.000 | 1.000 |
-| zpp::bits | 4,531.4 | 277.6 | 913.1 | 0.293 | 0.210 |
-| MessagePack | 9,577.0 | 5,765.5 | 6,113.1 | 0.014 | 0.031 |
-| Protocol Buffers | 15,780.6 | 7,461.1 | 13,065.7 | 0.011 | 0.015 |
-| FlatBuffers | 6,794.4 | 536.2 | 1,000.7 | 0.152 | 0.192 |
-| Cap'n Proto | 2,592.2 | 2,050.0 | 2,370.5 | 0.040 | 0.081 |
-| cista raw | 5,315.6 | 617.9 | 709.0 | 0.132 | 0.271 |
-| cista offset | 5,845.5 | 637.2 | 734.1 | 0.128 | 0.262 |
+| xoffset 4.0 | 0.5 | 107.9 | 275.4 | 1.000 | 1.000 |
+| zpp::bits | 4,531.4 | 409.8 | 1,298.2 | 0.263 | 0.212 |
+| MessagePack | 9,577.0 | 7,594.7 | 7,718.3 | 0.014 | 0.036 |
+| Protocol Buffers | 15,780.6 | 10,596.2 | 18,000.5 | 0.010 | 0.015 |
+| FlatBuffers | 6,794.4 | 718.7 | 1,321.9 | 0.150 | 0.208 |
+| Cap'n Proto | 2,592.2 | 2,610.3 | 3,232.1 | 0.041 | 0.085 |
+| cista raw | 5,315.6 | 739.9 | 899.6 | 0.146 | 0.306 |
+| cista offset | 5,845.5 | 736.1 | 882.0 | 0.147 | 0.312 |
 
 Report-only rows:
 
 | Row | reuse | fresh |
 | --- | ---: | ---: |
-| xoffset 4.0 full | 193.8 | 307.6 |
-| FlatBuffers view | 432.8 |  |
+| xoffset 4.0 full | 245.4 | 409.7 |
+| FlatBuffers view | 571.0 |  |
 
 ### Read/write loop (ns per iteration)
 
 | Library | Containers | 2024 | 4.0 | XOffset ÷ lib |
 | --- | --- | ---: | ---: | ---: |
-| xoffset 4.0 | XOffset (edit() per iteration) | 498.5 | 212.7 | 1.000 |
-| zpp::bits | std::* (shared, items = sorted vector) | 753.2 | 274.8 | 0.774 |
-| MessagePack | std::* (shared, items = sorted vector) | 680.4 | 274.8 | 0.774 |
-| Protocol Buffers | google::protobuf message | 565.4 | 67.8 | 3.137 |
-| FlatBuffers | std::* (shared, items = sorted vector) | 680.4 | 274.8 | 0.774 |
-| Cap'n Proto | std::* (shared, items = sorted vector) | 680.4 | 274.8 | 0.774 |
-| cista raw | cista::raw::* (items = hash_map) | 655.4 | 159.0 | 1.338 |
-| cista offset | cista::offset::* (items = hash_map) | 692.2 | 182.4 | 1.166 |
-| xoffset 4.0 plain_root (report-only) | XOffset, plain reference | | 179.7 | |
+| xoffset 4.0 | XOffset (edit() per iteration) | 498.5 | 280.2 | 1.000 |
+| zpp::bits | std::* (shared, items = sorted vector) | 753.2 | 406.7 | 0.689 |
+| MessagePack | std::* (shared, items = sorted vector) | 680.4 | 406.7 | 0.689 |
+| Protocol Buffers | google::protobuf message | 565.4 | 89.3 | 3.138 |
+| FlatBuffers | std::* (shared, items = sorted vector) | 680.4 | 406.7 | 0.689 |
+| Cap'n Proto | std::* (shared, items = sorted vector) | 680.4 | 406.7 | 0.689 |
+| cista raw | cista::raw::* (items = sorted vector) | 655.4 | 275.3 | 1.018 |
+| cista offset | cista::offset::* (items = sorted vector) | 692.2 | 291.8 | 0.960 |
+| xoffset 4.0 plain_root (report-only) | XOffset, plain reference | | 246.9 | |
 
 ### Wire size (bytes)
 
@@ -96,11 +102,11 @@ Report-only rows:
 | xoffset 4.0 | 4,184 | 3,075 | 3,232 | 3,001 |
 | zpp::bits | 2,916 | 2,769 | 2,916 | 2,926 |
 | MessagePack | 3,222 | 3,064 | 3,542 | 3,391 |
-| Protocol Buffers | 4,100 | 3,759 | 4,095 | 3,803 |
+| Protocol Buffers | 4,100 | 3,759 | 4,095 | 3,799 |
 | FlatBuffers | 3,672 | 3,247 | 3,680 | 3,128 |
 | Cap'n Proto | 3,656 | 3,205 | 3,656 | 3,131 |
-| cista raw | 5,392 | 3,294 | 5,392 | 3,634 |
-| cista offset | 5,392 | 3,336 | 5,392 | 3,634 |
+| cista raw | 5,392 | 3,294 | 3,216 | 2,992 |
+| cista offset | 5,392 | 3,336 | 3,216 | 2,992 |
 
 XOffset after the read/write rounds (report-only): save_verified 8,600 B, save_compact 3,552 B.
 
@@ -108,27 +114,27 @@ XOffset after the read/write rounds (report-only): save_verified 8,600 B, save_c
 
 | Library | Tuning applied | 2024 layout | Tuned | XOffset inline ÷ lib |
 | --- | --- | ---: | ---: | ---: |
-| xoffset inline | inline attributes, range append, erase at position; edit() per iteration | 212.7 | 57.2 | 1.000 |
-| std inline | inline attributes, range insert, erase at position | 274.8 | 64.4 | 0.888 |
-| Protocol Buffers bulk | attributes added as one range (no inline array in a message) | 67.8 | 55.5 | 1.031 |
-| cista raw inline | inline attributes, range insert, erase at position | 159.0 | 22.1 | 2.588 |
-| cista offset inline | inline attributes, range insert, erase at position | 182.4 | 26.2 | 2.183 |
+| xoffset inline | inline attributes, range append, erase at position; edit() per iteration | 280.2 | 80.1 | 1.000 |
+| std inline | inline attributes, range insert, erase at position | 406.7 | 86.8 | 0.923 |
+| Protocol Buffers bulk | attributes added as one range (no inline array in a message) | 89.3 | 82.6 | 0.970 |
+| cista raw inline | inline attributes, range insert, erase at position | 275.3 | 53.5 | 1.497 |
+| cista offset inline | inline attributes, range insert, erase at position | 291.8 | 55.6 | 1.441 |
 
 Report-only rows:
 
 | Row | ns |
 | --- | ---: |
-| xoffset inline, one edit() around all iterations of a round | 53.7 |
-| xoffset bulk (2024 layout, bulk calls, edit() per iteration) | 113.0 |
+| xoffset inline, one edit() around all iterations of a round | 74.7 |
+| xoffset bulk (2024 layout, bulk calls, edit() per iteration) | 157.3 |
 
 ### Tuned layout: send + receive (ns per message)
 
 | Library | reuse | fresh | XOffset inline ÷ lib (reuse) | XOffset inline ÷ lib (fresh) | raw bytes | zstd-3 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| xoffset inline | 68.3 | 172.7 | 1.000 | 1.000 | 3,128 | 2,977 |
-| zpp::bits inline | 256.9 | 689.1 | 0.266 | 0.251 | 2,948 | 2,958 |
-| cista raw inline | 607.3 | 698.6 | 0.112 | 0.247 | 5,456 | 3,643 |
-| cista offset inline | 619.4 | 716.1 | 0.110 | 0.241 | 5,456 | 3,643 |
+| xoffset inline | 93.3 | 272.2 | 1.000 | 1.000 | 3,128 | 2,977 |
+| zpp::bits inline | 368.0 | 927.7 | 0.254 | 0.293 | 2,948 | 2,958 |
+| cista raw inline | 726.0 | 863.7 | 0.129 | 0.315 | 3,280 | 2,994 |
+| cista offset inline | 710.2 | 851.7 | 0.131 | 0.320 | 3,280 | 2,994 |
 
 XOffset inline after the read/write rounds (report-only): save_verified 9,048 B (zstd-3 3,059), save_compact 3,632 B (zstd-3 3,006).
 
@@ -136,65 +142,68 @@ XOffset inline after the read/write rounds (report-only): save_verified 9,048 B 
 
 | Library | 2024 layout | Tuned | XOffset ÷ lib (2024 layout) | XOffset inline ÷ lib (tuned) |
 | --- | ---: | ---: | ---: | ---: |
-| xoffset | 294.0 | 125.5 | 1.000 | 1.000 |
-| zpp::bits (std model) | 552.4 | 321.3 | 0.532 | 0.391 |
-| Protocol Buffers | 7,528.9 | 7,516.6 | 0.039 | 0.017 |
-| cista raw | 776.9 | 629.4 | 0.378 | 0.199 |
-| cista offset | 819.6 | 645.6 | 0.359 | 0.194 |
+| xoffset | 388.1 | 173.4 | 1.000 | 1.000 |
+| zpp::bits (std model) | 816.5 | 454.8 | 0.475 | 0.381 |
+| Protocol Buffers | 10,685.5 | 10,678.8 | 0.036 | 0.016 |
+| cista raw | 1,015.2 | 779.5 | 0.382 | 0.222 |
+| cista offset | 1,027.9 | 765.8 | 0.378 | 0.226 |
 
-云端计时会抖（同一项单个进程之间最多差约 30%），上面取 7 个进程的中位数；比值在 0.95–1.05 之间的
-按持平看。
+云端计时会抖（这台机器约三分之一的进程整体慢 1.3–1.7 倍），上面取 15 个进程的中位数；比值在
+0.95–1.05 之间的按持平看。
 
 ## 怎么读
 
-- **发送+接收**：XOffset 4.0（信任档）reuse 每条约 81 ns，是 zpp::bits 的 0.29、FlatBuffers 的 0.15、
-  cista 的 0.13、Cap'n Proto 的 0.04、MessagePack / Protocol Buffers 的 0.01。fresh 模式每条要新建接收
-  buffer（新映射），XOffset 约 192 ns，对各家的比值 0.02–0.27。完整校验档 reuse 约 194 ns，仍是 zpp::bits
-  的约 0.70。对手换成内联布局后结论不变（XOffset inline 对 zpp::bits inline 0.27，对 cista inline 0.11）。
-- **读写，2024 原样**：XOffset 213 ns，快于 std 模型（0.77），慢于 cista（1.17–1.34）和 Protocol Buffers
-  （3.14）。
-- **读写，调优写法**：XOffset 57 ns，和 Protocol Buffers（56 ns，1.03）持平，快于 std 模型（0.89），慢于
-  cista（22–26 ns，2.2–2.6 倍）。一个 `edit()` 包住一轮全部迭代只比每次迭代一个 `edit()` 快约 3 ns。
-- **改一次 + 发一次 + 收一次**（两项中位数相加，只作参考）：XOffset 最低，调优写法下 126 ns，是
-  zpp::bits 的 0.39、cista 的 0.20、Protocol Buffers 的 0.02。读写上输给 cista 的约 35 ns 远小于发送+接收
-  赢回的约 540 ns。
+- **发送+接收**：XOffset 4.0（信任档）reuse 每条约 108 ns，是 zpp::bits 的 0.26、FlatBuffers 和 cista 的
+  0.15、Cap'n Proto 的 0.04、MessagePack / Protocol Buffers 的 0.01。fresh 模式每条要新建接收 buffer
+  （新映射），XOffset 约 275 ns，对各家的比值 0.02–0.31。完整校验档 reuse 约 245 ns，仍是 zpp::bits 的
+  约 0.60。对手换成内联布局后结论不变（XOffset inline 对 zpp::bits inline 0.25，对 cista inline 0.13）。
+- **读写，2024 原样**：XOffset 280 ns，快于 std 模型（0.69），和 cista 持平（0.96–1.02），慢于
+  Protocol Buffers（3.14）。
+- **读写，调优写法**：XOffset 80 ns，和 Protocol Buffers（83 ns，0.97）持平，快于 std 模型（0.92），慢于
+  cista（54–56 ns，1.4–1.5 倍）。一个 `edit()` 包住一轮全部迭代只比每次迭代一个 `edit()` 快约 5 ns。
+- **改一次 + 发一次 + 收一次**（两项中位数相加，只作参考）：XOffset 最低，调优写法下 173 ns，是
+  zpp::bits 的 0.38、cista 的 0.22、Protocol Buffers 的 0.02。读写上输给 cista 的约 25 ns 远小于发送+接收
+  赢回的约 630 ns。
 - **大小**：XOffset 4.0 的 wire 从 2024 的 4,184 字节降到 3,232 字节（V2 格式），zstd-3 后 3,001 字节，
-  和其他格式（2,926–3,803）同一量级。读写循环之后 `save_verified` 带着空洞表是 8,600 字节，`save_compact`
+  和其他格式（2,926–3,799）同一量级。读写循环之后 `save_verified` 带着空洞表是 8,600 字节，`save_compact`
   是 3,552 字节（只报告）。
 
 ## 读写的时间花在哪
 
-用 `-DCC24_PARTS` 把循环的三部分分开计时（云端，每个变体 3 个进程取中位数，ns/次；标量和位置的读写
-每个变体都在，约 1–2 ns）：
+用 `-DCC24_PARTS` 把循环的三部分分开计时（云端，每个变体 3 个进程取中位数，ns/次；“全部”列是上面
+15 个进程的数；标量和位置的读写每个变体都在，约 1–2 ns，所以三部分相加会略大于“全部”）：
 
 | 行 | 全部 | 装备 ×4 | 路径点和属性 | 物品 |
 | --- | ---: | ---: | ---: | ---: |
-| XOffset，2024 原样 | 212.7 | 147.6 | 17.3 | 48.9 |
-| XOffset，2024 原样，plain_root（只报告） | 179.7 | 118.1 | 15.5 | 49.3 |
-| std，2024 原样 | 274.8 | 201.3 | 12.5 | 65.4 |
-| Protocol Buffers，2024 原样 | 67.8 | 29.2 | 22.6 | 27.5 |
-| cista raw，2024 原样 | 159.0 | 139.2 | 13.5 | 14.0 |
-| cista offset，2024 原样 | 182.4 | 155.2 | 14.3 | 14.1 |
-| XOffset，调优写法 | 57.2 | 22.3 | 9.9 | 37.8 |
-| std，调优写法 | 64.4 | 12.5 | 8.4 | 55.8 |
-| Protocol Buffers，范围添加 | 55.5 | 16.9 | 22.4 | 28.0 |
-| cista raw，调优写法 | 22.1 | 15.9 | 8.2 | 9.5 |
-| cista offset，调优写法 | 26.2 | 17.2 | 8.3 | 10.3 |
+| XOffset，2024 原样 | 280.2 | 207.9 | 22.9 | 63.9 |
+| XOffset，2024 原样，plain_root（只报告） | 246.9 | 160.4 | 21.2 | 63.2 |
+| std，2024 原样 | 406.7 | 290.1 | 17.1 | 76.9 |
+| Protocol Buffers，2024 原样 | 89.3 | 39.1 | 31.7 | 53.1 |
+| cista raw，2024 原样 | 275.3 | 199.8 | 17.5 | 36.8 |
+| cista offset，2024 原样 | 291.8 | 212.5 | 17.9 | 34.7 |
+| XOffset，调优写法 | 80.1 | 28.1 | 11.6 | 46.7 |
+| std，调优写法 | 86.8 | 23.4 | 11.3 | 66.0 |
+| Protocol Buffers，范围添加 | 82.6 | 22.3 | 32.1 | 51.9 |
+| cista raw，调优写法 | 53.5 | 19.6 | 11.6 | 31.7 |
+| cista offset，调优写法 | 55.6 | 21.1 | 13.5 | 29.8 |
 
-- 装备追加再删除，2024 原样：每件装备的属性 vector 要分配一次再释放。std 走 `new`/`delete`；XOffset 在
-  `edit()` 里删掉的块要到 `edit()` 结束才复用（plain 引用仍然安全），所以每次迭代都要新分配；Protocol
-  Buffers 的 `RemoveLast` 留着清空的对象，下一次 `add_` 直接复用，不分配。内联布局去掉了这次分配，
-  各家都降到 12–22 ns。
-- 物品插入再删除：扁平有序 map（XOffset、std）要挪动后面的元素，调优写法下 XOffset 约 38 ns，std 约
-  56 ns；cista 的 hash map 约 10 ns，Protocol Buffers 的 map 约 28 ns。调优写法下 XOffset 输给 cista 的
-  差距主要在这里（约 28 ns），其次是装备部分（约 5–6 ns）。
-- 路径点：都在 8–23 ns。
+- 装备追加再删除，2024 原样：每件装备的属性 vector 要分配一次再释放。std 和 cista 走 `new`/`delete`；
+  XOffset 在 `edit()` 里删掉的块要到 `edit()` 结束才复用（plain 引用仍然安全），所以每次迭代都要新分配；
+  Protocol Buffers 的 `RemoveLast` 留着清空的对象，下一次 `add_` 直接复用，不分配。内联布局去掉了这次
+  分配，各家都降到 20–28 ns。
+- 物品插入再删除：XOffset、std、cista 都是有序扁平 map，都要挪动后面的元素。std 和 cista 跑同一段
+  代码，cista 约 30–37 ns，std 约 66–77 ns；XOffset 的 `XMap` 约 47–64 ns；Protocol Buffers 的 `map<>`
+  约 52 ns。调优写法下 XOffset 输给 cista 的约 25 ns 里，这里占约 15 ns，装备部分占约 8 ns。
+- 装备，调优写法：std 约 23 ns，cista 约 20 ns，Protocol Buffers 约 22 ns，XOffset 约 28 ns。
+- 路径点：都在 11–32 ns。
 
-所以读写的差距来自容器种类（扁平有序 map 对 hash map），不是 offset 指针本身的开销。
+容器种类相同之后，2024 原样的读写 XOffset 和 cista 持平；调优写法下还差 1.4–1.5 倍，差距在 `XMap`
+插入删除和 `edit()` 里追加装备这两处，还没有剖析到具体指令。
 
-这次对比顺带改了库里一处：`edit()` 结束时归还待回收块的列表会把列表的主机内存也释放掉，下一个
+PR #289 顺带改了库里一处：`edit()` 结束时归还待回收块的列表会把列表的主机内存也释放掉，下一个
 `edit()` 又要重新分配。现在保留列表的容量（最多 1024 项）。2024 原样的循环每次迭代从 4,794 Ir 降到
-4,121 Ir（GCC 16.2，−14%），计时从 260 ns 降到 213 ns（同机交替 7 对进程）；内联布局的行不受影响。
+4,121 Ir（GCC 16.2，−14%），计时从 260 ns 降到 213 ns（当时那台机器，同机交替 7 对进程）；内联布局的行
+不受影响。
 
 ## 历史结果
 
@@ -202,6 +211,10 @@ XOffset inline after the read/write rounds (report-only): save_verified 9,048 B 
 `xoffset inline` 读写行是一个 `edit()` 包住一轮全部迭代，对手都是 2024 原样的布局和写法，所以它的
 “读写对最快对手 0.889 / 0.755”不是同等写法下的比较，以本页的“调优写法”表为准。那次的发送+接收数据
 （对 zpp::bits 0.19 / 0.31）和本页方向一致。
+
+到 PR #289 为止，cista 的物品 map 沿用 2024 的 `hash_map`，当时读写 XOffset ÷ cista 是 1.17–1.34
+（2024 原样）和 2.18–2.59（调优写法）。那是拿有序扁平 map 和 hash map 比，这一版已去掉，cista 改用和
+其他模型相同的有序 vector，以本页的表为准。
 
 ## 和 2024 的 demo
 

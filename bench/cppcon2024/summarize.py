@@ -58,7 +58,7 @@ def main():
         elif lib == "Protocol Buffers":
             v, cont = g(lib, "rw"), "google::protobuf message"
         else:
-            v, cont = g(lib, "rw"), lib.replace("cista ", "cista::") + "::* (items = hash_map)"
+            v, cont = g(lib, "rw"), lib.replace("cista ", "cista::") + "::* (items = sorted vector)"
         out.append(f"| {lib} | {cont} | {Y2024[lib][1]:,.1f} | {v:,.1f} | {xrw / v:.3f} |")
     out.append(f"| xoffset 4.0 plain_root (report-only) | XOffset, plain reference | | {g('xoffset 4.0 plain_root', 'rw'):,.1f} | |")
     out += ["", "### Wire size (bytes)", "",
