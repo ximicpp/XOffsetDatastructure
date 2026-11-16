@@ -6,6 +6,9 @@
 #include <limits>
 #include <span>
 #include <stdexcept>
+#if !defined(__APPLE__) && !defined(_WIN32)
+#include <unistd.h>
+#endif
 
 namespace xo = XOffsetDatastructure;
 namespace xm = slg::xm;
@@ -90,7 +93,9 @@ int main() {
             }
         }
 #if !defined(__APPLE__) && !defined(_WIN32)
-        if (!ops.um || ops.um->reservation_limit() > (1u << 20) + 4096)
+        const auto page_size = ::sysconf(_SC_PAGESIZE);
+        if (page_size <= 0 || !ops.um ||
+            ops.um->reservation_limit() > (1u << 20) + static_cast<std::size_t>(page_size))
             throw std::runtime_error("uplink reserved more than the initial relocation arena");
 #endif
         std::puts("2048 full-field orders and random streams agree across both receive modes");
