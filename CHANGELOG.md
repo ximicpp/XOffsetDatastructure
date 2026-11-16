@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- `XVector::pop_back()` no longer zeroes the removed element's bytes by
+  default (threat model M4 exception, susu 2026-11-16): the next append
+  there constructs over them, owned blocks are still retired and zeroed (M3).
+  Build with `XOFFSET_SCRUB_POPPED=1` to zero them, or send with
+  `save_compact` (spare capacity rewritten as zero) where receivers must not
+  see removed elements. Appending an element whose construction ignores the
+  allocator (aggregates of heads and scalars) no longer looks the owner up;
+  `erase` of trivially copyable elements keeps the head in registers on GCC
+  and MSVC too. CppCon 2024 tuned read/write loop (GCC 16.2, callgrind):
+  993 -> 851 Ir per iteration (cista 686).
 - Docs and examples only, no library change: `docs/GETTING_STARTED.md` walks
   newcomers through the core use cases, each with a runnable example in the
   recommended style sharing one protocol header (`examples/game_protocol.hpp`,

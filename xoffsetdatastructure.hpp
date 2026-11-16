@@ -3701,6 +3701,11 @@ namespace XOffsetDatastructure {
         // head lies inside the other's owned tree. On by default only in debug
         // builds; release builds rely on the caller not moving a container
         // into (or out of) its own subobject.
+// pop_back() zeroes the removed element's bytes (threat model M4) only when
+// this is 1; by default they stay in spare capacity until overwritten.
+#ifndef XOFFSET_SCRUB_POPPED
+#  define XOFFSET_SCRUB_POPPED 0
+#endif
 #if !defined(XOFFSET_MOVE_OWNERSHIP_CHECKS)
 #  if defined(NDEBUG)
 #    define XOFFSET_MOVE_OWNERSHIP_CHECKS 0
@@ -3721,6 +3726,7 @@ namespace XOffsetDatastructure {
         }
 
         template <typename T> consteval bool stable_erase_supported();
+        template <typename T> consteval bool default_construct_reads_binding();
         template <typename T> void stable_erase_relocate(T*, T&) noexcept;
         template <typename T> consteval bool can_relocate_without_allocation();
         template <typename T> void relocate_construct(T* dst, T& src) noexcept;
@@ -5062,6 +5068,16 @@ namespace XOffsetDatastructure {
             if constexpr (std::is_trivially_copyable_v<T>) return {};
             else return binding();
         }
+        // Default construction reads the binding only through a user
+        // allocator constructor or a custom lifetime policy; the heads'
+        // own allocator constructors ignore it (the head's address names its
+        // payload). Without either, appending an empty element does no
+        // owner lookup.
+        allocator_type default_binding() const noexcept {
+            if constexpr (std::is_trivially_copyable_v<T> ||
+                          !fixed_detail::default_construct_reads_binding<T>()) return {};
+            else return binding();
+        }
 
         XOFFSET_DETAIL_MOVE_INLINE XArena* arena() const noexcept {
             return reinterpret_cast<XArena*>(detail::OwnerMap::payload_of(this));
@@ -5421,11 +5437,22 @@ namespace XOffsetDatastructure {
             return removed;
         }
 
+        // pop_back() leaves the removed element's bytes in spare capacity
+        // (susu 2026-11-16: a send copies them as they are; the next append
+        // there constructs over them). Its owned blocks are still retired and
+        // zeroed (M3). XOFFSET_SCRUB_POPPED=1 zeroes the slot too (M4, for
+        // buffers sent to readers that must not see removed elements;
+        // save_compact also rewrites spare capacity as zero).
         void pop_back() {
             if (size_ == 0) return;
-            fixed_detail::destroy_n(data() + (size_ - 1), 1);
-            --size_;
-            scrub(size_, size_ + 1);
+            // size_ > 0 names a live block: no null test.
+            const size_type last = size_ - 1u;
+            T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + last;
+            fixed_detail::destroy_n(slot, 1);
+            size_ = last;
+#if XOFFSET_SCRUB_POPPED
+            std::memset(static_cast<void*>(slot), 0, sizeof(T));
+#endif
         }
 
         T& emplace_back() {
@@ -5435,7 +5462,7 @@ namespace XOffsetDatastructure {
             const size_type n = size_;
             if (n < capacity_) [[likely]] {
                 T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + n;
-                fixed_detail::default_construct(slot, element_binding());
+                fixed_detail::default_construct(slot, default_binding());
                 size_ = n + 1u;
                 return *slot;
             }
@@ -5447,7 +5474,7 @@ namespace XOffsetDatastructure {
                 XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::grow_bytes<T>(capacity_), fixed_detail::soft_sink<T>());
 #endif
             return *append_construct([&](T* dst) {
-                fixed_detail::default_construct(dst, element_binding());
+                fixed_detail::default_construct(dst, default_binding());
             });
 #endif
         }
@@ -5470,7 +5497,7 @@ namespace XOffsetDatastructure {
 #if !defined(__clang__)
         XOFFSET_DETAIL_NOINLINE T& emplace_back_general() {
             return *insert_construct(size_, [&](T* dst) {
-                fixed_detail::default_construct(dst, element_binding());
+                fixed_detail::default_construct(dst, default_binding());
             });
         }
 #endif
@@ -5741,23 +5768,23 @@ namespace XOffsetDatastructure {
 
         void erase_index(size_type index) {
             if (index >= size_) return;
-            if (index + 1 == size_) { pop_back(); return; }
+            if (index + 1 == size_) {
+                // erase keeps M4 when pop_back does not zero the slot.
+                pop_back();
+#if !XOFFSET_SCRUB_POPPED
+                scrub(size_, size_ + 1);
+#endif
+                return;
+            }
             if constexpr (std::is_trivially_copyable_v<T>) {
-#if defined(__clang__)
                 // size_ > 1 names a live block. The head stays in registers
-                // across the move (Clang reloads it after the memmove
+                // across the move (compilers reload it after the memmove
                 // otherwise); the vacated slot is zeroed as by scrub(n - 1, n).
-                // GCC and MSVC keep the code they had.
                 const size_type n = size_;
                 T* const items = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta);
                 std::memmove(items + index, items + index + 1, std::size_t(n - index - 1) * sizeof(T));
                 size_ = n - 1u;
                 std::memset(static_cast<void*>(items + (n - 1u)), 0, sizeof(T));
-#else
-                std::memmove(data() + index, data() + index + 1, (size_ - index - 1) * sizeof(T));
-                --size_;
-                scrub(size_, size_ + 1);
-#endif
             } else if constexpr (detail::shift_relocate_supported<T>()) {
                 // SHIFT: same bytes and deltas as the loop below, in one
                 // memmove plus an inline-head restart of the moved run.
@@ -5937,7 +5964,9 @@ namespace XOffsetDatastructure {
                 XOFFSET_TRY {
                     while (size_ < count) { construct(data() + size_); ++size_; }
                 } XOFFSET_CATCH(...) {
+                    const auto built = size_;
                     while (size_ > old_size) pop_back();
+                    scrub(old_size, built);
                     XOFFSET_RETHROW;
                 }
             } else if constexpr (fixed_detail::can_relocate_without_allocation<T>()) {
@@ -7676,6 +7705,35 @@ namespace XOffsetDatastructure {
         template <typename T> struct is_owning_head<XSet<T>> : std::true_type {};
         template <typename K, typename V> struct is_owning_head<XFixedFlatMap<K, V>> : std::true_type {};
         template <typename K, typename V> struct is_owning_head<XMap<K, V>> : std::true_type {};
+
+        // Whether default_construct<T> passes its allocator to anything that
+        // reads it: a custom lifetime policy, or a constructor taking the
+        // allocator other than a head's (which ignores it). Aggregates built
+        // member by member read it when a base or member does.
+        template <typename T, std::size_t... B, std::size_t... M>
+        consteval bool default_construct_reads_binding_parts(std::index_sequence<B...>, std::index_sequence<M...>) {
+            return (false || ... || default_construct_reads_binding<schema::base_t<T, B>>()) ||
+                   (false || ... || default_construct_reads_binding<typename schema::member_t<T, M>::type>());
+        }
+        template <typename T>
+        consteval bool default_construct_reads_binding() {
+            using U = std::remove_cv_t<T>;
+            if constexpr (std::is_array_v<U>) {
+                return default_construct_reads_binding<std::remove_extent_t<U>>();
+            } else if constexpr (detail::future_custom_lifetime_supported<U>()) {
+                return true;
+            } else if constexpr (is_owning_head<U>::value) {
+                return false;
+            } else if constexpr (requires(const allocator_ref& value) { U(value); }) {
+                return true;
+            } else if constexpr (!std::is_trivially_copyable_v<U> && std::is_class_v<U>) {
+                return default_construct_reads_binding_parts<U>(
+                    std::make_index_sequence<schema::base_count_v<U>>{},
+                    std::make_index_sequence<schema::member_count_v<U>>{});
+            } else {
+                return false;
+            }
+        }
 
         // MV: for a string head, or a vector head whose elements are trivially
         // copyable, the generic function evaluates exactly one containment

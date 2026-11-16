@@ -92,6 +92,23 @@ static_assert(fd::can_relocate_without_allocation<HostTail>());
 #endif
 static_assert(!fd::can_relocate_without_allocation<Fallback>());
 
+#if XOFFSET_SCHEMA_REFLECTION
+// An element whose allocator constructor reads the binding: emplace_back()
+// still passes it (appending elements whose construction ignores it skips
+// the owner lookup). A C++26-only record shape (not an aggregate).
+struct BoundTail {
+    xo::XString text;
+    std::uint32_t bound = 0;
+    explicit BoundTail(const fd::allocator_ref& alloc) : text(alloc), bound(alloc.segment ? 1u : 0u) {}
+};
+static_assert(fd::default_construct_reads_binding<BoundTail>());
+static_assert(fd::default_construct_reads_binding<BoundTail[2]>());
+#endif
+static_assert(!fd::default_construct_reads_binding<ResizeAttr>());
+static_assert(!fd::default_construct_reads_binding<ResizeRecord>());
+static_assert(!fd::default_construct_reads_binding<xo::XString>());
+static_assert(!fd::default_construct_reads_binding<std::uint64_t>());
+
 namespace {
 unsigned cases = 0;
 void need(bool value, const char* message) {
@@ -327,6 +344,33 @@ void nonrelocatable_fallback() {
     std::destroy_at(v); ++cases;
 }
 
+void emplace_binding() {
+#if XOFFSET_SCHEMA_REFLECTION
+    auto bound = make_buffer();
+    auto* v = std::construct_at(static_cast<xo::XVector<BoundTail>*>(
+        bound.arena()->allocate_aligned(sizeof(xo::XVector<BoundTail>), alignof(xo::XVector<BoundTail>))),
+        fd::allocator_ref_of(bound.arena()));
+    for (int i = 0; i < 3; ++i) need(v->emplace_back().bound == 1u, "emplace_back dropped a binding its element reads");
+    v->back().text.assign("bound tail, out of line");
+    need(v->back().text.view() == "bound tail, out of line", "bound element string");
+    v->pop_back();
+    need(v->size() == 2, "pop_back size");
+    std::destroy_at(v);
+#endif
+    auto b = make_buffer();
+    auto& attrs = b.root<ResizeRoot>().attrs;
+    for (int i = 0; i < 3; ++i) { auto& a = attrs.emplace_back(); fill(a, "emplaced-key", std::uint8_t(i)); }
+    attrs.pop_back();
+    need(attrs.size() == 2, "attrs pop_back size");
+    check(attrs[1], "emplaced-key", 1);
+    // pop_back may leave the removed element's bytes (XOFFSET_SCRUB_POPPED=0);
+    // an append there still builds an empty element over them.
+    auto& again = attrs.emplace_back();
+    need(again.key.empty() && again.value.empty(), "append over a popped slot is not empty");
+    attrs.pop_back();
+    roundtrip(b); ++cases;
+}
+
 void stage6_mechanism_gate() {
     constexpr unsigned n = 4096;
     auto b = make_buffer(16u * 1024u * 1024u); auto& rows = b.root<ResizeRoot>().records;
@@ -404,7 +448,7 @@ int main(int argc, char** argv) {
 #if XOFFSET_SCHEMA_REFLECTION
         host_bad_alloc_tail_sweep();
 #endif
-        arena_bad_alloc_and_vm_failure(); nonrelocatable_fallback(); stage6_mechanism_gate();
+        arena_bad_alloc_and_vm_failure(); nonrelocatable_fallback(); emplace_binding(); stage6_mechanism_gate();
         std::cout << "P2 resize growth cases=" << cases << " passed (no timing)\n";
         return 0;
     } catch (const std::exception& e) { std::cerr << "P2 resize growth failure: " << e.what() << '\n'; return 1; }
