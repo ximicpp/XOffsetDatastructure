@@ -333,6 +333,28 @@ jobs:
             build/validation-differential/*.txt
           if-no-files-found: ignore
 
+  slg-native-regression:
+    name: Native SLG regressions (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - name: Preserve dependency line endings on Windows
+        if: runner.os == 'Windows'
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Configure SLG field-list tests
+        run: cmake -S bench/slg -B build/slg-native -DCMAKE_BUILD_TYPE=Release -DXOFFSET_CXX_STANDARD=23 -DSLG_WITH_XOFFSET=ON -DSLG_BUILD_REGRESSION_TESTS=ON
+      - name: Build and run SLG regressions
+        run: |
+          cmake --build build/slg-native --config Release --target slg_regression_tests --parallel 2
+          ctest --test-dir build/slg-native -C Release --output-on-failure --no-tests=error
+
   bench-smoke:
     name: Benchmark trees smoke (${{ matrix.compiler }})
     runs-on: ubuntu-latest

@@ -20,12 +20,22 @@ cmake --build build/slg --target slg_bench
 ```
 
 - `XOFFSET_ROOT` defaults to this repository; pass it to measure another checkout.
-- GCC 16 or P2996 Clang. Formats are found, never downloaded: cereal (header),
+- GCC 16 or P2996 Clang for the default reflection build. On native Windows,
+  use MSVC with `-DXOFFSET_CXX_STANDARD=23` for the field-list build.
+  Formats are found, never downloaded: cereal (header),
   protobuf (`find_package`), FlatBuffers (`flatc`), and optionally zpp_bits
   (`-DZPP_BITS_INCLUDE`) and cista (`-DCISTA_INCLUDE`). A format that is not
   found is left out of the build and named in the configure output.
 - `SLG_BUILD_PROBES=ON` adds the diagnostic programs `erase_probe` and
   `small_msg_probe` (off by default; they are not measurements).
+
+Run the SLG regression tests with the native compiler:
+
+```
+cmake -S bench/slg -B build/slg-native -DCMAKE_BUILD_TYPE=Release -DXOFFSET_CXX_STANDARD=23 -DSLG_WITH_XOFFSET=ON -DSLG_BUILD_REGRESSION_TESTS=ON
+cmake --build build/slg-native --config Release --target slg_regression_tests
+ctest --test-dir build/slg-native -C Release --output-on-failure --no-tests=error
+```
 
 ## Run
 
@@ -94,6 +104,9 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
     root reference, refreshed in snap_recv, the only point where the view's
     epoch changes, so U*.apply starts at the root rather than looking it up in
     the arena for every delta (-DSLG_RP_CHECK checks each use, off by default).
+    On macOS and Windows, deltas that remove and upsert marches can reuse vacated
+    slots in held views with more than 16 marches. The ordinary swap-and-erase
+    update handles shorter lists and deltas with a single kind of march change.
   M: 10,000 units, 1,500 clients, 1,000 marches, 4 ticks per cycle. Bytes
   include zstd-3 and, for XOffset, the save_compact pull.
 - native delta (XOffset only, built when the library has
@@ -139,6 +152,7 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   each cycle); LD, the server then changes the player every tick (troops,
   items, buildings, resources) and sends a PlayerPatch with only the changed
   parts (dirty marks recorded by the edit); the client applies it in place.
+  On Windows, the XOffset runner copies dirty armies as XOffset records.
   SD, the dirty-module save to storage (all armies and items as a PlayerPatch).
   XOffset native: LK login key delta, LN self deltas, SN delta to what storage
   holds; every native receiver is checked equal to the application-level one.
@@ -158,9 +172,15 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   bounds / full ratio. Bytes `UL.order`, `UL.order_zstd` (`ULZ.send`), count
   `UL.orders`. Runs after the login case; `SLG_UL_OFF=1` drops it. New keys
   only. Each client keeps one order and refills it: the std and cista
-  runners `clear()` one `March`, XOffset builds its buffer for the first order
-  and edits it in place after that (2026-11-12, 3.6 perf P2), so `troops`
-  keeps its capacity in each and the XOffset wire carries that spare capacity.
+  runners `clear()` one `March`. On macOS and Windows, XOffset writes the
+  order directly into an aligned dense V2 output buffer. The writer retains
+  an aligned output slot for each order length up to four troops and uses a
+  compact output buffer for longer orders. Both runners compute each random
+  value from its original position in the sequence. The macOS runner reuses
+  the client player ID and army span across read-only uplink rounds. It finds the order
+  length before preparing the fixed fields and generates up to four troop
+  records without loop control. Other builds fill it through the relocating
+  XBuffer's edit path and save it into the reused output.
 
 XOffset's A adapter (both case sets) calls `prefetch_for_update()` on the two
 players' buffers when the battle result starts arriving, inside the timed

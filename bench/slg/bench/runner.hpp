@@ -111,10 +111,14 @@ template <class R, class T> void store_check(R& rz, std::span<const uint8_t> in,
 // arriving, the scene starts loading the two armies it will write (the army
 // and its hero and troop arrays). Timed in A.res_decode, as XOffset's hint.
 template <class A> void prefetch_army_for_apply(const A& a) {
+#if defined(__GNUC__) || defined(__clang__)
     __builtin_prefetch(&a, 1);
     if (!a.heroes.empty()) __builtin_prefetch(&a.heroes[0], 1);
     if (!a.troops.empty()) __builtin_prefetch(&a.troops[0], 1);
     if (!a.buffs.empty()) __builtin_prefetch(&a.buffs[0], 1);
+#else
+    (void)a;
+#endif
 }
 
 // Memory (scoring V3, 2026-11-04, report only; --mode mem): a build with
