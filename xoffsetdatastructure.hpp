@@ -3701,6 +3701,11 @@ namespace XOffsetDatastructure {
         // head lies inside the other's owned tree. On by default only in debug
         // builds; release builds rely on the caller not moving a container
         // into (or out of) its own subobject.
+// pop_back() zeroes the removed element's bytes (threat model M4) only when
+// this is 1; by default they stay in spare capacity until overwritten.
+#if !defined(XOFFSET_SCRUB_POPPED)
+#  define XOFFSET_SCRUB_POPPED 0
+#endif
 #if !defined(XOFFSET_MOVE_OWNERSHIP_CHECKS)
 #  if defined(NDEBUG)
 #    define XOFFSET_MOVE_OWNERSHIP_CHECKS 0
@@ -5432,15 +5437,22 @@ namespace XOffsetDatastructure {
             return removed;
         }
 
+        // pop_back() leaves the removed element's bytes in spare capacity
+        // (susu 2026-11-16: a send copies them as they are; the next append
+        // there constructs over them). Its owned blocks are still retired and
+        // zeroed (M3). XOFFSET_SCRUB_POPPED=1 zeroes the slot too (M4, for
+        // buffers sent to readers that must not see removed elements;
+        // save_compact also rewrites spare capacity as zero).
         void pop_back() {
             if (size_ == 0) return;
-            // size_ > 0 names a live block: one address for the destroy and
-            // the scrub (M4), with no null test.
+            // size_ > 0 names a live block: no null test.
             const size_type last = size_ - 1u;
             T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + last;
             fixed_detail::destroy_n(slot, 1);
             size_ = last;
+#if XOFFSET_SCRUB_POPPED
             std::memset(static_cast<void*>(slot), 0, sizeof(T));
+#endif
         }
 
         T& emplace_back() {
