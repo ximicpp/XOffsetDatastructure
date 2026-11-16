@@ -133,9 +133,16 @@ static void rw_xoffset_bulk(C& r, const OpSet& o) {
     r.equips.pop_back();
   }
   const auto old_path_size = r.path.size();
-  r.path.resize(old_path_size + std::size(o.path));
-  auto* tail = r.path.data() + old_path_size;
-  for (const auto& p : o.path) *tail++ = {p[0], p[1], p[2]};
+  if constexpr (std::is_same_v<C, xo::Character>) {
+    r.path.resize(old_path_size + std::size(o.path));
+    auto* tail = r.path.data() + old_path_size;
+    for (const auto& p : o.path) *tail++ = {p[0], p[1], p[2]};
+  } else {
+    std::array<xo::Position, std::size(OpSet{}.path)> tail;
+    for (size_t i = 0; i < tail.size(); ++i)
+      tail[i] = {o.path[i][0], o.path[i][1], o.path[i][2]};
+    r.path.append_range(tail);
+  }
   r.attributes.push_back(o.attribute);
   const xo::Item item{o.item_id, o.item_number, o.item_uuid, o.item_timestamp};
   auto [it, inserted] = r.items.try_emplace(o.key, item);
@@ -241,9 +248,16 @@ static void bench_xoffset_layout(const char* name) {
     if (!fresh) throw std::runtime_error("trusted layout load rejected");
     return fresh->template root<C>().id;
   }));
-  put(name, "rw", time_rw([&](const OpSet& o) {
-    if (!src.edit([&](C& r) { rw_xoffset_bulk(r, o); }))
-      throw std::runtime_error("xoffset layout edit failed");
+  // A round is one edit batch. The timer includes opening and closing
+  // the pin, as well as every operation and its transient observations.
+  put(name, "rw", median_of(kRounds, [&] {
+    const auto start = Clock::now();
+    if (!src.edit([&](C& r) {
+      for (size_t i = 0; i < kRwIters; ++i)
+        rw_xoffset_bulk(r, g_ops[i & (kOpRing - 1)]);
+    })) throw std::runtime_error("xoffset layout edit failed");
+    const auto end = Clock::now();
+    return std::chrono::duration<double, std::nano>(end - start).count() / double(kRwIters);
   }));
   expect(name, checksum(src.plain_root()), g_rw_sum);
   const auto after = src.save_verified();

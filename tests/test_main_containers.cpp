@@ -338,8 +338,30 @@ void test_map_erase_at() {
     assert(map.empty());
 }
 
+void test_vector_append_range() {
+    auto buffer = TypedXBuffer<BridgeRoot>::create(8192);
+    auto& scores = buffer.plain_root().scores;
+    scores.append_range({});
+    assert(scores.empty() && scores.capacity() == 0);
+
+    constexpr std::array<int32_t, 3> input{10, 20, 30};
+    scores.reserve(input.size());
+    scores.append_range(input);
+    assert(scores.size() == 3 && scores.capacity() == 3);
+    scores.append_range(std::span<const int32_t>(scores.data() + 1, 2));
+    assert(scores.size() == 5 && scores[3] == 20 && scores[4] == 30);
+
+    const auto capacity = scores.capacity();
+    scores.append_range(std::span<const int32_t>(scores.data(), 1));
+    assert(scores.size() == 6 && scores[5] == 10 && scores.capacity() == capacity);
+    auto decoded = TypedXBuffer<BridgeRoot>::load(buffer.save_verified());
+    constexpr std::array<int32_t, 6> expected{10, 20, 30, 20, 30, 10};
+    assert(std::ranges::equal(decoded.plain_root().scores, expected));
+}
+
 int main() {
     test_map_erase_at();
+    test_vector_append_range();
     bool all_passed = true;
     all_passed &= test_main_containers_basic();
     all_passed &= test_main_containers_round_trip();
