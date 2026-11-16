@@ -26,24 +26,6 @@
 #include "xoffset_shared_delta.hpp"
 #include "xoffset_shared_publisher.hpp"
 
-#if defined(_WIN32)
-namespace slg::xm {
-inline void append_patch_army(XOffsetDatastructure::XVector<Army>& armies, const Army& source) {
-    armies.emplace_back(source);
-}
-} // namespace slg::xm
-#endif
-
-#if defined(__APPLE__)
-namespace slg::xm {
-inline void relocate_held_unit(ViewUnit& dst, ViewUnit& src) {
-    // Both units are elements of the same held vector. XOffset's same-arena
-    // move assignment can transfer their nested storage into the vacant slot.
-    dst = std::move(src);
-}
-} // namespace slg::xm
-#endif
-
 namespace slg {
 
 struct XoModel {
@@ -450,9 +432,6 @@ public:
         std::string lw, pw;
         void setup() {
             hold.clear(); hold.resize(srv.size());
-#if defined(__APPLE__)
-            uplink_sources.resize(srv.size());
-#endif
             pm.emplace(XBuffer::create<xm::PlayerPatch>(kViewInitial, build_cap()));
             pr.emplace(XBuffer::create<xm::PlayerPatch>(kViewInitial, cap()));
             for (auto& h : hw) h.reset();
@@ -497,129 +476,30 @@ public:
         PlayerState& held_w(int d) { return hw[std::size_t(d)]->template root<PlayerState>(); }
         void patch_recv_from(const std::string& w) { reload_wire<xm::PlayerPatch, kClient>(*pr, w); }
         const xm::PlayerPatch& patch() { return pr->template root<xm::PlayerPatch>(); }
-        // UL (uplink.hpp): the client fills a march order in its reused buffer and saves
-        // it; the server receives it through XReceiver<from_client>: xoffset reloads it
+        // UL (uplink.hpp): the client writes a march order (below); the server receives it through XReceiver<from_client>: xoffset reloads it
         // with the full check into a reused buffer, xoffset_trusted views it in place
         // with the bounds check (and times the full check as ULF.recv).
-#if defined(__APPLE__) || defined(_WIN32)
+        // UL.send writes the order straight into a prepared V2 frame: the
+        // frame for each small troop count keeps its header and vector head,
+        // and the order's scalars and troops are copied into it (bytes are
+        // those of the compact save; tests/uplink_order_paths_test.cpp).
         std::optional<XBuffer> ur;
-#if defined(__APPLE__)
         XOffsetDatastructure::detail::FlatRecordWriter<xm::March, 7, xm::Troop,
             XOffsetDatastructure::detail::FlatRecordFraming::sized_slots> ul_writer;
-#else
-        XOffsetDatastructure::detail::FlatRecordWriter<xm::March, 7, xm::Troop,
-            XOffsetDatastructure::detail::FlatRecordFraming::sized_slots> ul_writer;
-#endif
-#if defined(__APPLE__)
-        struct UplinkSource {
-            int64_t player_id = 0;
-            using Army = std::remove_pointer_t<decltype(std::declval<const PlayerState&>().armies.data())>;
-            std::span<Army> armies;
-        };
-        std::vector<UplinkSource> uplink_sources;
-
-        std::size_t up_encode_order(int player, int round, Rng& rng, int64_t seq) {
-            return encode_uplink_order<true>(player, round, rng.state, seq, &rng);
-        }
-
-        std::size_t up_encode_order_from_seed(int player, int round, uint64_t state, int64_t seq) {
-            return encode_uplink_order<false>(player, round, state, seq, nullptr);
-        }
-
-        template <bool TrackRng>
-        std::size_t encode_uplink_order(int player, int round, uint64_t state, int64_t seq, Rng* rng) {
-            auto& source = uplink_sources[std::size_t(player)];
-            if (round == 0) {
-                // Login and patches finished before UL. This read-only view
-                // remains valid until the last round sends its order.
-                const auto& state = held(player);
-                source.player_id = state.player_id;
-                source.armies = {state.armies.data(), state.armies.size()};
-            }
-#else
-        std::size_t up_encode_order(int player, int, Rng& rng, int64_t seq) {
-            const auto& source = held(player);
-#endif
+        std::size_t up_encode_input(const OrderInput& in) {
             static_assert(XOffsetDatastructure::schema::member_t<xm::March, 7>::offset == offsetof(xm::March, troops));
-            using SourceTroops = decltype(std::declval<const PlayerState&>().armies[0].troops.data());
-#if defined(__APPLE__)
-            const auto n = source.armies.size();
-            const bool has_army = n != 0;
-            const auto* army = source.armies.data();
-            auto troop_seed = state + 3 * Rng::step;
-            if (has_army) {
-                troop_seed += Rng::step;
-                const auto word = Rng::mix_word(troop_seed);
-                army += std::size_t(word % n);
-            }
-            if constexpr (TrackRng) rng->state = troop_seed;
-            const std::size_t count = has_army ? army->troops.size() : 0;
-            SourceTroops troops = count != 0 ? &army->troops.front() : nullptr;
-            const auto prepare = [&](xm::MarchOrderPrefix& order) noexcept {
-                order.march_id = seq;
-                order.owner = source.player_id;
-                order.from_x = has_army ? army->x : 0;
-                order.from_y = has_army ? army->y : 0;
-                order.to_x = int32_t(Rng::mix_word(state + Rng::step) & 4095u);
-                order.to_y = int32_t(Rng::mix_word(state + 2 * Rng::step) & 4095u);
-                order.eta = 30 + int32_t(Rng::mix_word(state + 3 * Rng::step) % 571u);
-            };
-            const auto generate = [&](std::size_t i) noexcept {
-                const auto& source_troop = troops[i];
-                const auto divisor = std::uint64_t((std::max)(source_troop.count, 1));
-                const auto word = Rng::mix_word(troop_seed + Rng::step * (i + 1));
-                return xm::Troop{source_troop.type, 1 + int32_t(word % divisor), 0};
-            };
-            const auto bytes = ul_writer.template write_counted<xm::MarchOrderPrefix>(count, prepare, generate);
-            if constexpr (TrackRng) rng->state = troop_seed + Rng::step * count;
-            return bytes;
-#else
-            const auto seed = rng.state;
-            const auto army_count = source.armies.size();
-            const auto* army = source.armies.data();
-            auto troop_seed = seed + 3 * Rng::step;
-            if (army_count != 0) {
-                troop_seed += Rng::step;
-                army += std::size_t(Rng::mix_word(troop_seed) % army_count);
-            }
-            const auto count = army_count != 0 ? army->troops.size() : 0;
-            SourceTroops troops = count != 0 ? army->troops.data() : nullptr;
             const auto prepare = [&](xm::MarchOrderPrefix& order) noexcept -> std::size_t {
-                order.march_id = seq;
-                order.owner = source.player_id;
-                order.from_x = army_count != 0 ? army->x : 0;
-                order.from_y = army_count != 0 ? army->y : 0;
-                order.to_x = int32_t(Rng::mix_word(seed + Rng::step) & 4095u);
-                order.to_y = int32_t(Rng::mix_word(seed + 2 * Rng::step) & 4095u);
-                order.eta = 30 + int32_t(Rng::mix_word(seed + 3 * Rng::step) % 571u);
-                return count;
+                order.march_id = in.march_id; order.owner = in.owner;
+                order.from_x = in.from_x; order.from_y = in.from_y;
+                order.to_x = in.to_x; order.to_y = in.to_y; order.eta = in.eta;
+                return in.troops.size();
             };
-            const auto generate = [&](std::size_t i) noexcept {
-                const auto& source_troop = troops[i];
-                const auto divisor = std::uint64_t((std::max)(source_troop.count, 1));
-                const auto word = Rng::mix_word(troop_seed + Rng::step * (i + 1));
-                return xm::Troop{source_troop.type, 1 + int32_t(word % divisor), 0};
+            const OrderTroop* troops = in.troops.data();
+            const auto generate = [troops](std::size_t i) noexcept {
+                return xm::Troop{troops[i].type, troops[i].count, troops[i].wounded};
             };
-            const auto bytes = ul_writer.template write<xm::MarchOrderPrefix>(prepare, generate);
-            rng.state = troop_seed + Rng::step * count;
-            return bytes;
-#endif
+            return ul_writer.template write<xm::MarchOrderPrefix>(prepare, generate);
         }
-#else
-        std::optional<XBuffer> um, ur;
-        std::string uw;
-        template <class Fill> std::size_t up_encode(Fill&& fill) {
-            // Fill through the normal pin-and-grow path and reuse the order.
-            if (!um) {
-                um.emplace(XBuffer::create<xm::March>(kUplinkInitial, build_cap()));
-                build_in<xm::March>(*um, fill);
-            } else {
-                edit_in<xm::March>(*um, fill);
-            }
-            um->template save_verified_into<xm::March>(uw);
-            return uw.size();
-        }
-#endif
         static XOffsetDatastructure::XReceiver<XOffsetDatastructure::XLink::from_client>& uplink_rx() {
             static XOffsetDatastructure::XReceiver<XOffsetDatastructure::XLink::from_client> rx(
                 XBuffer::maximum_capacity(XBuffer::DEFAULT_MAXIMUM_CAPACITY));
@@ -627,21 +507,13 @@ public:
         }
         uint64_t up_recv_checked() {
             if (!ur) ur.emplace(XBuffer::create<xm::March>(kUplinkInitial, cap()));
-#if defined(__APPLE__) || defined(_WIN32)
             const XOffsetDatastructure::XStatus r = uplink_rx().template reload<xm::March>(*ur, ul_writer.wire());
-#else
-            const XOffsetDatastructure::XStatus r = uplink_rx().template reload<xm::March>(*ur, uw);
-#endif
             if (!r) throw std::runtime_error("uplink receive rejected: " + std::string(r.error().message));
             return query_order(ur->template root<xm::March>());
         }
         uint64_t up_recv() {
             if constexpr (Trusted) {
-#if defined(__APPLE__) || defined(_WIN32)
                 const auto v = uplink_rx().template view<xm::March>(ul_writer.wire());
-#else
-                const auto v = uplink_rx().template view<xm::March>(uw);
-#endif
                 if (!v) throw std::runtime_error("uplink view rejected: " + std::string(v.error().message));
                 return query_order(v->root());
             } else {
@@ -649,14 +521,10 @@ public:
             }
         }
         uint64_t up_recv_full() requires Trusted { return up_recv_checked(); }
-#if defined(__APPLE__) || defined(_WIN32)
         std::string_view up_wire() const {
             const auto wire = ul_writer.wire();
             return {reinterpret_cast<const char*>(wire.data()), wire.size()};
         }
-#else
-        std::string_view up_wire() const { return uw; }
-#endif
 #ifdef XOFFSET_DELTA_SYNC_API
         std::vector<XOffsetDatastructure::XDeltaBaseline> nb;
         std::vector<XOffsetDatastructure::XDeltaCursor> nc;
@@ -848,78 +716,6 @@ public:
             else return dr->root<xm::ViewDelta>();
         }
 
-#if defined(__APPLE__) || defined(_WIN32)
-        // One scratch vector for all deliveries processed by this runner.
-        std::vector<int32_t> vacant_marches;
-
-        XOFFSET_DETAIL_NOINLINE static void append_held_march(
-                XOffsetDatastructure::XVector<xm::ViewMarch>& marches,
-                FlatHeldIndexMap& index, FlatHeldIndexMap::iterator entry,
-                const xm::ViewMarch& record) {
-            const auto pos = int32_t(marches.size());
-            try {
-                marches.push_back(record);
-            } catch (...) {
-                index.erase(entry);
-                throw;
-            }
-            entry->second = pos;
-        }
-
-        XOFFSET_DETAIL_NOINLINE void apply_held_delta(xm::ViewSnapshot& view, HeldIndex& at) {
-            apply_delta(view, at, delta(), [this](auto& marches, auto& index, const auto& d) {
-                // Use the swap-and-erase path for short lists or a one-way change.
-                constexpr std::size_t small_march_list = 16;
-                if (d.removed_marches.empty() || d.marches.empty() || marches.size() <= small_march_list)
-                    apply_march_delta(marches, index, d);
-                else
-                    apply_packed_marches(marches, index, d);
-            });
-        }
-
-        XOFFSET_DETAIL_NOINLINE void apply_packed_marches(
-                XOffsetDatastructure::XVector<xm::ViewMarch>& marches, FlatHeldIndexMap& index,
-                const xm::ViewDelta& d) {
-            auto& vacant = vacant_marches;
-            vacant.clear();
-            vacant.reserve(std::min<std::size_t>(d.removed_marches.size(), marches.size()));
-            // Remove IDs first. New records can occupy the vacated slots without
-            // copying the tail or repairing that tail record's index.
-            for (const auto id : d.removed_marches) {
-                if (auto* entry = index.find(id)) {
-                    vacant.push_back(entry->second);
-                    index.erase(entry);
-                }
-            }
-            for (const auto& record : d.marches) {
-                auto [entry, inserted] = index.emplace(record.id, 0);
-                if (!inserted) {
-                    marches[std::size_t(entry->second)] = record;
-                } else if (!vacant.empty()) {
-                    const auto pos = vacant.back();
-                    vacant.pop_back();
-                    entry->second = pos;
-                    marches[std::size_t(pos)] = record;
-                } else {
-                    append_held_march(marches, index, entry, record);
-                }
-            }
-            if (vacant.empty()) return;
-            // Compact only leftover vacancies, from highest slot to lowest
-            // so each tail record we move has a live index entry.
-            std::sort(vacant.rbegin(), vacant.rend());
-            auto end = marches.size();
-            for (const auto pos : vacant) {
-                if (std::size_t(pos) != --end) {
-                    auto& moved = marches[std::size_t(pos)];
-                    moved = marches[end];
-                    index[moved.id] = pos;
-                }
-            }
-            marches.truncate(end);
-        }
-
-#endif
 
 #ifdef XOFFSET_DELTA_SYNC_API
         // Native delta (N*): the server keeps each static client's view in an
