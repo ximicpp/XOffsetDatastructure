@@ -5204,6 +5204,35 @@ namespace XOffsetDatastructure {
                       std::is_trivially_destructible_v<T>) {
             assign_bytes(values.data(), values.size());
         }
+        // Append stable live objects, including a subrange of this vector.
+        // A growing append reads both ranges before it retires the old block.
+        void append_range(std::span<const T> values)
+            requires (!std::is_const_v<T> && !std::is_volatile_v<T> &&
+                      std::is_trivially_copyable_v<T> &&
+                      std::is_trivially_copy_constructible_v<T> &&
+                      std::is_trivially_destructible_v<T>) {
+            if (values.empty()) return;
+            const auto old_size = size_;
+            const auto added = checked_count(values.size());
+            if (added > max_size() - old_size) XOFFSET_THROW(XBadAlloc());
+            const auto wanted = static_cast<size_type>(old_size + added);
+            if (wanted <= capacity_) [[likely]] {
+                auto* tail = data() + old_size;
+                std::memmove(tail, values.data(), values.size_bytes());
+                for (size_type i = 0; i < added; ++i) detail::zero_implicit_padding(tail + i);
+                size_ = wanted;
+                return;
+            }
+            const auto new_capacity = std::max(wanted, grown_capacity());
+            XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::array_bytes<T>(new_capacity), );
+            const auto* old = data();
+            rebuild(wanted, new_capacity, [&](T* dst, size_type i) {
+                const auto& element = i < old_size ? old[i] : values[i - old_size];
+                std::construct_at(dst, element);
+                detail::zero_implicit_padding(dst);
+            });
+        }
+
         // assign_range from the object representations of count elements at
         // src, which need not be aligned for T (a message or file buffer): the
         // bytes are copied as they are (memmove) and no T* to src is formed.
@@ -6232,12 +6261,21 @@ namespace XOffsetDatastructure {
             return it->second;
         }
 
+        // Erase a position returned by this map. As with other flat-map
+        // mutations, the erased position and later positions are invalidated.
+        // Passing end() leaves the map unchanged.
+        iterator erase_at(const_iterator pos) {
+            if (pos == value_base::end()) return value_base::end();
+            const auto index = static_cast<std::uint32_t>(pos - value_base::begin());
+            value_base::erase_index(index);
+            return value_base::data() + index;
+        }
+
         template <typename KeyLike>
         std::uint32_t erase(const KeyLike& key) {
             auto it = find(key);
             if (it == value_base::end()) return 0;
-            auto index = static_cast<std::uint32_t>(it - value_base::begin());
-            value_base::erase_index(index);
+            erase_at(it);
             return 1;
         }
 
@@ -6353,6 +6391,7 @@ namespace XOffsetDatastructure {
         using Base::empty;
         using Base::clear;
         using Base::reserve;
+        using Base::append_range;
         using Base::assign_range;
         using Base::assign_bytes;
         using Base::assign;
