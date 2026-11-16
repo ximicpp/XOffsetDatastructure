@@ -575,14 +575,13 @@ public:
         std::optional<XBuffer> um, ur;
         std::string uw;
         template <class Fill> std::size_t up_encode(Fill&& fill) {
-            // Keep one outgoing order. Automatic growth keeps its root at
-            // the same address while the troop list grows.
+            // Fill through the normal pin-and-grow path and reuse the order.
             if (!um) {
-                um.emplace(XBuffer::create<xm::March>(kUplinkInitial,
-                    XBuffer::maximum_capacity(XBuffer::MAX_PAYLOAD).with_growth(
-                        XOffsetDatastructure::XGrowPolicy::Automatic)));
+                um.emplace(XBuffer::create<xm::March>(kUplinkInitial, build_cap()));
+                build_in<xm::March>(*um, fill);
+            } else {
+                edit_in<xm::March>(*um, fill);
             }
-            fill(um->template root<xm::March>());
             um->template save_verified_into<xm::March>(uw);
             return uw.size();
         }
