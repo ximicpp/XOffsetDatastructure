@@ -26,6 +26,18 @@
 #include "xoffset_shared_delta.hpp"
 #include "xoffset_shared_publisher.hpp"
 
+namespace slg::xm {
+// The scalar head of March, for the prepared uplink frame (LoginOps below).
+struct MarchOrderPrefix {
+    int64_t march_id{};
+    int64_t owner{};
+    int32_t from_x{}, from_y{}, to_x{}, to_y{}, eta{};
+};
+} // namespace slg::xm
+// Not reachable from the model's roots, so not in model_xoffset.hpp's
+// generated record block (tools/describe_dump --check).
+XOFFSET_RECORD(slg::xm::MarchOrderPrefix, march_id, owner, from_x, from_y, to_x, to_y, eta)
+
 namespace slg {
 
 struct XoModel {
