@@ -31,15 +31,33 @@ struct Character {
   std::vector<std::pair<uint64_t, Item>> items; std::vector<Position> path; std::vector<float> attributes;
   std::vector<Equip> equips; std::vector<Skill> skills;
 };
-inline void items_set(std::vector<std::pair<uint64_t, Item>>& v, uint64_t k, const Item& it) {
-  auto p = std::lower_bound(v.begin(), v.end(), k, [](const auto& e, uint64_t key) { return e.first < key; });
-  if (p != v.end() && p->first == k) p->second = it; else v.insert(p, {k, it});
-}
-inline void items_erase(std::vector<std::pair<uint64_t, Item>>& v, uint64_t k) {
-  auto p = std::lower_bound(v.begin(), v.end(), k, [](const auto& e, uint64_t key) { return e.first < key; });
-  if (p != v.end() && p->first == k) v.erase(p);
-}
 }  // namespace stdm
+
+// ---- the item map of every model that holds its own containers (std, cista) ----
+// A vector of (key, item) kept sorted by key: the same kind of container as XOffset's XMap.
+// V is std::vector<std::pair<...>> or cista's vector of cista::pair; both run this code.
+// The tail is shifted with std::move / std::move_backward rather than the vector's own
+// insert / erase: cista 0.16's are a rotate and a swap loop, several times slower.
+template <class V> inline auto items_find(V& v, uint64_t k) {
+  return std::lower_bound(v.begin(), v.end(), k, [](const auto& e, uint64_t key) { return e.first < key; });
+}
+// Insert or assign; returns the position, which the tuned loop erases without a second search.
+template <class V, class ItemT> inline auto items_upsert(V& v, uint64_t k, const ItemT& it) {
+  auto p = items_find(v, k);
+  if (p != v.end() && p->first == k) { p->second = it; return p; }
+  const auto at = p - v.begin();
+  v.emplace_back();                       // may reallocate
+  p = v.begin() + at;
+  std::move_backward(p, v.end() - 1, v.end());
+  p->first = k; p->second = it;
+  return p;
+}
+template <class V, class Pos> inline void items_erase_at(V& v, Pos p) { std::move(p + 1, v.end(), p); v.pop_back(); }
+template <class V, class ItemT> inline void items_set(V& v, uint64_t k, const ItemT& it) { items_upsert(v, k, it); }
+template <class V> inline void items_erase(V& v, uint64_t k) {
+  auto p = items_find(v, k);
+  if (p != v.end() && p->first == k) items_erase_at(v, p);
+}
 
 // ---- tuned layout: equipment attributes inline up to 8, longer ones in `Overflow` ----
 // The same layout XOffset's "xoffset inline" row uses (character.hpp), for every rival
@@ -72,22 +90,15 @@ struct CharacterInline {
   std::vector<std::pair<uint64_t, Item>> items; std::vector<Position> path; std::vector<float> attributes;
   std::vector<InlineEquip> equips; std::vector<Skill> skills;
 };
-// Insert or assign; returns the position, which the tuned loop erases without a second search.
-inline auto items_upsert(std::vector<std::pair<uint64_t, Item>>& v, uint64_t k, const Item& it) {
-  auto p = std::lower_bound(v.begin(), v.end(), k, [](const auto& e, uint64_t key) { return e.first < key; });
-  if (p != v.end() && p->first == k) { p->second = it; return p; }
-  return v.insert(p, {k, it});
-}
 }  // namespace stdm
 
 // Copies a Character into a model with the inline equipment layout (std or cista).
 template <class Ch> inline void fill_inline(Ch& r, const stdm::Character& c) {
   r.id = c.id; r.name = c.name; r.level = c.level; r.healthpoint = c.healthpoint; r.manapoint = c.manapoint; r.speed = c.speed;
   r.pos = {c.pos.x, c.pos.y, c.pos.z};
-  for (const auto& kv : c.items) {
-    const auto& it = kv.second;
-    if constexpr (requires { r.items.emplace_back(kv.first, it); }) r.items.emplace_back(kv.first, it);   // sorted vector
-    else { auto& x = r.items[kv.first]; x.id = it.id; x.number = it.number; x.uuid = it.uuid; x.timestamp = it.timestamp; }
+  for (const auto& [k, it] : c.items) {   // already sorted by key
+    auto& e = r.items.emplace_back(); e.first = k;
+    e.second.id = it.id; e.second.number = it.number; e.second.uuid = it.uuid; e.second.timestamp = it.timestamp;
   }
   for (const auto& p : c.path) { r.path.emplace_back(); r.path.back() = {p.x, p.y, p.z}; }
   for (float a : c.attributes) r.attributes.push_back(a);
@@ -121,7 +132,7 @@ inline stdm::Character make_character() {
   c.pos.x = r.fl(); c.pos.y = r.fl(); c.pos.z = r.fl();
   for (int i = 0; i < 64; ++i) {
     uint64_t k = r.u64(); stdm::Item it{}; it.id = r.u32(); it.uuid = r.u64(); it.number = r.u32(); it.timestamp = r.u64();
-    stdm::items_set(c.items, k, it);
+    items_set(c.items, k, it);
   }
   for (int i = 0; i < 16; ++i) { stdm::Position p{}; p.x = r.fl(); p.y = r.fl(); p.z = r.fl(); c.path.push_back(p); }
   for (int i = 0; i < 16; ++i) c.attributes.push_back(r.fl());
@@ -179,7 +190,7 @@ inline void observe(const T& value) {
 }
 
 // The loop body for every model with the 2024 member names (std, cista, XOffset).
-// items_set / items_erase are found by argument-dependent lookup on the model's map type.
+// set / erase are the model's own map calls (items_set / items_erase for the flat maps).
 template <class Ch, class ItemT, class SetFn, class EraseFn>
 inline void rw_once(Ch& r, const OpSet& o, SetFn&& set, EraseFn&& erase) {
   r.level += 1; r.healthpoint += 1; r.manapoint += 1; r.speed += 1;
@@ -244,7 +255,7 @@ inline void rw_tuned(Ch& r, const OpSet& o, UpsertFn&& upsert, EraseAtFn&& erase
   r.speed -= 1; r.manapoint -= 1; r.healthpoint -= 1; r.level -= 1;
 }
 
-// ---- checksum over every field (items order-independent: cista's map is a hash map) ----
+// ---- checksum over every field ----
 inline uint64_t mix(uint64_t h, uint64_t v) { return (h ^ (v + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2))) * 0xff51afd7ed558ccdull; }
 inline uint64_t fbits(float f) { return std::bit_cast<uint32_t>(f); }
 template <class S> inline std::string_view sv(const S& s) {

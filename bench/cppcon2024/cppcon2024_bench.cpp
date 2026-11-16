@@ -17,7 +17,7 @@
 #define MSGPACK_NO_BOOST 1
 #include <msgpack.hpp>
 #include "zpp_bits.h"
-#include <cista/containers/hash_map.h>
+#include <cista/containers/pair.h>
 #include <cista/containers/string.h>
 #include <cista/containers/vector.h>
 #include <cista/mode.h>
@@ -44,7 +44,9 @@ using namespace cc24;
 // ============================ XOffset 4.0 model ============================
 #include "character.hpp"
 
-// ============================ cista models (as 2024: raw and offset) ============================
+// ============================ cista models (raw and offset) ============================
+// items: cista's vector of cista::pair kept sorted by key, the same flat map every other
+// model uses. The 2024 original used cista's hash_map here, a different kind of container.
 #define CC24_CISTA_MODEL(NS)                                                                                   \
   namespace cista_##NS {                                                                                      \
   struct Skill { uint32_t id, level; };                                                                       \
@@ -54,7 +56,7 @@ using namespace cc24;
                  cista::NS::vector<float> attributes; };                                                      \
   struct Character {                                                                                          \
     uint64_t id; cista::NS::string name; uint32_t level; float healthpoint, manapoint, speed; Position pos;   \
-    cista::NS::hash_map<uint64_t, Item> items; cista::NS::vector<Position> path;                             \
+    cista::NS::vector<cista::pair<uint64_t, Item>> items; cista::NS::vector<Position> path;                  \
     cista::NS::vector<float> attributes; cista::NS::vector<Equip> equips; cista::NS::vector<Skill> skills;   \
   };                                                                                                          \
   /* tuned layout: equipment attributes inline up to 8 (the "xoffset inline" layout) */                       \
@@ -62,7 +64,7 @@ using namespace cc24;
                        cc24::InlineAttrs<cista::NS::vector<float>> attributes; };                             \
   struct CharacterInline {                                                                                    \
     uint64_t id; cista::NS::string name; uint32_t level; float healthpoint, manapoint, speed; Position pos;   \
-    cista::NS::hash_map<uint64_t, Item> items; cista::NS::vector<Position> path;                             \
+    cista::NS::vector<cista::pair<uint64_t, Item>> items; cista::NS::vector<Position> path;                  \
     cista::NS::vector<float> attributes; cista::NS::vector<InlineEquip> equips;                               \
     cista::NS::vector<Skill> skills;                                                                          \
   };                                                                                                          \
@@ -119,16 +121,16 @@ template <class F> static double time_rw(F&& f) {
 static void bench_std_rw() {
   stdm::Character c = g_char;
   put("std (shared)", "rw", time_rw([&](const OpSet& o) {
-    rw_once<stdm::Character, stdm::Item>(c, o, [](auto& m, uint64_t k, const stdm::Item& it) { stdm::items_set(m, k, it); },
-                                           [](auto& m, uint64_t k) { stdm::items_erase(m, k); }); }));
+    rw_once<stdm::Character, stdm::Item>(c, o, [](auto& m, uint64_t k, const stdm::Item& it) { items_set(m, k, it); },
+                                           [](auto& m, uint64_t k) { items_erase(m, k); }); }));
   g_rw_sum = checksum(c);
   // tuned: inline equipment attributes and the bulk calls (see rw_tuned)
   stdm::CharacterInline t{}; fill_inline(t, g_char);
   expect("std inline", checksum(t), g_sum);
   put("std inline", "rw", time_rw([&](const OpSet& o) {
     rw_tuned<stdm::CharacterInline, stdm::Item, stdm::Position>(t, o,
-      [](auto& m, uint64_t k, const stdm::Item& it) { return stdm::items_upsert(m, k, it); },
-      [](auto& m, auto pos) { m.erase(pos); }); }));
+      [](auto& m, uint64_t k, const stdm::Item& it) { return items_upsert(m, k, it); },
+      [](auto& m, auto pos) { items_erase_at(m, pos); }); }));
   expect("std inline rw", checksum(t), g_rw_sum);
 }
 
@@ -520,11 +522,14 @@ static void bench_capnp() {
     stdm::Character d{}; cp_decode(wf.asPtr(), d); return d.id; }));
 }
 
-// ============================ cista (raw and offset, as 2024; containers are cista's own) ============================
+// ============================ cista (raw and offset; containers are cista's own) ============================
 template <class Ch> static void fill_cista(Ch& r, const stdm::Character& c) {
   r.id = c.id; r.name = c.name; r.level = c.level; r.healthpoint = c.healthpoint; r.manapoint = c.manapoint; r.speed = c.speed;
   r.pos = {c.pos.x, c.pos.y, c.pos.z};
-  for (const auto& [k, it] : c.items) { auto& x = r.items[k]; x.id = it.id; x.number = it.number; x.uuid = it.uuid; x.timestamp = it.timestamp; }
+  for (const auto& [k, it] : c.items) {   // already sorted by key
+    auto& e = r.items.emplace_back(); e.first = k;
+    e.second.id = it.id; e.second.number = it.number; e.second.uuid = it.uuid; e.second.timestamp = it.timestamp;
+  }
   for (const auto& p : c.path) { r.path.emplace_back(); r.path.back() = {p.x, p.y, p.z}; }
   for (float a : c.attributes) r.attributes.push_back(a);
   for (const auto& e : c.equips) {
@@ -557,12 +562,13 @@ template <class Ch, class ItemT, class PosT, cista::mode Mode, bool Tuned> stati
     fill_inline(r, g_char);
     put(lib, "rw", time_rw([&](const OpSet& o) {
       rw_tuned<Ch, ItemT, PosT>(r, o,
-        [](auto& m, uint64_t k, const ItemT& it) { auto pos = m.emplace(k, it).first; pos->second = it; return pos; },
-        [](auto& m, auto pos) { m.erase(pos); }); }));
+        [](auto& m, uint64_t k, const ItemT& it) { return items_upsert(m, k, it); },
+        [](auto& m, auto pos) { items_erase_at(m, pos); }); }));
   } else {
     fill_cista(r, g_char);
     put(lib, "rw", time_rw([&](const OpSet& o) {
-      rw_once<Ch, ItemT>(r, o, [](auto& m, uint64_t k, const ItemT& it) { m[k] = it; }, [](auto& m, uint64_t k) { m.erase(k); }); }));
+      rw_once<Ch, ItemT>(r, o, [](auto& m, uint64_t k, const ItemT& it) { items_set(m, k, it); },
+                         [](auto& m, uint64_t k) { items_erase(m, k); }); }));
   }
   expect(lib, checksum(r), g_rw_sum);
 }
