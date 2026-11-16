@@ -67,24 +67,48 @@ def main():
         out.append(f"| {lib} | {Y2024[lib][2]:,} | {Y2024[lib][3]:,} | {g(lib, 'bytes'):,.0f} | {g(lib, 'bytes_zstd3'):,.0f} |")
     out.append(f"\nXOffset after the read/write rounds (report-only): save_verified {g('xoffset 4.0', 'bytes_after_rw'):,.0f} B, "
                f"save_compact {g('xoffset 4.0', 'bytes_after_rw_compact'):,.0f} B.")
+    # The tuned layout and loop, the same for every model that can express it.
     inline = "xoffset inline"
-    if g(inline, "rw") is not None:
-        out.extend(["", "### XOffset Character with inline equipment attributes", "",
-                    "| Metric | Original | Inline | Inline ÷ fastest rival |",
-                    "| --- | ---: | ---: | ---: |"])
-        for metric, rivals in (
-            ("sr_reuse", ORDER[1:]),
-            ("sr_fresh", ORDER[1:]),
-            ("rw", ("std (shared)", "Protocol Buffers", "cista raw", "cista offset")),
-        ):
-            original = g("xoffset 4.0", metric)
-            value = g(inline, metric)
-            best = min(g(lib, metric) for lib in rivals)
-            out.append(f"| {metric} (ns) | {original:.1f} | {value:.1f} | {value / best:.3f} |")
-        for metric in ("bytes", "bytes_zstd3", "bytes_after_rw_zstd3"):
-            original = g("xoffset 4.0", metric)
-            value = g(inline, metric)
-            out.append(f"| {metric} (B) | {original:.0f} | {value:.0f} | |")
+    if g(inline, "rw") is not None and g("std inline", "rw") is not None:
+        ir, ifr, irw = g(inline, "sr_reuse"), g(inline, "sr_fresh"), g(inline, "rw")
+        out += ["", "### Tuned layout and loop: read/write (ns per iteration)", "",
+                "| Library | Tuning applied | 2024 layout | Tuned | XOffset inline ÷ lib |",
+                "| --- | --- | ---: | ---: | ---: |"]
+        tuned_rw = (
+            (inline, "xoffset 4.0", "inline attributes, range append, erase at position; edit() per iteration"),
+            ("std inline", "std (shared)", "inline attributes, range insert, erase at position"),
+            ("Protocol Buffers bulk", "Protocol Buffers", "attributes added as one range (no inline array in a message)"),
+            ("cista raw inline", "cista raw", "inline attributes, range insert, erase at position"),
+            ("cista offset inline", "cista offset", "inline attributes, range insert, erase at position"),
+        )
+        for lib, base, what in tuned_rw:
+            out.append(f"| {lib} | {what} | {g(base, 'rw'):,.1f} | {g(lib, 'rw'):,.1f} | {irw / g(lib, 'rw'):.3f} |")
+        out += ["", "Report-only rows:", "", "| Row | ns |", "| --- | ---: |",
+                f"| xoffset inline, one edit() around all iterations of a round | {g(inline, 'rw_one_scope'):,.1f} |",
+                f"| xoffset bulk (2024 layout, bulk calls, edit() per iteration) | {g('xoffset bulk', 'rw'):,.1f} |"]
+        out += ["", "### Tuned layout: send + receive (ns per message)", "",
+                "| Library | reuse | fresh | XOffset inline ÷ lib (reuse) | XOffset inline ÷ lib (fresh) | raw bytes | zstd-3 |",
+                "| --- | ---: | ---: | ---: | ---: | ---: | ---: |"]
+        for lib in (inline, "zpp::bits inline", "cista raw inline", "cista offset inline"):
+            r, f = g(lib, "sr_reuse"), g(lib, "sr_fresh")
+            out.append(f"| {lib} | {r:,.1f} | {f:,.1f} | {ir / r:.3f} | {ifr / f:.3f} | {g(lib, 'bytes'):,.0f} | {g(lib, 'bytes_zstd3'):,.0f} |")
+        out.append(f"\nXOffset inline after the read/write rounds (report-only): save_verified {g(inline, 'bytes_after_rw'):,.0f} B "
+                   f"(zstd-3 {g(inline, 'bytes_after_rw_zstd3'):,.0f}), save_compact {g(inline, 'bytes_after_rw_compact'):,.0f} B "
+                   f"(zstd-3 {g(inline, 'bytes_after_rw_compact_zstd3'):,.0f}).")
+        # One update and one message: what a server tick pays per changed object.
+        out += ["", "### One read/write iteration + one send + receive (reuse), ns (sum of the medians above)", "",
+                "| Library | 2024 layout | Tuned | XOffset ÷ lib (2024 layout) | XOffset inline ÷ lib (tuned) |",
+                "| --- | ---: | ---: | ---: | ---: |"]
+        x0, x1 = xrw + xr, irw + ir
+        total = (
+            ("xoffset", x0, x1),
+            ("zpp::bits (std model)", g("std (shared)", "rw") + g("zpp::bits", "sr_reuse"), g("std inline", "rw") + g("zpp::bits inline", "sr_reuse")),
+            ("Protocol Buffers", g("Protocol Buffers", "rw") + g("Protocol Buffers", "sr_reuse"), g("Protocol Buffers bulk", "rw") + g("Protocol Buffers", "sr_reuse")),
+            ("cista raw", g("cista raw", "rw") + g("cista raw", "sr_reuse"), g("cista raw inline", "rw") + g("cista raw inline", "sr_reuse")),
+            ("cista offset", g("cista offset", "rw") + g("cista offset", "sr_reuse"), g("cista offset inline", "rw") + g("cista offset inline", "sr_reuse")),
+        )
+        for lib, t0, t1 in total:
+            out.append(f"| {lib} | {t0:,.1f} | {t1:,.1f} | {x0 / t0:.3f} | {x1 / t1:.3f} |")
     print("\n".join(out))
 
 
