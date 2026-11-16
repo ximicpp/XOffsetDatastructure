@@ -110,6 +110,7 @@ namespace XOffsetDatastructure {
         template<class T> void shift_rebase_moved(T*, std::size_t, std::int32_t) noexcept;
         template<class T> void empty_vacated_slot(T*) noexcept;
         template<class T> void zero_implicit_padding(T*) noexcept;
+        template<class T> void scrub_implicit_padding(T*) noexcept;
         template<class T> consteval bool subtree_copy_supported();
         template<class T> bool subtree_copy_assign(XFixedVector<T>&, const XFixedVector<T>&);
 #if defined(XOFFSET_TEST_HOOKS)
@@ -301,6 +302,47 @@ namespace XOffsetDatastructure {
 #endif
 #ifndef XOFFSET_INDETERMINATE
 #define XOFFSET_INDETERMINATE
+#endif
+
+// ---- Hardening switches (docs/V2_THREAT_MODEL.md, section 4.1) -----------
+// Speed first (2026-11-16). The measures below cost time on the mutate
+// and send paths and guard only against stale bytes on the wire (threat T5)
+// or against a caller's own mistake, so each is OFF unless a build asks for
+// it: -DXOFFSET_<NAME>=1 for one, -DXOFFSET_HARDENED=1 for every one the
+// build does not set itself (the behaviour up to 4.0.0). They change inline
+// functions: define them the same way in every translation unit of a program.
+// save_compact never emits stale bytes, with or without them.
+//   XOFFSET_SCRUB_POPPED     M4: pop_back() zeroes the removed element.
+//   XOFFSET_SCRUB_ERASED     M4: clear(), a shrinking resize(), erase and a
+//                            shorter assignment zero the bytes they vacate.
+//   XOFFSET_SCRUB_PADDING    M6: implicit padding inside stored elements is
+//                            zeroed when the library constructs or copies them.
+//   XOFFSET_PIN_QUARANTINE   a block retired inside an edit() / read() scope
+//                            is not reused before the scope closes, so a plain
+//                            reference the operation invalidated still reads
+//                            its old bytes.
+//   XOFFSET_SAVE_SELF_CHECK  save_verified(_into) re-checks the arena header
+//                            and that the output does not overlap the source.
+// Not switches, because deltas rely on them (a hole's bytes and the bytes
+// past used_end are zero on both sides): a retired block is always zeroed
+// (M3) and a reset always zeroes the used payload (N2).
+#ifndef XOFFSET_HARDENED
+#  define XOFFSET_HARDENED 0
+#endif
+#ifndef XOFFSET_SCRUB_POPPED
+#  define XOFFSET_SCRUB_POPPED XOFFSET_HARDENED
+#endif
+#ifndef XOFFSET_SCRUB_ERASED
+#  define XOFFSET_SCRUB_ERASED XOFFSET_HARDENED
+#endif
+#ifndef XOFFSET_SCRUB_PADDING
+#  define XOFFSET_SCRUB_PADDING XOFFSET_HARDENED
+#endif
+#ifndef XOFFSET_PIN_QUARANTINE
+#  define XOFFSET_PIN_QUARANTINE XOFFSET_HARDENED
+#endif
+#ifndef XOFFSET_SAVE_SELF_CHECK
+#  define XOFFSET_SAVE_SELF_CHECK XOFFSET_HARDENED
 #endif
 
     namespace fixed_detail {
@@ -1328,9 +1370,11 @@ namespace XOffsetDatastructure {
             // reference the container's own rules invalidated reads garbage).
             if (growth_policy_ == XGrowPolicy::Relocating) stress_poison_block(ptr, bytes);
 #endif
+#if XOFFSET_PIN_QUARANTINE
             // Inside a pin scope a retired block is not reused until the
             // scope closes: plain references into it stay harmless.
             if (pinned_) [[unlikely]] return quarantine_block(ptr, bytes);
+#endif
             const auto base = reinterpret_cast<std::uintptr_t>(buffer_.data());
             const auto address = reinterpret_cast<std::uintptr_t>(ptr);
             FreeTable* table = free_table_.get();
@@ -2155,6 +2199,9 @@ namespace XOffsetDatastructure {
             const auto offset = static_cast<std::uint32_t>(address - base);
             // M3 (threat model T5/P1): a block becomes a hole only after its old
             // contents are cleared, so emitted holes need no per-save scrub.
+            // Not a hardening switch: a delta from touch marks sends a hole
+            // only when it comes or goes, so both sides rely on its bytes
+            // being zero.
             // A large block's whole pages go back to the OS instead (Linux,
             // XOFFSET_RETIRE_DISCARD_BYTES): a vector that outgrew its block in
             // a long-lived buffer leaves a hole that later, larger requests do
@@ -3701,11 +3748,6 @@ namespace XOffsetDatastructure {
         // head lies inside the other's owned tree. On by default only in debug
         // builds; release builds rely on the caller not moving a container
         // into (or out of) its own subobject.
-// pop_back() zeroes the removed element's bytes (threat model M4) only when
-// this is 1; by default they stay in spare capacity until overwritten.
-#ifndef XOFFSET_SCRUB_POPPED
-#  define XOFFSET_SCRUB_POPPED 0
-#endif
 #if !defined(XOFFSET_MOVE_OWNERSHIP_CHECKS)
 #  if defined(NDEBUG)
 #    define XOFFSET_MOVE_OWNERSHIP_CHECKS 0
@@ -4157,7 +4199,7 @@ namespace XOffsetDatastructure {
             } else {
                 std::construct_at(dst);
             }
-            detail::zero_implicit_padding(dst);
+            detail::scrub_implicit_padding(dst);
         }
 
         template <typename T, typename Src, typename Alloc>
@@ -4189,7 +4231,7 @@ namespace XOffsetDatastructure {
             } else {
                 std::construct_at(dst, static_cast<const CleanSrc&>(src));
             }
-            detail::zero_implicit_padding(dst);
+            detail::scrub_implicit_padding(dst);
         }
 
         template <typename T, typename Alloc, typename... Args>
@@ -4216,7 +4258,7 @@ namespace XOffsetDatastructure {
             } else {
                 std::construct_at(dst, std::forward<Args>(args)...);
             }
-            detail::zero_implicit_padding(dst);
+            detail::scrub_implicit_padding(dst);
         }
 
         template <typename T>
@@ -4523,8 +4565,13 @@ namespace XOffsetDatastructure {
                 store_inline(nullptr, 0);
                 return;
             }
+#if XOFFSET_SCRUB_ERASED
             // M4: old characters never stay behind as spare capacity.
             if (auto* ptr = data()) std::memset(ptr, 0, std::size_t(size_) + 1u);
+#else
+            // Only the terminator; the old characters stay in the block.
+            if (auto* ptr = data()) ptr[0] = '\0';
+#endif
             size_ = 0;
         }
 
@@ -4580,8 +4627,12 @@ namespace XOffsetDatastructure {
                     const auto old_size = size_;
                     std::memmove(chars, rhs.data(), new_size);
                     chars[new_size] = '\0';
+#if XOFFSET_SCRUB_ERASED
                     // M4: zero the old characters after the terminator.
                     if (old_size > new_size) std::memset(chars + new_size + 1, 0, old_size - new_size);
+#else
+                    (void)old_size;
+#endif
                     size_ = new_size;
                     return;
                 }
@@ -4624,8 +4675,13 @@ namespace XOffsetDatastructure {
             if (new_size <= capacity_) {
                 const auto old_size = size_;
                 std::memmove(old_data, rhs.data(), rhs.size());
+#if XOFFSET_SCRUB_ERASED
                 // M4: zero the terminator and any old characters after it.
                 std::memset(old_data + new_size, 0, std::size_t(old_size > new_size ? old_size - new_size : 0) + 1u);
+#else
+                old_data[new_size] = '\0';
+                (void)old_size;
+#endif
                 size_ = new_size;
                 return;
             }
@@ -4693,7 +4749,7 @@ namespace XOffsetDatastructure {
             if (!is_inline() && count - 1u < std::size_t(capacity_ - size_)) [[likely]] {
                 // Nonempty and fits the out-of-line block (capacity_ != 0
                 // without the inline flag: bound, live block, below
-                // MAX_PAYLOAD). The spare bytes are zero (M4).
+                // MAX_PAYLOAD).
                 auto* const chars = fixed_detail::resolve_rel32_live<char>(&data_delta, data_delta);
                 if (count <= 16) fixed_detail::move_short_bytes(chars + size_, rhs.data(), count);
                 else std::memmove(chars + size_, rhs.data(), count);
@@ -4960,9 +5016,13 @@ namespace XOffsetDatastructure {
                     const size_type old_size = size_;
                     std::memmove(static_cast<void*>(items), other.data(), std::size_t(count) * sizeof(T));
                     size_ = count;
+#if XOFFSET_SCRUB_ERASED
                     if (old_size > count)
                         std::memset(static_cast<void*>(items + count), 0, std::size_t(old_size - count) * sizeof(T));
-                    for (size_type i = 0; i < count; ++i) detail::zero_implicit_padding(items + i);
+#else
+                    (void)old_size;
+#endif
+                    for (size_type i = 0; i < count; ++i) detail::scrub_implicit_padding(items + i);
                     XOFFSET_DETAIL_SUBTREE_COUNT(pod_hits, 1);
                     return *this;
                 }
@@ -5244,7 +5304,7 @@ namespace XOffsetDatastructure {
             if (wanted <= capacity_) [[likely]] {
                 auto* tail = data() + old_size;
                 std::memmove(tail, values.data(), values.size_bytes());
-                for (size_type i = 0; i < added; ++i) detail::zero_implicit_padding(tail + i);
+                for (size_type i = 0; i < added; ++i) detail::scrub_implicit_padding(tail + i);
                 size_ = wanted;
                 return;
             }
@@ -5254,7 +5314,7 @@ namespace XOffsetDatastructure {
             rebuild(wanted, new_capacity, [&](T* dst, size_type i) {
                 const auto& element = i < old_size ? old[i] : values[i - old_size];
                 std::construct_at(dst, element);
-                detail::zero_implicit_padding(dst);
+                detail::scrub_implicit_padding(dst);
             });
         }
 
@@ -5292,7 +5352,7 @@ namespace XOffsetDatastructure {
             const auto alloc = bound_binding();
             // D8a: a container that already has capacity regrows to
             // max(count, 2 * capacity), like libc++ assign; the first block
-            // stays exact. Fresh blocks are zero, so the spare tail is too (M4).
+            // stays exact.
             const size_type new_cap = capacity_ == 0 ? count
                 : std::max(count, static_cast<size_type>(
                       std::min<std::uint64_t>(max_size(), std::uint64_t(capacity_) * 2u)));
@@ -5769,7 +5829,8 @@ namespace XOffsetDatastructure {
         void erase_index(size_type index) {
             if (index >= size_) return;
             if (index + 1 == size_) {
-                // erase keeps M4 when pop_back does not zero the slot.
+                // With XOFFSET_SCRUB_ERASED, erase zeroes the slot when
+                // pop_back does not.
                 pop_back();
 #if !XOFFSET_SCRUB_POPPED
                 scrub(size_, size_ + 1);
@@ -5784,7 +5845,9 @@ namespace XOffsetDatastructure {
                 T* const items = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta);
                 std::memmove(items + index, items + index + 1, std::size_t(n - index - 1) * sizeof(T));
                 size_ = n - 1u;
+#if XOFFSET_SCRUB_ERASED
                 std::memset(static_cast<void*>(items + (n - 1u)), 0, sizeof(T));
+#endif
             } else if constexpr (detail::shift_relocate_supported<T>()) {
                 // SHIFT: same bytes and deltas as the loop below, in one
                 // memmove plus an inline-head restart of the moved run.
@@ -6013,12 +6076,17 @@ namespace XOffsetDatastructure {
         }
 
     private:
-        // M4 (threat model T5/P2): storage of destroyed elements is zeroed, so
-        // a later save never emits the old values as spare capacity.
-        void scrub(size_type from, size_type to) noexcept {
+        // M4 (threat model T5/P2, XOFFSET_SCRUB_ERASED): storage of destroyed
+        // elements is zeroed, so a later save does not emit the old values as
+        // spare capacity. Without it the bytes stay until an append
+        // constructs over them.
+        XOFFSET_DETAIL_MOVE_INLINE void scrub([[maybe_unused]] size_type from,
+                                              [[maybe_unused]] size_type to) noexcept {
+#if XOFFSET_SCRUB_ERASED
             if (to <= from) return;
             if (auto* items = data())
                 std::memset(static_cast<void*>(items + from), 0, std::size_t(to - from) * sizeof(T));
+#endif
         }
 
         void copy_from(const XFixedVector& other) {
@@ -6057,7 +6125,7 @@ namespace XOffsetDatastructure {
         void assign_trivial_copy(const XFixedVector& other) {
             assign_range(std::span<const T>(other.data(), other.size_));
             auto* items = data();
-            for (size_type i = 0; i < size_; ++i) detail::zero_implicit_padding(items + i);
+            for (size_type i = 0; i < size_; ++i) detail::scrub_implicit_padding(items + i);
             XOFFSET_DETAIL_SUBTREE_COUNT(pod_hits, 1);
         }
 
@@ -6328,7 +6396,7 @@ namespace XOffsetDatastructure {
                 std::destroy_at(&dst->first);
                 XOFFSET_RETHROW;
             }
-            detail::zero_implicit_padding(dst);  // between key and value (M6)
+            detail::scrub_implicit_padding(dst);  // between key and value (M6)
         }
     };
 
@@ -7869,7 +7937,7 @@ namespace XOffsetDatastructure {
                     using member = schema::member_t<T, decltype(index)::value>;
                     relocate_construct(&(member::get(*dst)), member::get(src));
                 });
-                detail::zero_implicit_padding(dst);
+                detail::scrub_implicit_padding(dst);
             }
         }
     } // namespace fixed_detail
@@ -9263,6 +9331,15 @@ namespace XOffsetDatastructure {
                 for (const auto& r : padding_ranges<T>)
                     for (std::size_t i = 0; i < r.count; ++i) std::memset(bytes + r.offset + i * r.stride, 0, r.bytes);
             }
+        }
+        // M6 at the places the library constructs or copies a stored element:
+        // zero_implicit_padding with XOFFSET_SCRUB_PADDING, nothing without
+        // (the padding then holds whatever the source value held there).
+        template <class T>
+        XOFFSET_DETAIL_PRE26_INLINE void scrub_implicit_padding([[maybe_unused]] T* object) noexcept {
+#if XOFFSET_SCRUB_PADDING
+            zero_implicit_padding(object);
+#endif
         }
     } // namespace detail
 

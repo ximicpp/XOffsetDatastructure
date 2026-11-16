@@ -149,6 +149,10 @@ template <class T> std::string digest_of(const T& value) {
 }
 
 // ---- hygiene: padding, spare capacity, block tails, inline tails ----------
+// Block tails and spare capacity are zero only with the scrub switches
+// (XOFFSET_HARDENED); inline tails always are.
+constexpr bool kScrubBlocks = XOFFSET_SCRUB_ERASED && XOFFSET_SCRUB_POPPED;
+constexpr bool kScrubPadding = XOFFSET_SCRUB_PADDING != 0;
 bool all_zero(const void* p, std::size_t n) {
     auto* b = static_cast<const unsigned char*>(p);
     for (std::size_t i = 0; i < n; ++i) if (b[i]) return false;
@@ -177,7 +181,8 @@ void hygiene(const T& value, const std::string& where, bool padding) {
         } else if (head.capacity_ != 0) {
             const auto* data = value.data();
             const auto block = xo::fixed_detail::block_bytes_of(head.capacity_ + 1u);
-            if (!all_zero(data + head.size_, block - head.size_)) fail(where + ": string tail not zero");
+            if (data[head.size_] != '\0') fail(where + ": string not terminated");
+            if (kScrubBlocks && !all_zero(data + head.size_, block - head.size_)) fail(where + ": string tail not zero");
         }
     } else if constexpr (xd::is_fixed_vector_v<T>) {
         using E = typename T::value_type;
@@ -186,11 +191,11 @@ void hygiene(const T& value, const std::string& where, bool padding) {
             auto* data = reinterpret_cast<const unsigned char*>(head.data());
             const auto block = xo::fixed_detail::block_bytes_of(static_cast<std::uint32_t>(head.capacity_ * sizeof(E)));
             const auto live = std::size_t(head.size_) * sizeof(E);
-            if (!all_zero(data + live, block - live)) fail(where + ": spare capacity not zero");
+            if (kScrubBlocks && !all_zero(data + live, block - live)) fail(where + ": spare capacity not zero");
         }
         for (const auto& element : value) {
             auto* bytes = reinterpret_cast<const unsigned char*>(&element);
-            if (padding)
+            if (padding && kScrubPadding)
                 for (const auto& r : xd::padding_ranges<E>)
                     for (std::size_t i = 0; i < r.count; ++i)
                         if (!all_zero(bytes + r.offset + i * r.stride, r.bytes)) fail(where + ": padding not zero");

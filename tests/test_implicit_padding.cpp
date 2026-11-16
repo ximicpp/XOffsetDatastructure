@@ -1,7 +1,10 @@
 // M6 (threat model T5/P3): has_implicit_padding_v finds bytes no field covers,
-// in the type itself or anywhere a wire can reach from it; and the library
-// zeroes the padding of every container element it builds or moves, so a
-// wire carries neither stale arena bytes nor the caller's stack through it.
+// in the type itself or anywhere a wire can reach from it (every build); and
+// with XOFFSET_SCRUB_PADDING (this program is built again as *_hardened with
+// XOFFSET_HARDENED=1) the library zeroes the padding of every container
+// element it builds or moves, so a wire carries neither stale arena bytes nor
+// the caller's stack through it. Without the switch the padding is whatever
+// the value held, and the test checks the content only.
 #include "xoffsetdatastructure.hpp"
 
 #include <cstdint>
@@ -147,22 +150,48 @@ std::string build(unsigned char garbage) {
     }
     r.resources.erase(3);                              // shifts entries (relocation)
     r.entries.erase(r.entries.begin() + 2);
+#if XOFFSET_SCRUB_PADDING
     for (const auto& e : r.entries) expect_zero_padding(e, "vector element");
     for (const auto& kv : r.resources) expect_zero_padding(kv, "map entry");
     for (const auto& n : r.named) expect_zero_padding(n, "element with string");
+#endif
     return b.save_verified();
+}
+
+// The content, whatever the padding holds.
+void expect_content(const std::string& wire) {
+    auto b = xo::TypedXBuffer<padrt::Root>::load(wire, xo::XBuffer::maximum_capacity(1u << 22));
+    const auto& r = b.plain_root();
+    if (r.entries.size() != 15 || r.resources.size() != 15 || r.named.size() != 16) fail("content: sizes");
+    for (std::size_t k = 0; k < r.entries.size(); ++k) {
+        const auto i = k < 2 ? k : k + 1;   // entry 2 was erased
+        if (r.entries[k].tag != std::uint8_t(i) || r.entries[k].value != std::uint64_t(i) * 3) fail("content: entries");
+    }
+    for (std::int32_t i = 0; i < 16; ++i) {
+        const auto it = r.resources.find(i);
+        if (i == 3 ? it != r.resources.end() : (it == r.resources.end() || it->second != std::int64_t(i) * 7))
+            fail("content: resources");
+        if (r.named[std::size_t(i)].id != std::uint16_t(i) ||
+            r.named[std::size_t(i)].name.view() != "name-" + std::to_string(i))
+            fail("content: named");
+    }
 }
 
 void elements_have_zero_padding_and_wires_are_deterministic() {
     const auto a = build(0xAB);
     const auto c = build(0xCD);
+    expect_content(a);
+    expect_content(c);
+#if XOFFSET_SCRUB_PADDING && XOFFSET_SCRUB_ERASED
     if (a != c) fail("the same content with different garbage produced different wires");
     if (a.find(std::string(4, char(0xAB))) != std::string::npos)
         fail("caller or arena garbage reached the wire");
+#endif
 }
 } // namespace
 
 int main() {
+    // zero_implicit_padding itself (every build; save_compact uses it too).
     // BigArray: n (4 bytes) + 4 padding, then 4096 Interior {u8; 7 pad; u64}.
     expect_exact_zeroing<pad::BigArray>("BigArray", 8, sizeof(pad::Interior), 1, 8);
     {
@@ -178,6 +207,10 @@ int main() {
     expect_exact_zeroing<pad::Grid>("Grid", 0, sizeof(pad::Tail), 9, 16);
 
     elements_have_zero_padding_and_wires_are_deterministic();
+#if XOFFSET_SCRUB_PADDING
     std::cout << "implicit padding: 12 compile-time checks, element padding zeroed, wires deterministic\n";
+#else
+    std::cout << "implicit padding: 12 compile-time checks, content checked (XOFFSET_SCRUB_PADDING off)\n";
+#endif
     return 0;
 }
