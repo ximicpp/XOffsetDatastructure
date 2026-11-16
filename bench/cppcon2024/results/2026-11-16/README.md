@@ -1,5 +1,11 @@
 # Character benchmark validation, 2026-11-16
 
+> Superseded for the read/write claim. In this record the `xoffset inline` read/write row ran one
+> `edit()` around all iterations of a round and was compared with rivals on the 2024 layout and
+> per-element loop. With the same tuning applied to every rival (std, cista, Protocol Buffers), XOffset
+> ties Protocol Buffers, beats the std model and trails cista; see the "调优写法" tables in
+> [`bench/cppcon2024/README.md`](../../README.md). The send + receive results stand.
+
 Baseline `2fcce3f64045951fd92e27642582133ea67329d1` is the merge of [PR #286](https://github.com/ximicpp/XOffsetDatastructure/pull/286). Both final campaigns measured candidate `9d1b56feb5017b12f251397da8639f669a042907`. Entries are nanoseconds per message or iteration. Each campaign alternated nine baseline and candidate process pairs. Each process reports medians of five rounds with 50,000 messages and 100,000 read/write iterations per round. Ratios use the fastest rival within the same candidate process.
 
 | Platform | Metric | PR #286 XOffset | Audited original | Optimized XOffset | Fastest rival | Median ratio | Wins |
