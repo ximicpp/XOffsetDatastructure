@@ -71,7 +71,18 @@ template <class M, class P> void fill_patch(M& m, P& p, const SelfDirty& d, int6
     m.player_id = p.player_id; m.seq = seq;
     m.army_index.clear(); m.armies.clear();
     m.army_index.reserve(d.armies.size()); m.armies.reserve(d.armies.size());
+#if defined(_WIN32)
+    for (int32_t a : d.armies) {
+        m.army_index.emplace_back(a);
+        const auto& army = p.armies[std::size_t(a)];
+        if constexpr (requires { append_patch_army(m.armies, army); })
+            append_patch_army(m.armies, army);
+        else
+            copy_army(m.armies.emplace_back(), army);
+    }
+#else
     for (int32_t a : d.armies) { m.army_index.emplace_back(a); copy_army(m.armies.emplace_back(), p.armies[std::size_t(a)]); }
+#endif
     m.items.clear();
     for (int32_t k : d.items) m.items[k] = p.items[k];
     m.city_changed = d.city ? 1 : 0;

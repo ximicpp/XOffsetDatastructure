@@ -31,12 +31,22 @@ std::string_view sv(const S& s) { return s.view(); }
 struct Rng {
     uint64_t state;
     explicit Rng(uint64_t seed) : state(seed) {}
+#if defined(__APPLE__) || defined(_WIN32)
+    static constexpr uint64_t step = 0x9e3779b97f4a7c15ull;
+    static constexpr uint64_t mix_word(uint64_t z) noexcept {
+        z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ull;
+        z = (z ^ (z >> 27)) * 0x94d049bb133111ebull;
+        return z ^ (z >> 31);
+    }
+    uint64_t next() { return mix_word(state += step); }
+#else
     uint64_t next() {
         uint64_t z = (state += 0x9e3779b97f4a7c15ull);
         z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ull;
         z = (z ^ (z >> 27)) * 0x94d049bb133111ebull;
         return z ^ (z >> 31);
     }
+#endif
     int32_t below(int32_t n) { return n <= 0 ? 0 : static_cast<int32_t>(next() % static_cast<uint64_t>(n)); }
     int32_t range(int32_t lo, int32_t hi) { return lo + below(hi - lo + 1); }
 };

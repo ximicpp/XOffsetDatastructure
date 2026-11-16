@@ -747,6 +747,235 @@ namespace detail {
         return sizeof(XWireHeaderV2) + w.cursor;
     }
 
+
+    template <class Root, std::size_t Member, std::size_t... I>
+    consteval bool flat_projection_members(std::index_sequence<I...>) {
+        return ((!compact_has_heads<typename schema::member_t<Root, I>::type>() || I == Member) && ...);
+    }
+
+    template <class Root, class Prefix, std::size_t... I>
+    consteval bool flat_prefix_matches(std::index_sequence<I...>) {
+        return ((std::is_same_v<schema::member_type_t<Root, I>, schema::member_type_t<Prefix, I>> &&
+                 schema::member_t<Root, I>::offset == schema::member_t<Prefix, I>::offset) && ...);
+    }
+
+    // Owns the output so a stable-layout wire can retain its framing across
+    // messages. The record and generated values are copied into its payload.
+    enum class FlatRecordFraming { retained, sized_slots = 2 };
+
+    template <class Root, std::size_t Member, class Element, FlatRecordFraming Framing = FlatRecordFraming::retained>
+    class FlatRecordWriter {
+        using Field = schema::member_t<Root, Member>;
+        static_assert(is_v1_wire_admitted_v<Root> && compact_direct_supported<Root>());
+        static_assert(std::is_same_v<typename Field::type, XVector<Element>>);
+        static_assert(std::is_trivially_copyable_v<Element> && !compact_has_heads<Element>());
+        static_assert(flat_projection_members<Root, Member>(
+            std::make_index_sequence<schema::member_count_v<Root>>{}));
+#ifdef XOFFSET_REJECT_IMPLICIT_PADDING
+        static_assert(!has_implicit_padding_v<Root>);
+#endif
+        static constexpr auto root_bytes = compact_root_end<Root>() - XWIRE_PAYLOAD_BEGIN;
+        static constexpr auto max_bytes = (XBufferCore::MAX_PAYLOAD - compact_root_end<Root>()) & ~std::size_t(7u);
+        static constexpr auto after_field = Field::offset + sizeof(typename Field::type);
+        static constexpr std::align_val_t wire_alignment{64};
+        struct Delete {
+            void operator()(char* wire) const noexcept { ::operator delete(wire, wire_alignment); }
+        };
+        std::unique_ptr<char, Delete> wire_;
+        std::size_t wire_size_ = 0;
+        std::uint32_t capacity_ = 0;
+        std::uint32_t size_ = 0;
+        struct NoSlots {};
+        // A slot keeps the V2 header and vector head for one troop count.
+        // Larger records reuse a dynamically sized compact buffer.
+        struct Slots {
+            std::array<std::unique_ptr<char, Delete>, 5> wires;
+            const char* current = nullptr;
+        };
+#if defined(_MSC_VER) && !defined(__clang__)
+        [[msvc::no_unique_address]]
+#else
+        [[no_unique_address]]
+#endif
+        std::conditional_t<Framing == FlatRecordFraming::sized_slots, Slots, NoSlots> slots_;
+
+        static constexpr std::size_t payload_extent(std::size_t count) noexcept {
+            return (count * sizeof(Element) + 7u) & ~std::size_t(7u);
+        }
+        static constexpr std::size_t wire_bytes(std::size_t count) noexcept {
+            return sizeof(XWireHeaderV2) + root_bytes + payload_extent(count);
+        }
+        static constexpr auto nonempty_delta = static_cast<std::int32_t>(root_bytes - Field::offset);
+
+        static std::span<const std::byte> sized_wire(const char* data) noexcept {
+            if (!data) return {};
+            std::uint32_t used;
+            std::memcpy(&used, data + offsetof(XWireHeaderV2, used_bytes), sizeof(used));
+            return {reinterpret_cast<const std::byte*>(data), sizeof(XWireHeaderV2) + used - XWIRE_PAYLOAD_BEGIN};
+        }
+
+        XOFFSET_DETAIL_WIRE_NOINLINE static char* open_slot(
+                std::unique_ptr<char, Delete>& slot, std::size_t count) {
+            const auto used = XWIRE_PAYLOAD_BEGIN + root_bytes + payload_extent(count);
+            std::unique_ptr<char, Delete> data(static_cast<char*>(::operator new(wire_bytes(count), wire_alignment)));
+            std::memset(data.get(), 0, wire_bytes(count));
+            const auto head = compact_wire_header<Root>(used);
+            std::memcpy(data.get(), &head, sizeof(head));
+            const auto size = static_cast<std::uint32_t>(count);
+            write_container_head(data.get() + sizeof(XWireHeaderV2), Field::offset,
+                                 size == 0 ? 0 : nonempty_delta, size, size);
+            slot = std::move(data);
+            return slot.get();
+        }
+
+        XOFFSET_DETAIL_WIRE_NOINLINE void resize_wire(std::size_t count) {
+            if (count > max_bytes / sizeof(Element))
+                XOFFSET_THROW(XException(XErrc::capacity_exceeded, "flat projection exceeds the wire limit"));
+            const auto extent = (count * sizeof(Element) + 7u) & ~std::size_t(7u);
+            const auto bytes = sizeof(XWireHeaderV2) + root_bytes + extent;
+            std::unique_ptr<char, Delete> next(static_cast<char*>(::operator new(bytes, wire_alignment)));
+            std::memset(next.get(), 0, bytes);
+            const auto head = compact_wire_header<Root>(XWIRE_PAYLOAD_BEGIN + root_bytes + extent);
+            std::memcpy(next.get(), &head, sizeof(head));
+            wire_ = std::move(next);
+            if constexpr (Framing == FlatRecordFraming::retained) {
+                wire_size_ = bytes;
+                capacity_ = static_cast<std::uint32_t>(count);
+            } else {
+                // Adding one reserves zero for the unallocated state.
+                capacity_ = static_cast<std::uint32_t>(count + 1);
+            }
+        }
+
+    public:
+        FlatRecordWriter() = default;
+        FlatRecordWriter(const FlatRecordWriter&) = delete;
+        FlatRecordWriter& operator=(const FlatRecordWriter&) = delete;
+
+        std::span<const std::byte> wire() const noexcept {
+            if constexpr (Framing == FlatRecordFraming::sized_slots)
+                return sized_wire(slots_.current);
+            else
+                return {reinterpret_cast<const std::byte*>(wire_.get()), wire_size_};
+        }
+
+#if defined(__APPLE__)
+        template <class Prefix = Root, class Prepare, class Generate>
+            requires std::is_invocable_r_v<std::size_t, Prepare&, Prefix&> &&
+                     std::is_nothrow_invocable_r_v<Element, Generate&, std::size_t>
+        XOFFSET_DETAIL_WIRE_INLINE std::size_t write(Prepare prepare, Generate generate) {
+            return write_impl<false, Prefix>(0, prepare, generate);
+        }
+
+        template <class Prefix = Root, class Prepare, class Generate>
+            requires std::is_nothrow_invocable_r_v<void, Prepare&, Prefix&> &&
+                     std::is_nothrow_invocable_r_v<Element, Generate&, std::size_t>
+        XOFFSET_DETAIL_WIRE_INLINE std::size_t write_counted(std::size_t count, Prepare prepare, Generate generate) {
+            return write_impl<true, Prefix>(count, prepare, generate);
+        }
+
+    private:
+        template <bool KnownCount, class Prefix, class Prepare, class Generate>
+        XOFFSET_DETAIL_WIRE_INLINE std::size_t write_impl(std::size_t count, Prepare& prepare, Generate& generate) {
+#else
+        template <class Prefix = Root, class Prepare, class Generate>
+            requires std::is_invocable_r_v<std::size_t, Prepare&, Prefix&> &&
+                     std::is_nothrow_invocable_r_v<Element, Generate&, std::size_t>
+        XOFFSET_DETAIL_WIRE_INLINE std::size_t write(Prepare prepare, Generate generate) {
+#endif
+            // A plain prefix can prepare the scalar fields without constructing
+            // the vector whose head is emitted separately below.
+            if constexpr (!std::is_same_v<Prefix, Root>) {
+                static_assert(std::is_standard_layout_v<Prefix> && std::is_trivially_copyable_v<Prefix>);
+                static_assert(Member + 1 == schema::member_count_v<Root> && after_field == sizeof(Root));
+                static_assert(schema::member_count_v<Prefix> == Member && sizeof(Prefix) >= Field::offset);
+                static_assert(flat_prefix_matches<Root, Prefix>(std::make_index_sequence<Member>{}));
+            }
+            Prefix root{};
+#if defined(__APPLE__)
+            if constexpr (!KnownCount) count = std::size_t(prepare(root));
+#else
+            const auto count = std::size_t(prepare(root));
+#endif
+            char* output;
+            if constexpr (Framing == FlatRecordFraming::retained) {
+                if (count > capacity_ || !wire_) [[unlikely]] resize_wire(count);
+                output = wire_.get();
+            } else {
+                if (count < slots_.wires.size()) [[likely]] {
+                    auto& slot = slots_.wires[count];
+                    output = slot ? slot.get() : open_slot(slot, count);
+                } else {
+                    if (count >= capacity_) [[unlikely]] resize_wire(count);
+                    output = wire_.get();
+                }
+            }
+#if defined(__APPLE__)
+            if constexpr (KnownCount) prepare(root);
+#endif
+            char* body = output + sizeof(XWireHeaderV2);
+            const auto* source = reinterpret_cast<const char*>(&root);
+            std::memcpy(body, source, Field::offset);
+            if constexpr (after_field < sizeof(Root))
+                std::memcpy(body + after_field, source + after_field, sizeof(Root) - after_field);
+            zero_padding_bytes<Root>(body);
+            if constexpr (root_bytes != sizeof(Root))
+                std::memset(body + sizeof(Root), 0, root_bytes - sizeof(Root));
+            const auto size = static_cast<std::uint32_t>(count);
+            if constexpr (Framing == FlatRecordFraming::retained) {
+                const auto delta = capacity_ == 0 ? 0 : nonempty_delta;
+                write_container_head(body, Field::offset, delta, size, capacity_);
+            } else if (count >= slots_.wires.size()) {
+                write_container_head(body, Field::offset, nonempty_delta, size, size);
+            }
+            char* data = body + root_bytes;
+#if defined(__APPLE__)
+            const auto store = [&](std::size_t i) noexcept {
+                const Element value = generate(i);
+                std::memcpy(data + i * sizeof(Element), &value, sizeof(Element));
+                zero_padding_bytes<Element>(data + i * sizeof(Element));
+            };
+            if constexpr (Framing == FlatRecordFraming::sized_slots) {
+                if (count <= 4) {
+                    if (count != 0) store(0);
+                    if (count > 1) store(1);
+                    if (count > 2) store(2);
+                    if (count > 3) store(3);
+                } else {
+                    for (std::size_t i = 0; i < count; ++i) store(i);
+                }
+            } else {
+                for (std::size_t i = 0; i < count; ++i) store(i);
+            }
+#else
+            for (std::size_t i = 0; i < count; ++i) {
+                const Element value = generate(i);
+                std::memcpy(data + i * sizeof(Element), &value, sizeof(Element));
+                zero_padding_bytes<Element>(data + i * sizeof(Element));
+            }
+#endif
+            if constexpr (Framing == FlatRecordFraming::retained) {
+                if (size_ > size) {
+                    char* unused = data + count * sizeof(Element);
+                    const auto removed = size_ - size;
+                    if (removed == 1) std::memset(unused, 0, sizeof(Element));
+                    else if (removed == 2) std::memset(unused, 0, 2 * sizeof(Element));
+                    else std::memset(unused, 0, removed * sizeof(Element));
+                }
+                size_ = size;
+                return wire_size_;
+            } else {
+                if constexpr (sizeof(Element) % 8 != 0)
+                    std::memset(data + count * sizeof(Element), 0, payload_extent(count) - count * sizeof(Element));
+                const auto used = static_cast<std::uint32_t>(XWIRE_PAYLOAD_BEGIN + root_bytes + payload_extent(count));
+                if (count >= slots_.wires.size())
+                    std::memcpy(output + offsetof(XWireHeaderV2, used_bytes), &used, sizeof(used));
+                slots_.current = output;
+                return wire_bytes(count);
+            }
+        }
+    };
+
     template<class T>
     void VerifiedPathsAccess::save_compact_into(XBufferCore& source, std::string& out, XCompactOptions options) {
         static_assert(compact_direct_supported<T>(),
