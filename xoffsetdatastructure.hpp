@@ -7549,12 +7549,24 @@ namespace XOffsetDatastructure {
             // the whole 1 KiB context for an aggregate initializer, with or
             // without [[indeterminate]], and for a default-initialized one
             // without the attribute.
+#if defined(__APPLE__) && defined(__clang__)
+            // Initialize the supplied resource directly rather than looking up
+            // the default and immediately replacing it.
+            WireValidationContext ctx{
+                .base = static_cast<const char*>(xbuf.get_address()),
+                .end = validated_end,
+                .segment = xbuf.arena(),
+                .upstream = upstream,
+                .retained = retained,
+            };
+#else
             XOFFSET_INDETERMINATE WireValidationContext ctx;
             ctx.base = static_cast<const char*>(xbuf.get_address());
             ctx.end = validated_end;
             ctx.segment = xbuf.arena();
             ctx.upstream = upstream;
             ctx.retained = retained;
+#endif
             if (ctx.segment->flags != 0 || ctx.segment->reserved0 != 0 || ctx.segment->reserved1 != 0) {
                 return wire_reject("wire validation: unsupported arena header flags");
             }
