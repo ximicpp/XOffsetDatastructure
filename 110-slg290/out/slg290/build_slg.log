@@ -1,0 +1,101 @@
+[1/15] Generating gen/slg_generated.h
+[2/15] Generating gen/slg.pb.cc, gen/slg.pb.h
+[3/15] Building CXX object CMakeFiles/flat_held_index_test.dir/tests/flat_held_index_test.cpp.o
+[4/15] Linking CXX executable flat_held_index_test
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[5/15] Building CXX object CMakeFiles/slg_bench.dir/gen/slg.pb.cc.o
+[6/15] Building CXX object CMakeFiles/uplink_frame_test.dir/tests/uplink_frame_test.cpp.o
+[7/15] Linking CXX executable uplink_frame_test
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[8/15] Building CXX object CMakeFiles/native_patch_copy_test.dir/tests/native_patch_copy_test.cpp.o
+[9/15] Linking CXX executable native_patch_copy_test
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[10/15] Building CXX object CMakeFiles/uplink_order_paths_test.dir/tests/uplink_order_paths_test.cpp.o
+[11/15] Linking CXX executable uplink_order_paths_test
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[12/15] Building CXX object CMakeFiles/packed_marches_test.dir/tests/packed_marches_test.cpp.o
+[13/15] Linking CXX executable packed_marches_test
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly
+[14/15] Building CXX object CMakeFiles/slg_bench.dir/bench/slg_bench.cpp.o
+In file included from /Volumes/XOffsetCS/perf-gate/src/slg290/bench/slg/bench/slg_bench.cpp:38:
+In file included from /Volumes/XOffsetCS/perf-gate/src/slg290/bench/slg/bench/cista_runner.hpp:21:
+In file included from /Volumes/XOffsetCS/competitors/sources/cista-v0.16/include/cista/serialization.h:13:
+In file included from /Volumes/XOffsetCS/competitors/sources/cista-v0.16/include/cista/containers.h:18:
+/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include/cista/containers/tuple.h:184:8: warning: 'aligned_storage_t' is deprecated [-Wdeprecated-declarations]
+  184 |   std::aligned_storage_t<get_total_size<Ts...>(), max_align_of<Ts...>()> mem_;
+      |        ^
+/Volumes/XOffsetCS/toolchain/p2996-d77eff1/bin/../include/c++/v1/__type_traits/aligned_storage.h:81:25: note: 'aligned_storage_t' has been explicitly marked deprecated here
+   81 | using aligned_storage_t _LIBCPP_DEPRECATED_IN_CXX23 = typename aligned_storage<_Len, _Align>::type;
+      |                         ^
+/Volumes/XOffsetCS/toolchain/p2996-d77eff1/bin/../include/c++/v1/__config:707:41: note: expanded from macro '_LIBCPP_DEPRECATED_IN_CXX23'
+  707 | #    define _LIBCPP_DEPRECATED_IN_CXX23 _LIBCPP_DEPRECATED
+      |                                         ^
+/Volumes/XOffsetCS/toolchain/p2996-d77eff1/bin/../include/c++/v1/__config:668:49: note: expanded from macro '_LIBCPP_DEPRECATED'
+  668 | #      define _LIBCPP_DEPRECATED __attribute__((__deprecated__))
+      |                                                 ^
+In file included from /Volumes/XOffsetCS/perf-gate/src/slg290/bench/slg/bench/slg_bench.cpp:38:
+In file included from /Volumes/XOffsetCS/perf-gate/src/slg290/bench/slg/bench/cista_runner.hpp:21:
+In file included from /Volumes/XOffsetCS/competitors/sources/cista-v0.16/include/cista/serialization.h:13:
+In file included from /Volumes/XOffsetCS/competitors/sources/cista-v0.16/include/cista/containers.h:20:
+/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include/cista/containers/variant.h:357:8: warning: 'aligned_union_t' is deprecated [-Wdeprecated-declarations]
+  357 |   std::aligned_union_t<0, T...> storage_{};
+      |        ^
+/Volumes/XOffsetCS/toolchain/p2996-d77eff1/bin/../include/c++/v1/__type_traits/aligned_union.h:45:23: note: 'aligned_union_t' has been explicitly marked deprecated here
+   45 | using aligned_union_t _LIBCPP_DEPRECATED_IN_CXX23 = typename aligned_union<_Len, _Types...>::type;
+      |                       ^
+/Volumes/XOffsetCS/toolchain/p2996-d77eff1/bin/../include/c++/v1/__config:707:41: note: expanded from macro '_LIBCPP_DEPRECATED_IN_CXX23'
+  707 | #    define _LIBCPP_DEPRECATED_IN_CXX23 _LIBCPP_DEPRECATED
+      |                                         ^
+/Volumes/XOffsetCS/toolchain/p2996-d77eff1/bin/../include/c++/v1/__config:668:49: note: expanded from macro '_LIBCPP_DEPRECATED'
+  668 | #      define _LIBCPP_DEPRECATED __attribute__((__deprecated__))
+      |                                                 ^
+In file included from /Volumes/XOffsetCS/perf-gate/src/slg290/bench/slg/bench/slg_bench.cpp:41:
+In file included from /Volumes/XOffsetCS/perf-gate/src/slg290/bench/slg/bench/xoffset_runner.hpp:19:
+In file included from /Volumes/XOffsetCS/perf-gate/src/slg290/bench/slg/include/slg/model_xoffset.hpp:6:
+/Volumes/XOffsetCS/perf-gate/src/slg290/xoffsetdatastructure.hpp:7968:29: warning: first argument in call to 'memcpy' is a pointer to non-trivially copyable type 'slg::xm::March' [-Wnontrivial-memcall]
+ 7968 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+/Volumes/XOffsetCS/perf-gate/src/slg290/xoffsetdatastructure.hpp:5404:39: note: in instantiation of function template specialization 'XOffsetDatastructure::fixed_detail::stable_erase_relocate<slg::xm::March>' requested here
+ 5404 |                         fixed_detail::stable_erase_relocate(items + write, items[read]);
+      |                                       ^
+/Volumes/XOffsetCS/perf-gate/src/slg290/bench/slg/include/slg/generic.hpp:304:17: note: in instantiation of function template specialization 'XOffsetDatastructure::XFixedVector<slg::xm::March>::stable_erase_if<(lambda at /Volumes/XOffsetCS/perf-gate/src/slg290/bench/slg/include/slg/generic.hpp:304:33)>' requested here
+  304 |         marches.stable_erase_if([](const auto& m) { return m.eta <= 0; });
+      |                 ^
+/Volumes/XOffsetCS/perf-gate/src/slg290/bench/slg/include/slg/generic.hpp:324:27: note: in instantiation of function template specialization 'slg::remove_arrived<XOffsetDatastructure::XVector<slg::xm::March>>' requested here
+  324 |         if (arrivals > 0) remove_arrived(s.marches);
+      |                           ^
+/Volumes/XOffsetCS/perf-gate/src/slg290/bench/slg/bench/xoffset_runner.hpp:239:42: note: in instantiation of function template specialization 'slg::shard_ticks<slg::xm::ShardState>' requested here
+  239 |             untimed(st, "C.ticks", [&] { shard_ticks(r->root<ShardState>(), mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
+      |                                          ^
+/Volumes/XOffsetCS/toolchain/p2996-d77eff1/bin/../include/c++/v1/__memory/unique_ptr.h:759:30: note: in instantiation of member function 'slg::XOffsetRunnerT<slg::XoModel, false>::run_cycle' requested here
+  759 |   return unique_ptr<_Tp>(new _Tp(std::forward<_Args>(__args)...));
+      |                              ^
+/Volumes/XOffsetCS/perf-gate/src/slg290/xoffsetdatastructure.hpp:7968:29: note: explicitly cast the pointer to silence this warning
+ 7968 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+      |                             (void*)
+/Volumes/XOffsetCS/perf-gate/src/slg290/xoffsetdatastructure.hpp:7968:29: warning: first argument in call to 'memcpy' is a pointer to non-trivially copyable type 'slg::xmr::March' [-Wnontrivial-memcall]
+ 7968 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+/Volumes/XOffsetCS/perf-gate/src/slg290/xoffsetdatastructure.hpp:5404:39: note: in instantiation of function template specialization 'XOffsetDatastructure::fixed_detail::stable_erase_relocate<slg::xmr::March>' requested here
+ 5404 |                         fixed_detail::stable_erase_relocate(items + write, items[read]);
+      |                                       ^
+/Volumes/XOffsetCS/perf-gate/src/slg290/bench/slg/include/slg/generic.hpp:304:17: note: in instantiation of function template specialization 'XOffsetDatastructure::XFixedVector<slg::xmr::March>::stable_erase_if<(lambda at /Volumes/XOffsetCS/perf-gate/src/slg290/bench/slg/include/slg/generic.hpp:304:33)>' requested here
+  304 |         marches.stable_erase_if([](const auto& m) { return m.eta <= 0; });
+      |                 ^
+/Volumes/XOffsetCS/perf-gate/src/slg290/bench/slg/include/slg/generic.hpp:324:27: note: in instantiation of function template specialization 'slg::remove_arrived<XOffsetDatastructure::XVector<slg::xmr::March>>' requested here
+  324 |         if (arrivals > 0) remove_arrived(s.marches);
+      |                           ^
+/Volumes/XOffsetCS/perf-gate/src/slg290/bench/slg/bench/xoffset_runner.hpp:239:42: note: in instantiation of function template specialization 'slg::shard_ticks<slg::xmr::ShardState>' requested here
+  239 |             untimed(st, "C.ticks", [&] { shard_ticks(r->root<ShardState>(), mix_seed(seed_, 0xc0 + uint64_t(cycle)), sc.shard_ticks); });
+      |                                          ^
+/Volumes/XOffsetCS/toolchain/p2996-d77eff1/bin/../include/c++/v1/__memory/unique_ptr.h:759:30: note: in instantiation of member function 'slg::XOffsetRunnerT<slg::XoOptinModel, false>::run_cycle' requested here
+  759 |   return unique_ptr<_Tp>(new _Tp(std::forward<_Args>(__args)...));
+      |                              ^
+/Volumes/XOffsetCS/perf-gate/src/slg290/xoffsetdatastructure.hpp:7968:29: note: explicitly cast the pointer to silence this warning
+ 7968 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+      |                             (void*)
+4 warnings generated.
+[15/15] Linking CXX executable slg_bench
+ld: warning: reexported library with install name '@rpath/libunwind.1.dylib' found at '/Volumes/XOffsetCS/toolchain/p2996-d77eff1/lib/libunwind.1.0.dylib' couldn't be matched with any parent library and will be linked directly

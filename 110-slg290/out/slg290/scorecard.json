@@ -1,0 +1,699 @@
+{
+ "cells": [
+  {
+   "group": "服务端之间",
+   "cell": "A",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.39256091483452993,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.39256091483452993,
+     "lo": 0.3799259089758525,
+     "hi": 0.4324917222221696,
+     "upper": 0.4037951684625544,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "服务端之间",
+   "cell": "B",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.2462616213999446,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.2462616213999446,
+     "lo": 0.23394378851075284,
+     "hi": 0.283004424852836,
+     "upper": 0.256306264790795,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "服务端之间",
+   "cell": "S",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.17072426528376053,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.17072426528376053,
+     "lo": 0.1648164481734273,
+     "hi": 0.19252152429303018,
+     "upper": 0.17652702129645498,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "服务端之间",
+   "cell": "SD",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.21542112497446989,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.21542112497446989,
+     "lo": 0.2119709341089463,
+     "hi": 0.2245712493384944,
+     "upper": 0.21804339785805849,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "服务端发送",
+   "cell": "L.send",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.34316561396373974,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.34316561396373974,
+     "lo": 0.33292843665203165,
+     "hi": 0.3702625127006667,
+     "upper": 0.35091145689945435,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "服务端发送",
+   "cell": "EB.send",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.42477065953569837,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.42477065953569837,
+     "lo": 0.4139803514871109,
+     "hi": 0.4649309097397616,
+     "upper": 0.43554221293856055,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "服务端发送",
+   "cell": "LD.send",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.5564463930775714,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.5564463930775714,
+     "lo": 0.5470506212705196,
+     "hi": 0.5677442439296211,
+     "upper": 0.5612637658237092,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "服务端发送",
+   "cell": "UP.send",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.8769962441528729,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.8769962441528729,
+     "lo": 0.8424861309052462,
+     "hi": 0.9829571695101608,
+     "upper": 0.9055124651956655,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "服务端发送",
+   "cell": "UC.send",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.43759750298035677,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.43759750298035677,
+     "lo": 0.4257412908777895,
+     "hi": 0.4789064605464215,
+     "upper": 0.44875015678945596,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "服务端发送",
+   "cell": "DP",
+   "kind": "main",
+   "best": "zpp_bits_dirty 共享",
+   "gm": 1.0162869217195216,
+   "class": "tie",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.6143611559638237,
+     "lo": 0.559658319154312,
+     "hi": 0.6931294456700992,
+     "upper": 0.643023486944531,
+     "batches": 8
+    },
+    "zpp_bits 共享": {
+     "gm": 0.9676897938110542,
+     "lo": 0.8686352113732566,
+     "hi": 1.059869049800686,
+     "upper": 1.0106997602040464,
+     "batches": 8
+    },
+    "zpp_bits_dirty 共享": {
+     "gm": 1.0162869217195216,
+     "lo": 0.9367147793518973,
+     "hi": 1.077576521109217,
+     "upper": 1.0498372092728416,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "服务端发送",
+   "cell": "DC",
+   "kind": "main",
+   "best": "zpp_bits_dirty 共享",
+   "gm": 0.875293817562786,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.11612966585271849,
+     "lo": 0.11196473651494343,
+     "hi": 0.12343229489998564,
+     "upper": 0.11868435551012471,
+     "batches": 8
+    },
+    "zpp_bits 共享": {
+     "gm": 0.5610267275171502,
+     "lo": 0.4920009798965622,
+     "hi": 0.606513240480621,
+     "upper": 0.5849679975062984,
+     "batches": 8
+    },
+    "zpp_bits_dirty 共享": {
+     "gm": 0.875293817562786,
+     "lo": 0.8573836085763977,
+     "hi": 0.9138419509982956,
+     "upper": 0.8871943167261195,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "客户端接收",
+   "cell": "L.recv",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.2734067592357124,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.2734067592357124,
+     "lo": 0.26273132404111343,
+     "hi": 0.30946551349451096,
+     "upper": 0.2831566700071129,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "客户端接收",
+   "cell": "EBW.recv",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.27766756732115777,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.27766756732115777,
+     "lo": 0.27346691965410946,
+     "hi": 0.2903512687065407,
+     "upper": 0.2811854014327157,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "客户端接收",
+   "cell": "LDW.recv",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.40618062757128104,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.40618062757128104,
+     "lo": 0.3978387732727375,
+     "hi": 0.4296740101321684,
+     "upper": 0.41296322808634345,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "客户端接收",
+   "cell": "UPW.recv",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.8400631082986695,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.8400631082986695,
+     "lo": 0.7739199623879571,
+     "hi": 1.1628814439291575,
+     "upper": 0.918067436926675,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "客户端接收",
+   "cell": "UCW.recv",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.4149990332163116,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.4149990332163116,
+     "lo": 0.4031704779148877,
+     "hi": 0.4752680858710728,
+     "upper": 0.4306654702912968,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "客户端接收",
+   "cell": "DPTW.recv",
+   "kind": "main",
+   "best": "zpp_bits_dirty 共享",
+   "gm": 0.7781512480925139,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.46636041501648073,
+     "lo": 0.34577938751418313,
+     "hi": 0.6593932010165574,
+     "upper": 0.5263650124505005,
+     "batches": 8
+    },
+    "zpp_bits 共享": {
+     "gm": 0.6362613421983432,
+     "lo": 0.5153364648315057,
+     "hi": 0.7828879629983958,
+     "upper": 0.7089974906282145,
+     "batches": 8
+    },
+    "zpp_bits_dirty 共享": {
+     "gm": 0.7781512480925139,
+     "lo": 0.596430460939469,
+     "hi": 1.0315645095676715,
+     "upper": 0.8608481846937776,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "客户端接收",
+   "cell": "DCTW.recv",
+   "kind": "main",
+   "best": "zpp_bits_dirty 共享",
+   "gm": 0.5882938521597403,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.15254185190132036,
+     "lo": 0.14283082565144722,
+     "hi": 0.18070758913647367,
+     "upper": 0.16037721586452497,
+     "batches": 8
+    },
+    "zpp_bits 共享": {
+     "gm": 0.4065545002748175,
+     "lo": 0.3781141712719408,
+     "hi": 0.48212994530081693,
+     "upper": 0.42906242243166554,
+     "batches": 8
+    },
+    "zpp_bits_dirty 共享": {
+     "gm": 0.5882938521597403,
+     "lo": 0.5430847699640913,
+     "hi": 0.6963410363429412,
+     "upper": 0.6193219193794576,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "上行",
+   "cell": "UL.recv",
+   "kind": "main",
+   "best": "zpp_bits",
+   "gm": 0.8242411609105647,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.8242411609105647,
+     "lo": 0.8063280496755165,
+     "hi": 0.8429021738847046,
+     "upper": 0.8332048426501205,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "上行",
+   "cell": "UL.send",
+   "kind": "report",
+   "best": "zpp_bits",
+   "gm": 0.7593297572444232,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.7593297572444232,
+     "lo": 0.7355754027788359,
+     "hi": 0.7827323981056643,
+     "upper": 0.7702611950626519,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "只报",
+   "cell": "US.send",
+   "kind": "report",
+   "best": "zpp_bits",
+   "gm": 0.41536004184265807,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.41536004184265807,
+     "lo": 0.4101711677554187,
+     "hi": 0.4423044610774431,
+     "upper": 0.4225332638216833,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "只报",
+   "cell": "DS",
+   "kind": "report",
+   "best": "zpp_bits_dirty 共享",
+   "gm": 0.7532825679901496,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.06672581668571355,
+     "lo": 0.06611228168677816,
+     "hi": 0.06784273167011629,
+     "upper": 0.06717579495856114,
+     "batches": 8
+    },
+    "zpp_bits 共享": {
+     "gm": 0.3681817186637847,
+     "lo": 0.3240002939595941,
+     "hi": 0.38372427659449787,
+     "upper": 0.38200148238123977,
+     "batches": 8
+    },
+    "zpp_bits_dirty 共享": {
+     "gm": 0.7532825679901496,
+     "lo": 0.7329873249295192,
+     "hi": 0.7675147229895645,
+     "upper": 0.7610819164322349,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "只报",
+   "cell": "USW.recv",
+   "kind": "report",
+   "best": "zpp_bits",
+   "gm": 0.4758129406644998,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.4758129406644998,
+     "lo": 0.46522944565152424,
+     "hi": 0.5006523349847084,
+     "upper": 0.48348656994757366,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "只报",
+   "cell": "DSTW.recv",
+   "kind": "report",
+   "best": "zpp_bits_dirty 共享",
+   "gm": 0.629050640125118,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.1273700010910851,
+     "lo": 0.11749516323204676,
+     "hi": 0.1421126072129793,
+     "upper": 0.13374197861668777,
+     "batches": 8
+    },
+    "zpp_bits 共享": {
+     "gm": 0.3234695959853097,
+     "lo": 0.302220617150631,
+     "hi": 0.3574070794406318,
+     "upper": 0.3388788205177138,
+     "batches": 8
+    },
+    "zpp_bits_dirty 共享": {
+     "gm": 0.629050640125118,
+     "lo": 0.591357212195645,
+     "hi": 0.6963333723150459,
+     "upper": 0.6590340945136336,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "只报",
+   "cell": "EB.recv",
+   "kind": "report",
+   "best": "zpp_bits",
+   "gm": 0.3432778240940395,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.3432778240940395,
+     "lo": 0.3357969944174448,
+     "hi": 0.3818634770610172,
+     "upper": 0.3533725845255995,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "只报",
+   "cell": "LD recv+apply",
+   "kind": "report",
+   "best": "zpp_bits",
+   "gm": 0.5388794270846463,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.5388794270846463,
+     "lo": 0.5196558066701737,
+     "hi": 0.5835943588906712,
+     "upper": 0.5536135799257816,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "只报",
+   "cell": "UP recv+apply",
+   "kind": "report",
+   "best": "zpp_bits",
+   "gm": 0.999388369554542,
+   "class": "tie",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.999388369554542,
+     "lo": 0.9357917905497944,
+     "hi": 1.3534678438792604,
+     "upper": 1.0860215760313632,
+     "batches": 8
+    }
+   }
+  },
+  {
+   "group": "只报",
+   "cell": "UC recv+apply",
+   "kind": "report",
+   "best": "zpp_bits",
+   "gm": 0.38354620735338,
+   "class": "win",
+   "rivals": {
+    "zpp_bits": {
+     "gm": 0.38354620735338,
+     "lo": 0.3696967889745106,
+     "hi": 0.4625903899625537,
+     "upper": 0.4035784572498968,
+     "batches": 8
+    }
+   }
+  }
+ ],
+ "batches": {
+  "xoffset": 8,
+  "xoffset_d3": 8,
+  "zpp_bits": 8,
+  "zpp_bits 共享": 8,
+  "zpp_bits_dirty 共享": 8
+ },
+ "bytes": [
+  {
+   "label": "A 请求",
+   "xo_key": "A.req",
+   "rival_key": "A.req",
+   "xo": 586340.0,
+   "rivals": {
+    "zpp_bits": 437165.5
+   }
+  },
+  {
+   "label": "A 结果",
+   "xo_key": "A.res",
+   "rival_key": "A.res",
+   "xo": 744936.0,
+   "rivals": {
+    "zpp_bits": 510254.5
+   }
+  },
+  {
+   "label": "B 迁服",
+   "xo_key": "B.out",
+   "rival_key": "B.out",
+   "xo": 3357584.0,
+   "rivals": {
+    "zpp_bits": 1625870.0
+   }
+  },
+  {
+   "label": "S 存盘",
+   "xo_key": "S.player",
+   "rival_key": "S.player",
+   "xo": 3345596.0,
+   "rivals": {
+    "zpp_bits": 1628905.5
+   }
+  },
+  {
+   "label": "SD 增量存盘",
+   "xo_key": "SD.modules",
+   "rival_key": "SD.modules",
+   "xo": 1077448.0,
+   "rivals": {
+    "zpp_bits": 697570.0
+   }
+  },
+  {
+   "label": "L 登录",
+   "xo_key": "L.player",
+   "rival_key": "L.player",
+   "xo": 599116.0,
+   "rivals": {
+    "zpp_bits": 434355.0
+   }
+  },
+  {
+   "label": "EB 浏览",
+   "xo_key": "EB.window",
+   "rival_key": "EB.window",
+   "xo": 322974196.0,
+   "rivals": {
+    "zpp_bits": 276928372.0
+   }
+  },
+  {
+   "label": "LD 自身增量",
+   "xo_key": "LD.patch",
+   "rival_key": "LD.patch",
+   "xo": 752272.0,
+   "rivals": {
+    "zpp_bits": 517869.5
+   }
+  },
+  {
+   "label": "UP 视野和平",
+   "xo_key": "UP.delta",
+   "rival_key": "UP.delta",
+   "xo": 1841160.0,
+   "rivals": {
+    "zpp_bits": 1248644.0
+   }
+  },
+  {
+   "label": "UC 视野冲突",
+   "xo_key": "UC.delta",
+   "rival_key": "UC.delta",
+   "xo": 18528172.0,
+   "rivals": {
+    "zpp_bits": 15321511.5
+   }
+  },
+  {
+   "label": "DP 共享和平 ÷ 对手 UP",
+   "xo_key": "DP.delta",
+   "rival_key": "UP.delta",
+   "xo": 739779.0,
+   "rivals": {
+    "zpp_bits": 1248644.0,
+    "zpp_bits 共享": 1155628.0,
+    "zpp_bits_dirty 共享": 786246.0
+   }
+  },
+  {
+   "label": "DC 共享冲突 ÷ 对手 UC",
+   "xo_key": "DC.delta",
+   "rival_key": "UC.delta",
+   "xo": 6221567.5,
+   "rivals": {
+    "zpp_bits": 15321511.5,
+    "zpp_bits 共享": 15225711.5,
+    "zpp_bits_dirty 共享": 5570815.0
+   }
+  },
+  {
+   "label": "UL 上行指令",
+   "xo_key": "UL.order",
+   "rival_key": "UL.order",
+   "xo": 139328.0,
+   "rivals": {
+    "zpp_bits": 77872.0
+   }
+  }
+ ],
+ "zstd_bytes": false,
+ "thresholds": {
+  "win_below": 0.95,
+  "loss_above": 1.05
+ }
+}
