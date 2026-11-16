@@ -5768,7 +5768,14 @@ namespace XOffsetDatastructure {
 
         void erase_index(size_type index) {
             if (index >= size_) return;
-            if (index + 1 == size_) { pop_back(); return; }
+            if (index + 1 == size_) {
+                // erase keeps M4 when pop_back does not zero the slot.
+                pop_back();
+#if !XOFFSET_SCRUB_POPPED
+                scrub(size_, size_ + 1);
+#endif
+                return;
+            }
             if constexpr (std::is_trivially_copyable_v<T>) {
                 // size_ > 1 names a live block. The head stays in registers
                 // across the move (compilers reload it after the memmove
@@ -5957,7 +5964,9 @@ namespace XOffsetDatastructure {
                 XOFFSET_TRY {
                     while (size_ < count) { construct(data() + size_); ++size_; }
                 } XOFFSET_CATCH(...) {
+                    const auto built = size_;
                     while (size_ > old_size) pop_back();
+                    scrub(old_size, built);
                     XOFFSET_RETHROW;
                 }
             } else if constexpr (fixed_detail::can_relocate_without_allocation<T>()) {
