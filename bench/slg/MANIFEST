@@ -313,6 +313,7 @@
 #   2026-11-16: prepare macOS SLG uplink output after determining the troop count.
 #   2026-11-16: restore bounded uplink arena setup and register SLG regression tests.
 #   2026-11-16: Windows uses preframed uplink output and indexed random draws.
+#   2026-11-16: compare each native SLG uplink frame with independent compact output.
 c7258374a6bc070e67baa3ecccbd18116fd3a20a3712aaed4b69a144d7e21431  CMakeLists.txt
 b3e74d714d9e6408f45e5fb065f40244969d79b2e4fb2a11ccbf52b110a2aec8  README.md
 ea141af841831b376028f48ab0d4c22e66ce2671f01d9e14c9f66814f5ebaa6e  adapters/cereal_format.hpp
@@ -344,5 +345,5 @@ cf948f2cf37c276e5f9d0734188fdc8ae9d4b0242cb676cfc4148573cec704a4  tests/flat_hel
 13b29cfca7541c7dd69541c48e076466e25be749f00423711e89fae6c57ad910  tests/native_patch_copy_test.cpp
 a52d1637af8716c80dc0aad7e72a9431d488ae66617bb95411db3a33b0172a49  tests/packed_marches_test.cpp
 018adb0c14fd1ef72fe8e877a35fba60a7b232ad7a1cf1160ce809ce72a629aa  tests/uplink_frame_test.cpp
-7d5306b8659afa1d8c040945b56375fd208931f4d6c024b84e72914721ed1e5b  tests/uplink_order_paths_test.cpp
+3e7db3bc00c3cb9159ccace0980092a0e50196be52213ad78f76dcdb11be2e4c  tests/uplink_order_paths_test.cpp
 959d39736472b7db0274f8a9cc5b23b0b864162cf80f5ce1bb88a5f21bb46244  tools/analyze.py

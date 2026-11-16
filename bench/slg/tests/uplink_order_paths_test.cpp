@@ -1,4 +1,5 @@
 #include "xoffset_runner.hpp"
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -50,6 +51,9 @@ int main() {
         ops.srv.emplace_back(xo::XBuffer::create<xm::PlayerState>(128 * 1024, cap));
         ops.setup();
         xo::XReceiver<xo::XLink::from_client> receiver(cap);
+#if defined(__APPLE__) || defined(_WIN32)
+        auto canonical = xo::XBuffer::create<xm::March>(32 * 1024, cap);
+#endif
         constexpr std::array army_counts{0, 1, 2, 3, 4, 5, 8, 15, 16, 17};
         constexpr std::array troop_counts{0, 1, 2, 3, 4, 5, 8, 128};
         constexpr std::array troop_limits{-1, 0, 1, 2, 151, 1034, (std::numeric_limits<int>::max)()};
@@ -81,6 +85,17 @@ int main() {
                 const auto wire = send(ops, round, input, seq);
                 if (input.state != reference.state)
                     throw std::runtime_error("order consumed a different random stream");
+#if defined(__APPLE__) || defined(_WIN32)
+                auto& canonical_order = canonical.reset<xm::March>();
+                slg::Rng canonical_rng(seed);
+                slg::fill_order(canonical_order, source, canonical_rng, seq);
+                xo::detail::zero_padding_bytes<xm::March>(reinterpret_cast<char*>(&canonical_order));
+                for (auto& troop : canonical_order.troops)
+                    xo::detail::zero_padding_bytes<xm::Troop>(reinterpret_cast<char*>(&troop));
+                const auto reference_wire = canonical.save_compact<xm::March>(xo::XCompactOptions{.slack_div = 0});
+                if (!std::ranges::equal(wire, std::as_bytes(std::span(reference_wire))))
+                    throw std::runtime_error("order differs from independent canonical frame");
+#endif
                 const auto view = receiver.view<xm::March>(wire);
                 auto full = xo::XBuffer::try_load_verified<xm::March>(wire, cap);
                 if (!view || !full)
