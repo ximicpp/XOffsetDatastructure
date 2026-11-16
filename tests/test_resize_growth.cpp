@@ -363,6 +363,11 @@ void emplace_binding() {
     attrs.pop_back();
     need(attrs.size() == 2, "attrs pop_back size");
     check(attrs[1], "emplaced-key", 1);
+    // pop_back may leave the removed element's bytes (XOFFSET_SCRUB_POPPED=0);
+    // an append there still builds an empty element over them.
+    auto& again = attrs.emplace_back();
+    need(again.key.empty() && again.value.empty(), "append over a popped slot is not empty");
+    attrs.pop_back();
     roundtrip(b); ++cases;
 }
 
