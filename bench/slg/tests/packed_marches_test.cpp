@@ -20,6 +20,74 @@ static std::vector<Image> contents(xm::ViewSnapshot& view, HeldIndex& index) {
     std::sort(rows.begin(), rows.end());
     return rows;
 }
+static void same_arena_held_unit_regression() {
+    using XBuffer = XOffsetDatastructure::XBuffer;
+    const auto cap = XBuffer::maximum_capacity(256 * 1024);
+    auto test = XBuffer::create<xm::ViewSnapshot>(32 * 1024, cap);
+    auto updates = XBuffer::create<xm::ViewDelta>(32 * 1024, cap);
+    auto& actual = test.root<xm::ViewSnapshot>();
+    stdm::ViewSnapshot expected;
+    HeldIndex actual_index, expected_index;
+    XOffsetRunnerT<XoTrustedModel, false>::BlockOps ops;
+
+    const auto add = [](xm::ViewDelta& delta, int32_t id, char letter) {
+        WorldUnit unit;
+        unit.id = id;
+        unit.hp = id * 23;
+        unit.name.assign(72, letter);
+        unit.alliance_tag.assign(40, char(letter + 1));
+        unit.owner_name.assign(56, char(letter + 2));
+        unit.commander = {id, 2, 3, 4};
+        for (int32_t i = 0; i < 5; ++i) {
+            unit.heroes.push_back({id + i, i, i + 1, i + 5});
+            unit.troops.push_back({i, id + i, i + 1});
+            unit.buffs.push_back({id - i, 3 * i, 104000 + 2000 * i});
+        }
+        copy_unit(delta.upserts.emplace_back(), unit);
+    };
+    const auto apply = [&](xm::ViewDelta& delta) {
+        slg::apply_delta(expected, expected_index, delta);
+        const auto wire = updates.save_verified<xm::ViewDelta>();
+        ops.delta_recv_from(wire);
+        ops.apply_held_delta(actual, actual_index);
+    };
+    const auto compare = [&](const auto& units) {
+        if (units.size() != expected.units.size())
+            throw std::runtime_error("held unit count changed");
+        for (const auto& expected_unit : expected.units) {
+            const auto where = actual_index.units.find(expected_unit.id);
+            if (!where || where->second < 0 || std::size_t(where->second) >= units.size())
+                throw std::runtime_error("held unit index lost a live unit");
+            const auto& unit = units[std::size_t(where->second)];
+            if (unit.id != expected_unit.id || query_unit(unit) != query_unit(expected_unit) ||
+                slg::sv(unit.name) != slg::sv(expected_unit.name) ||
+                slg::sv(unit.alliance_tag) != slg::sv(expected_unit.alliance_tag) ||
+                slg::sv(unit.owner_name) != slg::sv(expected_unit.owner_name))
+                throw std::runtime_error("held unit or nested storage differs from reference");
+        }
+    };
+
+    auto& first = updates.root<xm::ViewDelta>();
+    for (int32_t id = 1; id <= 4; ++id) add(first, id, char('a' + id));
+    apply(first);
+
+    auto& second = updates.reset<xm::ViewDelta>();
+    for (int32_t id : {2, 2, 4, 999}) second.removed.push_back(id);
+    add(second, 2, 'p');
+    apply(second);
+
+    if (actual_index.units.size() != expected.units.size() ||
+        actual_index.units.find(4) || actual_index.units.find(999))
+        throw std::runtime_error("held unit index kept a removed unit");
+    compare(actual.units);
+
+    const auto roundtrip = test.save_verified<xm::ViewSnapshot>();
+    auto checked = XBuffer::try_load_verified<xm::ViewSnapshot>(roundtrip, cap);
+    if (!checked) throw std::runtime_error("held unit move broke arena ownership");
+    compare(checked->root<xm::ViewSnapshot>().units);
+}
+
+
 int main() {
     using XBuffer = XOffsetDatastructure::XBuffer;
     using XOffsetDatastructure::XGrowPolicy;
@@ -114,5 +182,6 @@ int main() {
         live = append;
     }
     if (!rejected) throw std::runtime_error("fixed-size view never reached capacity");
+    same_arena_held_unit_regression();
     std::puts("packed marches: 4000 differential batches and append failure passed");
 }

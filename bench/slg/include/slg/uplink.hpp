@@ -120,7 +120,9 @@ template <class Ops> void run_uplink(Ops& ops, uint64_t seed, int cycle, int rou
             std::size_t n = 0;
 #if defined(__APPLE__) || defined(_WIN32)
             timed(st, "UL.send", [&] {
-                if constexpr (requires { ops.up_encode_order(p, r, rng, seq); })
+                if constexpr (requires { ops.up_encode_order_from_seed(p, r, rng.state, seq); })
+                    n = ops.up_encode_order_from_seed(p, r, rng.state, seq);
+                else if constexpr (requires { ops.up_encode_order(p, r, rng, seq); })
                     n = ops.up_encode_order(p, r, rng, seq);
                 else
                     n = ops.up_encode([&](auto& m) { fill_order(m, ops.held(p), rng, seq); });

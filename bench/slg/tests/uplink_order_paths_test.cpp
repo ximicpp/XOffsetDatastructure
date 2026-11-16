@@ -105,6 +105,15 @@ int main() {
                 const auto digest = slg::query_order(expected);
                 if (ops.up_recv() != digest || ops.up_recv_full() != digest)
                     throw std::runtime_error("wire receive disagrees with reference order");
+#if defined(__APPLE__)
+                const auto seeded_size = ops.up_encode_order_from_seed(0, round, seed, seq);
+                const auto seeded_wire = std::as_bytes(std::span(ops.up_wire()));
+                if (seeded_size != reference_wire.size() ||
+                    !std::ranges::equal(seeded_wire, std::as_bytes(std::span(reference_wire))))
+                    throw std::runtime_error("send from seed differs from independent canonical frame");
+                if (ops.up_recv() != digest || ops.up_recv_full() != digest)
+                    throw std::runtime_error("send from seed failed receive comparison");
+#endif
             }
         }
 #if !defined(__APPLE__) && !defined(_WIN32)

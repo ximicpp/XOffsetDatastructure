@@ -34,6 +34,16 @@ inline void append_patch_army(XOffsetDatastructure::XVector<Army>& armies, const
 } // namespace slg::xm
 #endif
 
+#if defined(__APPLE__)
+namespace slg::xm {
+inline void relocate_held_unit(ViewUnit& dst, ViewUnit& src) {
+    // Both units are elements of the same held vector. XOffset's same-arena
+    // move assignment can transfer their nested storage into the vacant slot.
+    dst = std::move(src);
+}
+} // namespace slg::xm
+#endif
+
 namespace slg {
 
 struct XoModel {
@@ -509,6 +519,15 @@ public:
         std::vector<UplinkSource> uplink_sources;
 
         std::size_t up_encode_order(int player, int round, Rng& rng, int64_t seq) {
+            return encode_uplink_order<true>(player, round, rng.state, seq, &rng);
+        }
+
+        std::size_t up_encode_order_from_seed(int player, int round, uint64_t state, int64_t seq) {
+            return encode_uplink_order<false>(player, round, state, seq, nullptr);
+        }
+
+        template <bool TrackRng>
+        std::size_t encode_uplink_order(int player, int round, uint64_t state, int64_t seq, Rng* rng) {
             auto& source = uplink_sources[std::size_t(player)];
             if (round == 0) {
                 // Login and patches finished before UL. This read-only view
@@ -524,17 +543,16 @@ public:
             static_assert(XOffsetDatastructure::schema::member_t<xm::March, 7>::offset == offsetof(xm::March, troops));
             using SourceTroops = decltype(std::declval<const PlayerState&>().armies[0].troops.data());
 #if defined(__APPLE__)
-            const auto state = rng.state;
-            const auto n = int32_t(source.armies.size());
+            const auto n = source.armies.size();
+            const bool has_army = n != 0;
             const auto* army = source.armies.data();
-            if (n > 0) {
-                const auto word = Rng::mix_word(state + 4 * Rng::step);
-                army += std::size_t(word % static_cast<uint64_t>(n));
-                rng.state = state + 4 * Rng::step;
-            } else {
-                rng.state = state + 3 * Rng::step;
+            auto troop_seed = state + 3 * Rng::step;
+            if (has_army) {
+                troop_seed += Rng::step;
+                const auto word = Rng::mix_word(troop_seed);
+                army += std::size_t(word % n);
             }
-            const bool has_army = !source.armies.empty();
+            if constexpr (TrackRng) rng->state = troop_seed;
             const std::size_t count = has_army ? army->troops.size() : 0;
             SourceTroops troops = count != 0 ? &army->troops.front() : nullptr;
             const auto prepare = [&](xm::MarchOrderPrefix& order) noexcept {
@@ -546,7 +564,6 @@ public:
                 order.to_y = int32_t(Rng::mix_word(state + 2 * Rng::step) & 4095u);
                 order.eta = 30 + int32_t(Rng::mix_word(state + 3 * Rng::step) % 571u);
             };
-            const auto troop_seed = rng.state;
             const auto generate = [&](std::size_t i) noexcept {
                 const auto& source_troop = troops[i];
                 const auto divisor = std::uint64_t((std::max)(source_troop.count, 1));
@@ -554,7 +571,7 @@ public:
                 return xm::Troop{source_troop.type, 1 + int32_t(word % divisor), 0};
             };
             const auto bytes = ul_writer.template write_counted<xm::MarchOrderPrefix>(count, prepare, generate);
-            rng.state = troop_seed + Rng::step * count;
+            if constexpr (TrackRng) rng->state = troop_seed + Rng::step * count;
             return bytes;
 #else
             const auto seed = rng.state;

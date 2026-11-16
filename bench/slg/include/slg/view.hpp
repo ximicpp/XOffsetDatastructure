@@ -717,11 +717,19 @@ template <class V, class D> void apply_delta(V& v, HeldIndex& at, const D& d) {
         if (it == at.units.end()) continue;
         const int32_t pos = it->second, last = int32_t(v.units.size()) - 1;
         if (pos != last) {
-            // Through a plain copy: the source lives in the same container.
-            static thread_local WorldUnit tmp;
-            copy_unit(tmp, v.units[std::size_t(last)]);
             auto& dst = v.units[std::size_t(pos)];
-            copy_unit(dst, tmp);
+            auto& src = v.units[std::size_t(last)];
+#if defined(__APPLE__)
+            if constexpr (requires { relocate_held_unit(dst, src); }) {
+                relocate_held_unit(dst, src);
+            } else
+#endif
+            {
+                // Other models can copy through a plain, independent unit.
+                static thread_local WorldUnit tmp;
+                copy_unit(tmp, src);
+                copy_unit(dst, tmp);
+            }
             at.units[dst.id] = pos;
         }
         v.units.pop_back();
