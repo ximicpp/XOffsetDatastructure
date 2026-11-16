@@ -57,6 +57,15 @@ using namespace cc24;
     cista::NS::hash_map<uint64_t, Item> items; cista::NS::vector<Position> path;                             \
     cista::NS::vector<float> attributes; cista::NS::vector<Equip> equips; cista::NS::vector<Skill> skills;   \
   };                                                                                                          \
+  /* tuned layout: equipment attributes inline up to 8 (the "xoffset inline" layout) */                       \
+  struct InlineEquip { uint32_t id; uint32_t number; uint64_t uuid; uint64_t timestamp; uint32_t level;       \
+                       cc24::InlineAttrs<cista::NS::vector<float>> attributes; };                             \
+  struct CharacterInline {                                                                                    \
+    uint64_t id; cista::NS::string name; uint32_t level; float healthpoint, manapoint, speed; Position pos;   \
+    cista::NS::hash_map<uint64_t, Item> items; cista::NS::vector<Position> path;                             \
+    cista::NS::vector<float> attributes; cista::NS::vector<InlineEquip> equips;                               \
+    cista::NS::vector<Skill> skills;                                                                          \
+  };                                                                                                          \
   }
 CC24_CISTA_MODEL(raw)
 CC24_CISTA_MODEL(offset)
@@ -113,6 +122,14 @@ static void bench_std_rw() {
     rw_once<stdm::Character, stdm::Item>(c, o, [](auto& m, uint64_t k, const stdm::Item& it) { stdm::items_set(m, k, it); },
                                            [](auto& m, uint64_t k) { stdm::items_erase(m, k); }); }));
   g_rw_sum = checksum(c);
+  // tuned: inline equipment attributes and the bulk calls (see rw_tuned)
+  stdm::CharacterInline t{}; fill_inline(t, g_char);
+  expect("std inline", checksum(t), g_sum);
+  put("std inline", "rw", time_rw([&](const OpSet& o) {
+    rw_tuned<stdm::CharacterInline, stdm::Item, stdm::Position>(t, o,
+      [](auto& m, uint64_t k, const stdm::Item& it) { return stdm::items_upsert(m, k, it); },
+      [](auto& m, auto pos) { m.erase(pos); }); }));
+  expect("std inline rw", checksum(t), g_rw_sum);
 }
 
 // ============================ XOffset 4.0 ============================
@@ -122,7 +139,7 @@ template<class C>
 static void rw_xoffset_bulk(C& r, const OpSet& o) {
   r.level += 1; r.healthpoint += 1; r.manapoint += 1; r.speed += 1;
   r.pos = {o.pos[0], o.pos[1], o.pos[2]};
-  for (const auto& eo : o.equip) {
+  if (kEquipPart) for (const auto& eo : o.equip) {
     auto& e = r.equips.emplace_back();
     e.id = eo.id; e.uuid = eo.uuid; e.number = eo.number; e.timestamp = eo.timestamp; e.level = eo.level;
     if constexpr (std::is_same_v<C, xo::Character>)
@@ -133,24 +150,32 @@ static void rw_xoffset_bulk(C& r, const OpSet& o) {
     r.equips.pop_back();
   }
   const auto old_path_size = r.path.size();
-  if constexpr (std::is_same_v<C, xo::Character>) {
-    r.path.resize(old_path_size + std::size(o.path));
-    auto* tail = r.path.data() + old_path_size;
-    for (const auto& p : o.path) *tail++ = {p[0], p[1], p[2]};
-  } else {
-    std::array<xo::Position, std::size(OpSet{}.path)> tail;
-    for (size_t i = 0; i < tail.size(); ++i)
-      tail[i] = {o.path[i][0], o.path[i][1], o.path[i][2]};
-    r.path.append_range(tail);
+  if (kPathPart) {
+    if constexpr (std::is_same_v<C, xo::Character>) {
+      r.path.resize(old_path_size + std::size(o.path));
+      auto* tail = r.path.data() + old_path_size;
+      for (const auto& p : o.path) *tail++ = {p[0], p[1], p[2]};
+    } else {
+      std::array<xo::Position, std::size(OpSet{}.path)> tail;
+      for (size_t i = 0; i < tail.size(); ++i)
+        tail[i] = {o.path[i][0], o.path[i][1], o.path[i][2]};
+      r.path.append_range(tail);
+    }
+    r.attributes.push_back(o.attribute);
   }
-  r.attributes.push_back(o.attribute);
-  const xo::Item item{o.item_id, o.item_number, o.item_uuid, o.item_timestamp};
-  auto [it, inserted] = r.items.try_emplace(o.key, item);
-  if (!inserted) it->second = item;
-  observe(r);
-  r.items.erase_at(it);
-  r.attributes.pop_back();
-  r.path.resize(old_path_size);
+  if (kItemPart) {
+    const xo::Item item{o.item_id, o.item_number, o.item_uuid, o.item_timestamp};
+    auto [it, inserted] = r.items.try_emplace(o.key, item);
+    if (!inserted) it->second = item;
+    observe(r);
+    r.items.erase_at(it);
+  } else {
+    observe(r);
+  }
+  if (kPathPart) {
+    r.attributes.pop_back();
+    r.path.resize(old_path_size);
+  }
   r.speed -= 1; r.manapoint -= 1; r.healthpoint -= 1; r.level -= 1;
 }
 
@@ -248,9 +273,14 @@ static void bench_xoffset_layout(const char* name) {
     if (!fresh) throw std::runtime_error("trusted layout load rejected");
     return fresh->template root<C>().id;
   }));
-  // A round is one edit batch. The timer includes opening and closing
-  // the pin, as well as every operation and its transient observations.
-  put(name, "rw", median_of(kRounds, [&] {
+  // rw: one edit() per iteration, as the "xoffset 4.0" row (each iteration is one update).
+  put(name, "rw", time_rw([&](const OpSet& o) {
+    if (!src.edit([&](C& r) { rw_xoffset_bulk(r, o); })) throw std::runtime_error("xoffset layout edit failed");
+  }));
+  expect(name, checksum(src.plain_root()), g_rw_sum);
+  // report-only: a round is one edit batch (one pin scope around all iterations). The
+  // timer includes opening and closing the pin.
+  put(name, "rw_one_scope", median_of(kRounds, [&] {
     const auto start = Clock::now();
     if (!src.edit([&](C& r) {
       for (size_t i = 0; i < kRwIters; ++i)
@@ -273,16 +303,16 @@ static void bench_xoffset_layout(const char* name) {
 }
 
 // ============================ zpp::bits ============================
-static void bench_zpp() {
-  stdm::Character src = g_char;
+// Ch = stdm::Character (the 2024 layout) or stdm::CharacterInline (the tuned layout).
+template <class Ch> static void bench_zpp(const char* lib, const Ch& src) {
   std::vector<std::byte> w0; { zpp::bits::out out{w0}; if (zpp::bits::failure(out(src))) throw std::runtime_error("zpp out"); }
-  put_bytes("zpp::bits", w0.data(), w0.size());
-  { stdm::Character d{}; zpp::bits::in in{w0}; (void)in(d); expect("zpp", checksum(d), g_sum); }
-  std::vector<std::byte> w; stdm::Character held{};
-  put("zpp::bits", "sr_reuse", time_sr([&](size_t) {
+  put_bytes(lib, w0.data(), w0.size());
+  { Ch d{}; zpp::bits::in in{w0}; (void)in(d); expect(lib, checksum(d), g_sum); }
+  std::vector<std::byte> w; Ch held{};
+  put(lib, "sr_reuse", time_sr([&](size_t) {
     w.clear(); zpp::bits::out out{w}; (void)out(src); zpp::bits::in in{w}; (void)in(held); return held.id; }));
-  put("zpp::bits", "sr_fresh", time_sr([&](size_t) {
-    std::vector<std::byte> wf; zpp::bits::out out{wf}; (void)out(src); stdm::Character d{}; zpp::bits::in in{wf}; (void)in(d); return d.id; }));
+  put(lib, "sr_fresh", time_sr([&](size_t) {
+    std::vector<std::byte> wf; zpp::bits::out out{wf}; (void)out(src); Ch d{}; zpp::bits::in in{wf}; (void)in(d); return d.id; }));
 }
 
 // ============================ MessagePack ============================
@@ -319,22 +349,30 @@ static uint64_t checksum_pb(const protobuf_test::Character& m) {
   for (const auto& s : m.skills()) c.skills.push_back({s.id(), s.level()});
   return checksum(c);
 }
-static void pb_rw(protobuf_test::Character& r, const OpSet& o) {
+// Bulk: the 8 equipment attributes are added as one range, the one bulk call that helps
+// here. A message has no inline scalar array, and RemoveLast already keeps the cleared
+// objects for reuse (DeleteSubrange and erase-by-iterator would free them instead).
+template <bool Bulk> static void pb_rw(protobuf_test::Character& r, const OpSet& o) {
   r.set_level(r.level() + 1); r.set_healthpoint(r.healthpoint() + 1); r.set_manapoint(r.manapoint() + 1); r.set_speed(r.speed() + 1);
   auto* p = r.mutable_pos(); p->set_x(o.pos[0]); p->set_y(o.pos[1]); p->set_z(o.pos[2]);
-  for (const auto& eo : o.equip) {
+  if (kEquipPart) for (const auto& eo : o.equip) {
     auto* e = r.add_equips(); e->set_id(eo.id); e->set_uuid(eo.uuid); e->set_number(eo.number); e->set_timestamp(eo.timestamp); e->set_level(eo.level);
-    for (float a : eo.attr) e->add_attributes(a);
+    if constexpr (Bulk) e->mutable_attributes()->Add(std::begin(eo.attr), std::end(eo.attr));
+    else for (float a : eo.attr) e->add_attributes(a);
     observe(*e);
     r.mutable_equips()->RemoveLast();
   }
-  for (const auto& q : o.path) { auto* x = r.add_path(); x->set_x(q[0]); x->set_y(q[1]); x->set_z(q[2]); }
-  r.add_attributes(o.attribute);
-  { auto& it = (*r.mutable_items())[o.key]; it.set_id(o.item_id); it.set_uuid(o.item_uuid); it.set_number(o.item_number); it.set_timestamp(o.item_timestamp); }
+  if (kPathPart) {
+    for (const auto& q : o.path) { auto* x = r.add_path(); x->set_x(q[0]); x->set_y(q[1]); x->set_z(q[2]); }
+    r.add_attributes(o.attribute);
+  }
+  if (kItemPart) { auto& it = (*r.mutable_items())[o.key]; it.set_id(o.item_id); it.set_uuid(o.item_uuid); it.set_number(o.item_number); it.set_timestamp(o.item_timestamp); }
   observe(r);
-  r.mutable_items()->erase(o.key);
-  r.mutable_attributes()->RemoveLast();
-  for (int i = 0; i < 8; ++i) r.mutable_path()->RemoveLast();
+  if (kItemPart) r.mutable_items()->erase(o.key);
+  if (kPathPart) {
+    r.mutable_attributes()->RemoveLast();
+    for (int i = 0; i < 8; ++i) r.mutable_path()->RemoveLast();
+  }
   r.set_speed(r.speed() - 1); r.set_manapoint(r.manapoint() - 1); r.set_healthpoint(r.healthpoint() - 1); r.set_level(r.level() - 1);
 }
 static void bench_protobuf() {
@@ -355,8 +393,11 @@ static void bench_protobuf() {
       throw std::runtime_error("pb fresh round trip");
     return d.id(); }));
   protobuf_test::Character r; fill_pb(r, g_char);
-  put("Protocol Buffers", "rw", time_rw([&](const OpSet& o) { pb_rw(r, o); }));
+  put("Protocol Buffers", "rw", time_rw([&](const OpSet& o) { pb_rw<false>(r, o); }));
   expect("protobuf rw", checksum_pb(r), g_rw_sum);
+  protobuf_test::Character rb; fill_pb(rb, g_char);
+  put("Protocol Buffers bulk", "rw", time_rw([&](const OpSet& o) { pb_rw<true>(rb, o); }));
+  expect("protobuf bulk rw", checksum_pb(rb), g_rw_sum);
 }
 
 // ============================ FlatBuffers (state: std model; recv unpacks into it) ============================
@@ -492,8 +533,11 @@ template <class Ch> static void fill_cista(Ch& r, const stdm::Character& c) {
   }
   for (const auto& s : c.skills) { r.skills.emplace_back(); r.skills.back() = {s.id, s.level}; }
 }
-template <class Ch, class ItemT, cista::mode Mode> static void bench_cista(const char* lib) {
-  Ch src{}; fill_cista(src, g_char);
+// Tuned = false: the 2024 layout and loop (rw_once). Tuned = true: Ch is the model's
+// CharacterInline and the loop is rw_tuned, as for "xoffset inline" and "std inline".
+template <class Ch, class ItemT, class PosT, cista::mode Mode, bool Tuned> static void bench_cista(const char* lib) {
+  Ch src{};
+  if constexpr (Tuned) fill_inline(src, g_char); else fill_cista(src, g_char);
   std::vector<uint8_t> w0 = cista::serialize<Mode>(src);
   put_bytes(lib, w0.data(), w0.size());
   { std::vector<uint8_t> copy = w0; expect(lib, checksum(*cista::deserialize<Ch, Mode>(copy)), g_sum); }
@@ -508,9 +552,18 @@ template <class Ch, class ItemT, cista::mode Mode> static void bench_cista(const
   put(lib, "sr_fresh", time_sr([&](size_t) {
     std::vector<uint8_t> wf = cista::serialize<Mode>(src); std::vector<uint8_t> h(wf.begin(), wf.end());
     return cista::deserialize<Ch, Mode>(h)->id; }));
-  Ch r{}; fill_cista(r, g_char);
-  put(lib, "rw", time_rw([&](const OpSet& o) {
-    rw_once<Ch, ItemT>(r, o, [](auto& m, uint64_t k, const ItemT& it) { m[k] = it; }, [](auto& m, uint64_t k) { m.erase(k); }); }));
+  Ch r{};
+  if constexpr (Tuned) {
+    fill_inline(r, g_char);
+    put(lib, "rw", time_rw([&](const OpSet& o) {
+      rw_tuned<Ch, ItemT, PosT>(r, o,
+        [](auto& m, uint64_t k, const ItemT& it) { auto pos = m.emplace(k, it).first; pos->second = it; return pos; },
+        [](auto& m, auto pos) { m.erase(pos); }); }));
+  } else {
+    fill_cista(r, g_char);
+    put(lib, "rw", time_rw([&](const OpSet& o) {
+      rw_once<Ch, ItemT>(r, o, [](auto& m, uint64_t k, const ItemT& it) { m[k] = it; }, [](auto& m, uint64_t k) { m.erase(k); }); }));
+  }
   expect(lib, checksum(r), g_rw_sum);
 }
 
@@ -521,12 +574,15 @@ int main(int argc, char** argv) {
   bench_std_rw();   // first: its end state is the reference for every other rw
   bench_xoffset();
   bench_xoffset_layout<xo::CharacterInline>("xoffset inline");
-  bench_zpp();
+  bench_zpp<stdm::Character>("zpp::bits", g_char);
+  { stdm::CharacterInline t{}; fill_inline(t, g_char); bench_zpp<stdm::CharacterInline>("zpp::bits inline", t); }
   bench_msgpack();
   bench_protobuf();
   bench_flatbuffers();
   bench_capnp();
-  bench_cista<cista_raw::Character, cista_raw::Item, cista::mode::UNCHECKED>("cista raw");
-  bench_cista<cista_offset::Character, cista_offset::Item, cista::mode::CAST>("cista offset");
+  bench_cista<cista_raw::Character, cista_raw::Item, cista_raw::Position, cista::mode::UNCHECKED, false>("cista raw");
+  bench_cista<cista_offset::Character, cista_offset::Item, cista_offset::Position, cista::mode::CAST, false>("cista offset");
+  bench_cista<cista_raw::CharacterInline, cista_raw::Item, cista_raw::Position, cista::mode::UNCHECKED, true>("cista raw inline");
+  bench_cista<cista_offset::CharacterInline, cista_offset::Item, cista_offset::Position, cista::mode::CAST, true>("cista offset inline");
   return 0;
 }

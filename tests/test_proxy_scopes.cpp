@@ -309,6 +309,30 @@ bool test_pin_scopes() {
 #endif
     });
     CHECK(ok);
+    // Blocks retired inside one scope are reused by the scopes after it: a
+    // loop of scopes that each add and drop the same data does not grow the
+    // buffer, whether a scope retires a few blocks (its quarantine list is
+    // kept for the next scope) or thousands (the list is released).
+    auto churn = make_relocating(8u << 20);   // room for what one large scope quarantines
+    auto churn_scope = [&](int rounds) {
+        return churn.edit<Root>([&](Root& root) {
+            for (int i = 0; i < rounds; ++i) {
+                Player& p = root.players.emplace_back();
+                for (int k = 0; k < 8; ++k) p.items.push_back(k);   // regrows: retires blocks
+                root.players.pop_back();                             // retires the last one
+            }
+        });
+    };
+    for (int i = 0; i < 8; ++i) CHECK(churn_scope(4));
+    const auto small_wire = churn.save_verified<Root>().size();
+    for (int i = 0; i < 2000; ++i) CHECK(churn_scope(4));
+    CHECK(churn.save_verified<Root>().size() == small_wire);
+    CHECK(churn_scope(5000));
+    const auto large_wire = churn.save_verified<Root>().size();
+    CHECK(large_wire > small_wire);
+    for (int i = 0; i < 2000; ++i) CHECK(churn_scope(4));
+    CHECK(churn.save_verified<Root>().size() == large_wire && churn.ok());
+    CHECK(churn.root<Root>().players.empty());
     // On entry a Relocating buffer whose reservation is more than half used
     // moves first.
     auto half = make_relocating(1u << 20);

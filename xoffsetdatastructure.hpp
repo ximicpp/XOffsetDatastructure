@@ -1039,6 +1039,13 @@ namespace XOffsetDatastructure {
                 if (offset < buffer_.size() && bytes <= buffer_.size() - offset)
                     retire_block(buffer_.data() + offset, bytes);
             }
+            // Hand the list's storage back for the next scope: a loop of
+            // scopes that each retire a few blocks then allocates no host
+            // memory per scope. A list a large scope grew is released.
+            if (blocks.capacity() <= quarantine_keep_max && quarantine_.capacity() == 0) {
+                blocks.clear();
+                quarantine_.swap(blocks);
+            }
         }
 #if defined(XOFFSET_STRESS_RELOCATE)
         void stress_poison_block(void* ptr, std::uint32_t bytes) noexcept {
@@ -3509,6 +3516,8 @@ namespace XOffsetDatastructure {
         bool pinned_ = false;
         detail::XCtl* ctl_ = nullptr;
         std::vector<std::uint64_t> quarantine_;
+        // Largest quarantine list (entries) kept between pin scopes: 8 KiB.
+        static constexpr std::size_t quarantine_keep_max = 1024;
         // An open bare pin scope (pin_open_lean without a block): where the
         // block goes if one is made before it closes.
         detail::XCtl** bare_slot_ = nullptr;
