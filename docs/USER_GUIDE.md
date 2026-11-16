@@ -207,7 +207,7 @@ marches.stable_erase_if([](const March& m) { return m.eta <= 0; });
 | `stable_erase_if(pred)` | 第一个被删的位置及之后失效 | 同 `std::erase_if` |
 | `reserve(n)`、`resize(n)` 超过容量 | 全部失效 | 同 `std::vector` |
 | `resize(n)` 不超过容量 | 缩小时第 n 个及之后失效，增大时都有效 | 同 `std::vector` |
-| `clear()`、`assign(…)` | 全部失效 | 同 `std::vector`；`clear()` 保留容量，并把旧元素的字节清零 |
+| `clear()`、`assign(…)` | 全部失效 | 同 `std::vector`；`clear()` 保留容量。旧元素的字节默认留在余量里，`XOFFSET_SCRUB_ERASED=1` 时清零（DEPLOYMENT 4.1 节） |
 | `XString` 的赋值、`clear()`、`reserve()` | 之前取到的 `view()`、`data()`、`c_str()` 失效 | 同 `std::string` |
 | `XSet` 的 `insert`、`emplace`；`XMap` 的 `try_emplace`、`emplace`，以及 `insert_or_assign`、`operator[]` 插入新键 | 插入位置及之后失效；扩容时全部失效 | 同 `std::flat_set`、`std::flat_map`；**不同于 `std::set`、`std::map`**（它们插入不影响别的元素） |
 | `XMap` 的 `insert_or_assign` 给已有键赋值 | 其他元素不受影响 | 同 std |
@@ -337,8 +337,10 @@ world.edit([&](View& w) {                  // 钉住作用域：普通引用，�
   记下第一个错误（`error()`：`capacity_exceeded`、`out_of_storage`、`borrowed`、`stale`、
   `out_of_range`）；之后的分配类操作直接失败，buffer 拒绝发送，直到 `clear_error()`。
 - **钉住作用域** `edit(f)` / `read(f)`：f 拿到普通引用，速度和普通结构体相同。作用域内 buffer
-  不搬（需要搬的操作失败并记 `borrowed`），容器回收的块等作用域结束才复用，所以作用域里拿到的
-  引用不会指向被复用的内存。f 不能返回指针、引用、`string_view` 或 `span`（编译期检查）。
+  不搬（需要搬的操作失败并记 `borrowed`）。容器自己的失效规则照旧（上表，同 `std::vector`）：
+  扩容或删除之后，之前取的引用不能再用，回收的块可能马上被别的容器复用。用
+  `XOFFSET_PIN_QUARANTINE=1` 编译时，回收的块等作用域结束才复用，失效的引用读到的还是旧
+  内容。f 不能返回指针、引用、`string_view` 或 `span`（编译期检查）。
   热路径和要交给接受 `T&` 的已有代码时用它。
 - `plain_root()` 是原来的 `root()`：没有保护的普通引用，buffer 搬家后悬空。只在确定不搬的
   存储上用（钉住槽位、VM、Pinned），或者干脆不用。

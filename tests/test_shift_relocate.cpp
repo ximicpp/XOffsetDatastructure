@@ -341,25 +341,36 @@ int rebase_overflow(std::string_view mode) {
     return 1;
 }
 
+// What the SHIFT path and the per-element path must agree on. Headers carry
+// the schema identity and are left out. With the M4 switches: every payload
+// byte. Without them a vacated slot keeps whatever its erase path left there
+// (one memmove against per-element moves), so the wires' compact forms, which
+// hold the live content only.
+template <class Root> std::string comparable(const std::string& wire) {
+    constexpr std::size_t header = sizeof(xo::XWireHeaderV2);
+#if XOFFSET_SCRUB_ERASED && XOFFSET_SCRUB_POPPED
+    return wire.substr(header);
+#else
+    xo::XBuffer loaded = xo::XBuffer::load_verified<Root>(wire, policy());
+    return loaded.save_compact<Root>().substr(header);
+#endif
+}
+
 int main(int argc, char** argv) {
     if (argc > 1) return rebase_overflow(argv[1]);
     rebase_edges();
     {
         const auto shifted = erase_tail_sizes<shift::Root>();
         const auto plain = erase_tail_sizes<shift::PlainRoot>();
-        constexpr std::size_t header = sizeof(xo::XWireHeaderV2);
-        if (shifted.size() != plain.size() ||
-            shifted.compare(header, std::string::npos, plain, header, std::string::npos) != 0)
+        if (shifted.size() != plain.size() || comparable<shift::Root>(shifted) != comparable<shift::PlainRoot>(plain))
             fail("erase tail sizes: SHIFT wire differs from the per-element path");
     }
     const auto shifted = run<shift::Root>();
     const auto plain = run<shift::PlainRoot>();
     if (shifted.size() != plain.size()) fail("checkpoint count");
-    // Headers carry the schema identity; every payload byte after them must match.
-    constexpr std::size_t header = sizeof(xo::XWireHeaderV2);
     for (std::size_t i = 0; i < shifted.size(); ++i) {
         if (shifted[i].size() != plain[i].size() ||
-            shifted[i].compare(header, std::string::npos, plain[i], header, std::string::npos) != 0)
+            comparable<shift::Root>(shifted[i]) != comparable<shift::PlainRoot>(plain[i]))
             fail("SHIFT wire differs from the per-element path at checkpoint " + std::to_string(i));
     }
     std::cout << "test_shift_relocate passed (" << shifted.size() << " checkpoints byte-identical)\n";

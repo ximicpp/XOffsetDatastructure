@@ -218,8 +218,8 @@ void bulk_workload_operation_gate_and_lifecycle() {
              <<" skipped_old_copy_bytes="<<n*16u<<"; mechanism counts, no timing\n";
 }
 // Whole-container copy assignment of a padded POD element: in place when the
-// capacity holds the source (storage kept, padding zeroed (M6), the shrunk
-// tail zeroed (M4)), and by regrowth otherwise.
+// capacity holds the source (storage kept; with the scrub switches the padding
+// is zeroed (M6) and so is the shrunk tail (M4)), and by regrowth otherwise.
 void copy_assign_in_place_and_regrow() {
     auto policy64 = policy(); auto b = xo::XBuffer::create<PadRoot>(1u << 16, policy64);
     auto foreign = xo::XBuffer::create<PadRoot>(1u << 16, policy64);
@@ -235,14 +235,22 @@ void copy_assign_in_place_and_regrow() {
     const auto* bytes = reinterpret_cast<const unsigned char*>(r.dst.data());
     for (std::uint32_t i = 0; i < 3; ++i) {
         need(r.dst[i].id == 50u + i && r.dst[i].value == 500u + i, "in-place copy values");
+#if XOFFSET_SCRUB_PADDING
         for (unsigned k = 4; k < 8; ++k) need(bytes[i * 16u + k] == 0, "in-place copy kept source padding");
+#endif
     }
+#if XOFFSET_SCRUB_ERASED && XOFFSET_SCRUB_PADDING
     for (std::size_t k = 3 * 16; k < std::size_t(cap) * 16; ++k) need(bytes[k] == 0, "in-place copy left the shrunk tail");
+#endif
     r.dst = r.dst;
     need(r.dst.size() == 3 && r.dst[2].id == 52u && r.dst.data() == p, "self copy");
     r.dst = r.src;
     need(r.dst.empty() && r.dst.capacity() == cap && r.dst.data() == p, "empty source changed storage");
+#if XOFFSET_SCRUB_ERASED && XOFFSET_SCRUB_PADDING
     for (std::size_t k = 0; k < std::size_t(cap) * 16; ++k) need(bytes[k] == 0, "empty source left elements");
+#else
+    (void)bytes;
+#endif
     for (std::uint32_t i = 3; i < 12; ++i) f.src.push_back(PadRec{50u + i, 500u + i});
     r.dst = f.src;
     need(r.dst.size() == 12 && r.dst.capacity() >= 12 && r.dst[11].value == 511u && r.dst.data() != p,
