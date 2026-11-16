@@ -315,6 +315,7 @@
 #   2026-11-16: Windows uses preframed uplink output and indexed random draws.
 #   2026-11-16: compare each native SLG uplink frame with independent compact output.
 #   2026-11-16: pass macOS uplink seeds by value and move units within the held view arena.
+#   2026-11-16: exercise the reused dirty-module storage receiver with empty modules.
 c7258374a6bc070e67baa3ecccbd18116fd3a20a3712aaed4b69a144d7e21431  CMakeLists.txt
 b3e74d714d9e6408f45e5fb065f40244969d79b2e4fb2a11ccbf52b110a2aec8  README.md
 ea141af841831b376028f48ab0d4c22e66ce2671f01d9e14c9f66814f5ebaa6e  adapters/cereal_format.hpp
@@ -343,7 +344,7 @@ ddf4523b91de1844cae9215de10d5f77b49fdfdc6567db92701efcc9e64674c5  include/slg/vi
 bf2ab42341c4db797200c2302cbcf3c62fc08030c98210e3270deb6d2d072605  schema/slg.fbs
 e7b20776bf0f93be063a8228ded1e15b00f50fd3be507e957a0033afd9f79761  schema/slg.proto
 cf948f2cf37c276e5f9d0734188fdc8ae9d4b0242cb676cfc4148573cec704a4  tests/flat_held_index_test.cpp
-13b29cfca7541c7dd69541c48e076466e25be749f00423711e89fae6c57ad910  tests/native_patch_copy_test.cpp
+d83b73fb2855aa2067266ec71eea40643e0ee01331fd8c99656c03f5c409904f  tests/native_patch_copy_test.cpp
 99f25ded0fe83308d6f97b9a67c813c456e6ace1889ece55bd9a01b6f9865426  tests/packed_marches_test.cpp
 018adb0c14fd1ef72fe8e877a35fba60a7b232ad7a1cf1160ce809ce72a629aa  tests/uplink_frame_test.cpp
 b16e110858873012f040a17b46cc438b23fbcf255ddb1e5be049eb38e2889db3  tests/uplink_order_paths_test.cpp
