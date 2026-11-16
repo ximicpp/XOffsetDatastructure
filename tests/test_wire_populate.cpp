@@ -1,8 +1,9 @@
 // E-2 (Linux): output prefetch with madvise(MADV_POPULATE_WRITE).
 //   - a fresh output of at least 1 MiB is populated in 256 KiB chunks;
 //   - a reused, resident output and an output below 1 MiB are not;
-//   - a kernel without MADV_POPULATE_WRITE (EINVAL, simulated here) gives the
-//     same bytes, is asked once, and never again in the process.
+//   - a kernel without MADV_POPULATE_WRITE (EINVAL) gives the same bytes, is
+//     asked once, and never again in the process.
+// Simulate both kernel responses so the copy paths are covered on any kernel.
 // Every output equals the one written by a plain copy. Other platforms only
 // check that the wire is unchanged.
 #if defined(__linux__)
@@ -21,6 +22,7 @@ inline int madvise(void* addr, std::size_t length, int advice) {
         ++calls;
         bytes += length;
         if (einval) { errno = EINVAL; return -1; }
+        return 0;
     }
     return ::madvise(addr, length, advice);
 }

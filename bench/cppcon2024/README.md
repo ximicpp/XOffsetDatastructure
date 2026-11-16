@@ -16,6 +16,23 @@ zstd 1.5.7），在主机上按记分卡固定的提交拉 zpp_bits v4.7.6 和 c
 （`schema/` 是 2024 原样的 `.proto`、`.fbs`、`.capnp`），`-std=c++26 -freflection -O3 -DNDEBUG` 编译，
 `--cpuset-cpus` 绑核跑 `RUNS` 个进程，`summarize.py` 对每项取中位数并和 2024 的数并列。
 
+## 内联属性布局
+
+`xoffset inline` 行使用新的 Character wire schema，保留同样的逻辑字段和有序物品表。
+装备属性数量 ≤8 时内联，更长的序列放入 arena vector。路径用 append_range 批量追加，物品插入后通过返回的迭代器删除。每轮以一次 edit() 容纳全部操作，计时涵盖 pin 的开启和关闭。
+原始 `xoffset 4.0` 行保留原 schema 和容器操作，便于在同一进程复测。
+
+可以独立运行 Character 写入、修改、回读 demo，编译只需库头文件。
+
+```sh
+c++ -std=c++20 -O2 -I. bench/cppcon2024/character_demo.cpp -o character_demo
+checksum=$(./character_demo write character.xwire)
+./character_demo modify character.xwire character.changed.xwire "$checksum"
+./character_demo verify character.changed.xwire
+```
+
+修改进程可以在另一平台运行。回读进程使用首次写入的平台，按独立生成的参考对象校验完整状态。
+
 ## 场景和规则
 
 - 数据：和 2024 同形状：64 个物品（map）、16 个路径点、16 个属性、8 件装备各 8 个属性、4 个技能、8 字节名字。
