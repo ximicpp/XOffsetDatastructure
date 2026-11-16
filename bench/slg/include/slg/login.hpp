@@ -67,22 +67,23 @@ template <class P, class Touch = NoTouch> void self_edits(P& p, Rng& rng, int op
     std::sort(d.items.begin(), d.items.end()); d.items.erase(std::unique(d.items.begin(), d.items.end()), d.items.end());
 }
 
+// Append a copy of an army to a patch's list. A model whose patch holds the
+// same army type copies it whole (the std and cista containers' and XOffset's
+// copy constructors); the others copy field by field. Every format takes the
+// same path for its own types.
+template <class L, class A> void append_army(L& list, const A& army) {
+    using Dst = typename std::remove_cvref_t<L>::value_type;
+    if constexpr (std::is_same_v<Dst, A> && requires { list.emplace_back(army); })
+        list.emplace_back(army);
+    else
+        copy_army(list.emplace_back(), army);
+}
+
 template <class M, class P> void fill_patch(M& m, P& p, const SelfDirty& d, int64_t seq) {
     m.player_id = p.player_id; m.seq = seq;
     m.army_index.clear(); m.armies.clear();
     m.army_index.reserve(d.armies.size()); m.armies.reserve(d.armies.size());
-#if defined(_WIN32)
-    for (int32_t a : d.armies) {
-        m.army_index.emplace_back(a);
-        const auto& army = p.armies[std::size_t(a)];
-        if constexpr (requires { append_patch_army(m.armies, army); })
-            append_patch_army(m.armies, army);
-        else
-            copy_army(m.armies.emplace_back(), army);
-    }
-#else
-    for (int32_t a : d.armies) { m.army_index.emplace_back(a); copy_army(m.armies.emplace_back(), p.armies[std::size_t(a)]); }
-#endif
+    for (int32_t a : d.armies) { m.army_index.emplace_back(a); append_army(m.armies, p.armies[std::size_t(a)]); }
     m.items.clear();
     for (int32_t k : d.items) m.items[k] = p.items[k];
     m.city_changed = d.city ? 1 : 0;
@@ -95,7 +96,7 @@ template <class M, class P> void fill_modules(M& m, const P& p, int64_t seq) {
     m.player_id = p.player_id; m.seq = seq;
     m.army_index.clear(); m.armies.clear();
     m.army_index.reserve(p.armies.size()); m.armies.reserve(p.armies.size());
-    for (std::size_t a = 0; a < p.armies.size(); ++a) { m.army_index.emplace_back(int32_t(a)); copy_army(m.armies.emplace_back(), p.armies[a]); }
+    for (std::size_t a = 0; a < p.armies.size(); ++a) { m.army_index.emplace_back(int32_t(a)); append_army(m.armies, p.armies[a]); }
     copy_map(m.items, p.items);
     m.city_changed = 0;
     m.city.city_id = 0; m.city.level = 0; m.city.buildings.clear(); m.city.resources.clear();

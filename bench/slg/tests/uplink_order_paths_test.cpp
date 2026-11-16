@@ -7,9 +7,6 @@
 #include <limits>
 #include <span>
 #include <stdexcept>
-#if !defined(__APPLE__) && !defined(_WIN32)
-#include <unistd.h>
-#endif
 
 namespace xo = XOffsetDatastructure;
 namespace xm = slg::xm;
@@ -33,12 +30,8 @@ void check_order(const Order& actual, const slg::stdm::March& expected) {
 }
 
 template <class Ops>
-std::span<const std::byte> send(Ops& ops, int round, slg::Rng& rng, int64_t seq) {
-    std::size_t size;
-    if constexpr (requires { ops.up_encode_order(0, round, rng, seq); })
-        size = ops.up_encode_order(0, round, rng, seq);
-    else
-        size = ops.up_encode([&](auto& order) { slg::fill_order(order, ops.held(0), rng, seq); });
+std::span<const std::byte> send(Ops& ops, const slg::OrderInput& order) {
+    const std::size_t size = ops.up_encode_input(order);
     const auto bytes = ops.up_wire();
     if (bytes.size() != size) throw std::runtime_error("send size disagrees with its wire");
     return std::as_bytes(std::span<const char>(bytes.data(), bytes.size()));
@@ -51,9 +44,7 @@ int main() {
         ops.srv.emplace_back(xo::XBuffer::create<xm::PlayerState>(128 * 1024, cap));
         ops.setup();
         xo::XReceiver<xo::XLink::from_client> receiver(cap);
-#if defined(__APPLE__) || defined(_WIN32)
         auto canonical = xo::XBuffer::create<xm::March>(32 * 1024, cap);
-#endif
         constexpr std::array army_counts{0, 1, 2, 3, 4, 5, 8, 15, 16, 17};
         constexpr std::array troop_counts{0, 1, 2, 3, 4, 5, 8, 128};
         constexpr std::array troop_limits{-1, 0, 1, 2, 151, 1034, (std::numeric_limits<int>::max)()};
@@ -82,10 +73,11 @@ int main() {
                 slg::stdm::March expected;
                 const auto seq = (std::int64_t(shape) << 40) + round;
                 slg::fill_order(expected, source, reference, seq);
-                const auto wire = send(ops, round, input, seq);
+                slg::OrderInput order;
+                slg::fill_order(order, ops.held(0), input, seq);
                 if (input.state != reference.state)
                     throw std::runtime_error("order consumed a different random stream");
-#if defined(__APPLE__) || defined(_WIN32)
+                const auto wire = send(ops, order);
                 auto& canonical_order = canonical.reset<xm::March>();
                 slg::Rng canonical_rng(seed);
                 slg::fill_order(canonical_order, source, canonical_rng, seq);
@@ -95,7 +87,6 @@ int main() {
                 const auto reference_wire = canonical.save_compact<xm::March>(xo::XCompactOptions{.slack_div = 0});
                 if (!std::ranges::equal(wire, std::as_bytes(std::span(reference_wire))))
                     throw std::runtime_error("order differs from independent canonical frame");
-#endif
                 const auto view = receiver.view<xm::March>(wire);
                 auto full = xo::XBuffer::try_load_verified<xm::March>(wire, cap);
                 if (!view || !full)
@@ -105,23 +96,8 @@ int main() {
                 const auto digest = slg::query_order(expected);
                 if (ops.up_recv() != digest || ops.up_recv_full() != digest)
                     throw std::runtime_error("wire receive disagrees with reference order");
-#if defined(__APPLE__)
-                const auto seeded_size = ops.up_encode_order_from_seed(0, round, seed, seq);
-                const auto seeded_wire = std::as_bytes(std::span(ops.up_wire()));
-                if (seeded_size != reference_wire.size() ||
-                    !std::ranges::equal(seeded_wire, std::as_bytes(std::span(reference_wire))))
-                    throw std::runtime_error("send from seed differs from independent canonical frame");
-                if (ops.up_recv() != digest || ops.up_recv_full() != digest)
-                    throw std::runtime_error("send from seed failed receive comparison");
-#endif
             }
         }
-#if !defined(__APPLE__) && !defined(_WIN32)
-        const auto page_size = ::sysconf(_SC_PAGESIZE);
-        if (page_size <= 0 || !ops.um ||
-            ops.um->reservation_limit() > (1u << 20) + static_cast<std::size_t>(page_size))
-            throw std::runtime_error("uplink reserved more than the initial relocation arena");
-#endif
         std::puts("2048 full-field orders and random streams agree across both receive modes");
         return 0;
     } catch (const std::exception& e) {

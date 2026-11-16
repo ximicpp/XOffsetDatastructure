@@ -859,30 +859,10 @@ namespace detail {
                 return {reinterpret_cast<const std::byte*>(wire_.get()), wire_size_};
         }
 
-#if defined(__APPLE__)
         template <class Prefix = Root, class Prepare, class Generate>
             requires std::is_invocable_r_v<std::size_t, Prepare&, Prefix&> &&
                      std::is_nothrow_invocable_r_v<Element, Generate&, std::size_t>
         XOFFSET_DETAIL_WIRE_INLINE std::size_t write(Prepare prepare, Generate generate) {
-            return write_impl<false, Prefix>(0, prepare, generate);
-        }
-
-        template <class Prefix = Root, class Prepare, class Generate>
-            requires std::is_nothrow_invocable_r_v<void, Prepare&, Prefix&> &&
-                     std::is_nothrow_invocable_r_v<Element, Generate&, std::size_t>
-        XOFFSET_DETAIL_WIRE_INLINE std::size_t write_counted(std::size_t count, Prepare prepare, Generate generate) {
-            return write_impl<true, Prefix>(count, prepare, generate);
-        }
-
-    private:
-        template <bool KnownCount, class Prefix, class Prepare, class Generate>
-        XOFFSET_DETAIL_WIRE_INLINE std::size_t write_impl(std::size_t count, Prepare& prepare, Generate& generate) {
-#else
-        template <class Prefix = Root, class Prepare, class Generate>
-            requires std::is_invocable_r_v<std::size_t, Prepare&, Prefix&> &&
-                     std::is_nothrow_invocable_r_v<Element, Generate&, std::size_t>
-        XOFFSET_DETAIL_WIRE_INLINE std::size_t write(Prepare prepare, Generate generate) {
-#endif
             // A plain prefix can prepare the scalar fields without constructing
             // the vector whose head is emitted separately below.
             if constexpr (!std::is_same_v<Prefix, Root>) {
@@ -892,11 +872,7 @@ namespace detail {
                 static_assert(flat_prefix_matches<Root, Prefix>(std::make_index_sequence<Member>{}));
             }
             Prefix root{};
-#if defined(__APPLE__)
-            if constexpr (!KnownCount) count = std::size_t(prepare(root));
-#else
             const auto count = std::size_t(prepare(root));
-#endif
             char* output;
             if constexpr (Framing == FlatRecordFraming::retained) {
                 if (count > capacity_ || !wire_) [[unlikely]] resize_wire(count);
@@ -910,9 +886,6 @@ namespace detail {
                     output = wire_.get();
                 }
             }
-#if defined(__APPLE__)
-            if constexpr (KnownCount) prepare(root);
-#endif
             char* body = output + sizeof(XWireHeaderV2);
             const auto* source = reinterpret_cast<const char*>(&root);
             std::memcpy(body, source, Field::offset);
@@ -929,31 +902,11 @@ namespace detail {
                 write_container_head(body, Field::offset, nonempty_delta, size, size);
             }
             char* data = body + root_bytes;
-#if defined(__APPLE__)
-            const auto store = [&](std::size_t i) noexcept {
-                const Element value = generate(i);
-                std::memcpy(data + i * sizeof(Element), &value, sizeof(Element));
-                zero_padding_bytes<Element>(data + i * sizeof(Element));
-            };
-            if constexpr (Framing == FlatRecordFraming::sized_slots) {
-                if (count <= 4) {
-                    if (count != 0) store(0);
-                    if (count > 1) store(1);
-                    if (count > 2) store(2);
-                    if (count > 3) store(3);
-                } else {
-                    for (std::size_t i = 0; i < count; ++i) store(i);
-                }
-            } else {
-                for (std::size_t i = 0; i < count; ++i) store(i);
-            }
-#else
             for (std::size_t i = 0; i < count; ++i) {
                 const Element value = generate(i);
                 std::memcpy(data + i * sizeof(Element), &value, sizeof(Element));
                 zero_padding_bytes<Element>(data + i * sizeof(Element));
             }
-#endif
             if constexpr (Framing == FlatRecordFraming::retained) {
                 if (size_ > size) {
                     char* unused = data + count * sizeof(Element);
