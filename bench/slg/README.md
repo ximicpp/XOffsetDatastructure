@@ -104,9 +104,11 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
     root reference, refreshed in snap_recv, the only point where the view's
     epoch changes, so U*.apply starts at the root rather than looking it up in
     the arena for every delta (-DSLG_RP_CHECK checks each use, off by default).
-    On macOS and Windows, deltas that remove and upsert marches can reuse vacated
-    slots in held views with more than 16 marches. The ordinary swap-and-erase
-    update handles shorter lists and deltas with a single kind of march change.
+    U*.apply is one algorithm for every format and platform (2026-11-16): a
+    unit that leaves is replaced by the last one, moved (each model's move
+    assignment); deltas that remove and upsert marches reuse vacated slots in
+    held views with more than 16 marches, and swap-and-erase handles shorter
+    lists and deltas with a single kind of march change.
   M: 10,000 units, 1,500 clients, 1,000 marches, 4 ticks per cycle. Bytes
   include zstd-3 and, for XOffset, the save_compact pull.
 - native delta (XOffset only, built when the library has
@@ -152,7 +154,8 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   each cycle); LD, the server then changes the player every tick (troops,
   items, buildings, resources) and sends a PlayerPatch with only the changed
   parts (dirty marks recorded by the edit); the client applies it in place.
-  On Windows, the XOffset runner copies dirty armies as XOffset records.
+  A patch (LD and SD) copies each army whole when the model's patch holds the
+  same army type (copy constructor; every format, every platform).
   SD, the dirty-module save to storage (all armies and items as a PlayerPatch).
   XOffset native: LK login key delta, LN self deltas, SN delta to what storage
   holds; every native receiver is checked equal to the application-level one.
@@ -160,8 +163,9 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
 - client uplink (`include/slg/uplink.hpp`, 2026-11-10, 3.5 W4, report only):
   UL, every online client sends the server one march order per round (4
   rounds per cycle): one of the armies of the player it holds, a target tile,
-  an arrival time and part of each troop type. `UL.send` is the client's fill
-  + encode, `UL.recv` the server's receive with the checks it runs on client
+  an arrival time and part of each troop type. The order's values (army, target,
+  troop counts) are drawn from the held player before the timer, as game logic
+  (2026-11-16); `UL.send` is the client's write of those values + encode, `UL.recv` the server's receive with the checks it runs on client
   data plus the read of every field. The rivals decode as everywhere else
   here (FlatBuffers' Verifier runs; cista in its format's mode); `xoffset`
   reloads with the full check through `XReceiver<XLink::from_client>`
@@ -172,15 +176,11 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   bounds / full ratio. Bytes `UL.order`, `UL.order_zstd` (`ULZ.send`), count
   `UL.orders`. Runs after the login case; `SLG_UL_OFF=1` drops it. New keys
   only. Each client keeps one order and refills it: the std and cista
-  runners `clear()` one `March`. On macOS and Windows, XOffset writes the
-  order directly into an aligned dense V2 output buffer. The writer retains
-  an aligned output slot for each order length up to four troops and uses a
-  compact output buffer for longer orders. Both runners compute each random
-  value from its original position in the sequence. The macOS runner reuses
-  the client player ID and army span across read-only uplink rounds. It finds the order
-  length before preparing the fixed fields and generates up to four troop
-  records without loop control. Other builds fill it through the relocating
-  XBuffer's edit path and save it into the reused output.
+  runners `clear()` one `March`; XOffset writes the order directly into a
+  dense V2 frame (`detail::FlatRecordWriter`, sized slots: one frame per
+  troop count up to four keeps its header and vector head, longer orders use
+  a grown frame), byte-identical to `save_compact` (tests/uplink_frame_test.cpp,
+  tests/uplink_order_paths_test.cpp). Same code on every platform.
 
 XOffset's A adapter (both case sets) calls `prefetch_for_update()` on the two
 players' buffers when the battle result starts arriving, inside the timed
