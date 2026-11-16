@@ -19,7 +19,7 @@ zstd 1.5.7），在主机上按记分卡固定的提交拉 zpp_bits v4.7.6 和 c
 ## 内联属性布局
 
 `xoffset inline` 行使用新的 Character wire schema，保留同样的逻辑字段和有序物品表。
-常见装备的前八个属性内联，较长的属性序列放入 arena vector。路径按批次调整，物品插入后通过返回的迭代器删除。
+装备属性数量 ≤8 时内联，更长的序列放入 arena vector。路径用 append_range 批量追加，物品插入后通过返回的迭代器删除。每轮以一次 edit() 容纳全部操作，计时涵盖 pin 的开启和关闭。
 原始 `xoffset 4.0` 行保留原 schema 和容器操作，便于在同一进程复测。
 
 可以独立运行 Character 写入、修改、回读 demo，编译只需库头文件。
