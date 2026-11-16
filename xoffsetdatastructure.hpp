@@ -3703,7 +3703,7 @@ namespace XOffsetDatastructure {
         // into (or out of) its own subobject.
 // pop_back() zeroes the removed element's bytes (threat model M4) only when
 // this is 1; by default they stay in spare capacity until overwritten.
-#if !defined(XOFFSET_SCRUB_POPPED)
+#ifndef XOFFSET_SCRUB_POPPED
 #  define XOFFSET_SCRUB_POPPED 0
 #endif
 #if !defined(XOFFSET_MOVE_OWNERSHIP_CHECKS)
