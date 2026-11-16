@@ -29,6 +29,14 @@ cmake --build build/slg --target slg_bench
 - `SLG_BUILD_PROBES=ON` adds the diagnostic programs `erase_probe` and
   `small_msg_probe` (off by default; they are not measurements).
 
+Run the SLG regression tests with the native compiler:
+
+```
+cmake -S bench/slg -B build/slg-native -DCMAKE_BUILD_TYPE=Release -DXOFFSET_CXX_STANDARD=23 -DSLG_WITH_XOFFSET=ON -DSLG_BUILD_REGRESSION_TESTS=ON
+cmake --build build/slg-native --config Release --target slg_regression_tests
+ctest --test-dir build/slg-native -C Release --output-on-failure --no-tests=error
+```
+
 ## Run
 
 ```
@@ -171,8 +179,8 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   compact output buffer for longer orders. The macOS runner reuses the client
   player ID and army span across read-only uplink rounds. It finds the order
   length before preparing the fixed fields and generates up to four troop
-  records without loop control. Other builds fill it in an `Automatic` XBuffer
-  and save it into the reused output.
+  records without loop control. Other builds fill it through the relocating
+  XBuffer's edit path and save it into the reused output.
 
 XOffset's A adapter (both case sets) calls `prefetch_for_update()` on the two
 players' buffers when the battle result starts arriving, inside the timed
