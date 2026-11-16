@@ -2,12 +2,14 @@
 // the plain std model the std-based rivals use, timing and a checksum.
 #pragma once
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <bit>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <random>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -38,6 +40,63 @@ inline void items_erase(std::vector<std::pair<uint64_t, Item>>& v, uint64_t k) {
   if (p != v.end() && p->first == k) v.erase(p);
 }
 }  // namespace stdm
+
+// ---- tuned layout: equipment attributes inline up to 8, longer ones in `Overflow` ----
+// The same layout XOffset's "xoffset inline" row uses (character.hpp), for every rival
+// whose containers can express it (std model, cista). Protocol Buffers, FlatBuffers and
+// Cap'n Proto have no inline array of scalars in a message, so they keep their schema.
+template <class Overflow>
+struct InlineAttrs {
+  std::array<float, 8> values{};
+  Overflow overflow;
+  uint32_t count = 0;
+  void assign(std::span<const float> attrs) {
+    if (attrs.size() > values.size()) {
+      overflow.clear(); overflow.insert(overflow.end(), attrs.begin(), attrs.end());
+      values.fill(0);
+    } else {
+      std::copy(attrs.begin(), attrs.end(), values.begin());
+      if (!overflow.empty()) overflow.clear();
+      std::fill(values.begin() + attrs.size(), values.end(), 0.0f);
+    }
+    count = static_cast<uint32_t>(attrs.size());
+  }
+  const float* begin() const { return count <= values.size() ? values.data() : overflow.data(); }
+  const float* end() const { return begin() + count; }
+  uint32_t size() const { return count; }
+};
+namespace stdm {
+struct InlineEquip { uint32_t id; uint32_t number; uint64_t uuid; uint64_t timestamp; uint32_t level; InlineAttrs<std::vector<float>> attributes; };
+struct CharacterInline {
+  uint64_t id; std::string name; uint32_t level; float healthpoint, manapoint, speed; Position pos;
+  std::vector<std::pair<uint64_t, Item>> items; std::vector<Position> path; std::vector<float> attributes;
+  std::vector<InlineEquip> equips; std::vector<Skill> skills;
+};
+// Insert or assign; returns the position, which the tuned loop erases without a second search.
+inline auto items_upsert(std::vector<std::pair<uint64_t, Item>>& v, uint64_t k, const Item& it) {
+  auto p = std::lower_bound(v.begin(), v.end(), k, [](const auto& e, uint64_t key) { return e.first < key; });
+  if (p != v.end() && p->first == k) { p->second = it; return p; }
+  return v.insert(p, {k, it});
+}
+}  // namespace stdm
+
+// Copies a Character into a model with the inline equipment layout (std or cista).
+template <class Ch> inline void fill_inline(Ch& r, const stdm::Character& c) {
+  r.id = c.id; r.name = c.name; r.level = c.level; r.healthpoint = c.healthpoint; r.manapoint = c.manapoint; r.speed = c.speed;
+  r.pos = {c.pos.x, c.pos.y, c.pos.z};
+  for (const auto& kv : c.items) {
+    const auto& it = kv.second;
+    if constexpr (requires { r.items.emplace_back(kv.first, it); }) r.items.emplace_back(kv.first, it);   // sorted vector
+    else { auto& x = r.items[kv.first]; x.id = it.id; x.number = it.number; x.uuid = it.uuid; x.timestamp = it.timestamp; }
+  }
+  for (const auto& p : c.path) { r.path.emplace_back(); r.path.back() = {p.x, p.y, p.z}; }
+  for (float a : c.attributes) r.attributes.push_back(a);
+  for (const auto& e : c.equips) {
+    auto& x = r.equips.emplace_back(); x.id = e.id; x.number = e.number; x.uuid = e.uuid; x.timestamp = e.timestamp; x.level = e.level;
+    x.attributes.assign(e.attributes);
+  }
+  for (const auto& s : c.skills) { r.skills.emplace_back(); r.skills.back() = {s.id, s.level}; }
+}
 
 // ---- the data: same shape as 2024 (64 items, 16 path points, 16 attributes, 8 equips x 8, 4 skills) ----
 struct Gen {
@@ -99,6 +158,14 @@ inline std::vector<OpSet> make_ops() {
   return v;
 }
 
+// Which parts of the loop run: 1 = equipment (4x append + drop), 2 = path points and the
+// attribute, 4 = the item insert + erase. Default all (7). Building with -DCC24_PARTS=1, 2
+// or 4 times one part alone (every part restores the state, so the checks still hold).
+#ifndef CC24_PARTS
+#define CC24_PARTS 7
+#endif
+constexpr bool kEquipPart = (CC24_PARTS & 1) != 0, kPathPart = (CC24_PARTS & 2) != 0, kItemPart = (CC24_PARTS & 4) != 0;
+
 // Make the temporary objects visible to the optimizer before removal.
 // The GCC/Clang benchmark uses a compiler barrier with no runtime call.
 template <class T>
@@ -117,21 +184,63 @@ template <class Ch, class ItemT, class SetFn, class EraseFn>
 inline void rw_once(Ch& r, const OpSet& o, SetFn&& set, EraseFn&& erase) {
   r.level += 1; r.healthpoint += 1; r.manapoint += 1; r.speed += 1;
   r.pos.x = o.pos[0]; r.pos.y = o.pos[1]; r.pos.z = o.pos[2];
-  for (const auto& eo : o.equip) {
+  if (kEquipPart) for (const auto& eo : o.equip) {
     auto& e = r.equips.emplace_back();
     e.id = eo.id; e.uuid = eo.uuid; e.number = eo.number; e.timestamp = eo.timestamp; e.level = eo.level;
     for (float a : eo.attr) e.attributes.push_back(a);
     observe(e);
     r.equips.pop_back();
   }
-  for (const auto& p : o.path) { r.path.emplace_back(); auto& b = r.path.back(); b.x = p[0]; b.y = p[1]; b.z = p[2]; }
-  r.attributes.push_back(o.attribute);
+  if (kPathPart) {
+    for (const auto& p : o.path) { r.path.emplace_back(); auto& b = r.path.back(); b.x = p[0]; b.y = p[1]; b.z = p[2]; }
+    r.attributes.push_back(o.attribute);
+  }
   ItemT it{}; it.id = o.item_id; it.uuid = o.item_uuid; it.number = o.item_number; it.timestamp = o.item_timestamp;
-  set(r.items, o.key, it);
+  if (kItemPart) set(r.items, o.key, it);
   observe(r);
-  erase(r.items, o.key);
-  r.attributes.pop_back();
-  for (int i = 0; i < 8; ++i) r.path.pop_back();
+  if (kItemPart) erase(r.items, o.key);
+  if (kPathPart) {
+    r.attributes.pop_back();
+    for (int i = 0; i < 8; ++i) r.path.pop_back();
+  }
+  r.speed -= 1; r.manapoint -= 1; r.healthpoint -= 1; r.level -= 1;
+}
+
+// The tuned loop body: the same logical operations as rw_once with the bulk calls each
+// container offers. Equipment attributes are assigned as one range (inline layout: no
+// allocation), the 8 path points are appended as one range and dropped with one resize,
+// and the item is erased at the position its insert returned (no second lookup).
+// upsert(map, key, item) returns that position; erase_at(map, position) removes it.
+template <class Ch, class ItemT, class PosT, class UpsertFn, class EraseAtFn>
+inline void rw_tuned(Ch& r, const OpSet& o, UpsertFn&& upsert, EraseAtFn&& erase_at) {
+  r.level += 1; r.healthpoint += 1; r.manapoint += 1; r.speed += 1;
+  r.pos.x = o.pos[0]; r.pos.y = o.pos[1]; r.pos.z = o.pos[2];
+  if (kEquipPart) for (const auto& eo : o.equip) {
+    auto& e = r.equips.emplace_back();
+    e.id = eo.id; e.uuid = eo.uuid; e.number = eo.number; e.timestamp = eo.timestamp; e.level = eo.level;
+    e.attributes.assign(eo.attr);
+    observe(e);
+    r.equips.pop_back();
+  }
+  const auto old_path_size = r.path.size();
+  if (kPathPart) {
+    std::array<PosT, 8> tail;
+    for (size_t i = 0; i < tail.size(); ++i) { tail[i].x = o.path[i][0]; tail[i].y = o.path[i][1]; tail[i].z = o.path[i][2]; }
+    r.path.insert(r.path.end(), tail.begin(), tail.end());
+    r.attributes.push_back(o.attribute);
+  }
+  ItemT it{}; it.id = o.item_id; it.uuid = o.item_uuid; it.number = o.item_number; it.timestamp = o.item_timestamp;
+  if (kItemPart) {
+    auto pos = upsert(r.items, o.key, it);
+    observe(r);
+    erase_at(r.items, pos);
+  } else {
+    observe(r);
+  }
+  if (kPathPart) {
+    r.attributes.pop_back();
+    r.path.resize(old_path_size);
+  }
   r.speed -= 1; r.manapoint -= 1; r.healthpoint -= 1; r.level -= 1;
 }
 
