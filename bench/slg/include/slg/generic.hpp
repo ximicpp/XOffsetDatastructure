@@ -31,7 +31,7 @@ std::string_view sv(const S& s) { return s.view(); }
 struct Rng {
     uint64_t state;
     explicit Rng(uint64_t seed) : state(seed) {}
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(_WIN32)
     static constexpr uint64_t step = 0x9e3779b97f4a7c15ull;
     static constexpr uint64_t mix_word(uint64_t z) noexcept {
         z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ull;
