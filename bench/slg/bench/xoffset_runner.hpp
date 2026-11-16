@@ -497,7 +497,8 @@ public:
         XOffsetDatastructure::detail::FlatRecordWriter<xm::March, 7, xm::Troop,
             XOffsetDatastructure::detail::FlatRecordFraming::sized_slots> ul_writer;
 #else
-        XOffsetDatastructure::detail::FlatRecordWriter<xm::March, 7, xm::Troop> ul_writer;
+        XOffsetDatastructure::detail::FlatRecordWriter<xm::March, 7, xm::Troop,
+            XOffsetDatastructure::detail::FlatRecordFraming::sized_slots> ul_writer;
 #endif
 #if defined(__APPLE__)
         struct UplinkSource {
@@ -556,19 +557,35 @@ public:
             rng.state = troop_seed + Rng::step * count;
             return bytes;
 #else
-            SourceTroops troops = nullptr;
-            const auto prepare = [&](xm::MarchOrderPrefix& order) -> std::size_t {
-                const auto* army = fill_order_head(order, source, rng, seq, [] {});
-                if (!army) return 0;
-                troops = army->troops.data();
-                return army->troops.size();
+            const auto seed = rng.state;
+            const auto army_count = source.armies.size();
+            const auto* army = source.armies.data();
+            auto troop_seed = seed + 3 * Rng::step;
+            if (army_count != 0) {
+                troop_seed += Rng::step;
+                army += std::size_t(Rng::mix_word(troop_seed) % army_count);
+            }
+            const auto count = army_count != 0 ? army->troops.size() : 0;
+            SourceTroops troops = count != 0 ? army->troops.data() : nullptr;
+            const auto prepare = [&](xm::MarchOrderPrefix& order) noexcept -> std::size_t {
+                order.march_id = seq;
+                order.owner = source.player_id;
+                order.from_x = army_count != 0 ? army->x : 0;
+                order.from_y = army_count != 0 ? army->y : 0;
+                order.to_x = int32_t(Rng::mix_word(seed + Rng::step) & 4095u);
+                order.to_y = int32_t(Rng::mix_word(seed + 2 * Rng::step) & 4095u);
+                order.eta = 30 + int32_t(Rng::mix_word(seed + 3 * Rng::step) % 571u);
+                return count;
             };
             const auto generate = [&](std::size_t i) noexcept {
-                xm::Troop troop;
-                fill_order_troop(troop, troops[i], rng);
-                return troop;
+                const auto& source_troop = troops[i];
+                const auto divisor = std::uint64_t((std::max)(source_troop.count, 1));
+                const auto word = Rng::mix_word(troop_seed + Rng::step * (i + 1));
+                return xm::Troop{source_troop.type, 1 + int32_t(word % divisor), 0};
             };
-            return ul_writer.template write<xm::MarchOrderPrefix>(prepare, generate);
+            const auto bytes = ul_writer.template write<xm::MarchOrderPrefix>(prepare, generate);
+            rng.state = troop_seed + Rng::step * count;
+            return bytes;
 #endif
         }
 #else

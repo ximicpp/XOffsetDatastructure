@@ -173,11 +173,11 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   `UL.orders`. Runs after the login case; `SLG_UL_OFF=1` drops it. New keys
   only. Each client keeps one order and refills it: the std and cista
   runners `clear()` one `March`. On macOS and Windows, XOffset writes the
-  order directly into an aligned dense V2 output buffer and clears inactive
-  troop slots when an order shrinks on Windows. On macOS the writer retains
+  order directly into an aligned dense V2 output buffer. The writer retains
   an aligned output slot for each order length up to four troops and uses a
-  compact output buffer for longer orders. The macOS runner reuses the client
-  player ID and army span across read-only uplink rounds. It finds the order
+  compact output buffer for longer orders. Both runners compute each random
+  value from its original position in the sequence. The macOS runner reuses
+  the client player ID and army span across read-only uplink rounds. It finds the order
   length before preparing the fixed fields and generates up to four troop
   records without loop control. Other builds fill it through the relocating
   XBuffer's edit path and save it into the reused output.
