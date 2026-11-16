@@ -7,7 +7,7 @@
 using namespace slg;
 using Image = std::array<int64_t, 8>;
 
-static std::vector<Image> contents(xm::ViewSnapshot& view, HeldIndex& index) {
+template <class V> static std::vector<Image> contents(V& view, HeldIndex& index) {
     std::vector<Image> rows;
     for (auto& march : view.marches) {
         const auto entry = index.marches.find(march.id);
@@ -20,6 +20,29 @@ static std::vector<Image> contents(xm::ViewSnapshot& view, HeldIndex& index) {
     std::sort(rows.begin(), rows.end());
     return rows;
 }
+// Reference: the swap-and-erase march update, one record at a time.
+template <class V, class D> static void reference_marches(V& v, HeldIndex& at, const D& d) {
+    for (const auto& id : d.removed_marches) {
+        const auto it = at.marches.find(id);
+        if (it == at.marches.end()) continue;
+        const int32_t pos = it->second, last = int32_t(v.marches.size()) - 1;
+        if (pos != last) {
+            copy_vmarch(v.marches[std::size_t(pos)], v.marches[std::size_t(last)]);
+            at.marches[v.marches[std::size_t(pos)].id] = pos;
+        }
+        v.marches.pop_back();
+        at.marches.erase(it);
+    }
+    for (const auto& m : d.marches) {
+        const auto it = at.marches.find(m.id);
+        if (it != at.marches.end()) copy_vmarch(v.marches[std::size_t(it->second)], m);
+        else {
+            at.marches.emplace(m.id, int32_t(v.marches.size()));
+            copy_vmarch(v.marches.emplace_back(), m);
+        }
+    }
+}
+
 static void same_arena_held_unit_regression() {
     using XBuffer = XOffsetDatastructure::XBuffer;
     const auto cap = XBuffer::maximum_capacity(256 * 1024);
@@ -49,7 +72,7 @@ static void same_arena_held_unit_regression() {
         slg::apply_delta(expected, expected_index, delta);
         const auto wire = updates.save_verified<xm::ViewDelta>();
         ops.delta_recv_from(wire);
-        ops.apply_held_delta(actual, actual_index);
+        slg::apply_delta(actual, actual_index, ops.delta());
     };
     const auto compare = [&](const auto& units) {
         if (units.size() != expected.units.size())
@@ -99,8 +122,8 @@ int main() {
     auto& expected = control.root<xm::ViewSnapshot>();
     auto& delta = updates.root<xm::ViewDelta>();
     HeldIndex a, b;
-    XOffsetRunnerT<XoTrustedModel, false>::BlockOps ops;
-    ops.dview = &delta;
+    stdm::ViewSnapshot std_view;
+    HeldIndex si;
     Rng random(20261115);
     for (int i = 0; i < 4000; ++i) {
         delta.removed_marches.clear();
@@ -127,9 +150,10 @@ int main() {
             delta.marches.emplace_back().id = 5;
             delta.marches.emplace_back().id = 5;
         }
-        slg::apply_delta(expected, b, delta);
-        ops.apply_held_delta(actual, a);
-        if (contents(actual, a) != contents(expected, b))
+        reference_marches(expected, b, delta);
+        slg::apply_delta(actual, a, delta);
+        slg::apply_delta(std_view, si, delta);
+        if (contents(actual, a) != contents(expected, b) || contents(std_view, si) != contents(expected, b))
             throw std::runtime_error("packed march state differs from reference");
     }
     // Exercise a deletion batch larger than the expected number of vacancies.
@@ -137,16 +161,16 @@ int main() {
     delta.marches.clear();
     for (int id = 1000; id < 1100; ++id)
         delta.marches.emplace_back().id = id;
-    slg::apply_delta(expected, b, delta);
-    ops.apply_held_delta(actual, a);
+    reference_marches(expected, b, delta);
+    slg::apply_delta(actual, a, delta);
     delta.removed_marches.clear();
     delta.marches.clear();
     for (int id = 1000; id < 1065; ++id)
         delta.removed_marches.push_back(id);
     for (int id = 1030; id < 1085; ++id)
         delta.marches.emplace_back().id = id;
-    slg::apply_delta(expected, b, delta);
-    ops.apply_held_delta(actual, a);
+    reference_marches(expected, b, delta);
+    slg::apply_delta(actual, a, delta);
     if (contents(actual, a) != contents(expected, b))
         throw std::runtime_error("large deletion batch differs from reference");
 
@@ -170,7 +194,7 @@ int main() {
         const auto append = next++;
         delta.marches.emplace_back().id = append;
         try {
-            ops.apply_held_delta(view, index);
+            slg::apply_delta(view, index, delta);
         } catch (const std::exception&) {
             rejected = true;
             if (!recycle || index.marches.find(live) || !index.marches.find(append - 1) ||
