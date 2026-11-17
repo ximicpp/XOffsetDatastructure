@@ -70,3 +70,11 @@ git checkout 87a0514b6fd76bdd130d1be1067232211ce78b24 -- $(git ls-tree --name-on
 ```
 
 仍然指向这些路径的只有历史材料：`openspec/changes/` 的设计与任务、`docs/handoff-history/`、`docs/validation/`、`docs/perf/` 里的旧记录，以及 `docs/STABLE_VM_STORAGE_*.md` 中标为 archived 的几处引用。这些文件不改，读到时按上面的命令取回。
+
+## 2026-11-17：移除 LLM/agent 文件与 openspec
+
+`CLAUDE.md`、`AGENTS.md`、`.claude/`（sync-typelayout 技能）和 `openspec/changes/`（三个已归档变更 + `vm-next-stage-hardening`）已从仓库删除，并加入 `.gitignore`。其中对人有用的构建、测试与代码约定移到了 [CONTRIBUTING.md](../CONTRIBUTING.md)。`docs/validation/` 里的清单和冻结副本仍会提到这些路径，不改；需要原文时从合并前的提交取回，例如：
+
+```bash
+git show 18a37f39:openspec/changes/vm-next-stage-hardening/tasks.md
+```
