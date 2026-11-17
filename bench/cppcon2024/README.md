@@ -49,6 +49,8 @@ part of the read/write loop, to see where the time goes.
   - XOffset: `save_verified_into` / `save_verified`; receiving uses the trusted tier
     `XReceiver<XLink::server_peer>` (`reload` into a reused buffer / `load` a new one). The full
     validation tier (`reload_verified` / `load`) is report only.
+    The scored rows send a buffer that was filled once. `sr_reuse_after_rw` (report only) sends the
+    buffer the read/write loop has run on, whose wire also carries spare capacity and freed blocks.
   - zpp::bits, MessagePack: encode std objects, decode into std objects.
   - Protocol Buffers: as in 2024, the state is the mutable protobuf message: `SerializeToString` +
     `ParseFromString`.
@@ -86,9 +88,61 @@ part of the read/write loop, to see where the time goes.
 - Both sets of XOffset read/write rows use one `edit()` per iteration. One `edit()` around all
   iterations of a round is report only (`rw_one_scope`).
 
+## Send + receive of a buffer that has been modified (2026-11-17)
+
+The send + receive rows above and below send a buffer that was filled once and never modified. That is the
+best case for XOffset: its wire is the buffer, so spare capacity and the blocks that modifications have
+freed travel with it, while a rival's wire depends only on the state. A review of the published numbers
+(2026-11-17) asked how much this matters, so the bench now also sends the buffer the read/write loop has
+just run on (`sr_reuse_after_rw`, report-only). Its state is the one the std model has after the loop:
+every container is back at its original size after 500,000 iterations of growing and shrinking. The rivals' rows are
+unchanged, because their encoders see only the state. The scored rows stay as they were.
+
+Library at main b25e0cfc (unchanged by this change), 15 processes, GCC 16.2, one cloud machine. All tables
+and the raw output of every process:
+[`results/2026-11-17-modified-buffer/summary.md`](results/2026-11-17-modified-buffer/summary.md). This is
+a separate run from the next section, so compare ratios, not nanoseconds; the read/write tables the
+top-level README quotes are still the ones of the next section.
+
+| XOffset row | Wire bytes | zstd-3 | ns per message | ÷ zpp::bits | ÷ cista raw |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 2024 layout, trusted tier, as filled (the scored row) | 3,064 | 2,986 | 78.4 | 0.245 | 0.117 |
+| 2024 layout, trusted tier, after the read/write rounds | 7,928 | 3,173 | 180.7 | 0.566 | 0.269 |
+| 2024 layout, full validation tier, as filled | 3,064 | 2,986 | 191.2 | 0.599 | 0.284 |
+| 2024 layout, full validation tier, after the read/write rounds | 7,928 | 3,173 | 331.0 | 1.036 | 0.492 |
+| Tuned layout, trusted tier, as filled (the scored row) | 3,128 | 2,977 | 78.1 | 0.250 | 0.122 |
+| Tuned layout, trusted tier, after the read/write rounds | 8,536 | 3,213 | 187.6 | 0.602 | 0.293 |
+
+- After the rounds the wire is 2.6 to 2.7 times larger (7,928 against 3,064 bytes) and send + receive takes
+  about 2.3 times longer (per-process ratio: median 2.31, range 2.05 to 3.79). The time follows the bytes:
+  both ends copy the wire, and the receiver loads a longer table of free blocks.
+- On the trusted tier XOffset is still faster than zpp::bits in every one of the 15 processes, but at 0.57
+  to 0.60 of its time (per-process median 0.58, range 0.54 to 0.88), not 0.24 to 0.25. Against cista
+  (unchecked) it is 0.27 to 0.29, not 0.12.
+- On the full validation tier a modified buffer ties zpp::bits: 1.04 (per-process median 1.04, range 0.93
+  to 1.13, faster in 2 of 15 processes). The sentence "the full tier is still 0.50 of zpp::bits" holds for
+  a buffer that has not been modified.
+- One read/write iteration plus one send + receive, with XOffset sending the modified buffer: 331 ns on
+  the 2024 layout and 250 ns tuned, against zpp::bits on std containers 656 and 399 ns (0.51 and 0.63; with
+  the as-filled buffer 0.35 and 0.35), cista 897 to 910 and 701 to 704 ns (0.36 to 0.37), Protocol Buffers
+  9,311 and 9,116 ns (0.036 and 0.027).
+- After zstd-3 the modified wire is 3,173 bytes against 2,986 as filled (zpp::bits 2,926): the extra bytes
+  are mostly zeros and old data that compress well, so the cost is mainly time and uncompressed bytes.
+- `save_compact` writes the same state without the spare capacity and free blocks: 3,552 bytes (tuned
+  layout 3,632, zstd-3 3,006). It walks the state, so it is not a free replacement for sending the buffer
+  as it is; its time is not measured here.
+- How large the effect is depends on how much the buffer has grown and shrunk. Each iteration of this loop
+  adds and removes 4 equipment records with 8 attributes each, 8 path points, an attribute and a map item,
+  100,000 iterations per round, which is heavy churn for a 3 KB state. A buffer whose changes are scalar
+  writes stays at the as-filled figures; cases in between were not measured.
+- In this run the tuned read/write loop is a tie with cista raw (62.4 against 62.6 ns, per-process ratio
+  median 0.98, XOffset faster in 9 of 15 processes; 0.89 against cista offset, 14 of 15), where the next
+  section measured 0.91 and 15 of 15. The two runs differ by machine noise on a 60 ns row; read the tuned
+  margin over cista raw as "a tie to a small win", not as a fixed 0.91.
+
 ## Latest results: XVector first block of at least 32 bytes (2026-11-17)
 
-This set supersedes the next section as the one the top-level README quotes.
+This set supersedes the section after it as the one the top-level README quotes for the main tables.
 
 One library change (e36cf44): the block an empty `XVector` takes on its first append holds at least 32 bytes
 (8 floats or 32-bit ids; it was 4 elements, 16 bytes), and a `push_back` of a small scalar that triggers growth

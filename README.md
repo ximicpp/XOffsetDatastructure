@@ -197,6 +197,24 @@ iteration uses a new map key. Median of 15 processes, library at e36cf44
 With the full validation tier instead, XOffset takes 171 ns, still 0.50 of
 zpp::bits.
 
+These rows send a buffer that was filled once and never modified, which is
+XOffset's best case: its wire is the buffer, so the spare capacity and the
+blocks that modifications have freed travel with it, while a rival's wire
+depends only on the state. Sending the buffer that the read/write loop below
+has just run on (same state size, heavy churn; a separate run of 15 processes
+with zpp::bits at 319 ns, [details](bench/cppcon2024/README.md#send--receive-of-a-buffer-that-has-been-modified-2026-11-17)):
+
+| XOffset buffer | Wire bytes | ns / message | ÷ zpp::bits | ÷ cista raw |
+| --- | ---: | ---: | ---: | ---: |
+| As filled, trusted tier | 3,064 | 78 | 0.25 | 0.12 |
+| After the read/write loop, trusted tier | 7,928 | 181 | 0.57 | 0.27 |
+| As filled, full validation tier | 3,064 | 191 | 0.60 | 0.28 |
+| After the read/write loop, full validation tier | 7,928 | 331 | 1.04 | 0.49 |
+
+So on the trusted tier a heavily modified buffer is still sent and received
+in a bit over half of zpp::bits's time (faster in all 15 processes), not a
+quarter, and on the full validation tier it ties zpp::bits.
+
 **Read/write loop** (one iteration: change scalars and position, add and
 remove equipment, waypoints, an attribute and a map item):
 
@@ -212,18 +230,26 @@ position; applied to every library that can express it.
 
 In-place read/write is the fastest of these libraries in both layouts, in
 every one of the 15 processes. The margin over cista is small on the tuned
-layout (0.90–0.91). Protocol Buffers' default `RemoveLast` keeps the removed
+layout (0.90–0.91); the separate run above measured 0.98 against cista raw
+(faster in 9 of 15 processes) and 0.89 against cista offset, so read it as a
+tie to a small win. Protocol Buffers' default `RemoveLast` keeps the removed
 messages for the next `add_`, so its loop allocates nothing (77 ns on the
 2024 layout, report-only, about half of XOffset's 144 ns); the scored row
 frees them like every other library. **One read/write iteration plus one
 send and receive** costs XOffset 144 ns (tuned), against 390 ns for zpp::bits
 on std containers (0.37), 661–682 ns for cista (0.21–0.22) and 9,157 ns for
-Protocol Buffers (0.016).
+Protocol Buffers (0.016). That sum uses the as-filled buffer. With the buffer
+the loop has modified it is 250 ns in the separate run: 0.63 of zpp::bits,
+0.36 of cista and 0.027 of Protocol Buffers (2024 layout: 331 ns, 0.51, 0.36
+to 0.37 and 0.036).
 
 Size: the `Character` wire is 3,064 bytes raw and 2,986 bytes after zstd-3
 (zpp::bits 2,926, Protocol Buffers 3,800). The wire header makes small
 XOffset messages about 100 bytes larger than zpp::bits; this is accepted by
-design and reported, not optimized away.
+design and reported, not optimized away. That is the as-filled buffer too:
+after the read/write loop the same state is 7,928 bytes on the wire (3,173
+after zstd-3), and `save_compact`, which leaves out spare capacity and free
+blocks, writes it in 3,552.
 
 ### SLG game-server scorecard
 
@@ -231,10 +257,33 @@ design and reported, not optimized away.
 per-client deltas, a shared map viewport, client orders going up, and players
 moving between servers. Each cell times only data writing, sending and
 receiving, against the strongest rival for that cell (zpp_bits or unchecked
-cista, both without verification, XOffset on its trusted tier). For the 4.0.0
+cista, neither with a separate verification pass, XOffset on its trusted
+tier). For the 4.0.0
 release ([PERFORMANCE.md 6b](docs/PERFORMANCE.md)): **19 gated cells, 14 wins,
 5 ties, 0 losses**, 8 batches × 21 cycles, the borderline shared-delta cells
 re-judged under three code layouts.
+
+A review on 2026-11-17 found the verdicts sound and added reading notes
+([PERFORMANCE.md 6b](docs/PERFORMANCE.md#reading-this-scorecard-review-of-2026-11-17)):
+
+- The scorecard was measured on 4.0.0 and has not been rerun on the current
+  tree.
+- The two storage cells (S, SD) against zpp_bits include a decode on zpp's
+  side that the trusted tier does not need. On the same basis they are 0.24
+  and 0.41, not 0.17 and 0.28. Unchecked cista is the strongest rival of both
+  cells (0.41 and 0.39), so they stay wins.
+- The client-order cells (UL) take about 42 ns per order on the cloud host,
+  about 30 ns of which is the two clock reads around each message, for
+  XOffset and rival alike. That pulls the ratio toward 1: UL.recv is a tie at
+  0.97 there and 0.82 on the Apple M4.
+- The later Apple M4 run (18 wins, 1 tie, 0 losses) has zpp_bits as its only
+  rival. Unchecked cista, the strongest rival of six cloud cells, was not run
+  there, so that count is not the same measure as 14 / 5 / 0.
+- zpp_bits always bounds-checks its reads and has no unchecked mode, so its
+  receive cells compare a checked decoder with XOffset's unchecked trusted
+  tier, as the trust model intends.
+- XOffset messages are larger: 1.11 to 1.46 times zpp_bits after zstd-3, and
+  1.34 to 2.07 times uncompressed between servers.
 
 These numbers hold for these workloads, adapters and hosts. A different
 workload or a different way of writing the rival adapters can change them.
