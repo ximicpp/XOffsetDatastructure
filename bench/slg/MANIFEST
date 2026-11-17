@@ -325,8 +325,11 @@
 #                        slots (one apply_delta). LD/SD patches copy a same-type army whole
 #                        for every model (append_army). All four SLG regression tests on all
 #                        platforms. Wire bytes and every report_sum unchanged.
-77301efbc2755d89c1ee037f3a96bfe869b27edbf1daab197904465ad0456a38  CMakeLists.txt
-70e0b3fd0121beaacc2f418cd907849ee39495563f729972cfc2e287fcbdf0dd  README.md
+#   CMakeLists.txt, README.md, tools/analyze.py  2026-11-17 (repository English only): comments,
+#                        thread names and analyze.py's report text translated to English.
+#                        No bench code, keys, bytes or results changed.
+247d2e5e3f05e6e3771614f2d4be44360de72e80b02c50567c54f6d59c5e2e84  CMakeLists.txt
+c3d7a0bb3db59874a56fb6ee1bd6802d4a8d5eb07c9a1e9ffed16bae1de81d54  README.md
 ea141af841831b376028f48ab0d4c22e66ce2671f01d9e14c9f66814f5ebaa6e  adapters/cereal_format.hpp
 6441a0f51cf04424de67df98f6a3696b378f8ec3cd3d97c2bf5a6ec065db2768  adapters/flatbuffers_format.hpp
 677c3607ff9390c5a1b9d6a348da3dcd7aee4eef52740a35911d2ab041136ced  adapters/protobuf_format.hpp
@@ -357,4 +360,4 @@ d83b73fb2855aa2067266ec71eea40643e0ee01331fd8c99656c03f5c409904f  tests/native_p
 2b85fe5346c0d03957c139cdb6afb1925d607ac549590932d3ef5d905e22a3c7  tests/packed_marches_test.cpp
 e04fe0e1e7b3d2fffe1821603903eb0dd1d60e441a2c7035337708c1b0abb8a4  tests/uplink_frame_test.cpp
 bcb932d2439d37bd88c1cf5ff414e166debf72269b0ffe9ad4e9901b73032048  tests/uplink_order_paths_test.cpp
-959d39736472b7db0274f8a9cc5b23b0b864162cf80f5ce1bb88a5f21bb46244  tools/analyze.py
+f293009667aeb2e033fe5ca2d04d52f4a5dce9cd555f000cb90a5f3d501bc63a  tools/analyze.py
