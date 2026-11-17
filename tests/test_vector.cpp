@@ -150,9 +150,57 @@ bool test_vector_iterators() {
     return true;
 }
 
+// An empty vector's first block holds 4 elements and at least 32 bytes, so a
+// handful of small scalars is appended without moving to a second block;
+// reserve() and the range assignments stay exact.
+struct GrowthTest {
+    XVector<std::uint8_t> bytes;
+    XVector<std::uint16_t> shorts;
+    XVector<float> floats;
+    XVector<std::uint64_t> wides;
+    XVector<XString> strings;
+    XVector<int> exact;
+};
+XOFFSET_RECORD_DERIVED(GrowthTest, (), bytes, shorts, floats, wides, strings, exact)
+
+template <class V, class Value>
+static bool first_block_holds(V& v, std::uint32_t expected, Value value) {
+    if (v.capacity() != 0) return false;
+    v.push_back(value);
+    if (v.capacity() != expected) return false;
+    const auto* block = v.data();
+    for (std::uint32_t i = 1; i < expected; ++i) v.push_back(value);
+    if (v.data() != block || v.capacity() != expected || v.size() != expected) return false;
+    v.push_back(v[0]); // the full vector doubles; the value is an element of the old block
+    return v.capacity() == 2 * expected && v.size() == expected + 1 && v[expected] == v[0];
+}
+
+bool test_vector_first_block() {
+    std::cout << "\n[TEST] Vector first block\n";
+    static_assert(fixed_detail::first_capacity<std::uint8_t>() == 32 && fixed_detail::first_capacity<float>() == 8 &&
+                  fixed_detail::first_capacity<std::uint64_t>() == 4 && fixed_detail::first_capacity<XString>() == 4);
+    XBuffer xbuf(4096);
+    auto* obj = xbuf.make<GrowthTest>();
+    bool ok = first_block_holds(obj->bytes, 32, std::uint8_t(7)) &&
+              first_block_holds(obj->shorts, 16, std::uint16_t(7)) &&
+              first_block_holds(obj->floats, 8, 1.5f) &&
+              first_block_holds(obj->wides, 4, std::uint64_t(7));
+    obj->strings.emplace_back();
+    ok = ok && obj->strings.capacity() == 4;
+    obj->exact.reserve(3);
+    ok = ok && obj->exact.capacity() == 3;
+    const std::uint64_t two[] = {1, 2};
+    XBuffer other(4096);
+    auto* fresh = other.make<GrowthTest>();
+    fresh->wides.assign_range(two);
+    ok = ok && fresh->wides.capacity() == 2;
+    std::cout << (ok ? "[PASS]" : "[FAIL]") << " Vector first block\n";
+    return ok;
+}
+
 int main() {
     try {
-        return test_vector_operations() && test_vector_iterators() ? 0 : 1;
+        return test_vector_operations() && test_vector_iterators() && test_vector_first_block() ? 0 : 1;
     } catch (const std::exception& e) {
         std::cerr << "[FAIL] Exception: " << e.what() << "\n";
         return 1;
