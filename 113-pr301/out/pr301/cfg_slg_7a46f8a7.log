@@ -1,0 +1,15 @@
+loading initial cache file /Volumes/XOffsetCS/perf-gate/slg-init-p2996-d77eff1.cmake
+-- The CXX compiler identification is Clang 21.0.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /Volumes/XOffsetCS/toolchain/p2996-d77eff1/bin/clang++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- XOFFSET_CXX_STANDARD not given: C++26 reflection found, using 26
+-- Found Threads: TRUE
+-- Using C++26 with reflection (schema backend: auto)
+-- Full-library reflection compile/link probe passed
+-- slg_bench formats:xoffset=ON ir_count=OFF cereal=/Volumes/XOffsetCS/competitors/sources/cereal-v1.3.2/include protobuf=TRUE flatbuffers=/Volumes/XOffsetCS/mac-validation/install/flatbuffers/bin/flatc zpp_bits=/Volumes/XOffsetCS/competitors/sources/zpp_bits-v4.7.6 cista=/Volumes/XOffsetCS/competitors/sources/cista-v0.16/include compression=/opt/homebrew/lib/libzstd.dylib
+-- Configuring done (1.7s)
+-- Generating done (0.0s)
+-- Build files have been written to: /Volumes/XOffsetCS/perf-gate/build/pr301-7a46f8a7/slg

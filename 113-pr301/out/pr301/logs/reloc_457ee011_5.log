@@ -1,0 +1,6 @@
+reloc_bench: mode=bench rounds=201 warmup=3 (console: median ns/op, median per-round ratio xoffset/baseline)
+vec.push_back_grow             G9               0.35   std::vector 0.48 ratio 0.744
+hero.push_back_grow.ord        G9              26.41   std::vector 86.55 ratio 0.305
+hero.push_back_grow.plain      report          29.70   std::vector 87.32 ratio 0.341
+reset                          G9              23.44   std 115.88 ratio 0.202
+4 cases; checks: all passed
