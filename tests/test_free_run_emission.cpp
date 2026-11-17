@@ -3,7 +3,10 @@
 //   - a run next to small holes skips only its large blocks;
 //   - a run made only of small holes is not skipped (dense wire);
 //   - a single large free block (the large table) is skipped;
-//   - two runs give three extents.
+//   - two runs give three extents;
+//   - random layouts with few candidates (sorted in local storage) and with
+//     many candidates and many runs (heap storage) skip exactly the runs a
+//     reference computed from the hole table finds.
 // Every wire loads the dense payload, save_verified_into emits the same
 // bytes, and a beta.1-style check holds: every skipped byte is a hole. (A run
 // at the payload tail is covered by test_wire_hole_zeroing's declared-size
@@ -132,6 +135,49 @@ std::vector<Hole> emit(Buffer& b, const std::string& where) {
     return p.gaps;
 }
 
+// The runs the emission must skip, from the wire's own hole table: holes of
+// at least 256 B sorted by offset, adjacent ones merged, runs of at least
+// 4 KiB kept.
+std::vector<Hole> reference_runs(const std::string& wire) {
+    auto holes = parse(wire).holes;
+    std::erase_if(holes, [](Hole h) { return h.bytes < 256; });
+    std::sort(holes.begin(), holes.end(), [](Hole a, Hole c) { return a.offset < c.offset; });
+    std::vector<Hole> runs;
+    std::uint64_t start = 0, end = 0;
+    auto close = [&] { if (end - start >= 4096) runs.push_back({std::uint32_t(start), std::uint32_t(end - start)}); };
+    for (auto h : holes) {
+        if (h.offset == end && end != 0) { end += h.bytes; continue; }
+        close();
+        start = h.offset;
+        end = std::uint64_t(h.offset) + h.bytes;
+    }
+    close();
+    return runs;
+}
+
+// Blocks of random sizes (some below 256 B), a random subset freed.
+void random_layout(std::uint64_t seed, std::size_t blocks, unsigned free_percent, std::size_t& candidates,
+                   std::size_t& runs) {
+    std::uint64_t s = seed;
+    auto next = [&] { s = s * 6364136223846793005ull + 1442695040888963407ull; return s >> 33; };
+    std::vector<std::size_t> sizes, freed;
+    for (std::size_t i = 0; i < blocks; ++i) {
+        sizes.push_back(next() % 8 == 0 ? 64 + 8 * (next() % 16) : 256 + 8 * (next() % 400));
+        if (next() % 100 < free_percent) freed.push_back(i);
+    }
+    auto b = make(sizes, freed);
+    const auto wire = b.save_verified();
+    const auto gaps = emit(b, "random layout");
+    const auto expected = reference_runs(wire);
+    need(gaps.size() == expected.size(), "random layout: run count differs from the reference");
+    for (std::size_t i = 0; i < gaps.size() && i < expected.size(); ++i)
+        need(gaps[i].offset == expected[i].offset && gaps[i].bytes == expected[i].bytes,
+             "random layout: a run differs from the reference");
+    candidates = 0;
+    for (auto h : parse(wire).holes) candidates += h.bytes >= 256 ? 1 : 0;
+    runs = gaps.size();
+}
+
 std::uint32_t offset_of_block(Buffer& b, std::size_t i) {
     return std::uint32_t(reinterpret_cast<const char*>(b.plain_root().blobs[i].data.data()) -
                          static_cast<const char*>(b.get_address()));
@@ -171,6 +217,17 @@ int main() {
         need(gaps.size() == 2 && gaps[0].offset == a && gaps[1].offset == c, "two runs: expected both 4 KiB blocks");
         need(parse(b.save_verified()).h.extent_count == 3, "two runs: expected three extents");
     }
-    std::cout << "test_free_run_emission: 4 groups passed\n";
+    {   // Random layouts: up to 64 candidates (local storage), and more
+        // candidates with more than 8 runs (heap storage).
+        bool local = false, spilled = false;
+        for (std::uint64_t seed = 1; seed <= 300; ++seed) {
+            std::size_t candidates = 0, runs = 0;
+            random_layout(seed, seed % 2 ? 60 : 900, seed % 3 == 0 ? 85 : 60, candidates, runs);
+            local |= candidates <= 64 && runs >= 1;
+            spilled |= candidates > 64 && runs > 8;
+        }
+        need(local && spilled, "random layouts: both storage paths must be reached");
+    }
+    std::cout << "test_free_run_emission: 5 groups passed\n";
     return 0;
 }
