@@ -1,0 +1,74 @@
+# cppcon2024 rerun: rw 100000 iters, send+recv 50000 msgs, median of 5 rounds, ns per iteration/message
+std (shared)           rw                                278.2
+std inline             rw                                 69.8
+xoffset 4.0            bytes                            3112.0
+xoffset 4.0            bytes_zstd3                      3006.0
+xoffset 4.0            sr_reuse                           85.6
+xoffset 4.0            sr_fresh                          187.6
+xoffset 4.0 full       sr_reuse                          203.3
+xoffset 4.0 full       sr_fresh                          304.2
+xoffset 4.0 plain_root rw                                168.5
+xoffset bulk           rw                                 98.4
+xoffset 4.0            rw                                171.0
+xoffset 4.0            bytes_after_rw                   8272.0
+xoffset 4.0            bytes_after_rw_zstd3             3195.0
+xoffset 4.0            bytes_after_rw_compact           3552.0
+xoffset 4.0            bytes_after_rw_compact_zstd3       3022.0
+xoffset inline         bytes                            3128.0
+xoffset inline         bytes_zstd3                      2977.0
+xoffset inline         sr_reuse                           72.8
+xoffset inline         sr_fresh                          168.2
+xoffset inline         rw                                 51.9
+xoffset inline         rw_one_scope                       50.1
+xoffset inline         bytes_after_rw                   8536.0
+xoffset inline         bytes_after_rw_zstd3             3213.0
+xoffset inline         bytes_after_rw_compact           3632.0
+xoffset inline         bytes_after_rw_compact_zstd3       3006.0
+zpp::bits              bytes                            2916.0
+zpp::bits              bytes_zstd3                      2926.0
+zpp::bits              sr_reuse                          266.3
+zpp::bits              sr_fresh                          879.1
+zpp::bits inline       bytes                            2948.0
+zpp::bits inline       bytes_zstd3                      2958.0
+zpp::bits inline       sr_reuse                          267.8
+zpp::bits inline       sr_fresh                          695.8
+MessagePack            bytes                            3542.0
+MessagePack            bytes_zstd3                      3391.0
+MessagePack            sr_reuse                         5400.3
+MessagePack            sr_fresh                         6398.3
+Protocol Buffers       bytes                            4095.0
+Protocol Buffers       bytes_zstd3                      3800.0
+Protocol Buffers       sr_reuse                         7625.4
+Protocol Buffers       sr_fresh                        12304.9
+Protocol Buffers       rw                                461.5
+Protocol Buffers bulk  rw                                293.8
+Protocol Buffers reuse rw                                 65.5
+FlatBuffers            bytes                            3680.0
+FlatBuffers            bytes_zstd3                      3128.0
+FlatBuffers            sr_reuse                          557.2
+FlatBuffers            sr_fresh                          944.1
+FlatBuffers view       sr_reuse                          430.0
+Cap'n Proto            bytes                            3656.0
+Cap'n Proto            bytes_zstd3                      3131.0
+Cap'n Proto            sr_reuse                         1929.7
+Cap'n Proto            sr_fresh                         2238.6
+cista raw              bytes                            3216.0
+cista raw              bytes_zstd3                      2992.0
+cista raw              sr_reuse                          538.3
+cista raw              sr_fresh                          626.9
+cista raw              rw                                186.8
+cista offset           bytes                            3216.0
+cista offset           bytes_zstd3                      2992.0
+cista offset           sr_reuse                          559.9
+cista offset           sr_fresh                          649.0
+cista offset           rw                                211.1
+cista raw inline       bytes                            3280.0
+cista raw inline       bytes_zstd3                      2994.0
+cista raw inline       sr_reuse                          529.7
+cista raw inline       sr_fresh                          624.1
+cista raw inline       rw                                 56.8
+cista offset inline    bytes                            3280.0
+cista offset inline    bytes_zstd3                      2994.0
+cista offset inline    sr_reuse                          534.9
+cista offset inline    sr_fresh                          628.9
+cista offset inline    rw                                 59.3

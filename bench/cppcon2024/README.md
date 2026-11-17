@@ -24,6 +24,13 @@ zstd 1.5.7），在主机上按记分卡固定的提交拉 zpp_bits v4.7.6 和 c
 - 读写循环（每次迭代）：4 个标量 +1，改位置，4 次（追加一件 8 属性装备再删掉），追加 8 个路径点和 1 个属性，
   插入并删除一个物品，删掉那 8 个点和 1 个属性，4 个标量 -1。2024 在计时里每次迭代抽 85 个
   `mt19937_64` 随机数，开销和数据操作本身差不多大；这里随机数在计时前生成好，计时只含数据读写。
+- 删掉的东西各家都真释放（2026-11-17 起）。Protocol Buffers 删装备和路径点用 `DeleteSubrange`，被删的
+  message 会被 delete，和其他库每次迭代真分配、真释放一样。它默认的 `RemoveLast` 把清空的 message 留在
+  repeated 字段里，下一次 `add_` 直接复用，整个循环不分配；这个写法另列一行只报告（`Protocol Buffers reuse`）。
+- 物品的 key 每次迭代都不同（2026-11-17 起）：计时前按迭代号生成 10 万个 splitmix64 值，按顺序读，各家相同。
+  其余值仍取自 1024 项的环。以前 key 也取自环，每轮每个 key 重复约 100 次，std 和 cista 的有分支二分查找
+  （`std::lower_bound`）的 1024 条路径被分支预测器记住，XOffset `XMap` 的无分支查找不受益；只跑物品部分时，
+  cista raw 调优写法从 28 ns 变成 53 ns，XOffset 从 41 ns 变成 49 ns。
 - 发送 = 内存状态 → 别的进程能用的字节；接收 = 字节 → 接收方能读也能改的状态（2024 的说法）。
   - XOffset：`save_verified_into` / `save_verified`，接收用信任档 `XReceiver<XLink::server_peer>`
     （`reload` 进复用的 buffer / `load` 新建）。完整校验档（`reload_verified` / `load`）只报告。
@@ -46,12 +53,34 @@ zstd 1.5.7），在主机上按记分卡固定的提交拉 zpp_bits v4.7.6 和 c
   返回的位置删除（`rw_tuned`，XOffset 是 `rw_xoffset_bulk`）。调优对每个能这样写的模型都做：XOffset
   （`xoffset inline`）、std 模型（`std inline`，也是 `zpp::bits inline` 的状态）、cista（`cista raw inline`、
   `cista offset inline`）。Protocol Buffers 的消息里没有内联的标量数组，`RemoveLast` 本来就留着清空的
-  对象，能用的批量调用只有按范围添加属性（`Protocol Buffers bulk`）；试过再加上 `DeleteSubrange` 和按迭代器
-  插入、删除物品，整体更慢（154 ns 对 67 ns），没有用。FlatBuffers 和 Cap'n Proto 的 schema 由 IDL 固定，读写用的是 std 模型。
+  对象（计分行改用 `DeleteSubrange` 真释放，见上），能用的批量调用只有按范围添加属性（`Protocol Buffers bulk`）。FlatBuffers 和 Cap'n Proto 的 schema 由 IDL 固定，读写用的是 std 模型。
 - XOffset 的两组读写行都是每次迭代一个 `edit()`。一个 `edit()` 包住一轮全部迭代的写法只报告
   （`rw_one_scope`）。
 
-## 最新结果：PR #292 之后（2026-11-16）
+## 最新结果：公平用例（2026-11-17）
+
+用例改了两处（上面“场景和规则”里标了 2026-11-17 的两条）：Protocol Buffers 删掉的 message 真释放，物品 key
+每次迭代不同。库是 main 18a37f39（PR #292、#293 之后，加固默认关闭）。云端 x86-64，GCC 16.2，15 个进程取中位数。
+全部表格和每个进程的原始输出：[`results/2026-11-17-fair/`](results/2026-11-17-fair/summary.md)。这台机器和下面
+几节的不同，绝对纳秒数不能跨节比，比值可以。
+
+| 项 | XOffset ns | std | cista raw / offset | Protocol Buffers |
+| --- | ---: | ---: | ---: | ---: |
+| 读写，2024 原样：对手 ns | 170.5 | 273.9 | 184.3 / 207.0 | 450.7 |
+| 　XOffset ÷ 对手 | | 0.62 | 0.92 / 0.82 | 0.38 |
+| 读写，调优写法：对手 ns | 51.1 | 70.0 | 54.3 / 56.5 | 288.2 |
+| 　XOffset ÷ 对手 | | 0.73 | 0.94 / 0.90 | 0.18 |
+
+- 两种写法下 XOffset 的读写都是最快的。逐进程比，XOffset 对 cista raw 15 个进程赢 14 个（2024 原样和调优
+  写法都是），对 cista offset 和 Protocol Buffers 全赢。
+- Protocol Buffers 用 `RemoveLast` 复用对象时 2024 原样是 65.5 ns（只报告），真释放后 450.7 ns：以前 3 倍的
+  领先全部来自对象复用。
+- 发送+接收 reuse：XOffset 87 ns，zpp::bits 的 0.33，FlatBuffers 和 cista 的 0.16，Cap'n Proto 的 0.045，
+  MessagePack 的 0.016，Protocol Buffers 的 0.013。完整校验档 202 ns（zpp::bits 的 0.76）。
+- 读写一次 + 发送 + 接收（调优写法）：XOffset 122 ns，zpp::bits（std 容器）327 ns（0.37），cista 578–591 ns
+  （0.21），Protocol Buffers 7,180 ns（0.017）。
+
+## PR #292 之后（2026-11-16，旧用例）
 
 PR #292（`emplace_back` 不再查 owner、`pop_back` 默认不清零、`erase` 快路径）合并前后的库，在同一台云端机器上
 用本目录的同一套 bench 各跑 15 个进程、前后交替，取中位数。全部表格：
@@ -71,7 +100,7 @@ PR #292（`emplace_back` 不再查 owner、`pop_back` 默认不清零、`erase` 
 #292 之后 PR #293 把加固措施改成默认关闭的编译开关，CHANGELOG 记录了默认构建对 `XOFFSET_HARDENED=1` 的指令数（读写循环 2024 原样 −14.4%、调优 −7.6%），
 没有重新计时。
 
-## 上一版结果（云端 x86-64，GCC 16.2，15 个进程取中位数，2026-11-16，next_cpp26 3f25b76c + 本目录这次的改动）
+## 更早的结果（旧用例：Protocol Buffers 复用删掉的对象，物品 key 取自 1024 项的环；云端 x86-64，GCC 16.2，15 个进程取中位数，2026-11-16，next_cpp26 3f25b76c + 本目录这次的改动）
 
 “2024” 列是 2024 README 的数换算成每次的纳秒（10 万次的毫秒数 × 10）。2024 的 XOffset 发送+接收
 0.5 ns 是测错的：循环第一次就把发送方的 buffer move 走了，之后计的是空 move；2024 FlatBuffers 和
@@ -173,6 +202,8 @@ XOffset inline after the read/write rounds (report-only): save_verified 9,048 B 
 
 ## 怎么读
 
+（读的是“更早的结果”那组，旧用例；现在的结论见“最新结果”。）
+
 - **发送+接收**：XOffset 4.0（信任档）reuse 每条约 108 ns，是 zpp::bits 的 0.26、FlatBuffers 和 cista 的
   0.15、Cap'n Proto 的 0.04、MessagePack / Protocol Buffers 的 0.01。fresh 模式每条要新建接收 buffer
   （新映射），XOffset 约 275 ns，对各家的比值 0.02–0.31。完整校验档 reuse 约 245 ns，仍是 zpp::bits 的
@@ -189,6 +220,8 @@ XOffset inline after the read/write rounds (report-only): save_verified 9,048 B 
   是 3,552 字节（只报告）。
 
 ## 读写的时间花在哪
+
+（旧用例的数：Protocol Buffers 复用删掉的对象，物品 key 取自 1024 项的环。）
 
 用 `-DCC24_PARTS` 把循环的三部分分开计时（云端，每个变体 3 个进程取中位数，ns/次；“全部”列是上面
 15 个进程的数；标量和位置的读写每个变体都在，约 1–2 ns，所以三部分相加会略大于“全部”）：
