@@ -1,0 +1,15 @@
+cycle 0 xoffset      state=872f9b5312801bdf reports=4223352721224
+cycle 0 cereal       state=872f9b5312801bdf reports=4223352721224
+cycle 1 xoffset      state=9ce25b0fdb68f2ab reports=3337950063644
+cycle 1 cereal       state=9ce25b0fdb68f2ab reports=3337950063644
+
+wire bytes per message (average over the last cycle)
+format              A.req        A.res     B.player      C.shard     D.report
+xoffset              1177         2666        13240       188488          864
+cereal               1006         1639         7401       152884          687
+
+compressed size of one sample message (zstd -3 / lz4), bytes
+format                       A.res              B.player               C.shard              D.report
+xoffset             954/      1397       2711/      4173      41681/     68454        361/       510
+cereal              764/      1116       2256/      3492      38175/     63104        316/       440
+verify: all formats agree

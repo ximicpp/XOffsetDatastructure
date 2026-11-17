@@ -1,0 +1,4 @@
+reloc_bench: mode=bench rounds=201 warmup=3 (console: median ns/op, median per-round ratio xoffset/baseline)
+vec.push_back                  G9               0.51   std::vector 0.52 ratio 0.995
+str.assign_short.copy          report           0.99   std::string 0.87 ratio 1.134
+2 cases; checks: all passed
