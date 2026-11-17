@@ -187,11 +187,19 @@ processes; [method and all rows](bench/cppcon2024/README.md)):
   wire is the buffer. After the read/write loop has churned it, the wire grows
   from 3,064 to 7,928 bytes and send + receive takes 181 ns, 0.57 of
   zpp::bits (trusted tier) or 1.04, a tie (full validation tier).
-- Read/write is the fastest of the scored rows in both layouts. Against cista
-  on the tuned layout the margin is small (0.90–0.98): a tie to a small win.
+- Read/write is the fastest of the scored rows on the 2024 layout. On the
+  tuned layout it ties cista: 0.90–0.98 in the published processes, 1.00
+  [0.78, 1.25] in a rerun of 21 processes on 4.1.0.
   Protocol Buffers' default `RemoveLast` keeps removed messages for reuse and
   then takes 77 ns on the 2024 layout (report only; the scored row frees them
   like every other library).
+- Across sizes and churn ([bench/premises](bench/premises/README.md), 68 bytes
+  to 729 KB, five rivals): on a buffer as filled the trusted tier wins at every
+  size, most at 3–12 KB (0.21–0.24 of the strongest rival); full validation
+  ties zpp::bits below about 120 bytes. A churned buffer sends about twice the
+  bytes and loses the lead from about 11 KB messages up (1.2–1.4 of zpp::bits
+  at 11.5 KB, 1.05–1.1 at 46 KB); `save_compact` brings it back (0.53–0.94).
+  [PERFORMANCE.md section 2](docs/PERFORMANCE.md#2-where-the-lead-holds).
 - Sizes after zstd-3: XOffset 2,986 bytes, zpp::bits 2,926, Protocol Buffers
   3,800. The wire header makes small messages about 100 bytes larger than
   zpp::bits; this is by design.

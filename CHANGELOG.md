@@ -5,6 +5,13 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- `bench/premises`: where the send + receive lead holds, by message size (68 bytes to 729 KB), receiver
+  checks and churn of the sender's buffer, against zpp::bits, cista, FlatBuffers, Protocol Buffers and
+  cereal. `docs/PERFORMANCE.md` section 2 has the results; its reading notes no longer say the lead
+  grows with message size or that small messages tie (both were wrong: the lead is largest at 3–12 KB,
+  and small messages tie only under full validation). Churn matters most: one read/write pass makes
+  the trusted tier lose from about 11 KB messages, and `save_compact` brings the lead back. README:
+  the tuned read/write layout ties cista. Documentation and benchmark only.
 - Apple clang client columns re-run on the v4.1.0 tag (macOS arm64 C++20 and C++23, iOS 27.0 simulator
   C++20): full CTest 211/211 each, the 24-file reference corpus accepted and written byte for byte.
   Documentation only; the last such run was for 3.3.0.
