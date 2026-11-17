@@ -7,9 +7,9 @@ name: Client targets (K8)
 #   windows-x64   native Windows runner, MSYS2 UCRT64 GCC (LLP64, Win32 VM)
 on:
   pull_request:
-    branches: [ next_cpp26 ]
+    branches: [ main ]
   push:
-    branches: [ next_cpp26 ]
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:

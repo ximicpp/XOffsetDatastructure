@@ -125,10 +125,14 @@ Clang P2996 fork (from bloomberg/clang-p2996). Searched at: `/usr/local/bin/clan
 
 ## Branches & CI
 
-- **`next_cpp26`** — active development branch
-- **`main`** — stable branch
-- `CI` runs automatically on pushes and pull requests to `main`/`master` and
-  `next_cpp26`; `CI-Structure` is manual (Actions tab → workflow_dispatch).
+- **`main`** — the only development branch (default branch). The C++20/C++23
+  field-list backend and the C++26 reflection backend live in one codebase, so
+  there is no separate C++26 branch any more. Work goes on topic branches with
+  PRs into `main`. `next_cpp26` was merged into `main` on 2026-11-17 and is
+  kept only until in-flight PRs are retargeted; the old v2.0 practical `main`
+  is preserved as tag `archive/main-v2-practical`.
+- `CI` runs automatically on pushes and pull requests to `main`/`master`;
+  `CI-Structure` is manual (Actions tab → workflow_dispatch).
   `.github/workflows/ci.yml` reads the fixed Linux image
   digest from `toolchains/vm-validation.json`, verifies compiler/dependency
   identity, builds, runs CTest and checks signature drift in `tools/sigs/`.
