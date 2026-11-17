@@ -240,87 +240,47 @@ another client, which validates it again. There are four rules.
 | Server to server | Set the limit to the largest valid size of that kind of state (one state block can reach hundreds of MB) | Data between servers counts as authenticated, but abnormal data must still not bring down the process |
 | Client receiving or building | Use a smaller `maximum_capacity` (2x the largest message sent down); when creating and destroying buffers often, reuse free reservations with `XBufferPool`; **on iOS keep the sum of `maximum_capacity` over all live buffers within 3 GiB** | Each live buffer reserves 64 MiB of address space by default; a pool only reuses free reservations and does not shrink those of live buffers. iPhone measurements below |
 
-iPhone measurements (iPhone 15 Pro Max, iOS 26.6.2, 8 GB RAM, signed with a free developer account,
-`xo_mem_probe`, 2026-10-28):
+On an iPhone 15 Pro Max (iOS 26.6.2) one process can reserve about 3.4 GiB of address space: about
+50 buffers of the default 64 MiB. Clients that hold many buffers set small limits on each (the SLG
+stress test uses 2 MiB per player buffer). A limit of a multiple of 4 MiB minus 64 bytes (such as
+`64 MiB - 64`) avoids mapping one extra 4 MiB granule per VM buffer. Android and desktop systems have
+much larger address spaces.
 
-- One process can reserve about 3.4 GiB of address space: at most 54 buffers of 64 MiB (3.375 GiB),
-  or 2 of 1 GiB; one buffer's `maximum_capacity` can be at most 2047 MiB. Creating buffers after that
-  throws `XBadAlloc`; the process is not killed.
-- Actual writes: one buffer failed to allocate at 1920 MiB written, the process stayed up, and
-  `os_proc_available_memory` was about 3.4 GiB at startup.
-- So with the default 64 MiB, no more than about 50 buffers can be alive at once. Clients that hold
-  many buffers must set small limits on each: the SLG stress test at M scale (one buffer per each of
-  512 players) uses 2 MiB per player, battle and report buffer (`SLG_XOFFSET_CAP_MIB=2`) and 256 MiB
-  for map shards; with 256 MiB each, even S scale (64 players) fails.
-- Android (64-bit Linux kernel) and desktop systems have much larger address spaces and no such
-  limit; their limit is the memory actually written.
-- Since 3.4 the host header of a VM buffer sits in the first 64 bytes of the payload's first page; when
-  the limit is exactly a multiple of 4 MiB (such as 64 MiB), each buffer maps one more 4 MiB granule
-  (inaccessible and not resident while unused), with alignment unchanged. If iOS's limit counts mapped
-  address space, about 50 buffers of the default 64 MiB can be alive at once (the 54 above was measured
-  on 3.3; 3.4 has not been re-measured on an iPhone). Setting the limit to a multiple of 4 MiB minus 64
-  bytes (such as `64 MiB - 64`) avoids mapping the extra granule.
-
-Also:
-
-- One valid buffer does not mean total resources are controlled: also limit the number of concurrent
-  buffers, queue lengths, total memory or virtual address budget, and the processing time of a single
-  request.
-- Every wire has a 40-byte header and every buffer has a virtual memory reservation. The cost of
-  high-frequency messages of about a hundred bytes has not been measured; measure first for such
-  cases.
-- The 1 MiB and "2x" in the table above are suggested starting points, not measurements; adjust them
-  to your business data when integrating.
+Also limit the number of concurrent buffers, queue lengths, total memory and per-request processing
+time: one valid buffer does not bound total resources. The 1 MiB and "2x" above are starting points,
+not measurements.
 
 ## 6. Network transport
 
-- A wire is the raw memory layout and is larger than varint-style formats. SLG M scale, player state
-  message in cycle 20: 3.1.0 dense wire 13,667 B, FlatBuffers 8,423 B; protobuf about 4.5 KB
-  (2026-10-21 prototype). The extra size is mostly container slack and holes; for read-only messages
-  sent down, `save_compact` with `XCompactOptions{.slack_div = 0}` removes it, estimated on par with
-  FlatBuffers (not measured on 3.1.0).
-- Links inside the server data center usually do not need compression.
-- **On client links (especially mobile networks) add zstd compression outside the library**, or lz4
-  (faster, lower ratio). Compress after `save_verified` and decompress before `load_verified`; the
-  library's validation is unaffected. Also limit the decompressed length to guard against compression
-  bombs.
-- A whole-buffer wire carries the whole state; for incremental updates use delta sync
-  ([USER_GUIDE.md](USER_GUIDE.md) sections 4.5 and 4.6).
+- A wire is the raw memory layout plus container slack and holes, larger than varint formats. For
+  read-only messages sent down, `save_compact` with `XCompactOptions{.slack_div = 0}` removes the slack
+  and holes.
+- Links inside a data center usually need no compression. **On client links add zstd (or lz4) outside
+  the library**: compress after saving, decompress before receiving, and limit the decompressed length.
+- For incremental updates use delta sync ([DELTA_SYNC.md](DELTA_SYNC.md),
+  [SHARED_DELTA.md](SHARED_DELTA.md)).
 
 ### 6.1 Choosing compression
 
-Compression is not in the library; the library only produces and validates wires. Choose by message
-size:
-
-| Message | Choice | Basis (measured on cloud x86-64) |
+| Message | Choice | Basis (cloud x86-64) |
 | --- | --- | --- |
-| Large snapshots (KB and above: whole scene, view, full state) | **zstd level 3**, standard frame | Demo whole scene 321 KB → 123 KB (0.38), view 15.1 KB → 6.4 KB (0.42); `save_compact` + `XCompactOptions{0}` plus zstd-3 makes SLG A/B/C 7–9% smaller than FlatBuffers' raw size |
-| Small messages (tens to hundreds of bytes: events, battle reports, commands) | **zstd dictionary**; when several are sent at the same moment, **also batch** them (several per frame) | Without a dictionary zstd barely helps small messages: an SLG battle report (class D, XOffset 197 B, FlatBuffers 158 B) compresses to XOffset 135.9 B, FlatBuffers 114.0 B (1.19x); with a 16 KB dictionary: single message 56.2 B versus 56.3 B (1.00), batches of 8 / 32 / 128 average 40.4 / 37.2 / 34.5 B versus 41.9 / 38.1 / 35.3 B (0.96 / 0.98 / 0.98). Encoding about 1.2–1.5 µs and decoding about 0.5–0.7 µs per message |
-| Tight CPU (low-end phones, small per-frame budget) | **lz4** | Lower ratio than zstd, faster; this project has no lz4 numbers, measure when integrating |
+| KB and above (snapshots, views) | **zstd level 3** | Demo scene 321 KB -> 123 KB, view 15.1 KB -> 6.4 KB |
+| Tens to hundreds of bytes (events, reports, commands) | **zstd dictionary**, and batch messages sent together | A 197 B battle report: plain zstd 136 B, with a 16 KB dictionary 56 B, batches of 32 about 37 B per message |
+| Tight CPU budget | **lz4** | Faster, lower ratio; not measured here |
 
-Dictionary compression for small messages uses `contrib/zstd_dict` (a separate component, C++17, links
-zstd 1.5.x, not part of the library):
+Dictionaries use `contrib/zstd_dict` (separate C++17 component, zstd 1.5.x; see its README):
 
-- **Train the dictionary from server samples**: `xoffset_zstd_dict train --id N --binding auto INPUT...`,
-  where the samples are real XOffset wires (several thousand or more). Training is deterministic: the
-  same samples give the same dictionary.
-- **Both ends carry the dictionary version**: the dictionary id is the version number and is written
-  in every frame header. A client reports its dictionary id when subscribing, and the server rejects
-  the subscription on a mismatch; the decoder rejects frames with another id before decoding
-  (`dict_id_mismatch`). Changing the dictionary = changing the id; keep old and new dictionaries on
-  the server until old clients have upgraded.
-- **Dictionaries are bound to a schema**: `--binding auto` binds the dictionary to the schema
-  fingerprint in the sample wire headers, and the encoder rejects wires of other schemas; once bound,
-  each frame saves the fixed 24 bytes of the wire header, which the decoder restores. Changing the
-  schema means retraining the dictionary.
-- **Length limits**: before decoding, frames are rejected by their declared length and the caller's
-  limit, with no allocation first; batch frames limit the count and the length of each message. What
-  comes out is still an unvalidated wire and goes through `load_verified` as usual.
-- Frames carry no checksum; integrity is left to the transport (TCP/TLS) and `load_verified`.
+- Train from real server wires: `xoffset_zstd_dict train --id N --binding auto INPUT...`
+  (deterministic).
+- The dictionary id is its version and is in every frame header; clients report it when subscribing,
+  and frames with another id are rejected before decoding. Keep old dictionaries until old clients
+  upgrade.
+- `--binding auto` binds a dictionary to the schema fingerprint (a schema change means retraining) and
+  saves the fixed 24 header bytes per frame.
+- Frames are length-checked before decoding and carry no checksum; the output still goes through the
+  normal receive check.
 
-The `demo/mapstate` event stream is a complete example: A pushes a batch of UnitEvents every 20 ticks
-(144–168 B each), and clients subscribe with `--events raw|zstd|zdict|batch`. Average network bytes
-per message at the 10000-unit tier: raw 146, zstd 152, dictionary 68, batches of 100 per frame 52.
+`demo/mapstate`'s event stream is a full example (`--events raw|zstd|zdict|batch`).
 
 ## 7. Integration checklist
 
