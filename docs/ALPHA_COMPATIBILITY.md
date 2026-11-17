@@ -1,4 +1,4 @@
-# 4.0.0 compatibility and input boundaries
+# 4.1.0 compatibility and input boundaries
 
 (The file name dates from the alpha period.) This pre-release is aimed at early users who pin their
 compiler, dependencies and schemas and do their own acceptance testing. The core implementation is
@@ -10,13 +10,13 @@ storage and wire format (`docs/V2_FORMAT.md`) and does not read V1 wires.
 ## Version and toolchain
 
 `XOFFSET_VERSION` at the source root (`share/XOffsetDatastructure/VERSION` after install) is the single
-text source of the full version `4.0.0`; the CMake project's numeric version is `4.0.0`. Installed
+text source of the full version `4.1.0`; the CMake project's numeric version is `4.1.0`. Installed
 consumers look the package up without a version and then check the full string:
 
 ```cmake
 find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
-if(NOT XOffsetDatastructure_VERSION STREQUAL "4.0.0")
-    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 4.0.0")
+if(NOT XOffsetDatastructure_VERSION STREQUAL "4.1.0")
+    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 4.1.0")
 endif()
 ```
 
