@@ -5,6 +5,17 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- `reset()` no longer zeroes the payload it discards (`XOFFSET_SCRUB_RESET`, 0 by default, 1 with
+  `XOFFSET_HARDENED=1`). **Behaviour change:** the next content's slack, string tails and padding
+  carry the previous content, so a send buffer used for different receivers in turn can put one
+  receiver's data into the next one's `save_verified` wire or delta; build with the switch, send with
+  `save_compact`, or keep a buffer per receiver ([threat model](docs/V2_THREAT_MODEL.md) 3.2 P4).
+  SLG UP.send -4.1% instructions, UC.send -2.6%, a reset alone -43%.
+- New switch `XOFFSET_CHECK_UPLINK`, **1 by default**: `-DXOFFSET_CHECK_UPLINK=0` gives
+  `XReceiver<XLink::from_client>` the trusted links' default (`XCheck::admit`), for deployments whose
+  clients are their own code over a protected transport; any client can then make the server read or
+  write out of bounds. It saves 9.6% of the instructions of receiving an SLG uplink order. Default
+  builds are unchanged.
 - **Hardening is opt-in** (speed first). Measures that cost time on mutate and send are compile-time
   switches, 0 by default: `XOFFSET_SCRUB_POPPED`, `XOFFSET_SCRUB_ERASED`, `XOFFSET_SCRUB_PADDING`,
   `XOFFSET_PIN_QUARANTINE`, `XOFFSET_SAVE_SELF_CHECK`. `XOFFSET_HARDENED=1` turns on every one a build

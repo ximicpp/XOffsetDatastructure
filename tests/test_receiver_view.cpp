@@ -56,7 +56,9 @@ XOFFSET_REGISTER_SCHEMA_NAME(VwGroups, "test.ReceiverViewGroups")
 
 static_assert(default_view_check<XLink::server_peer> == XCheck::admit);
 static_assert(default_view_check<XLink::from_server> == XCheck::admit);
-static_assert(default_view_check<XLink::from_client> == XCheck::bounds);
+// The walk is tested by name (XCheck::bounds), so that the same tests run
+// whether or not a client link checks by default (XOFFSET_CHECK_UPLINK).
+static_assert(default_view_check<XLink::from_client> == (XOFFSET_CHECK_UPLINK ? XCheck::bounds : XCheck::admit));
 static_assert(!detail::force_full_check);
 // A view gives only const access.
 static_assert(std::is_same_v<decltype(std::declval<XView<VwRoot>&>().root()), const VwRoot&>);
@@ -186,7 +188,7 @@ void view_matches_full() {
             verified.reload_verified<VwRoot>(wire);
             const auto expect = dump(verified.root<VwRoot>());
             const Exact exact(wire);
-            auto v = client.view<VwRoot>(exact.span());
+            auto v = client.view<VwRoot, XCheck::bounds>(exact.span());
             need(v.has_value(), "bounds view of a valid wire");
             if (v) {
                 need(v->check() == XCheck::bounds, "bounds view reports its check");
@@ -209,7 +211,7 @@ void rejects_framing() {
     const auto wire = src.save_verified<VwRoot>(XSaveOptions{XWireEmission::dense});
     auto rejects = [&](const std::string& w, XErrc code, const char* what) {
         const Exact exact(w);
-        auto v = rx.view<VwRoot>(exact.span());
+        auto v = rx.view<VwRoot, XCheck::bounds>(exact.span());
         need(!v && v.code() == code, what);
         // The full check gives the same code where it rejects at the header.
         auto full = XBuffer::try_load_verified<VwRoot>(exact.span(), cap());
@@ -243,7 +245,7 @@ void rejects_framing() {
     {
         XReceiver<XLink::from_client> small(XBuffer::maximum_capacity(256));
         const Exact exact(wire);
-        auto v = small.view<VwRoot>(exact.span());
+        auto v = small.view<VwRoot, XCheck::bounds>(exact.span());
         need(!v && v.code() == XErrc::capacity_exceeded, "used_bytes over the maximum capacity");
     }
     // A sparse wire: valid, but a view needs the payload in one piece.
@@ -255,9 +257,9 @@ void rejects_framing() {
         const auto sparse = big.save_verified<VwRoot>(XSaveOptions{XWireEmission::zero_runs});
         need(header_of(sparse).extent_count != 0, "test wire is sparse");
         const Exact exact(sparse);
-        auto v = rx.view<VwRoot>(exact.span());
+        auto v = rx.view<VwRoot, XCheck::bounds>(exact.span());
         need(!v && v.code() == XErrc::invalid_argument, "sparse wire refused");
-        auto dense = rx.view<VwRoot>(big.save_verified<VwRoot>(XSaveOptions{XWireEmission::dense}));
+        auto dense = rx.view<VwRoot, XCheck::bounds>(big.save_verified<VwRoot>(XSaveOptions{XWireEmission::dense}));
         need(dense.has_value(), "its dense form is viewed");
     }
     // Misaligned bytes.
@@ -265,7 +267,7 @@ void rejects_framing() {
         std::vector<std::uint64_t> words(wire.size() / 8 + 2);
         auto* p = reinterpret_cast<std::byte*>(words.data()) + 4;
         std::memcpy(p, wire.data(), wire.size());
-        auto v = rx.view<VwRoot>(std::span<const std::byte>(p, wire.size()));
+        auto v = rx.view<VwRoot, XCheck::bounds>(std::span<const std::byte>(p, wire.size()));
         need(!v && v.code() == XErrc::invalid_argument, "misaligned wire refused");
     }
 }
@@ -295,7 +297,7 @@ void rejects_payload() {
 
     auto rejects = [&](const std::string& w, const char* what) {
         const Exact exact(w);
-        auto v = rx.view<VwRoot>(exact.span());
+        auto v = rx.view<VwRoot, XCheck::bounds>(exact.span());
         need(!v && v.code() == XErrc::invalid_payload, what);
         need(!XBuffer::try_load_verified<VwRoot>(exact.span(), cap()), "the full check rejects it too");
     };
@@ -334,7 +336,7 @@ void rejects_payload() {
     bad = wire; bad[ready0] = char(0x80); rejects(bad, "element bool 0x80");
     // The untouched wire is viewed.
     const Exact exact(wire);
-    need(rx.view<VwRoot>(exact.span()).has_value(), "the untouched wire");
+    need(rx.view<VwRoot, XCheck::bounds>(exact.span()).has_value(), "the untouched wire");
 }
 
 // Overlapping blocks: the bounds view does not look for overlap, but the
@@ -367,13 +369,13 @@ void overlap_bounded() {
     aim(all, kGroups, kItems);
     const Exact amplified(all);
     need(std::uint64_t(kGroups) * kItems * sizeof(VwItem) > header_of(all).used_bytes, "the walk would exceed the payload");
-    auto v = rx.view<VwGroups>(amplified.span());
+    auto v = rx.view<VwGroups, XCheck::bounds>(amplified.span());
     need(!v && v.code() == XErrc::invalid_payload, "amplification refused");
     std::string two = wire;
     aim(two, 2, 8);  // a second group naming the first 8 items
     const Exact shared(two);
     need(!XBuffer::try_load_verified<VwGroups>(shared.span(), cap()), "the full check refuses the overlap");
-    auto w = rx.view<VwGroups>(shared.span());
+    auto w = rx.view<VwGroups, XCheck::bounds>(shared.span());
     need(w.has_value(), "a small overlap is viewed (read-only, in bounds)");
     if (w) need(dump(**w).size() > 0, "reading the overlap");
 }
@@ -401,7 +403,7 @@ void mutations_read_in_bounds() {
                 }
             }
             const Exact exact(w);
-            auto v = rx.view<VwRoot>(exact.span());
+            auto v = rx.view<VwRoot, XCheck::bounds>(exact.span());
             if (!v) { ++refused; continue; }
             ++viewed;
             (void)dump(v->root());  // every const access, in bounds
@@ -414,8 +416,25 @@ void mutations_read_in_bounds() {
 }
 } // namespace
 
+// The check a client link applies when none is named: bounds with
+// XOFFSET_CHECK_UPLINK, admit (as on the trusted links) without.
+void client_default() {
+    XReceiver<XLink::from_client> rx(cap());
+    auto src = make_source(11, 200);
+    const auto wire = src.save_verified<VwRoot>(XSaveOptions{XWireEmission::dense});
+    const Exact exact(wire);
+    auto v = rx.view<VwRoot>(exact.span());
+    need(v.has_value(), "default view of a valid wire");
+    if (v) need(v->check() == (XOFFSET_CHECK_UPLINK ? XCheck::bounds : XCheck::admit), "default view reports its check");
+#if !XOFFSET_CHECK_UPLINK
+    auto a = rx.view<VwRoot, XCheck::admit>(exact.span());
+    need(a.has_value() && a->check() == XCheck::admit, "named admit view on a client link");
+#endif
+}
+
 int main() {
     view_matches_full();
+    client_default();
     rejects_framing();
     rejects_payload();
     overlap_bounded();

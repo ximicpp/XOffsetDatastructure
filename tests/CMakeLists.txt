@@ -204,11 +204,16 @@ endforeach()
 
 # Trust tiers by link type (xoffset_receiver.hpp): XReceiver admit against
 # the full check, the forced full check, and the client uplink refusing admit
-# at compile time.
+# at compile time. A build with XOFFSET_CHECK_UPLINK=0 gives a client link
+# the trusted links' default and lets it admit: test_receiver and
+# test_receiver_view are built a second time that way as
+# <name>_uplink_unchecked (the *_admit_fail programs pin the switch to 1, so
+# they hold in a build that turns it off globally).
 add_xoffset_test(test_receiver reflection)
 add_xoffset_test(test_receiver_forced reflection)
 add_executable(receiver_from_client_admit_fail EXCLUDE_FROM_ALL receiver/from_client_admit_fail.cpp)
 configure_xoffset_target(receiver_from_client_admit_fail)
+target_compile_definitions(receiver_from_client_admit_fail PRIVATE XOFFSET_CHECK_UPLINK=1)
 add_test(NAME receiver_from_client_admit_fail
     COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target receiver_from_client_admit_fail --config $<CONFIG>)
 set_tests_properties(receiver_from_client_admit_fail PROPERTIES
@@ -226,8 +231,21 @@ set_tests_properties(receiver_from_client_sync_fail PROPERTIES
 # that must not compile: an admit view on a client uplink, and a write
 # through a view.
 add_xoffset_test(test_receiver_view reflection)
+foreach(test_name test_receiver test_receiver_view)
+    if(NOT XOFFSET_TESTS_REFLECTION AND test_name IN_LIST XOFFSET_CXX26_ONLY_TESTS)
+        xoffset_cxx26_only(${test_name}_uplink_unchecked)
+        continue()
+    endif()
+    add_executable(${test_name}_uplink_unchecked ${test_name}.cpp)
+    configure_xoffset_target(${test_name}_uplink_unchecked)
+    xoffset_enable_test_assertions(${test_name}_uplink_unchecked)
+    target_compile_definitions(${test_name}_uplink_unchecked PRIVATE XOFFSET_CHECK_UPLINK=0)
+    add_test(NAME ${test_name}_uplink_unchecked COMMAND ${test_name}_uplink_unchecked)
+    set_tests_properties(${test_name}_uplink_unchecked PROPERTIES LABELS "reflection")
+endforeach()
 add_executable(receiver_from_client_view_admit_fail EXCLUDE_FROM_ALL receiver/from_client_view_admit_fail.cpp)
 configure_xoffset_target(receiver_from_client_view_admit_fail)
+target_compile_definitions(receiver_from_client_view_admit_fail PRIVATE XOFFSET_CHECK_UPLINK=1)
 add_test(NAME receiver_from_client_view_admit_fail
     COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target receiver_from_client_view_admit_fail --config $<CONFIG>)
 set_tests_properties(receiver_from_client_view_admit_fail PROPERTIES
@@ -345,8 +363,8 @@ foreach(test_name ${NO_EXCEPTIONS_TESTS})
 endforeach()
 # Hardening switches (docs/V2_THREAT_MODEL.md 4.1) are off by default. The tests
 # of what the switches guarantee (zeroed spare capacity and padding, the pin
-# scope quarantine) and of the container paths they change are built a
-# second time as <name>_hardened with XOFFSET_HARDENED=1, so one CTest run
+# scope quarantine, a reset that zeroes) and of the paths they change are
+# built a second time as <name>_hardened with XOFFSET_HARDENED=1, so one CTest run
 # covers both settings. A build configured with XOFFSET_HARDENED=ON is that
 # build already and adds none.
 set(HARDENED_TESTS
@@ -366,6 +384,10 @@ set(HARDENED_TESTS
     test_fixed_layout_containers
     test_shift_relocate
     test_ordinary_records
+    test_reset_used_range
+    test_reload_reset
+    test_regrow_used_range
+    test_slot_storage
 )
 if(NOT XOFFSET_HARDENED)
     foreach(test_name ${HARDENED_TESTS})

@@ -57,7 +57,10 @@ server, server to client and your own saved files; it is **not** an entry point 
 (debug and sanitizer builds still validate fully). The trusted tier for whole-buffer receive and deltas
 is `XReceiver<XLink::server_peer / from_server>::reload / load / apply_delta` (`xoffset_receiver.hpp`);
 `XReceiver<XLink::from_client>` rejects the trusted tier at compile time; a client connection
-mistakenly built as a trusted-link receiver is found by code review. By definition the trusted tier
+mistakenly built as a trusted-link receiver is found by code review. A deployment whose clients are its
+own code over a protected transport can build with `XOFFSET_CHECK_UPLINK=0` (a switch since 2026-11-17,
+default 1, see 4.1): the client link then defaults to the trusted tier too, and only calls that name
+`XCheck::bounds` / `XCheck::full` are checked. By definition the trusted tier
 does not take untrusted input and does not promise a usable result for arbitrary input; fuzzing and the
 `test_receiver` differential tests require only two things: its own parsing and writes never go out of
 bounds for any input (ASan), and for input the full tier accepts it gives the same result (the admit
@@ -75,11 +78,11 @@ in section 5.
 
 | ID | Threat | Status | Basis / gap |
 | --- | --- | --- | --- |
-| T1 | A crafted wire makes the receiver read or write out of bounds | **Protected** | Full validation (V2_FORMAT section 5); ASan+UBSan CI with Clang and GCC 16; libFuzzer on every PR (multiple schemas, section 5); pre-release GCC 16 ASan+UBSan differential fuzzing of 4.8 million cases with no disagreement. Gap: daily long fuzz runs are not yet running (section 5, F4) |
+| T1 | A crafted wire makes the receiver read or write out of bounds | **Protected** (a server built with `XOFFSET_CHECK_UPLINK=0` is not protected against client uplink, see 4.1) | Full validation (V2_FORMAT section 5); ASan+UBSan CI with Clang and GCC 16; libFuzzer on every PR (multiple schemas, section 5); pre-release GCC 16 ASan+UBSan differential fuzzing of 4.8 million cases with no disagreement. Gap: daily long fuzz runs are not yet running (section 5, F4) |
 | T2 | Tampering with field values (A3) | **Not protected** | A wire that only changes scalar values passes validation; the wire header has no checksum (format 2.1 removed the always-zero `crc32c`) and no MAC. TLS or message signatures must be used outside the library |
 | T3 | Forging schema identity | No privilege gained | The schema fingerprint (64-bit FNV-1a) is a consistency check, not authentication: an attacker copying the fingerprint can only make the receiver fully validate against **the receiver's own type** |
 | T4 | Resource exhaustion | **Bounded by default** (M1: 64 MiB default when no limit is passed) | See 3.1; servers receiving client data should still set a smaller limit (DEPLOYMENT section 5) |
-| T5 | Old bytes of deleted data sent with the wire (A4) | **Partly protected** (since 2026-11-16, performance first); essentially protected with `XOFFSET_HARDENED=1` or `save_compact` | Freed blocks are still zeroed (P1, M3). The default build does not zero bytes vacated by containers (P2) or padding bytes (P3), and `save_verified`, `freeze_verified` and delta sync send them as they are. `XOFFSET_HARDENED=1` turns on M4 and M6 (the default behavior in 4.0.0 and earlier); `save_compact` never carries old bytes from container slack in any build. See 3.2 and 4.1 |
+| T5 | Old bytes of deleted data sent with the wire (A4) | **Partly protected** (since 2026-11-16, performance first); essentially protected with `XOFFSET_HARDENED=1` or `save_compact` | Freed blocks are still zeroed (P1, M3). The default build does not zero bytes vacated by containers (P2) or padding bytes (P3), and `save_verified`, `freeze_verified` and delta sync send them as they are; since 2026-11-17 `reset` does not zero either, so a reused buffer carries bytes of its previous content into the slack and padding of the next (P4). `XOFFSET_HARDENED=1` turns on M4 and M6 (the default behavior in 4.0.0 and earlier); `save_compact` never carries old bytes from container slack in any build. See 3.2 and 4.1 |
 | T6 | Different compilers interpret the same wire differently | One case found and fixed | When an enum key defines only `operator<=>`, Clang and GCC order sets oppositely and reject each other's wires; the fix and the CI cross-read job are in the GCC 16 port PR |
 | T7 | Invalid business values (negative gold and the like) | **Not protected** | Not part of structural validation; check them as ordinary business input |
 | T8 | Amplifying server cost with old-version wires (3.2 schema evolution) | **Bounded** | An attacker can pick the oldest version on the chain, making the server do one more full validation plus one conversion per step; the converted object can be larger than the wire (new fields, wider types). The conversion target buffer's limit defaults to the `maximum_capacity` passed to `load_verified`, and exceeding it fails. Estimate the amplification from the chain length and shorten the chain if needed. `fuzz_schema_evolution` covers this entry point |
@@ -144,10 +147,11 @@ been stored in that buffer and was already deleted** (other players' information
 fields and so on), and P3 could also leak data from the server's stack.
 
 **Status (since 2026-11-16):** susu decided performance comes first, and zeroing for P2 and P3 became
-compile switches, **off by default**. `XOFFSET_HARDENED=1` turns them all on (the default behavior in
+compile switches, **off by default**; since 2026-11-17 so is the zeroing on reset (P4 below).
+`XOFFSET_HARDENED=1` turns them all on (the default behavior in
 4.0.0 and earlier), or each can be turned on separately (section 4.1). In the default build, bytes sent
 by `save_verified`, `freeze_verified` and delta sync may contain elements already erased from
-containers. `save_compact` is unaffected: it writes no holes and rewrites slack and string tails as 0.
+containers, and content the buffer held before it was reset. `save_compact` is unaffected: it writes no holes and rewrites slack and string tails as 0.
 
 - P1: blocks are zeroed when freed (M3), holes in the arena are 0, and all output paths still copy
   verbatim. This is **not a switch**: deltas generated from touch marks send a hole's bytes only when
@@ -167,10 +171,17 @@ containers. `save_compact` is unaffected: it writes no holes and rewrites slack 
   implicit padding: find it at compile time with `XOFFSET_REQUIRE_NO_PADDING(T)` or
   `XOFFSET_REJECT_IMPLICIT_PADDING` and turn it into explicit fields. Padded records the caller assigns
   directly are out of the library's reach in any build.
-- Reset: operations that start a buffer over, such as `reset<T>()`, still zero all used bytes, and this
-  is not a switch either (the library internals and delta sync rely on "everything after used_end is
-  0"). So a buffer that builds messages for different receivers in turn never carries the previous
-  message's content into the next.
+- P4, reset (not zeroed by default since 2026-11-17): `reset<T>()` only marks the buffer empty, and the
+  bytes of the previous content stay past the new `used_end`. The blocks of the new content are
+  allocated from that range; the values written overwrite the old bytes, but the parts of a block that
+  are not written (a vector's slack, the bytes from a string's end to the end of its block, implicit
+  padding of records) still hold the previous content. So **one send buffer that builds messages for
+  different receivers in turn carries content of the previous receiver's message inside the next
+  wire** (measured 2026-11-16: one buffer building 40 messages in turn, 3 carried content of the
+  message before). With `XOFFSET_SCRUB_RESET=1`, `reset` zeroes all used bytes (the behavior in 4.0.0
+  and earlier). `save_compact` never carries these bytes in any build. The library internals still keep
+  "everything after some offset is 0": the range not zeroed is recorded on the buffer, and in-place
+  reload and delta receive work as before.
 - Forwarding: holes and container slack (`[size, capacity)`) of a loaded wire keep the sender's bytes;
   validation does not require them to be 0, and saving directly after loading forwards them unchanged.
   This is not the receiver's own memory, but a malicious sender can use it to smuggle bytes downstream.
@@ -178,16 +189,16 @@ containers. `save_compact` is unaffected: it writes no holes and rewrites slack 
   string tails; implicit padding in records is still copied byte for byte, so forwarded types must have
   no implicit padding ([DEPLOYMENT.md](DEPLOYMENT.md) section 4.2).
 
-Regression tests: `test_wire_hole_zeroing` (P1, P2, forwarding, M1/M2) and `test_implicit_padding` (P3).
-Each test is built twice: the default build checks that holes are 0, that `save_compact` carries no old
+Regression tests: `test_wire_hole_zeroing` (P1, P2, forwarding, M1/M2), `test_implicit_padding` (P3) and
+`test_reset_used_range` (P4). Each test is built twice: the default build checks that holes are 0, that `save_compact` carries no old
 bytes, and that content is correct; the `XOFFSET_HARDENED=1` build (`*_hardened`) checks that the wire
 contains no old bytes at all, that padding is 0 and that the wire is deterministic.
 
 ## 4. Mitigations (all implemented in 0.3.0-beta.1)
 
 M1–M6 were implemented in 0.3.0-beta.1; behavior changes are in CHANGELOG. M3 costs about +5% on the
-modification path, measured. Since 2026-11-16 the zeroing of M4 and M6 is off by default and turned on
-by the switches of section 4.1; M1, M2, M3 and M5 are unchanged.
+modification path, measured. Since 2026-11-16 the zeroing of M4 and M6 is off by default, since 2026-11-17
+the zeroing on reset too, and all are turned on by the switches of section 4.1; M1, M2, M3 and M5 are unchanged.
 
 | ID | Mitigation | Impact |
 | --- | --- | --- |
@@ -201,8 +212,9 @@ by the switches of section 4.1; M1, M2, M3 and M5 are unchanged.
 ### 4.1 Hardening switches (off by default since 2026-11-16)
 
 The measures below spend time on the hot modification and send paths; they protect against old bytes in
-containers being sent with the wire (P2 and P3 of T5) or against the caller's own usage errors. susu
-decided on 2026-11-16 that performance comes first: every item is a compile switch, default 0;
+a buffer being sent with the wire (P2, P3 and P4 of T5) or against the caller's own usage errors. susu
+decided on 2026-11-16 that performance comes first, and confirmed on 2026-11-17 that this includes the
+zeroing on reset: every item is a compile switch, default 0;
 `-DXOFFSET_<name>=1` turns one on, and `-DXOFFSET_HARDENED=1` (CMake option `XOFFSET_HARDENED=ON`)
 turns on all items not set individually. The switches change the behavior of inline functions, so all
 translation units of one program must use the same values.
@@ -214,23 +226,36 @@ translation units of one program must use the same values.
 | `XOFFSET_SCRUB_PADDING` | M6: implicit padding of container elements the library builds or moves is zeroed | Padding carries bytes from the value it was built from (usually from the stack); wires with the same content may differ | SLG A.apply 1.6%, SD 1.3% |
 | `XOFFSET_PIN_QUARANTINE` | Blocks reclaimed inside an `edit()` / `read()` scope are reused only when the scope ends | Blocks can be reused right away. An already invalidated reference in the scope (obtained before a container grew or erased) may read other data written later; the invalidation rules themselves are the same as `std::vector` | CppCon 2024 layout read/write 12.6% (about 18% in time); every SLG cell under 0.5%. The other side: with immediate reuse the buffer is smaller but holes can be more fragmented. When the CppCon 2024 character data is filled in one `edit()`, the wire goes from 3232 bytes with 1 hole to 3112 bytes with 2 holes, and one send/receive round takes 123 more instructions (9%) |
 | `XOFFSET_SAVE_SELF_CHECK` | Before every save of a small message (under 4 KiB), re-check the arena header's magic and size, and that the output `std::string` does not overlap the buffer's own storage | Both are sender self-checks: passing the buffer's own storage as the output is undefined behavior; a corrupted arena header is not reported. Larger messages take the generic path, where both checks still run | SLG UP.send 5.7%, UC.send 1.8% |
+| `XOFFSET_SCRUB_RESET` | `reset()` zeroes all used bytes; a reset buffer is byte for byte the same as a new one | `reset()` does not zero. The previous content stays past the new `used_end`, and the slack and padding of the new content's blocks carry it; a send buffer that builds messages for different receivers in turn carries bytes of the previous message into the next (P4 in 3.2) | SLG UP.send 4.1%, UC.send 2.6%, EB.send 2.4%, SD 2.2%, LD.send 2.0%; one `reset` alone (`reloc.reset`) 43%. Swapping or moving buffers carries one more field: 9 more instructions per `std::swap`, 3 more per move |
 
-Numbers are callgrind instruction counts on P2996 Clang x86-64 (2026-11-16, `relax-survey-20261116/`).
+Numbers are callgrind instruction counts on P2996 Clang x86-64 (2026-11-16 and 2026-11-17,
+`relax-survey-20261116/`).
+
+**One item that is on by default: the client uplink check `XOFFSET_CHECK_UPLINK` (default 1;
+`XOFFSET_HARDENED` does not change it).** `XReceiver<XLink::from_client>` checks by default: `view()`
+uses the bounds tier, `reload()` / `load()` / `apply_delta()` the full tier, and `XCheck::admit` on
+this link does not compile. Built with `-DXOFFSET_CHECK_UPLINK=0`, the client link defaults to the
+trusted tier like the trusted links and checks only the wire header and that the root lies in the
+payload; **any client can then send one crafted message that makes the server read out of bounds
+(`view`) or write out of bounds (modifying the result of `reload`), crash, or read and change server
+memory**. Calls that name `XCheck::bounds` / `XCheck::full` are not affected. It only suits deployments
+whose clients are their own code over a protected transport. It saves little: receiving an SLG uplink
+order (UL.recv) takes 9.6% fewer instructions, about 46 per order, which is why susu decided on
+2026-11-17 that this item stays on by default.
+
 Not switches and unchanged:
 
-- Zeroing blocks on free (M3) and zeroing used bytes on buffer reset: delta sync relies on "holes are 0"
-  and "everything after used_end is 0", see 3.2. Turning M3 off was measured to save only 1.5% of
-  LD.apply and 1.3% of LDW.recv instructions.
-- Receive check tiers are unchanged: `view()` on `XReceiver<from_client>` is still the bounds tier and
-  `reload()` still full validation; trusted links still check only the wire header. Deployments that
-  trust the peer could always build the receiver as a trusted link (`XReceiver<XLink::server_peer>`, see
-  the notes at the top of `xoffset_receiver.hpp`), with no compile switch needed.
+- Zeroing blocks on free (M3): deltas generated from touch marks rely on "holes are 0", see 3.2.
+  Turning M3 off was measured to save only 1.5% of LD.apply and 1.3% of LDW.recv instructions, and delta
+  sync breaks.
+- Trusted links still check only the wire header; any link can name `XCheck::bounds` or `XCheck::full`
+  on a call.
 - The M1 default limit, argument checks, `XOFFSET_FORCE_FULL_CHECK` (default 1 in debug and sanitizer
-  builds).
+  builds, where the trusted tier runs full validation anyway).
 
 When sending to receivers that must not see deleted data, either build with `XOFFSET_HARDENED=1` (or
-its three zeroing switches `XOFFSET_SCRUB_ERASED`, `XOFFSET_SCRUB_POPPED`, `XOFFSET_SCRUB_PADDING`), or
-send on that path with `save_compact`.
+its four zeroing switches `XOFFSET_SCRUB_ERASED`, `XOFFSET_SCRUB_POPPED`, `XOFFSET_SCRUB_PADDING`,
+`XOFFSET_SCRUB_RESET`), or send on that path with `save_compact`.
 
 ## 5. Continuous fuzzing
 

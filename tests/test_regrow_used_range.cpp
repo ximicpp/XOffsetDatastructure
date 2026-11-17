@@ -116,6 +116,27 @@ int main() {
         assert(c.save_verified() == d.save_verified());
     }
 
+    // A reset before the reload. Without XOFFSET_SCRUB_RESET the reset leaves
+    // the old content past the new used_end, so the reload may not take
+    // [used_end, logical) for zero: growth after it must still expose zero
+    // bytes only (deltas applied to the reloaded content rely on it).
+    {
+        auto e = Buffer::create(4096, growable());
+        for (std::uint64_t i = 0; i < (std::uint64_t(1) << 20) / 8; ++i) e.plain_root().values.push_back(~i);
+        (void)e.reset();
+        e.plain_root().values.push_back(1);
+        e.reload_verified(small);
+        auto f = Buffer::load_verified(small, growable());
+        assert(tail_zero(e));
+        for (std::uint64_t i = 0; i < (std::uint64_t(2) << 20) / 8; ++i) {
+            const std::size_t before = e.get_size();
+            e.plain_root().other.push_back(i);
+            f.plain_root().other.push_back(i);
+            if (e.get_size() != before) assert(tail_zero(e));
+        }
+        assert(e.save_verified() == f.save_verified());
+    }
+
     std::cout << "test_regrow_used_range: growths_in_used_range=" << growths
               << " high=" << high << " final_size=" << a.get_size() << " passed\n";
     return 0;
