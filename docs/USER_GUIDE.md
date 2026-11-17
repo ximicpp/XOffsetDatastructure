@@ -78,33 +78,20 @@ XOFFSET_RECORD_DERIVED(Player, (Entity), level, items)   // bases in parentheses
   1-byte member that looks like padding does not change the size.
 - Records must therefore be aggregates (no user-declared constructors, private or protected
   members, or virtual functions). Use an alias when a type name contains a comma.
-- `XOFFSET_RECORD` is also the `XOFFSET_ORDINARY_RECORDS` declaration (section 3.1); do not write
-  both for the same type. Without reflection, the "ordinary record" declaration (whichever macro,
-  or a hand-written `wire_record_layout` specialization) also promises that the record has no
-  user-declared destructor, copy/move constructor or assignment. Without reflection the library can
-  only partly check this: if every base and member destructor (or assignment) is trivial but the
-  record's own is not, it is user-provided and the record is judged not ordinary; when a member is
-  itself non-trivial (for example `XString`) this cannot be detected and remains a promise. C++26
-  builds check it fully.
-  A record that cannot make this promise uses `XOFFSET_RECORD_DERIVED(T, (), members...)`: field
-  list only, no ordinary-record declaration.
-  **Note: records written this way do not take the SHIFT path.** As `XVector` elements, middle
-  inserts, erases and growth move elements one by one (measured on an order book: about 1,000
-  instructions per inserted price level, where SHIFT is one memmove). For records without
-  user-declared special member functions, write `XOFFSET_RECORD` (or add
-  `XOFFSET_ORDINARY_RECORDS(T)`); do not use `XOFFSET_RECORD_DERIVED(T, (), ...)` just because the
-  record has no base.
+- `XOFFSET_RECORD` also declares the record ordinary (section 3.1); do not write both. Without
+  reflection that is a promise that the record has no user-declared destructor, copy/move constructor
+  or assignment, which the library can only partly check; C++26 builds check it fully. A record that
+  cannot make the promise uses `XOFFSET_RECORD_DERIVED(T, (), members...)` (field list only), and then
+  middle inserts, erases and growth of an `XVector` of it move elements one by one instead of one
+  `memmove`.
 - Enums on the wire must have a fixed underlying type (`enum class`, or
   `enum E : std::uint8_t {...}`); otherwise compilation fails with a suggested fix (section 2.2).
 - `XString`, `XVector`, `XSet`, `XMap`, `XKeyValue` and `std::array` come with library field lists.
 - Unions and non-aggregate classes (`std::string`, classes with virtual functions or constructors)
   cannot have a field list. Without reflection the library treats them as opaque: not admitted
   (`is_byte_copy_safe_v` is false), and no "missing field list" error.
-- Migration helper `tools/describe_dump`: compile it with GCC 16 or P2996, pass a root type, and it
-  uses reflection to print these lines for every reachable record in dependency order (the 13
-  lines in `bench/slg` are its output; the `describe_dump_slg` test keeps them in sync). Types that
-  cannot be written (non-aggregates, overlapping `[[no_unique_address]]` members, ...) are printed
-  as a comment line giving the reason.
+- `tools/describe_dump` (built with GCC 16 or P2996) prints these lines for every record reachable
+  from a root type, in dependency order.
 - Before release, compile the schema at least once with a C++26 compiler so reflection checks the
   field lists and the promises.
 - The field list also generates by-name accessors on the record's proxy (section 3.5): `u.hp()` is
@@ -168,12 +155,8 @@ throws. The growth rules below describe this form.
   **not like `std::set` and `std::map`**. Per-operation rules are in section 3.2. Automatic growth
   and container operations do not move the arena; an explicit `grow()` may move it on a movable
   slot (section 3.4).
-- **When elements are record types with `XString`, `XVector`, `XMap` or similar members, first
-  declare those records ordinary (section 3.1), for example `XOFFSET_ORDINARY_RECORDS(Troop, March)`
-  at global scope.** Without the declaration everything is still correct, but middle
-  insert/erase and growth move elements one by one: in a cloud GCC 16 microbenchmark (ratios
-  only, not a formal measurement), a middle erase in an `XVector` whose elements have string and
-  vector members was about 1.6x `std::vector` without the declaration and about 0.73x with it.
+- Declare record types used as `XVector` elements ordinary (section 3.1); otherwise middle
+  insert/erase and growth move elements one by one.
 - What you can and cannot change (schema, writers, ownership) is in section 3.3.
 - The typed wrapper `TypedXBuffer<T>` has `create`, `root()`, `edit`/`read`, `save_verified()` and
   `load()` (the validating path). `root()` returns a proxy (`XRef<T>`), not a plain reference; see
@@ -181,10 +164,8 @@ throws. The growth rules below describe this form.
 
 ### 3.1 Erase and insert performance
 
-Erasing or inserting one element in the middle of an `XVector` shifts all following elements by
-one, at a cost proportional to their number. Erasing from the middle one by one in a loop is
-O(n·k), especially visible when elements contain container headers (in the SLG prototype, erasing
-2000 marches one by one per tick moved about 1.6 million elements per cycle).
+Erasing or inserting in the middle of an `XVector` shifts all following elements, so erasing one by
+one in a loop is O(n·k).
 
 - For bulk erasure use `stable_erase_if`: one pass, original order kept, each kept element moved at
   most once.
@@ -474,16 +455,10 @@ in.read([](const Profile& r) { print(r.name.view()); });   // read plain members
 
 ### 4.1 Many small messages: slots, or reuse mappings with `XBufferPool`
 
-Every VM-backed `XBuffer` has its own virtual memory reservation: on creation it reserves
-`maximum_capacity` and enables the host prefix page and payload pages, and on destruction it
-releases the whole range. These system calls and page faults cost about 4.4 µs on Apple M4, mostly
-independent of the reservation size. When messages are only a few KB and each one creates and
-destroys a buffer (battle server round trips, read-only battle reports, client receive), this
-overhead is far larger than the validation itself.
-
-Small messages without a pool and with Explicit growth (the default) land on slots (section 3.4)
-and skip these system calls. Automatic growth with a large limit still uses VM; such receivers and
-senders should share a pool so a destroyed mapping is kept for the next message to reuse:
+Small messages with Explicit growth (the default) land on slots (section 3.4) and need no system
+call per buffer. A VM-backed buffer (Automatic growth with a large limit) reserves and releases its own
+mapping, which costs microseconds per message; such senders and receivers should share a pool so a
+destroyed mapping is reused by the next message:
 
 ```cpp
 XBufferPool pool({16, 16 * cap_bytes, 64u << 20});   // caches at most 16 free mappings
@@ -500,16 +475,6 @@ XBuffer in = XBuffer::load_verified<Msg>(wire, cap);  // still fully validated
   (block count, reserved bytes, accessible bytes) cap how much is kept; `pool.clear()` releases
   everything immediately.
 - `XBufferPool` is currently an experimental interface (see section 8).
-
-Effect in the SLG prototype (M scale, Apple M4, prototype data, not a formal acceptance):
-
-| Scenario | New mapping per message | With pool |
-| --- | ---: | ---: |
-| Battle server round trip, XOffset ÷ cereal / FlatBuffers / protobuf (geometric mean) | 2.91 / 4.16 / 1.28 | 0.58 / 0.85 / 0.25 |
-| Read-only battle report, per read | 4.9 µs | 0.44 µs |
-
-With the pool the read-only battle report is still slower than cereal (about 2.6x); the remaining
-cost is setting up the owner and "copy first, then validate".
 
 ### 4.2 Whole-buffer copies in one process: `clone()` / `clone_into()`
 
@@ -539,18 +504,15 @@ buf.clone_into(scratch);            // reuses scratch's mapping and address, lik
 ### 4.3 Design conventions: which costs come from the contract
 
 Two conventions are prerequisites for whole-region relocation (K0) and "what is sent is the arena
-bytes" (K3, K5). Their cost falls on a few fixed kinds of operations, and the library does not plan
-to remove it by changing the contract. At the v1.0 checkpoint (Apple M4, SLG prototype M scale,
-against zpp_bits) the two most visible places were A.apply (about 2.0x) and A.simulate (about 1.3x)
-in the battle server round trip; scenario A as a whole was still faster than zpp_bits (upper bound
-0.78). Below are the causes and what users can do.
+bytes" (K3, K5). Their cost falls on a few kinds of operations, and the contract will not change to
+remove it. Below are the causes and what users can do.
 
 **Convention one: one arena per buffer, with its own free table.** Free space is recorded in the
 buffer's own table and is sent and loaded with the hole table, so after a whole-region move or send,
 further edits do not degrade (K5) and nothing depends on process-global allocator state. The cost is
 that metadata is spread per buffer: the first time a buffer uses a size class, that class's metadata
-is cold. Loads where many buffers are each edited once or twice (for example the 512 player buffers
-in the SLG prototype) hit cold metadata almost every time; that is the A.apply gap.
+is cold, so loads where many buffers are each edited once or twice hit cold metadata almost every
+time.
 
 - Remedies: keep buffers long-lived and reuse them message by message (`reload_verified` /
   `reset<T>()`, see [BUFFER_REUSE.md](BUFFER_REUSE.md)), so the free table and mapping stay in
@@ -560,8 +522,7 @@ in the SLG prototype) hit cold metadata almost every time; that is the A.apply g
   buffers first. It only issues non-blocking cache prefetches (owner map entry, owner word, arena
   header, free-table counters, bitmap and the first few small bins) and changes no content or
   allocation decision; the cold-metadata misses then overlap with receiving instead of being waited
-  for one by one during the edit. Scenario A of the SLG prototype calls it once for each of the two
-  players (counted in A.res_decode).
+  for one by one during the edit.
 
 **Convention two: container slack is part of the payload.** Slack is sent with the wire like any
 other bytes, and bytes newly exposed by growth must be zeroed first (uninitialized bytes must never
@@ -569,7 +530,7 @@ be sent). So the library does not reserve extra on your behalf: the first `assig
 assignment into an empty container allocates only the length (later growth doubles), and
 `save_compact` with `slack_div = 0` also makes capacity equal length. The cost is that when a
 received message is edited on the receiver, the first growth of a container must allocate, move the
-elements and zero the newly exposed part; every new message starts over. That is the A.simulate gap.
+elements and zero the newly exposed part; every new message starts over.
 
 - When the final size is known, call `reserve` on the `XVector` / `XString` first to allocate once
   instead of doubling several times.
@@ -629,114 +590,39 @@ if (auto v = view_fixed_batch<Quote>(recv_bytes))
   snapshot); the record bytes are the same in both.
 - No exceptions, no allocation. Experimental interface (section 8, E6).
 
-Cost (cloud callgrind, 40-byte record, see `bench/fixedmsg/README.md`): encoding takes 1 to 8 more
-instructions than a hand-written struct and each reader 5 to 8 more; compared with putting the same
-record in an XOffset root, encoding takes 6 to 12 times fewer and reading 1.7 to 6 times fewer.
+Cost: a few instructions more than a hand-written struct, several times fewer than the same record
+in an XOffset root (`bench/fixedmsg/README.md`).
 
 ### 4.5 Delta sync: send only the changed bytes
 
-When the receiver already holds a copy (a client holding its own units or player data, a storage
-server holding a player) and the sender changed a few fields, there is no need to send the whole
-buffer: `xoffset_delta.hpp` (included by the main header) sends only the changed payload bytes, the
-receiver patches its copy in place, and afterwards both payloads are byte-identical. Format, checks
-and guarantees are in [DELTA_SYNC.md](DELTA_SYNC.md); a complete send/receive loop is in
+When the receiver already holds a copy, `xoffset_delta.hpp` (included by the main header) sends only the
+changed payload bytes and the receiver patches its copy in place; afterwards both payloads are
+byte-identical. Usage, format, checks and guarantees: [DELTA_SYNC.md](DELTA_SYNC.md); a complete loop:
 `examples/delta_sync.cpp`.
 
 ```cpp
-// Sender: one baseline per receiver (a group of receivers that always get the same deltas can share one).
-XDeltaBaseline base;                                   // the peer holds nothing yet
-std::string d;
-world.save_delta_into<View>(d, base);                  // the first one is a key delta (the whole state)
-// ... modify world in place: root<View>().units[i].hp -= 3 ...
-if (world.save_delta_into<View>(d, base); !d.empty()) send(d);   // afterwards only what changed
-base.reset();                                          // when the peer asks to start over: the next one is a key delta
+XDeltaBaseline base;                                   // sender: one per receiver; the first delta is a key delta
+if (world.save_delta_into<View>(d, base); !d.empty()) send(d);
 
-// Receiver: build the receiver per link (section 8, K4); the cursor records which stream and version the copy is at.
-XReceiver<XLink::from_server> rx(XBuffer::maximum_capacity(1 << 20));
+XReceiver<XLink::from_server> rx(XBuffer::maximum_capacity(1 << 20));   // receiver
 XDeltaCursor cursor;
 if (XStatus r = rx.apply_delta<View>(held, d, cursor); !r) ask_for_key_delta();
-const View& v = held.root<View>();                     // read in place
 ```
 
-- After loss, reordering, duplication or a client restart, a delta that does not match the copy's
-  version returns `delta_base_mismatch` and leaves the copy and the cursor unchanged; ask the sender
-  to `reset()` its baseline and send a key delta to recover. A receiver joining midway starts from
-  `key_delta_into` and then receives the same delta stream as everyone else.
-- The copy is read-only: if the receiver modifies its copy, the result of the next delta is no
-  longer the sender's data (detected and rolled back when sent with `digest`). To send changes back,
-  the receiver sends deltas in the other direction with its own buffer and baseline.
-- Send deltas only when both ends have the same schema: when the handshake on connect
-  (`xoffset_handshake.hpp`) answers `same` for the root type, send deltas; when it answers
-  `convert`, send converted whole buffers (section 7). Receiving `schema_mismatch` means the
-  handshake result is wrong; reconnect, since asking for another key delta will not help.
-- Trusted links (server to server, server to client) admit by default: only the delta's format,
-  stream and version, and that every block and hole lies within the used payload, are checked, and no
-  check table is built; deltas received from clients can only be fully validated (DELTA_SYNC.md
-  section 3).
-- Delta format 1.0 is frozen within 3.x since 3.4.0 (DELTA_SYNC.md section 2), and
-  `tests/test_delta_format.cpp` pins a short sequence of deltas byte for byte.
+- A delta that does not match the copy's version (loss, reordering, restart) returns
+  `delta_base_mismatch` and changes nothing; the sender calls `base.reset()` and sends a key delta.
+- The copy is read-only; to send changes back, use deltas in the other direction.
+- Send deltas only when the handshake answers `same` for the root type; on `convert` send converted
+  whole buffers (section 7).
 
 ### 4.6 Shared deltas: viewport sync
 
-When a server sends each client the part of a shared world it can see (units, marches, tiles in its
-viewport), the deltas of section 4.5 need a baseline and a comparison per client. Shared deltas
-(`xoffset_shared_delta.hpp`, XS 2.0) are written per record: the server encodes each entity once per
-tick, and every connection that can see it receives a copy of the same bytes; the client finds the
-record by the operation's id in its own storage and writes it in place, with its own layout. The id
-can be a slot number the server assigned for this client (the client fetches the record by slot
-number with no lookup) or the entity id (the client looks it up with `xsync::XSyncSlots`). Format,
-target interface, checks and guarantees are in [SHARED_DELTA.md](SHARED_DELTA.md); a complete
-send/receive loop is in `examples/shared_delta.cpp`.
-
-The server uses the library's publisher (`xoffset_shared_publisher.hpp`, since 4.0): per entity it
-keeps this tick's change and enter encodings (encoded once on first use) and how many connections
-hold the entity; per connection it keeps the version and the client's free slot numbers. The
-application only manages its own world and tells it, per message, which entities left, stayed and
-entered.
-
-```cpp
-#include "xoffset_shared_publisher.hpp"
-namespace xs = XOffsetDatastructure::xsync;
-using Conn = xs::XSyncConn<xs::XSyncFreeSlots<kUnit, 16>>;        // per connection: version and free slots (the hot part)
-xs::XSyncPublisher pub;
-xs::XSyncDirtyTable<kUnit, Unit> units;                           // the application marks members dirty
-xs::XSyncOut out;
-
-// Server: each tick, before the first message, every changed entity is encoded once, however many clients there are.
-pub.begin_tick(tick);
-units.publish(pub, changed, src);                                 // src: the application's view of its world (SHARED_DELTA.md section 1)
-
-// One message per client: the root record (table 0) is carried whole in every message, then one call per table and operation.
-xs::XSyncMessage<Conn> m(pub, conn, cold, out, head);             // key message: (..., head, stream)
-units.leaves(m, left_index, left_slot);                           // left the viewport
-units.changes(m, src, kept_index, kept_slot);                     // stayed in the viewport: the shared change, with this client's slot
-units.enters(m, src, new_index, [&](std::size_t r, std::uint32_t slot) { held_slot[r] = slot; });   // entered: the whole record
-m.finish();
-send(client, out.view());
-
-// Client: the target maps ids to its own records (SHARED_DELTA.md section 1); build the receiver per link (section 8, K4).
-XReceiver<XLink::from_server> rx(XBuffer::maximum_capacity(1 << 20));
-xs::XSyncCursor cursor;                                           // which stream and version it follows
-if (xs::is_key(msg)) target.empty_units();                        // a key message re-enters every entry
-if (XStatus r = rx.apply_sync(msg, cursor, target); !r) ask_for_key();
-```
-
-- The target states which tables exist and each table's record type, and finds records by id
-  (`find`, `record`); table 0 is the root record (no containers, carried whole in every message);
-  tables that enter and leave the viewport, such as units and marches, also have `enter` and
-  `leave`. On enter the whole record is written (every plain byte and every container, no zeroing
-  first); on leave the record is handed to the target as is; to make empty slots read as empty,
-  clear it in `leave` (`XRecordBody<R>::clear`).
-- After a lost or reordered message or a client restart the version does not match: it returns
-  `delta_base_mismatch` and changes nothing; ask the server for a key message.
-- The check tier follows the link: `from_server` and `server_peer` admit by default and check the
-  message header, stream and version, each section's table and kind, and each operation's id; the
-  message body is trusted. `apply_sync<XCheck::full>` checks every body first and then writes; a
-  rejected message changes nothing. `apply_sync` does not compile on `from_client`: the server does
-  not read client uplink as shared deltas.
-- XS 2.0 replaces XS 1.0 since 4.0 (no old format), and `tests/test_shared_delta_format.cpp` pins a
-  key message and the delta after it byte for byte; changing those bytes means a new format with new
-  format bytes.
+For a viewport onto a shared world, shared deltas (`xoffset_shared_delta.hpp`, format XS 2.0) are
+written per record: the server encodes each changed entity once per tick with the library publisher
+(`xoffset_shared_publisher.hpp`), every connection that sees it gets the same bytes, and the client
+writes each record in place in its own storage through `XReceiver<L>::apply_sync`. Usage, target
+interface, format and checks: [SHARED_DELTA.md](SHARED_DELTA.md); a complete loop:
+`examples/shared_delta.cpp`.
 
 ## 5. Constraints you must follow
 
@@ -810,55 +696,36 @@ required.
 
 ## 7. Schema changes
 
-3.1.0 and earlier **do not support schema evolution**:
-
-- The schema identity in the wire header must match the reader's type exactly. Adding, removing,
-  reordering or changing any field makes old wires rejected.
-- This fits cases where sender and receiver use the same version of the type definitions (processes
-  deployed from the same build). For clients, any server update that changes the schema must ship
-  together with the clients.
-- For data that is stored long-term or read across versions, keep a program that can read the
-  original version and export and re-import it yourself.
-
-Since 3.2.0 schema evolution is available: the server keeps a version chain, fully validates a wire
-from an old version against that old version and then upgrades it by field name, and downgrades
-before writing to old clients; the client only adds a handshake. Usage, release rules and costs are
-in [SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md). The wire format is unchanged.
-- Wire compatibility between compilers and platforms holds only on verified toolchains (section 8,
-  K7). Pin your schema with `XOFFSET_PIN_SCHEMA` ([SCHEMA_PINS.md](SCHEMA_PINS.md)): any build whose
-  computed layout differs from the pinned text fails to compile; it detects layout changes but does
-  not provide evolution.
+The wire header carries the schema identity, and a reader rejects a wire whose identity differs from
+its type: adding, removing, reordering or changing any field needs both ends updated together. When
+ends run different versions, the server converts with the version chain of
+[SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md) and the client only adds a handshake. Pin shared types with
+`XOFFSET_PIN_SCHEMA` ([SCHEMA_PINS.md](SCHEMA_PINS.md)) so a compiler that lays one out differently
+fails to compile.
 
 ## 8. Core guarantees and API stability
 
-Source API and ABI stability between versions are not promised. K0–K9 below are the core guarantees
-(whole-region transfer), and later versions must not regress them; if a related interface is renamed
-or its signature changes, CHANGELOG lists it separately with the replacement.
+Source API and ABI stability between versions are not promised. K0–K9 are the core guarantees; later
+versions must not regress them, and CHANGELOG names any renamed interface with its replacement. The
+tests behind each are in [STABILITY_TESTS.md](STABILITY_TESTS.md).
 
 | # | Guarantee | Interface / mechanism |
 | --- | --- | --- |
-| K0 | Relocatable: the payload contains no absolute addresses, so after any modification it can be copied as a whole to any address and read and written there; moving within a process, across processes and across machines moves the same bytes. K2, K3 and K5 build on it | Compile-time admission (`is_byte_copy_safe_v`: XOffset follows TypeLayout's rules, recursing over the field interface and rejecting every type that contains raw pointers, member pointers, references or vtables). Both paths apply the same rules: the server's C++26 build gets fields from reflection and cross-checks against TypeLayout's verdict; the client's C++20/C++23 build gets fields from the `XOFFSET_RECORD` field list, and unions and non-aggregate classes, which cannot have a field list, are never admitted. Container headers store only relative offsets, and the root uses a base-relative offset |
-| K1 | Schemas are plain C++ aggregates, no IDL: on the server (C++26) reflection derives layout and fingerprint with no boilerplate; on the client (C++20/C++23) each record adds a one-line field list whose completeness the compiler proves (strictly increasing offsets + matching aggregate-initialization arity); C++26 builds also check the field list against reflection, and both builds produce the same wire bytes (section 2.1) | `XOFFSET_REGISTER_SCHEMA_NAME`, `XOFFSET_RECORD`, `XOFFSET_RECORD_DERIVED`, `XString`, `XVector`, `XFixedVector`, `XSet`, `XMap` |
-| K2 | Objects are built directly in the arena and read and modified in place (including variable-length changes), with free-block reuse | `XBuffer::create<T>`, `root<T>`, `has_root<T>`, the containers' public member functions, `maximum_capacity`, `with_growth`, `XGrowPolicy` |
-| K3 | Independent output: what is sent is a copy owned by the caller, and the sender can keep modifying afterwards | `save_verified<T>` |
-| K4 | Receive checks come in three tiers (below): the full tier validates the whole graph structure and rejects truncation, out-of-bounds, overlap, incomplete tiling, invalid values and schema mismatch; 3.4 added the trusted and bounds tiers. Delta input (K9) is covered the same way. Before every release one round of ASan fuzzing runs against every receive entry point (all three tiers, including delta apply), and the release ships only with no findings | `load_verified<T>`, `XException`, delta apply |
-| K5 | After receiving, keep modifying and send again; free space comes along with the hole table, with no degradation | Same as above |
-| K6 | Schema fingerprints must match exactly and are rejected otherwise; ends on different versions use the evolution handshake and conversion (E0) | Wire header `schema_hash` |
-| K7 | Object representation is consistent across compilers and platforms | User schemas: `XOFFSET_PIN_SCHEMA`; library types: signature baselines in `tools/sigs/`; cross-compiler wire corpus comparison (`tools/platform_matrix.sh`) |
-| K8 | Clients and servers use the same library and the same wire: clients (iOS, Android, Windows, 64-bit little-endian) use the field-list backend, build as C++20 with each platform's native compiler, and can receive, read, write, validate and send again (delivered in 3.2.0, made a core guarantee on 2026-11-04) | Field-list backend (`XOFFSET_RECORD`, section 2.1); `tools/native_targets.sh` |
-| K9 | Native delta sync: after changing its working state a program sends only the changed bytes; the receiver merges the delta into its copy, checks it at the link's tier and keeps reading and writing. Whole state uses delta 1.0 (`XReceiver<L>::apply_delta`, frozen since 3.4), viewports use shared deltas (`XReceiver<L>::apply_sync`, since 3.5; format XS 2.0 since 4.0, replacing XS 1.0); with different schema versions it falls back to whole wires per the handshake. Delta apply is part of the pre-release ASan fuzzing (K4) (core guarantee since 3.5.0) | `apply_delta`, `XDeltaCursor`, `apply_sync`, `xsync::XSyncCursor` ([DELTA_SYNC.md](DELTA_SYNC.md), [SHARED_DELTA.md](SHARED_DELTA.md)) |
+| K0 | Relocatable: the payload has no absolute addresses, so after any modification the whole region can be copied to any address, process or machine and used there | Compile-time admission (`is_byte_copy_safe_v`) rejects raw pointers, member pointers, references and vtables; container heads hold relative offsets |
+| K1 | Schemas are plain C++ aggregates, no IDL; C++26 reflection or a C++20 field list, with identical wire bytes | `XOFFSET_RECORD`, `XOFFSET_RECORD_DERIVED`, `XOFFSET_REGISTER_SCHEMA_NAME`, the containers |
+| K2 | Objects are built and modified in place in the arena, including variable-length changes, with free-block reuse | `create`, `root`, container members, `maximum_capacity`, `XGrowPolicy` |
+| K3 | What is sent is a copy owned by the caller; the sender keeps modifying | `save_verified<T>` |
+| K4 | Receive checks in three tiers (below); the full tier rejects truncation, out-of-bounds, overlap, incomplete tiling, invalid values and schema mismatch, deltas included; one ASan fuzz round with no findings before every release | `XReceiver`, `load_verified<T>`, delta apply |
+| K5 | A received buffer is modified and sent again; free space travels with the hole table | Same as K3, K4 |
+| K6 | Schema fingerprints must match exactly; different versions use the evolution handshake (E0) | Wire header `schema_hash` |
+| K7 | The same object representation on every verified compiler and platform | `XOFFSET_PIN_SCHEMA`; library signature baselines in `tools/sigs/`; the cross-compiler wire corpus |
+| K8 | Clients (Windows, iOS, Android) build as C++20 with their native compilers and use the same library and wire as servers ([CLIENT_TARGETS.md](CLIENT_TARGETS.md)) | Field-list backend; `tools/native_targets.sh` |
+| K9 | Native delta sync: whole-state deltas (format 1.0) and shared viewport deltas (XS 2.0), checked at the link's tier and fuzzed before release | `apply_delta`, `apply_sync` ([DELTA_SYNC.md](DELTA_SYNC.md), [SHARED_DELTA.md](SHARED_DELTA.md)) |
 
-Scope of K0: the unit that moves is the whole region, not individual objects in it (container
-headers cannot be copied or moved). A buffer in use has a fixed address (it grows within the VM
-reservation) and moves only at explicit points: output, receive, reload, `XCompactor` compaction;
-`XHandle` uses the epoch to relocate after a move. Same-ABI, already-trusted data can skip validation
-with `load_unverified`; untrusted input goes through K4.
+The unit that moves is the whole region (container heads cannot be copied on their own). A buffer moves
+only at explicit points (output, receive, reload, `XCompactor`); `XHandle` follows it by epoch.
 
-Receive checks have three tiers (decided 2026-11-04). 3.3.x and earlier had only the full tier: all
-existing entry points such as `load_verified`, `reload_verified` and delta apply validate the whole
-graph. Since 3.4 the trusted tier for whole-buffer receive and delta apply is provided by
-`XReceiver` (`xoffset_receiver.hpp`), and since 3.5 the bounds tier for client uplink by
-`XReceiver<XLink::from_client>::view`. The defaults per link are:
+Receive checks have three tiers, chosen by the link a `XReceiver` serves (`xoffset_receiver.hpp`):
 
 | Tier | Default for | What it checks | What you can do after receiving |
 | --- | --- | --- | --- |
@@ -913,66 +780,9 @@ to the full tier, the first full delta validates the whole buffer once and rebui
 without `NDEBUG` and in ASan and TSan builds, and release builds can turn it on by hand for stress
 tests or staged rollouts.
 
-Status of K7:
-
-- **User schemas**: `XOFFSET_PIN_SCHEMA` pins a type's wire layout as signature text; every build that
-  includes the pin file evaluates it with its own compiler and fails to compile on a mismatch
-  ([SCHEMA_PINS.md](SCHEMA_PINS.md); CTest `schema_pin_mismatch` confirms that it really fails). This
-  holds for the server's GCC 16 and P2996 Clang; the client's field-list builds need no reflection,
-  and the same pin is evaluated by the native compilers: full CTest runs on NDK r29/r30 Clang,
-  MSVC 19.44, clang-cl 19, MinGW GCC 13 and Apple clang (iOS, macOS) all include this check.
-- **Library types**: signature baselines for four targets (x86-64 Linux, x86-64 Windows, arm64 iOS,
-  arm64 Android) are in `tools/sigs/` and checked in CTest (`check_compat`,
-  `check_signature_regeneration`).
-- **Cross-compiler wires**: in the 3.1.0 RC local platform matrix, the 2.1 corpora written by Linux
-  x86-64 (GCC 16, P2996), Linux arm64 (GCC 16, P2996) and Windows x64 (MinGW-w64 GCC 16) were
-  byte-identical and accepted by each other. Since the field-list build landed (3.2.0), Android arm64
-  (NDK r29/r30), Windows x64 (MSVC 19.44 C++20 and C++23, clang-cl 19, MinGW GCC 13), macOS arm64 and
-  the iOS simulator (Apple clang) all read and accept the reference corpus written by the server's
-  C++26 reflection build, and the corpora they write are byte-identical to it
-  ([CLIENT_TARGETS.md](CLIENT_TARGETS.md)). Since 3.2.0, schemas that mean different things on
-  different platforms (keys ordered by plain `char`, enums without a fixed underlying type) are
-  rejected at compile time (section 2.2).
-- **Boundary**: only toolchains that ran the checks above are covered. Real devices: 3.2.0-rc.1 passed
-  on one Android 11 phone; on one iPhone 15 Pro Max (iOS 26.6.2) CTest and all 24 reference wires
-  passed ([DEVICE_TESTING.md](DEVICE_TESTING.md) section 9). The library-type signature baselines are
-  currently checked only in CTest and do not fail user builds; the goal is to export signatures for
-  user schemas, fail the build on a mismatch, and bring GCC 16 into the same gate (in progress).
-
-Precondition of K4: the receiver must set `maximum_capacity`. Otherwise a sender can send data close
-to the payload limit (about 2 GiB) and make the receiver copy and fully validate it, exhausting
-resources. Suggested default limits are in [DEPLOYMENT.md](DEPLOYMENT.md) section 5.
-
-Boundary of the validation guarantee: for untrusted input (client uplink), the bounds tier guarantees
-that reads stay in bounds, and only the full tier guarantees a legal structure and a matching schema;
-no tier **guarantees content integrity**. Data in which only a scalar field value was changed is
-accepted, so validation is not a way to detect tampering.
-
-Status of K8 (4.0.0): clients use the field-list backend (section 2.1) and build as C++20 with each
-platform's native compiler (Apple clang, Android NDK Clang, Windows compilers); the server still uses
-C++26 reflection. Windows (MSVC 19.44, clang-cl 19, MinGW) and Android (NDK r29/r30, run under cloud
-qemu-aarch64) pass full CTest on 4.0.0 with corpora byte-identical to the server's; the same results
-for macOS and the iOS simulator (Apple clang, deployment target macOS 14.0 / iOS 17.0) come from 3.3.0
-and were not re-run for 4.0.0 (per-target numbers in [CLIENT_TARGETS.md](CLIENT_TARGETS.md)). Real
-devices (3.2.x, not re-run for 4.0.0): iPhone 15 Pro Max (iOS 26.6.2) CTest 138/138, corpus
-byte-identical, demo passed; 3.2.0-rc.1 passed every functional check on one Android 11 phone.
-Scope of the guarantee: all three client targets build natively and pass CTest, the cross-target wire
-corpora match, and signatures match the `tools/sigs/` baselines; iOS address space and the minimum
-deployment target (the system libc++ `std::pmr` fails to load below macOS 14 / iOS 17) are in
-[DEPLOYMENT.md](DEPLOYMENT.md). Client speed numbers on phones will be published only after a
-real-device review (Android has no timing yet). 3.1.0 has no such build path: Android, iOS and MSVC
-cannot build it.
-
-Status of K9 (core guarantee since 3.5.0): whole-state deltas (format 1.0, frozen in 3.4.0) and
-viewport shared deltas (XS 1.0 since 3.5.0, XS 2.0 since 4.0) both have rejection cases, random
-stream tests and byte-exact golden tests ([STABILITY_TESTS.md](STABILITY_TESTS.md)); the apply of both
-kinds of delta is among the pre-release ASan fuzz targets (`fuzz_delta_sync`, `fuzz_shared_delta`, in
-both server and client builds), and 3.5.0, 3.6.0 and 4.0.0 each ran one round before release with no
-findings; the map demo uses native deltas end to end. Ends with different schema versions do not send
-deltas: when the handshake on connect answers `convert`, the converted whole wire is sent
-(DELTA_SYNC.md section 5). Performance is report-only: on the Mac SLG340 the client native delta NP
-against zpp_bits is 0.766; server per-client native deltas (not a product path; viewports use shared
-deltas) are still slower than the rivals, see [PERFORMANCE.md](PERFORMANCE.md).
+Preconditions: the receiver sets `maximum_capacity` (limits in [DEPLOYMENT.md](DEPLOYMENT.md)
+section 5). No tier checks content: a well-formed message with changed field values is accepted.
+K7 covers only toolchains that ran the checks ([CLIENT_TARGETS.md](CLIENT_TARGETS.md)).
 
 The following interfaces are provided but optional or experimental and may change in later versions:
 
@@ -989,12 +799,7 @@ The following interfaces are provided but optional or experimental and may chang
 `XHandle`, diagnostic and statistics interfaces, and the low-level members of `XBufferCore` are not
 covered by the guarantees.
 
-## 9. How performance numbers are measured
+## 9. Performance numbers
 
-Formal timing comes from one Apple M4 and one game server workload (`bench/slg`), comparing six
-formats in one process: zpp_bits, cista, cereal, protobuf, FlatBuffers; the numbers, methods and
-limits per release are in [PERFORMANCE.md](PERFORMANCE.md). When quoting, also state the machine,
-the workload and the adapter style; there are no formal timing conclusions for Linux or Windows
-(cloud x86-64 numbers are report-only, see PERFORMANCE.md section 6). The set of cloud ratios in
-section 3 (GCC 16, Linux VM) only illustrates the order of magnitude of declaring ordinary records;
-it is not a formal measurement.
+Numbers, methods and limits are in [PERFORMANCE.md](PERFORMANCE.md). When quoting one, also state the
+machine, the workload and the adapter style.
