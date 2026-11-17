@@ -46,10 +46,10 @@ Clients (iOS, Android, Windows, 64-bit little-endian) build with the field-list 
 native compiler, using the same library and the same wire as the server. It is not a CTest item; each
 client target runs `tools/native_targets.sh` once:
 
-| Check | What it tests | Status (3.5.0) |
+| Check | What it tests | Status (4.1.0) |
 |---|---|---|
-| Full CTest on the target (Release) | The tests of K0–K7 above that run in both builds pass on the target's compiler and standard library | Windows x64 (MSVC 19.44 C++20/C++23, clang-cl 19, MinGW GCC 16) and Android arm64 (NDK r29/r30, cloud qemu-aarch64) all pass on 4.1.0; the passing results for macOS arm64 and the iOS simulator (Apple clang) come from 3.3.0 and were not rerun on 4.1.0 (numbers in [CLIENT_TARGETS.md](CLIENT_TARGETS.md)); real devices (3.2.x): iPhone 15 Pro Max 138/138 and an Android 11 phone (3.2.0-rc.1) pass ([DEVICE_TESTING.md](DEVICE_TESTING.md) section 9) |
-| Reading the reference corpus | All 6 corpus files written by the server's C++26 reflection build are accepted by the target's `load_verified` | Accepted by all of the targets above |
+| Full CTest on the target (Release) | The tests of K0–K7 above that run in both builds pass on the target's compiler and standard library | Windows x64 (MSVC 19.44 C++20/C++23, clang-cl 19, MinGW GCC 16) and Android arm64 (NDK r29/r30, cloud qemu-aarch64) all pass on 4.1.0; macOS arm64 (Apple clang 21, C++20 and C++23) and the iOS 27.0 simulator (C++20) pass 211/211 on the v4.1.0 tag, run on a Mac on 2026-11-17 after the release (toolchains in [CLIENT_TARGETS.md](CLIENT_TARGETS.md)); real devices (3.2.x): iPhone 15 Pro Max 138/138 and an Android 11 phone (3.2.0-rc.1) pass ([DEVICE_TESTING.md](DEVICE_TESTING.md) section 9) |
+| Reading the reference corpus | All 24 corpus files written by the server's C++26 reflection build are accepted by the target's `load_verified` | Accepted by all of the targets above |
 | Writing the corpus, `diff -r` | The corpus written by the target is byte-identical to the reference | Byte-identical on all of the targets above |
 
 The scope of the guarantee is in [USER_GUIDE.md](USER_GUIDE.md) section 8, and per-target results in
