@@ -13,7 +13,7 @@ Needs Git, CMake 3.20+ and GCC 12+, Clang 16+, Apple clang 15+ or MSVC 19.38+
 on a 64-bit little-endian target:
 
 ```sh
-git clone -b next_cpp26 https://github.com/ximicpp/xoffsetdatastructure.git
+git clone https://github.com/ximicpp/xoffsetdatastructure.git
 cd xoffsetdatastructure
 git -c core.autocrlf=false -c core.eol=lf submodule update --init -- external/boost
 git -c core.autocrlf=false -c core.eol=lf -C external/boost submodule update --init -- libs/container libs/core libs/config libs/throw_exception libs/static_assert libs/container_hash libs/type_traits libs/winapi libs/intrusive libs/predef

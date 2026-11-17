@@ -1,6 +1,6 @@
 # 发版流程
 
-本页是 `next_cpp26` 打正式版和预发布版的固定流程。GitHub CI 永久停用（2026-10-23），
+本页是 `main` 打正式版和预发布版的固定流程。GitHub CI 永久停用（2026-10-23），
 每一步的证据都来自云端本地验证，不等任何 GitHub 作业，也不等 Mac（susu 2026-11-05 定：发版前一律
 只用云端；Mac 阶段复核在发版后跑，第 7 节）。
 
@@ -24,7 +24,7 @@
 
 从 3.3.1 起，发版前的性能判定只用云端（MERGE_RULES_V2 补充，2026-11-05），不再跑 Mac 发布批：
 
-- 候选提交（`next_cpp26` 上准备发版的那个提交，下称 C）对上一个发版 tag 跑 GCC 16 和 P2996 两个 Ir 门。
+- 候选提交（`main` 上准备发版的那个提交，下称 C）对上一个发版 tag 跑 GCC 16 和 P2996 两个 Ir 门。
   它们就是第 3 步 `local_validate --release --base <上一个 tag>` 里的 `ir` 和 `p2996-ir` 两步：base 是上一个
   tag，第 7 步又把 `bench/perf/ANCHOR` 移到了上一个 tag，所以 head÷base 和 head÷anchor 都是 C 对上一个 tag。
 - 判定（两个编译器各自判）就是工具对 head÷base 的判定行，和 S 类门禁同一套阈值（[PERF_GATE.md](PERF_GATE.md)
@@ -148,7 +148,7 @@ PASS。有发现：`tools/fuzz_report.py` 开 issue（用法见 `tools/fuzz_nigh
 
 ## 4. 发版 PR（0 类）
 
-一个只改版本和文档的 PR，标题 `Release X.Y.Z`，base 是 `next_cpp26`：
+一个只改版本和文档的 PR，标题 `Release X.Y.Z`，base 是 `main`：
 
 1. `XOFFSET_VERSION` 改成新版本号。
 2. `CHANGELOG.md`：把 `## Unreleased` 下的条目整段移到新标题 `## X.Y.Z: <一句话主题>` 下，
@@ -181,7 +181,7 @@ PASS。有发现：`tools/fuzz_report.py` 开 issue（用法见 `tools/fuzz_nigh
      --component storage --out build/release-storage-pack
    ```
 
-合并条件：第 2、3 步对 C 都通过，并且 C 之后 `next_cpp26` 上除这个 PR 以外没有别的合并。
+合并条件：第 2、3 步对 C 都通过，并且 C 之后 `main` 上除这个 PR 以外没有别的合并。
 发版 PR 不改库代码，所以 C 的云端判定和本地验证结果原样适用于它的合并提交。期间有别的 PR
 合进来，就把 C 换成新的头，重跑第 3 步（第 2 步的两个 Ir 门在同一次运行里）。
 
@@ -191,7 +191,7 @@ PASS。有发现：`tools/fuzz_report.py` 开 issue（用法见 `tools/fuzz_nigh
 也可以在 Mac 线程里请 Mac 会话代为执行（3.2.1、3.3.0 都是这样推的）。推好后开发线程用 `git ls-remote` 核对：
 
 ```sh
-git fetch origin next_cpp26
+git fetch origin main
 git tag -a vX.Y.Z <提交> -m "XOffset vX.Y.Z"
 git push origin vX.Y.Z
 ```
