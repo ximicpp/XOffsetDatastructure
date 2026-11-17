@@ -1,16 +1,13 @@
 # Performance regression gate (instruction counts, L0)
 
-**Instruction counts are used only to catch regressions; timing conclusions come from the formal Mac
-batches.** No claim of "faster" or of meeting a target (G1–G4) may use the numbers here as evidence.
+**Instruction counts are used only to catch regressions.** No claim of "faster" may use the numbers
+here as evidence; published speed numbers are in [PERFORMANCE.md](PERFORMANCE.md).
 
-**Merge rules (susu 2026-11-05 01:26Z)**: all performance verdicts happen in the cloud. Class S and
-class L PRs only pass the GCC 16 and P2996 Ir gates before merging (thresholds of section 3), then run
-`tools/local_validate.sh` on the merge result; class L also attaches a cache-sim comparison of D1/LL
-misses (section 5a), as a warning only. Mac batches only review after merges and releases, report only,
-and never block a merge; regressions found by the review get a fix PR in the next patch release.
-Wherever the text below says "run Mac L2 before merging", read it under this rule as: attach the function
-diff table and the cache-sim comparison, let the performance thread judge, and write the conclusion into
-the PR body.
+**Merge rules**: all verdicts happen in the cloud. Class S and class L PRs pass the GCC 16 and P2996 Ir
+gates before merging (section 3), then `tools/local_validate.sh` runs on the merge result; class L also
+attaches a cache-sim comparison (section 5a, warning only). Mac batches only review after merges and
+releases and never block a merge. Where the text below says "run Mac L2 before merging", attach the
+function diff table and the cache-sim comparison instead.
 
 **Tiered validation (susu 2026-11-11 05:57Z)**: `tools/local_validate.sh` runs the PR tier by default
 (`--tier pr`); the merge evidence is every step of that tier passing, with the two Ir gates judged per
@@ -24,16 +21,8 @@ section 3:
 | `release` (= `--release`) | Release candidates | All steps |
 
 Failures found by `daily` get a fix PR the same day, and nothing is released until they are fixed.
-`full` was the default step set before 11-11 and can still be requested when needed.
-
-Design basis: section 5 of the H3 design `beta2-20261022/H3_PERF_GATE_DESIGN_20261022.md`. This page is
-the implementation description.
-
-**Operating status (2026-10-26)**: GitHub CI is off (susu's decision of 10-23); `perf-gate.yml` is kept
-but no longer runs automatically, and the gate is run by the local validation script (commands in
-section 6). Implementation acceptance: 1 (historical replay) and 2 (a deliberate regression is caught)
-passed; 3 (one week of stability) is void: GitHub CI is off, and the gate is run by the local validation
-script.
+GitHub CI is off; `perf-gate.yml` is kept but the gate runs through the local validation script
+(section 6).
 
 ## 1. What it does
 
@@ -315,17 +304,3 @@ difference fails. Standalone: `asm_equal.py run --base REV --head REV --compiler
 - Self-test: `tools/perf_gate/test_asm_equal.py [--cxx ...]` verifies with small programs that a rename
   is judged identical, moving addresses is judged "same instructions, different placement", and adding a
   function or changing a constant is judged different and located to the changed function.
-
-## 9. Historical replays (cloud, GCC 16 x86-64, valgrind 3.22, SLG cycles 4–7, bench code from next_cpp26's `bench/`)
-
-| Change | Result | Failing items |
-| --- | --- | --- |
-| Old M3 (b3a694e → ea885e5) | Fail | formal.emit_after 1.305, formal.mutate 1.030, slg.A 1.021, slg.C 1.012, A.apply 1.101, B.out_encode 1.130, B.back_encode 1.128, C.snapshot 1.052, C.snapshot2 1.053, S.ticks_middle 1.060 |
-| New M3 (b3a694e → 70ee1c4) | Fail | formal.mutate 1.056, slg.A 1.017, A.apply 1.114, S.ticks_middle 1.073; B.season_edits 0.946 (Mac +2–3%, missed, platform difference) |
-| #26 (ea885e5 → 70ee1c4) | Fail | formal.mutate 1.026 (needs a ledger entry stating "trades output −23%", emit_after 0.766) |
-| #27 (f0768ad → b3ab3a3) | Pass | — |
-| #29 (b3ab3a3 → 30bb5ca) | Fail, GCC inlining change, expected result | slg.D 1.032, slg.B 1.014, A.req_decode 1.092 (slg.A 0.951). The function diff table flagged suspected inlining: `register_allocation` calls `register_owned_range`, −100,096 / +154,112 in D. #29 added a binary search and a throwing branch to `register_owned_range`, and GCC 16 stopped inlining most of it into `register_allocation`; the Mac's Clang did not change, and A–D all got faster (0.951 / 0.991 / 0.985 / 0.969). After moving the overlap check into a `[[gnu::noinline]]` cold function, D, B and C went back to 1.001 / 0.998 / 1.000 (verified by the performance gate thread; the library change was handled separately) |
-
-The formal harness is not affected by the window; the checked-in harness's Ir differs from the design
-probe by only a few instructions (old M3 emit_after 3,912,706 versus 3,912,698, new M3 mutate 43,729,854
-versus 43,729,847), and the M input wire is `2bf0c0717767f377…` in all cases.

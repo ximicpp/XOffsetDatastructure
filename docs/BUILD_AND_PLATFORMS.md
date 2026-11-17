@@ -1,29 +1,26 @@
 # Build, platforms and storage rules
 
-Moved here from the top-level README on 2026-11-17 when the README became an
-introduction; the text is unchanged. The [README](../README.md) has the quick
-start and the overview; the [user guide](USER_GUIDE.md) is the full reference.
+Requirements, building, installing and consuming the library, and the storage rules. The
+[README](../README.md) has the quick start; the [user guide](USER_GUIDE.md) is the full reference.
 
 ## Requirements
 
 | Use | Requirements |
 | --- | --- |
 | Full library, C++26 reflection build (servers), `XOffset::xoffset` | P2996 Clang with `<experimental/meta>` and matching libc++, or GCC 16+ (`-freflection`, `<meta>`, libstdc++); CMake 3.30+; 64-bit little-endian target; Linux, macOS or Windows VM APIs |
-| Client build, field-list backend (since 3.2.0) | C++20 or C++23 with the platform's native compiler (Android NDK Clang, MSVC 19.44 with `/Zc:preprocessor`, clang-cl, MinGW GCC, Apple clang for iOS 17+ and macOS 14+); one `XOFFSET_RECORD` line per record; CMake 3.20+; 64-bit little-endian target |
+| Client build, field-list backend | C++20 or C++23 with the platform's native compiler (Android NDK Clang, MSVC 19.44 with `/Zc:preprocessor`, clang-cl, MinGW GCC, Apple clang for iOS 17+ and macOS 14+); one `XOFFSET_RECORD` line per record; CMake 3.20+; 64-bit little-endian target |
 | OS storage only, `XOffset::storage` | C++17 compiler; CMake 3.13+; Linux, macOS or Windows VM APIs and threads |
 | Maintained validation tools and their tests | Python 3.10+; CMake/CTest 3.21+ for storage, 3.30+ for full; the C++ library has no Python runtime dependency |
 
-Ordinary C++26 support does not imply P2996 support. In 3.1.0 the full API had
-no non-reflection fallback. Since 3.2.0 (field-list backend), clients (Windows, Android, iOS) build the same library with
-C++20/C++23 and a one-line field list per record
+Ordinary C++26 support does not imply P2996 support. Clients (Windows, Android, iOS) build the same
+library with C++20/C++23 and a one-line field list per record
 ([user guide 2.1](USER_GUIDE.md#21-field-lists-xoffset_record)); servers keep
 C++26 reflection, which also checks each field list, and both builds write the
 same wire bytes ([CLIENT_TARGETS.md](CLIENT_TARGETS.md)). The supported
 reflection compilers are the Bloomberg clang-p2996
-fork pinned in [toolchains/README.md](../toolchains/README.md) and GCC 16 (CI uses
-the official `gcc:16` image, GCC 16.2.0, pinned by digest). CI checks that both
-compilers produce byte-identical wires from the same source and accept each
-other's wires.
+fork pinned in [toolchains/README.md](../toolchains/README.md) and GCC 16 (the
+official `gcc:16` image, pinned by digest). Local validation checks that both
+compilers produce byte-identical wires and accept each other's.
 Native Windows (MSVC, clang-cl) runs the full library only through the
 field-list backend; the reflection builds do not support it.
 
@@ -94,29 +91,11 @@ only storage is needed.
 
 ## Validation scope
 
-Results are profile-specific, not a promise for every compiler on each OS.
-GitHub CI has been off since 2026-10-23; the rows that cite CI are records of
-the 2.0 format from before that date. Since then the record is local
-validation (`tools/local_validate.sh`) and the local platform matrix
-(`tools/platform_matrix.sh`, [CLIENT_TARGETS.md](CLIENT_TARGETS.md)).
-
-| Environment | V2 result | Boundary |
-| --- | --- | --- |
-| 3.1.0 RC `e913d22` (format 2.1), local platform matrix: Linux x86_64 GCC 16 and P2996, Linux arm64 GCC 16 and P2996 (colima on Apple M4), Windows x64 MinGW-w64 GCC 16.2 (wine) | Full CTest 107/107 on each Linux column; Windows 105 pass, 2 skipped by design; 2.1 wire corpus byte-identical across all five | Functional only, no timing; MSVC, clang-cl, Android and iOS cannot build 3.1.0 (see the field-list row) |
-| Field-list backend, `next_cpp26` after #149 (since 3.2.0), `tools/native_targets.sh`: Android arm64 NDK r29/r30 (qemu), Windows x64 MSVC 19.44 C++20/C++23, clang-cl 19 and MinGW GCC 13.2 (wine) | Release CTest 106/106 on each; all 6 reference wires from the GCC 16 C++26 reflection build accepted, written corpus byte-identical | Functional only; iOS simulator (Xcode 27.1, iOS 27.0) 129/129 with the same corpus; an iPhone 15 Pro Max passed 138/138 and 3.2.0-rc.1 passed on one Android 11 phone ([records](DEVICE_TESTING.md)); core guarantee K8 since 2026-11-04 ([CLIENT_TARGETS.md](CLIENT_TARGETS.md)) |
-| macOS 26.3 arm64 (Apple M4), clang-p2996 `d77eff1` | Debug 78/78; TSan 75/75; ASan+UBSan passes except 8 cases inside the 9 known platform-limit cases (Darwin ASan replaces `operator new`, so injected host allocation failures cannot fire) | Recorded on 2026-10-21 for the V2 merge |
-| Linux x86_64, pinned P2996 Docker image | Full build, CTest, signature check and package consumption run in CI ([ci.yml](../.github/workflows/ci.yml)); a separate CI job runs ASan+UBSan on the allocator, wire and V2 tests | CI is the record; see the workflow runs |
-| Linux x86_64, GCC 16.2.0 (`gcc:16` image) | Debug build, CTest and ASan+UBSan in CI; cross-compiler wire corpus exchanged with P2996 Clang (byte-identical, mutually accepted) | No x86_64 performance comparison with P2996 Clang (cloud GCC timing is reference only) |
-| Linux arm64 VM on Apple M4 (colima vz), GCC 16.2.0 vs clang-p2996 `d77eff1` | Release CTest 98/98 with both; per-cycle state and wire bytes identical across the two compilers; SLG A–C xoffset÷baseline ≤ 0.50 under GCC in both batches (reference only) | GCC÷Clang wall-clock has no verdict: both allowed batches were invalid by their A/A and bridge rules; directions in the 2026-10-26 run notes, removed from the tree and retrievable per [ARCHIVED_EVIDENCE.md](ARCHIVED_EVIDENCE.md) |
-| Linux arm64 (native runner), GCC 16 | Full Debug CTest in CI; wire corpus byte-identical with Linux x86-64 | CI is the record ([client-targets.yml](../.github/workflows/client-targets.yml)) |
-| Windows x64, MSYS2 UCRT64 MinGW-w64 GCC 16.2 | Full Debug CTest in CI; wire corpus byte-identical with Linux x86-64 | No reflection compiler for MSVC, Android or iOS; those clients use the field-list backend (row above) |
-| Native Windows x64, MSVC | storage only (V1-era record) | Full library through the field-list backend only (row above) |
-
-V2 also passed a 100,000-case differential fuzz of the validators (35,000 under
-ASan+UBSan) with zero disagreements. Earlier V1-era platform records
-(`docs/VM_FINAL_DELIVERY.md` and the other `VM_`/`V1_` documents) were moved out
-of the tree on 2026-10-27; [ARCHIVED_EVIDENCE.md](ARCHIVED_EVIDENCE.md)
-says how to retrieve them. They do not describe the V2 format.
+Results are per toolchain, not a promise for every compiler on an OS. GitHub CI is off; the record is
+`tools/local_validate.sh` (Linux GCC 13/16, Clang 18, P2996, sanitizers, and the client columns) and the
+platform runs in [CLIENT_TARGETS.md](CLIENT_TARGETS.md) (Android NDK, MSVC, clang-cl, MinGW, Apple
+clang, Linux arm64, real devices). Every column runs the full CTest and checks the cross-compiler wire
+corpus byte for byte; none of them is a timing result.
 
 ## Storage and ownership rules
 
@@ -164,19 +143,5 @@ says how to retrieve them. They do not describe the V2 format.
 Both public headers are required for full consumers. Keep header versions,
 compile-time options and toolchain settings consistent across translation units.
 A release does not promise stable source API, ABI or arbitrary cross-toolchain
-wire compatibility; the [user guide](USER_GUIDE.md#8-core-guarantees-and-api-stability) lists the
-core guarantees (K0–K9, starting with K0: the payload holds no absolute
-address, so after any modification the whole region can still be copied to
-another address, process or machine) and which interfaces they cover. K8,
-native client builds (iOS, Android, Windows) sharing one library and one wire
-with the servers, became a core guarantee on 2026-11-04. Schema evolution
-(different schema versions on the two ends, since 3.2.0) is provided, see
-[SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md). K9, native delta sync (send
-only the bytes that changed; the receiver merges them into its copy: delta
-format 1.0 for whole states, shared deltas XS 1.0 for views), became a core
-guarantee in 3.5.0 after its apply entry points passed the pre-release fuzz. Receive checks come in three tiers (user guide
-section 8): today every receive entry point does the full check; 3.4 adds a
-trusted tier (default between servers and from server to client: header and
-hole-table bounds only, never for untrusted input) and a bounds tier (default
-for client uploads: reads stay in bounds, data is used read-only); modifying
-client data in place takes the full check.
+wire compatibility; the core guarantees K0–K9 and the three receive check tiers
+are in [user guide section 8](USER_GUIDE.md#8-core-guarantees-and-api-stability).
