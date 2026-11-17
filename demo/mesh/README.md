@@ -1,4 +1,4 @@
-# Device mesh demo (跨设备数据互传 demo)
+# Device mesh demo (cross-device data exchange demo)
 
 Any device (Linux, Windows, Android, iOS, macOS; all 64-bit little endian)
 joins a mesh at a central hub. An object of one of six everyday data types

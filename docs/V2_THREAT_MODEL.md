@@ -1,265 +1,309 @@
-# V2 威胁模型（4.0.0；文中「0.3.0-beta.1」指该版起的状态）
+# V2 threat model (4.0.0; "0.3.0-beta.1" in this text means the state since that version)
 
-本文说明 XOffset V2 在接收**不可信 wire** 时防住了什么、没防住什么，以及调用方必须
-在外层补上什么。格式细节见 [V2_FORMAT.md](V2_FORMAT.md)，接入要求见
-[DEPLOYMENT.md](DEPLOYMENT.md)。文中的实测数据都可以用第 6 节的方法复现。
+This document describes what XOffset V2 protects against when receiving an **untrusted wire**, what it
+does not, and what callers must add outside the library. Format details are in
+[V2_FORMAT.md](V2_FORMAT.md) and integration requirements in [DEPLOYMENT.md](DEPLOYMENT.md). All
+measurements here can be reproduced with the method of section 6.
 
-## 1. 保护对象与攻击者
+## 1. Assets and attackers
 
-**保护对象**
+**Assets**
 
-- 接收方进程的内存安全：读取通过校验的数据时，不越界、不读写 arena 以外的内存。
-- 接收方进程的可用性：一条消息消耗的内存、地址空间和 CPU 有界。
-- 发送方数据的保密性：wire 里只出现发送方当前对象图里的内容。
+- Memory safety of the receiving process: reading validated data never goes out of bounds or reads or
+  writes memory outside the arena.
+- Availability of the receiving process: the memory, address space and CPU one message consumes are
+  bounded.
+- Confidentiality of the sender's data: a wire contains only what is in the sender's current object
+  graph.
 
-**攻击者**
+**Attackers**
 
-| 编号 | 攻击者 | 能力 |
+| ID | Attacker | Capability |
 | --- | --- | --- |
-| A1 | 任意网络发送者（例如恶意客户端） | 完全控制发给服务端的 wire 字节，知道 schema 和公开的 schema 指纹 |
-| A2 | 被攻破的对端服务端 | 同 A1，并且能发很大的消息 |
-| A3 | 链路上的中间人（没有 TLS 时） | 读取和改写 wire |
-| A4 | 收到服务端数据的客户端 | 读取发给自己的 wire 的全部字节 |
+| A1 | Any network sender (for example a malicious client) | Fully controls the wire bytes sent to the server; knows the schema and the public schema fingerprint |
+| A2 | A compromised peer server | Same as A1, and can send very large messages |
+| A3 | A man in the middle on the link (without TLS) | Reads and rewrites wires |
+| A4 | A client receiving server data | Reads every byte of the wires sent to it |
 
-不在范围内：与接收方同进程的攻击者、侧信道、编译器或标准库自身的缺陷。
+Out of scope: attackers in the same process as the receiver, side channels, defects in the compiler or
+the standard library itself.
 
-## 2. 入口
+## 2. Entry points
 
-不可信字节只能从下面的接口进入，它们的校验强度相同：
+Untrusted bytes can only enter through the interfaces below, which all validate with the same
+strength:
 
-- `XBuffer::load_verified<T>`、`TypedXBuffer<T>::load`；
-- `begin_verified_receive<T>` / `finish_verified`；
-- `receive_raw::validate<T>`（内部接口）；
-- 3.2 schema 演进：`XPeerSchemas::load_verified<W>`、`evolve_load_verified<W>`（按 wire
-  头选出链上的版本，再走上面的 `load_verified`）、`XPeerSchemas::accept` 和
-  `read_schema_ack`（握手消息，同样走 `load_verified`，另有 64 KiB 和条目数上限）。
+- `XBuffer::load_verified<T>`, `TypedXBuffer<T>::load`;
+- `begin_verified_receive<T>` / `finish_verified`;
+- `receive_raw::validate<T>` (internal interface);
+- 3.2 schema evolution: `XPeerSchemas::load_verified<W>`, `evolve_load_verified<W>` (pick the version on
+  the chain from the wire header, then go through `load_verified` above), `XPeerSchemas::accept` and
+  `read_schema_ack` (handshake messages, also through `load_verified`, with additional 64 KiB and entry
+  count limits).
 
-- 重新加载进已有 buffer：`reload_verified` / `try_reload_verified`、`begin_verified_reload`
-  （直接收进已有 buffer 的存储），以及可搬槽位存储（R1）上的同样入口；
-- `load_verified_with_resource<T>` / `load_verified_with_scratch<T>`（校验用的位图来自调用方给的
-  内存资源，校验本身与 `load_verified` 相同）；
-- 客户端构建：以上入口在 C++20 字段表构建和关异常构建（`try_` 入口）里各是一份独立编译的代码。
+- Reloading into an existing buffer: `reload_verified` / `try_reload_verified`, `begin_verified_reload`
+  (receives directly into an existing buffer's storage), and the same entry points on movable slot
+  storage (R1);
+- `load_verified_with_resource<T>` / `load_verified_with_scratch<T>` (the validation bitmap comes from a
+  memory resource supplied by the caller; validation itself is the same as `load_verified`);
+- Client builds: each of the entry points above is separately compiled code in the C++20 field-list
+  build and in the no-exception build (`try_` entry points).
 
-`load_unverified` 不校验，**不是**不可信输入的入口。
+`load_unverified` does not validate and is **not** an entry point for untrusted input.
 
-接收检查分三档（2026-11-04 定，信任档和边界档的接口 3.4 加入）：信任档只查 wire 头准入和空洞表边界，
-用于服务端之间、服务端发往客户端和自己的存档，**不是**不可信输入的入口（调试和 sanitizer 构建里照样
-完整校验）。整块接收和增量的信任档是 `XReceiver<XLink::server_peer / from_server>::reload / load /
-apply_delta`（`xoffset_receiver.hpp`），`XReceiver<XLink::from_client>` 在编译期拒绝信任档；把客户端连接误建成可信
-链路的接收器靠代码审查发现。信任档按定义不接不可信输入，不保证对任意输入给出可用的结果；fuzz 和
-`test_receiver` 的差分测试只要求两件事：它自己的解析和写入对任何输入都不越界（ASan），对完整档接受的
-输入给出相同结果（第 5 节表中的 admit 一行）。边界档（3.5）用于客户端上行：`XReceiver<XLink::from_client>::view`
-在 wire 字节上给出只读视图 `XView<T>`，只有 const 访问。它保证的是：任何 const 访问都不读出 wire 之外，
-遍历的工作量不超过负载大小的线性倍数（块可以重叠，所以按负载大小限遍历的元素字节总数），bool 不会是
-0、1 以外的值（避免未定义行为）。它不保证值有意义：块重叠、set/map 键乱序、填充字节非零的输入可能被接受，
-读出来的是垃圾值或查找不到。要原地修改客户端数据时走完整档，即上面这些入口。harness 见第 5 节表中的
-bounds 一行。
+Receive checks have three tiers (decided 2026-11-04; the trusted and bounds tier interfaces were added
+in 3.4): the trusted tier checks only wire header admission and hole table bounds, and is for server to
+server, server to client and your own saved files; it is **not** an entry point for untrusted input
+(debug and sanitizer builds still validate fully). The trusted tier for whole-buffer receive and deltas
+is `XReceiver<XLink::server_peer / from_server>::reload / load / apply_delta` (`xoffset_receiver.hpp`);
+`XReceiver<XLink::from_client>` rejects the trusted tier at compile time; a client connection
+mistakenly built as a trusted-link receiver is found by code review. By definition the trusted tier
+does not take untrusted input and does not promise a usable result for arbitrary input; fuzzing and the
+`test_receiver` differential tests require only two things: its own parsing and writes never go out of
+bounds for any input (ASan), and for input the full tier accepts it gives the same result (the admit
+row of the table in section 5). The bounds tier (3.5) is for client uplink:
+`XReceiver<XLink::from_client>::view` gives a read-only view `XView<T>` over the wire bytes, with const
+access only. It guarantees that no const access reads outside the wire, that the work of a walk is at
+most linear in the payload size (blocks can overlap, so the total element bytes walked are capped by
+the payload size), and that bools are never anything but 0 or 1 (avoiding undefined behavior). It does
+not guarantee that values make sense: input with overlapping blocks, out-of-order set/map keys or
+non-zero padding bytes may be accepted, and reads give garbage or lookups miss. To modify client data
+in place use the full tier, that is, the entry points above. The harness is the bounds row of the table
+in section 5.
 
-## 3. 威胁与现状
+## 3. Threats and status
 
-| 编号 | 威胁 | 现状 | 依据 / 缺口 |
+| ID | Threat | Status | Basis / gap |
 | --- | --- | --- | --- |
-| T1 | 构造的 wire 让接收方越界读写 | **已防住** | 完整校验（V2_FORMAT 第 5 节）；Clang 与 GCC 16 的 ASan+UBSan CI；每个 PR 上的 libFuzzer（多 schema，第 5 节）；发布前 GCC 16 ASan+UBSan 差分 fuzz 480 万例无分歧。缺口：每日长时间 fuzz 尚未运行（第 5 节 F4） |
-| T2 | 篡改字段值（A3） | **不防** | 只改标量值的 wire 能通过校验；wire 头没有校验和（格式 2.1 删除了固定为 0 的 `crc32c`），没有 MAC。外层必须用 TLS 或消息签名 |
-| T3 | 伪造 schema 身份 | 不构成越权 | schema 指纹（64 位 FNV-1a）是一致性检查，不是认证：攻击者照抄指纹也只能让接收方按**接收方自己的类型**做完整校验 |
-| T4 | 资源耗尽 | **默认有界**（M1：不传上限时默认 64 MiB） | 见 3.1；服务端接收客户端数据仍应设更小的上限（DEPLOYMENT 第 5 节） |
-| T5 | 已删除数据的旧字节随 wire 发出（A4） | **部分防住**（2026-11-16 起，性能优先）；`XOFFSET_HARDENED=1` 或 `save_compact` 时基本防住 | 释放的块仍然清零（P1，M3）。默认构建不清零容器腾出的字节（P2）和填充字节（P3），`save_verified`、`freeze_verified` 和增量同步会把它们原样发出。`XOFFSET_HARDENED=1` 打开 M4、M6（4.0.0 及之前的默认行为）；`save_compact` 在任何构建下都不带容器余量里的旧字节。见 3.2 和 4.1 |
-| T6 | 不同编译器对同一 wire 的理解不同 | 已发现一处并修复 | enum 键只定义 `operator<=>` 时，Clang 和 GCC 的集合顺序相反，两边互相拒收；修复和 CI 互读作业见 GCC 16 移植 PR |
-| T7 | 业务层非法值（负数金币等） | **不防** | 不属于结构校验，按普通业务输入检查 |
-| T8 | 用旧版本 wire 放大服务端开销（3.2 schema 演进） | **有界** | 攻击者可以选链上最旧的版本，让服务端多做一次完整校验加每级一次转换；转换后的对象可能比 wire 大（新增字段、更宽的类型）。转换目标 buffer 的上限默认等于传给 `load_verified` 的 `maximum_capacity`，超过即失败。按链长估算放大倍数，必要时缩短链。`fuzz_schema_evolution` 覆盖这条入口 |
+| T1 | A crafted wire makes the receiver read or write out of bounds | **Protected** | Full validation (V2_FORMAT section 5); ASan+UBSan CI with Clang and GCC 16; libFuzzer on every PR (multiple schemas, section 5); pre-release GCC 16 ASan+UBSan differential fuzzing of 4.8 million cases with no disagreement. Gap: daily long fuzz runs are not yet running (section 5, F4) |
+| T2 | Tampering with field values (A3) | **Not protected** | A wire that only changes scalar values passes validation; the wire header has no checksum (format 2.1 removed the always-zero `crc32c`) and no MAC. TLS or message signatures must be used outside the library |
+| T3 | Forging schema identity | No privilege gained | The schema fingerprint (64-bit FNV-1a) is a consistency check, not authentication: an attacker copying the fingerprint can only make the receiver fully validate against **the receiver's own type** |
+| T4 | Resource exhaustion | **Bounded by default** (M1: 64 MiB default when no limit is passed) | See 3.1; servers receiving client data should still set a smaller limit (DEPLOYMENT section 5) |
+| T5 | Old bytes of deleted data sent with the wire (A4) | **Partly protected** (since 2026-11-16, performance first); essentially protected with `XOFFSET_HARDENED=1` or `save_compact` | Freed blocks are still zeroed (P1, M3). The default build does not zero bytes vacated by containers (P2) or padding bytes (P3), and `save_verified`, `freeze_verified` and delta sync send them as they are. `XOFFSET_HARDENED=1` turns on M4 and M6 (the default behavior in 4.0.0 and earlier); `save_compact` never carries old bytes from container slack in any build. See 3.2 and 4.1 |
+| T6 | Different compilers interpret the same wire differently | One case found and fixed | When an enum key defines only `operator<=>`, Clang and GCC order sets oppositely and reject each other's wires; the fix and the CI cross-read job are in the GCC 16 port PR |
+| T7 | Invalid business values (negative gold and the like) | **Not protected** | Not part of structural validation; check them as ordinary business input |
+| T8 | Amplifying server cost with old-version wires (3.2 schema evolution) | **Bounded** | An attacker can pick the oldest version on the chain, making the server do one more full validation plus one conversion per step; the converted object can be larger than the wire (new fields, wider types). The conversion target buffer's limit defaults to the `maximum_capacity` passed to `load_verified`, and exceeding it fails. Estimate the amplification from the chain length and shorten the chain if needed. `fuzz_schema_evolution` covers this entry point |
 
-### 3.1 资源耗尽（T4）
+### 3.1 Resource exhaustion (T4)
 
-**R1 稀疏 wire 放大。** 稀疏 wire 的空隙不占 wire 字节，只要求落在空洞里。一个
-184 字节的 wire 可以声明接近 2 GiB 的 `used_bytes`：
+**R1 sparse wire amplification.** The gaps of a sparse wire take no wire bytes; they only have to fall
+inside holes. A 184-byte wire can declare a `used_bytes` close to 2 GiB:
 
-| wire | 声明的 used_bytes | 不设上限 | 设 `maximum_capacity(1 MiB)` |
+| Wire | Declared used_bytes | No limit | With `maximum_capacity(1 MiB)` |
 | ---: | ---: | --- | --- |
-| 184 B | 64 MiB | 接受，预留 64 MiB，4 ms | 拒绝 |
-| 184 B | 1 GiB | 接受，预留 1 GiB，67 ms | 拒绝 |
-| 184 B | 2047 MiB | 接受，预留 2 GiB，140 ms，RSS +8 MiB | 拒绝 |
+| 184 B | 64 MiB | Accepted, reserves 64 MiB, 4 ms | Rejected |
+| 184 B | 1 GiB | Accepted, reserves 1 GiB, 67 ms | Rejected |
+| 184 B | 2047 MiB | Accepted, reserves 2 GiB, 140 ms, RSS +8 MiB | Rejected |
 
-不设上限时，`load_verified` 的预留等于 wire 声明的大小；`begin_verified_receive`
-不传上限时同样以声明的大小为准。后果：
+Without a limit, `load_verified` reserves the size the wire declares; `begin_verified_receive` without
+a limit also goes by the declared size. Consequences:
 
-- 服务端：每条 184 字节的消息占 2 GiB 地址空间和约 140 ms CPU。并发几十条就可能
-  耗尽提交额度（`vm.overcommit_memory=2` 时直接失败）或拖慢服务。
-- 客户端（尤其 iOS）：地址空间预算小，几条这样的消息就可能让进程崩溃。
-- **只检查 wire 长度不够**：184 字节远小于任何长度上限。
+- Server: every 184-byte message takes 2 GiB of address space and about 140 ms of CPU. A few dozen
+  concurrent ones can exhaust the commit limit (failing outright with `vm.overcommit_memory=2`) or slow
+  the service down.
+- Client (iOS in particular): the address space budget is small, and a few such messages can crash the
+  process.
+- **Checking the wire length is not enough**: 184 bytes is far below any length limit.
 
-**R2 空洞表放大。** 空洞表每项 8 字节，加载时每项都进入宿主侧空闲表，校验时还要
-登记到字节索引：
+**R2 hole table amplification.** Each hole table entry is 8 bytes; on load every entry goes into the
+host-side free table, and validation also registers it in the byte index:
 
-| 声明的 used_bytes | 空洞大小 | wire | 加载耗时 | 空闲块数 | 峰值 RSS |
+| Declared used_bytes | Hole size | Wire | Load time | Free blocks | Peak RSS |
 | ---: | ---: | ---: | ---: | ---: | ---: |
 | 1 GiB | 4096 B | 2 MiB | 182 ms | 262,144 | 141 MiB |
 | 1 GiB | 64 B | 128 MiB | 797 ms | 16,777,215 | 267 MiB |
 | 1 MiB | 8 B | 1 MiB | 5 ms | 131,063 | 5 MiB |
 
-宿主内存和耗时随 `used_bytes` 和空洞数线性增长，不会超线性。设置
-`maximum_capacity` 后，二者都被上限约束（1 MiB 上限时峰值约 5 MiB）。
+Host memory and time grow linearly with `used_bytes` and the number of holes, never superlinearly. With
+`maximum_capacity` set, both are bounded by the limit (peak about 5 MiB with a 1 MiB limit).
 
-**R3 其他。** 并发 buffer 数、队列长度、解压后长度、单请求耗时都在库外，由调用方
-限制（DEPLOYMENT 第 5、6 节）。
+**R3 other.** Concurrent buffer count, queue length, decompressed length and per-request time are
+outside the library and limited by the caller (DEPLOYMENT sections 5 and 6).
 
-**结论：** 上面的数据是缓解前的实测。0.3.0-beta.1 起，不传上限时按默认上限（64 MiB，
-M1）在预留前拒绝，R1、R2 的放大被约束在默认上限内；超限的报错写明声明大小和上限
-（M2）。对客户端上行数据，64 MiB 仍然偏大，应按 DEPLOYMENT 第 5 节设更小的上限。
+**Conclusion:** the data above was measured before mitigation. Since 0.3.0-beta.1, when no limit is
+passed, wires are rejected before reserving by the default limit (64 MiB, M1), bounding the R1 and R2
+amplification by the default limit; the error for exceeding it names the declared size and the limit
+(M2). For client uplink data 64 MiB is still too large; set a smaller limit per DEPLOYMENT section 5.
 
-### 3.2 旧内容泄露（T5）
+### 3.2 Leaking old content (T5)
 
-下表是缓解前的实测：当时库不清零不再使用的字节，而 wire 是 arena 字节的原样复制，
-所以有三条泄露途径。0.3.0-beta.1 的处理见表后的「现状」。
+The table below was measured before mitigation: at the time the library did not zero bytes no longer in
+use, and a wire is a verbatim copy of the arena bytes, so there were three leak paths. How 0.3.0-beta.1
+handles them is under "Status" after the table.
 
-| 途径 | 例子 | 实测 |
+| Path | Example | Measured |
 | --- | --- | --- |
-| P1 已释放块（空洞） | 字符串换成更长的值、删除含堆字符串的元素、vector 迁移后，旧块进入空闲表，内容不变 | 旧字符串（`SECRET-TOKEN-…`、`TOPSECRET-player-name`）出现在 wire 里，并且经过 `load_verified` 再保存后仍然保留 |
-| P2 容器的空余容量 | `vector.clear()`、`resize()` 变小之后，`[size, capacity)` 里还是旧元素 | 旧元素字节出现在 wire 里 |
-| P3 对象的填充字节 | 带隐式填充的结构体（如 `{uint8_t; uint64_t;}`）。从空闲块重新分配，或从栈上临时对象复制进来时，填充字节会带上旧的 arena 内容或栈内容 | 已实测（2026-10-21，Mac）：`alignas(8)` 的 `Troop` 数据 12 字节、`sizeof` 16，`troops.push_back({1, 2, 3})` 的临时对象带 4 字节不确定的填充，被原样写进 wire；同一份数据的两次构建在偏移 3884 处相差 1 字节（2 对 0）。加显式 `std::int32_t pad{};` 后完全一致。所以 P3 既会让 wire 不确定，也会带出发送方栈上的字节 |
+| P1 freed blocks (holes) | After replacing a string with a longer value, erasing elements that hold heap strings, or vector migration, the old block goes into the free table with its content unchanged | Old strings (`SECRET-TOKEN-…`, `TOPSECRET-player-name`) appeared in the wire, and remained after `load_verified` and saving again |
+| P2 spare container capacity | After `vector.clear()` or a shrinking `resize()`, `[size, capacity)` still holds the old elements | Old element bytes appeared in the wire |
+| P3 object padding bytes | Structs with implicit padding (such as `{uint8_t; uint64_t;}`). When reallocated from a free block, or copied in from a temporary on the stack, the padding bytes carry old arena content or stack content | Measured (2026-10-21, Mac): an `alignas(8)` `Troop` with 12 bytes of data and `sizeof` 16; the temporary in `troops.push_back({1, 2, 3})` carried 4 bytes of indeterminate padding that were written into the wire verbatim; two builds of the same data differed by 1 byte at offset 3884 (2 versus 0). With an explicit `std::int32_t pad{};` they were identical. So P3 both makes wires nondeterministic and leaks bytes from the sender's stack |
 
-字符串被更短的值覆盖时，实测旧尾部没有发出。
+When a string was overwritten by a shorter value, the old tail was measured not to be sent.
 
-缓解前的后果：服务端发给客户端的 wire，可能带有这个 buffer 里**曾经存过、已经删掉**
-的数据（其他玩家的信息、服务端内部字段等），P3 还可能带出服务端栈上的数据。
+Consequence before mitigation: a wire the server sent to a client could contain data that **had once
+been stored in that buffer and was already deleted** (other players' information, server-internal
+fields and so on), and P3 could also leak data from the server's stack.
 
-**现状（2026-11-16 起）：** susu 决定性能优先，P2、P3 两项清零改成编译开关，**默认关闭**。
-`XOFFSET_HARDENED=1` 全部打开（4.0.0 及之前的默认行为），也可以单独打开（4.1 节）。
-默认构建下，`save_verified`、`freeze_verified` 和增量同步发出的字节，可能带有容器里已经
-删掉的元素。`save_compact` 不受影响：它不写空洞，余量和字符串尾部重写为 0。
+**Status (since 2026-11-16):** susu decided performance comes first, and zeroing for P2 and P3 became
+compile switches, **off by default**. `XOFFSET_HARDENED=1` turns them all on (the default behavior in
+4.0.0 and earlier), or each can be turned on separately (section 4.1). In the default build, bytes sent
+by `save_verified`, `freeze_verified` and delta sync may contain elements already erased from
+containers. `save_compact` is unaffected: it writes no holes and rewrites slack and string tails as 0.
 
-- P1：块在释放时清零（M3），arena 里的空洞就是 0，所有输出路径仍是原样复制。这一项
-  **不是开关**：从 touch 标记生成的增量只在空洞出现或消失时发送它的字节，收发两端都依赖
-  空洞里是 0，关掉会让副本和发送方的字节不一致。
-- P2：默认不清零，`clear()`、`resize()` 变小、`erase`、`pop_back()`、赋更短的值之后，
-  旧元素和旧字符留在 `[size, capacity)` 里，直到下一次在这个位置追加时被覆盖（字符串
-  仍然写结尾的 NUL）。被删元素自己拥有的块照常释放并清零（M3），所以留下的是元素本身的
-  内联字节（标量字段、内联数组、不超过 10 字节的内联字符串）和堆字符串缩短后的旧尾部。
-  `XOFFSET_SCRUB_ERASED=1` 清零 `clear`、`resize`、`erase` 和赋值腾出的字节，
-  `XOFFSET_SCRUB_POPPED=1` 清零 `pop_back` 删掉的元素（M4）。
-- P3：默认不清零，带隐式填充的容器元素会带上构造它的那个值的填充字节，通常是发送方
-  栈上的字节；同样的内容两次构建，wire 也可能不同。`XOFFSET_SCRUB_PADDING=1` 时库构造
-  或搬移的容器元素（含 map 条目）填充字节清零（M6）。更省事的办法是让 wire 类型没有
-  隐式填充：用 `XOFFSET_REQUIRE_NO_PADDING(T)` 或 `XOFFSET_REJECT_IMPLICIT_PADDING` 在
-  编译期发现，改成显式字段。调用方直接赋值的带填充记录，库在任何构建下都无法触及。
-- 重置：`reset<T>()` 等重新开始一个 buffer 的操作，仍然把用过的字节全部清零，也不是
-  开关（库内部和增量同步依赖「used_end 之后全是 0」）。所以轮流给不同接收方构建消息的
-  同一个 buffer，不会把上一条消息的内容带进下一条。
-- 转发：load 进来的 wire 里的空洞和容器余量（`[size, capacity)`）保留发送方字节，
-  校验不要求它们是 0，load 后直接 save 会原样转发。这不是接收方自己的内存，但恶意
-  发送方可借此给下游夹带字节。转发前用 `save_compact` 重建：它不写空洞、余量重写为 0、
-  字符串尾部清零；记录的隐式填充仍按字节复制，所以转发的类型要没有隐式填充
-  （[DEPLOYMENT.md](DEPLOYMENT.md) 4.2 节）。
+- P1: blocks are zeroed when freed (M3), holes in the arena are 0, and all output paths still copy
+  verbatim. This is **not a switch**: deltas generated from touch marks send a hole's bytes only when
+  the hole appears or disappears, and both ends rely on holes being 0; turning it off would make the
+  copy's bytes differ from the sender's.
+- P2: not zeroed by default. After `clear()`, a shrinking `resize()`, `erase`, `pop_back()` or assigning
+  a shorter value, old elements and characters stay in `[size, capacity)` until an append at that
+  position overwrites them (strings still write the terminating NUL). Blocks owned by erased elements
+  are freed and zeroed as usual (M3), so what remains is the elements' own inline bytes (scalar fields,
+  inline arrays, inline strings of up to 10 bytes) and the old tails of shortened heap strings.
+  `XOFFSET_SCRUB_ERASED=1` zeroes the bytes vacated by `clear`, `resize`, `erase` and assignment, and
+  `XOFFSET_SCRUB_POPPED=1` zeroes elements removed by `pop_back` (M4).
+- P3: not zeroed by default. Container elements with implicit padding carry the padding bytes of the
+  value they were built from, usually bytes from the sender's stack; two builds of the same content can
+  give different wires. With `XOFFSET_SCRUB_PADDING=1` the padding of container elements the library
+  builds or moves (including map entries) is zeroed (M6). The simpler way is to give wire types no
+  implicit padding: find it at compile time with `XOFFSET_REQUIRE_NO_PADDING(T)` or
+  `XOFFSET_REJECT_IMPLICIT_PADDING` and turn it into explicit fields. Padded records the caller assigns
+  directly are out of the library's reach in any build.
+- Reset: operations that start a buffer over, such as `reset<T>()`, still zero all used bytes, and this
+  is not a switch either (the library internals and delta sync rely on "everything after used_end is
+  0"). So a buffer that builds messages for different receivers in turn never carries the previous
+  message's content into the next.
+- Forwarding: holes and container slack (`[size, capacity)`) of a loaded wire keep the sender's bytes;
+  validation does not require them to be 0, and saving directly after loading forwards them unchanged.
+  This is not the receiver's own memory, but a malicious sender can use it to smuggle bytes downstream.
+  Rebuild with `save_compact` before forwarding: it writes no holes, rewrites slack as 0 and zeroes
+  string tails; implicit padding in records is still copied byte for byte, so forwarded types must have
+  no implicit padding ([DEPLOYMENT.md](DEPLOYMENT.md) section 4.2).
 
-回归测试：`test_wire_hole_zeroing`（P1、P2、转发、M1/M2）、`test_implicit_padding`（P3）。
-两个测试各构建两次：默认构建检查空洞为 0、`save_compact` 不带旧字节、内容正确；
-`XOFFSET_HARDENED=1` 构建（`*_hardened`）检查 wire 里没有任何旧字节、填充为 0、wire 确定。
+Regression tests: `test_wire_hole_zeroing` (P1, P2, forwarding, M1/M2) and `test_implicit_padding` (P3).
+Each test is built twice: the default build checks that holes are 0, that `save_compact` carries no old
+bytes, and that content is correct; the `XOFFSET_HARDENED=1` build (`*_hardened`) checks that the wire
+contains no old bytes at all, that padding is 0 and that the wire is deterministic.
 
-## 4. 缓解措施（0.3.0-beta.1 全部实施）
+## 4. Mitigations (all implemented in 0.3.0-beta.1)
 
-M1–M6 已在 0.3.0-beta.1 实施，行为变化见 CHANGELOG。M3 的修改路径开销实测约 +5%。
-2026-11-16 起 M4 和 M6 的清零默认关闭，由 4.1 节的开关打开；M1、M2、M3、M5 不变。
+M1–M6 were implemented in 0.3.0-beta.1; behavior changes are in CHANGELOG. M3 costs about +5% on the
+modification path, measured. Since 2026-11-16 the zeroing of M4 and M6 is off by default and turned on
+by the switches of section 4.1; M1, M2, M3 and M5 are unchanged.
 
-| 编号 | 措施 | 影响 |
+| ID | Mitigation | Impact |
 | --- | --- | --- |
-| M1 | `load_verified` 和 `begin_verified_receive` 不传上限时，用默认上限（64 MiB，可用 `XOFFSET_DEFAULT_MAXIMUM_CAPACITY` 调整），超过就在预留前拒绝；需要更大的 wire 时显式传 `maximum_capacity` | 公开 API 行为变化：大于 64 MiB 的 wire 必须显式传上限。读路径性能不变 |
-| M2 | 上限不足时的报错改为 `used_bytes … exceeds maximum_capacity …`（现在是笼统的 `XOffset arena allocation failed`） | 只改诊断 |
-| M3 | 块释放时清零，空洞在 arena 里就是 0（P1），输出路径不变 | 改变含空洞 wire 的字节（golden 要更新）；开销在释放路径，与释放的字节数成正比。load 进来的 wire 空洞保留发送方字节，load 后直接 save 会原样转发（不泄漏本端内存，但恶意发送方可借此给下游夹带字节）。最初实现是输出时按空洞补零，实测正式输出慢约 22%，故改为释放时清零 |
-| M4 | （默认关闭）容器缩小时把腾出的元素字节清零（P2）：`XOFFSET_SCRUB_ERASED=1` 管 `clear`、`resize` 变小、`erase`、赋更短的值，`XOFFSET_SCRUB_POPPED=1` 管 `pop_back` | 开销只在修改路径，与删除的字节数成正比；打开后 `clear()` 是 O(n) |
-| M5 | 文档：DEPLOYMENT 写明「只检查 wire 长度不够，必须设上限」，以及 P1–P3 | 无代码影响 |
-| M6 | 填充字节（P3）：编译期检查开关（`XOFFSET_REQUIRE_NO_PADDING`、`XOFFSET_REJECT_IMPLICIT_PADDING`），schema 有隐式填充就报错，让用户改成显式字段；`XOFFSET_SCRUB_PADDING=1`（默认关闭）时库在构造或搬移容器元素时按填充位置清零 | 编译期检查没有运行时开销；清零的开销见 4.1 |
+| M1 | When `load_verified` and `begin_verified_receive` get no limit, they use the default limit (64 MiB, adjustable with `XOFFSET_DEFAULT_MAXIMUM_CAPACITY`) and reject larger wires before reserving; pass `maximum_capacity` explicitly for larger wires | Public API behavior change: wires larger than 64 MiB need an explicit limit. Read path performance unchanged |
+| M2 | The error for an insufficient limit became `used_bytes … exceeds maximum_capacity …` (previously the generic `XOffset arena allocation failed`) | Diagnostics only |
+| M3 | Blocks are zeroed when freed, so holes in the arena are 0 (P1); output paths unchanged | Changes the bytes of wires with holes (goldens need updating); the cost is on the free path, proportional to the bytes freed. Holes of a loaded wire keep the sender's bytes, and saving directly after loading forwards them unchanged (no local memory leaks, but a malicious sender can smuggle bytes downstream). The first implementation zero-filled holes at output time and made formal output about 22% slower, so it was changed to zeroing on free |
+| M4 | (Off by default) Zero the element bytes vacated when a container shrinks (P2): `XOFFSET_SCRUB_ERASED=1` covers `clear`, shrinking `resize`, `erase` and assigning a shorter value; `XOFFSET_SCRUB_POPPED=1` covers `pop_back` | Cost only on the modification path, proportional to the bytes removed; when on, `clear()` is O(n) |
+| M5 | Documentation: DEPLOYMENT states "checking the wire length is not enough, a limit must be set", and P1–P3 | No code impact |
+| M6 | Padding bytes (P3): compile-time check switches (`XOFFSET_REQUIRE_NO_PADDING`, `XOFFSET_REJECT_IMPLICIT_PADDING`) make a schema with implicit padding an error so users turn it into explicit fields; with `XOFFSET_SCRUB_PADDING=1` (off by default) the library zeroes padding positions when building or moving container elements | The compile-time check has no run-time cost; the cost of zeroing is in 4.1 |
 
-### 4.1 加固开关（2026-11-16 起默认关闭）
+### 4.1 Hardening switches (off by default since 2026-11-16)
 
-下面的措施花在修改和发送的热路径上，防的是容器里的旧字节随 wire 发出（T5 的 P2、P3），
-或者调用方自己的用法错误。susu 2026-11-16 决定性能优先：每一项都是编译开关，默认 0；`-DXOFFSET_<名字>=1`
-打开一项，`-DXOFFSET_HARDENED=1`（CMake 选项 `XOFFSET_HARDENED=ON`）打开所有没有单独
-指定的项。开关改变内联函数的行为，同一个程序的所有翻译单元要用同样的值。
+The measures below spend time on the hot modification and send paths; they protect against old bytes in
+containers being sent with the wire (P2 and P3 of T5) or against the caller's own usage errors. susu
+decided on 2026-11-16 that performance comes first: every item is a compile switch, default 0;
+`-DXOFFSET_<name>=1` turns one on, and `-DXOFFSET_HARDENED=1` (CMake option `XOFFSET_HARDENED=ON`)
+turns on all items not set individually. The switches change the behavior of inline functions, so all
+translation units of one program must use the same values.
 
-| 开关 | 打开后 | 默认（关闭）时 | 关闭省下的指令数 |
+| Switch | When on | When off (default) | Instructions saved by turning it off |
 | --- | --- | --- | --- |
-| `XOFFSET_SCRUB_POPPED` | M4：`pop_back()` 把删掉的元素清零 | 元素的内联字节留在余量里，下一次追加时覆盖 | CppCon 2024 调优布局读写 7.6%；SLG UP.apply 1.9% |
-| `XOFFSET_SCRUB_ERASED` | M4：`clear()`、`resize()` 变小、`erase`、赋更短的值，把腾出的字节清零 | 旧元素、旧字符留在余量里 | CppCon 调优布局读写再少约 4%；SLG LD.apply 3.8%、LDW.recv 3.4%；原生增量字节 NB.delta 少 9.9%（清零也是改动，要随增量发出） |
-| `XOFFSET_SCRUB_PADDING` | M6：库构造或搬移的容器元素，隐式填充清零 | 填充带着构造它的值里的字节（通常来自栈），同样内容的 wire 可能不同 | SLG A.apply 1.6%、SD 1.3% |
-| `XOFFSET_PIN_QUARANTINE` | `edit()` / `read()` 作用域里回收的块，到作用域结束才复用 | 块立刻可以复用。作用域里一个已经失效的引用（容器扩容或删除之前取的）可能读到后来写进去的别的数据；失效规则本身和 `std::vector` 一样 | CppCon 2024 布局读写 12.6%（计时约 18%）；SLG 各格不到 0.5%。反过来的一面：块立刻复用后 buffer 更小，但空洞可能更碎。CppCon 2024 的角色数据在一次 `edit()` 里填好后，wire 从 3232 字节、1 个空洞变成 3112 字节、2 个空洞，收发一轮多 123 条指令（9%） |
-| `XOFFSET_SAVE_SELF_CHECK` | 小消息（4 KiB 以下）每次保存前，再查一次 arena 头的魔数和大小，以及输出 `std::string` 不和 buffer 自己的存储重叠 | 这两项是发送方自查：把 buffer 自己的存储当输出传入是未定义行为；arena 头被外部写坏时不报错。较大的消息走通用路径，两项检查仍然做 | SLG UP.send 5.7%、UC.send 1.8% |
+| `XOFFSET_SCRUB_POPPED` | M4: `pop_back()` zeroes the removed element | The element's inline bytes stay in the slack until the next append overwrites them | CppCon 2024 tuned layout read/write 7.6%; SLG UP.apply 1.9% |
+| `XOFFSET_SCRUB_ERASED` | M4: `clear()`, shrinking `resize()`, `erase` and assigning a shorter value zero the vacated bytes | Old elements and characters stay in the slack | CppCon tuned layout read/write about 4% more; SLG LD.apply 3.8%, LDW.recv 3.4%; native delta bytes NB.delta 9.9% smaller (zeroing is also a change and has to be sent with the delta) |
+| `XOFFSET_SCRUB_PADDING` | M6: implicit padding of container elements the library builds or moves is zeroed | Padding carries bytes from the value it was built from (usually from the stack); wires with the same content may differ | SLG A.apply 1.6%, SD 1.3% |
+| `XOFFSET_PIN_QUARANTINE` | Blocks reclaimed inside an `edit()` / `read()` scope are reused only when the scope ends | Blocks can be reused right away. An already invalidated reference in the scope (obtained before a container grew or erased) may read other data written later; the invalidation rules themselves are the same as `std::vector` | CppCon 2024 layout read/write 12.6% (about 18% in time); every SLG cell under 0.5%. The other side: with immediate reuse the buffer is smaller but holes can be more fragmented. When the CppCon 2024 character data is filled in one `edit()`, the wire goes from 3232 bytes with 1 hole to 3112 bytes with 2 holes, and one send/receive round takes 123 more instructions (9%) |
+| `XOFFSET_SAVE_SELF_CHECK` | Before every save of a small message (under 4 KiB), re-check the arena header's magic and size, and that the output `std::string` does not overlap the buffer's own storage | Both are sender self-checks: passing the buffer's own storage as the output is undefined behavior; a corrupted arena header is not reported. Larger messages take the generic path, where both checks still run | SLG UP.send 5.7%, UC.send 1.8% |
 
-数字是 P2996 Clang x86-64 上 callgrind 的指令数（2026-11-16，
-`relax-survey-20261116/`）。不在开关里、保持不变的：
+Numbers are callgrind instruction counts on P2996 Clang x86-64 (2026-11-16, `relax-survey-20261116/`).
+Not switches and unchanged:
 
-- 块释放时清零（M3）和 buffer 重置时清零用过的字节：增量同步依赖「空洞是 0」和
-  「used_end 之后是 0」，见 3.2。关掉 M3 实测只省 LD.apply 1.5%、LDW.recv 1.3% 的指令。
-- 接收端的检查档位不变：`XReceiver<from_client>` 的 `view()` 仍是边界档，`reload()` 仍是
-  完整校验；可信链路仍是线头检查。信任对端的部署本来就可以把接收端建成可信链路
-  （`XReceiver<XLink::server_peer>`，见 `xoffset_receiver.hpp` 开头的说明），不需要编译开关。
-- M1 默认上限、参数检查、`XOFFSET_FORCE_FULL_CHECK`（调试构建和 sanitizer 下默认 1）。
+- Zeroing blocks on free (M3) and zeroing used bytes on buffer reset: delta sync relies on "holes are 0"
+  and "everything after used_end is 0", see 3.2. Turning M3 off was measured to save only 1.5% of
+  LD.apply and 1.3% of LDW.recv instructions.
+- Receive check tiers are unchanged: `view()` on `XReceiver<from_client>` is still the bounds tier and
+  `reload()` still full validation; trusted links still check only the wire header. Deployments that
+  trust the peer could always build the receiver as a trusted link (`XReceiver<XLink::server_peer>`, see
+  the notes at the top of `xoffset_receiver.hpp`), with no compile switch needed.
+- The M1 default limit, argument checks, `XOFFSET_FORCE_FULL_CHECK` (default 1 in debug and sanitizer
+  builds).
 
-发给不该看到已删数据的接收方时，两个办法任选：用 `XOFFSET_HARDENED=1`（或其中的三个
-清零开关 `XOFFSET_SCRUB_ERASED`、`XOFFSET_SCRUB_POPPED`、`XOFFSET_SCRUB_PADDING`）编译，
-或者这条路径用 `save_compact` 发送。
+When sending to receivers that must not see deleted data, either build with `XOFFSET_HARDENED=1` (or
+its three zeroing switches `XOFFSET_SCRUB_ERASED`, `XOFFSET_SCRUB_POPPED`, `XOFFSET_SCRUB_PADDING`), or
+send on that path with `save_compact`.
 
-## 5. 持续 fuzz
+## 5. Continuous fuzzing
 
-现状（2026-11-04 起，susu 11-04 06:15Z）：每晚长跑自 2026-10-28 停，不再恢复；改为**每次发版前**
-在云端跑一轮 `tools/fuzz_prerelease.sh`（[RELEASING.md](RELEASING.md) 第 3 节），覆盖第 2 节的
-每个入口，无发现才发版。入口与 harness 的对应：
+Status (since 2026-11-04, susu 11-04 06:15Z): the nightly long runs stopped on 2026-10-28 and will not
+resume; instead, **before every release** one round of `tools/fuzz_prerelease.sh` runs in the cloud
+([RELEASING.md](RELEASING.md) section 3), covering every entry point of section 2, and the release ships
+only with no findings. Entry points and harnesses:
 
-| 入口 | harness（ASan+UBSan） |
+| Entry point | Harness (ASan+UBSan) |
 | --- | --- |
-| `load_verified`、`TypedXBuffer<T>::load`、`try_load_verified`、`load_verified_with_resource` | `fuzz_v2_wire`、`fuzz_wire_schemas`（libFuzzer）；`test_v2_fuzz`（GCC 16 差分，带独立 oracle） |
-| `begin_verified_receive` / `finish_verified`、`receive_raw::validate` | 同上（`v2_fuzz_core.hpp` 的 receive、raw 两列，与 oracle 比较） |
-| `reload_verified`、`begin_verified_reload`、可搬槽位存储 | 同上（reload、direct、slot 各列，与新 buffer 的加载逐字节比较） |
-| schema 演进：`evolve_load_verified`、`XPeerSchemas` 握手、`read_schema_ack` | `fuzz_schema_evolution` |
-| 增量 apply：`try_apply_delta_verified` / `apply_delta_verified`（3.3） | `fuzz_delta_sync`（反射和字段表两种构建）：快路径（none、in_place）与克隆副本上的全量校验比较结论、错误和结果；拒绝时副本和游标不变；接受的结果能再校验加载 |
-| 信任档（3.4）：`XReceiver<server_peer / from_server>` 的 `reload`、`load`、`apply_delta`（admit） | 整块：`v2_fuzz_core.hpp` 第 8 列（`fuzz_v2_wire`、`test_v2_fuzz`），完整档接受的必须接受且结果逐字节相同，oracle 在线头阶段拒绝的必须拒绝；增量：`fuzz_delta_sync` 在另一份克隆上走 admit，完整档接受的必须接受且结果相同，解析阶段的错误必须相同，拒绝时副本和游标不变。admit 多接受的输入不读 |
-| 共享增量（3.5）：`XReceiver<server_peer / from_server>::apply_sync`（4.0 起 XS 2.0，full 和 admit） | `fuzz_shared_delta`（反射和字段表两种构建）：原始根记录和操作段、真实消息流加篡改、整条消息、关键消息四种输入；每条先走 full，拒绝时记录和游标不变，接受的结果能再校验加载；full 接受的再在副本上走 admit，记录和游标必须相同。admit 不读 full 拒绝的输入（消息体信任发送方） |
-| 边界档（3.5）：`XReceiver<from_client>::view`（bounds） | `v2_fuzz_core.hpp` 第 9 列（`fuzz_v2_wire`、`test_v2_fuzz`）：wire 复制进一个大小正好的堆块，完整档接受的稠密 wire 必须接受且读出的每个字段相同，稀疏 wire 和 oracle 在线头阶段拒绝的必须拒绝；多接受的输入通过视图读完全部字段，不能越界（ASan）。`test_receiver_view`：构造的越界块、超长内联字符串、缺 NUL、bool 2、重叠放大和随机变异 |
-| 客户端字段表构建、关异常构建 | `fuzz_v2_wire`、`fuzz_wire_schemas` 的 C++20 字段表构建（libFuzzer），`tools/fuzz_outcome_diff.sh`（三种构建逐条比较结果和错误文字） |
+| `load_verified`, `TypedXBuffer<T>::load`, `try_load_verified`, `load_verified_with_resource` | `fuzz_v2_wire`, `fuzz_wire_schemas` (libFuzzer); `test_v2_fuzz` (GCC 16 differential, with an independent oracle) |
+| `begin_verified_receive` / `finish_verified`, `receive_raw::validate` | Same as above (the receive and raw columns of `v2_fuzz_core.hpp`, compared with the oracle) |
+| `reload_verified`, `begin_verified_reload`, movable slot storage | Same as above (the reload, direct and slot columns, compared byte for byte with loading into a new buffer) |
+| Schema evolution: `evolve_load_verified`, the `XPeerSchemas` handshake, `read_schema_ack` | `fuzz_schema_evolution` |
+| Delta apply: `try_apply_delta_verified` / `apply_delta_verified` (3.3) | `fuzz_delta_sync` (both reflection and field-list builds): the fast paths (none, in_place) are compared with full validation on a cloned copy for verdict, error and result; on rejection the copy and cursor are unchanged; accepted results can be validated and loaded again |
+| Trusted tier (3.4): `reload`, `load`, `apply_delta` (admit) of `XReceiver<server_peer / from_server>` | Whole buffer: column 8 of `v2_fuzz_core.hpp` (`fuzz_v2_wire`, `test_v2_fuzz`): what the full tier accepts must be accepted with byte-identical results, and what the oracle rejects at the header stage must be rejected. Deltas: `fuzz_delta_sync` runs admit on another clone: what the full tier accepts must be accepted with the same result, parse-stage errors must be the same, and on rejection the copy and cursor are unchanged. Inputs admit additionally accepts are not read |
+| Shared deltas (3.5): `XReceiver<server_peer / from_server>::apply_sync` (XS 2.0 since 4.0, full and admit) | `fuzz_shared_delta` (both reflection and field-list builds): four kinds of input, raw root records and operation sections, real message streams with tampering, whole messages, and key messages; each first goes through full, which on rejection leaves records and cursor unchanged and whose accepted results can be validated and loaded again; what full accepts then goes through admit on a copy, and records and cursor must be the same. Admit does not read inputs full rejects (the message body trusts the sender) |
+| Bounds tier (3.5): `XReceiver<from_client>::view` (bounds) | Column 9 of `v2_fuzz_core.hpp` (`fuzz_v2_wire`, `test_v2_fuzz`): the wire is copied into a heap block of exactly its size; dense wires the full tier accepts must be accepted and every field read must be the same; sparse wires and wires the oracle rejects at the header stage must be rejected; inputs additionally accepted are read completely through the view and must stay in bounds (ASan). `test_receiver_view`: crafted out-of-bounds blocks, overlong inline strings, missing NUL, bool 2, overlap amplification and random mutation |
+| Client field-list build, no-exception build | The C++20 field-list builds of `fuzz_v2_wire` and `fuzz_wire_schemas` (libFuzzer), and `tools/fuzz_outcome_diff.sh` (compares results and error text one by one across three builds) |
 
-各阶段与预算见脚本开头的说明；一轮发版 fuzz 约 4 小时（GCC 45 分钟，每个 libFuzzer 目标每种构建
-20 分钟）。下面是更早的记录。
+Stages and budgets are described at the top of the script; one release fuzz round takes about 4 hours
+(GCC 45 minutes, 20 minutes per libFuzzer target per build). Earlier records follow.
 
-现状（0.3.0-beta.1）：F1–F3 已实现，F4 的 PR 短跑已在 CI 运行；每日长跑的 workflow
-已写好，但 GitHub 定时任务只在默认分支触发，目前没有运行，发布前以一次 480 万例的
-GCC 16 ASan+UBSan 差分 fuzz 代替。
+Status (0.3.0-beta.1): F1–F3 were implemented and F4's short PR runs ran in CI; the daily long-run
+workflow was written, but GitHub scheduled jobs only trigger on the default branch, so it did not run,
+and a 4.8-million-case GCC 16 ASan+UBSan differential fuzz run before release stood in for it.
 
-现状（beta.2，2026-10-23 起）：项目不再使用 GitHub Actions，`fuzz.yml` 和 `ci.yml` 保留但不运行。
-每日长跑改在云端 Docker 主机上执行 `tools/fuzz_nightly.sh`（北京时间每天 02:23）：
+Status (beta.2, since 2026-10-23): the project no longer uses GitHub Actions; `fuzz.yml` and `ci.yml`
+are kept but do not run. The daily long runs moved to a cloud Docker host running
+`tools/fuzz_nightly.sh` (every day at 02:23 Beijing time):
 
-- GCC 16 ASan+UBSan 差分 fuzz：`test_v2_fuzz` 4 个进程，seed 按日期轮换
-  （`YYYYMMDD×10+i`），用例数按约 45 分钟标定；失败时写出 wire 和 `--replay` 命令。
-- GCC 16 ASan+UBSan 回放：`fuzz_<target>_replay` 回放 `tests/fuzz/regressions/` 和两个
-  harness 的种子语料。
-- 发现崩溃时，`tools/fuzz_report.py` 按签名开 GitHub issue（标签 `fuzz-crash`，同一签名只
-  追加评论，已关闭的重新打开并标注回归），并把输入推到 `fuzz-crash/<签名>` 分支，作为
-  `tests/fuzz/regressions/<target>/<签名>`。修复 PR 带上这个输入，issue 由修复关闭。没有发现
-  却失败的运行记在唯一的 `fuzz-infra` issue 上。结果同时写进项目文件。
-- libFuzzer 覆盖率引导 fuzz（F1、F2，2026-10-27 起）：同一晚接着执行
-  `tools/fuzz_libfuzzer.sh`，用云端自编的 P2996 工具链（clang-p2996 d77eff1，带
-  compiler-rt 的 libFuzzer 运行库）在主机上原生构建 `fuzz_v2_wire` 和 `fuzz_wire_schemas`
-  （ASan+UBSan），步骤与 `fuzz.yml` 的 libfuzzer 作业相同：先单进程回放已有语料和种子，
-  再 `-fork=4` 跑约 20 分钟，然后合并语料、复现并最小化发现。语料以 tar 包跨夜保存在
-  项目文件里；调试信息里的路径映射为 `/workspace`，签名与 Docker 作业一致。首晚即发现
-  #130（harness 对短于头部的输入检查过严，已修复，输入入回归目录）。
-- 客户端构建（2026-10-28 起）：同一晚在 C++20 字段表构建上跑 libFuzzer（`v2_wire`、
-  `wire_schemas`），再用 `tools/fuzz_outcome_diff.sh` 让反射、字段表、关异常三种构建回放
-  同一批语料，逐条比较各入口的结果和错误文字。
-- 仍有的缺口：没有 PR 短跑（PR 的合并证据是 `tools/local_validate.sh`）。
+- GCC 16 ASan+UBSan differential fuzzing: `test_v2_fuzz` with 4 processes, seeds rotating by date
+  (`YYYYMMDD×10+i`), case count calibrated to about 45 minutes; on failure it writes the wire and a
+  `--replay` command.
+- GCC 16 ASan+UBSan replay: `fuzz_<target>_replay` replays `tests/fuzz/regressions/` and the seed corpora
+  of both harnesses.
+- When a crash is found, `tools/fuzz_report.py` opens a GitHub issue per signature (label `fuzz-crash`;
+  the same signature only adds a comment, and a closed one is reopened and marked as a regression), and
+  pushes the input to a `fuzz-crash/<signature>` branch as
+  `tests/fuzz/regressions/<target>/<signature>`. The fix PR carries this input and the fix closes the
+  issue. Runs that fail without a finding are recorded on a single `fuzz-infra` issue. Results are also
+  written to the project files.
+- libFuzzer coverage-guided fuzzing (F1, F2, since 2026-10-27): the same night `tools/fuzz_libfuzzer.sh`
+  runs next, building `fuzz_v2_wire` and `fuzz_wire_schemas` (ASan+UBSan) natively on the host with the
+  P2996 toolchain built in the cloud (clang-p2996 d77eff1, with compiler-rt's libFuzzer runtime), with
+  the same steps as the libfuzzer job of `fuzz.yml`: first replay the existing corpus and seeds in a
+  single process, then run `-fork=4` for about 20 minutes, then merge the corpus and reproduce and
+  minimize findings. The corpus is kept across nights as a tarball in the project files; paths in the
+  debug info are mapped to `/workspace`, and signatures match the Docker job. The first night found
+  #130 (the harness was too strict about inputs shorter than the header; fixed, and the input went into
+  the regression directory).
+- Client builds (since 2026-10-28): the same night runs libFuzzer on the C++20 field-list build
+  (`v2_wire`, `wire_schemas`), then `tools/fuzz_outcome_diff.sh` replays the same corpus in the
+  reflection, field-list and no-exception builds and compares each entry point's result and error text
+  one by one.
+- Remaining gap: no short PR runs (the merge evidence for PRs is `tools/local_validate.sh`).
 
-- **F1 覆盖率引导 fuzz**：libFuzzer harness（`LLVMFuzzerTestOneInput`），入口为
-  `load_verified`、`finish_verified`、`receive_raw::validate`，用 P2996 Clang 和 CI 里已经
-  固定的 compiler-rt 构建；种子用跨编译器 wire 语料。
-- **F2 多 schema**：除现有的差分 fuzz schema，加入跨编译器语料的 schema（enum 键、
-  定长数组、浮点、bool、嵌套 vector）。
-- **F3 资源断言**：harness 里设 `maximum_capacity`，并断言单例的预留和峰值内存不超过
-  上限的固定倍数，把 R1/R2 变成可回归的检查。
-- **F4 运行方式**：PR 上每次跑短时间（例如 5 分钟），每天定时跑长时间；崩溃输入
-  自动加入回归语料。
+- **F1 coverage-guided fuzzing**: libFuzzer harnesses (`LLVMFuzzerTestOneInput`) with entry points
+  `load_verified`, `finish_verified` and `receive_raw::validate`, built with P2996 Clang and the
+  compiler-rt already pinned in CI; seeds are the cross-compiler wire corpus.
+- **F2 multiple schemas**: besides the existing differential fuzz schema, add the schemas of the
+  cross-compiler corpus (enum keys, fixed-size arrays, floating point, bool, nested vectors).
+- **F3 resource assertions**: the harness sets `maximum_capacity` and asserts that each case's
+  reservation and peak memory stay under a fixed multiple of the limit, turning R1/R2 into regression
+  checks.
+- **F4 how it runs**: a short run (for example 5 minutes) on every PR and a long daily scheduled run;
+  crashing inputs are added to the regression corpus automatically.
 
-## 6. 复现方法
+## 6. How to reproduce
 
-实测环境：云端 x86-64 容器（Intel Xeon 2.1 GHz，4 核），GCC 16.2.0，`-O2`，单次运行，
-不是正式性能测量。做法：取一个合法的小 wire，把 `used_bytes` 和 payload 头的
-`used_end` 改大，加一个覆盖新增区间的空洞（R1），或用许多小空洞铺满（R2），改成
-单个范围的稀疏 wire 后调用 `TypedXBuffer<T>::load`，记录耗时、`reserved_bytes()` 和
-`/proc/self/status` 的 RSS。T5 的做法：替换字符串或迁移 vector 后保存，在 wire 中
-搜索旧内容。
+Measurement environment: cloud x86-64 container (Intel Xeon 2.1 GHz, 4 cores), GCC 16.2.0, `-O2`,
+single runs, not a formal performance measurement. Method: take a small valid wire, enlarge `used_bytes`
+and the payload header's `used_end`, add a hole covering the new range (R1) or tile it with many small
+holes (R2), make it a single-range sparse wire, call `TypedXBuffer<T>::load`, and record the time,
+`reserved_bytes()` and the RSS from `/proc/self/status`. For T5: save after replacing a string or
+migrating a vector, and search the wire for the old content.

@@ -1,7 +1,5 @@
 # XOffsetDatastructure
 
-[中文](README.zh-CN.md)
-
 **4.0.0** · C++20 / C++26 · header-only · 64-bit little-endian
 
 XOffsetDatastructure keeps C++ objects, strings, vectors, sets and maps in one
@@ -288,8 +286,6 @@ storage and ownership rules are in
 | [PERFORMANCE.md](docs/PERFORMANCE.md), [bench/cppcon2024](bench/cppcon2024/README.md) | Performance numbers and methods |
 | [CHANGELOG.md](CHANGELOG.md), [RELEASING.md](docs/RELEASING.md) | Releases |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Building, testing and conventions for library development |
-
-Most documents under `docs/` are written in Chinese.
 
 ## License
 

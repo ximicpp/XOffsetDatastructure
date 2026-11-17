@@ -72,7 +72,7 @@ CACHE_MIN_DELTA = 100                          # ... and the misses grew by at l
 CACHE_MIN_PER_IR = 1e-4                        # ... or by at least one per 10,000 Ir of the metric (base Ir)
 CACHE_EVENTS = {"D1": ("D1mr", "D1mw"), "LL": ("DLmr", "DLmw")}
 
-FIRST_LINE = "指令数只用于拦截回退，计时结论以 Mac 正式批次为准。"
+FIRST_LINE = "Instruction counts are used only to catch regressions; timing conclusions come from the formal Mac batches."
 
 FN_TOP = 10                                    # functions listed per flagged metric
 FN_NAME_MAX = 110                              # display width of a function name
@@ -808,13 +808,13 @@ def fn_diff(ref_tree, head_tree, metric, ref_role):
         moved = sorted(g for g in partners[f] if g != f and delta.get(g, 0) * delta[f] < 0
                        and abs(delta[g]) >= abs(delta[f]) / 2)
         if moved:
-            suspects.append(f"`{short_fn(f)}` 只在 {only} 出现，`{short_fn(moved[0])}` 反向变化 {delta[moved[0]]:+,}")
+            suspects.append(f"`{short_fn(f)}` appears only in {only}, `{short_fn(moved[0])}` moves the other way by {delta[moved[0]]:+,}")
     listed = set(top)
     for x, y in sorted(edges):
         if x != y and x in listed and y in listed:
             dx, dy = delta[x], delta[y]
             if dx * dy < 0 and abs(dx + dy) < (abs(dx) + abs(dy)) / 2 and max(abs(dx), abs(dy)) >= floor:
-                suspects.append(f"`{short_fn(x)}` 调用 `{short_fn(y)}`，自身 Ir 一升一降（{dx:+,} / {dy:+,}）")
+                suspects.append(f"`{short_fn(x)}` calls `{short_fn(y)}`, self Ir moves in opposite directions ({dx:+,} / {dy:+,})")
     return {"ref": ref_role, "keys": keys, "delta": net, "top": rows,
             "inline_suspect": bool(suspects), "suspects": suspects, "alloc_recycle": alloc_recycle}
 
@@ -852,14 +852,14 @@ def cmd_compare(a):
         fail(p)
     head_tree = ir["trees"].get(head_sha)
     if head_tree is None or not head_tree["checks"]["ok"]:
-        fail("head 的正确性检查失败，不出数字" if head_tree else "head 构建失败")
+        fail("head failed its correctness check, no numbers" if head_tree else "head failed to build")
     for e in ir.get("errors", []):
-        fail(f"callgrind 运行失败：{e.splitlines()[0]}")
+        fail(f"callgrind run failed: {e.splitlines()[0]}")
     if head_tree and head_tree.get("reloc_status") == "verify_failed":
-        fail("head 的 reloc_bench --mode verify 失败（各方结果摘要不一致），不出 reloc.* 的数字")
+        fail("head's reloc_bench --mode verify failed (result digests disagree), no reloc.* numbers")
     for k, d in ir.get("determinism", {}).items():
         if not d["identical"]:
-            fail(f"同一二进制两次 Ir 不同（{k}: {d['first']} vs {d['second']}），门禁结果不可信")
+            fail(f"the same binary gave two different Ir counts ({k}: {d['first']} vs {d['second']}), gate results are not trustworthy")
 
     status = {}
     for role in ("anchor", "base"):
@@ -868,17 +868,17 @@ def cmd_compare(a):
         t = ir["trees"].get(sha)
         if b == "incomparable":
             status[role] = "incomparable"
-            warn(f"{role} {short(sha)} 用 head 的基准编不过，也没有自己的基准：不可比，合并前需要跑一次 Mac L2")
+            warn(f"{role} {short(sha)} does not compile with head's bench and has no bench of its own: not comparable; explain in the PR body and attach a cache-sim comparison before merging")
         elif t is None or not t["checks"]["ok"]:
             status[role] = "incomparable"
-            warn(f"{role} {short(sha)} 正确性检查失败：不可比，合并前需要跑一次 Mac L2")
+            warn(f"{role} {short(sha)} failed its correctness check: not comparable; explain in the PR body and attach a cache-sim comparison before merging")
         else:
             status[role] = b
             if b == "bench_differs":
-                warn(f"{role} {short(sha)} 用它自己那一版基准构建（基准不同），比值仅供参考")
+                warn(f"{role} {short(sha)} was built with its own version of the bench (different bench), ratios are for reference only")
             rs = t.get("reloc_status", "absent")
             if rs in ("failed", "verify_failed") and (head_tree or {}).get("reloc_status") == "ok":
-                warn(f"{role} {short(sha)} 的 reloc_bench {'编不过' if rs == 'failed' else '校验失败'}：reloc.* 不和它比")
+                warn(f"{role} {short(sha)}'s reloc_bench {'does not compile' if rs == 'failed' else 'failed verification'}: reloc.* is not compared with it")
 
     metrics = {}
     for role in ROLES:
@@ -891,7 +891,7 @@ def cmd_compare(a):
         at = ir["trees"].get(roles["anchor"])
         aw = at["checks"].get("wire_M_sha256") if at else None
         if aw and hw and aw != hw:
-            warn(f"M 输入 wire 变了（anchor {aw[:16]}… → head {hw[:16]}…）：格式改动要 susu 定")
+            warn(f"M input wire changed (anchor {aw[:16]}… → head {hw[:16]}…): format changes are for susu to decide")
 
     rows = []
     names = sorted(set(hm) | set(bm), key=lambda k: (k.split(".")[0], k.count("."), k))
@@ -905,7 +905,7 @@ def cmd_compare(a):
         if h is None:
             row["verdict"] = "missing"
             if cls != "report" and b is not None:
-                warn(f"{metric}：head 没有这个阶段")
+                warn(f"{metric}: head has no such stage")
         elif b is None and status["base"] != "incomparable":
             row["verdict"] = "new"
         if rb is not None and cls != "report":
@@ -917,16 +917,16 @@ def cmd_compare(a):
                 if cap is not None and rb <= cap:
                     row["verdict"] = "allowed"
                     row["ledger"] = [e["id"] for e in allow]
-                    notes.append(f"{metric} head÷base {rb:.4f} 由 ledger {', '.join(row['ledger'])} 放行（上限 {cap}）")
+                    notes.append(f"{metric} head÷base {rb:.4f} exempted by ledger {', '.join(row['ledger'])} (cap {cap})")
                 else:
                     row["verdict"] = "fail"
-                    fail(f"{metric} head÷base {rb:.4f} > {fail_t}" + (f"（超过 ledger 上限 {cap}）" if cap else ""))
+                    fail(f"{metric} head÷base {rb:.4f} > {fail_t}" + (f" (above ledger cap {cap})" if cap else ""))
             elif rb > warn_t:
                 row["trigger"] = "base"
                 row["verdict"] = "warn"
                 warn(f"{metric} head÷base {rb:.4f} > {warn_t}")
             if cls == "total" and rb < DROP_NOTE:
-                notes.append(f"{metric} 指令数下降 {rb:.4f}：要 Mac 数据才能说变快")
+                notes.append(f"{metric} instruction count dropped {rb:.4f}: Mac data is needed to claim it is faster")
         if ra is not None and cls == "total":
             allow = ledger_matches(ledger_head, metric, a.compiler)
             credit = 1.0
@@ -938,11 +938,11 @@ def cmd_compare(a):
                 row.setdefault("trigger", "anchor")
             if net > ANCHOR_FAIL:
                 row["verdict"] = "fail"
-                fail(f"{metric} head÷anchor {ra:.4f}（扣除 ledger 后 {net:.4f}）> {ANCHOR_FAIL}")
+                fail(f"{metric} head÷anchor {ra:.4f} ({net:.4f} after ledger exemptions) > {ANCHOR_FAIL}")
             elif net > ANCHOR_WARN:
                 if row["verdict"] == "pass":
                     row["verdict"] = "warn"
-                warn(f"{metric} head÷anchor {ra:.4f}（扣除 ledger 后 {net:.4f}）> {ANCHOR_WARN}")
+                warn(f"{metric} head÷anchor {ra:.4f} ({net:.4f} after ledger exemptions) > {ANCHOR_WARN}")
         rows.append(row)
 
     # Function-level difference for every metric that warns, fails or needs the ledger (design 5.3).
@@ -955,14 +955,14 @@ def cmd_compare(a):
             continue
         row["functions"] = d
         if d["inline_suspect"]:
-            notes.append(f"{row['metric']}：疑似内联变化（只是诊断，不放行；见函数差异表）")
+            notes.append(f"{row['metric']}: suspected inlining change (diagnostic only, exempts nothing; see the function diff table)")
         ar = d.get("alloc_recycle")
         if ar:
-            what = (f"malloc/free/new/delete 自身 Ir {ar['alloc']:+,}，分配器调用换成了原地回收（D2 型）"
-                    if ar["kind"] == "alloc_calls_removed" else "分配器调用没有减少，要回收的 bin 变多了（COPS 型）")
-            notes.append(f"{row['metric']}：分配器回收型（只是诊断，不放行）：FreeTableRecycler::recycle 自身 Ir "
-                         f"{ar['recycle']:+,}（该指标净增 {d['delta']:+,}）；{what}。校准时这两类在 Mac 上都是变快，"
-                         "Ir 方向相反，判定不变，按 L 类由 Mac L2 下结论")
+            what = (f"malloc/free/new/delete self Ir {ar['alloc']:+,}, allocator calls replaced by in-place recycling (type D2)"
+                    if ar["kind"] == "alloc_calls_removed" else "allocator calls did not drop, more bins to recycle (type COPS)")
+            notes.append(f"{row['metric']}: allocator recycling type (diagnostic only, exempts nothing): FreeTableRecycler::recycle self Ir "
+                         f"{ar['recycle']:+,} (net change of this metric {d['delta']:+,}); {what}. In calibration both kinds got faster on the Mac, "
+                         "opposite to Ir; the verdict is unchanged, and as class L the performance thread judges with a cache-sim comparison")
 
     cache = cache_rows(ir, roles, bm, hm)  # its warnings stay in out["cache"]: they never touch the Ir verdict
 
@@ -1004,7 +1004,7 @@ def cmd_compare(a):
     for r in cache["rows"]:
         print(f"CACHE {a.compiler} {r['metric']} D1 base={r['base_D1']} head={r['head_D1']} "
               f"LL base={r['base_LL']} head={r['head_LL']} class={r['class']} verdict={r['verdict']}")
-    cache_part = (f"; cache {cache['verdict']}: {len(cache['warnings'])} warnings (警告项，不判 fail)"
+    cache_part = (f"; cache {cache['verdict']}: {len(cache['warnings'])} warnings (warning only, never fail)"
                   if cache["rows"] or cache["note"] else "")
     log(f"verdict {verdict}: {len(failures)} failures, {len(warnings)} warnings{cache_part} -> {json_path}")
     return 1 if verdict == "fail" else 0
@@ -1023,7 +1023,7 @@ def cache_rows(ir, roles, bm, hm):
         return res
     bt, ht = ir["trees"].get(roles["base"]), ir["trees"].get(roles["head"])
     if not bt or not ht or "cache" not in bt or "cache" not in ht:
-        res["note"] = "base 或 head 没有缓存模拟数据（构建或正确性检查失败），不出缓存对比"
+        res["note"] = "base or head has no cache simulation data (build or correctness check failed), no cache comparison"
         res["verdict"] = "warn"
         res["warnings"].append(res["note"])
         return res
@@ -1044,19 +1044,19 @@ def cache_rows(ir, roles, bm, hm):
             ir_ref = bm.get(metric) or hm.get(metric) or 0
             big = delta is not None and (delta >= CACHE_MIN_DELTA or delta >= ir_ref * CACHE_MIN_PER_IR)
             if r is not None and r > CACHE_WARN and cls != "report" and big:
-                over.append(f"{lv} {r:.4f}（{delta:+,}）")
+                over.append(f"{lv} {r:.4f} ({delta:+,})")
         if over:
             row["verdict"] = "warn"
             res["verdict"] = "warn"
-            res["warnings"].append(f"{metric} 缺失 head÷base {', '.join(over)} > {CACHE_WARN}，"
-                                   f"且增量 ≥ {CACHE_MIN_DELTA} 次或 ≥ 每 1 万 Ir 1 次")
+            res["warnings"].append(f"{metric} misses head÷base {', '.join(over)} > {CACHE_WARN}, "
+                                   f"and the increase is ≥ {CACHE_MIN_DELTA} or ≥ 1 per 10,000 Ir")
         res["rows"].append(row)
     return res
 
 
 def render_cache(c):
-    L = ["", f"**缓存模拟**（警告项，不判 fail；`{' '.join(c['args'])}`，只跑 base 和 head）："
-         f"{'⚠️ 警告' if c['verdict'] == 'warn' else '✅ 无警告'}", ""]
+    L = ["", f"**Cache simulation** (warning only, never fail; `{' '.join(c['args'])}`, base and head only): "
+         f"{'⚠️ warning' if c['verdict'] == 'warn' else '✅ no warnings'}", ""]
     if c["note"]:
         L += [c["note"], ""]
     L += [f"- {x}" for x in c["warnings"] if x != c["note"]]
@@ -1064,7 +1064,7 @@ def render_cache(c):
         L.append("")
     if not c["rows"]:
         return L
-    L += ["| 指标 | 类别 | D1 缺失 base | head | head÷base | LL 缺失 base | head | head÷base | 判定 |",
+    L += ["| Metric | Class | D1 misses base | head | head÷base | LL misses base | head | head÷base | Verdict |",
           "| --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
     for r in c["rows"]:
         if r["class"] == "report" and r["verdict"] == "pass":
@@ -1076,22 +1076,22 @@ def render_cache(c):
 
 def render_summary(out, plan, biggest):
     r = out["roles"]
-    icon = {"pass": "✅ 通过", "warn": "⚠️ 通过（有警告）", "fail": "❌ 失败"}[out["verdict"]]
+    icon = {"pass": "✅ pass", "warn": "⚠️ pass (with warnings)", "fail": "❌ fail"}[out["verdict"]]
     c = out.get("cache")
-    cache_icon = (" · 缓存 ⚠️ 警告" if c["verdict"] == "warn" else " · 缓存 ✅") if c else ""
-    L = [FIRST_LINE, "", f"## 指令数门禁（{out['compiler']}）：{icon}{cache_icon}", ""]
+    cache_icon = (" · cache ⚠️ warning" if c["verdict"] == "warn" else " · cache ✅") if c else ""
+    L = [FIRST_LINE, "", f"## Instruction count gate ({out['compiler']}): {icon}{cache_icon}", ""]
     L.append(f"anchor `{short(r['anchor'])}` · base `{short(r['base'])}` · head `{short(r['head'])}` · "
              f"{out['compiler_version']} · {out['valgrind']}")
-    L.append(f"SLG {out['slg']['scale']} 规模、{out['slg']['cycles']} 周期（跳过前 {out['slg']['skip_cycles']} 个）、"
-             f"seed {out['slg']['seed']}、复用协议；正式 harness M fixture；"
-             f"reloc 每项 {out['reloc']['rounds']} 轮（热身 {out['reloc']['warmup']}，收第 {out['reloc']['skip_rounds']} 轮起）")
+    L.append(f"SLG {out['slg']['scale']} scale, {out['slg']['cycles']} cycles (first {out['slg']['skip_cycles']} skipped), "
+             f"seed {out['slg']['seed']}, reuse protocol; formal harness M fixture; "
+             f"reloc {out['reloc']['rounds']} rounds per item (warm-up {out['reloc']['warmup']}, collected from round {out['reloc']['skip_rounds']})")
     L.append("")
-    for title, items in (("失败", out["failures"]), ("警告", out["warnings"]), ("说明", out["notes"])):
+    for title, items in (("Failures", out["failures"]), ("Warnings", out["warnings"]), ("Notes", out["notes"])):
         if items:
             L.append(f"**{title}**")
             L += [f"- {x}" for x in items]
             L.append("")
-    L.append("| 指标 | 类别 | head÷base | head÷anchor | head Ir | 判定 |")
+    L.append("| Metric | Class | head÷base | head÷anchor | head Ir | Verdict |")
     L.append("| --- | --- | --- | --- | --- | --- |")
     for row in out["rows"]:
         if row["class"] == "report" and row["verdict"] in ("pass", "new"):
@@ -1099,7 +1099,7 @@ def render_summary(out, plan, biggest):
         L.append(f"| `{row['metric']}` | {row['class']} | {fmt_ratio(row['head_base'])} | {fmt_ratio(row['head_anchor'])} | "
                  f"{row['head'] if row['head'] is not None else '—'} | {row['verdict']} |")
     if biggest:
-        L += ["", "**各场景变化最大的阶段（head÷base）**", ""]
+        L += ["", "**Stages that changed most per scenario (head÷base)**", ""]
         for scen, row in sorted(biggest.items()):
             L.append(f"- {scen}: `{row['metric']}` {row['head_base']:.4f}")
     shown = {}
@@ -1108,25 +1108,25 @@ def render_summary(out, plan, biggest):
         if not d:
             continue
         if not shown:
-            L += ["", "**函数差异**（自身 Ir，即 `callgrind_annotate --inclusive=no`，变化最大的 "
-                  f"{FN_TOP} 个）", ""]
+            L += ["", "**Function diff** (self Ir, i.e. `callgrind_annotate --inclusive=no`, the "
+                  f"{FN_TOP} that changed most)", ""]
         ident = (d["ref"], tuple(d["keys"]))
         ratio = row["head_base"] if d["ref"] == "base" else row["head_anchor"]
-        head = f"`{row['metric']}`（head÷{d['ref']} {fmt_ratio(ratio)}，{d['delta']:+,}）"
+        head = f"`{row['metric']}` (head÷{d['ref']} {fmt_ratio(ratio)}, {d['delta']:+,})"
         if ident in shown:
-            L += [f"{head}：同 `{shown[ident]}`", ""]
+            L += [f"{head}: same as `{shown[ident]}`", ""]
             continue
         shown[ident] = row["metric"]
-        tags = (["疑似内联变化"] if d["inline_suspect"] else []) + (["分配器回收型"] if d.get("alloc_recycle") else [])
-        L.append(head + (f"：⚠️ {'、'.join(tags)}（只是诊断，不放行）" if tags else ""))
+        tags = (["suspected inlining change"] if d["inline_suspect"] else []) + (["allocator recycling type"] if d.get("alloc_recycle") else [])
+        L.append(head + (f": ⚠️ {', '.join(tags)} (diagnostic only, exempts nothing)" if tags else ""))
         L += [f"- {x}" for x in d["suspects"]]
-        L += ["", f"| 函数 | {d['ref']} | head | 变化 |", "| --- | --- | --- | --- |"]
+        L += ["", f"| Function | {d['ref']} | head | Change |", "| --- | --- | --- | --- |"]
         for t in d["top"]:
             L.append(f"| `{short_fn(t['function'])}` | {t['ref']:,} | {t['head']:,} | {t['delta']:+,} |")
         L.append("")
     if c:
         L += render_cache(c)
-    L += ["", "占比 < 5% 的阶段只在 JSON 里报。门槛和 ledger 见 `docs/PERF_GATE.md`。", ""]
+    L += ["", "Stages under 5% are reported only in the JSON. Thresholds and the ledger: `docs/PERF_GATE.md`.", ""]
     return "\n".join(L)
 
 

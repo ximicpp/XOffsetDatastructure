@@ -156,7 +156,7 @@ if(SLG_BUILD_PROBES)
     target_compile_definitions(erase_probe PRIVATE SLG_WITH_XOFFSET=1)
   endif()
 
-  # small-message probe (diagnostic, thread 小消息开销)
+  # small-message probe (diagnostic, thread "small-message overhead")
   if(SLG_WITH_XOFFSET)
     add_executable(small_msg_probe bench/small_msg_probe.cpp)
     target_include_directories(small_msg_probe PRIVATE include adapters bench)

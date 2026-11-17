@@ -75,6 +75,10 @@ globally.
 - `XOFFSET_REGISTER_TYPE`, `XOFFSET_REGISTER_CONTAINER` and
   `XOFFSET_REGISTER_MAP` must be used at global scope; inside a namespace they
   fail a `static_assert`.
+- English only: documents, comments, strings and tool output. No CJK
+  characters in tracked text files (they get garbled under other code pages);
+  test data that needs such bytes writes them as escapes. `tools/check_no_cjk.py`
+  checks this and runs in the `meta` step of `tools/local_validate.sh`.
 
 ## Updating TypeLayout
 

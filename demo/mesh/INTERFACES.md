@@ -1,6 +1,6 @@
 # Device mesh demo: interfaces for parallel implementation
 
-Frozen contract for the device mesh demo ("跨设备数据互传 demo"). The design,
+Frozen contract for the device mesh demo ("cross-device data exchange demo"). The design,
 the options and the decision live in the proposal document
 <https://claude.ai/artifact/PUqGPMQvcr2JjnqN4ocxYq>. Decided 10-28: option A,
 and the first version is **pure relay** (devices register at a central
@@ -228,7 +228,7 @@ section 3 table.
 
 ## 7. Threads and done criteria
 
-**T1, types and self-test** (`互传 demo：类型和自测`): `src/types/` (six types:
+**T1, types and self-test** (thread "mesh demo: types and self-test"): `src/types/` (six types:
 state 0 per scale, mutations, content digest, the plain-std reference model
 and field-by-field comparison, `replay`, `make_evil`), `src/hop.cpp`,
 `xmesh_selftest`, `xmesh_schema_freeze` and `schema.lock`, the corpus.
@@ -238,7 +238,7 @@ without exceptions), the corpus written on Linux checks byte-identical on
 all of them, C++26 reflection builds give the section 3 fingerprints, and
 `RESULT.md` lists the state 0 sizes per type and scale.
 
-**T2, hub and device program** (`互传 demo：中心节点和设备程序`): `net.hpp` /
+**T2, hub and device program** (thread "mesh demo: hub and device program"): `net.hpp` /
 `net.cpp` (adapted from demo/mapstate: POSIX and Winsock, `try_*` calls for
 builds without exceptions), `xo_hub` (registration, roster, relay, job
 planning, scoring, CSV files, archive, HTTP dashboard and join page),
