@@ -4030,10 +4030,22 @@ namespace XOffsetDatastructure {
             if (count > (std::size_t(1) << 32)) return std::size_t(1) << 40;
             return count * sizeof(E) + alignof(E) + 24u;
         }
+        // The capacity an empty vector takes when its first element is
+        // appended: 4 elements, and at least 32 bytes. Elements smaller than
+        // 8 bytes (scalars: a float, an id) so start with room for 32 bytes
+        // of them, and the usual handful (5 to 8 floats) is appended without
+        // moving to a second block: that second block cost an allocation, a
+        // copy and a retirement per vector (CppCon 2024 read/write loop: 692
+        // -> 398 instructions per equipment appended and removed). reserve()
+        // and the range assignments size their block exactly, as before.
+        template <class E>
+        constexpr std::uint32_t first_capacity() noexcept {
+            return sizeof(E) >= 8u ? 4u : static_cast<std::uint32_t>(32u / sizeof(E));
+        }
         // ... of a container of `capacity` that grows by one element.
         template <class E>
         constexpr std::size_t grow_bytes(std::size_t capacity) noexcept {
-            return array_bytes<E>(capacity ? capacity * 2u : 4u);
+            return array_bytes<E>(capacity ? capacity * 2u : first_capacity<E>());
         }
 
 #if XOFFSET_NO_EXCEPTIONS
@@ -5603,7 +5615,8 @@ namespace XOffsetDatastructure {
         size_type grown_capacity() const {
             if (size_ == max_size()) XOFFSET_THROW(XBadAlloc());
             return std::max(size_ + 1u, static_cast<size_type>(
-                std::min<std::uint64_t>(max_size(), capacity_ ? std::uint64_t(capacity_) * 2u : 4u)));
+                std::min<std::uint64_t>(max_size(), capacity_ ? std::uint64_t(capacity_) * 2u
+                                                                  : fixed_detail::first_capacity<T>())));
         }
 
         template <bool OutOfLine>
