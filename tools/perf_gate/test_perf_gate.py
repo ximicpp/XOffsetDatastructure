@@ -117,6 +117,24 @@ def main():
     rc, out = run_case(tree())
     expect("identical counts pass", rc == 0 and out["verdict"] == "pass")
 
+    # The demo-set hole table items: the whole run is a total, a steady-state key a scenario of its own.
+    sd = {"S.store_recv": 100_000, "whole": 1_500_000_000}
+    t_base = tree(); t_base["slgd"] = dict(sd)
+    t_head = tree(); t_head["slgd"] = dict(sd, whole=int(1_500_000_000 * 1.005))
+    rc, out = run_case(t_head, base_tree=t_base)
+    expect("slgd.whole +0.5% warns as a total", rc == 0 and row(out, "slgd.whole")["class"] == "total"
+           and row(out, "slgd.whole")["verdict"] == "warn")
+    t_head = tree(); t_head["slgd"] = dict(sd, whole=int(1_500_000_000 * 1.02))
+    rc, out = run_case(t_head, base_tree=t_base)
+    expect("slgd.whole +2% fails", rc == 1 and row(out, "slgd.whole")["verdict"] == "fail")
+    t_head = tree(); t_head["slgd"] = dict(sd, **{"S.store_recv": 106_000})
+    rc, out = run_case(t_head, base_tree=t_base)
+    expect("slgd.S.store_recv +6% fails as a phase", rc == 1 and row(out, "slgd.S.store_recv")["class"] == "phase"
+           and row(out, "slgd.S.store_recv")["verdict"] == "fail")
+    t_head = tree(); t_head["slgd"] = dict(sd, **{"S.store_recv": 60_000})
+    rc, out = run_case(t_head, base_tree=t_base)
+    expect("slgd.S.store_recv -40% passes", rc == 0 and row(out, "slgd.S.store_recv")["verdict"] == "pass")
+
     f = dict(BASE_FORMAL, mutate=int(43_000_000 * 1.02))
     rc, out = run_case(tree(formal=f))
     expect("formal.mutate +2% fails", rc == 1 and row(out, "formal.mutate")["verdict"] == "fail")

@@ -82,6 +82,7 @@ change when the code does not, and the push results already cover every merge.
 | --- | --- | --- |
 | SLG | S scale, seed 20261021, `SLG_REUSE=1` (measure c), 8 cycles, collecting only cycles 4–7 (the first cycles are still warming up: in scenario A of 30bb5ca the per-cycle Ir of cycles 4–7 is only 74% of cycles 1–2; the formal Mac SLG measures steady state) | Each timed stage `slg.<key>` (such as `slg.A.apply`, `slg.S.ticks_middle`); scenario totals `slg.A`…`slg.D` = the sum of that scenario's stages |
 | Formal harness | M fixture (`bench/formal/model/reference.py --scale M`, default seed) | `formal.load`, `formal.query_before`, `formal.mutate`, `formal.emit_after`, `formal.retire`, `formal.reload`, `formal.query_after`, `formal.cleanup`; `formal.read_sum` = query_before + query_after; `formal.total` report only |
+| SLG demo case set, trusted tier (hole table items, 4.2.0) | S scale, seed 20261021, `SLG_REUSE=1 SLG_CASES=demo SLG_NATIVE_OFF=1 SLG_XOFFSET_CAP_MIB=16`, `--formats xoffset_trusted`; steady state: 15 cycles, collecting only S.store_recv in cycle 15 (by then a stored player carries about 27 holes); whole run: 21 cycles, every instruction of the process (`--collect-atstart=yes`: setup, timed and untimed stages) | `slgd.S.store_recv` (the steady-state receive of a stored player); `slgd.whole` (the whole run) |
 | Relocation tax (G9) | `bench/reloc`, one process per item: `--rounds 5 --warmup 1 --cases <item>`, `RELOC_IR_SKIP_ROUNDS=2`, collecting only XOffset's timed region (rounds 2–4) | Each item `reloc.<item>` (such as `reloc.vec.push_back`, `reloc.map.insert.fresh`), including the report-only `*.reused`, `.plain` and node container comparison items |
 
 SLG builds only XOffset + cereal (cereal v1.3.2, `ebef1e92`, headers). M-scale SLG exceeds the address
@@ -98,6 +99,10 @@ input wire changed", and format changes are for susu to decide.
 | Stages under 5%, `formal.retire`, `formal.cleanup` | Report only (JSON) | — |
 | Totals: head÷anchor, after deducting what the ledger exempts | > 1.010 | > 1.020 |
 | Any total head÷base < 0.97 | Marked "instruction count dropped", with a reminder that Mac data is needed to claim it is faster | — |
+
+`slgd.whole` is judged as a total and `slgd.S.store_recv` as a scenario of its own (stage thresholds). The
+whole run is there so that work moved out of a timed stage still counts: a hole table index built later
+(at the first allocation that needs it) instead of during the receive shows up in it at full cost.
 
 The share is computed on whichever of base and head is larger. `slg.S.ticks_middle` (the middle-erase
 stress item) is a scenario of its own and judged by the stage thresholds. Each `reloc.<item>` is also a
