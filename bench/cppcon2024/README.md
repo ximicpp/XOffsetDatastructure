@@ -86,6 +86,52 @@ part of the read/write loop, to see where the time goes.
 - Both sets of XOffset read/write rows use one `edit()` per iteration. One `edit()` around all
   iterations of a round is report only (`rw_one_scope`).
 
+## Latest results: XVector first block of at least 32 bytes (2026-11-17)
+
+This set supersedes the next section as the one the top-level README quotes.
+
+One library change (e36cf44): the block an empty `XVector` takes on its first append holds at least 32 bytes
+(8 floats or 32-bit ids; it was 4 elements, 16 bytes), and a `push_back` of a small scalar that triggers growth
+skips the staged copy and insert checks of the general path. The case is the fair case of the next section,
+unchanged. The library before (main 837c9d4f) and after ran 15 processes each on the same cloud machine,
+alternating; medians below. All tables and the raw output of every process:
+[`results/2026-11-17-first-block/summary.md`](results/2026-11-17-first-block/summary.md) (after) and
+[`before.md`](results/2026-11-17-first-block/before.md) (before). The machine was about 1.2 times slower this
+time than in the next section, so compare ratios across sections, not nanoseconds.
+
+| Row | Before | After |
+| --- | ---: | ---: |
+| Read/write, 2024 layout: XOffset ns | 202.6 | 143.5 |
+| ÷ std / cista raw / cista offset / Protocol Buffers | 0.59 / 0.84 / 0.80 / 0.35 | 0.42 / 0.61 / 0.55 / 0.24 |
+| Read/write, tuned layout: XOffset ns | 61.3 | 60.4 |
+| ÷ std / cista raw / cista offset / Protocol Buffers | 0.72 / 0.96 / 0.91 / 0.17 | 0.72 / 0.91 / 0.90 / 0.16 |
+| Send + receive reuse, 2024 layout: XOffset ns (÷ zpp::bits) | 102.7 (0.31) | 83.2 (0.24) |
+| Send + receive reuse, full validation tier: XOffset ns (÷ zpp::bits) | 218.1 (0.65) | 170.5 (0.50) |
+| One read/write + send + receive, tuned: XOffset ns (÷ zpp::bits / cista) | 145.4 (0.36 / 0.22) | 144.4 (0.37 / 0.21–0.22) |
+| Wire bytes (zstd-3) | 3,112 (3,006) | 3,064 (2,986) |
+
+- Read/write, 2024 layout: faster in every pair, median after ÷ before 0.71. Instructions per iteration
+  (GCC 16.2, callgrind) 3,489 -> 2,187. Four times per iteration the loop appends an equipment record with 8
+  float attributes and removes it; the attribute vector used to take 16 bytes and move to 32 bytes at the fifth
+  attribute (one more allocation, a copy and a retirement), and now takes 32 bytes at once. The equipment step
+  alone goes from 2,771 to 1,491 instructions per iteration.
+- Read/write, tuned layout: instructions unchanged (813), timing unchanged (pair ratio median 1.00). The move
+  from 0.96 to 0.91 against cista raw is jitter of the cista row (63.8 vs 66.3 ns). After the change XOffset
+  wins both read/write rows against every rival in all 15 processes.
+- Send + receive, 2024 layout: faster in every pair (median 0.81), 1,445 -> 994 instructions per message. The
+  sent state is built with `push_back`; each attribute vector used to leave a retired 16-byte block that was
+  saved and loaded with the wire's hole table. Those blocks are gone and the wire is 48 bytes smaller. The
+  inline-layout rows have no such vector and do not change (84 ns).
+- The report-only Protocol Buffers row that reuses removed messages (`RemoveLast`) takes 76.8 ns and is still
+  faster than XOffset's 143.5 ns: its loop allocates nothing. Doing the same in the library would keep removed
+  slots owning blocks, which changes the wire contract, so it is not done.
+- The report-only row `xoffset bulk` (2024 layout, bulk calls) reads 113.8 -> 119.9 ns with the same
+  instruction count (1,749). A separate program with only these rows, alternating on the same machine, gives
+  115.4 vs 113.4 ns, so this is code placement in the bench binary, not a slower library.
+- Cost: a vector grown one element at a time with `push_back` / `emplace_back` that ends with 1 to 4 four-byte
+  scalars takes 16 bytes more than before (24 more for 1- and 2-byte elements). `reserve()` and the range
+  assignments still size their block exactly. The wire format is unchanged.
+
 ## Fair cases (2026-11-17)
 
 Two changes to the cases (the two items marked 2026-11-17 in "Scenario and rules" above): messages
