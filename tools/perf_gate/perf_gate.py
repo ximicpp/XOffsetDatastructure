@@ -4,8 +4,8 @@
 Builds three copies of the benchmarks in one job -- anchor (bench/perf/ANCHOR),
 base and head -- all from the head's benchmark sources, counts the instructions
 of every timed phase of the SLG benchmark (S scale), the formal acceptance
-harness (M fixture) and every case of the relocation tax benchmark under
-callgrind, and judges head/base and head/anchor against the thresholds in
+harness (M fixture), every case of the relocation tax benchmark and the two
+demo-set hole table items (SLGD_*) under callgrind, and judges head/base and head/anchor against the thresholds in
 docs/PERF_GATE.md.
 
 Instruction counts only block regressions. They are never evidence that code
@@ -52,6 +52,16 @@ SLG_SEED = "20261021"
 SLG_SCALE = "S"
 SLG_CYCLES = "8"
 SLG_SKIP_CYCLES = "4"
+# Demo case set, trusted tier (4.2.0 hole table items): the steady-state receive of a stored player
+# (S.store_recv in the last of SLGD_STEADY_CYCLES cycles, about 27 holes per player by then) and the
+# instructions of a whole run (every stage, timed or not, and the setup): a cost the lazy hole table only
+# moves to a later stage shows up in the second.
+SLGD_FORMAT = "xoffset_trusted"
+SLGD_SCALE = "S"
+SLGD_STEADY_CYCLES = "15"
+SLGD_WHOLE_CYCLES = "21"
+SLGD_STEADY_KEYS = ("S.store_recv",)
+SLGD_WHOLE = "whole"
 FORMAL_PHASES = ("load", "query_before", "mutate", "emit_after", "retire", "reload", "query_after", "cleanup")
 RELOC_ROUNDS, RELOC_WARMUP, RELOC_SKIP_ROUNDS = "5", "1", "2"   # collect rounds 2-4 of each case
 
@@ -327,10 +337,11 @@ IR_ENV = {"GLIBC_TUNABLES": "glibc.cpu.x86_rep_movsb_threshold=0x7ffffffffffffff
                             "glibc.cpu.x86_rep_stosb_threshold=0x7fffffffffffffff"}
 
 
-def callgrind(valgrind, cmd, env, tmp: Path):
-    """Run `cmd` under callgrind with collection off at start; return the collected Ir and the profile."""
+def callgrind(valgrind, cmd, env, tmp: Path, collect_all=False):
+    """Run `cmd` under callgrind with collection off at start (on for the whole run with collect_all);
+    return the collected Ir and the profile."""
     logf = tmp / "vg.log"
-    full = shlex.split(valgrind) + ["--tool=callgrind", "--collect-atstart=no",
+    full = shlex.split(valgrind) + ["--tool=callgrind", f"--collect-atstart={'yes' if collect_all else 'no'}",
                                     f"--callgrind-out-file={tmp / 'cg.out'}", f"--log-file={logf}"] + cmd
     r = subprocess.run(full, env={**env, **IR_ENV}, text=True, capture_output=True, cwd=tmp)
     text = logf.read_text(encoding="utf-8", errors="replace") if logf.exists() else ""
@@ -340,11 +351,11 @@ def callgrind(valgrind, cmd, env, tmp: Path):
     return int(m.group(1)), fn_profile(tmp / "cg.out")
 
 
-def callgrind_cache(valgrind, cmd, env, tmp: Path):
+def callgrind_cache(valgrind, cmd, env, tmp: Path, collect_all=False):
     """Run `cmd` under callgrind with CACHE_SIM_ARGS; return the collected events by name (Ir, D1mr, ... DLmw)."""
     logf = tmp / "vg.log"
     out = tmp / "cg.out"
-    full = shlex.split(valgrind) + ["--tool=callgrind", "--collect-atstart=no", *CACHE_SIM_ARGS,
+    full = shlex.split(valgrind) + ["--tool=callgrind", f"--collect-atstart={'yes' if collect_all else 'no'}", *CACHE_SIM_ARGS,
                                     f"--callgrind-out-file={out}", f"--log-file={logf}"] + cmd
     r = subprocess.run(full, env={**env, **IR_ENV}, text=True, capture_output=True, cwd=tmp)
     text = logf.read_text(encoding="utf-8", errors="replace") if logf.exists() else ""
@@ -437,6 +448,23 @@ def slg_bench_cmd(binary, out):
             "--seed", SLG_SEED, "--formats", "xoffset", "--out", str(out)]
 
 
+def slgd_env(**extra):
+    """The demo case set (SLGD_*): reuse protocol, no native rows, 16 MiB per buffer (fits valgrind)."""
+    env = slg_env(SLG_CASES="demo", SLG_NATIVE_OFF="1", SLG_XOFFSET_CAP_MIB="16")
+    env.update(extra)
+    return env
+
+
+def slgd_task(binary, key, out):
+    """(command, environment, collect_all) of one SLGD item: a steady-state key or the whole run."""
+    cycles = SLGD_WHOLE_CYCLES if key == SLGD_WHOLE else SLGD_STEADY_CYCLES
+    cmd = [str(binary), "--mode", "bench", "--scale", SLGD_SCALE, "--cycles", cycles,
+           "--seed", SLG_SEED, "--formats", SLGD_FORMAT, "--out", str(out)]
+    if key == SLGD_WHOLE:
+        return cmd, slgd_env(), True
+    return cmd, slgd_env(SLG_IR_KEYS=key, SLG_IR_SKIP_CYCLES=str(int(SLGD_STEADY_CYCLES) - 1)), False
+
+
 def discover_slg_keys(binary, tmp: Path):
     out = tmp / "keys.jsonl"
     subprocess.run(slg_bench_cmd(binary, out), env=slg_env(), check=True, capture_output=True)
@@ -524,7 +552,7 @@ def cmd_measure(a):
         t2 = scratch / f"keys-{short(sha)}"
         t2.mkdir()
         keys = discover_slg_keys(Path(b["dir"]) / "slg_bench", t2) if chk["ok"] else []
-        tr = {"checks": chk, "slg_keys": keys, "slg": {}, "formal": {}, "functions": {},
+        tr = {"checks": chk, "slg_keys": keys, "slg": {}, "slgd": {}, "formal": {}, "functions": {},
               "reloc_status": b.get("reloc", "absent"), "reloc_keys": [], "reloc": {}}
         if chk["ok"] and tr["reloc_status"] == "ok":
             tr["reloc_check"], tr["reloc_keys"] = reloc_check(Path(b["dir"]) / "reloc_bench", t2)
@@ -542,6 +570,8 @@ def cmd_measure(a):
         bdir = Path(usable[sha]["dir"])
         for k in tr["slg_keys"]:
             tasks.append((sha, "slg", k, 0))
+        for k in SLGD_STEADY_KEYS + (SLGD_WHOLE,):
+            tasks.append((sha, "slgd", k, 0))
         for ph in FORMAL_PHASES:
             tasks.append((sha, "formal", ph, 0))
         for k in tr["reloc_keys"]:
@@ -567,6 +597,9 @@ def cmd_measure(a):
             if kind == "slg":
                 ir, prof = run_cg(a.valgrind, slg_bench_cmd(bdir / "slg_bench", tmp / "raw.jsonl"),
                                slg_env(SLG_IR_KEYS=key, SLG_IR_SKIP_CYCLES=SLG_SKIP_CYCLES), tmp)
+            elif kind == "slgd":
+                cmd, env, whole = slgd_task(bdir / "slg_bench", key, tmp / "raw.jsonl")
+                ir, prof = run_cg(a.valgrind, cmd, env, tmp, whole)
             elif kind == "reloc":
                 ir, prof = run_cg(a.valgrind, reloc_cmd(bdir / "reloc_bench", key), reloc_env(key), tmp)
             else:
@@ -590,6 +623,8 @@ def cmd_measure(a):
         tr["cache"] = {}
         for k in tr["slg_keys"]:
             tasks.append((sha, "slg", k, "cache"))
+        for k in SLGD_STEADY_KEYS + (SLGD_WHOLE,):
+            tasks.append((sha, "slgd", k, "cache"))
         for ph in FORMAL_PHASES:
             tasks.append((sha, "formal", ph, "cache"))
         for k in tr["reloc_keys"]:
@@ -630,7 +665,7 @@ def cmd_measure(a):
 
 def cache_counts(tree, level):
     """One tree's cache-sim misses of one level (D1 or LL, read + write) in the shape metrics_of reads."""
-    t = {"slg": {}, "formal": {}, "reloc": {}}
+    t = {"slg": {}, "slgd": {}, "formal": {}, "reloc": {}}
     for k, ev in (tree.get("cache") or {}).items():
         kind, _, key = k.partition(".")
         t[kind][key] = sum(ev[e] for e in CACHE_EVENTS[level])
@@ -656,6 +691,8 @@ def metrics_of(tree):
         m["formal.total"] = sum(f.values())
     for k, v in tree.get("reloc", {}).items():
         m[f"reloc.{k}"] = v
+    for k, v in tree.get("slgd", {}).items():
+        m[f"slgd.{k}"] = v
     return m
 
 
@@ -664,6 +701,8 @@ def classify(metric, base_m, head_m):
     kind, _, rest = metric.partition(".")
     if kind == "reloc":
         return "phase", 1.0  # every case is its own scenario
+    if kind == "slgd":           # the whole run is a total; a steady-state key is its own scenario
+        return ("total", 1.0) if rest == SLGD_WHOLE else ("phase", 1.0)
     if kind == "slg":
         if rest in SLG_TOTALS:
             return "total", 1.0
@@ -726,7 +765,7 @@ def validate_ledger(entries):
 def metric_keys(metric, tree):
     """The callgrind runs (keys of a tree's "functions") that a gate metric adds up."""
     kind, _, rest = metric.partition(".")
-    if kind == "reloc":
+    if kind in ("reloc", "slgd"):
         return [metric]
     if kind == "slg":
         if rest in SLG_TOTALS:
@@ -981,6 +1020,8 @@ def cmd_compare(a):
            "valgrind": ir["valgrind"], "verdict": verdict, "roles": roles, "status": status,
            "slg": {"scale": SLG_SCALE, "cycles": int(SLG_CYCLES), "skip_cycles": int(SLG_SKIP_CYCLES),
                    "seed": int(SLG_SEED), "protocol": "reuse"},
+           "slgd": {"format": SLGD_FORMAT, "scale": SLGD_SCALE, "steady_cycles": int(SLGD_STEADY_CYCLES),
+                    "steady_keys": list(SLGD_STEADY_KEYS), "whole_cycles": int(SLGD_WHOLE_CYCLES)},
            "formal": {"fixture": "M", "input_digest": ir["fixture_input_digest"]},
            "reloc": {"rounds": int(RELOC_ROUNDS), "warmup": int(RELOC_WARMUP), "skip_rounds": int(RELOC_SKIP_ROUNDS),
                      "status": {sha: t.get("reloc_status", "absent") for sha, t in ir["trees"].items()}},
@@ -1084,7 +1125,10 @@ def render_summary(out, plan, biggest):
              f"{out['compiler_version']} · {out['valgrind']}")
     L.append(f"SLG {out['slg']['scale']} scale, {out['slg']['cycles']} cycles (first {out['slg']['skip_cycles']} skipped), "
              f"seed {out['slg']['seed']}, reuse protocol; formal harness M fixture; "
-             f"reloc {out['reloc']['rounds']} rounds per item (warm-up {out['reloc']['warmup']}, collected from round {out['reloc']['skip_rounds']})")
+             f"reloc {out['reloc']['rounds']} rounds per item (warm-up {out['reloc']['warmup']}, collected from round {out['reloc']['skip_rounds']})"
+             + (f"; demo set {out['slgd']['format']} {out['slgd']['scale']} scale: steady state = last of "
+                f"{out['slgd']['steady_cycles']} cycles, whole run = all Ir of {out['slgd']['whole_cycles']} cycles"
+                if out.get("slgd") else ""))
     L.append("")
     for title, items in (("Failures", out["failures"]), ("Warnings", out["warnings"]), ("Notes", out["notes"])):
         if items:
