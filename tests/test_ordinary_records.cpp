@@ -156,16 +156,29 @@ template <class Root> std::vector<std::string> run() {
     wires.push_back(buf.save_verified<Root>());
     return wires;
 }
+// What the declared and the undeclared record must agree on. Headers carry
+// the schema identity and are left out. With the M4 switches: every payload
+// byte. Without them a vacated slot keeps whatever its erase path left there
+// (one memmove against per-element moves), so the wires' compact forms, which
+// hold the live content only.
+template <class Root> std::string comparable(const std::string& wire) {
+    constexpr std::size_t header = sizeof(xo::XWireHeaderV2);
+#if XOFFSET_SCRUB_ERASED && XOFFSET_SCRUB_POPPED
+    return wire.substr(header);
+#else
+    xo::XBuffer loaded = xo::XBuffer::load_verified<Root>(wire, policy());
+    return loaded.save_compact<Root>().substr(header);
+#endif
+}
 } // namespace
 
 int main() {
     const auto declared = run<orec::Root>();
     const auto plain = run<orec::PlainRoot>();
     if (declared.size() != plain.size()) fail("checkpoint count");
-    constexpr std::size_t header = sizeof(xo::XWireHeaderV2);
     for (std::size_t i = 0; i < declared.size(); ++i)
         if (declared[i].size() != plain[i].size() ||
-            declared[i].compare(header, std::string::npos, plain[i], header, std::string::npos) != 0)
+            comparable<orec::Root>(declared[i]) != comparable<orec::PlainRoot>(plain[i]))
             fail("declared and undeclared wires differ at checkpoint " + std::to_string(i));
     std::cout << "test_ordinary_records passed (" << declared.size() << " checkpoints byte-identical)\n";
     return 0;

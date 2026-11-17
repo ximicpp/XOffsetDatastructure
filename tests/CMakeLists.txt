@@ -343,6 +343,44 @@ foreach(test_name ${NO_EXCEPTIONS_TESTS})
     add_test(NAME ${test_name}_noexc COMMAND ${test_name}_noexc)
     set_tests_properties(${test_name}_noexc PROPERTIES LABELS "reflection;no-exceptions")
 endforeach()
+# Hardening switches (docs/V2_THREAT_MODEL.md 4.1) are off by default. The tests
+# of what the switches guarantee (zeroed spare capacity and padding, the pin
+# scope quarantine) and of the container paths they change are built a
+# second time as <name>_hardened with XOFFSET_HARDENED=1, so one CTest run
+# covers both settings. A build configured with XOFFSET_HARDENED=ON is that
+# build already and adds none.
+set(HARDENED_TESTS
+    test_wire_hole_zeroing
+    test_implicit_padding
+    test_subtree_copy
+    test_assign_range
+    test_proxy_scopes
+    test_runtime_regressions
+    test_resize_growth
+    test_string_append
+    test_xstring_direct_assign
+    test_save_composed
+    test_vector
+    test_map_set
+    test_main_containers
+    test_fixed_layout_containers
+    test_shift_relocate
+    test_ordinary_records
+)
+if(NOT XOFFSET_HARDENED)
+    foreach(test_name ${HARDENED_TESTS})
+        if(NOT XOFFSET_TESTS_REFLECTION AND test_name IN_LIST XOFFSET_CXX26_ONLY_TESTS)
+            xoffset_cxx26_only(${test_name}_hardened)
+            continue()
+        endif()
+        add_executable(${test_name}_hardened ${test_name}.cpp)
+        configure_xoffset_target(${test_name}_hardened)
+        xoffset_enable_test_assertions(${test_name}_hardened)
+        target_compile_definitions(${test_name}_hardened PRIVATE XOFFSET_HARDENED=1)
+        add_test(NAME ${test_name}_hardened COMMAND ${test_name}_hardened)
+        set_tests_properties(${test_name}_hardened PROPERTIES LABELS "reflection;hardened")
+    endforeach()
+endif()
 # A failure without a caller to return it to goes to the fatal handler.
 add_test(NAME test_no_exceptions_fatal COMMAND test_no_exceptions --fatal)
 add_test(NAME test_no_exceptions_noexc_fatal COMMAND test_no_exceptions_noexc --fatal)

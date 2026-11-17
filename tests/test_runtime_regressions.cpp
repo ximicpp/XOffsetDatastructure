@@ -112,7 +112,9 @@ void mid_insert_erase() {
     const int32_t erased[] = {0, 20, 50, 30, 50, 60, -1, 70};
     assert(v.size() == 8 && v.capacity() == 16);
     for (std::uint32_t i = 0; i < 8; ++i) assert(v[i] == erased[i]);
-    assert(v.data()[8] == 0 && v.data()[9] == 0);
+#if XOFFSET_SCRUB_ERASED
+    assert(v.data()[8] == 0 && v.data()[9] == 0);   // M4: erase zeroes the vacated slots
+#endif
     while (v.size() < v.capacity()) v.push_back(7);
     v.insert(v.begin() + 1, v[2]);
     assert(v.size() == 17 && v[0] == 0 && v[1] == 50 && v[2] == 20 && v[16] == 7);

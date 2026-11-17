@@ -1,10 +1,14 @@
-// M3 (threat model T5): a retired block is cleared before it becomes a hole, so
-// neither the arena nor any emitted wire carries freed contents. For dense and
-// sparse wires from save_verified, save_verified_into and freeze_verified:
-// every hole byte is zero and every payload byte equals the arena byte. Holes a
-// loaded wire brought in keep the sender's bytes (forwarded unchanged); a block
-// the receiver retires is cleared. Also checks the M1/M2 limits on declared
-// wire sizes.
+// Threat model T5: freed contents on the wire. In every build: a retired block
+// is cleared before it becomes a hole (M3), so neither the arena nor any
+// emitted wire carries freed contents; each emitted payload byte equals the
+// arena byte and every hole byte is zero (dense and sparse wires from
+// save_verified, save_verified_into and freeze_verified); holes a loaded wire
+// brought in keep the sender's bytes (forwarded unchanged); and save_compact
+// carries nothing that was freed or vacated. With the M4 scrub switches
+// (XOFFSET_SCRUB_ERASED, _POPPED; this program is built again as *_hardened
+// with XOFFSET_HARDENED=1) vacated elements are zeroed too, so no emitted wire
+// carries anything deleted. Also checks the M1/M2 limits on declared wire
+// sizes.
 #include "xoffsetdatastructure.hpp"
 
 #include <array>
@@ -43,6 +47,8 @@ template<> struct wire_record_layout<hz::Root> { static constexpr bool ordinary_
 namespace {
 using Buffer = xo::TypedXBuffer<hz::Root>;
 constexpr std::string_view kSecret = "SECRET-TOKEN-0123456789-abcdefghijklmnop";
+// Whether this build zeroes what containers vacate (M4); freed blocks always are (M3).
+constexpr bool kScrubbed = XOFFSET_SCRUB_ERASED && XOFFSET_SCRUB_POPPED;
 
 [[noreturn]] void fail(const std::string& message) {
     std::cerr << "test_wire_hole_zeroing FAILED: " << message << "\n";
@@ -137,9 +143,10 @@ void check_emitted(std::string_view wire, const char* arena, const char* what) {
     for (std::uint64_t offset = 0; offset < p.header.used_bytes; ++offset)
         if (in_hole[offset] && arena[offset] != 0)
             fail(std::string(what) + ": arena hole byte at offset " + std::to_string(offset) + " is not zero");
-    if (wire.find(kSecret.substr(0, 12)) != std::string_view::npos ||
-        wire.find("AAAAAAAA") != std::string_view::npos)
+    if (wire.find(kSecret.substr(0, 12)) != std::string_view::npos)
         fail(std::string(what) + ": freed contents reached the wire");
+    if (kScrubbed && wire.find("AAAAAAAA") != std::string_view::npos)
+        fail(std::string(what) + ": cleared elements reached the wire");
 }
 
 void emitted_holes_are_zero() {
@@ -200,6 +207,26 @@ void loaded_holes_keep_sender_bytes() {
         fail("receiver-retired secret is still in the arena");
 }
 
+// save_compact rebuilds the wire from the live graph: no hole, spare capacity
+// and string tails written as zero. It carries nothing freed or vacated in
+// any build (the way to send from a default build to a reader that must not
+// see deleted data), and loads as the same content.
+void compact_carries_no_freed_contents() {
+    for (bool sparse : {false, true}) {
+        auto b = make(sparse);
+        const auto wire = b.save_compact();
+        if (wire.find(kSecret.substr(0, 12)) != std::string::npos || wire.find("AAAAAAAA") != std::string::npos ||
+            wire.find("BBBBBBBB") != std::string::npos)
+            fail("save_compact carries freed contents");
+        if (parse(wire).header.hole_count != 0) fail("save_compact wrote a hole");
+        auto loaded = Buffer::load(wire, cap());
+        const auto& r = loaded.plain_root();
+        if (r.secret.view() != std::string(200, 'z') || !r.filler.empty() ||
+            r.entries.size() != (sparse ? 9u : 8u) || r.entries[0].note.view() != "short")
+            fail("save_compact changed the live content");
+    }
+}
+
 std::string inflate_sparse(const std::string& wire, std::uint64_t used) {
     xo::XWireHeaderV2 h;
     std::memcpy(&h, wire.data(), sizeof(h));
@@ -256,7 +283,9 @@ int main() {
     emitted_holes_are_zero();
     frozen_segments_are_zero();
     loaded_holes_keep_sender_bytes();
+    compact_carries_no_freed_contents();
     declared_size_limits();
-    std::cout << "wire hole zeroing and declared-size limits: 4 groups passed\n";
+    std::cout << "wire hole zeroing (M4 scrub switches " << (kScrubbed ? "on" : "off")
+              << ") and declared-size limits: 5 groups passed\n";
     return 0;
 }
