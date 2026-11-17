@@ -1,6 +1,6 @@
 #!/bin/bash
 # The library tests and the phone measurements on an iPhone or an iOS simulator, through
-# the test host app (tools/test_host; docs/CLIENT_TARGETS.md, "手机上运行"). Mac with
+# the test host app (tools/test_host; docs/CLIENT_TARGETS.md, "Running on phones: the test host"). Mac with
 # Xcode; macOS bash 3.2.
 #
 #   tools/device/ios_device.sh sim|device OUT [options] [-- extra cmake args]

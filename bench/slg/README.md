@@ -211,9 +211,9 @@ application-level row from such processes and the native rows from a
 unit whole only when it is new to the view; otherwise it writes the fields
 the world marked dirty this tick (`touch(u, bits)`, `MapWorld::dirty`), as a
 game server's dirty flags, and every client's native delta goes into one
-shared buffer (thread 设计并实现增量同步).
+shared buffer (thread "design and implement delta sync").
 
-Fairness review (thread 审查三类对比测试的公平性, 2026-11-03): the std model's
+Fairness review (thread "fairness review of the three comparison classes", 2026-11-03): the std model's
 maps (items, research, buildings, resources) are `stdm::smap`, a sorted flat
 map (one vector of pairs) written in `model_std.hpp`, like XOffset's and
 cista's (were `std::map`; briefly `boost::container::flat_map`, which needs
@@ -232,7 +232,7 @@ and march id -> slot maps are flat open-addressing tables (2026-11-04, were
 `std::unordered_map`; slot choice, bytes and states unchanged). cereal
 reuses its input stream. Allocator: glibc malloc for every format.
 
-Scoring V3 (2026-11-04, thread 确定下一阶段开发方向, doc GZH4QtBqBrDXKrH9uwTmsH):
+Scoring V3 (2026-11-04, thread "next-phase direction", doc GZH4QtBqBrDXKrH9uwTmsH):
 new keys only; no existing key or the time range of an existing stage changes,
 so earlier batches and the perf gate compare as before.
 
@@ -305,7 +305,7 @@ so earlier batches and the perf gate compare as before.
   views a fixed 128 KiB slot (`kHeldMax`); the shard keeps 256 MiB. At scale M
   page tables went from 13.1 to 5.6 MiB (0.84% of RSS; the gate is 1%).
 
-D3 shared deltas (2026-11-04, thread 设计共享增量原型, doc X5MZPWya7DWFzdCughpZqL;
+D3 shared deltas (2026-11-04, thread "shared-delta prototype design", doc X5MZPWya7DWFzdCughpZqL;
 `xoffset_shared_delta.hpp`, XS 1.0 in 3.5-3.6, XS 2.0 since 4.0, docs/SHARED_DELTA.md). XOffset and (since
 4.0 W1, below) zpp_bits, class 3 only;
 `SLG_D3=1` runs D3 alone (no N*), `SLG_D3=2` both, unset none (keys and stage

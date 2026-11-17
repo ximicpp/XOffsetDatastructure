@@ -82,24 +82,24 @@ def main():
             else: by[r["format"]][r["metric"]][r["cycle"]] = r["bytes"]
 
     formats = sorted(ns)
-    scen = {"A": "战斗服往返", "B": "跨服迁移", "C": "分区快照", "D": "战报只读"}
+    scen = {"A": "battle server round trip", "B": "cross-server migration", "C": "zone snapshot", "D": "battle report read only"}
     if meta.get("cases") == "demo":  # SLG_CASES=demo (include/slg/view.hpp)
-        scen = {"A": "场景↔战斗", "B": "场景↔场景", "S": "场景↔存储", "SD": "场景↔存储（只存脏模块）",
-                "L": "登录全量", "LD": "登录后自身增量"}
-        scen["EB"] = "浏览地图，视口全量"
-        scen["EBW"] = "浏览地图，单设备热视图接收"
+        scen = {"A": "scene<->battle", "B": "scene<->scene", "S": "scene<->storage", "SD": "scene<->storage (dirty modules only)",
+                "L": "login full state", "LD": "own delta after login"}
+        scen["EB"] = "map browse, full viewport"
+        scen["EBW"] = "map browse, single-device warm view receive"
         if any(m.startswith("UL.") for f in formats for m in ns[f]):   # uplink.hpp (SLG_UL_OFF=1 drops it)
-            scen["UL"] = "客户端上行（行军指令，服务端收：边界档 / 对手各自的检查）"
-        for r, name in (("P", "和平"), ("C", "交战"), ("S", "压力")):
-            scen["U" + r] = f"静止视口增量（{name}）"
+            scen["UL"] = "client uplink (march orders, server receive: bounds tier / each rival's own checks)"
+        for r, name in (("P", "peace"), ("C", "combat"), ("S", "stress")):
+            scen["U" + r] = f"static viewport delta ({name})"
         # XOffset's own delta sync (xoffset_delta.hpp): N* deltas per static
         # client, compared with each baseline's U*.
         if any(m.startswith("N") and m[2:3] == "." for f in formats for m in ns[f]):
-            for r, name in (("P", "和平"), ("C", "交战"), ("S", "压力")):
-                scen["N" + r] = f"静止视口增量 XOffset 原生 ÷ 对手 U{r}（{name}）"
-            scen["LK"] = "登录全量 XOffset 原生 key ÷ 对手 L"
-            scen["LN"] = "自身增量 XOffset 原生 ÷ 对手 LD"
-            scen["SN"] = "存盘 XOffset 原生增量 ÷ 对手 SD"
+            for r, name in (("P", "peace"), ("C", "combat"), ("S", "stress")):
+                scen["N" + r] = f"static viewport delta, XOffset native ÷ rival U{r} ({name})"
+            scen["LK"] = "login full state, XOffset native key ÷ rival L"
+            scen["LN"] = "own delta, XOffset native ÷ rival LD"
+            scen["SN"] = "save, XOffset native delta ÷ rival SD"
     # Scenario totals per cycle.
     for fmt in formats:
         for s in scen:
@@ -111,10 +111,10 @@ def main():
                                               if m.startswith(s + ".") and m != s + ".total" and not m.endswith("read_direct"))
     out = []
     p = out.append
-    p(f"# SLG 原型结果\n\n规模 {meta.get('scale')}，seed {meta.get('seed')}，{meta.get('cycles')} 个周期（丢弃第 0 个）。单位 ms，为每个周期整批消息的合计。\n")
-    p("## 各阶段中位数（ms）\n")
+    p(f"# SLG prototype results\n\nScale {meta.get('scale')}, seed {meta.get('seed')}, {meta.get('cycles')} cycles (cycle 0 discarded). Unit ms, the total of each cycle's whole batch of messages.\n")
+    p("## Median per stage (ms)\n")
     metrics = sorted({m for f in formats for m in ns[f]})
-    p("| 阶段 | " + " | ".join(formats) + " |")
+    p("| Stage | " + " | ".join(formats) + " |")
     p("| --- |" + " ---: |" * len(formats))
     for m in metrics:
         cells = []
@@ -129,9 +129,9 @@ def main():
         if a.baselines:
             base = [f for f in a.baselines.split(",") if f in formats and f != a.subject]
         k = len(scen) * len(base)
-        p(f"\n## {a.subject} ÷ 基线（场景合计，逐周期配对）\n")
-        p(f"几何均值 / 单侧 {100 * (1 - a.alpha):.0f}% 上界，Bonferroni 校正 k={k}。<1 表示 {a.subject} 更快。\n")
-        p("| 场景 | " + " | ".join(base) + " |")
+        p(f"\n## {a.subject} ÷ baselines (scenario totals, paired per cycle)\n")
+        p(f"Geometric mean / one-sided {100 * (1 - a.alpha):.0f}% upper bound, Bonferroni correction k={k}. < 1 means {a.subject} is faster.\n")
+        p("| Scenario | " + " | ".join(base) + " |")
         p("| --- |" + " --- |" * len(base))
         for s, label in scen.items():
             cells = []
@@ -152,11 +152,11 @@ def main():
             cs = sorted(set(x) & set(y))
             if cs:
                 r = math.exp(statistics.mean(math.log(x[c] / y[c]) for c in cs))
-                p(f"\nD 对照：{a.subject} 读取 ÷ {b} 原地读取（校验后直接读、不拷贝不解包）= {r:.3f}（几何均值，仅参考）。")
+                p(f"\nD control: {a.subject} read ÷ {b} in-place read (read directly after validation, no copy, no unpack) = {r:.3f} (geometric mean, reference only).")
 
-    p("\n## wire 字节（每周期合计的中位数）\n")
+    p("\n## Wire bytes (median of per-cycle totals)\n")
     bm = sorted({m for f in formats for m in by[f]})
-    p("| 消息 | " + " | ".join(formats) + " |")
+    p("| Message | " + " | ".join(formats) + " |")
     p("| --- |" + " ---: |" * len(formats))
     for m in bm:
         p(f"| {m} | " + " | ".join(f"{statistics.median(by[f][m].values()):.0f}" if m in by[f] else "" for f in formats) + " |")

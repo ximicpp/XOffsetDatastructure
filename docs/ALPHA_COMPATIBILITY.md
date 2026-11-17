@@ -1,14 +1,17 @@
-# 4.0.0 兼容与输入边界
+# 4.0.0 compatibility and input boundaries
 
-（文件名沿用 alpha 时期。）此预发布版面向固定编译器、依赖、schema 并自行验收的试用者。核心实现可用，
-但预发布版之间不承诺源码 API 或 ABI 稳定（稳定承诺只有 K0–K9，见 `docs/STABILITY_TESTS.md`），也不承诺任意编译器、标准库、schema
-演进与布局组合之间的长期 wire 兼容。本版本使用 V2 存储与 wire 格式（`docs/V2_FORMAT.md`），
-不读取 V1 wire。
+(The file name dates from the alpha period.) This pre-release is aimed at early users who pin their
+compiler, dependencies and schemas and do their own acceptance testing. The core implementation is
+usable, but source API and ABI stability between pre-releases is not promised (the only stability
+promises are K0–K9, see `docs/STABILITY_TESTS.md`), nor is long-term wire compatibility across arbitrary
+combinations of compilers, standard libraries, schema evolution and layouts. This version uses the V2
+storage and wire format (`docs/V2_FORMAT.md`) and does not read V1 wires.
 
-## 版本和工具链
+## Version and toolchain
 
-源码根目录的 `XOFFSET_VERSION`（安装后为 `share/XOffsetDatastructure/VERSION`）是完整版本 `4.0.0` 的唯一文本来源；CMake project 数字版本是
-`4.0.0`。安装消费采用无版本查找，再检查完整字符串：
+`XOFFSET_VERSION` at the source root (`share/XOffsetDatastructure/VERSION` after install) is the single
+text source of the full version `4.0.0`; the CMake project's numeric version is `4.0.0`. Installed
+consumers look the package up without a version and then check the full string:
 
 ```cmake
 find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
@@ -17,103 +20,123 @@ if(NOT XOffsetDatastructure_VERSION STREQUAL "4.0.0")
 endif()
 ```
 
-storage 消费改用 `COMPONENTS storage` 和 `XOffset::storage`。
-数字、EXACT 和版本范围查找全部拒绝，避免预发布版被当作兼容的稳定版本。
-源码构建中的完整版本变量是 `XOFFSET_VERSION_FULL`。
+Storage consumers use `COMPONENTS storage` and `XOffset::storage` instead. Numeric, EXACT and version
+range lookups are all rejected, so a pre-release is not taken for a compatible stable version. In source
+builds the full version variable is `XOFFSET_VERSION_FULL`.
 
-完整库要求 64-bit little-endian、P2996 Clang 与匹配 libc++；普通 C++26 不是替代品。
-固定配方与依赖来源见源码分发中的 `docs/PACKAGING.md`、`toolchains/README.md`
-及 `toolchains/vm-validation.json`；这些配方不随安装 prefix 复制。
-支持结论按具体 profile 给出，不能从 OS API 存在推导完整编译器支持。Windows 上 MSVC 只验
-storage；MinGW-w64 GCC 16 的完整库由 CI 验证（`docs/CLIENT_TARGETS.md`）。WSL、Docker 的结果必须保留实际虚拟化/仿真类别。
+The full library requires 64-bit little-endian, P2996 Clang and a matching libc++; plain C++26 is not a
+substitute. The pinned recipes and dependency sources are in the source distribution's
+`docs/PACKAGING.md`, `toolchains/README.md` and `toolchains/vm-validation.json`; these recipes are not
+copied into the install prefix. Support verdicts are given per concrete profile; full compiler support
+cannot be inferred from an OS API being present. On Windows, MSVC only validates storage; the full
+library under MinGW-w64 GCC 16 is validated by CI (`docs/CLIENT_TARGETS.md`). Results from WSL and Docker
+must keep their actual virtualization/emulation category.
 
-同一可执行文件内应使用一致的生产头、TypeLayout/Boost 内容、工具链和编译选项。
-`XOFFSET_DEFAULT_MAXIMUM_CAPACITY` 等宏在所有翻译单元中保持一致。
-已验证的多翻译单元安装/源码消费不扩大为共享库、动态插件、跨 CRT、混合标准库
-或混合头版本的 ABI 保证。
+Within one executable, use consistent production headers, TypeLayout/Boost contents, toolchain and
+compile options. Macros such as `XOFFSET_DEFAULT_MAXIMUM_CAPACITY` must be consistent across all
+translation units. The validated multi-translation-unit install and source consumption does not extend to
+ABI guarantees for shared libraries, dynamic plugins, crossing CRTs, mixed standard libraries or mixed
+header versions.
 
-## V2 wire 的准入和兼容
+## Admission and compatibility of V2 wires
 
-V2 是当前固定格式，wire 格式版本 2.1（magic 字节 `'X' 'O' 2 1`，40 字节 wire 头）。
-V1 wire 一律以 `wire format 1 is not supported` 拒绝，2.0 wire（3.0.0 及更早）以
-`wire format 2.0 is not supported; this build reads 2.1 (sender and receiver must upgrade together)`
-拒绝；库内没有 V1 或 2.0 的读取或迁移路径，收发两端要一起升级。
-不提供 schema 演进、通用 schema migration 或任意 ABI 转换：加载要求匹配的
-root/schema/type/layout 身份及有效的对象图（活块与空洞表恰好铺满已用区）；注册相同 schema 名称
-并不能让不同布局兼容。需要持久化跨版本读取时，应保留能够读取原格式的工具链、
-schema 与转换程序，并单独验证迁移结果。
+V2 is the current fixed format, wire format version 2.1 (magic bytes `'X' 'O' 2 1`, 40-byte wire header).
+V1 wires are always rejected with `wire format 1 is not supported`, and 2.0 wires (3.0.0 and earlier) with
+`wire format 2.0 is not supported; this build reads 2.1 (sender and receiver must upgrade together)`; the
+library has no read or migration path for V1 or 2.0, and both ends must upgrade together. No schema
+evolution in this path, general schema migration or arbitrary ABI conversion is offered: loading requires
+matching root/schema/type/layout identities and a valid object graph (the live block and hole tables tile
+the used region exactly); registering the same schema name does not make different layouts compatible.
+When persisted data must be read across versions, keep a toolchain, schema and conversion program that
+can read the original format, and validate the migration result separately.
 
-- 存储类型必须满足 `XOffsetDatastructure::is_byte_copy_safe_v<T>`。
-- 固定 schema verified 路径还要求 `is_v1_wire_admitted_v<T>`（名称沿用旧版，规则适用于 V2）；
-  这是额外的 wire 准入约束，不等于“所有可平凡复制的 C++ 类型均可用”。
-- 使用 library 的 XString/XVector 等 arena 容器。普通进程地址、原生指针/引用、
-  member pointer、union 不能进入此 admitted wire 域；普通 `std::string/std::vector`
-  不是 offset 容器的替代品。
-- 记录类型必须符合实际 admission 检查，包括 standard-layout、非多态、无基类、
-  对齐不超过 8，且所有成员递归 admitted。数组、标量、枚举和容器元素也递归检查。
-- 每种 root 用 `XOFFSET_REGISTER_SCHEMA_NAME(T, "唯一且稳定的名称")` 注册。
-  不应把名称、单个 signature 或一次 roundtrip 当作任意目标平台的兼容证明。
+- Stored types must satisfy `XOffsetDatastructure::is_byte_copy_safe_v<T>`.
+- The fixed-schema verified path also requires `is_v1_wire_admitted_v<T>` (the name is kept from the old
+  version; the rule applies to V2); this is an extra wire admission constraint and does not mean "every
+  trivially copyable C++ type can be used".
+- Use the library's arena containers such as XString/XVector. Ordinary process addresses, native
+  pointers/references, member pointers and unions cannot enter this admitted wire domain; ordinary
+  `std::string/std::vector` are not substitutes for the offset containers.
+- Record types must pass the actual admission checks, including standard-layout, non-polymorphic, no base
+  classes, alignment no more than 8, and all members recursively admitted. Arrays, scalars, enums and
+  container elements are checked recursively too.
+- Register each root with `XOFFSET_REGISTER_SCHEMA_NAME(T, "a unique and stable name")`. Do not take a
+  name, a single signature or one roundtrip as proof of compatibility with an arbitrary target platform.
 
-仓库 `tools/sigs/` 的四目标签名是显式 wire catalog 与目标 ABI metadata 生成的
-基线；它们不等于对应目标原生导出/运行证据，也不建立任意用户 schema 的兼容性。
+The four-target signatures in the repository's `tools/sigs/` are baselines generated from the explicit
+wire catalog and target ABI metadata; they are not native export/run evidence for those targets, and do
+not establish compatibility of arbitrary user schemas.
 
-`save()`/`save_verified()` 使用规范化 transport 语义：保存 admitted 对象图并支持
-加载后继续变更，不承诺保留原 spare capacity 或 allocator 碎片形态。
-save 会形成 owning byte copy；load 将输入复制到新 reservation。
-这不是外部只读映射或通用零复制加载 API。
+`save()`/`save_verified()` use canonicalizing transport semantics: they save the admitted object graph and
+support further changes after loading, without promising to keep the original spare capacity or
+allocator fragmentation. save produces an owning byte copy; load copies the input into a new
+reservation. This is not an external read-only mapping or a general zero-copy load API.
 
-## Verified 不是认证协议
+## Verified is not an authentication protocol
 
-`TypedXBuffer<T>::load()` 使用 verified 路径；`XBuffer::load_verified<T>()` 在发布
-typed root 前验证 wire、schema、allocator 和对象图。`save_verified()` 检查 typed
-root/schema/allocator 并规范化输出，但不应被描述为完整对象图扫描或恶意输入认证。
-`load_unverified()` 仅适合调用方已经信任的 raw payload。
+`TypedXBuffer<T>::load()` uses the verified path; `XBuffer::load_verified<T>()` validates the wire,
+schema, allocator and object graph before publishing the typed root. `save_verified()` checks the typed
+root/schema/allocator and canonicalizes the output, but should not be described as a full object graph
+scan or authentication of malicious input. `load_unverified()` is only for raw payloads the caller
+already trusts.
 
-格式中的 signature、FNV 和文件 SHA-256 清单用于身份/完整性核对，不提供发送者认证、
-机密性、MAC 或数字签名。格式 2.1 的 wire 头没有校验和字段（2.0 头里固定为 0 的
-`crc32c` 已删除），不提供 CRC 检验。若业务需要来源真实性或防篡改，应在外部协议中进行认证并保护对应
-版本/schema/长度信息；库的 verified 标记不替代该协议。
+The signature, FNV and file SHA-256 lists in the format are for identity/integrity checks; they provide no
+sender authentication, confidentiality, MAC or digital signature. The format 2.1 wire header has no
+checksum field (the `crc32c` field fixed at 0 in the 2.0 header was removed), and no CRC check is done.
+When the application needs source authenticity or protection against modification, authenticate in an
+outer protocol and protect the corresponding version/schema/length information there; the library's
+verified mark does not replace that protocol.
 
-接受不可信输入时，调用方须在分配/加载前限制总 wire 长度，并设置合理的
-`XBuffer::maximum_capacity(bytes)`。另行限制并发 buffer 数、聚合内存/虚拟地址预算、
-队列长度、执行时间及失败后的清理；单个 buffer 的合法性不能限制总业务资源消耗。
-payload 上限为 `0x7ffffff8`，但这不是建议给每个请求预留的预算。
+When accepting untrusted input, the caller must bound the total wire length before allocating/loading,
+and set a reasonable `XBuffer::maximum_capacity(bytes)`. Separately bound the number of concurrent
+buffers, the aggregate memory/virtual address budget, queue lengths, execution time and cleanup after
+failure; the validity of a single buffer cannot bound total resource use. The payload limit is
+`0x7ffffff8`, but that is not a budget to reserve for each request.
 
-## 生命周期、增长和并发
+## Lifetime, growth and concurrency
 
-成功创建/加载后的 arena base 在 grow、逻辑 shrink 和 save 中保持稳定；达到硬上限
-或 OS 失败时不会转为搬迁分配。容器扩容、插入/擦除、赋值及替换仍可能移动或销毁
-元素；不能据 arena base 稳定长期保存元素指针。compaction 创建独立 buffer。
+After a successful create/load, the arena base stays stable across grow, logical shrink and save; on
+reaching the hard limit or on OS failure it does not switch to a relocating allocation. Container growth,
+insert/erase, assignment and replacement can still move or destroy elements; do not keep element pointers
+long term because the arena base is stable. Compaction creates a separate buffer.
 
-容器对象本身应在所属 arena 内；传 native string/view 给插入接口，不要在栈上构造
-绑定 arena 的 XString 临时对象。无 per-object delete，由 buffer 统一拥有对象。
-`get_buffer()` 是借用视图；`copy_bytes()` 才是显式 owning copy。
+Container objects themselves should live in their owning arena; pass native strings/views to insertion
+interfaces rather than constructing arena-bound XString temporaries on the stack. There is no per-object
+delete; the buffer owns all objects. `get_buffer()` is a borrowed view; `copy_bytes()` is the explicit
+owning copy.
 
-`XHandle<T>` 跟随 C++ buffer 对象，不能延长它的生命周期；buffer 对象必须晚于 handle
-销毁。move/swap/替换及类型/verified 状态变化遵循 handle 检查规则，不能把 handle
-当作跨 owner 的 shared ownership。写入需调用方同步。
+`XHandle<T>` follows the C++ buffer object and cannot extend its lifetime; the buffer object must be
+destroyed after the handle. move/swap/replacement and changes of type/verified state follow the handle
+checking rules; a handle cannot be used as shared ownership across owners. Writes need synchronization by
+the caller.
 
-默认 Explicit 增长可能因当前逻辑区不足抛 `XBadAlloc`；Automatic 仍受硬上限与 OS
-失败约束。库容器变更在分配失败时保留逻辑内容，但容量与 allocator bookkeeping
-不必回滚；多步业务操作、普通 record assignment、外部构造副作用不因此成为事务。
+The default Explicit growth can throw `XBadAlloc` when the current logical region is too small; Automatic
+is still bounded by the hard limit and OS failures. Library container changes keep the logical content
+when allocation fails, but capacity and allocator bookkeeping need not roll back; multi-step business
+operations, ordinary record assignment and external construction side effects do not become
+transactions because of this.
 
-默认 maximum 是 64 MiB，或较大的初始长度。`maximum_capacity()` 是硬上限；旧
-`max_capacity(bytes)` 参数只是 reservation hint。`reserved_bytes()` 表示页舍入的
-虚拟地址范围；`accessible_bytes()` 表示可读写页面，不是 RSS。逻辑 shrink 保留已启用
-页面；显式 reclaim 可部分完成，应检查返回结果。pool 限额仅约束 idle reservation，
-不限制 live owner 或全进程内存；policy/pool 不序列化。
+The default maximum is 64 MiB, or the initial length if larger. `maximum_capacity()` is the hard limit;
+the old `max_capacity(bytes)` argument is only a reservation hint. `reserved_bytes()` is the page-rounded
+virtual address range; `accessible_bytes()` is the readable/writable pages, not RSS. Logical shrink keeps
+pages already enabled; explicit reclaim can complete partially, so check the returned result. Pool limits
+only bound idle reservations, not live owners or whole-process memory; policies and pools are not
+serialized.
 
-## 本版本不包含的承诺
+## Promises not included in this version
 
-生产异步 transport、真实业务网络整合、N7 三项 I/O 扩展与性能归因不属于此版本
-承诺。现有网络验收是同步 TCP 回环参考及独立注入生命周期模型。
-当前 WSL F/F 校准未取得预定的 2% 噪声资格，不能推导加速、等价、回退或候选 adoption。
-后续 Linux 测量允许 WSL 或 Docker；仍须事前固定输入、记录环境并通过噪声资格。
-本版本文档不改写既有历史实验的范围、失败证据或当时的启动条件。
+Production asynchronous transport, real business network integration, the three N7 I/O extensions and
+performance attribution are not promised by this version. The existing network acceptance is a
+synchronous TCP loopback reference plus a separately injected lifetime model. The current WSL F/F
+calibration did not reach the planned 2% noise qualification, so no speedup, equivalence, regression or
+candidate adoption can be inferred from it. Later Linux measurements may use WSL or Docker; inputs must
+still be fixed in advance, the environment recorded, and the noise qualification passed. This version's
+documents do not rewrite the scope, failure evidence or start conditions of earlier experiments.
 
-## 直接接收数据的地址模型（W9）
+## Address model for directly received data (W9)
 
-直接接收（verified receive）得到的 buffer 与普通 load 一样，按平坦地址模型解析内部
-相对偏移（`origin + delta`），依赖相同的、已披露的实现定义行为。库不再承诺接收数据的
-指针由接收存储的字节数组派生；`XBufferCore::canonical_bytes_at` 作为公开接口保留以兼容
-源码，但不再参与库内解析。
+A buffer obtained by direct receive (verified receive), like an ordinary load, resolves internal relative
+offsets with the flat address model (`origin + delta`), relying on the same disclosed
+implementation-defined behavior. The library no longer promises that pointers into received data are
+derived from the byte array of the receiving storage; `XBufferCore::canonical_bytes_at` is kept as a
+public interface for source compatibility, but no longer takes part in resolution inside the library.

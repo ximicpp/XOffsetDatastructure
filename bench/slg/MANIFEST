@@ -42,7 +42,7 @@
 #                        Unset: same machine code under GCC 16 and P2996 (asm_equal). An iPhone
 #                        process gets ~3.4 GiB of address space, less than scale S needs at 256 MiB
 #                        (origin 278a2c98ab068aae8b167fcf29146196b6509cf6fae2a1900d5e45156c9ed84b)
-#   2026-11-02 demo case set (susu, thread 整理与竞品的性能对比): SLG_CASES=demo with
+#   2026-11-02 demo case set (susu, thread "rival performance comparison"): SLG_CASES=demo with
 #                        SLG_REUSE=1 runs A (scene <-> battle, unchanged), B (scene <-> scene:
 #                        one hop, the receiver plays on the received state and sends it on),
 #                        S (scene <-> storage: save, checked receive at storage, load back) and
@@ -61,7 +61,7 @@
 #                        sums as before at S, both protocols). New message types ViewUnit /
 #                        ViewSnapshot / ViewDelta in every model, adapter and schema; Slot kView.
 #   bench/xoffset_runner.hpp  2026-11-02: demo B.install and S.load_install call XBuffer::swap
-#                        (std::swap did three moves); thread 优化服务端进程间迁移性能. Default
+#                        (std::swap did three moves); thread "server-to-server migration performance". Default
 #                        A/B/C/D unchanged.
 #   bench/xoffset_runner.hpp  2026-11-02: XOffset A adapter, when the library defines
 #                        XOFFSET_PREFETCH_FOR_UPDATE_API the scene side calls the public cache
@@ -69,18 +69,18 @@
 #                        result starts arriving, timed in A.res_decode (both protocols, both
 #                        case sets). Changes no bytes, digests or report sums; older libraries
 #                        build the previous code (origin 3d54d5719b51e871db7390beed5fca242f19449e6c9728ec0dd1b6e781414f79)
-#   2026-11-02 viewport sync (thread 优化客户端视口同步性能): K*.recv times the key
+#   2026-11-02 viewport sync (thread "client viewport sync performance"): K*.recv times the key
 #                        delta receive and the read of every unit and march, as E*.recv does
 #                        (the read was untimed before); K*.window_zstd added. XOffset native
 #                        block buffers: capacity reserved once (1.5x average + 32, was a fixed
 #                        2x + 64 slots), vectors as long as the most records held, free slots
 #                        reused lowest first. Application-level E/U and other formats unchanged.
-#   2026-11-03 A write-back (susu 03:41Z, thread 优化服务端进程间迁移性能): in the demo case
+#   2026-11-03 A write-back (susu 03:41Z, thread "server-to-server migration performance"): in the demo case
 #                        set a battle writes back troop counts and wounded only (a wiped troop
 #                        leaves); hero buffs stay in the battle (generic.hpp apply_battle_army,
 #                        all formats). SLG_A_FULL=1 restores the buff write-back as a report-only
 #                        stress variant. Default mode unchanged (same digests and report sums).
-#   2026-11-03 viewport cases redefined (susu 07:22Z, thread 整理与竞品的性能对比): no 3x3
+#   2026-11-03 viewport cases redefined (susu 07:22Z, thread "rival performance comparison"): no 3x3
 #                        block window; a client holds exactly its 512x384 viewport (tiles of
 #                        32 px with terrain/level/owner, units, march lines crossing it). EB
 #                        browse (class 2): every client drags or jumps its view every tick and
@@ -97,11 +97,11 @@
 #                        strings, nested UnitHero commander, hero/troop/buff lists) in every model,
 #                        adapter and schema (schema names v4); world events change several fields
 #                        each; held views up to SLOT_MAX. Default mode unchanged.
-#   2026-11-03 EBW.recv (report column, thread 优化客户端视口同步性能): each EB pull is also
+#   2026-11-03 EBW.recv (report column, thread "client viewport sync performance"): each EB pull is also
 #                        received into one extra held view (index clients) reused by every pull,
 #                        the warm single-device receive; must read the same as the client's view.
 #                        EB keys and numbers unchanged; class 3 unchanged.
-#   2026-11-03 EB bytes pass (thread 优化客户端视口同步性能): EB.window_zstd and the compact
+#   2026-11-03 EB bytes pass (thread "client viewport sync performance"): EB.window_zstd and the compact
 #                        sizes come from a second untimed pass per round that rebuilds the same
 #                        pulls (checked: same wire size); compression and the compact save no
 #                        longer run between timed pulls (they evicted the world and send buffers:
@@ -114,16 +114,16 @@
 #                        wires, so zstd no longer runs between timed deliveries. Bytes unchanged.
 #   2026-11-03 native split: SLG_NATIVE_OFF=1 (bench/runner.hpp native_on()) skips the XOffset
 #                        native stages, so application-level rows come from processes where native
-#                        did not warm the world first. Native view update (thread 设计并实现增量同步,
+#                        did not warm the world first. Native view update (thread "design and implement delta sync",
 #                        bench_native_dirty_shared_6442d85e.diff 51deec48): MapWorld dirty bits per
 #                        unit per tick, n_update writes only dirty fields of a held unit (whole unit
 #                        when new to the view), one shared native delta buffer. Bytes unchanged.
-#   2026-11-03 std runner EB pull without a second copy (thread 调研游戏场景的进一步优化方案): zpp_bits,
+#   2026-11-03 std runner EB pull without a second copy (thread "further game-case optimizations"): zpp_bits,
 #                        FlatBuffers, cereal and protobuf copied each encoded pull from the format's
 #                        reuse slot into a vector before receive (~26% of zpp_bits' EB.send
 #                        instructions); the pull now stays where the format wrote it, as cista and
 #                        XOffset already did. Bytes unchanged.
-#   2026-11-03 fairness review (thread 审查三类对比测试的公平性, report HWDQ7VCRhwACDb6YbycvEX): std model
+#   2026-11-03 fairness review (thread "fairness review of the three comparison classes", report HWDQ7VCRhwACDb6YbycvEX): std model
 #                        maps -> boost::container::flat_map (std_flat_map.diff); FlatBuffers reused
 #                        struct/offset scratch vectors; storage receive = Verifier (fb) /
 #                        parse (protobuf); std/cista prefetch the armies before A.apply (XOffset's hint
@@ -133,36 +133,36 @@
 #                        pairs) instead of boost::container::flat_map, which needed Boost.Move and
 #                        Boost.Assert outside cmake/XOffsetDependencyLock.cmake (Mac batches failed to
 #                        build). Rivals 5-15% faster in B/L/LD/S at S. Bytes unchanged (240 S records).
-#   2026-11-03 native adapter (thread 设计并实现增量同步, bench_nplan_shared.diff 2b41901c): n_plan's
+#   2026-11-03 native adapter (thread "design and implement delta sync", bench_nplan_shared.diff 2b41901c): n_plan's
 #                        per-delivery plan vectors are shared by all clients (n_plan is followed by the
 #                        same client's n_update), take() uses one try_emplace. Cases unchanged.
-#   2026-11-04 A prefetch parity (thread 回退分析, report NgkEazVuMAnphW6ZN5w4GD): the XOffset runner's
+#   2026-11-04 A prefetch parity (thread "regression analysis", report NgkEazVuMAnphW6ZN5w4GD): the XOffset runner's
 #                        A.res_decode prefetches the two armies with prefetch_army_for_apply, as std and
 #                        cista do; the prefetch_for_update() allocator hint (unused by the troop-only
 #                        write-back) is dropped. Cases unchanged.
-#   2026-11-04 held view root (thread 调研游戏场景的进一步优化方案, accepted by thread 整理与竞品的性能对比):
+#   2026-11-04 held view root (thread "further game-case optimizations", accepted by thread "rival performance comparison"):
 #                        the XOffset runner's BlockOps keeps each client's view root reference
 #                        (held_roots), refreshed in snap_recv, the only epoch change point; held()
 #                        returns it instead of root<ViewSnapshot>() on every U*.apply, as zpp_bits/std
 #                        hold the decoded object and cista its pointer. -DSLG_RP_CHECK (off by default)
 #                        checks each use against root(). Cases, bytes and digests unchanged.
-#   2026-11-04 native adapter (thread 设计并实现增量同步): the NP view's unit and march id -> slot maps
+#   2026-11-04 native adapter (thread "design and implement delta sync"): the NP view's unit and march id -> slot maps
 #                        are flat open-addressing tables instead of std::unordered_map. Slot choice, wire bytes
 #                        and states unchanged.
-#   2026-11-04 scoring V3 (thread 确定下一阶段开发方向, accepted by susu 06:15Z): new keys only.
+#   2026-11-04 scoring V3 (thread "next-phase direction", accepted by susu 06:15Z): new keys only.
 #                        *Z.send (zstd 3 per wire, timed after the round), *_zstd sizes for every
 #                        server -> client wire, warm single-device replays U*W/N*W/LDW/LNW (16 devices,
 #                        per-delivery timing, untimed read before each), --mode mem with -DSLG_MEMCOUNT=1
 #                        (MEM.* report-only), streaming zstd per warm connection (*ZS, report only);
 #                        warm copies laid out after the clients' objects. Existing keys, stage ranges,
 #                        states and reports unchanged.
-#   2026-11-04 held view index (thread 评审并引入 SLG 持有索引分支, from branch codex/slg-flat-held-index-20261104
+#   2026-11-04 held view index (thread "review and adopt the SLG held-index branch", from branch codex/slg-flat-held-index-20261104
 #                        5b8b9f15): HeldIndex (client id -> position, every format, timed in U*.apply and
 #                        U*W.recv) is a flat open-addressing table (include/slg/flat_held_index.hpp) instead
 #                        of std::unordered_map, for all formats together; apply_delta unchanged.
 #                        tests/flat_held_index_test.cpp checks it against std::unordered_map. Cases, bytes,
 #                        states and reports unchanged.
-#   2026-11-05 native browse delta (3.4 line C item P3, assigned by thread 3.4 主线; report only): new keys
+#   2026-11-05 native browse delta (3.4 line C item P3, assigned by the 3.4 main thread; report only): new keys
 #                        NB.* / NBW.* / NBZ.* / NBZS.* for the browse case, XOffset only. The server keeps
 #                        each browsing client's view (units and marches from the U* tracker, tiles in a
 #                        17 x 13 ring of slots), moves it with the client's rectangle and sends the delta;
@@ -170,18 +170,18 @@
 #                        EB's timed and bytes passes; existing keys, stage ranges, states and reports
 #                        unchanged. NB.check_* counts how each apply was checked; SLG_NB_OFF=1 drops NB alone.
 #                        slg_bench's text table prints the native delta's zstd size too.
-#   2026-11-04 D3 shared deltas (thread 设计共享增量原型, EXPERIMENTAL): new keys only, with SLG_D3=1|2
+#   2026-11-04 D3 shared deltas (thread "shared-delta prototype design", EXPERIMENTAL): new keys only, with SLG_D3=1|2
 #                        (D*.pub/.send/.recv, D*T.recv, D*W/D*TW.recv, D*Z/D*ZS, MEM.D*); untimed bookkeeping
 #                        for them (tracker fresh flags, world changed-unit list); SlotMap declared outside the
 #                        XOFFSET_DELTA_SYNC_API block. SLG_D3 unset: keys, stage ranges, states, reports unchanged.
-#   2026-11-05 D3 server path (thread 设计共享增量原型, after SLGV9c): messages built with xsync::XSyncWriter
+#   2026-11-05 D3 server path (thread "shared-delta prototype design", after SLGV9c): messages built with xsync::XSyncWriter
 #                        into XSyncOut buffers; same bytes, keys and stage ranges. SLG_D3 unset: unchanged.
-#   2026-11-05 trust tier P2 (thread 3.4 发版, XReceiver<L>::apply_delta): format xoffset_trusted applies
+#   2026-11-05 trust tier P2 (the 3.4 release thread, XReceiver<L>::apply_delta): format xoffset_trusted applies
 #                        every delta (login, warm, view, store) through XReceiver admit (kClient links use
 #                        from_server, the store kPeer link server_peer) instead of apply_delta_verified;
 #                        n_store_check counts admit as 5 (SN.check_admit). xoffset itself unchanged
 #                        (the helper forwards to try_apply_delta_verified). Same keys, bytes and states.
-#   2026-11-10 D3 receive through the library (W3, thread 把 D3 共享增量做成正式接口): the D3 client
+#   2026-11-10 D3 receive through the library (W3, thread "make D3 shared deltas a formal API"): the D3 client
 #                        rows (D*T.recv admit, D*.recv full, warm D*W/D*TW) apply each message with
 #                        XReceiver<XLink::from_server>::apply_sync and a D3Target over the held view (its
 #                        calls forced inline: the TU reaches GCC's inline-unit-growth limit); the bench's
@@ -325,8 +325,11 @@
 #                        slots (one apply_delta). LD/SD patches copy a same-type army whole
 #                        for every model (append_army). All four SLG regression tests on all
 #                        platforms. Wire bytes and every report_sum unchanged.
-77301efbc2755d89c1ee037f3a96bfe869b27edbf1daab197904465ad0456a38  CMakeLists.txt
-70e0b3fd0121beaacc2f418cd907849ee39495563f729972cfc2e287fcbdf0dd  README.md
+#   CMakeLists.txt, README.md, tools/analyze.py  2026-11-17 (repository English only): comments,
+#                        thread names and analyze.py's report text translated to English.
+#                        No bench code, keys, bytes or results changed.
+247d2e5e3f05e6e3771614f2d4be44360de72e80b02c50567c54f6d59c5e2e84  CMakeLists.txt
+c3d7a0bb3db59874a56fb6ee1bd6802d4a8d5eb07c9a1e9ffed16bae1de81d54  README.md
 ea141af841831b376028f48ab0d4c22e66ce2671f01d9e14c9f66814f5ebaa6e  adapters/cereal_format.hpp
 6441a0f51cf04424de67df98f6a3696b378f8ec3cd3d97c2bf5a6ec065db2768  adapters/flatbuffers_format.hpp
 677c3607ff9390c5a1b9d6a348da3dcd7aee4eef52740a35911d2ab041136ced  adapters/protobuf_format.hpp
@@ -357,4 +360,4 @@ d83b73fb2855aa2067266ec71eea40643e0ee01331fd8c99656c03f5c409904f  tests/native_p
 2b85fe5346c0d03957c139cdb6afb1925d607ac549590932d3ef5d905e22a3c7  tests/packed_marches_test.cpp
 e04fe0e1e7b3d2fffe1821603903eb0dd1d60e441a2c7035337708c1b0abb8a4  tests/uplink_frame_test.cpp
 bcb932d2439d37bd88c1cf5ff414e166debf72269b0ffe9ad4e9901b73032048  tests/uplink_order_paths_test.cpp
-959d39736472b7db0274f8a9cc5b23b0b864162cf80f5ce1bb88a5f21bb46244  tools/analyze.py
+f293009667aeb2e033fe5ca2d04d52f4a5dce9cd555f000cb90a5f3d501bc63a  tools/analyze.py
