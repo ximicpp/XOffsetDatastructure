@@ -57,44 +57,53 @@ zstd 1.5.7），在主机上按记分卡固定的提交拉 zpp_bits v4.7.6 和 c
 - XOffset 的两组读写行都是每次迭代一个 `edit()`。一个 `edit()` 包住一轮全部迭代的写法只报告
   （`rw_one_scope`）。
 
-## 最新结果：vector 第一块至少 32 字节（2026-11-17）
+## Latest results: XVector first block of at least 32 bytes (2026-11-17)
 
-库改了一处（e36cf44）：空 `XVector` 第一次追加时拿到的块至少 32 字节（8 个 float 或 32 位 id，以前是 4 个、
-16 字节），`push_back` 一个小标量触发扩容时不再走通用路径里的暂存和插入检查。用例是下一节的公平用例，没有改。
-改动前（main 837c9d4f）和改动后的库在同一台云端机器上各跑 15 个进程、前后交替，取中位数。全部表格和每个
-进程的原始输出：[`results/2026-11-17-first-block/summary.md`](results/2026-11-17-first-block/summary.md)
-（改动后）和 [`before.md`](results/2026-11-17-first-block/before.md)（改动前）。顶层 README 引用的是改动后
-这一组。这台机器这次比下一节那次慢约 1.2 倍，绝对纳秒数不能跨节比，比值可以。
+This set supersedes the next section as the one the top-level README quotes.
 
-| 项 | 改动前 | 改动后 |
+One library change (e36cf44): the block an empty `XVector` takes on its first append holds at least 32 bytes
+(8 floats or 32-bit ids; it was 4 elements, 16 bytes), and a `push_back` of a small scalar that triggers growth
+skips the staged copy and insert checks of the general path. The case is the fair case of the next section,
+unchanged. The library before (main 837c9d4f) and after ran 15 processes each on the same cloud machine,
+alternating; medians below. All tables and the raw output of every process:
+[`results/2026-11-17-first-block/summary.md`](results/2026-11-17-first-block/summary.md) (after) and
+[`before.md`](results/2026-11-17-first-block/before.md) (before). The machine was about 1.2 times slower this
+time than in the next section, so compare ratios across sections, not nanoseconds.
+
+| Row | Before | After |
 | --- | ---: | ---: |
-| 读写，2024 原样：XOffset ns | 202.6 | 143.5 |
-| 　÷ std / cista raw / cista offset / Protocol Buffers | 0.59 / 0.84 / 0.80 / 0.35 | 0.42 / 0.61 / 0.55 / 0.24 |
-| 读写，调优写法：XOffset ns | 61.3 | 60.4 |
-| 　÷ std / cista raw / cista offset / Protocol Buffers | 0.72 / 0.96 / 0.91 / 0.17 | 0.72 / 0.91 / 0.90 / 0.16 |
-| 发送+接收 reuse，2024 原样：XOffset ns（÷ zpp::bits） | 102.7（0.31） | 83.2（0.24） |
-| 发送+接收 reuse，完整校验档：XOffset ns（÷ zpp::bits） | 218.1（0.65） | 170.5（0.50） |
-| 读写一次 + 发送 + 接收，调优写法：XOffset ns（÷ zpp::bits / cista） | 145.4（0.36 / 0.22） | 144.4（0.37 / 0.21–0.22） |
-| wire 字节（zstd-3） | 3,112（3,006） | 3,064（2,986） |
+| Read/write, 2024 layout: XOffset ns | 202.6 | 143.5 |
+| ÷ std / cista raw / cista offset / Protocol Buffers | 0.59 / 0.84 / 0.80 / 0.35 | 0.42 / 0.61 / 0.55 / 0.24 |
+| Read/write, tuned layout: XOffset ns | 61.3 | 60.4 |
+| ÷ std / cista raw / cista offset / Protocol Buffers | 0.72 / 0.96 / 0.91 / 0.17 | 0.72 / 0.91 / 0.90 / 0.16 |
+| Send + receive reuse, 2024 layout: XOffset ns (÷ zpp::bits) | 102.7 (0.31) | 83.2 (0.24) |
+| Send + receive reuse, full validation tier: XOffset ns (÷ zpp::bits) | 218.1 (0.65) | 170.5 (0.50) |
+| One read/write + send + receive, tuned: XOffset ns (÷ zpp::bits / cista) | 145.4 (0.36 / 0.22) | 144.4 (0.37 / 0.21–0.22) |
+| Wire bytes (zstd-3) | 3,112 (3,006) | 3,064 (2,986) |
 
-- 读写，2024 原样：每对进程里改动后都更快，改动后 ÷ 改动前的中位数是 0.71。每次迭代的指令数（GCC 16.2，
-  callgrind）从 3,489 降到 2,187。原因：每次迭代 4 次“追加一件带 8 个 float 属性的装备再删掉”，以前属性
-  vector 先拿 16 字节、第 5 个属性时换成 32 字节（多一次分配、一次拷贝、一次回收），现在一次拿够。装备这一段
-  每次迭代从 2,771 降到 1,491 条指令。
-- 读写，调优写法：指令数不变（813），计时不变（每对进程的比值中位数 1.00）。对 cista raw 的比值从 0.96 到
-  0.91 是 cista 那一行自己的抖动（63.8 对 66.3 ns）。改动后 XOffset 的两组读写行在 15 个进程里对每个对手都赢。
-- 发送+接收，2024 原样：每对进程里改动后都更快（比值中位数 0.81），每条消息的指令数从 1,445 降到 994。
-  原因：被发送的状态是用 `push_back` 建出来的，以前每个属性 vector 留下一个回收的 16 字节块，这些块要随
-  wire 的空洞表一起保存和加载；现在没有这些块，wire 也小了 48 字节。内联布局的行没有这种 vector，不变（84 ns）。
-- Protocol Buffers 用 `RemoveLast` 复用对象的只报告行是 76.8 ns，仍比 XOffset 的 143.5 ns 快：它整个循环
-  不分配。库里做同样的事要让已删除的槽位继续占着块，等于改 wire 约定，没有做。
-- 只报告行 `xoffset bulk`（2024 原样布局、批量调用）计时 113.8 到 119.9 ns，指令数相同（1,749）；换一个
-  只含这几行的测试程序同机交替跑是 115.4 对 113.4 ns，所以是这个 bench 可执行文件里代码位置的影响，不是库
-  变慢。
-- 代价：用 `push_back` / `emplace_back` 逐个追加、最后只有 1 到 4 个 4 字节标量的 vector 比以前多占 16 字节
-  （1、2 字节元素多 24 字节）。`reserve()` 和按范围赋值仍然按需要的大小分配。wire 格式不变。
+- Read/write, 2024 layout: faster in every pair, median after ÷ before 0.71. Instructions per iteration
+  (GCC 16.2, callgrind) 3,489 -> 2,187. Four times per iteration the loop appends an equipment record with 8
+  float attributes and removes it; the attribute vector used to take 16 bytes and move to 32 bytes at the fifth
+  attribute (one more allocation, a copy and a retirement), and now takes 32 bytes at once. The equipment step
+  alone goes from 2,771 to 1,491 instructions per iteration.
+- Read/write, tuned layout: instructions unchanged (813), timing unchanged (pair ratio median 1.00). The move
+  from 0.96 to 0.91 against cista raw is jitter of the cista row (63.8 vs 66.3 ns). After the change XOffset
+  wins both read/write rows against every rival in all 15 processes.
+- Send + receive, 2024 layout: faster in every pair (median 0.81), 1,445 -> 994 instructions per message. The
+  sent state is built with `push_back`; each attribute vector used to leave a retired 16-byte block that was
+  saved and loaded with the wire's hole table. Those blocks are gone and the wire is 48 bytes smaller. The
+  inline-layout rows have no such vector and do not change (84 ns).
+- The report-only Protocol Buffers row that reuses removed messages (`RemoveLast`) takes 76.8 ns and is still
+  faster than XOffset's 143.5 ns: its loop allocates nothing. Doing the same in the library would keep removed
+  slots owning blocks, which changes the wire contract, so it is not done.
+- The report-only row `xoffset bulk` (2024 layout, bulk calls) reads 113.8 -> 119.9 ns with the same
+  instruction count (1,749). A separate program with only these rows, alternating on the same machine, gives
+  115.4 vs 113.4 ns, so this is code placement in the bench binary, not a slower library.
+- Cost: a vector grown one element at a time with `push_back` / `emplace_back` that ends with 1 to 4 four-byte
+  scalars takes 16 bytes more than before (24 more for 1- and 2-byte elements). `reserve()` and the range
+  assignments still size their block exactly. The wire format is unchanged.
 
-## 公平用例（2026-11-17）
+## 最新结果：公平用例（2026-11-17）
 
 用例改了两处（上面“场景和规则”里标了 2026-11-17 的两条）：Protocol Buffers 删掉的 message 真释放，物品 key
 每次迭代不同。库是 main 18a37f39（PR #292、#293 之后，加固默认关闭）。云端 x86-64，GCC 16.2，15 个进程取中位数。
