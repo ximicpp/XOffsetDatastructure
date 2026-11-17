@@ -231,6 +231,9 @@ set_tests_properties(receiver_from_client_sync_fail PROPERTIES
 # that must not compile: an admit view on a client uplink, and a write
 # through a view.
 add_xoffset_test(test_receiver_view reflection)
+# Hole table differential (4.2.0): every hole table load run lazily and
+# eagerly on the same operations (XOFFSET_TEST_EAGER_HOLE_TABLE, in the test).
+add_xoffset_test(test_hole_table_differential reflection)
 foreach(test_name test_receiver test_receiver_view)
     if(NOT XOFFSET_TESTS_REFLECTION AND test_name IN_LIST XOFFSET_CXX26_ONLY_TESTS)
         xoffset_cxx26_only(${test_name}_uplink_unchecked)
