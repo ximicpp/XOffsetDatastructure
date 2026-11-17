@@ -246,7 +246,7 @@ class Report(unittest.TestCase):
         result = fuzz_report.run_report(self.gh, report_args(
             self.root, mode='manual', expect='gcc16-diff,gcc16-replay',
             needs={'gcc16-diff': {'result': 'success'}, 'gcc16-replay': {'result': 'failure'}},
-            run_url='https://example.invalid/fuzz-nightly/drill', no_branches=True, ref='next_cpp26'))
+            run_url='https://example.invalid/fuzz-nightly/drill', no_branches=True, ref='main'))
         self.assertEqual(result['infra_failures'], [])
         [issue] = self.gh.issues_list
         self.assertEqual(issue['title'], f'[fuzz] v2_wire: inject: injected crash in unknown frame ({SIG})')

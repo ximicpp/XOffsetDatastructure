@@ -12,7 +12,7 @@
 #   quick    PRs that leave the library alone (bench/, tools/, tests/, docs/): meta gcc smoke
 #            p2996; refuses to run when a top-level source file, CMakeLists.txt or cmake/
 #            differs from the base
-#   daily    once a day on the head of next_cpp26: tsan, the whole C++20/C++23 matrix, every
+#   daily    once a day on the head of main: tsan, the whole C++20/C++23 matrix, every
 #            client column and wire-matrix (the steps the pr tier leaves out)
 #   full     the default before 2026-11-11: pr plus the C++20/C++23 matrix and wire-matrix
 #   release  the same as --release: every step, tsan and every client column included
@@ -144,8 +144,8 @@ done
 
 HEAD_SHA=$(git rev-parse HEAD)
 if [[ -z "$BASE_REV" ]]; then
-    git fetch -q origin next_cpp26 2>/dev/null || true
-    BASE_REV=$(git merge-base HEAD origin/next_cpp26) || { echo "no merge-base with origin/next_cpp26; pass --base" >&2; exit 2; }
+    git fetch -q origin main 2>/dev/null || true
+    BASE_REV=$(git merge-base HEAD origin/main) || { echo "no merge-base with origin/main; pass --base" >&2; exit 2; }
 fi
 BASE_SHA=$(git rev-parse "$BASE_REV^{commit}") || exit 2
 WORK=${WORK:-$HOME/xo-validate-${HEAD_SHA:0:7}}

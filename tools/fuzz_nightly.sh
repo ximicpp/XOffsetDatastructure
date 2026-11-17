@@ -14,7 +14,7 @@
 #   tools/fuzz_report.py --repo ximicpp/XOffsetDatastructure report \
 #     --findings-dir OUT --needs-json OUT/needs.json \
 #     --expect gcc16-diff,gcc16-replay --mode nightly \
-#     --sha "$(git rev-parse HEAD)" --ref next_cpp26 --run-id <name> --run-url <link>
+#     --sha "$(git rev-parse HEAD)" --ref main --run-id <name> --run-url <link>
 #
 # --inject is the drill: builds with XOFFSET_FUZZ_INJECT_CRASH=ON and adds an
 # XOFFSET-INJECT input to the v2_wire replay, which must come back as one

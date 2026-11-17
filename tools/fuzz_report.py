@@ -211,7 +211,7 @@ class Context:
         self.sha = args.sha
         self.run_id = args.run_id
         self.mode = args.mode
-        self.ref = getattr(args, 'ref', None) or 'next_cpp26'
+        self.ref = getattr(args, 'ref', None) or 'main'
         server = args.server_url.rstrip('/')
         self.run_url = getattr(args, 'run_url', None) or f'{server}/{self.repo}/actions/runs/{self.run_id}'
         self.push_branches = not getattr(args, 'no_branches', False)
@@ -314,7 +314,7 @@ def report_findings(gh, ctx, findings, actions):
         else:
             body = (f'Nightly fuzzing found a new crash signature `{signature}`.\n\n{details}\n\n'
                     f'Fix on `{BRANCH_PREFIX}{signature}` (or copy its input into '
-                    f'`{REGRESSION_DIR}/{first["target"]}/`), open the PR against next_cpp26 with '
+                    f'`{REGRESSION_DIR}/{first["target"]}/`), open the PR against main with '
                     f'`Fixes #<this issue>`, and let CTest replay the input. This issue is not closed automatically.')
             issue = gh.create_issue(issue_title(first), body, [CRASH_LABEL])
             actions.append(f'opened #{issue["number"]} ({signature})')
