@@ -48,7 +48,7 @@ client target runs `tools/native_targets.sh` once:
 
 | Check | What it tests | Status (3.5.0) |
 |---|---|---|
-| Full CTest on the target (Release) | The tests of K0–K7 above that run in both builds pass on the target's compiler and standard library | Windows x64 (MSVC 19.44 C++20/C++23, clang-cl 19, MinGW GCC 16) and Android arm64 (NDK r29/r30, cloud qemu-aarch64) all pass on 4.0.0; the passing results for macOS arm64 and the iOS simulator (Apple clang) come from 3.3.0 and were not rerun on 4.0.0 (numbers in [CLIENT_TARGETS.md](CLIENT_TARGETS.md)); real devices (3.2.x): iPhone 15 Pro Max 138/138 and an Android 11 phone (3.2.0-rc.1) pass ([DEVICE_TESTING.md](DEVICE_TESTING.md) section 9) |
+| Full CTest on the target (Release) | The tests of K0–K7 above that run in both builds pass on the target's compiler and standard library | Windows x64 (MSVC 19.44 C++20/C++23, clang-cl 19, MinGW GCC 16) and Android arm64 (NDK r29/r30, cloud qemu-aarch64) all pass on 4.1.0; the passing results for macOS arm64 and the iOS simulator (Apple clang) come from 3.3.0 and were not rerun on 4.1.0 (numbers in [CLIENT_TARGETS.md](CLIENT_TARGETS.md)); real devices (3.2.x): iPhone 15 Pro Max 138/138 and an Android 11 phone (3.2.0-rc.1) pass ([DEVICE_TESTING.md](DEVICE_TESTING.md) section 9) |
 | Reading the reference corpus | All 6 corpus files written by the server's C++26 reflection build are accepted by the target's `load_verified` | Accepted by all of the targets above |
 | Writing the corpus, `diff -r` | The corpus written by the target is byte-identical to the reference | Byte-identical on all of the targets above |
 

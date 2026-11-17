@@ -1,4 +1,4 @@
-# XOffsetDatastructure User Guide (4.0.0, wire format 2.1)
+# XOffsetDatastructure User Guide (4.1.0, wire format 2.1)
 
 This guide is for users of the library. It explains how to define types, build,
 modify, save and load them, and the constraints you must follow.
