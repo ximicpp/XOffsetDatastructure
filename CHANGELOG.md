@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- CppCon 2024 bench made fairer (susu 2026-11-17): Protocol Buffers now frees
+  removed equipment and waypoint messages (`DeleteSubrange`) like every other
+  library; its default `RemoveLast` reuse is a report-only row. The item key
+  is new every iteration (was a 1024-entry ring, which let the branch predictor
+  learn the std / cista binary searches). Read/write, XOffset ÷ rival: 2024
+  layout cista 0.92 / 0.82, Protocol Buffers 0.38; tuned cista 0.94 / 0.90,
+  Protocol Buffers 0.18. Results in `bench/cppcon2024/results/2026-11-17-fair/`;
+  README tables updated. Bench and docs only.
 - README rewritten as an introduction: core features, a server/client
   example (compiled and run with GCC 13 C++20), how the arena, offsets, wire
   and check tiers work, and the current comparisons (CppCon 2024 `Character`

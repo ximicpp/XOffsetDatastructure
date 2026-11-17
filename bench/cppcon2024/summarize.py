@@ -56,7 +56,7 @@ def main():
         elif lib == "xoffset 4.0":
             v, cont = xrw, "XOffset (edit() per iteration)"
         elif lib == "Protocol Buffers":
-            v, cont = g(lib, "rw"), "google::protobuf message"
+            v, cont = g(lib, "rw"), "google::protobuf message (removed messages freed)"
         else:
             v, cont = g(lib, "rw"), lib.replace("cista ", "cista::") + "::* (items = sorted vector)"
         out.append(f"| {lib} | {cont} | {Y2024[lib][1]:,.1f} | {v:,.1f} | {xrw / v:.3f} |")
@@ -77,7 +77,7 @@ def main():
         tuned_rw = (
             (inline, "xoffset 4.0", "inline attributes, range append, erase at position; edit() per iteration"),
             ("std inline", "std (shared)", "inline attributes, range insert, erase at position"),
-            ("Protocol Buffers bulk", "Protocol Buffers", "attributes added as one range (no inline array in a message)"),
+            ("Protocol Buffers bulk", "Protocol Buffers", "attributes added as one range (no inline array in a message); removed messages freed"),
             ("cista raw inline", "cista raw", "inline attributes, range insert, erase at position"),
             ("cista offset inline", "cista offset", "inline attributes, range insert, erase at position"),
         )
@@ -85,7 +85,8 @@ def main():
             out.append(f"| {lib} | {what} | {g(base, 'rw'):,.1f} | {g(lib, 'rw'):,.1f} | {irw / g(lib, 'rw'):.3f} |")
         out += ["", "Report-only rows:", "", "| Row | ns |", "| --- | ---: |",
                 f"| xoffset inline, one edit() around all iterations of a round | {g(inline, 'rw_one_scope'):,.1f} |",
-                f"| xoffset bulk (2024 layout, bulk calls, edit() per iteration) | {g('xoffset bulk', 'rw'):,.1f} |"]
+                f"| xoffset bulk (2024 layout, bulk calls, edit() per iteration) | {g('xoffset bulk', 'rw'):,.1f} |",
+                f"| Protocol Buffers reuse (2024 layout, RemoveLast keeps removed messages for the next add_) | {g('Protocol Buffers reuse', 'rw'):,.1f} |"]
         out += ["", "### Tuned layout: send + receive (ns per message)", "",
                 "| Library | reuse | fresh | XOffset inline ÷ lib (reuse) | XOffset inline ÷ lib (fresh) | raw bytes | zstd-3 |",
                 "| --- | ---: | ---: | ---: | ---: | ---: | ---: |"]
