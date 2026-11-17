@@ -232,6 +232,7 @@ cmake --build build --config Release --target helloworld
 | [CLIENT_TARGETS.md](docs/CLIENT_TARGETS.md)、[DEVICE_TESTING.md](docs/DEVICE_TESTING.md) | 客户端工具链和真机记录 |
 | [PERFORMANCE.md](docs/PERFORMANCE.md)、[bench/cppcon2024](bench/cppcon2024/README.md) | 性能数字和测法 |
 | [CHANGELOG.md](CHANGELOG.md)、[RELEASING.md](docs/RELEASING.md) | 发版 |
+| [CONTRIBUTING.md](CONTRIBUTING.md)（英文） | 开发本库时的构建、测试与代码约定 |
 
 ## 许可证
 
