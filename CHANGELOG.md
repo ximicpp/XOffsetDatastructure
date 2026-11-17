@@ -5,6 +5,15 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+## 4.1.0: speed-first defaults
+
+Hardening and zeroing become compile-time switches, off by default; the client uplink bounds check stays
+on. Faster first growth of `XVector`, a fairer CppCon 2024 comparison, and an English-only, shorter
+documentation set. Pre-release scorecard: 19 main cells, 16 wins, 3 ties, 0 losses
+([PERFORMANCE.md](docs/PERFORMANCE.md)); pre-release fuzz with no findings; release validation 27/27.
+Ir gate warnings (no failures, every total level or better): GCC `reloc.str.assign_short.copy` 1.039 and
+P2996 `reloc.vec.push_back` 1.040 against 4.0.0; the same rows on the other compiler are level.
+
 - `reset()` no longer zeroes the payload it discards (`XOFFSET_SCRUB_RESET`, 0 by default, 1 with
   `XOFFSET_HARDENED=1`). **Behaviour change:** the next content's slack, string tails and padding
   carry the previous content, so a send buffer used for different receivers in turn can put one
@@ -32,7 +41,8 @@ of this file and in the pull requests.
   (`docs/PERFORMANCE.md` section 1). No verdict changed.
 - Documentation: README rewritten as an introduction; `docs/GETTING_STARTED.md` with one runnable
   example per use case; repository is English only (`tools/check_no_cjk.py`); historical evidence
-  removed from the tree (see `docs/ARCHIVED_EVIDENCE.md`).
+  removed from the tree (see `docs/ARCHIVED_EVIDENCE.md`). The source package now carries
+  `docs/BUILD_AND_PLATFORMS.md`.
 
 ## 4.0.0: shared deltas in the library
 

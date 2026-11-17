@@ -1,4 +1,4 @@
-# XOffsetDatastructure Deployment Guide (4.0.0)
+# XOffsetDatastructure Deployment Guide (4.1.0)
 
 This guide is for engineers integrating XOffset into servers and clients. It covers the
 prerequisites for releases, security and networking. API usage is in [USER_GUIDE.md](USER_GUIDE.md),
@@ -10,15 +10,15 @@ XOffset moves mutable state **between C++ programs that share the same schema**:
 and between servers and clients. Compilers and platforms may differ; the schema must be the same.
 It is not a cross-language protocol and not a long-term storage format.
 
-Server-to-client use is currently a goal and is not advertised publicly. Status in 4.0.0 (details in
+Server-to-client use is currently a goal and is not advertised publicly. Status in 4.1.0 (details in
 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)):
 
 - Clients build with the C++20/C++23 field lists (`XOFFSET_RECORD`, each platform's native
   compiler) and servers with C++26 reflection; the wire is byte-identical. Windows x64 (MSVC 19.44,
   clang-cl 19, MinGW GCC 16) and Android arm64 (NDK r29/r30, run under cloud qemu-aarch64) pass the
-  full tests on 4.0.0, read the reference corpus written by the server, and after editing save the
+  full tests on 4.1.0, read the reference corpus written by the server, and after editing save the
   same bytes as the server; the same results for macOS arm64 and the iOS simulator (Apple clang) come
-  from 3.3.0 and were not re-run for 4.0.0 (releases since 3.3.1 use the cloud only).
+  from 3.3.0 and were not re-run for 4.1.0 (releases since 3.3.1 use the cloud only).
 - End-to-end demo (`demo/mapstate`): a Linux server to Windows, Android emulator, iOS simulator and
   macOS clients all run. Real devices: 3.2.0-rc.1 passed every functional check on one Android 11
   phone (record in [validation/2026-10-28-rc1-platform](validation/2026-10-28-rc1-platform/README.md)),
