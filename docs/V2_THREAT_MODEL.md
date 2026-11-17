@@ -46,7 +46,9 @@
 用于服务端之间、服务端发往客户端和自己的存档，**不是**不可信输入的入口（调试和 sanitizer 构建里照样
 完整校验）。整块接收和增量的信任档是 `XReceiver<XLink::server_peer / from_server>::reload / load /
 apply_delta`（`xoffset_receiver.hpp`），`XReceiver<XLink::from_client>` 在编译期拒绝信任档；把客户端连接误建成可信
-链路的接收器靠代码审查发现。信任档按定义不接不可信输入，不保证对任意输入给出可用的结果；fuzz 和
+链路的接收器靠代码审查发现。客户端是自己的代码、链路受保护的部署，可以用 `XOFFSET_CHECK_UPLINK=0` 编译
+（2026-11-17 起的开关，默认 1，见 4.1）：这时客户端链路也默认信任档，只有调用处写明 `XCheck::bounds` /
+`XCheck::full` 的才检查。信任档按定义不接不可信输入，不保证对任意输入给出可用的结果；fuzz 和
 `test_receiver` 的差分测试只要求两件事：它自己的解析和写入对任何输入都不越界（ASan），对完整档接受的
 输入给出相同结果（第 5 节表中的 admit 一行）。边界档（3.5）用于客户端上行：`XReceiver<XLink::from_client>::view`
 在 wire 字节上给出只读视图 `XView<T>`，只有 const 访问。它保证的是：任何 const 访问都不读出 wire 之外，
@@ -59,11 +61,11 @@ bounds 一行。
 
 | 编号 | 威胁 | 现状 | 依据 / 缺口 |
 | --- | --- | --- | --- |
-| T1 | 构造的 wire 让接收方越界读写 | **已防住** | 完整校验（V2_FORMAT 第 5 节）；Clang 与 GCC 16 的 ASan+UBSan CI；每个 PR 上的 libFuzzer（多 schema，第 5 节）；发布前 GCC 16 ASan+UBSan 差分 fuzz 480 万例无分歧。缺口：每日长时间 fuzz 尚未运行（第 5 节 F4） |
+| T1 | 构造的 wire 让接收方越界读写 | **已防住**（用 `XOFFSET_CHECK_UPLINK=0` 编译的服务端对客户端上行不防，见 4.1） | 完整校验（V2_FORMAT 第 5 节）；Clang 与 GCC 16 的 ASan+UBSan CI；每个 PR 上的 libFuzzer（多 schema，第 5 节）；发布前 GCC 16 ASan+UBSan 差分 fuzz 480 万例无分歧。缺口：每日长时间 fuzz 尚未运行（第 5 节 F4） |
 | T2 | 篡改字段值（A3） | **不防** | 只改标量值的 wire 能通过校验；wire 头没有校验和（格式 2.1 删除了固定为 0 的 `crc32c`），没有 MAC。外层必须用 TLS 或消息签名 |
 | T3 | 伪造 schema 身份 | 不构成越权 | schema 指纹（64 位 FNV-1a）是一致性检查，不是认证：攻击者照抄指纹也只能让接收方按**接收方自己的类型**做完整校验 |
 | T4 | 资源耗尽 | **默认有界**（M1：不传上限时默认 64 MiB） | 见 3.1；服务端接收客户端数据仍应设更小的上限（DEPLOYMENT 第 5 节） |
-| T5 | 已删除数据的旧字节随 wire 发出（A4） | **部分防住**（2026-11-16 起，性能优先）；`XOFFSET_HARDENED=1` 或 `save_compact` 时基本防住 | 释放的块仍然清零（P1，M3）。默认构建不清零容器腾出的字节（P2）和填充字节（P3），`save_verified`、`freeze_verified` 和增量同步会把它们原样发出。`XOFFSET_HARDENED=1` 打开 M4、M6（4.0.0 及之前的默认行为）；`save_compact` 在任何构建下都不带容器余量里的旧字节。见 3.2 和 4.1 |
+| T5 | 已删除数据的旧字节随 wire 发出（A4） | **部分防住**（2026-11-16 起，性能优先）；`XOFFSET_HARDENED=1` 或 `save_compact` 时基本防住 | 释放的块仍然清零（P1，M3）。默认构建不清零容器腾出的字节（P2）和填充字节（P3），`save_verified`、`freeze_verified` 和增量同步会把它们原样发出；2026-11-17 起 `reset` 也不清零，复用的 buffer 会把上一份内容的字节带进下一份内容的块余量和填充里（P4）。`XOFFSET_HARDENED=1` 打开 M4、M6（4.0.0 及之前的默认行为）；`save_compact` 在任何构建下都不带容器余量里的旧字节。见 3.2 和 4.1 |
 | T6 | 不同编译器对同一 wire 的理解不同 | 已发现一处并修复 | enum 键只定义 `operator<=>` 时，Clang 和 GCC 的集合顺序相反，两边互相拒收；修复和 CI 互读作业见 GCC 16 移植 PR |
 | T7 | 业务层非法值（负数金币等） | **不防** | 不属于结构校验，按普通业务输入检查 |
 | T8 | 用旧版本 wire 放大服务端开销（3.2 schema 演进） | **有界** | 攻击者可以选链上最旧的版本，让服务端多做一次完整校验加每级一次转换；转换后的对象可能比 wire 大（新增字段、更宽的类型）。转换目标 buffer 的上限默认等于传给 `load_verified` 的 `maximum_capacity`，超过即失败。按链长估算放大倍数，必要时缩短链。`fuzz_schema_evolution` 覆盖这条入口 |
@@ -122,10 +124,11 @@ M1）在预留前拒绝，R1、R2 的放大被约束在默认上限内；超限�
 缓解前的后果：服务端发给客户端的 wire，可能带有这个 buffer 里**曾经存过、已经删掉**
 的数据（其他玩家的信息、服务端内部字段等），P3 还可能带出服务端栈上的数据。
 
-**现状（2026-11-16 起）：** susu 决定性能优先，P2、P3 两项清零改成编译开关，**默认关闭**。
+**现状（2026-11-16 起）：** susu 决定性能优先，P2、P3 两项清零改成编译开关，**默认关闭**；
+2026-11-17 起重置时的清零（下面的 P4）也是。
 `XOFFSET_HARDENED=1` 全部打开（4.0.0 及之前的默认行为），也可以单独打开（4.1 节）。
 默认构建下，`save_verified`、`freeze_verified` 和增量同步发出的字节，可能带有容器里已经
-删掉的元素。`save_compact` 不受影响：它不写空洞，余量和字符串尾部重写为 0。
+删掉的元素，以及这个 buffer 重置之前存过的内容。`save_compact` 不受影响：它不写空洞，余量和字符串尾部重写为 0。
 
 - P1：块在释放时清零（M3），arena 里的空洞就是 0，所有输出路径仍是原样复制。这一项
   **不是开关**：从 touch 标记生成的增量只在空洞出现或消失时发送它的字节，收发两端都依赖
@@ -141,23 +144,30 @@ M1）在预留前拒绝，R1、R2 的放大被约束在默认上限内；超限�
   或搬移的容器元素（含 map 条目）填充字节清零（M6）。更省事的办法是让 wire 类型没有
   隐式填充：用 `XOFFSET_REQUIRE_NO_PADDING(T)` 或 `XOFFSET_REJECT_IMPLICIT_PADDING` 在
   编译期发现，改成显式字段。调用方直接赋值的带填充记录，库在任何构建下都无法触及。
-- 重置：`reset<T>()` 等重新开始一个 buffer 的操作，仍然把用过的字节全部清零，也不是
-  开关（库内部和增量同步依赖「used_end 之后全是 0」）。所以轮流给不同接收方构建消息的
-  同一个 buffer，不会把上一条消息的内容带进下一条。
+- P4 重置（2026-11-17 起默认不清零）：`reset<T>()` 只把 buffer 标成空的，上一份内容的字节
+  留在新的 `used_end` 之后。新内容的块从这段区域里分配，写入的值覆盖旧字节，但块里没被
+  写到的部分（vector 的余量、字符串结尾之后到块尾、记录的隐式填充）仍是上一份内容。
+  所以**轮流给不同接收方构建消息的同一个发送 buffer，会把上一个接收方的消息内容夹在
+  下一条 wire 里**（2026-11-16 实测：同一个 buffer 轮流构建 40 条消息，3 条带出了上一条的
+  内容）。`XOFFSET_SCRUB_RESET=1` 时 `reset` 把用过的字节全部清零（4.0.0 及之前的行为）。
+  `save_compact` 在任何构建下都不带这些字节。库内部仍然保持「某个偏移之后全是 0」：没清零的
+  范围记在 buffer 上，原地重载和增量接收照常工作。
 - 转发：load 进来的 wire 里的空洞和容器余量（`[size, capacity)`）保留发送方字节，
   校验不要求它们是 0，load 后直接 save 会原样转发。这不是接收方自己的内存，但恶意
   发送方可借此给下游夹带字节。转发前用 `save_compact` 重建：它不写空洞、余量重写为 0、
   字符串尾部清零；记录的隐式填充仍按字节复制，所以转发的类型要没有隐式填充
   （[DEPLOYMENT.md](DEPLOYMENT.md) 4.2 节）。
 
-回归测试：`test_wire_hole_zeroing`（P1、P2、转发、M1/M2）、`test_implicit_padding`（P3）。
+回归测试：`test_wire_hole_zeroing`（P1、P2、转发、M1/M2）、`test_implicit_padding`（P3）、
+`test_reset_used_range`（P4）。
 两个测试各构建两次：默认构建检查空洞为 0、`save_compact` 不带旧字节、内容正确；
 `XOFFSET_HARDENED=1` 构建（`*_hardened`）检查 wire 里没有任何旧字节、填充为 0、wire 确定。
 
 ## 4. 缓解措施（0.3.0-beta.1 全部实施）
 
 M1–M6 已在 0.3.0-beta.1 实施，行为变化见 CHANGELOG。M3 的修改路径开销实测约 +5%。
-2026-11-16 起 M4 和 M6 的清零默认关闭，由 4.1 节的开关打开；M1、M2、M3、M5 不变。
+2026-11-16 起 M4 和 M6 的清零默认关闭，2026-11-17 起重置清零也默认关闭，
+都由 4.1 节的开关打开；M1、M2、M3、M5 不变。
 
 | 编号 | 措施 | 影响 |
 | --- | --- | --- |
@@ -170,8 +180,9 @@ M1–M6 已在 0.3.0-beta.1 实施，行为变化见 CHANGELOG。M3 的修改路
 
 ### 4.1 加固开关（2026-11-16 起默认关闭）
 
-下面的措施花在修改和发送的热路径上，防的是容器里的旧字节随 wire 发出（T5 的 P2、P3），
-或者调用方自己的用法错误。susu 2026-11-16 决定性能优先：每一项都是编译开关，默认 0；`-DXOFFSET_<名字>=1`
+下面的措施花在修改和发送的热路径上，防的是旧字节随 wire 发出（T5 的 P2、P3、P4），
+或者调用方自己的用法错误。susu 2026-11-16 决定性能优先，2026-11-17
+确认重置清零也在内：每一项都是编译开关，默认 0；`-DXOFFSET_<名字>=1`
 打开一项，`-DXOFFSET_HARDENED=1`（CMake 选项 `XOFFSET_HARDENED=ON`）打开所有没有单独
 指定的项。开关改变内联函数的行为，同一个程序的所有翻译单元要用同样的值。
 
@@ -182,20 +193,30 @@ M1–M6 已在 0.3.0-beta.1 实施，行为变化见 CHANGELOG。M3 的修改路
 | `XOFFSET_SCRUB_PADDING` | M6：库构造或搬移的容器元素，隐式填充清零 | 填充带着构造它的值里的字节（通常来自栈），同样内容的 wire 可能不同 | SLG A.apply 1.6%、SD 1.3% |
 | `XOFFSET_PIN_QUARANTINE` | `edit()` / `read()` 作用域里回收的块，到作用域结束才复用 | 块立刻可以复用。作用域里一个已经失效的引用（容器扩容或删除之前取的）可能读到后来写进去的别的数据；失效规则本身和 `std::vector` 一样 | CppCon 2024 布局读写 12.6%（计时约 18%）；SLG 各格不到 0.5%。反过来的一面：块立刻复用后 buffer 更小，但空洞可能更碎。CppCon 2024 的角色数据在一次 `edit()` 里填好后，wire 从 3232 字节、1 个空洞变成 3112 字节、2 个空洞，收发一轮多 123 条指令（9%） |
 | `XOFFSET_SAVE_SELF_CHECK` | 小消息（4 KiB 以下）每次保存前，再查一次 arena 头的魔数和大小，以及输出 `std::string` 不和 buffer 自己的存储重叠 | 这两项是发送方自查：把 buffer 自己的存储当输出传入是未定义行为；arena 头被外部写坏时不报错。较大的消息走通用路径，两项检查仍然做 | SLG UP.send 5.7%、UC.send 1.8% |
+| `XOFFSET_SCRUB_RESET` | `reset()` 把用过的字节全部清零，重置后的 buffer 和新建的逐字节相同 | `reset()` 不清零。上一份内容留在新 `used_end` 之后，新内容的块余量和填充里带着它；轮流给不同接收方构建消息的发送 buffer 会把上一条消息的字节带进下一条（3.2 的 P4） | SLG UP.send 4.1%、UC.send 2.6%、EB.send 2.4%、SD 2.2%、LD.send 2.0%；单独一次 `reset`（`reloc.reset`）43%。buffer 之间交换或移动时要多带一个字段：每次 `std::swap` 多 9 条指令、每次移动多 3 条 |
 
-数字是 P2996 Clang x86-64 上 callgrind 的指令数（2026-11-16，
-`relax-survey-20261116/`）。不在开关里、保持不变的：
+数字是 P2996 Clang x86-64 上 callgrind 的指令数（2026-11-16、2026-11-17，
+`relax-survey-20261116/`）。
 
-- 块释放时清零（M3）和 buffer 重置时清零用过的字节：增量同步依赖「空洞是 0」和
-  「used_end 之后是 0」，见 3.2。关掉 M3 实测只省 LD.apply 1.5%、LDW.recv 1.3% 的指令。
-- 接收端的检查档位不变：`XReceiver<from_client>` 的 `view()` 仍是边界档，`reload()` 仍是
-  完整校验；可信链路仍是线头检查。信任对端的部署本来就可以把接收端建成可信链路
-  （`XReceiver<XLink::server_peer>`，见 `xoffset_receiver.hpp` 开头的说明），不需要编译开关。
-- M1 默认上限、参数检查、`XOFFSET_FORCE_FULL_CHECK`（调试构建和 sanitizer 下默认 1）。
+**默认打开的一项：客户端上行检查 `XOFFSET_CHECK_UPLINK`（默认 1，`XOFFSET_HARDENED` 不影响它）。**
+`XReceiver<XLink::from_client>` 默认检查：`view()` 走边界档，`reload()` / `load()` / `apply_delta()`
+走完整档，在这条链路上写 `XCheck::admit` 编译不过。用 `-DXOFFSET_CHECK_UPLINK=0` 编译时，客户端链路
+和可信链路一样默认信任档，只查 wire 头和根在负载内，**任何客户端发一条构造的消息，就能让服务端越界读
+（`view`）或越界写（修改 `reload` 的结果），崩溃或读到、改到服务端内存**；调用处写明 `XCheck::bounds` /
+`XCheck::full` 的不受影响。它只适合客户端也是自己的代码、链路受保护的部署。实测省得不多：SLG 上行指令
+UL.recv 少 9.6%（每条指令约 46 条机器指令），所以 susu 2026-11-17 决定这一项默认打开。
 
-发给不该看到已删数据的接收方时，两个办法任选：用 `XOFFSET_HARDENED=1`（或其中的三个
-清零开关 `XOFFSET_SCRUB_ERASED`、`XOFFSET_SCRUB_POPPED`、`XOFFSET_SCRUB_PADDING`）编译，
-或者这条路径用 `save_compact` 发送。
+不在开关里、保持不变的：
+
+- 块释放时清零（M3）：从 touch 标记生成的增量依赖「空洞是 0」，见 3.2。关掉 M3 实测只省
+  LD.apply 1.5%、LDW.recv 1.3% 的指令，而且增量同步会出错。
+- 可信链路仍是线头检查；任何链路都可以在调用处写明 `XCheck::bounds` 或 `XCheck::full`。
+- M1 默认上限、参数检查、`XOFFSET_FORCE_FULL_CHECK`（调试构建和 sanitizer 下默认 1，这时
+  信任档照样跑完整校验）。
+
+发给不该看到已删数据的接收方时，两个办法任选：用 `XOFFSET_HARDENED=1`（或其中的四个
+清零开关 `XOFFSET_SCRUB_ERASED`、`XOFFSET_SCRUB_POPPED`、`XOFFSET_SCRUB_PADDING`、
+`XOFFSET_SCRUB_RESET`）编译，或者这条路径用 `save_compact` 发送。
 
 ## 5. 持续 fuzz
 

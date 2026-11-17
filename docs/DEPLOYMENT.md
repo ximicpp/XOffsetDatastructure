@@ -89,6 +89,10 @@ XOffset 用于**同一份 schema 的 C++ 程序之间**搬运可变状态：服�
   `XOFFSET_DEFAULT_MAXIMUM_CAPACITY` 调整）在预留之前拒绝更大的 wire，报错里写明
   声明大小和上限；但默认值是兜底，不是给每个请求的预算，接收不可信数据时要按第 5
   节显式设置。结构安全的承诺（K4）以设置上限为前提。
+- 客户端上行用 `XReceiver<XLink::from_client>` 接收：它默认检查（`view` 边界档，`reload` 等完整档），
+  写信任档编译不过。`-DXOFFSET_CHECK_UPLINK=0` 会关掉这个默认（2026-11-17 起的开关，默认 1），客户端链路
+  变成和可信链路一样只查 wire 头；**对外服务端不要用它编译**，否则任何客户端发一条构造的消息就能让服务端
+  越界读写（V2_THREAT_MODEL 4.1 节）。
 - `load_unverified` 只用于进程内或已经认证过的数据。
 - **校验保证什么**：通过校验后，对根对象图的类型化访问不会越界，结构与 schema 一致
   （截断、越界、重叠、未铺满、非法 bool、乱序集合、schema 不符都会被拒绝）。
@@ -102,10 +106,11 @@ XOffset 用于**同一份 schema 的 C++ 程序之间**搬运可变状态：服�
 ### 4.1 发出的 wire 里不带旧数据
 
 wire 是 arena 的原始字节，发给客户端之前要确认里面没有不该发的内容。威胁模型
-（`docs/V2_THREAT_MODEL.md`）实测过三类来源。
+（`docs/V2_THREAT_MODEL.md`）实测过下面几类来源。
 
-**2026-11-16 起默认构建不清零后两类字节**（性能优先，V2_THREAT_MODEL 4.1 节）。
-`save_verified`、`freeze_verified` 和增量同步发出的数据，可能带有容器里已经删掉的元素。
+**2026-11-16 起默认构建不清零后两类字节，2026-11-17 起重置也不清零**（性能优先，V2_THREAT_MODEL 4.1 节）。
+`save_verified`、`freeze_verified` 和增量同步发出的数据，可能带有容器里已经删掉的元素，
+以及这个 buffer 重置之前存过的内容。
 发给不该看到这些内容的接收方（典型是客户端）时，二选一：
 
 - 用 `-DXOFFSET_HARDENED=1`（CMake：`-DXOFFSET_HARDENED=ON`）编译服务端，恢复清零；
@@ -116,9 +121,7 @@ wire 是 arena 的原始字节，发给客户端之前要确认里面没有不�
 | P1 已释放块（空洞）：字符串换成更长的值、删除元素、vector 迁移后留下的旧块 | 块在释放时清零，arena 里的空洞本身就是 0（不是开关） | 同左 | 转发收到的数据时，发送方 wire 空洞里的字节会原样再发出（那是发送方的字节，不是本端内存）。转发前用 `save_compact` 重建，见 4.2 节 |
 | P2 容器的空余容量：`clear()`、`resize()` 变小、`erase`、`pop_back` 之后 `[size, capacity)` 里的旧元素；字符串变短后的旧尾部 | 旧元素、旧字符留在余量里，随 wire 发出，直到下一次追加覆盖 | 腾出的字节在缩小时清零（`XOFFSET_SCRUB_ERASED`、`XOFFSET_SCRUB_POPPED`；`clear()` 因此是 O(n)） | 默认构建下，删过不该给接收方看的内容的 buffer 用 `save_compact` 发送 |
 | P3 结构体的隐式填充字节 | 填充带着构造这个元素的值里的字节（通常是栈上的），同样内容的 wire 可能不同 | 库构造或搬移的容器元素（含 `XMap` 的键值对）把填充清零（`XOFFSET_SCRUB_PADDING`） | 发给客户端的 schema 加 `XOFFSET_REQUIRE_NO_PADDING(T)`，或全局定义 `XOFFSET_REJECT_IMPLICIT_PADDING`，有隐式填充就编译失败，按报错补显式字段。没有隐式填充的类型不受这一项影响 |
-
-buffer 重置（`reset<T>()`）时用过的字节仍然全部清零，所以轮流给不同接收方构建消息的同一个
-buffer 不会把上一条消息带进下一条；上表说的是同一个 buffer 存活期间删掉的内容。
+| P4 重置前的内容：`reset<T>()` 之后，上一份内容的字节留在新内容的块余量、字符串尾部和填充里 | 不清零。**轮流给不同接收方构建消息的同一个发送 buffer，会把上一个接收方的消息内容夹在下一条 wire 里** | `reset` 把用过的字节全部清零（`XOFFSET_SCRUB_RESET`） | 默认构建下，给不同接收方轮流用的发送 buffer：用 `-DXOFFSET_SCRUB_RESET=1` 编译，或用 `save_compact` 发送，或每个接收方用自己的 buffer |
 
 仍然需要注意：
 
@@ -270,8 +273,9 @@ raw 146、zstd 152、字典 68、每帧 100 条批量 52。
 - [ ] 每个平台使用第 3 节表里已验证的工具链构建，且只面向 64 位小端平台
 - [ ] 收发的根类型都用 `XOFFSET_PIN_SCHEMA` 固定，固定文件进了服务端和每个客户端的构建
 - [ ] 网络输入只走 `load_verified` 路径，并设置了 `maximum_capacity`
+- [ ] 对外服务端没有用 `XOFFSET_CHECK_UPLINK=0` 编译，客户端连接的接收器是 `XReceiver<XLink::from_client>`（第 4 节）
 - [ ] 下发给客户端的 schema 没有隐式填充（`XOFFSET_REQUIRE_NO_PADDING` 或 `XOFFSET_REJECT_IMPLICIT_PADDING`），下发 buffer 只含客户端可见的数据
-- [ ] 下发给客户端的 buffer 里删过客户端不该看到的元素时：服务端用 `XOFFSET_HARDENED=1` 编译，或这条路径用 `save_compact` 发送（4.1 节；默认构建不清零容器腾出的字节）
+- [ ] 下发给客户端的 buffer 里删过客户端不该看到的元素，或者同一个发送 buffer 轮流给不同客户端用时：服务端用 `XOFFSET_HARDENED=1` 编译，或这条路径用 `save_compact` 发送（4.1 节；默认构建不清零容器腾出的字节，重置也不清零）
 - [ ] 服务端接收客户端数据时有 wire 长度上限（建议起点 1 MiB）
 - [ ] 转发客户端上行数据前用 `save_compact` 重建，转发的类型没有隐式填充（4.2 节）
 - [ ] 收到的数据改完再发出时：收端完整校验加业务检查（需要时加应用层摘要），客户端直连只限同版本，关异常的客户端给要修改的 buffer 留上限余量（4.3 节）

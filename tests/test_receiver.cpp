@@ -41,7 +41,7 @@ XOFFSET_REGISTER_SCHEMA_NAME(RxOther, "test.ReceiverOther")
 
 static_assert(default_mutable_check<XLink::server_peer> == XCheck::admit);
 static_assert(default_mutable_check<XLink::from_server> == XCheck::admit);
-static_assert(default_mutable_check<XLink::from_client> == XCheck::full);
+static_assert(default_mutable_check<XLink::from_client> == (XOFFSET_CHECK_UPLINK ? XCheck::full : XCheck::admit));
 static_assert(!detail::force_full_check);
 
 namespace {
@@ -306,12 +306,18 @@ void admit_skips_graph() {
     auto dst = XBuffer::create<RxRoot>(4096, cap());
     need(peer.reload<RxRoot>(dst, bad).has_value(), "admit walks the graph");
     need(!peer.reload<RxRoot, XCheck::full>(dst, bad), "explicit full on a trusted link accepted a bad graph");
-    need(!client.reload<RxRoot>(dst, bad), "client uplink (full) accepted a bad graph");
-    need(!client.load<RxRoot>(bad), "client uplink load (full) accepted a bad graph");
+    need(!client.reload<RxRoot, XCheck::full>(dst, bad), "client uplink (full) accepted a bad graph");
+    need(!client.load<RxRoot, XCheck::full>(bad), "client uplink load (full) accepted a bad graph");
+    // The link's default: the full check with XOFFSET_CHECK_UPLINK, admit without.
+    need(client.reload<RxRoot>(dst, bad).has_value() == !XOFFSET_CHECK_UPLINK, "client uplink default reload");
+    need(client.load<RxRoot>(bad).has_value() == !XOFFSET_CHECK_UPLINK, "client uplink default load");
+#if !XOFFSET_CHECK_UPLINK
+    need(client.reload<RxRoot, XCheck::admit>(dst, bad).has_value(), "client uplink named admit");
+#endif
     need(!XBuffer::try_load_verified<RxRoot>(bytes_of(bad), cap()), "load_verified accepted a bad graph");
 }
 
-// Typed buffers and typed loads; the client uplink defaults to full.
+// Typed buffers and typed loads; the client uplink with the full check.
 void typed_and_links() {
     auto src = make_source(21, 500);
     const auto wire = src.save_verified<RxRoot>();
@@ -331,7 +337,7 @@ void typed_and_links() {
     }
     XReceiver<XLink::from_client> client(cap());
     auto dst = XBuffer::create<RxRoot>(4096, cap());
-    need(client.reload<RxRoot>(dst, wire).has_value(), "client uplink full reload");
+    need(client.reload<RxRoot, XCheck::full>(dst, wire).has_value(), "client uplink full reload");
     need(used_bytes_equal(dst, expect), "client uplink payload");
     need(client.maximum_capacity().value == cap().value, "receiver capacity");
 }
@@ -585,7 +591,7 @@ void delta_admit_skips_graph() {
     next.append(reinterpret_cast<const char*>(&stream), 8);
     next += varint(cur.version() + 1) + varint(0);
     XReceiver<XLink::from_client> client(cap());
-    auto st = client.apply_delta<RxRoot>(dst, next, cur);
+    auto st = client.apply_delta<RxRoot, XCheck::full>(dst, next, cur);
     need(!st && st.code() != XErrc::delta_base_mismatch, "client uplink (full) accepted the payload");
     st = peer.apply_delta<RxRoot, XCheck::full>(dst, next, cur);
     need(!st && st.code() != XErrc::delta_base_mismatch, "full after a bad admitted delta accepted the payload");

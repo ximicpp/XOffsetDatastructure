@@ -2,6 +2,43 @@
 
 ## Unreleased
 
+- `reset()` no longer zeroes the payload it discards (susu 2026-11-17: speed
+  first; switch `XOFFSET_SCRUB_RESET`, 0 by default, 1 with
+  `XOFFSET_HARDENED=1`). **Behaviour change:** the previous content's bytes
+  stay past the new `used_end`, and the next content's blocks start with
+  them, so a block's spare capacity, the bytes after a string's end and
+  implicit padding carry the previous content. A send buffer that builds
+  messages for different receivers in turn can put one receiver's data into
+  the next one's `save_verified` wire or delta (threat model 3.2, P4): build
+  with `XOFFSET_SCRUB_RESET=1`, send with `save_compact`, or keep a buffer per
+  receiver. A reset buffer is no longer byte-identical to a new one; its
+  content, its sizes and its compact wire are. The library still relies on
+  zero bytes past an offset: the buffer records how far a reset left bytes
+  behind (`XBufferCore`, 4 bytes in existing padding, size still 256;
+  `XGrowPolicy` is now one byte), and the in-place reload uses that mark
+  instead of `used_end` when it tells the storage where zeros begin. Delta
+  senders compare contents and were already correct with a non-zero tail.
+  Under `XOFFSET_STRESS_RELOCATE` a reset now fills the discarded payload
+  with the poison byte, so the stress suite finds any path that assumes a
+  zero tail (found none in the library; three tests asserted the zeroing and
+  now follow the switch). Instruction counts, P2996 Clang x86-64, against the
+  previous default: SLG UP.send -4.1%, UC.send -2.6%, EB.send -2.4%, SD
+  -2.2%, LD.send -2.0%, `reloc.reset` -43%; swapping two buffers costs 9
+  instructions more and moving one 3 (`slg.B.writeback`, `slg.C.replace`
+  +1.4%). Builds with the switch on are unchanged.
+- New switch `XOFFSET_CHECK_UPLINK`, **1 by default** (susu 2026-11-17: the
+  check stays on; it is 9.6% of the instructions of receiving an SLG march
+  order, about 46 per order). `-DXOFFSET_CHECK_UPLINK=0` gives
+  `XReceiver<XLink::from_client>` the trusted links' default
+  (`XCheck::admit` for `view`, `reload`, `load` and `apply_delta`) and lets
+  `XCheck::admit` compile on it; `XCheck::bounds` and `XCheck::full` remain
+  per call. Only for deployments whose clients are their own code over a
+  protected transport: with it any client can make the server read or write
+  out of bounds. `XOFFSET_HARDENED` does not change it. Default builds are
+  unchanged. `test_receiver` and `test_receiver_view` are built a second time
+  with the switch off (`*_uplink_unchecked`); the SLG bench and the fuzz
+  harness name `XCheck::bounds` / `XCheck::full` on the client link, so their
+  cells mean the same in either build.
 - README rewritten as an introduction: core features, a server/client
   example (compiled and run with GCC 13 C++20), how the arena, offsets, wire
   and check tiers work, and the current comparisons (CppCon 2024 `Character`
@@ -26,7 +63,7 @@
   with `save_compact`, or build with `XOFFSET_HARDENED=1`, where the
   receiver must not see them. Unchanged: retired blocks are still zeroed
   (M3; deltas from touch marks rely on zero holes), resetting a buffer still
-  zeroes it, the receive checks (`XCheck` tiers), the wire format.
+  zeroes it (changed afterwards, see `XOFFSET_SCRUB_RESET` above), the receive checks (`XCheck` tiers), the wire format.
   A subtree copy of a heap string now writes its terminator (a hole a loaded
   wire brought in may hold any bytes). `docs/V2_THREAT_MODEL.md` 3.2 and
   4.1, `docs/DEPLOYMENT.md` 4.1. Tests of the switches are built twice

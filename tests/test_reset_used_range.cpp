@@ -4,6 +4,12 @@
 // mutation runs (growth, holes, tail expansion), after an unverified load
 // with bytes past its used_end, and after a failed reload. The emptied free
 // table is kept and works exactly as a fresh one.
+//
+// That is the reset of a build with XOFFSET_SCRUB_RESET=1 (the _hardened
+// build of this test). A default build clears nothing: the used payload
+// (header and root) is a fresh one's, the bytes past it are the old
+// content's, and a run after the reset holds the same values as the same run
+// in a fresh buffer (compact wires equal; the blocks' slack may differ).
 #include <cassert>
 #include <cstdint>
 #include <cstring>
@@ -62,7 +68,12 @@ void check_fresh(XBuffer& b, ResetRoot& root) {
     auto fresh = XBuffer::create<ResetRoot>(b.get_size(), cap());
     assert(fresh.get_size() == b.get_size());
     assert(&root == &b.root<ResetRoot>());
+#if XOFFSET_SCRUB_RESET
     assert(std::memcmp(fresh.data(), b.data(), b.get_size()) == 0);
+#else
+    assert(b.arena()->used_end == fresh.arena()->used_end);
+    assert(std::memcmp(fresh.data(), b.data(), b.arena()->used_end) == 0);
+#endif
 }
 
 } // namespace
@@ -88,7 +99,12 @@ int main() {
         mutate(b.root<ResetRoot>(), a_rng, 500);
         mutate(other.root<ResetRoot>(), b_rng, 500);
         assert(b.free_block_count() == other.free_block_count());
+#if XOFFSET_SCRUB_RESET
         assert(b.save_verified<ResetRoot>() == other.save_verified<ResetRoot>());
+#else
+        assert(b.save_verified<ResetRoot>().size() == other.save_verified<ResetRoot>().size());
+        assert(b.save_compact<ResetRoot>() == other.save_compact<ResetRoot>());
+#endif
     }
 
     // An unverified load whose bytes run past used_end: the bytes past it are

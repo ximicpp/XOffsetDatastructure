@@ -483,8 +483,10 @@ void direct_reload_keeps_n2() {
         for (std::size_t i = used; i < in.get_size(); ++i)
             need(in.data()[i] == 0, "growth after direct reload exposed stale bytes");
         (void)in.reset<ReloadRoot>();
+#if XOFFSET_SCRUB_RESET
         for (std::size_t i = static_cast<std::size_t>(in.arena()->used_end); i < in.get_size(); ++i)
             need(in.data()[i] == 0, "reset after direct reload left stale bytes");
+#endif
         auto fresh = XBuffer::create<ReloadRoot>(4096, cap());
         need(in.save_verified<ReloadRoot>() == fresh.save_verified<ReloadRoot>(),
              "reset after direct reload differs from create");
