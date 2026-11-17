@@ -48,6 +48,22 @@ def main():
     for lib in ("xoffset 4.0 full", "FlatBuffers view"):
         f = g(lib, "sr_fresh")
         out.append(f"| {lib} | {g(lib, 'sr_reuse'):,.1f} | {'' if f is None else f'{f:,.1f}'} |")
+    # The rows above send a buffer that was filled once and never modified. After the
+    # read/write rounds it carries spare capacity and free blocks, which are part of the wire.
+    if g("xoffset 4.0", "sr_reuse_after_rw") is not None:
+        out += ["", "### Send + receive of a modified XOffset buffer (reuse, report-only)", "",
+                "| Row | Wire bytes | zstd-3 | ns per message | ÷ zpp::bits | ÷ cista raw |",
+                "| --- | ---: | ---: | ---: | ---: | ---: |"]
+        for lib, tier, zpp, cista in (("xoffset 4.0", "xoffset 4.0", "zpp::bits", "cista raw"),
+                                      ("xoffset 4.0", "xoffset 4.0 full", "zpp::bits", "cista raw"),
+                                      ("xoffset inline", "xoffset inline", "zpp::bits inline", "cista raw inline")):
+            z, c = g(zpp, "sr_reuse"), g(cista, "sr_reuse")
+            if z is None or c is None or g(tier, "sr_reuse_after_rw") is None:
+                continue
+            v = g(tier, "sr_reuse")
+            out.append(f"| {tier}, as filled | {g(lib, 'bytes'):,.0f} | {g(lib, 'bytes_zstd3'):,.0f} | {v:,.1f} | {v / z:.3f} | {v / c:.3f} |")
+            v = g(tier, "sr_reuse_after_rw")
+            out.append(f"| {tier}, after the read/write rounds | {g(lib, 'bytes_after_rw'):,.0f} | {g(lib, 'bytes_after_rw_zstd3'):,.0f} | {v:,.1f} | {v / z:.3f} | {v / c:.3f} |")
     out += ["", "### Read/write loop (ns per iteration)", "",
             "| Library | Containers | 2024 | 4.0 | XOffset ÷ lib |", "| --- | --- | ---: | ---: | ---: |"]
     for lib in ORDER:
@@ -110,6 +126,15 @@ def main():
         )
         for lib, t0, t1 in total:
             out.append(f"| {lib} | {t0:,.1f} | {t1:,.1f} | {x0 / t0:.3f} | {x1 / t1:.3f} |")
+        # The same sum with XOffset's send + receive of the buffer the loop has modified.
+        xa, ia = g("xoffset 4.0", "sr_reuse_after_rw"), g(inline, "sr_reuse_after_rw")
+        if xa is not None and ia is not None:
+            y0, y1 = xrw + xa, irw + ia
+            out += ["", "With XOffset sending the buffer the loop has modified (the rivals' rows are the same):", "",
+                    "| Library | 2024 layout | Tuned | XOffset ÷ lib (2024 layout) | XOffset inline ÷ lib (tuned) |",
+                    "| --- | ---: | ---: | ---: | ---: |"]
+            for lib, t0, t1 in (("xoffset, modified buffer", y0, y1),) + total[1:]:
+                out.append(f"| {lib} | {t0:,.1f} | {t1:,.1f} | {y0 / t0:.3f} | {y1 / t1:.3f} |")
     print("\n".join(out))
 
 
