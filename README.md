@@ -1,6 +1,6 @@
 # XOffsetDatastructure
 
-**4.0.0** · C++20 / C++26 · header-only · 64-bit little-endian
+**4.1.0** · C++20 / C++26 · header-only · 64-bit little-endian
 
 XOffsetDatastructure keeps C++ objects, strings, vectors, sets and maps in one
 contiguous, position-independent arena. The arena bytes are the message: you
@@ -198,8 +198,8 @@ processes; [method and all rows](bench/cppcon2024/README.md)):
 
 **SLG game-server scorecard** (`bench/slg`: login state, per-client and shared
 viewport deltas, client orders, server hand-offs; XOffset trusted tier against
-the strongest unchecked rival per cell): **19 cells, 14 wins, 5 ties, 0
-losses** on 4.0.0. XOffset messages are 1.11–1.46x zpp_bits after zstd-3.
+the strongest unchecked rival per cell): **19 cells, 16 wins, 3 ties, 0
+losses** on 4.1.0. XOffset messages are 1.11–1.46x zpp_bits after zstd-3.
 
 These numbers hold for these workloads, adapters and hosts.
 [PERFORMANCE.md](docs/PERFORMANCE.md) has the method, the reading notes of the
