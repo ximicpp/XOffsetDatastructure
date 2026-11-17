@@ -1,11 +1,245 @@
 # XOffsetDatastructure
 
-**4.0.0** is a C++20/C++26 library for objects and offset containers stored in
-one contiguous, position-independent arena. Any C++20 compiler builds it with
-one `XOFFSET_RECORD` line per record (the build every client uses: Windows,
-Android, iOS); servers can use C++26 reflection (GCC 16 or the P2996 Clang),
-which also checks those lines. Both builds write the same wire bytes. The
-independent OS storage header can also be used with C++17.
+[中文](README.zh-CN.md)
+
+**4.0.0** · C++20 / C++26 · header-only · 64-bit little-endian
+
+XOffsetDatastructure keeps C++ objects, strings, vectors, sets and maps in one
+contiguous, position-independent arena. The arena bytes are the message: you
+mutate the data in place, copy the bytes to another process or machine, and
+the receiver reads and keeps mutating them. There is no serialization step and
+no IDL.
+
+It is built for game backends: Linux servers that hand state to each other and
+push it to Windows, iOS and Android clients, all from one C++ header that both
+sides include.
+
+- [Core features](#core-features)
+- [Example](#example)
+- [How it works](#how-it-works)
+- [Performance](#performance)
+- [Quick start](#quick-start-c20)
+- [Documentation](#documentation)
+
+## Core features
+
+| | What you get |
+| --- | --- |
+| **No serialize step** | Objects live in the arena and point to each other by relative offsets. Sending is one copy of the arena; receiving is a check plus one copy. Nothing is encoded or decoded per field. |
+| **Mutate in place** | Read and write fields, append, insert and erase in the containers directly in the buffer, including variable-length changes. Freed space is reused. |
+| **Keep mutating after receive** | A received buffer is a normal working buffer: change it and send it on. The free-space table travels with the message, so a buffer does not degrade after many hops. |
+| **Any 64-bit LE device** | The same bytes are valid on Linux x86-64/arm64, Windows x64, macOS, iOS and Android. Pin a type's layout once (`XOFFSET_PIN_SCHEMA`) and every compiler that builds it checks the layout at build time. |
+| **Plain C++ types** | A schema is an aggregate struct with library containers (`XString`, `XVector`, `XSet`, `XMap`). C++20 needs one `XOFFSET_RECORD` line per type; with C++26 reflection (GCC 16 or the P2996 Clang) the fields come from the type itself and the line, when present, is checked against them. Both builds write identical bytes. |
+| **Delta sync** | Once the peer holds a copy, send only the bytes that changed: per-client deltas for a state a client owns, and shared deltas (one encoding per changed entity, shared by every viewer) for a viewport onto a shared world. |
+| **Checks chosen per link** | A receiver is typed by the link it serves. Between your own servers and from server to client the trusted tier checks the header and bounds only; a client uplink can be bounds-checked (read-only view) or fully validated before it is kept or modified. |
+| **Clients without exceptions** | Client builds use the platform's own compiler (MSVC, Android NDK Clang, Apple clang) in C++20. The receive and mutate paths a client needs report errors as `XStatus` or `buffer.error()`, so `-fno-exceptions` builds work. |
+
+What it does not do: it is not cross-language, it does not compress (use zstd
+or similar on top), and its checks are structural, not authentication. Pair a
+link with TLS or mTLS when it crosses an untrusted network.
+
+## Example
+
+One header, shared by the server and every client build:
+
+```cpp
+// game_protocol.hpp
+#include "xoffsetdatastructure.hpp"
+#include <cstdint>
+using namespace XOffsetDatastructure;
+
+struct Unit {
+    std::uint32_t id;
+    std::int32_t x, y, hp;
+    XString name;
+};
+XOFFSET_RECORD(Unit, id, x, y, hp, name)      // global scope, right after the type
+
+struct WorldView {
+    std::uint64_t tick;
+    XVector<Unit> units;
+};
+XOFFSET_RECORD(WorldView, tick, units)
+XOFFSET_REGISTER_SCHEMA_NAME(WorldView, "game.WorldView")   // one stable name per root type
+```
+
+The server builds and changes the state in place, then sends the arena bytes:
+
+```cpp
+auto world = TypedXBuffer<WorldView>::create(4096, XBuffer::maximum_capacity(1 << 20));
+
+auto units = world.root().units();              // a proxy: stays valid if the buffer grows
+auto u = units.emplace_back();
+u.id() = 1;
+u.hp() = 100;
+u.name() = "Archer Captain";                    // own block; <= 10 bytes would sit in the head
+
+world.edit([](WorldView& v) {                   // hot loops: plain references at plain speed
+    v.tick += 1;
+    for (Unit& unit : v.units) unit.y += 1;
+});
+
+std::string wire;                               // reused for every send
+world.save_verified_into(wire);                 // one copy, no per-field encoding
+send(wire);
+```
+
+The client receives into a buffer it keeps, reads plain members, and can
+change and send the data again:
+
+```cpp
+#include "xoffset_receiver.hpp"
+
+XReceiver<XLink::from_server> rx{XBuffer::maximum_capacity(1 << 20)};
+auto held = TypedXBuffer<WorldView>::create(4096, XBuffer::maximum_capacity(1 << 20));
+
+if (XStatus s = rx.reload(held, wire); !s) {     // no exceptions needed
+    ask_for_whole_state();
+    return;
+}
+held.read([](const WorldView& v) {
+    for (const Unit& unit : v.units) draw(unit.id, unit.x, unit.y, unit.name.view());
+});
+held.root().tick() += 1;                        // still a normal, mutable buffer
+```
+
+Runnable versions: [`examples/helloworld.cpp`](examples/helloworld.cpp), and
+one example per use case in [GETTING_STARTED.md](docs/GETTING_STARTED.md):
+server to client (`server_to_client.cpp`), deltas (`delta_sync.cpp`,
+`shared_delta.cpp`), client uplink (`client_uplink.cpp`) and server to server
+(`server_to_server.cpp`).
+
+## How it works
+
+```
+ one arena (payload), any address
+ ┌────────┬───────────────────────┬──────────┬────────┬──────────────────┐
+ │ header │ root WorldView        │ Unit[]   │ hole   │ "Archer Captain" │
+ │ 48 B   │ tick │ units{Δ,n,cap} │ Unit ... │ (free) │                  │
+ └────────┴───────────────┬───────┴─▲────────┴────────┴─▲────────────────┘
+                          └─────────┘                   │
+                     rel32 Δ from head to block         │
+                          Unit.name{Δ,n,cap} ───────────┘
+
+ wire = 40 B header + used arena bytes + hole table
+```
+
+1. **Relative offsets instead of pointers.** Every container head is 12 bytes:
+   a signed 32-bit offset from the head to its data block, a size and a
+   capacity. Short strings (up to 10 bytes) sit inside the head. The root is
+   found by its offset from the start of the arena. Nothing in the payload is
+   an absolute address, so the bytes mean the same thing at any address, in
+   any process, on any 64-bit little-endian machine.
+2. **An allocator inside the arena.** Containers allocate 8-byte aligned blocks
+   from the arena itself. A freed block becomes a hole; the buffer keeps the
+   holes in a free table (exact-size bins for small blocks, best fit for large
+   ones) and reuses them. That is what makes in-place, variable-length
+   mutation possible: a vector that outgrows its block moves to a new one and
+   the old block is reused by the next allocation.
+3. **The wire is the arena.** `save_verified` writes a 40-byte wire header
+   (format version, used size, root offset, schema fingerprint, root type),
+   the used part of the arena, and the hole table. Large free runs or zero
+   runs can be skipped on the wire. The receiver copies the bytes into its own
+   buffer, loads the hole table back into its free table and carries on: one
+   copy on each end, no encode or decode, and the free space survives the hop.
+4. **The schema is the C++ type.** Each record's field list (written once with
+   `XOFFSET_RECORD`, or derived by C++26 reflection) gives a layout signature
+   and a 64-bit fingerprint. The wire carries the fingerprint, and the receiver
+   rejects a wire whose fingerprint differs. `XOFFSET_PIN_SCHEMA` fixes the
+   layout text in the shared header so a client compiler that would lay a type
+   out differently fails to compile. Types with raw pointers, references or
+   virtual functions are rejected at compile time.
+5. **Checks per link.** A trusted link checks the wire header and the hole
+   table bounds and does not walk the object graph. A bounds check walks the
+   container heads so that every read stays inside the message and gives a
+   read-only view. A full check validates the whole graph (no overlap, exact
+   coverage, sorted keys, valid values) before the buffer may be modified. No
+   tier checks content: a well-formed message with odd field values is
+   accepted, so the server still applies its own game rules to client input.
+6. **Speed first by default.** Hardening that costs time on mutate and send
+   (zeroing removed elements and padding, delayed reuse inside `edit()`, save
+   self-checks) is off by default and turned on together with
+   `-DXOFFSET_HARDENED=1`. Without it, bytes of elements a container removed
+   can travel in `save_verified` output; use `save_compact` or a hardened
+   build where a receiver must not see them
+   ([threat model 4.1](docs/V2_THREAT_MODEL.md)).
+
+The format is specified in [V2_FORMAT.md](docs/V2_FORMAT.md) (wire format 2.1).
+
+## Performance
+
+Two comparisons, both on a cloud x86-64 Linux host (Xeon, GCC 16 `-O3`,
+pinned core). The host is noisy, so each figure is a median over many
+processes and ratios between 0.95 and 1.05 count as a tie. Ratios are
+XOffset ÷ rival: **below 1 means XOffset is faster**. Compression is never
+timed; sizes are reported after zstd level 3.
+
+### CppCon 2024 `Character`
+
+The game character from the CppCon 2024 talk (64-item map, waypoints,
+attributes, 8 pieces of equipment with attributes each), rerun with 4.0.0 and
+current rules: random numbers are drawn before timing, every library's map is
+the same sorted flat map, receiving means "the receiver can read and modify
+the state". Median of 15 processes, library after PR #292
+([method and all rows](bench/cppcon2024/README.md)).
+
+**Send + receive** (one message, buffers reused, XOffset trusted tier):
+
+| Library | ns / message | XOffset ÷ lib |
+| --- | ---: | ---: |
+| XOffset | 96 | 1.00 |
+| zpp::bits | 343 | 0.28 |
+| FlatBuffers (build + read back) | 663 | 0.15 |
+| cista (raw / offset, unchecked) | 654 / 660 | 0.15 |
+| Cap'n Proto | 2,381 | 0.04 |
+| MessagePack | 6,510 | 0.015 |
+| Protocol Buffers | 8,676 | 0.011 |
+
+With the full validation tier instead, XOffset takes 232 ns, still 0.67 of
+zpp::bits.
+
+**Read/write loop** (one iteration: change scalars and position, add and
+remove equipment, waypoints, an attribute and a map item):
+
+| Layout | XOffset | std containers | cista raw / offset | Protocol Buffers |
+| --- | ---: | ---: | ---: | ---: |
+| 2024 layout, ns | 239 | 340 | 224 / 245 | 78 |
+| XOffset ÷ lib | | 0.70 | 1.07 / 0.97 | **3.06** |
+| Tuned layout\*, ns | 62 | 79 | 46 / 53 | 72 |
+| XOffset ÷ lib | | 0.79 | **1.34 / 1.16** | 0.86 |
+
+\* Small attribute arrays stored inline, range append, erase at a known
+position; applied to every library that can express it.
+
+In-place read/write is faster than the same code on std containers and on par
+with cista on the 2024 layout, but it is not the fastest in every case:
+Protocol Buffers wins the 2024-layout loop (its `RemoveLast` keeps the
+removed objects for reuse) and cista wins the tuned loop by 1.16–1.34x.
+Where XOffset wins clearly is the round trip. **One read/write iteration plus
+one send and receive** costs XOffset 143 ns (tuned), against 393 ns for
+zpp::bits on std containers (0.36), 688–715 ns for cista (0.20–0.21) and
+8,748 ns for Protocol Buffers (0.016).
+
+Size: the `Character` wire is 3,232 bytes raw and 3,001 bytes after zstd-3
+(zpp::bits 2,926, Protocol Buffers 3,802). The wire header makes small
+XOffset messages about 100 bytes larger than zpp::bits; this is accepted by
+design and reported, not optimized away.
+
+### SLG game-server scorecard
+
+`bench/slg` models a strategy game server end to end: whole state on login,
+per-client deltas, a shared map viewport, client orders going up, and players
+moving between servers. Each cell times only data writing, sending and
+receiving, against the strongest rival for that cell (zpp_bits or unchecked
+cista, both without verification, XOffset on its trusted tier). For the 4.0.0
+release ([PERFORMANCE.md 6b](docs/PERFORMANCE.md)): **19 gated cells, 14 wins,
+5 ties, 0 losses**, 8 batches × 21 cycles, the borderline shared-delta cells
+re-judged under three code layouts.
+
+These numbers hold for these workloads, adapters and hosts. A different
+workload or a different way of writing the rival adapters can change them.
+[PERFORMANCE.md](docs/PERFORMANCE.md) has the per-release history (including
+the earlier Apple M4 results), the protocol and the limits.
 
 ## Quick start (C++20)
 
@@ -22,266 +256,38 @@ cmake --build build --config Release --target helloworld
 ./build/bin/Release/helloworld        # Windows: build\bin\Release\helloworld.exe
 ```
 
-[`examples/helloworld.cpp`](examples/helloworld.cpp) is the recommended style,
-the same as the example below. Next, [GETTING_STARTED.md](docs/GETTING_STARTED.md)
-walks through the core use cases (server to client, client uplink, server to
-server) with one runnable example each. Without `-DXOFFSET_CXX_STANDARD`, configure
-picks C++26 when the toolchain has reflection (CMake 3.30+, GCC 16+ or the
-P2996 Clang) and otherwise builds C++20 and says so.
+Without `-DXOFFSET_CXX_STANDARD`, configure picks C++26 when the toolchain has
+reflection (CMake 3.30+, GCC 16+ or the P2996 Clang) and otherwise builds
+C++20 and says so. Next, [GETTING_STARTED.md](docs/GETTING_STARTED.md) walks
+through each use case with a runnable example.
 
-## What it does
-
-Objects live in one contiguous arena and refer to each other through relative
-offsets, so the arena bytes are the serialized form: there is no per-field
-encoding or decoding. Saving produces an owning byte copy; loading validates the
-whole object graph and copies the bytes into a new reservation. Save and load
-are not zero-copy operations: sending a buffer costs one copy on each end and
-no encode or decode pass.
-
-This release uses the **V2 storage and wire format** ([format specification](docs/V2_FORMAT.md)).
-V1 wires are rejected with `unsupported wire format version 1`; there is no V1
-reader or migration path. Start with the [user guide](docs/USER_GUIDE.md) and
-the [deployment guide](docs/DEPLOYMENT.md), then read the
-[compatibility and input contract](docs/ALPHA_COMPATIBILITY.md) before
-persisting or accepting wire data. [CHANGELOG.md](CHANGELOG.md) records each
-release; [RELEASING.md](docs/RELEASING.md) is how one is made.
-
-## Requirements
-
-| Use | Requirements |
+| Build | Compilers |
 | --- | --- |
-| Full library, C++26 reflection build (servers), `XOffset::xoffset` | P2996 Clang with `<experimental/meta>` and matching libc++, or GCC 16+ (`-freflection`, `<meta>`, libstdc++); CMake 3.30+; 64-bit little-endian target; Linux, macOS or Windows VM APIs |
-| Client build, field-list backend (since 3.2.0) | C++20 or C++23 with the platform's native compiler (Android NDK Clang, MSVC 19.44 with `/Zc:preprocessor`, clang-cl, MinGW GCC, Apple clang for iOS 17+ and macOS 14+); one `XOFFSET_RECORD` line per record; CMake 3.20+; 64-bit little-endian target |
-| OS storage only, `XOffset::storage` | C++17 compiler; CMake 3.13+; Linux, macOS or Windows VM APIs and threads |
-| Maintained validation tools and their tests | Python 3.10+; CMake/CTest 3.21+ for storage, 3.30+ for full; the C++ library has no Python runtime dependency |
+| Servers, C++26 reflection | GCC 16+ or the P2996 Clang ([toolchains](toolchains/README.md)); CMake 3.30+ |
+| Clients and any C++20/C++23 build | Platform compilers: MSVC 19.44 (`/Zc:preprocessor`), clang-cl, MinGW GCC, Android NDK Clang, Apple clang for iOS 17+ / macOS 14+; CMake 3.20+ |
+| OS storage layer only | Any C++17 compiler; CMake 3.13+ |
 
-Ordinary C++26 support does not imply P2996 support. In 3.1.0 the full API had
-no non-reflection fallback. Since 3.2.0 (field-list backend), clients (Windows, Android, iOS) build the same library with
-C++20/C++23 and a one-line field list per record
-([user guide 2.1](docs/USER_GUIDE.md#21-字段表xoffset_record)); servers keep
-C++26 reflection, which also checks each field list, and both builds write the
-same wire bytes ([CLIENT_TARGETS.md](docs/CLIENT_TARGETS.md)). The supported
-reflection compilers are the Bloomberg clang-p2996
-fork pinned in [toolchains/README.md](toolchains/README.md) and GCC 16 (CI uses
-the official `gcc:16` image, GCC 16.2.0, pinned by digest). CI checks that both
-compilers produce byte-identical wires from the same source and accept each
-other's wires.
-Native Windows (MSVC, clang-cl) runs the full library only through the
-field-list backend; the reflection builds do not support it.
+Installing, package consumption, the validated platform matrix and the
+storage and ownership rules are in
+[BUILD_AND_PLATFORMS.md](docs/BUILD_AND_PLATFORMS.md).
 
-The source archive includes the locked TypeLayout and ten Boost header modules.
-Full installed packages include the same dependency headers. Neither package
-includes a compiler, SDK or runtime. Fixed compiler/image, CMake and dependency
-recipes are in [toolchains/README.md](toolchains/README.md),
-[toolchains/vm-validation.json](toolchains/vm-validation.json), and the
-[package guide](docs/PACKAGING.md#fixed-inputs).
+## Documentation
 
-## Minimal example
+| Read | For |
+| --- | --- |
+| [GETTING_STARTED.md](docs/GETTING_STARTED.md) | Use cases with one runnable example each |
+| [USER_GUIDE.md](docs/USER_GUIDE.md) | The API: types, mutation, save/load, storage, errors, core guarantees K0–K9 |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Limits, links and checklists for production |
+| [DELTA_SYNC.md](docs/DELTA_SYNC.md), [SHARED_DELTA.md](docs/SHARED_DELTA.md) | Per-client deltas and shared viewport deltas |
+| [SCHEMA_EVOLUTION.md](docs/SCHEMA_EVOLUTION.md), [SCHEMA_PINS.md](docs/SCHEMA_PINS.md) | Different schema versions on the two ends; pinned layouts |
+| [V2_FORMAT.md](docs/V2_FORMAT.md), [V2_THREAT_MODEL.md](docs/V2_THREAT_MODEL.md) | Wire format; what the checks do and do not cover |
+| [ALPHA_COMPATIBILITY.md](docs/ALPHA_COMPATIBILITY.md) | Compatibility and input contract |
+| [CLIENT_TARGETS.md](docs/CLIENT_TARGETS.md), [DEVICE_TESTING.md](docs/DEVICE_TESTING.md) | Client toolchains and real-device records |
+| [PERFORMANCE.md](docs/PERFORMANCE.md), [bench/cppcon2024](bench/cppcon2024/README.md) | Performance numbers and methods |
+| [CHANGELOG.md](CHANGELOG.md), [RELEASING.md](docs/RELEASING.md) | Releases |
 
-```cpp
-#include "xoffsetdatastructure.hpp"
-#include <cstdint>
+Most documents under `docs/` are written in Chinese.
 
-using namespace XOffsetDatastructure;
+## License
 
-struct Player {
-    std::int32_t level{};
-    XString name;
-    XVector<std::int32_t> items;
-};
-XOFFSET_RECORD(Player, level, name, items)   // field list: named accessors
-XOFFSET_REGISTER_SCHEMA_NAME(Player, "example.Player")
-
-int main() {
-    constexpr std::size_t limit = 8 * 1024 * 1024;
-    auto buffer = TypedXBuffer<Player>::create(4096,
-        XBuffer::maximum_capacity(limit));
-    auto player = buffer.root();      // a proxy: stays valid if the buffer moves
-    player.level() = 10;
-    player.name() = "Alice";
-    player.items().push_back(101);
-
-    // Hot loops: a pin scope hands out plain references at plain speed.
-    buffer.edit([](Player& p) { p.level += 1; });
-
-    auto bytes = buffer.save_verified();
-    auto restored = TypedXBuffer<Player>::load(bytes,
-        XBuffer::maximum_capacity(limit));
-    return restored.root().level() == 11 ? 0 : 1;
-}
-```
-
-`TypedXBuffer<T>::root()` returns a proxy (`XRef<T>`): every access checks
-one version word, so it stays valid when the buffer moves to a larger
-reservation, and a failed allocation is recorded (`buffer.error()`) instead of
-throwing or aborting. `XOFFSET_RECORD` gives each field an accessor
-(`player.level()`); without a field list use `player.field<&Player::level>()`.
-`edit` / `read` run a callable with plain references while the buffer is
-pinned; `plain_root()` is the old unprotected reference.
-
-`TypedXBuffer<T>::load()` uses the verified path. Use library containers inside
-the arena, register each root schema, and satisfy both byte-copy safety and wire
-admission. A schema name alone does not establish compatibility: the reader's
-type layout must match the writer's exactly (see
-[schema changes](docs/USER_GUIDE.md#7-schema-变更)).
-See `examples/helloworld.cpp`, the use-case examples in
-[GETTING_STARTED.md](docs/GETTING_STARTED.md) (`server_to_client.cpp`,
-`client_uplink.cpp`, `server_to_server.cpp`, `delta_sync.cpp`,
-`shared_delta.cpp`), `examples/stable_storage.cpp` and `examples/demo.cpp`.
-
-## Build and consume
-
-Extract the versioned source archive; it already contains the required dependency
-headers. In a Git checkout, first initialize the exact submodules using the
-[LF-preserving recipe](docs/PACKAGING.md#fixed-inputs).
-
-For a full source build with an already prepared P2996 toolchain:
-
-```sh
-cmake -S . -B build/alpha-full -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_CXX_COMPILER=/path/to/p2996/bin/clang++
-cmake --build build/alpha-full --parallel 2
-ctest --test-dir build/alpha-full --output-on-failure -C Release
-```
-
-For storage only, use your platform compiler:
-
-```sh
-cmake -S . -B build/alpha-storage -DXOFFSET_STORAGE_ONLY=ON
-cmake --build build/alpha-storage --config Release --parallel 2
-ctest --test-dir build/alpha-storage --output-on-failure -C Release
-```
-
-To install a full package, use a new build directory and your chosen prefix:
-
-```sh
-cmake -S . -B build/alpha-install \
-  -DCMAKE_CXX_COMPILER=/path/to/p2996/bin/clang++ \
-  -DCMAKE_INSTALL_PREFIX=/path/to/xoffset-prefix \
-  -DXOFFSET_BUILD_TESTS=OFF -DXOFFSET_BUILD_TOOLS=OFF -DXOFFSET_BUILD_EXAMPLES=OFF
-cmake --build build/alpha-install --config Release
-cmake --install build/alpha-install --config Release
-```
-
-An installed full-library consumer uses:
-
-```cmake
-cmake_minimum_required(VERSION 3.30)
-project(MyConsumer LANGUAGES CXX)
-find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
-if(NOT XOffsetDatastructure_VERSION STREQUAL "4.0.0")
-    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 4.0.0")
-endif()
-add_executable(my_app main.cpp)
-target_link_libraries(my_app PRIVATE XOffset::xoffset)
-```
-
-Configure the consumer with `-DCMAKE_PREFIX_PATH=/path/to/xoffset-prefix` and the
-same compatible P2996 toolchain. For storage, request `COMPONENTS storage`, link
-`XOffset::storage`, and use CMake 3.13+. Packages reject numeric, `EXACT` and
-range version requests (no release promises compatibility with another one);
-check the complete version string as above.
-
-For embedded source consumption, use `add_subdirectory(path/to/XOffsetDatastructure)`
-and link the same target. Subprojects default tests, tools, examples and install
-rules to OFF. Set `XOFFSET_STORAGE_ONLY=ON` before adding the subdirectory when
-only storage is needed.
-
-## Validation scope
-
-Results are profile-specific, not a promise for every compiler on each OS.
-GitHub CI has been off since 2026-10-23; the rows that cite CI are records of
-the 2.0 format from before that date. Since then the record is local
-validation (`tools/local_validate.sh`) and the local platform matrix
-(`tools/platform_matrix.sh`, [CLIENT_TARGETS.md](docs/CLIENT_TARGETS.md)).
-
-| Environment | V2 result | Boundary |
-| --- | --- | --- |
-| 3.1.0 RC `e913d22` (format 2.1), local platform matrix: Linux x86_64 GCC 16 and P2996, Linux arm64 GCC 16 and P2996 (colima on Apple M4), Windows x64 MinGW-w64 GCC 16.2 (wine) | Full CTest 107/107 on each Linux column; Windows 105 pass, 2 skipped by design; 2.1 wire corpus byte-identical across all five | Functional only, no timing; MSVC, clang-cl, Android and iOS cannot build 3.1.0 (see the field-list row) |
-| Field-list backend, `next_cpp26` after #149 (since 3.2.0), `tools/native_targets.sh`: Android arm64 NDK r29/r30 (qemu), Windows x64 MSVC 19.44 C++20/C++23, clang-cl 19 and MinGW GCC 13.2 (wine) | Release CTest 106/106 on each; all 6 reference wires from the GCC 16 C++26 reflection build accepted, written corpus byte-identical | Functional only; iOS simulator (Xcode 27.1, iOS 27.0) 129/129 with the same corpus; an iPhone 15 Pro Max passed 138/138 and 3.2.0-rc.1 passed on one Android 11 phone ([records](docs/DEVICE_TESTING.md)); core guarantee K8 since 2026-11-04 ([CLIENT_TARGETS.md](docs/CLIENT_TARGETS.md)) |
-| macOS 26.3 arm64 (Apple M4), clang-p2996 `d77eff1` | Debug 78/78; TSan 75/75; ASan+UBSan passes except 8 cases inside the 9 known platform-limit cases (Darwin ASan replaces `operator new`, so injected host allocation failures cannot fire) | Recorded on 2026-10-21 for the V2 merge |
-| Linux x86_64, pinned P2996 Docker image | Full build, CTest, signature check and package consumption run in CI ([ci.yml](.github/workflows/ci.yml)); a separate CI job runs ASan+UBSan on the allocator, wire and V2 tests | CI is the record; see the workflow runs |
-| Linux x86_64, GCC 16.2.0 (`gcc:16` image) | Debug build, CTest and ASan+UBSan in CI; cross-compiler wire corpus exchanged with P2996 Clang (byte-identical, mutually accepted) | No x86_64 performance comparison with P2996 Clang (cloud GCC timing is reference only) |
-| Linux arm64 VM on Apple M4 (colima vz), GCC 16.2.0 vs clang-p2996 `d77eff1` | Release CTest 98/98 with both; per-cycle state and wire bytes identical across the two compilers; SLG A–C xoffset÷baseline ≤ 0.50 under GCC in both batches (reference only) | GCC÷Clang wall-clock has no verdict: both allowed batches were invalid by their A/A and bridge rules; directions in [docs/perf/gcc16-20261026](docs/perf/gcc16-20261026/README.md) (2026-10-26) |
-| Linux arm64 (native runner), GCC 16 | Full Debug CTest in CI; wire corpus byte-identical with Linux x86-64 | CI is the record ([client-targets.yml](.github/workflows/client-targets.yml)) |
-| Windows x64, MSYS2 UCRT64 MinGW-w64 GCC 16.2 | Full Debug CTest in CI; wire corpus byte-identical with Linux x86-64 | No reflection compiler for MSVC, Android or iOS; those clients use the field-list backend (row above) |
-| Native Windows x64, MSVC | storage only (V1-era record) | Full library through the field-list backend only (row above) |
-
-V2 also passed a 100,000-case differential fuzz of the validators (35,000 under
-ASan+UBSan) with zero disagreements. Earlier V1-era platform records
-(`docs/VM_FINAL_DELIVERY.md` and the other `VM_`/`V1_` documents) were moved out
-of the tree on 2026-10-27; [ARCHIVED_EVIDENCE.md](docs/ARCHIVED_EVIDENCE.md)
-says how to retrieve them. They do not describe the V2 format.
-
-## Performance
-
-All timing claims come from one Apple M4 running one game-server workload
-(`bench/slg`) against zpp_bits, cista, cereal, protobuf and FlatBuffers in the
-same process. [docs/PERFORMANCE.md](docs/PERFORMANCE.md) has the numbers for
-each release, the protocol and the limits. Treat them as specific to that
-machine, workload and adapter set. No Linux or Windows timing figures are
-claimed; the cloud instruction-count gate ([docs/PERF_GATE.md](docs/PERF_GATE.md))
-only blocks regressions.
-
-## Storage and ownership rules
-
-- A strict per-buffer limit is `XBuffer::maximum_capacity(bytes)`. The default is
-  64 MiB, or the initial length if larger; the payload ceiling is `0x7ffffff8`.
-  `max_capacity(bytes)` is a legacy reservation hint, not a strict limit.
-- Growth defaults to `XGrowPolicy::Explicit`; exhaustion throws `XBadAlloc`.
-  `XGrowPolicy::Automatic` and `XBufferPool` are opt-in. Pool budgets bound idle
-  cached reservations, not live owners or total process memory.
-- Storage is chosen when a buffer is created (`storage_kind()` reports it):
-  - **VM** (a reserved virtual-memory range, address fixed for life): with an
-    `XBufferPool`, with `with_storage(XStorage::Pinned)`, with Automatic growth
-    and a maximum above `XBuffer::SLOT_MAX` (256 KiB − 64 B), or when the initial
-    size is above `SLOT_MAX`.
-  - **Pinned slot** (a slot of the library slab, address fixed for life): a
-    maximum of at most `SLOT_MAX`.
-  - **Movable slot**: otherwise, which includes the default (Explicit growth,
-    64 MiB maximum) for small buffers and loads.
-- Addresses stay fixed through Automatic growth, container mutation, save,
-  `shrink_to_fit` and `reclaim_tail_pages`. On a movable slot, `grow()` may move
-  the payload to a larger slot (or to VM above `SLOT_MAX`, pinned from then on),
-  and so may `reload_verified`, `begin_verified_reload` and
-  `set_growth_policy(XGrowPolicy::Automatic)`. A move invalidates root references,
-  element pointers, `allocator<T>()` results and borrowed spans; `XHandle`
-  re-resolves, and `epoch()` changes. `address_stable()` tells which case applies;
-  use `with_storage(XStorage::Pinned)` for an address that never changes.
-- `reserved_bytes()` counts page-rounded virtual address space (the slot size on
-  a slot); `accessible_bytes()` counts enabled pages (the slot capacity on a
-  slot), not RSS. Logical shrink retains enabled pages; `reclaim_tail_pages()`
-  explicitly attempts page reclamation (a no-op on a slot). Freed slots stay in
-  the process for reuse; `XBuffer::trim_slot_storage()` discards their pages.
-- Container mutation can move or destroy elements. Borrowed spans and handles do
-  not own the buffer; the C++ buffer object must outlive its handles. Synchronize
-  writes externally.
-- Library container mutations preserve logical contents on allocation failure;
-  capacities and allocator bookkeeping need not roll back. User operation
-  sequences and external constructor effects are not transactions.
-- Arena memory allocated by hand (for example `XBuffer::allocator<T>()`) and not
-  reachable from the root must be released before `save_verified`; the V2 exact
-  coverage check rejects unreachable regions.
-- Bound wire size, per-buffer capacity and aggregate in-flight work before
-  accepting untrusted input. Verified validation is not cryptographic
-  authentication; see the [compatibility contract](docs/ALPHA_COMPATIBILITY.md).
-
-Both public headers are required for full consumers. Keep header versions,
-compile-time options and toolchain settings consistent across translation units.
-A release does not promise stable source API, ABI or arbitrary cross-toolchain
-wire compatibility; the [user guide](docs/USER_GUIDE.md#8-核心承诺与-api-稳定性) lists the
-core guarantees (K0–K9, starting with K0: the payload holds no absolute
-address, so after any modification the whole region can still be copied to
-another address, process or machine) and which interfaces they cover. K8,
-native client builds (iOS, Android, Windows) sharing one library and one wire
-with the servers, became a core guarantee on 2026-11-04. Schema evolution
-(different schema versions on the two ends, since 3.2.0) is provided, see
-[SCHEMA_EVOLUTION.md](docs/SCHEMA_EVOLUTION.md). K9, native delta sync (send
-only the bytes that changed; the receiver merges them into its copy: delta
-format 1.0 for whole states, shared deltas XS 1.0 for views), became a core
-guarantee in 3.5.0 after its apply entry points passed the pre-release fuzz. Receive checks come in three tiers (user guide
-section 8): today every receive entry point does the full check; 3.4 adds a
-trusted tier (default between servers and from server to client: header and
-hole-table bounds only, never for untrusted input) and a bounds tier (default
-for client uploads: reads stay in bounds, data is used read-only); modifying
-client data in place takes the full check.
+See [LICENSE](LICENSE).
