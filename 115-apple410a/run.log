@@ -1,0 +1,23 @@
+reference corpus: none (write only)
+== 13:45:41Z macos-c++20
+macos-c++20 rc=0
+| configure | passed | `native-logs/configure.log` |
+| build | passed | `native-logs/build.log` |
+| ctest summary | 100% tests passed out of 211 | |
+| corpus write | passed | `native-logs/corpus-write.log` |
+| corpus read / diff | not run: no --ref | |
+== 13:47:54Z macos-c++23
+macos-c++23 rc=0
+| configure | passed | `native-logs/configure.log` |
+| build | passed | `native-logs/build.log` |
+| ctest summary | 100% tests passed out of 211 | |
+| corpus write | passed | `native-logs/corpus-write.log` |
+| corpus read / diff | not run: no --ref | |
+== 13:49:36Z ios-sim-c++20
+ios-sim-c++20 rc=0
+| configure | passed | `native-logs/configure.log` |
+| build | passed | `native-logs/build.log` |
+| ctest summary | 100% tests passed out of 211 | |
+| corpus write | passed | `native-logs/corpus-write.log` |
+| corpus read / diff | not run: no --ref | |
+result tarball sha256 d85d58820925080bdd871671f0c57c01821ffdc72d64f7842c18822d75dc6ba5
