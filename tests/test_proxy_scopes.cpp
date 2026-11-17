@@ -296,7 +296,8 @@ bool test_pin_scopes() {
     // reused before it closes; without it they are reusable at once.
     auto q = make_relocating();
     ok = q.edit<Root>([&](Root& root) {
-        for (int i = 0; i < 4; ++i) root.ints.push_back(i);
+        root.ints.push_back(0);             // the first block
+        for (int i = 1; root.ints.size() < root.ints.capacity(); ++i) root.ints.push_back(i);   // fill it
         root.title = "a title long enough for a heap block";   // the ints block cannot grow in place
         const std::int32_t* old_block = root.ints.data();
         root.ints.push_back(4);             // regrows: the old block is retired

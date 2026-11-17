@@ -83,21 +83,21 @@ class ScorecardTest(unittest.TestCase):
             rows, batches = sc.evaluate(d, "xoffset_trusted", ["zpp_bits", "cista_unchecked"], "head", "d3",
                                         ["zpp_bits", "zpp_bits_dirty"])
             rows = {r["cell"]: r for r in rows}
-            self.assertEqual(batches["zpp_bits 共享"], 3)
-            self.assertNotIn("zpp_bits_dirty 共享", batches)  # no d3 processes: skipped
-            self.assertAlmostEqual(rows["DP"]["rivals"]["zpp_bits 共享"]["gm"], 2.0, places=9)  # 0.6 / 0.3
-            self.assertEqual(rows["DP"]["best"], "zpp_bits 共享")
+            self.assertEqual(batches["zpp_bits shared"], 3)
+            self.assertNotIn("zpp_bits_dirty shared", batches)  # no d3 processes: skipped
+            self.assertAlmostEqual(rows["DP"]["rivals"]["zpp_bits shared"]["gm"], 2.0, places=9)  # 0.6 / 0.3
+            self.assertEqual(rows["DP"]["best"], "zpp_bits shared")
             self.assertEqual(rows["DP"]["class"], "loss")
             # Slower shared receive: the per-client row stays the strongest.
             self.assertEqual(rows["DPTW.recv"]["best"], "zpp_bits")
             # No shared D keys for DC: U rows only.
-            self.assertNotIn("zpp_bits 共享", rows["DC"]["rivals"])
-            self.assertNotIn("zpp_bits 共享", rows["A"]["rivals"])
+            self.assertNotIn("zpp_bits shared", rows["DC"]["rivals"])
+            self.assertNotIn("zpp_bits shared", rows["A"]["rivals"])
             brows = {b["label"]: b for b in sc.byte_rows(d, "xoffset_trusted", ["zpp_bits"], "head", "d3", True,
                                                          ["zpp_bits"])}
-            self.assertEqual(brows["DP 共享和平 ÷ 对手 UP"]["rivals"]["zpp_bits 共享"], 60)
+            self.assertEqual(brows["DP shared peace ÷ rival UP"]["rivals"]["zpp_bits shared"], 60)
             text = sc.render(list(rows.values()), batches, ["zpp_bits", "cista_unchecked"], [], True, None, None)
-            self.assertIn("÷ zpp_bits 共享", text)
+            self.assertIn("÷ zpp_bits shared", text)
 
     def test_tie_bounds(self):
         self.assertEqual(sc.classify(0.9499), "win")
@@ -111,10 +111,10 @@ class ScorecardTest(unittest.TestCase):
             rows, batches = sc.evaluate(d, "xoffset_trusted", ["zpp_bits"], "head", "d3")
             brows = sc.byte_rows(d, "xoffset_trusted", ["zpp_bits"], "head", "d3", True)
             text = sc.render(rows, batches, ["zpp_bits"], brows, True, None, None)
-            self.assertIn("主格 19：赢 17，平 1，输 1", text)  # DPTW tie, DCTW loss; UL.send not counted
+            self.assertIn("Main cells 19: win 17, tie 1, loss 1", text)  # DPTW tie, DCTW loss; UL.send not counted
             by = {b["label"]: b for b in brows}
-            self.assertEqual(by["UP 视野和平"]["xo"], 100)
-            self.assertEqual(by["DP 共享和平 ÷ 对手 UP"]["rivals"]["zpp_bits"], 80)
+            self.assertEqual(by["UP view peace"]["xo"], 100)
+            self.assertEqual(by["DP shared peace ÷ rival UP"]["rivals"]["zpp_bits"], 80)
 
     def test_missing_d3_fails_main(self):
         with tempfile.TemporaryDirectory() as d:

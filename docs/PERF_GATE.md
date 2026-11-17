@@ -1,68 +1,124 @@
-# 性能回归门禁（指令数，L0）
+# Performance regression gate (instruction counts, L0)
 
-**指令数只用于拦截回退，计时结论以 Mac 正式批次为准。** 任何"变快"或达标（G1–G4）的说法都不能拿这里的数字作证据。
+**Instruction counts are used only to catch regressions; timing conclusions come from the formal Mac
+batches.** No claim of "faster" or of meeting a target (G1–G4) may use the numbers here as evidence.
 
-**合并规则（susu 2026-11-05 01:26Z）**：性能判定全部在云端。S 类和 L 类 PR 合并前都只过 GCC 16 和 P2996 两个 Ir 门（第 3 节的阈值），再在合并结果上跑 `tools/local_validate.sh`；L 类另附 cache-sim 的 D1/LL 缺失对比（第 5a 节），只作警告。Mac 批次只做合并后和发版后的复核，只报，不挡合并；复核发现的回退开修复 PR，进下一个补丁版本。下文凡是写“合并前跑 Mac L2”的地方，都按这条换成：带上函数差异表和 cache-sim 对比，由「性能优化」判断，结论写进 PR 正文。
+**Merge rules (susu 2026-11-05 01:26Z)**: all performance verdicts happen in the cloud. Class S and
+class L PRs only pass the GCC 16 and P2996 Ir gates before merging (thresholds of section 3), then run
+`tools/local_validate.sh` on the merge result; class L also attaches a cache-sim comparison of D1/LL
+misses (section 5a), as a warning only. Mac batches only review after merges and releases, report only,
+and never block a merge; regressions found by the review get a fix PR in the next patch release.
+Wherever the text below says "run Mac L2 before merging", read it under this rule as: attach the function
+diff table and the cache-sim comparison, let the performance thread judge, and write the conclusion into
+the PR body.
 
-**分层验证（susu 2026-11-11 05:57Z）**：`tools/local_validate.sh` 默认按 PR 层跑（`--tier pr`），合并证据是这一层全部 pass，两个 Ir 门按第 3 节判：
+**Tiered validation (susu 2026-11-11 05:57Z)**: `tools/local_validate.sh` runs the PR tier by default
+(`--tier pr`); the merge evidence is every step of that tier passing, with the two Ir gates judged per
+section 3:
 
-| 层 | 用在哪 | 步骤 |
+| Tier | Used for | Steps |
 | --- | --- | --- |
-| `pr`（默认） | 改了库的 PR（S、L 类，以及改库源文件的 0 类） | meta、gcc、asan、fuzz、diff、smoke、ir、p2996、p2996-ir、asm，加 diff-c++20 和一个 C++20 客户端列（client-c++20，MSVC 优先） |
-| `quick` | 不碰库的 PR（只改 bench/、tools/、tests/、docs/） | meta、gcc、smoke、p2996；顶层源文件、CMakeLists.txt 或 cmake/ 和 base 不同时拒绝运行 |
-| `daily` | 每天一次，在 `main` 的最新提交上 | tsan、整个 C++20/C++23 矩阵、全部客户端列、wire-matrix（`pr` 层省掉的部分） |
-| `release`（= `--release`） | 发版候选 | 全部步骤 |
+| `pr` (default) | PRs that change the library (class S and L, and class 0 PRs that change library sources) | meta, gcc, asan, fuzz, diff, smoke, ir, p2996, p2996-ir, asm, plus diff-c++20 and one C++20 client column (client-c++20, MSVC first) |
+| `quick` | PRs that do not touch the library (only bench/, tools/, tests/, docs/) | meta, gcc, smoke, p2996; refuses to run when top-level sources, CMakeLists.txt or cmake/ differ from the base |
+| `daily` | Once a day, on the latest commit of `main` | tsan, the whole C++20/C++23 matrix, all client columns, wire-matrix (the parts the `pr` tier leaves out) |
+| `release` (= `--release`) | Release candidates | All steps |
 
-`daily` 发现的失败当天开修复 PR，修好之前不发版。`full` 是 11-11 之前的默认步骤，需要时仍可指定。
+Failures found by `daily` get a fix PR the same day, and nothing is released until they are fixed.
+`full` was the default step set before 11-11 and can still be requested when needed.
 
-设计依据：H3 设计 `beta2-20261022/H3_PERF_GATE_DESIGN_20261022.md` 第 5 节。本页是实现说明。
+Design basis: section 5 of the H3 design `beta2-20261022/H3_PERF_GATE_DESIGN_20261022.md`. This page is
+the implementation description.
 
-**运行状态（2026-10-26）**：GitHub CI 已停用（susu 10-23 决定），`perf-gate.yml` 保留但不再自动运行，门禁改由本地验证脚本运行（命令见第 6 节）。实现验收：1（历史回放）、2（人为回归被拦）已通过；3（一周稳定）作废：GitHub CI 停用，门禁改由本地验证脚本运行。
+**Operating status (2026-10-26)**: GitHub CI is off (susu's decision of 10-23); `perf-gate.yml` is kept
+but no longer runs automatically, and the gate is run by the local validation script (commands in
+section 6). Implementation acceptance: 1 (historical replay) and 2 (a deliberate regression is caught)
+passed; 3 (one week of stability) is void: GitHub CI is off, and the gate is run by the local validation
+script.
 
-## 1. 它做什么
+## 1. What it does
 
-`.github/workflows/perf-gate.yml` 在 PR 指向 `main`（忽略只改 `docs/**`、`*.md` 的 PR）、push 到 `main` 和手动触发时运行，GCC 16 和 P2996 Clang 各一个作业，两个都判定：
+`.github/workflows/perf-gate.yml` runs on PRs targeting `main` (ignoring PRs that only change `docs/**`
+and `*.md`), on pushes to `main` and on manual triggers, with one job each for GCC 16 and P2996 Clang,
+both judged:
 
-1. 在同一个作业里导出三份库代码：**anchor**（`bench/perf/ANCHOR`）、**base**（PR 是 merge-base，push 是第一父提交）、**head**。
-2. 三份都用 **head 里的基准代码**（手动回放时用所选分支的基准代码）（`bench/slg/`、`bench/formal/`、`bench/reloc/`）编译 `slg_bench`、`sc_xoffset` 和 `reloc_bench`。base 或 anchor 用 head 的基准编不过（公开 API 改了）时，改用它自己那一版的基准，标"基准不同"并警告；仍编不过就标"不可比"，作业不失败；这个 PR 合并前要在 PR 正文里说明，并附 cache-sim 对比（第 5a 节），合并后的 Mac 复核要覆盖它。`reloc_bench` 是可选的：base 或 anchor 编不过它时只少 `reloc.*` 的比较（警告），head 编不过就是构建失败。
-3. 计数前先查正确性：SLG `--mode verify --scale S`（xoffset 与 cereal 一致，复用协议和逐条协议各一次）；正式 harness 用各自的 `encode` 生成 S、M 输入 wire，`validate` S 和 M；`reloc_bench --mode verify`（每轮各方结果摘要一致，同时给出项名）。head 任何一项失败，门禁直接失败，不出数字。
-4. 在 valgrind callgrind 下数每个阶段的指令数（Ir），`--collect-atstart=no`，只在被测阶段里打开收集。各阶段一个进程，`nproc` 个并行。
-   - 每个进程都带 `GLIBC_TUNABLES=glibc.cpu.x86_rep_movsb_threshold=0x7fffffffffffffff:glibc.cpu.x86_rep_stosb_threshold=0x7fffffffffffffff`，关掉 glibc memcpy 的 rep movsb 路径和 memset 的 rep stosb 路径。
-   - 原因：valgrind 把 `rep movsb` / `rep stosb` 的每次迭代算一条指令，落在这条路径上的拷贝或清零约每字节一条 Ir；同样的字节走向量循环只要几十分之一。
-   - memcpy 的例子：#83 把 12 MiB 输出拆成 256 KiB 一块，formal.emit_after 的 Ir 就成了 5.96 倍，实际工作量并没有变。关掉这条路径后 memcpy 的 Ir 跟拷贝字节数走，#83 是 1.058 倍。
-   - memset 的例子：glibc 对 ≥ 2 KiB（`x86_rep_stosb_threshold` 默认值）的 memset 走 rep stosb。一个把几次小清零合成一次 3 KiB 清零的原型，只关 movsb 时 A.simulate 是 1.416 倍（memset 61.7 万 Ir），两条都关是 1.0003 倍（memset 5.7 万 Ir）（`A_SIMULATE_REGROW_20261026.md` 第 4 节）。
-   - 口径从 movsb 单项改成两项是 2026-10-26（PR 见 ledger `record_only` 条目 `ir-env-stosb`）。之前的门禁 JSON、校准表和 ledger 里的绝对 Ir 是旧口径，不能和之后的绝对值直接比；head÷base 的比值只在改动改变了 ≥ 2 KiB memset 的次数或大小时才会不同，已有门禁对的重判见 `/mnt/project-files/throughput-20261026/ir-calibration/stosb-rejudge/`。
-5. head 的一个 SLG 阶段、正式 mutate 和第一个 reloc 项各多跑一次，两次 Ir 必须逐位相同，否则门禁失败（结果不可信）。
-6. 按第 3 节的门槛判定，作业摘要里一张表，JSON 产物 `perf-gate-<编译器>-<head sha>.json`（90 天）。不发 PR 评论。
-7. 每个警告、失败或要 ledger 放行的指标，再从同一次 callgrind 输出列一张函数差异表（见第 5 节）。
+1. Export three copies of the library code in the same job: **anchor** (`bench/perf/ANCHOR`), **base**
+   (the merge-base for a PR, the first parent for a push) and **head**.
+2. All three are compiled into `slg_bench`, `sc_xoffset` and `reloc_bench` with **head's bench code**
+   (for manual replays, the bench code of the chosen branch) (`bench/slg/`, `bench/formal/`,
+   `bench/reloc/`). When base or anchor does not compile with head's bench (the public API changed), it
+   uses its own version's bench instead, marked "different bench" with a warning; if that still does not
+   compile it is marked "not comparable" and the job does not fail; before this PR merges, the PR body
+   must explain it and attach a cache-sim comparison (section 5a), and the post-merge Mac review must
+   cover it. `reloc_bench` is optional: when base or anchor cannot compile it, only the `reloc.*`
+   comparisons are missing (warning); when head cannot compile it, the build fails.
+3. Correctness is checked before counting: SLG `--mode verify --scale S` (xoffset agrees with cereal,
+   once with the reuse protocol and once with the per-message protocol); the formal harness generates S
+   and M input wires with its own `encode` and `validate`s S and M; `reloc_bench --mode verify` (each
+   side's result digest agrees per round, with the item names). If head fails any of them, the gate fails
+   right away with no numbers.
+4. Count instructions (Ir) per stage under valgrind callgrind with `--collect-atstart=no`, turning
+   collection on only inside the measured stage. One process per stage, `nproc` in parallel.
+   - Every process carries
+     `GLIBC_TUNABLES=glibc.cpu.x86_rep_movsb_threshold=0x7fffffffffffffff:glibc.cpu.x86_rep_stosb_threshold=0x7fffffffffffffff`,
+     turning off glibc memcpy's rep movsb path and memset's rep stosb path.
+   - Why: valgrind counts each iteration of `rep movsb` / `rep stosb` as one instruction, so copying or
+     zeroing on that path costs about one Ir per byte; the same bytes through a vector loop take a few
+     dozen times fewer.
+   - A memcpy example: #83 split a 12 MiB output into 256 KiB chunks, and the Ir of formal.emit_after
+     became 5.96x although the actual work did not change. With this path off, memcpy's Ir follows the
+     bytes copied, and #83 is 1.058x.
+   - A memset example: glibc sends memsets ≥ 2 KiB (the default `x86_rep_stosb_threshold`) through rep
+     stosb. A prototype merging several small zeroings into one 3 KiB zeroing measured A.simulate at
+     1.416x with only movsb off (memset 617k Ir), and 1.0003x with both off (memset 57k Ir)
+     (`A_SIMULATE_REGROW_20261026.md` section 4).
+   - The measure changed from movsb alone to both on 2026-10-26 (PR: ledger `record_only` entry
+     `ir-env-stosb`). Absolute Ir in earlier gate JSON, calibration tables and the ledger use the old
+     measure and cannot be compared directly with later absolute values; head÷base ratios differ only when
+     a change alters the number or size of memsets ≥ 2 KiB; re-judgments of existing gate pairs are in
+     `/mnt/project-files/throughput-20261026/ir-calibration/stosb-rejudge/`.
+5. One SLG stage of head, formal mutate and the first reloc item each run once more, and the two Ir
+   counts must be bit-identical, or the gate fails (results not trustworthy).
+6. Judge by the thresholds of section 3: one table in the job summary and a JSON artifact
+   `perf-gate-<compiler>-<head sha>.json` (90 days). No PR comments.
+7. For every metric with a warning, a failure or a ledger exemption, list a function diff table from the
+   same callgrind output (see section 5).
 
-不需要存基线，不需要 nightly：Ir 是确定的，三份每次现编现测，runner 镜像、valgrind 版本的变化自动抵消；代码不变时 Ir 不变，push 的结果已经覆盖每次合并。
+No stored baselines and no nightly runs are needed: Ir is deterministic, all three copies are built and
+measured fresh every time, and changes in the runner image or valgrind version cancel out; Ir does not
+change when the code does not, and the push results already cover every merge.
 
-## 2. 测什么
+## 2. What it measures
 
-| 来源 | 设置 | 指标名 |
+| Source | Settings | Metric names |
 | --- | --- | --- |
-| SLG | S 规模，seed 20261021，`SLG_REUSE=1`（口径 c），8 个周期，只收集第 4–7 周期（前几个周期还在预热，30bb5ca 的 A 场景第 4–7 周期每周期 Ir 只有第 1–2 周期的 74%；Mac 正式 SLG 量的是稳态） | 每个计时阶段 `slg.<键>`（如 `slg.A.apply`、`slg.S.ticks_middle`）；场景合计 `slg.A`…`slg.D` = 该场景各阶段之和 |
-| 正式 harness | M fixture（`bench/formal/model/reference.py --scale M`，默认 seed） | `formal.load`、`formal.query_before`、`formal.mutate`、`formal.emit_after`、`formal.retire`、`formal.reload`、`formal.query_after`、`formal.cleanup`；`formal.read_sum` = query_before + query_after；`formal.total` 只报 |
-| 重定位税（G9） | `bench/reloc`，每项一个进程：`--rounds 5 --warmup 1 --cases <项>`，`RELOC_IR_SKIP_ROUNDS=2`，只收 XOffset 一侧的计时区（第 2–4 轮） | 每项 `reloc.<项>`（如 `reloc.vec.push_back`、`reloc.map.insert.fresh`），包括只报告的 `*.reused`、`.plain` 和节点容器对照项 |
+| SLG | S scale, seed 20261021, `SLG_REUSE=1` (measure c), 8 cycles, collecting only cycles 4–7 (the first cycles are still warming up: in scenario A of 30bb5ca the per-cycle Ir of cycles 4–7 is only 74% of cycles 1–2; the formal Mac SLG measures steady state) | Each timed stage `slg.<key>` (such as `slg.A.apply`, `slg.S.ticks_middle`); scenario totals `slg.A`…`slg.D` = the sum of that scenario's stages |
+| Formal harness | M fixture (`bench/formal/model/reference.py --scale M`, default seed) | `formal.load`, `formal.query_before`, `formal.mutate`, `formal.emit_after`, `formal.retire`, `formal.reload`, `formal.query_after`, `formal.cleanup`; `formal.read_sum` = query_before + query_after; `formal.total` report only |
+| Relocation tax (G9) | `bench/reloc`, one process per item: `--rounds 5 --warmup 1 --cases <item>`, `RELOC_IR_SKIP_ROUNDS=2`, collecting only XOffset's timed region (rounds 2–4) | Each item `reloc.<item>` (such as `reloc.vec.push_back`, `reloc.map.insert.fresh`), including the report-only `*.reused`, `.plain` and node container comparison items |
 
-SLG 只编 XOffset + cereal（cereal v1.3.2，`ebef1e92`，头文件）。M 规模的 SLG 在 valgrind 下会超出地址空间（512 × 256 MiB 预留），所以用 S。正式 harness 的 M 输入 wire 由每份二进制自己编码并记录 sha256；与 anchor 不同时摘要会写"M 输入 wire 变了"，格式改动要 susu 定。
+SLG builds only XOffset + cereal (cereal v1.3.2, `ebef1e92`, headers). M-scale SLG exceeds the address
+space under valgrind (512 × 256 MiB reservations), so S is used. The formal harness's M input wire is
+encoded by each binary itself and its sha256 recorded; when it differs from anchor the summary says "M
+input wire changed", and format changes are for susu to decide.
 
-## 3. 门槛
+## 3. Thresholds
 
-| 对象 | 警告 | 失败 |
+| Subject | Warning | Failure |
 | --- | --- | --- |
-| 合计：`slg.A`–`slg.D`，`formal.read_sum`、`mutate`、`emit_after`、`load`、`reload`；head÷base | > 1.003 | > 1.010 |
-| 单个阶段，占所在场景（正式为 `formal.total`）Ir ≥ 5%；head÷base | > 1.020 | > 1.050 |
-| 占比 < 5% 的阶段，`formal.retire`、`formal.cleanup` | 只报（JSON） | — |
-| 合计：head÷anchor，扣除 ledger 已放行的部分 | > 1.010 | > 1.020 |
-| 任一合计 head÷base < 0.97 | 标"指令数下降"，提醒要 Mac 数据才能说变快 | — |
+| Totals: `slg.A`–`slg.D`, `formal.read_sum`, `mutate`, `emit_after`, `load`, `reload`; head÷base | > 1.003 | > 1.010 |
+| A single stage with ≥ 5% of its scenario's Ir (`formal.total` for formal); head÷base | > 1.020 | > 1.050 |
+| Stages under 5%, `formal.retire`, `formal.cleanup` | Report only (JSON) | — |
+| Totals: head÷anchor, after deducting what the ledger exempts | > 1.010 | > 1.020 |
+| Any total head÷base < 0.97 | Marked "instruction count dropped", with a reminder that Mac data is needed to claim it is faster | — |
 
-占比按 base 和 head 中较大的一边算。`slg.S.ticks_middle`（中间删除压力项）自成一个场景，按阶段门槛判定。每个 `reloc.<项>` 也自成一个场景，按阶段门槛（> 1.02 警告，> 1.05 失败）判定；G9 自己的判定（XOffset ÷ std 的 UB ≤ 1.05）以 Mac 批次为准，门禁只拦 XOffset 一侧的指令数回退。
+The share is computed on whichever of base and head is larger. `slg.S.ticks_middle` (the middle-erase
+stress item) is a scenario of its own and judged by the stage thresholds. Each `reloc.<item>` is also a
+scenario of its own, judged by the stage thresholds (> 1.02 warning, > 1.05 failure); G9's own verdict
+(the UB of XOffset ÷ std ≤ 1.05) comes from the Mac batches, and the gate only catches instruction count
+regressions on the XOffset side.
 
-## 4. ledger（有意的回退）
+## 4. Ledger (intentional regressions)
 
-`bench/perf/ledger.json`：
+`bench/perf/ledger.json`:
 
 ```json
 {
@@ -74,55 +130,117 @@ SLG 只编 XOffset + cereal（cereal v1.3.2，`ebef1e92`，头文件）。M 规�
       "metric": "formal.mutate",
       "compiler": "*",
       "max_ratio": 1.03,
-      "reason": "换回输出 −23%（emit_after），修改阶段多 2.4% 指令",
-      "evidence": "m3v2_RESULT.md；Mac mutate 1.038",
-      "approved_by": "susu（项目对话卡片，日期）"
+      "reason": "trades output -23% (emit_after) for 2.4% more instructions in the mutate stage",
+      "evidence": "m3v2_RESULT.md; Mac mutate 1.038",
+      "approved_by": "susu (project conversation card, date)"
     }
   ]
 }
 ```
 
-- `metric` 可用通配符（`slg.A.*`），`compiler` 是 `*`、`gcc16` 或 `p2996`，`max_ratio` > 1。所有字段必填，`id` 不能重复。
-- `"record_only": true` 的条目只作记录（例如 Ir 看不到的收益），什么都不放行，也不需要 susu 批准；`max_ratio` 写当时观察到的比值。
-- **head÷base**：只有这个 PR 新加的条目（base 的 ledger 里没有的 `id`）能放行。超过失败门槛但不超过 `max_ratio` 的指标记为"已放行"，摘要里列出条目；超过 `max_ratio` 照样失败。
-- **head÷anchor**：head 的 ledger 里所有匹配条目的 `max_ratio` 连乘，作为已放行的部分扣除后再比门槛。
-- **批准**：场景合计（`slg.A`–`slg.D`、`formal.*`）≤ 2% 的条目由「性能优化」批准并写进 `approved_by`；超过 2% 或涉及安全与性能取舍的，要 susu 确认，`approved_by` 必须写明 susu，否则门禁直接失败。
-- **内联变化**：函数差异表标了"疑似内联变化"的回退，先试把新增的冷路径（错误分支、抛异常、少见情形）挪进一个 `[[gnu::noinline]]` 函数，让热函数保持原来的内联状态；挪了仍回退才写条目，`evidence` 里附上这张函数差异表（摘要里的表或 JSON 的 `functions`）和试过的改法。
-- **anchor 前移**：发版（tag 推上去）后，开一个只改 `bench/perf/ANCHOR`（改成 tag 的提交）的 PR，同时把旧条目移到 `bench/perf/ledger_archive.json`（门禁不读它；条目失效时也移过去，例如 `reloc-bench-added` 在门禁开始测 `reloc.*` 时移入）。
+- `metric` may use wildcards (`slg.A.*`), `compiler` is `*`, `gcc16` or `p2996`, and `max_ratio` > 1.
+  All fields are required, and `id`s must be unique.
+- Entries with `"record_only": true` are records only (for example gains Ir cannot see); they exempt
+  nothing and need no approval from susu; `max_ratio` holds the ratio observed at the time.
+- **head÷base**: only entries added by this PR (`id`s not in the base's ledger) can exempt. A metric above
+  the failure threshold but not above `max_ratio` is marked "exempted" and the summary lists the entry;
+  above `max_ratio` it fails as usual.
+- **head÷anchor**: the product of the `max_ratio`s of all matching entries in head's ledger is deducted as
+  the exempted part before comparing with the thresholds.
+- **Approval**: entries with scenario totals (`slg.A`–`slg.D`, `formal.*`) ≤ 2% are approved by the
+  performance thread and recorded in `approved_by`; above 2%, or when a security/performance trade-off is
+  involved, susu must confirm and `approved_by` must name susu, otherwise the gate fails outright.
+- **Inlining changes**: for a regression whose function diff table is marked "suspected inlining
+  change", first try moving the new cold path (error branches, throwing, rare cases) into a
+  `[[gnu::noinline]]` function so the hot function keeps its previous inlining; write an entry only if it
+  still regresses after the move, attaching this function diff table (the summary's table or the JSON's
+  `functions`) and the attempted change in `evidence`.
+- **Moving the anchor**: after a release (the tag is pushed), open a PR that only changes
+  `bench/perf/ANCHOR` (to the tag's commit), and at the same time move old entries to
+  `bench/perf/ledger_archive.json` (the gate does not read it; stale entries also move there, for example
+  `reloc-bench-added` moved in when the gate started measuring `reloc.*`).
 
-## 5. 看结果
+## 5. Reading the results
 
-- 作业摘要：第一行固定是上面的加粗句；然后是判定、失败/警告/说明列表、判定对象和超门槛阶段的表、各场景变化最大的阶段。
-- 产物：`perf-gate-<编译器>-<sha>.json`（全部行，含只报的阶段）、`plan.json`、`build-*.json`、`ir-*.json`、构建日志。
-- 函数差异表：每个警告、失败或"已放行"的指标，列出参照（head÷base 触发的是 base，只有 head÷anchor 触发的是 anchor）与 head 之间自身 Ir（即 `callgrind_annotate --inclusive=no`；GCC 的 `[clone …]` 后缀合并到原函数）变化最大的 10 个函数，摘要和 JSON（行的 `functions` 字段）都有。合计行与它唯一的阶段相同时只列一次。
-- **疑似内联变化**：表里的函数满足下面任一条，就在表头和"说明"里标出：
-  - 只在一边出现，并且它的某个调用者或被调用者反向变化，幅度至少是它的一半（被内联进那个函数或从中拆出）；
-  - 一对调用者与被调用者自身 Ir 一升一降，两者之和的变化不到两者变化幅度之和的一半。
+- Job summary: the first line is always the bold sentence above; then the verdict, the list of
+  failures/warnings/notes, a table of judged subjects and stages over threshold, and each scenario's
+  stages that changed most.
+- Artifacts: `perf-gate-<compiler>-<sha>.json` (all rows, including report-only stages), `plan.json`,
+  `build-*.json`, `ir-*.json`, build logs.
+- Function diff table: for every metric with a warning, a failure or an "exempted" mark, the 10 functions
+  whose self Ir (that is, `callgrind_annotate --inclusive=no`; GCC's `[clone …]` suffixes are merged into
+  the original function) changed most between the reference (base when triggered by head÷base, anchor
+  when triggered only by head÷anchor) and head, both in the summary and in the JSON (the row's
+  `functions` field). When a total equals its only stage, it is listed once.
+- **Suspected inlining change**: a function in the table that meets either condition below is marked in
+  the table header and in "notes":
+  - It appears on one side only, and one of its callers or callees changes in the opposite direction by
+    at least half its amount (it was inlined into that function or split out of it);
+  - A caller and callee pair's self Ir move in opposite directions, and the change of their sum is less
+    than half the sum of their changes' magnitudes.
 
-  两条都只算变化量至少占该指标总变化 10% 的函数。只在一边出现、却没有反向变化的伙伴，是新增或删除的代码；同名不同参数的是签名改了，都不标。**这个标记只是诊断，不放行**，也不改变判定：真回退里同样可能有内联移动（旧 M3 的 formal.mutate、slg.C、S.ticks_middle 都会被标），看到标记不能当成误报，放行仍然只靠 ledger。
-- **分配器回收型**：被标的指标净增 Ir 里，`FreeTableRecycler::recycle` 的自身 Ir 增量至少占一半，就在表头和"说明"里标出，并按 malloc/free/realloc/calloc/new/delete（含 glibc 的 `_int_*`、`tcache*`）自身 Ir 的降幅分成两种：降幅至少是 recycle 增量的 10%，算"分配器调用换成原地回收"（D2 型，校准里是 28–55%）；否则算"要回收的 bin 变多"（COPS 型，校准里分配器只降了 recycle 增量的 1–3%，是噪声级）。2026-10-26 用 Mac L2 校准时这两例 Ir 都上升（D2 的 slg.B.in_decode GCC 1.059、P2996 1.052；COPS 的 slg.B GCC 1.014），Mac 上却都变快（0.989；0.977），缓存模拟也没把 D2 翻过来。**这个标记同样只是诊断，不放行**，判定不变：这类 PR 本来就因为 Ir 警告或失败进 L 类，要附 cache-sim 对比（第 5a 节），由「性能优化」判断；合并后的 Mac 复核只报。
-- 变红怎么办：先看是哪个阶段、哪些函数；是意外就修；标了疑似内联的，先试把新增的冷路径挪进 `[[gnu::noinline]]` 函数（见第 4 节）；是有意的取舍就写 ledger 条目（见上），> 1% 的放行在合并前还要附 cache-sim 对比（第 5a 节）。
+  Both only count functions whose change is at least 10% of the metric's total change. A function that
+  appears on one side only with no partner moving the other way is added or removed code; same names
+  with different parameters mean a changed signature; neither is marked. **This mark is diagnostic only
+  and exempts nothing**, nor does it change the verdict: real regressions can also involve inlining moves
+  (the old M3's formal.mutate, slg.C and S.ticks_middle would all be marked), so a mark cannot be taken
+  as a false positive; exemptions still come only from the ledger.
+- **Allocator recycling type**: when at least half of a marked metric's net Ir increase is the self Ir
+  increase of `FreeTableRecycler::recycle`, it is marked in the table header and in "notes", and split
+  into two kinds by the decrease of self Ir in malloc/free/realloc/calloc/new/delete (including glibc's
+  `_int_*` and `tcache*`): a decrease of at least 10% of the recycle increase counts as "allocator calls
+  replaced by in-place recycling" (type D2, 28–55% in calibration); otherwise "more bins to recycle"
+  (type COPS, where in calibration the allocator dropped only 1–3% of the recycle increase, noise
+  level). In the 2026-10-26 calibration against Mac L2, Ir went up in both cases (D2's slg.B.in_decode
+  GCC 1.059, P2996 1.052; COPS's slg.B GCC 1.014), yet both got faster on the Mac (0.989; 0.977), and
+  the cache simulation did not reverse D2 either. **This mark is likewise diagnostic only and exempts
+  nothing**, and the verdict is unchanged: such PRs are class L anyway because of the Ir warning or
+  failure, attach a cache-sim comparison (section 5a), and the performance thread judges; the post-merge
+  Mac review is report only.
+- When it goes red: first see which stage and which functions; if it is unexpected, fix it; if it is
+  marked as suspected inlining, first try moving the new cold path into a `[[gnu::noinline]]` function
+  (see section 4); if it is an intentional trade-off, write a ledger entry (see above), and exemptions
+  above 1% also attach a cache-sim comparison before merging (section 5a).
 
-## 5a. cache-sim 对比（L 类，警告项）
+## 5a. Cache-sim comparison (class L, warning item)
 
-Ir 看不到内存访问的变化（第 8 节），所以 L 类 PR 合并前另附一份缓存模拟对比。由 `perf_gate.py measure`（或 `run`）加 `--cache-sim` 生成，`compare` 照常跑：
+Ir cannot see changes in memory access (section 8), so class L PRs attach a cache simulation comparison
+before merging. It is produced by `perf_gate.py measure` (or `run`) with `--cache-sim`, and `compare`
+runs as usual:
 
-- **跑什么**：在 Ir 门的正常测量之外，base 和 head（不含 anchor）的每个 SLG 阶段、formal 阶段和 reloc 项各再跑一遍 callgrind。运行方式与 Ir 门相同：S 规模、seed 20261021、8 个周期、只收集第 4–7 周期、`SLG_REUSE=1`、关掉 rep movsb/stosb，每个键单独收集。
-- **参数**：固定为 `--cache-sim=yes --D1=131072,8,128 --LL=16777216,16,128`（`CACHE_SIM_ARGS`）。
-- **对比什么**：每个场景、每个阶段的 D1 缺失（D1mr+D1mw）和 LL 缺失（DLmr+DLmw），以及各自的 head÷base。
-- **什么时候警告**：场景合计，或者占本场景 Ir 至少 5% 的阶段（与 Ir 门的分类相同），某一级缺失同时满足下面两条才算警告（susu / 「性能优化」2026-11-05）：
-  - head÷base > 1.02；
-  - 缺失增量 ≥ 100 次，或者增量 ≥ 该指标 base Ir 的万分之一。
+- **What runs**: besides the Ir gate's normal measurement, every SLG stage, formal stage and reloc item
+  of base and head (not anchor) runs once more under callgrind. It runs the same way as the Ir gate: S
+  scale, seed 20261021, 8 cycles, collecting only cycles 4–7, `SLG_REUSE=1`, rep movsb/stosb off, each key
+  collected separately.
+- **Parameters**: fixed as `--cache-sim=yes --D1=131072,8,128 --LL=16777216,16,128`
+  (`CACHE_SIM_ARGS`).
+- **What is compared**: per scenario and per stage, D1 misses (D1mr+D1mw) and LL misses (DLmr+DLmw), and
+  each one's head÷base.
+- **When it warns**: for scenario totals, or stages with at least 5% of their scenario's Ir (the same
+  classification as the Ir gate), a warning needs one level of misses to meet both conditions below
+  (susu / the performance thread, 2026-11-05):
+  - head÷base > 1.02;
+  - the miss increase is ≥ 100, or ≥ one ten-thousandth of the metric's base Ir.
 
-  第二条用来避免几十次的计数多两三次就报警。占比 < 5% 的阶段只在 JSON 里列出，不警告。
-- **结果写在哪**：判定行末尾附 `cache warn|pass`；摘要表头显示「缓存 ⚠️ 警告」，附一张缓存表；JSON 写在 `cache` 字段。结果表要写进 PR 正文，警告由「性能优化」决定。
-- **不挡合并**：只作警告，不判 fail，也不改 Ir 判定和退出码。模拟的缓存不是任何一台真机，结论仍以合并后的 Mac 复核为准。cache-sim 运行报出的 Ir 和普通运行略有不同，不使用。
+  The second condition avoids warnings when a count of a few dozen grows by two or three. Stages under 5%
+  are only listed in the JSON, without warnings.
+- **Where results go**: the verdict line ends with `cache warn|pass`; the summary header shows a cache
+  warning, with a cache table; the JSON has it in the `cache` field. The result table goes into the PR
+  body, and warnings are decided by the performance thread.
+- **Does not block merging**: warning only, never a fail, and it does not change the Ir verdict or exit
+  code. The simulated cache is not any real machine, and conclusions still rest on the post-merge Mac
+  review. The Ir reported by cache-sim runs differs slightly from normal runs and is not used.
 
-## 6. 手动触发与回放
+## 6. Manual triggers and replays
 
-Actions → "Perf gate (instruction counts)" → Run workflow，选一个带 `bench/` 的分支（通常是 main），输入 `base`、`head`、`anchor`（可选，默认取该分支的 `bench/perf/ANCHOR`）、`compilers`。基准代码取自所选分支，所以可以回放 `bench/` 入库之前的提交，也可以给 Mac 候选预检。回放 GCC 16 支持合入之前的提交时，GCC 一侧不可比，只看 P2996。回放历史提交时把 `anchor` 设成 `base`，否则 head÷anchor 比的是一个更新的提交。
+Actions → "Perf gate (instruction counts)" → Run workflow, choose a branch with `bench/` (usually main),
+and enter `base`, `head`, `anchor` (optional, defaults to that branch's `bench/perf/ANCHOR`) and
+`compilers`. The bench code comes from the chosen branch, so commits from before `bench/` was checked in
+can be replayed, and Mac candidates can be pre-checked. When replaying commits from before GCC 16 support
+landed, the GCC side is not comparable; look only at P2996. When replaying historical commits, set
+`anchor` to `base`, otherwise head÷anchor compares against a newer commit.
 
-本地（需要 GCC 16 或 P2996 Clang、valgrind、python3）：
+Locally (needs GCC 16 or P2996 Clang, valgrind, python3):
 
 ```bash
 git submodule update --init external/typelayout
@@ -130,48 +248,84 @@ git clone https://github.com/USCiLab/cereal.git /tmp/cereal && git -C /tmp/cerea
 W=build/perf-gate
 python3 tools/perf_gate/perf_gate.py prepare --work $W --base origin/main --head HEAD
 python3 tools/perf_gate/perf_gate.py run --work $W --compiler gcc16 --cereal /tmp/cereal/include
-python3 tools/perf_gate/test_perf_gate.py   # 判定逻辑自测，不需要编译器
+python3 tools/perf_gate/test_perf_gate.py   # self-test of the verdict logic, no compiler needed
 ```
 
-`build` 的 `--cxx` 可以是一条命令（例如用 docker 包装的 g++），`--extra-flags` 追加编译选项（宿主 valgrind 跑容器里编的二进制时加 `-static-libstdc++ -static-libgcc`）。
+`build`'s `--cxx` can be a command (for example g++ wrapped in docker), and `--extra-flags` appends
+compile options (add `-static-libstdc++ -static-libgcc` when the host valgrind runs a binary built in a
+container).
 
-## 7. 基准代码要提供的接口
+## 7. Interfaces the bench code must provide
 
-门禁直接用编译命令构建（不走 CMake），对 `bench/` 的要求：
+The gate builds with compile commands directly (no CMake), and requires of `bench/`:
 
-| 位置 | 要求 |
+| Location | Requirement |
 | --- | --- |
-| `bench/slg/bench/slg_bench.cpp` | 入口；包含目录 `include`、`adapters`、`bench`；`-DSLG_WITH_XOFFSET=1 -DSLG_WITH_CEREAL=1` 能编 |
-| `bench/slg/bench/runner.hpp` | `-DSLG_IR_COUNT=1` 时：`timed()` 对 `SLG_IR_KEYS`（逗号分隔）里**精确等于**键名的区间，或以 `*` 结尾的前缀条目，用 `CALLGRIND_TOGGLE_COLLECT` 开关收集；`SLG_IR_SKIP_CYCLES=N` 时第 0…N−1 周期不收集（主循环每周期设置 `slg::ir_cycle() = c`）。不定义 `SLG_IR_COUNT` 时不包含 valgrind 头文件、不改变计时代码 |
-| `bench/slg` 的输出 | `--mode bench --out f.jsonl` 每行一个 `{"cycle","format","metric","ns"}`，门禁用它发现阶段名 |
-| `bench/formal/driver.cpp` | `-DSC_IR_COUNT=1` 时按 `SC_IR_PHASE`（load、query_before、mutate、emit_after、retire、reload、query_after、cleanup）只收集一个阶段；`-DSC_ADAPTER_HEADER="adapters/xoffset/adapter.hpp" -DSC_ADAPTER_TYPE=sc::XOffsetAdapter`，包含目录 `include` 和根目录 |
-| `bench/formal/model/reference.py` | `--scale S|M --out DIR` 生成 fixture（`input.canonical.bin`、`trace.bin`、`fixture.json`） |
-| `bench/reloc/reloc_bench.cpp` | 单文件入口，只需库的包含目录；`-DRELOC_IR_COUNT=1` 时只在 `RELOC_IR_KEYS`（精确名或 `*` 前缀）所选项的 XOffset 计时区收集，`RELOC_IR_SKIP_ROUNDS=N` 时第 0…N−1 轮和热身轮不收集；`--cases <项>` 只跑这一项；`--mode verify --out f.jsonl` 校验并按行写出 `{"case","round",…}`，门禁用它发现项名 |
+| `bench/slg/bench/slg_bench.cpp` | Entry point; include directories `include`, `adapters`, `bench`; compiles with `-DSLG_WITH_XOFFSET=1 -DSLG_WITH_CEREAL=1` |
+| `bench/slg/bench/runner.hpp` | With `-DSLG_IR_COUNT=1`: `timed()` toggles collection with `CALLGRIND_TOGGLE_COLLECT` for regions whose key **exactly equals** an entry of `SLG_IR_KEYS` (comma-separated), or matches a prefix entry ending in `*`; with `SLG_IR_SKIP_CYCLES=N`, cycles 0…N−1 are not collected (the main loop sets `slg::ir_cycle() = c` each cycle). Without `SLG_IR_COUNT` it includes no valgrind header and does not change the timing code |
+| Output of `bench/slg` | `--mode bench --out f.jsonl` writes one `{"cycle","format","metric","ns"}` per line; the gate uses it to discover stage names |
+| `bench/formal/driver.cpp` | With `-DSC_IR_COUNT=1`, collects only the one stage named by `SC_IR_PHASE` (load, query_before, mutate, emit_after, retire, reload, query_after, cleanup); `-DSC_ADAPTER_HEADER="adapters/xoffset/adapter.hpp" -DSC_ADAPTER_TYPE=sc::XOffsetAdapter`, include directories `include` and the root |
+| `bench/formal/model/reference.py` | `--scale S|M --out DIR` generates the fixture (`input.canonical.bin`, `trace.bin`, `fixture.json`) |
+| `bench/reloc/reloc_bench.cpp` | Single-file entry point needing only the library include directory; with `-DRELOC_IR_COUNT=1`, collects only in XOffset's timed region of the items selected by `RELOC_IR_KEYS` (exact names or `*` prefixes), and with `RELOC_IR_SKIP_ROUNDS=N`, rounds 0…N−1 and the warm-up round are not collected; `--cases <item>` runs only that item; `--mode verify --out f.jsonl` verifies and writes `{"case","round",…}` per line, which the gate uses to discover item names |
 
-精确匹配是必须的：前缀匹配下 `C.snapshot` 会把 `C.snapshot2` 也算进去。
+Exact matching is required: with prefix matching, `C.snapshot` would also count `C.snapshot2`.
 
-## 8. 它抓不到什么
+## 8. What it cannot catch
 
-只改内存访问、不改指令数的变化：#27 让 Mac 上的正式修改快 3.0%，Ir 只变 −0.1%；新 M3 在 Mac 上让 B.season_edits 慢 2–3%，x86 Ir 却是 −5%。x86 与 Mac 的方向可能相反。2026-10-26 用 GCC 16 和 P2996 两种 Ir 重放 Mac L2 门禁对：分配器回收型改动（D2、COPS）两种 Ir 都与 Mac 反向；GCC 的内联决定翻转会让 GCC Ir 与 Mac 反向（W0b 的 formal.mutate：GCC 0.955、P2996 1.005、Mac 1.011）；方向一致时 Ir 与 Mac 的幅度也差 0.3–5 倍。所以 L0 只是合并前的过滤器。2026-11-05 起合并和发版都只用云端判定（见页首），这类变化靠 L 类的 cache-sim 对比（第 5a 节）提示，Mac 合并后和发版后的复核（只报）兜底，回退进下一个补丁版本。
+Changes that alter only memory access, not instruction counts: #27 made the formal mutate 3.0% faster on
+the Mac while Ir changed only −0.1%; the new M3 made B.season_edits 2–3% slower on the Mac while x86 Ir
+was −5%. x86 and the Mac can move in opposite directions. On 2026-10-26 the Mac L2 gate pairs were
+replayed with both GCC 16 and P2996 Ir: for allocator recycling changes (D2, COPS) both Irs moved
+opposite to the Mac; GCC inlining decisions flipping can make GCC Ir move opposite to the Mac (W0b's
+formal.mutate: GCC 0.955, P2996 1.005, Mac 1.011); even when the directions agree, Ir and the Mac differ
+in magnitude by 0.3–5x. So L0 is only a pre-merge filter. Since 2026-11-05 merges and releases use only
+cloud verdicts (see the top of the page); such changes are flagged by the class L cache-sim comparison
+(section 5a), backstopped by the post-merge and post-release Mac reviews (report only), with regressions
+going into the next patch release.
 
-## 8a. 机器码比对（0 类证据）
+## 8a. Machine code comparison (class 0 evidence)
 
-`tools/perf_gate/asm_equal.py` 回答“改动前后，三个基准程序（正式 harness `sc_xoffset`、`slg_bench`、`reloc_bench`）的机器码是否相同”，是 MERGE_RULES_V2 第 0 类“两种编译器反汇编逐条相同”的判据。`tools/local_validate.sh` 的 `asm` 步骤直接用 Ir 步骤的构建，在 GCC 16 和 P2996 下各比一次，结果写进 REPORT.md；默认只报告，`--asm-strict` 时不同就判失败。单独用：`asm_equal.py run --base REV --head REV --compiler gcc16|p2996 --work DIR --cereal INC [--cxx ...]`，或对已有构建 `asm_equal.py compare --base DIR --head DIR`。
+`tools/perf_gate/asm_equal.py` answers "is the machine code of the three bench programs (the formal
+harness `sc_xoffset`, `slg_bench`, `reloc_bench`) the same before and after the change", the criterion for
+MERGE_RULES_V2 class 0, "disassembly identical instruction by instruction under both compilers". The
+`asm` step of `tools/local_validate.sh` reuses the builds of the Ir step and compares once each under GCC
+16 and P2996, writing the result into REPORT.md; by default it only reports, and with `--asm-strict` a
+difference fails. Standalone: `asm_equal.py run --base REV --head REV --compiler gcc16|p2996 --work DIR
+--cereal INC [--cxx ...]`, or for existing builds `asm_equal.py compare --base DIR --head DIR`.
 
-- 比什么：objdump 的每个函数按符号大小截取（函数后的对齐填充算摆放，不算代码），去掉地址：函数内跳转改成相对函数起点的偏移，引用别的函数改成那个函数的身份，rip 相对和绝对地址引用数据改成“数据”。函数的身份是它规范化后的指令再把它引用的函数换成对方身份的哈希，迭代几轮，所以改名的函数仍能配上，调用换了对象则配不上。
-- 判定：两边身份的多重集合相同，就是“指令逐条相同”；再加上 .text 里（身份、相对 .text 起点的偏移、大小）的序列相同，就是“摆放相同”。只是摆放变了仍算 0 类，但要写进 PR 正文和 ledger，作为下一次阶段复核的二分点（INT1 的 map.insert 指令相同、只是对齐变了，Mac 上慢了 6–8%）。
-- 不同的时候：先列出自己指令变了的函数（附 diff），再列出只因调用的函数变了而跟着变的函数。
-- 局限：GCC `-static` 是固定地址的可执行文件，立即数里的地址只有“函数起点”或“落在数据段里”才当地址看，其余当数字；所以一个恰好落在数据段地址范围里的常数会被当成地址：摆放变化时可能误报为不同，两边这样的常数不同时也可能漏报。P2996 构建是位置无关的，地址都走 rip 相对，没有这个问题。
-- 自检：`tools/perf_gate/test_asm_equal.py [--cxx ...]` 用小程序验证改名判相同、挪地址判“指令相同、摆放不同”、加函数和改常数判不同并定位到变了的函数。
+- What is compared: each function of the objdump output, cut by symbol size (alignment padding after a
+  function counts as placement, not code), with addresses removed: jumps within a function become offsets
+  from the function start, references to other functions become that function's identity, and
+  rip-relative and absolute references to data become "data". A function's identity is a hash of its
+  normalized instructions with referenced functions replaced by their identities, iterated a few rounds,
+  so renamed functions still match while calls to a different target do not.
+- Verdict: when the multisets of identities on both sides are equal, it is "identical instruction by
+  instruction"; if in addition the sequence of (identity, offset from the start of .text, size) in .text
+  is the same, it is "same placement". A change of placement only still counts as class 0, but goes into
+  the PR body and the ledger as a bisection point for the next stage review (INT1's map.insert had the
+  same instructions with only alignment changed, and was 6–8% slower on the Mac).
+- When they differ: first list the functions whose own instructions changed (with a diff), then the
+  functions that changed only because a function they call changed.
+- Limits: GCC `-static` produces a fixed-address executable, so addresses in immediates are taken as
+  addresses only when they are a "function start" or "fall in the data segment"; everything else is a
+  number; so a constant that happens to fall in the data segment's address range is taken as an address:
+  a placement change can then be falsely reported as a difference, and differing such constants on the
+  two sides can be missed. P2996 builds are position-independent and all addresses go through
+  rip-relative addressing, so they do not have this problem.
+- Self-test: `tools/perf_gate/test_asm_equal.py [--cxx ...]` verifies with small programs that a rename
+  is judged identical, moving addresses is judged "same instructions, different placement", and adding a
+  function or changing a constant is judged different and located to the changed function.
 
-## 9. 历史回放（云端，GCC 16 x86-64，valgrind 3.22，SLG 第 4–7 周期，基准代码取自 next_cpp26 的 `bench/`）
+## 9. Historical replays (cloud, GCC 16 x86-64, valgrind 3.22, SLG cycles 4–7, bench code from next_cpp26's `bench/`)
 
-| 变化 | 结果 | 失败项 |
+| Change | Result | Failing items |
 | --- | --- | --- |
-| 旧 M3（b3a694e → ea885e5） | 失败 | formal.emit_after 1.305、formal.mutate 1.030、slg.A 1.021、slg.C 1.012、A.apply 1.101、B.out_encode 1.130、B.back_encode 1.128、C.snapshot 1.052、C.snapshot2 1.053、S.ticks_middle 1.060 |
-| 新 M3（b3a694e → 70ee1c4） | 失败 | formal.mutate 1.056、slg.A 1.017、A.apply 1.114、S.ticks_middle 1.073；B.season_edits 0.946（Mac +2–3%，漏掉，平台差异） |
-| #26（ea885e5 → 70ee1c4） | 失败 | formal.mutate 1.026（要 ledger 写明"换回输出 −23%"，emit_after 0.766） |
-| #27（f0768ad → b3ab3a3） | 通过 | — |
-| #29（b3ab3a3 → 30bb5ca） | 失败，GCC 内联变化，预期结果 | slg.D 1.032、slg.B 1.014、A.req_decode 1.092（slg.A 0.951）。函数差异表标出疑似内联：`register_allocation` 调用 `register_owned_range`，D 里 −100,096 / +154,112。#29 给 `register_owned_range` 加了二分查找和抛异常的分支，GCC 16 不再把它的大部分内联进 `register_allocation`；Mac 的 Clang 没有这个变化，A–D 都变快（0.951 / 0.991 / 0.985 / 0.969）。把重叠检查挪进 `[[gnu::noinline]]` 冷函数后 D、B、C 回到 1.001 / 0.998 / 1.000（「性能门禁」验证，改库代码另行处理） |
+| Old M3 (b3a694e → ea885e5) | Fail | formal.emit_after 1.305, formal.mutate 1.030, slg.A 1.021, slg.C 1.012, A.apply 1.101, B.out_encode 1.130, B.back_encode 1.128, C.snapshot 1.052, C.snapshot2 1.053, S.ticks_middle 1.060 |
+| New M3 (b3a694e → 70ee1c4) | Fail | formal.mutate 1.056, slg.A 1.017, A.apply 1.114, S.ticks_middle 1.073; B.season_edits 0.946 (Mac +2–3%, missed, platform difference) |
+| #26 (ea885e5 → 70ee1c4) | Fail | formal.mutate 1.026 (needs a ledger entry stating "trades output −23%", emit_after 0.766) |
+| #27 (f0768ad → b3ab3a3) | Pass | — |
+| #29 (b3ab3a3 → 30bb5ca) | Fail, GCC inlining change, expected result | slg.D 1.032, slg.B 1.014, A.req_decode 1.092 (slg.A 0.951). The function diff table flagged suspected inlining: `register_allocation` calls `register_owned_range`, −100,096 / +154,112 in D. #29 added a binary search and a throwing branch to `register_owned_range`, and GCC 16 stopped inlining most of it into `register_allocation`; the Mac's Clang did not change, and A–D all got faster (0.951 / 0.991 / 0.985 / 0.969). After moving the overlap check into a `[[gnu::noinline]]` cold function, D, B and C went back to 1.001 / 0.998 / 1.000 (verified by the performance gate thread; the library change was handled separately) |
 
-正式 harness 不受窗口影响；入库版 harness 的 Ir 与设计探针只差几条指令（旧 M3 emit_after 3,912,706 对 3,912,698，新 M3 mutate 43,729,854 对 43,729,847），M 输入 wire 都是 `2bf0c0717767f377…`。
+The formal harness is not affected by the window; the checked-in harness's Ir differs from the design
+probe by only a few instructions (old M3 emit_after 3,912,706 versus 3,912,698, new M3 mutate 43,729,854
+versus 43,729,847), and the M input wire is `2bf0c0717767f377…` in all cases.

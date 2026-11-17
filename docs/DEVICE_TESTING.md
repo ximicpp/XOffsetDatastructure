@@ -1,188 +1,217 @@
-# 真机测试（4.0.0）
+# Real-device testing (4.0.0)
 
-本页给 4.0.0 的真机测试：在一台干净的电脑上拉取这个版本，把手机接上 USB，
-一条命令跑完，再把结果文件传回来。
+This page describes real-device testing for 4.0.0: pull this version on a clean computer, connect the
+phone over USB, run one command, and send back the result file.
 
-第 1–6 节是 **Android 手机 + Linux 服务端**：功能检查、SLG 计时和内存上限；第 7 节是 **iPhone**：
-库测试、wire 语料、SLG 计时和内存上限。
+Sections 1–6 cover an **Android phone + Linux server**: functional checks, SLG timing and memory limits;
+section 7 covers the **iPhone**: library tests, wire corpus, SLG timing and memory limits.
 
-## 1. 测什么
+## 1. What is tested
 
-`tools/device/android_device.sh` 在手机上做四件事。前两件和 Android 模拟器上已经通过的检查相同，后两件是手机上的性能和内存：
+`tools/device/android_device.sh` does four things on the phone. The first two are the same checks that
+already pass on the Android emulator; the last two are performance and memory on the phone:
 
-1. **库**：C++20 字段表构建（Android NDK r29，arm64-v8a）的全量 CTest，每个测试程序用 adb 推到
-   手机的 `/data/local/tmp/xo` 运行；再做 wire 语料检查：手机读入 Linux 服务端构建（GCC 16、
-   C++26 反射）写出的参照 wire，必须全部接受，手机自己写出的字节必须与参照逐字节相同。
-   15 个编译失败测试（编译期应当报错的用例）要用 NDK，在电脑上跑。
-2. **游戏 demo**（`demo/mapstate`）：Linux 服务端 A/B（GCC 16、C++26 反射）在电脑的 docker
-   容器里运行；demo 客户端（开异常、关异常两个版本）在手机上运行，经 `adb reverse` 连到电脑
-   （手机上的 127.0.0.1:17800–18049 就是电脑）。每个客户端跑自检、回放 A 写的快照语料、
-   1/100/10000 个单位各 500 步（dense、compact、zstd 三种快照轮换）、恶意输入。
-3. **slg 计时**（SC-6）：冻结的 `bench/slg` 在字段表构建上运行，带 FlatBuffers 25.12.19 对照。先 verify，
-   再计时 3 次（规模 M、41 轮），每次前记录温控状态和电量。`XO_SLG_RUNS`、`XO_SLG_SCALE`、
-   `XO_SLG_CYCLES` 可以改。计时时插着充电器、关掉其他 app、屏幕常亮。
-4. **内存上限**（SC-12）：`xo_mem_probe` 测单个缓冲区最大的 `maximum_capacity`、能同时保留多少
-   地址空间，再以 64 MiB 一步提交内存，直到被系统杀掉（默认上限是手机的 MemTotal，`XO_MEM_LIMIT`
-   改）。这一步会让手机暂时很卡、后台 app 被关掉，属正常现象。
+1. **Library**: the full CTest of the C++20 field-list build (Android NDK r29, arm64-v8a), each test
+   program pushed with adb to the phone's `/data/local/tmp/xo` and run there; then the wire corpus
+   check: the phone reads the reference wires written by the Linux server build (GCC 16, C++26
+   reflection), which must all be accepted, and the bytes the phone writes must be byte-identical to the
+   reference. The 15 compile-fail tests (cases that must fail at compile time) need the NDK and run on
+   the computer.
+2. **Game demo** (`demo/mapstate`): Linux servers A/B (GCC 16, C++26 reflection) run in docker
+   containers on the computer; the demo clients (builds with and without exceptions) run on the phone and
+   connect to the computer through `adb reverse` (127.0.0.1:17800–18049 on the phone is the computer).
+   Each client runs the self-test, replays the snapshot corpus A wrote, runs 500 steps each with 1, 100
+   and 10000 units (rotating dense, compact and zstd snapshots), and malicious input.
+3. **slg timing** (SC-6): the frozen `bench/slg` runs on the field-list build, with FlatBuffers 25.12.19
+   for comparison. First verify, then time 3 times (scale M, 41 rounds), recording the thermal state and
+   battery level before each run. `XO_SLG_RUNS`, `XO_SLG_SCALE` and `XO_SLG_CYCLES` can be changed. While
+   timing, keep the charger plugged in, close other apps and keep the screen on.
+4. **Memory limits** (SC-12): `xo_mem_probe` measures the largest `maximum_capacity` of a single buffer
+   and how much address space can be held at once, then commits memory in 64 MiB steps until the system
+   kills it (the default limit is the phone's MemTotal; change it with `XO_MEM_LIMIT`). This step
+   temporarily makes the phone sluggish and background apps get closed; that is expected.
 
-## 2. 准备电脑
+## 2. Preparing the computer
 
-macOS（Apple 芯片或 Intel）或 Linux（x86-64、arm64）都可以。磁盘留 8 GB，能访问 github.com、
-dl.google.com 和 Docker Hub（x86-64 用 `mirror.gcr.io` 镜像）。
+macOS (Apple silicon or Intel) or Linux (x86-64, arm64). Leave 8 GB of disk space and make sure
+github.com, dl.google.com and Docker Hub are reachable (x86-64 uses the `mirror.gcr.io` mirror).
 
-**macOS**：
+**macOS**:
 
 ```sh
-xcode-select --install                       # git、python3（已装 Xcode 可跳过）
-brew install cmake ninja colima docker       # 没有 Homebrew 先装：https://brew.sh
-colima start --cpu 4 --memory 6 --disk 40    # 或者用 Docker Desktop
+xcode-select --install                       # git, python3 (skip if Xcode is installed)
+brew install cmake ninja colima docker       # without Homebrew, install it first: https://brew.sh
+colima start --cpu 4 --memory 6 --disk 40    # or use Docker Desktop
 ```
 
-**Linux**：git、python3、unzip、ninja、docker（当前用户能运行 `docker info`），CMake 3.30 以上
-（发行版的太旧时：`pip3 install --user cmake`）。
+**Linux**: git, python3, unzip, ninja, docker (the current user can run `docker info`), CMake 3.30 or
+newer (when the distribution's is too old: `pip3 install --user cmake`).
 
-**Windows**：脚本不直接支持。3.2.0-rc.1 的真机结果是在 WSL2（Ubuntu 22.04）里跑脚本、经 Windows 的
-`adb.exe` 连手机得到的，为此另写了一个 adb 包装：把 WSL 路径用 `wslpath -w` 转成 Windows 路径，并保留
-目录末尾的 `/.`（丢了它，`adb push` 会把语料推进多一层的目录，demo 回放读不到 `corpus.csv`）。
-做法和包装脚本见 [validation/2026-10-28-rc1-platform/README.md](validation/2026-10-28-rc1-platform/README.md) 第 4 节。
+**Windows**: the script does not support it directly. The 3.2.0-rc.1 real-device results were obtained by
+running the script inside WSL2 (Ubuntu 22.04) and connecting to the phone through Windows' `adb.exe`, with
+a separate adb wrapper: it converts WSL paths to Windows paths with `wslpath -w` and keeps the trailing
+`/.` of directories (without it, `adb push` puts the corpus one directory level deeper and the demo replay
+cannot find `corpus.csv`). The approach and the wrapper script are in section 4 of
+[validation/2026-10-28-rc1-platform/README.md](validation/2026-10-28-rc1-platform/README.md).
 
-adb 和 NDK 不用自己装：没有时脚本从 dl.google.com 下载 platform-tools 和 NDK r29
-（约 1 GB，校验 SHA-1）到 `~/xo-device/sdk`。已经装了的话，`adb` 在 PATH 上或设 `ADB=`，
-NDK 设 `ANDROID_NDK=`。
+You do not need to install adb and the NDK yourself: when they are missing, the script downloads
+platform-tools and NDK r29 (about 1 GB, SHA-1 checked) from dl.google.com to `~/xo-device/sdk`. If they
+are already installed, put `adb` on PATH or set `ADB=`, and set `ANDROID_NDK=` for the NDK.
 
-## 3. 准备手机
+## 3. Preparing the phone
 
-要求：64 位（arm64-v8a）、Android 9 以上。
+Requirements: 64-bit (arm64-v8a), Android 9 or newer.
 
-1. 设置 → 关于手机 → 连续点「版本号」7 次，打开开发者选项。
-2. 开发者选项里打开「USB 调试」；建议同时打开「不锁定屏幕」（充电时保持唤醒），长时间运行不被
-   休眠打断。小米、OPPO、vivo 等若有「USB 调试（安全设置）」不用开：脚本只在
-   `/data/local/tmp` 下运行程序，不安装 app。
-3. 用 USB 数据线接到电脑，解锁手机，弹出「允许 USB 调试吗？」时选「始终允许」并确定。
+1. Settings → About phone → tap "Build number" 7 times to turn on developer options.
+2. In developer options turn on "USB debugging"; also turning on "Stay awake" (keep the screen on while
+   charging) is recommended, so long runs are not interrupted by sleep. Xiaomi, OPPO, vivo and others
+   may have "USB debugging (Security settings)"; it does not need to be on: the script only runs programs
+   under `/data/local/tmp` and installs no app.
+3. Connect the phone to the computer with a USB data cable, unlock it, and when "Allow USB debugging?"
+   appears, choose "Always allow" and confirm.
 
-## 4. 拉取这个版本
+## 4. Pulling this version
 
 ```sh
 git clone --branch v4.0.0 --depth 1 https://github.com/ximicpp/XOffsetDatastructure.git xoffset-4.0.0
 cd xoffset-4.0.0
 cat XOFFSET_VERSION          # 4.0.0
-git rev-parse HEAD           # 与发版记录里的提交一致
+git rev-parse HEAD           # matches the commit in the release record
 ```
 
-子模块（TypeLayout 和用到的 boost 头文件）由脚本按需拉取。
+Submodules (TypeLayout and the boost headers used) are fetched by the script as needed.
 
-## 5. 运行
+## 5. Running
 
 ```sh
 bash tools/device/android_device.sh
 ```
 
-依次做 setup（检查工具，缺 adb/NDK 时下载）、build（docker 里的 flatc、Android 程序、docker 里的服务端和参照语料）、
-run（手机上的五步）。第一次大约 30–60 分钟，大部分在编译。可以分开跑：
+It runs setup (checks tools, downloads adb/NDK if missing), build (flatc in docker, the Android programs,
+the server and reference corpus in docker) and run (the five steps on the phone) in order. The first run
+takes about 30–60 minutes, mostly compiling. The stages can be run separately:
 
 ```sh
 bash tools/device/android_device.sh setup
-bash tools/device/android_device.sh build    # 编一次
-bash tools/device/android_device.sh run      # 每台手机跑一次
+bash tools/device/android_device.sh build    # build once
+bash tools/device/android_device.sh run      # run once per phone
 ```
 
-接了多台手机时用 `adb devices -l` 看序列号，再 `ANDROID_SERIAL=<序列号> bash tools/device/android_device.sh run`，
-一台一台跑。跑完 `bash tools/device/android_device.sh clean` 删掉容器和手机上的临时目录。
-运行中途手机断开或锁屏导致失败时，重新 `run` 即可，不用重新 build。
+With several phones connected, look up serial numbers with `adb devices -l`, then run them one at a time
+with `ANDROID_SERIAL=<serial> bash tools/device/android_device.sh run`. When done,
+`bash tools/device/android_device.sh clean` removes the containers and the temporary directory on the
+phone. If a run fails because the phone disconnected or locked midway, just `run` again; no rebuild is
+needed.
 
-退出码：0 全部通过，3 有步骤失败（看 RESULT.md），2 缺工具或没连上手机（什么都没跑）。
+Exit codes: 0 all passed, 3 some step failed (see RESULT.md), 2 missing tools or no phone connected
+(nothing ran).
 
-## 6. 回传结果
+## 6. Sending back results
 
-结束时脚本打印结果包的位置，形如：
+At the end the script prints where the result package is, like:
 
 ```
-result: ~/xo-device/4.0.0-<提交前 7 位>/out-<UTC 时间>/RESULT.md; send back ~/xo-device/4.0.0-<提交前 7 位>/out-<UTC 时间>.tar.gz
+result: ~/xo-device/4.0.0-<first 7 of commit>/out-<UTC time>/RESULT.md; send back ~/xo-device/4.0.0-<first 7 of commit>/out-<UTC time>.tar.gz
 ```
 
-把 **`out-<UTC 时间>.tar.gz`** 拖进项目对话里，并说一下手机型号。包里有：
+Send **`out-<UTC time>.tar.gz`** back to the project, and say which phone model it is. The package
+contains:
 
-| 文件 | 内容 |
+| File | Contents |
 | --- | --- |
-| `RESULT.md` | 每一步的结论（先看它） |
-| `device.txt` | 型号、SoC、Android 版本、ABI、页大小、内存 |
-| `ctest.log`、`host_compile_tests.txt` | 手机上的 CTest、电脑上的编译失败测试 |
-| `corpus-*.log`、`corpus.sha256` | wire 语料检查 |
-| `demo/E2E_RESULT.md` 和各目录 | demo 每个客户端的自检、回放、三档、恶意输入 |
-| `slg/ANALYSIS.md`、`slg/run_*.jsonl`、`slg/info_*.txt` | slg 计时表、原始数据、每次计时前的温控和电量 |
-| `mem/SUMMARY.md` 和各文件 | 内存探测结果、低内存杀进程的日志 |
-| `SHA256SUMS` | 以上文件的校验和 |
+| `RESULT.md` | The verdict of each step (read this first) |
+| `device.txt` | Model, SoC, Android version, ABI, page size, memory |
+| `ctest.log`, `host_compile_tests.txt` | CTest on the phone, compile-fail tests on the computer |
+| `corpus-*.log`, `corpus.sha256` | Wire corpus check |
+| `demo/E2E_RESULT.md` and directories | Each demo client's self-test, replay, three tiers, malicious input |
+| `slg/ANALYSIS.md`, `slg/run_*.jsonl`, `slg/info_*.txt` | slg timing table, raw data, thermal state and battery before each timing run |
+| `mem/SUMMARY.md` and files | Memory probe results, low-memory kill logs |
+| `SHA256SUMS` | Checksums of the files above |
 
-通过的样子：RESULT.md 里 `library CTest (phone)`、`wire corpus`、`slg`、`mem`、`demo` 五行都是 passed，
-编译失败测试一行显示全部通过。
+What passing looks like: in RESULT.md the five lines `library CTest (phone)`, `wire corpus`, `slg`,
+`mem` and `demo` all say passed, and the compile-fail test line shows everything passing.
 
 ## 7. iPhone
 
-iPhone 上不能直接运行命令行程序：`tools/device/ios_device.sh` 把每个测试编成测试宿主 app
-（`tools/test_host`）里的一个模块，用 Xcode 里登录的 Apple ID 签名，装到手机上一次跑一个，
-结果从 app 的数据容器取回。**这一步已在 iOS 模拟器上跑通，还没有在 iPhone 上跑过。**
+An iPhone cannot run command-line programs directly: `tools/device/ios_device.sh` builds each test as a
+module inside the test host app (`tools/test_host`), signs it with the Apple ID signed in to Xcode,
+installs it on the phone, runs one at a time, and collects results from the app's data container. **This
+step has run on the iOS simulator but not yet on an iPhone.**
 
-准备（一台 Mac）：
+Preparation (one Mac):
 
-1. 装 Xcode；`export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`；PATH 上有
-   CMake 3.30 以上和 ninja（`brew install cmake ninja`）。
-2. Xcode → Settings → Accounts 里登录 Apple ID（免费账号即可，签名 7 天有效）。
-3. iPhone 用数据线接到 Mac，点「信任此电脑」；在 Xcode 的 Devices 窗口里出现一次之后，打开
-   设置 → 隐私与安全性 → 开发者模式，按提示重启。
-4. 自动锁定设为「永不」，插上充电器。
+1. Install Xcode; `export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`; have CMake 3.30 or
+   newer and ninja on PATH (`brew install cmake ninja`).
+2. Sign in with an Apple ID in Xcode → Settings → Accounts (a free account works; signatures are valid
+   for 7 days).
+3. Connect the iPhone to the Mac with a data cable and tap "Trust This Computer"; once it has appeared in
+   Xcode's Devices window, open Settings → Privacy & Security → Developer Mode and restart as prompted.
+4. Set Auto-Lock to "Never" and plug in the charger.
 
-运行（在拉取的目录里）：
+Run (in the pulled directory):
 
 ```sh
 bash tools/device/ios_device.sh device out-iphone --steps build,info,ctest,slg,mem
 ```
 
-- 接了多台 iPhone 时，用 `xcrun devicectl list devices` 查 UDID，加 `--udid <UDID>`。
-- wire 语料检查：步骤加 `,corpus` 和 `--ref <参照目录>`。参照目录就是第 5 节 Android 脚本生成的
-  `~/xo-device/4.0.0-<提交前 7 位>/ref-corpus`（Linux GCC 16 C++26 写出）。
-- `slg` 要和 FlatBuffers 对照时，加 `--fb-include <flatbuffers 25.12.19 的 include 目录>` 和
-  `--fb-generated <slg_generated.h 所在目录>`；不加只测 XOffset。
-- 只有 `net`、`clients` 两步用 `--server-host`（同一 Wi-Fi 下 Mac 的地址：`ipconfig getifaddr en0`）；
-  第一次会弹「本地网络」权限，3 分钟内点允许。iPhone 上的 demo 这一版不在步骤里。
+- With several iPhones connected, look up the UDID with `xcrun devicectl list devices` and add
+  `--udid <UDID>`.
+- Wire corpus check: add `,corpus` to the steps and `--ref <reference directory>`. The reference
+  directory is the `~/xo-device/4.0.0-<first 7 of commit>/ref-corpus` produced by the Android script in
+  section 5 (written by Linux GCC 16 C++26).
+- To compare `slg` with FlatBuffers, add `--fb-include <include directory of flatbuffers 25.12.19>` and
+  `--fb-generated <directory containing slg_generated.h>`; without them only XOffset is measured.
+- Only the `net` and `clients` steps use `--server-host` (the Mac's address on the same Wi-Fi:
+  `ipconfig getifaddr en0`); the first time a "Local Network" permission prompt appears; tap allow within
+  3 minutes. The demo on iPhone is not among the steps in this version.
 
-回传：`tar -czf out-iphone.tar.gz out-iphone`，把包拖进项目对话。先看 `RESULT.md`，其余是
-`info.txt`、ctest 日志、`slg/ANALYSIS.md` 和 `run_*.jsonl`、`mem/SUMMARY.md`。`mem` 的 commit
-探测被系统杀掉（rc 125）是预期的，那正是要测的内存上限。
+Sending back: `tar -czf out-iphone.tar.gz out-iphone`, and send the package to the project. Read
+`RESULT.md` first; the rest are `info.txt`, the ctest log, `slg/ANALYSIS.md` and `run_*.jsonl`, and
+`mem/SUMMARY.md`. The `mem` commit probe being killed by the system (rc 125) is expected: that is exactly
+the memory limit being measured.
 
-## 8. 常见问题
+## 8. Common problems
 
-- **`adb devices` 显示 unauthorized**：手机没点「允许 USB 调试」。解锁手机重新插线；仍不弹时在
-  开发者选项里「撤销 USB 调试授权」后再插。
-- **Linux 上显示 no permissions**：缺 udev 规则。装发行版的 `android-sdk-platform-tools-common`
-  （Debian/Ubuntu）或 `android-udev-rules`（Arch），重新插线。
-- **容器写不了工作目录**：工作目录默认在 `~/xo-device`，Docker Desktop 和 colima 默认共享家目录；
-  改了 `XO_WORK` 时要放在共享的目录下。
-- **端口被占用**：电脑上 127.0.0.1 的 17800–17849、17900–17949、18000–18049 要空着，手机上的同一组端口
-  也要空着（`adb reverse` 在手机上监听）。被占用时用 `XO_PORT_BASE=<另一个起点>` 换一组，起点要低于
-  32768：Android 的临时端口（一般 32768–60999，有的厂商 37000–50000）随时被手机自己的连接占用。
-  3.2.0-rc.1 的脚本固定用 47800 起，落在这个范围里，在一台小米手机上 `adb reverse tcp:48024` 失败过；
-  用 rc.1 测试时把脚本第 52 行 `PORTS` 和第 344 行 `MAPDEMO_PORT_BASE` 里的 47800 起改成 17800 起。
-- **只想重跑某一步**：`XO_SKIP="ctest corpus slg mem" bash tools/device/android_device.sh run` 只跑 demo。
-- **没有 docker 编 flatc**：用 Mac 上 `run_phone_mac.sh fb` 生成的 `slg_generated.h`，
-  `XO_FB_GENERATED=<它所在的目录>`；`XO_NO_FB=1` 则 slg 不带 FlatBuffers。
+- **`adb devices` shows unauthorized**: the phone did not allow USB debugging. Unlock the phone and
+  replug; if the prompt still does not appear, use "Revoke USB debugging authorizations" in developer
+  options and plug in again.
+- **no permissions on Linux**: udev rules are missing. Install the distribution's
+  `android-sdk-platform-tools-common` (Debian/Ubuntu) or `android-udev-rules` (Arch) and replug.
+- **The container cannot write the working directory**: the working directory defaults to `~/xo-device`,
+  and Docker Desktop and colima share the home directory by default; if you change `XO_WORK`, put it in
+  a shared directory.
+- **Port in use**: ports 17800–17849, 17900–17949 and 18000–18049 on the computer's 127.0.0.1 must be
+  free, and so must the same ports on the phone (`adb reverse` listens on the phone). When they are taken,
+  switch to another set with `XO_PORT_BASE=<another start>`; the start must be below 32768: Android's
+  ephemeral ports (usually 32768–60999, 37000–50000 on some vendors) can be taken by the phone's own
+  connections at any time. The 3.2.0-rc.1 script started at 47800, inside that range, and
+  `adb reverse tcp:48024` failed on a Xiaomi phone; when testing with rc.1, change the 47800 start in
+  `PORTS` on line 52 and `MAPDEMO_PORT_BASE` on line 344 of the script to 17800.
+- **Re-running only one step**: `XO_SKIP="ctest corpus slg mem" bash tools/device/android_device.sh run`
+  runs only the demo.
+- **No docker to build flatc**: use the `slg_generated.h` produced by `run_phone_mac.sh fb` on a Mac with
+  `XO_FB_GENERATED=<its directory>`; `XO_NO_FB=1` runs slg without FlatBuffers.
 
-## 9. 已有结果
+## 9. Existing results
 
-| 版本 | 手机 | 电脑 | 结果 | 记录 |
+| Version | Phone | Computer | Result | Record |
 | --- | --- | --- | --- | --- |
-| 3.2.0-rc.1（39de636），2026-10-28 | Xiaomi M2102K1C，Android 11（API 30），arm64-v8a | Windows 11 + WSL2，服务端在 WSL2 Docker | 编译失败测试 15/15、手机 CTest 114/114、6 个参照 wire 逐字节一致、两个 demo 客户端 E2E PASSED（前两次分别因端口和 adb 路径未通过，记录保留） | [validation/2026-10-28-rc1-platform/README.md](validation/2026-10-28-rc1-platform/README.md) |
-| a473fb27（3.2.0-rc.2 之后，含 #178、#181），2026-10-28 | iPhone 15 Pro Max（iPhone16,2），iOS 26.6.2，8 GB，免费 Apple ID 签名，USB | Mac mini M4，服务端在 colima（GCC 16，arm64） | 测试宿主 App 104 个库；CTest 138/138；24 个参照 wire 全部接受、写出字节一致；slg（SC-6）verify 通过，3 次 × M 规模 × 41 周期，热状态 0；内存探测（SC-12）见 [DEPLOYMENT.md](DEPLOYMENT.md) 第 5 节；demo 两个客户端 E2E PASSED。第 5 次因 fork 和 slg 地址空间未全过，第 6 次常驻模式退步，记录在第 7 节下面 | 下表 |
-| 8cf9e16c（= #185 合入的 ea7edd3a 的内容，含 #183），2026-10-29 | 同上 | 同上 | 常驻模式（一个 App 依次运行全部程序，slg 计时和内存探测各用新启动的 App）：CTest 138/138；24 个参照 wire 字节一致；slg verify 通过，3 次 × M × 41 周期，热状态 0；内存探测通过；demo 两个客户端 E2E PASSED；没有 CoreDeviceError 7000。第 8 次（084d4859）因 `.ready` 拷贝报错未全过（#185 修复） | [CLIENT_TARGETS.md](CLIENT_TARGETS.md) 测试宿主一节 |
+| 3.2.0-rc.1 (39de636), 2026-10-28 | Xiaomi M2102K1C, Android 11 (API 30), arm64-v8a | Windows 11 + WSL2, server in WSL2 Docker | Compile-fail tests 15/15, phone CTest 114/114, 6 reference wires byte-identical, both demo clients E2E PASSED (the first two attempts failed because of ports and the adb path respectively; records kept) | [validation/2026-10-28-rc1-platform/README.md](validation/2026-10-28-rc1-platform/README.md) |
+| a473fb27 (after 3.2.0-rc.2, with #178, #181), 2026-10-28 | iPhone 15 Pro Max (iPhone16,2), iOS 26.6.2, 8 GB, signed with a free Apple ID, USB | Mac mini M4, server in colima (GCC 16, arm64) | Test host app with 104 libraries; CTest 138/138; all 24 reference wires accepted, written bytes identical; slg (SC-6) verify passed, 3 runs × M scale × 41 cycles, thermal state 0; memory probe (SC-12) see [DEPLOYMENT.md](DEPLOYMENT.md) section 5; both demo clients E2E PASSED. The 5th attempt did not fully pass because of fork and slg address space, and the 6th regressed in resident mode, recorded under section 7 | Table below |
+| 8cf9e16c (= the content of ea7edd3a merged by #185, with #183), 2026-10-29 | Same as above | Same as above | Resident mode (one app runs all programs in sequence; slg timing and the memory probe each use a freshly launched app): CTest 138/138; 24 reference wires byte-identical; slg verify passed, 3 runs × M × 41 cycles, thermal state 0; memory probe passed; both demo clients E2E PASSED; no CoreDeviceError 7000. The 8th attempt (084d4859) did not fully pass because of `.ready` copy errors (fixed by #185) | Test host section of [CLIENT_TARGETS.md](CLIENT_TARGETS.md) |
 
-iPhone 15 Pro Max 上的 SC-6（slg M 规模，3 次运行合并，xoffset 与 FlatBuffers 25.12.19 同机对比，几何均值 / 单侧 95% 上界，
-<1 表示 xoffset 更快；玩家、战斗、报告 buffer 各预留 2 MiB，`SLG_REUSE=1`）：
+SC-6 on the iPhone 15 Pro Max (slg M scale, 3 runs pooled, xoffset against FlatBuffers 25.12.19 on the
+same device, geometric mean / one-sided 95% upper bound, < 1 means xoffset is faster; player, battle and
+report buffers reserve 2 MiB each, `SLG_REUSE=1`):
 
-| 场景 | xoffset ÷ FlatBuffers | xoffset 中位数（ms/周期） | FlatBuffers 中位数（ms/周期） |
+| Scenario | xoffset ÷ FlatBuffers | xoffset median (ms per cycle) | FlatBuffers median (ms per cycle) |
 | --- | --- | ---: | ---: |
-| A 战斗服往返 | 0.305 / 0.322 | 0.609 | 2.176 |
-| B 跨服迁移 | 0.179 / 0.183 | 1.752 | 9.890 |
-| C 分区快照 | 0.252 / 0.267 | 0.294 | 1.211 |
-| D 战报只读 | 0.858 / 0.909 | 0.072 | 0.081 |
+| A battle server round trip | 0.305 / 0.322 | 0.609 | 2.176 |
+| B cross-server migration | 0.179 / 0.183 | 1.752 | 9.890 |
+| C zone snapshot | 0.252 / 0.267 | 0.294 | 1.211 |
+| D read-only battle report | 0.858 / 0.909 | 0.072 | 0.081 |
 
-D 对照 FlatBuffers 校验后原地读取（不拷贝不解包）时 xoffset 是 1.204 倍（仅参考）。wire 字节（每周期合计）：
-B 的玩家状态 xoffset 约大 64%，D 的战报约大 25%。手机数字只和同一台手机比，不和 Mac 门禁数字比。
+Against FlatBuffers reading in place after verification (no copy, no unpacking), D is 1.204x for
+xoffset (reference only). Wire bytes (per-cycle totals): B's player state is about 64% larger for xoffset
+and D's battle report about 25% larger. Phone numbers are compared only with the same phone, not with the
+Mac gate numbers.

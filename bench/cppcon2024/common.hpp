@@ -168,6 +168,16 @@ inline std::vector<OpSet> make_ops() {
   }
   return v;
 }
+// Item keys, one per iteration (splitmix64 of the index, drawn before timing).
+inline std::vector<uint64_t> make_keys(size_t n) {
+  std::vector<uint64_t> v(n);
+  for (size_t i = 0; i < n; ++i) {
+    uint64_t z = (i + 1) * 0x9E3779B97F4A7C15ull;
+    z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull; z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+    v[i] = z ^ (z >> 31);
+  }
+  return v;
+}
 
 // Which parts of the loop run: 1 = equipment (4x append + drop), 2 = path points and the
 // attribute, 4 = the item insert + erase. Default all (7). Building with -DCC24_PARTS=1, 2

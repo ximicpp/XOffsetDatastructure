@@ -93,7 +93,7 @@ jobs:
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
             echo "::notice::bench/slg, bench/formal or bench/perf/ANCHOR is missing in the checkout; perf gate skipped."
-            echo "指令数门禁跳过：检出的树里还没有 bench/slg、bench/formal 或 bench/perf/ANCHOR。" >> "$GITHUB_STEP_SUMMARY"
+            echo "Instruction count gate skipped: the checked-out tree has no bench/slg, bench/formal or bench/perf/ANCHOR yet." >> "$GITHUB_STEP_SUMMARY"
           fi
           echo "anchor=${IN_ANCHOR:-(bench/perf/ANCHOR)} base=$base head=$head"
 

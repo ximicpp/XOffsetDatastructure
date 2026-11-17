@@ -63,11 +63,11 @@ NSString* ns(const std::string& s) { return [NSString stringWithUTF8String:s.c_s
     [super viewDidLoad];
     self.view.backgroundColor = UIColor.systemBackgroundColor;
     UILabel* title = [self label:17 weight:UIFontWeightSemibold];
-    title.text = @"XOffset 测试主机";
+    title.text = @"XOffset test host";
     title.textColor = UIColor.secondaryLabelColor;
     _state = [self label:17 weight:UIFontWeightRegular];
     UILabel* receivedTitle = [self label:15 weight:UIFontWeightRegular];
-    receivedTitle.text = @"累计接收数据";
+    receivedTitle.text = @"Data received in total";
     receivedTitle.textColor = UIColor.secondaryLabelColor;
     _received = [self label:44 weight:UIFontWeightBold];
     _receivedDetail = [self label:15 weight:UIFontWeightRegular];
@@ -104,29 +104,29 @@ NSString* ns(const std::string& s) { return [NSString stringWithUTF8String:s.c_s
     const xoffset_test_host::Dashboard d = xoffset_test_host::dashboard();
     _showingPaused = d.quiet;
     if (d.quiet) {
-        _state.text = ns("计时中：" + d.current + "\n界面暂停刷新，结束后更新");
+        _state.text = ns("Timing: " + d.current + "\nScreen updates paused until the run ends");
         _state.textColor = UIColor.systemOrangeColor;
         return;
     }
     char line[256];
     if (!d.current.empty()) {
-        std::snprintf(line, sizeof line, "运行中：%s（%.0f 秒）", d.current.c_str(), d.current_seconds);
+        std::snprintf(line, sizeof line, "Running: %s (%.0f s)", d.current.c_str(), d.current_seconds);
         _state.text = ns(line);
         _state.textColor = UIColor.systemBlueColor;
     } else {
-        _state.text = d.serving ? @"空闲，等待电脑发来任务" : @"启动中";
+        _state.text = d.serving ? @"Idle, waiting for jobs from the computer" : @"Starting";
         _state.textColor = UIColor.secondaryLabelColor;
     }
     const unsigned long long demo_bytes = d.demo_bytes + d.live_bytes;
     _received.text = ns(human_bytes(d.bytes_in + demo_bytes));
-    _receivedDetail.text = ns("任务包 " + human_bytes(d.bytes_in) + " · demo 快照 " + human_bytes(demo_bytes) +
-                              " · 发回结果 " + human_bytes(d.bytes_out));
-    std::snprintf(line, sizeof line, "已运行 %llu 个（通过 %llu，失败 %llu）%s", d.runs, d.passed, d.failed,
-                  d.restarts ? (" · app 重启 " + std::to_string(d.restarts) + " 次").c_str() : "");
+    _receivedDetail.text = ns("Job packages " + human_bytes(d.bytes_in) + " · demo snapshots " + human_bytes(demo_bytes) +
+                              " · results sent back " + human_bytes(d.bytes_out));
+    std::snprintf(line, sizeof line, "Ran %llu (passed %llu, failed %llu)%s", d.runs, d.passed, d.failed,
+                  d.restarts ? (" · app restarted " + std::to_string(d.restarts) + " times").c_str() : "");
     _runs.text = ns(line);
-    std::string demo = "demo 快照 " + with_commas(d.demo_snapshots + d.live_snapshots) + " 帧";
-    if (d.demo_runs) demo += "（" + std::to_string(d.demo_runs) + " 次客户端运行）";
-    if (!d.current.empty() && d.live_snapshots) demo += "\n本次 " + with_commas(d.live_snapshots) + " 帧 " + human_bytes(d.live_bytes);
+    std::string demo = "demo snapshots " + with_commas(d.demo_snapshots + d.live_snapshots) + " frames";
+    if (d.demo_runs) demo += " (" + std::to_string(d.demo_runs) + " client runs)";
+    if (!d.current.empty() && d.live_snapshots) demo += "\nThis run " + with_commas(d.live_snapshots) + " frames " + human_bytes(d.live_bytes);
     _demo.text = ns(demo);
     std::string recent;
     for (const auto& r : d.recent) {

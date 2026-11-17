@@ -1,137 +1,153 @@
-# 复用同一个 XBuffer（4.0.0，实验接口）
+# Reusing one XBuffer (4.0.0, experimental API)
 
-大量 KB 级消息逐条收发时，每条消息都新建、销毁一个 `XBuffer` 的固定开销（映射、owner
-登记、空闲表）会超过序列化本身。除了用 `XBufferPool` 复用映射，还可以让收发两端各自
-长期持有一个 buffer，逐条复用：
+When many KB-sized messages are sent and received one by one, the fixed cost of creating and destroying
+an `XBuffer` per message (mapping, owner registration, free table) exceeds the serialization itself.
+Besides reusing mappings with `XBufferPool`, each side can keep one long-lived buffer and reuse it per
+message:
 
 ```cpp
-// 接收方
+// Receiver
 XBuffer in = XBuffer::create<Msg>(16 * 1024, cap);
 for (const std::string& wire : incoming) {
-    in.reload_verified<Msg>(wire);          // 完整校验，复用 in 的映射和登记
+    in.reload_verified<Msg>(wire);          // full validation, reuses in's mapping and registration
     handle(in.root<Msg>());
 }
 
-// 发送方
+// Sender
 XBuffer out = XBuffer::create<Msg>(16 * 1024, cap);
 std::string frame;
 for (...) {
-    Msg& m = out.reset<Msg>();              // 清空，重建默认构造的根
+    Msg& m = out.reset<Msg>();              // clear, rebuild a default-constructed root
     fill(m);
-    out.save_verified_into<Msg>(frame);     // 写进 frame，复用其容量
+    out.save_verified_into<Msg>(frame);     // write into frame, reusing its capacity
     send(frame);
 }
 ```
 
-`TypedXBuffer<T>` 有同名的 `reload_verified(wire)`、`reset()`、`save_verified_into(out)`。
+`TypedXBuffer<T>` has `reload_verified(wire)`, `reset()` and `save_verified_into(out)` with the same
+names.
 
-## 直接接收进复用槽
+## Receiving directly into a reused slot
 
-`reload_verified(wire)` 要先有一整段连续的 wire，库再把 payload 拷进 buffer。传输层可以
-省掉这次拷贝，直接把收到的字节写进 buffer：
+`reload_verified(wire)` needs one contiguous wire first, and the library then copies the payload into the
+buffer. The transport layer can skip this copy and write received bytes straight into the buffer:
 
 ```cpp
-XWireHeaderV2 h = read_header(conn);         // 先收 wire 头，拿到三个长度
+XWireHeaderV2 h = read_header(conn);         // receive the wire header first, which has the three lengths
 auto t = in.begin_verified_reload<Msg>(h.used_bytes, h.hole_count, h.extent_count);
 std::memcpy(t.header_bytes().data(), &h, sizeof h);
-recv_exact(conn, t.extent_bytes());          // 稀疏 wire 的 extent 表
-recv_exact(conn, t.payload_bytes());         // payload [48, used)：稠密整段；稀疏 extent o 写到 o - 48
-recv_exact(conn, t.hole_bytes());            // 空洞表
+recv_exact(conn, t.extent_bytes());          // extent table of a sparse wire
+recv_exact(conn, t.payload_bytes());         // payload [48, used): dense in one piece; sparse extent o goes to o - 48
+recv_exact(conn, t.hole_bytes());            // hole table
 t.complete(t.header_bytes().size(), t.payload_bytes().size(),
            t.hole_bytes().size(), t.extent_bytes().size());
-t.finish();                                  // 与 reload_verified 同一个校验器
+t.finish();                                  // the same validator as reload_verified
 handle(in.root<Msg>());
 ```
 
-- 接纳、校验、拒绝集合和结果与对同一条 wire 调用 `reload_verified<T>()` 完全相同。
-- `payload_bytes()` 是 payload 的 `[48, used_bytes)`：48 字节的 payload 头不在 wire 上，
-  由库在 `finish()` 时写入。extent 表里的偏移是 payload 偏移，偏移 `o` 的 extent 写到
-  `payload_bytes()` 的 `o - 48` 处。
-- `complete()` 报的是实际写入的字节数；稀疏 wire 的 payload 计数包括 gap，即全部 extent
-  落地后的逻辑长度（`used_bytes - 48`）。消息比头里声明的短或长、没有调用 `complete()`、计数不符、声明的
-  长度与头不符，都拒绝。
-- token 在 `finish()` 之前被销毁（例如连接中途断开）等同于一次失败的 reload：buffer
-  变成空的，没有可用的根。
-- 从 begin 到 `finish()` 成功之前，buffer 没有可用的根；期间不能使用、移动或销毁 buffer，
-  同一个 buffer 同时只能有一个 token。
-- begin 不清零：稠密 payload 由传输层整段覆盖；稀疏 wire 的 gap 只在 finish 时清掉旧内容
-  弄脏的部分（从未暴露过的页本来就是零）。
-- header、extent 表和空洞表放在 buffer 保留的暂存里（与校验位图一起由
-  `release_reload_scratch()` 归还），稠密 wire 每条消息不向宿主申请内存。
-- 传输层按未校验的 extent 表写入时要自己检查每个 extent 落在 `payload_bytes()` 之内；
-  越界的表在 finish 时一定会被拒绝。
+- Acceptance, validation, the rejection set and the result are exactly the same as calling
+  `reload_verified<T>()` on the same wire.
+- `payload_bytes()` is `[48, used_bytes)` of the payload: the 48-byte payload header is not on the wire;
+  the library writes it at `finish()`. Offsets in the extent table are payload offsets; the extent at
+  offset `o` goes to `o - 48` of `payload_bytes()`.
+- `complete()` reports the bytes actually written; for a sparse wire the payload count includes the gaps,
+  that is, the logical length after all extents have landed (`used_bytes - 48`). A message shorter or
+  longer than its header declares, not calling `complete()`, mismatched counts, or declared lengths that
+  disagree with the header are all rejected.
+- Destroying the token before `finish()` (for example when the connection drops midway) equals a failed
+  reload: the buffer becomes empty, with no usable root.
+- From begin until `finish()` succeeds, the buffer has no usable root; during that time the buffer must
+  not be used, moved or destroyed, and a buffer can have only one token at a time.
+- begin does not zero: a dense payload is overwritten in full by the transport layer; for a sparse wire,
+  finish clears only the parts of the gaps dirtied by old content (pages never exposed are zero anyway).
+- The header, extent table and hole table go into scratch kept by the buffer (returned together with the
+  validation bitmaps by `release_reload_scratch()`), so dense wires request no host memory per message.
+- A transport layer writing according to the unvalidated extent table must check itself that each extent
+  falls inside `payload_bytes()`; an out-of-range table is always rejected at finish.
 
-## 语义
+## Semantics
 
-- `reload_verified<T>(wire)` 的接纳和校验与 `load_verified<T>(wire, 该 buffer 的 MaximumCapacity)`
-  完全相同（同一个校验器，同样的拒绝集合）。超过该 buffer 的 `maximum_capacity` 的 wire
-  以 `XBadAlloc` 拒绝。
-- `reset<T>()` 等价于 `create<T>(当前大小, 当前 MaximumCapacity)`。
-- `save_verified_into<T>(out)` 与 `save_verified<T>()` 输出逐字节相同，`out` 是调用方独占的副本，
-  之后继续修改 buffer 不影响它。
-- 复用后，之前内容留下的字节不会出现在新内容里：wire 里的空隙、尾部和之后增长出来的
-  字节都读为零。
+- Acceptance and validation of `reload_verified<T>(wire)` are exactly those of
+  `load_verified<T>(wire, that buffer's MaximumCapacity)` (the same validator, the same rejection set). A
+  wire larger than the buffer's `maximum_capacity` is rejected with `XBadAlloc`.
+- `reset<T>()` is equivalent to `create<T>(current size, current MaximumCapacity)`.
+- The output of `save_verified_into<T>(out)` is byte-identical to `save_verified<T>()`; `out` is a copy
+  owned by the caller, unaffected by later changes to the buffer.
+- After reuse, bytes left by earlier content never show up in the new content: gaps in the wire, the tail
+  and bytes grown later all read as zero.
 
-## 失效规则
+## Invalidation rules
 
-调用 `reload_verified`、`begin_verified_reload` 或 `reset` 之后：
+After calling `reload_verified`, `begin_verified_reload` or `reset`:
 
-- 之前取得的根引用、元素指针或引用、`view()` 得到的 `string_view`、借用的 span 全部失效，
-  不能再使用；
-- `XHandle` 会按新的内容重新解析（与 move 赋值后的规则相同）；
-- buffer 的地址（`get_address()`）不变；例外是可搬槽位上的 buffer 收到放不下的内容时会先换存储
-  （见 USER_GUIDE 第 3.4 节），这时地址改变，`epoch()` 照样加一。
+- Root references, element pointers or references, `string_view`s from `view()` and borrowed spans
+  obtained earlier are all invalid and must not be used again;
+- `XHandle`s re-resolve against the new content (the same rule as after move assignment);
+- The buffer's address (`get_address()`) does not change; the exception is a buffer in a movable slot
+  receiving content that does not fit, which first switches storage (see USER_GUIDE section 3.4); the
+  address then changes, and `epoch()` still increments.
 
-## 失败
+## Failure
 
-`reload_verified` 失败时抛出与 `load_verified` 相同类别的异常，buffer 变成空的、没有可用
-的根：`root<T>()`、`save_verified<T>()` 抛 `XException`，`has_root<T>()` 返回 false。之后可以
-再次 `reload_verified` 或 `reset<T>()`。旧内容不保留；需要"失败时保留旧内容"时继续用
-`load_verified` 构造新 buffer。
+When `reload_verified` fails, it throws the same kinds of exceptions as `load_verified`, and the buffer
+becomes empty with no usable root: `root<T>()` and `save_verified<T>()` throw `XException`, and
+`has_root<T>()` returns false. Afterwards `reload_verified` or `reset<T>()` can be called again. The old
+content is not kept; when "keep the old content on failure" is needed, keep using `load_verified` to build
+a new buffer.
 
-## 同进程复制：`clone()` 与 `clone_into()`
+## In-process copies: `clone()` and `clone_into()`
 
 ```cpp
-XBuffer copy = buf.clone();   // 新 owner
-buf.clone_into(scratch);      // 复用 scratch
+XBuffer copy = buf.clone();   // new owner
+buf.clone_into(scratch);      // reuses scratch
 ```
 
-`TypedXBuffer<T>` 有同名的 `clone()` 和 `clone_into(TypedXBuffer<T>&)`。
+`TypedXBuffer<T>` has `clone()` and `clone_into(TypedXBuffer<T>&)` with the same names.
 
-- `clone()` 新建一个 owner，大小、`maximum_capacity`、增长策略和池都与源相同，把源的
-  已用区拷贝过去；`clone_into(dst)` 把同样的内容拷进 dst，复用 dst 的映射、地址和 owner
-  登记，dst 的 `maximum_capacity` 和增长策略不变，大小变成源的大小（不超过 dst 的上限）。
-- 空闲表原样带过去（不完整的空闲表仍不完整），所以副本和源之后做同样的修改，分配位置
-  和字节完全相同；`save_verified` 输出与源相同。类型化根访问和 schema 绑定也带过去：
-  未校验的源复制后仍然只能 `unsafe_root<T>()`。
-- 不经过 wire，也不做校验：源是本进程里正在使用的 buffer，字节本身就是可信的。
-- 副本与源互相独立，任何一方修改或销毁都不影响另一方。dst 原有内容留下的字节不会
-  出现在副本里：已用区之外的尾部和之后增长出来的字节都读为零。
+- `clone()` creates a new owner with the same size, `maximum_capacity`, growth policy and pool as the
+  source, and copies the source's used region over; `clone_into(dst)` copies the same content into dst,
+  reusing dst's mapping, address and owner registration; dst's `maximum_capacity` and growth policy do
+  not change, and its size becomes the source's size (not above dst's limit).
+- The free table is carried over as is (an incomplete free table stays incomplete), so when the copy and
+  the source then make the same changes, allocation positions and bytes are identical; the
+  `save_verified` output equals the source's. Typed root access and schema binding carry over too: an
+  unvalidated source still only allows `unsafe_root<T>()` after copying.
+- It does not go through a wire and does not validate: the source is a buffer in use in this process, and
+  its bytes are trusted as they are.
+- The copy and the source are independent; changing or destroying either does not affect the other. Bytes
+  left by dst's previous content never show up in the copy: the tail beyond the used region and bytes
+  grown later all read as zero.
 
-失效规则：`clone_into(dst)` 之后，dst 原有内容的根引用、元素指针或引用、`view()`
-得到的 `string_view`、借用的 span 全部失效；`dst.epoch()` 加一，`XHandle` 按新的内容
-重新解析；dst 的 `get_address()` 不变。`clone()` 不改动源，源上的引用照常有效。
+Invalidation rules: after `clone_into(dst)`, root references, element pointers or references,
+`string_view`s from `view()` and borrowed spans into dst's previous content are all invalid;
+`dst.epoch()` increments, `XHandle`s re-resolve against the new content; dst's `get_address()` does not
+change. `clone()` does not change the source, and references into the source stay valid.
 
-失败：
+Failure:
 
-- `clone_into(dst)` 的源就是 dst：抛 `XException`，buffer 不变。
-- 源的已用区超过 dst 的 `maximum_capacity`，或系统分配失败：抛 `XBadAlloc`。
-- 源没有 arena：抛 `XException`。
-- 除自拷贝外，`clone_into` 失败后 dst 是没有根的空 arena（与 `reload_verified` 失败相同），
-  之后可以再 `clone_into`、`reload_verified` 或 `reset<T>()`。
-- `clone()` 失败只抛异常，源不变。
+- The source of `clone_into(dst)` is dst itself: throws `XException`, the buffer is unchanged.
+- The source's used region exceeds dst's `maximum_capacity`, or the system allocation fails: throws
+  `XBadAlloc`.
+- The source has no arena: throws `XException`.
+- Except for self-copy, after a failed `clone_into` dst is an empty arena with no root (the same as a
+  failed `reload_verified`); afterwards `clone_into`, `reload_verified` or `reset<T>()` can be called
+  again.
+- A failed `clone()` only throws; the source is unchanged.
 
-## 内存
+## Memory
 
-复用不会自动归还已提交的页：先收一条大消息、再收小消息时，大消息用过的页仍然提交着。
-需要归还时调用 `reclaim_tail_pages()`（释放逻辑末尾之后的整页），或者销毁 buffer。
+Reuse does not automatically return committed pages: after receiving a large message and then small
+ones, the pages the large message used stay committed. To return them, call `reclaim_tail_pages()`
+(releases whole pages after the logical end), or destroy the buffer.
 
-校验用两张位图（每 8 字节一位，活块一张、空洞一张）。payload 不超过 32 KiB 时
-位图在栈上，不申请任何宿主内存。更大的 payload：`reload_verified(wire)`（不带资源
-参数的形式）用这个 buffer 自己保留的一块位图内存，按收到过的最大 payload 增长、
-之后原样复用，所以循环 reload 时每条消息不再向宿主分配器申请校验内存。这块内存
-只是宿主侧临时内存，不进 payload，也不进 wire；随 buffer 一起释放，也可以调用
-`release_reload_scratch()` 提前归还。`load_verified_with_resource` 和
-`reload_verified_with_resource` 向调用方给的资源申请一块。
-规范布局的 wire（没有空洞，块按访问顺序首尾相接，例如 `XCompactor::compact` 的
-结果）走游标路径，只记一个偏移，不碰位图，任何大小都不申请校验内存。
+Validation uses two bitmaps (one bit per 8 bytes, one for live blocks, one for holes). For payloads up to
+32 KiB the bitmaps are on the stack and no host memory is requested. For larger payloads,
+`reload_verified(wire)` (the form without a resource argument) uses a block of bitmap memory kept by the
+buffer itself, which grows to the largest payload received and is then reused as is, so looping reloads
+no longer request validation memory from the host allocator per message. This memory is only temporary
+host-side memory, not in the payload and not on the wire; it is freed with the buffer, and can be
+returned early with `release_reload_scratch()`. `load_verified_with_resource` and
+`reload_verified_with_resource` request a block from the resource the caller gives. Wires in canonical
+layout (no holes, blocks laid end to end in visiting order, such as the output of
+`XCompactor::compact`) take the cursor path, which records only one offset, does not touch the bitmaps,
+and requests no validation memory at any size.
