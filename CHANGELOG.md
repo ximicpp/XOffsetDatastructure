@@ -5,6 +5,10 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- Apple clang client columns re-run on the v4.1.0 tag (macOS arm64 C++20 and C++23, iOS 27.0 simulator
+  C++20): full CTest 211/211 each, the 24-file reference corpus accepted and written byte for byte.
+  Documentation only; the last such run was for 3.3.0.
+
 ## 4.1.0: speed-first defaults
 
 Hardening and zeroing become compile-time switches, off by default; the client uplink bounds check stays
