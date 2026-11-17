@@ -1,7 +1,5 @@
 # XOffsetDatastructure
 
-[中文](README.zh-CN.md)
-
 **4.0.0** · C++20 / C++26 · header-only · 64-bit little-endian
 
 XOffsetDatastructure keeps C++ objects, strings, vectors, sets and maps in one
@@ -181,22 +179,23 @@ The game character from the CppCon 2024 talk (64-item map, waypoints,
 attributes, 8 pieces of equipment with attributes each), rerun with 4.0.0 and
 current rules: random numbers are drawn before timing, every library's map is
 the same sorted flat map, receiving means "the receiver can read and modify
-the state". Median of 15 processes, library after PR #292
+the state", every library really frees what the loop removes, and each
+iteration uses a new map key. Median of 15 processes, library at e36cf44
 ([method and all rows](bench/cppcon2024/README.md)).
 
 **Send + receive** (one message, buffers reused, XOffset trusted tier):
 
 | Library | ns / message | XOffset ÷ lib |
 | --- | ---: | ---: |
-| XOffset | 96 | 1.00 |
-| zpp::bits | 343 | 0.28 |
-| FlatBuffers (build + read back) | 663 | 0.15 |
-| cista (raw / offset, unchecked) | 654 / 660 | 0.15 |
-| Cap'n Proto | 2,381 | 0.04 |
-| MessagePack | 6,510 | 0.015 |
-| Protocol Buffers | 8,676 | 0.011 |
+| XOffset | 83 | 1.00 |
+| zpp::bits | 340 | 0.24 |
+| FlatBuffers (build + read back) | 614 | 0.14 |
+| cista (raw / offset, unchecked) | 637 / 639 | 0.13 |
+| Cap'n Proto | 2,268 | 0.037 |
+| MessagePack | 6,112 | 0.014 |
+| Protocol Buffers | 8,789 | 0.009 |
 
-With the full validation tier instead, XOffset takes 232 ns, still 0.67 of
+With the full validation tier instead, XOffset takes 171 ns, still 0.50 of
 zpp::bits.
 
 **Read/write loop** (one iteration: change scalars and position, add and
@@ -204,25 +203,26 @@ remove equipment, waypoints, an attribute and a map item):
 
 | Layout | XOffset | std containers | cista raw / offset | Protocol Buffers |
 | --- | ---: | ---: | ---: | ---: |
-| 2024 layout, ns | 239 | 340 | 224 / 245 | 78 |
-| XOffset ÷ lib | | 0.70 | 1.07 / 0.97 | **3.06** |
-| Tuned layout\*, ns | 62 | 79 | 46 / 53 | 72 |
-| XOffset ÷ lib | | 0.79 | **1.34 / 1.16** | 0.86 |
+| 2024 layout, ns | 144 | 343 | 236 / 259 | 592 |
+| XOffset ÷ lib | | 0.42 | 0.61 / 0.55 | 0.24 |
+| Tuned layout\*, ns | 60 | 83 | 66 / 67 | 368 |
+| XOffset ÷ lib | | 0.72 | 0.91 / 0.90 | 0.16 |
 
 \* Small attribute arrays stored inline, range append, erase at a known
 position; applied to every library that can express it.
 
-In-place read/write is faster than the same code on std containers and on par
-with cista on the 2024 layout, but it is not the fastest in every case:
-Protocol Buffers wins the 2024-layout loop (its `RemoveLast` keeps the
-removed objects for reuse) and cista wins the tuned loop by 1.16–1.34x.
-Where XOffset wins clearly is the round trip. **One read/write iteration plus
-one send and receive** costs XOffset 143 ns (tuned), against 393 ns for
-zpp::bits on std containers (0.36), 688–715 ns for cista (0.20–0.21) and
-8,748 ns for Protocol Buffers (0.016).
+In-place read/write is the fastest of these libraries in both layouts, in
+every one of the 15 processes. The margin over cista is small on the tuned
+layout (0.90–0.91). Protocol Buffers' default `RemoveLast` keeps the removed
+messages for the next `add_`, so its loop allocates nothing (77 ns on the
+2024 layout, report-only, about half of XOffset's 144 ns); the scored row
+frees them like every other library. **One read/write iteration plus one
+send and receive** costs XOffset 144 ns (tuned), against 390 ns for zpp::bits
+on std containers (0.37), 661–682 ns for cista (0.21–0.22) and 9,157 ns for
+Protocol Buffers (0.016).
 
-Size: the `Character` wire is 3,232 bytes raw and 3,001 bytes after zstd-3
-(zpp::bits 2,926, Protocol Buffers 3,802). The wire header makes small
+Size: the `Character` wire is 3,064 bytes raw and 2,986 bytes after zstd-3
+(zpp::bits 2,926, Protocol Buffers 3,800). The wire header makes small
 XOffset messages about 100 bytes larger than zpp::bits; this is accepted by
 design and reported, not optimized away.
 
@@ -286,8 +286,7 @@ storage and ownership rules are in
 | [CLIENT_TARGETS.md](docs/CLIENT_TARGETS.md), [DEVICE_TESTING.md](docs/DEVICE_TESTING.md) | Client toolchains and real-device records |
 | [PERFORMANCE.md](docs/PERFORMANCE.md), [bench/cppcon2024](bench/cppcon2024/README.md) | Performance numbers and methods |
 | [CHANGELOG.md](CHANGELOG.md), [RELEASING.md](docs/RELEASING.md) | Releases |
-
-Most documents under `docs/` are written in Chinese.
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Building, testing and conventions for library development |
 
 ## License
 

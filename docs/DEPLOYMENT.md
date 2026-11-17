@@ -1,286 +1,346 @@
-# XOffsetDatastructure 部署指南（4.0.0）
+# XOffsetDatastructure Deployment Guide (4.0.0)
 
-本文写给把 XOffset 接入服务端、客户端的工程师，说明发布、安全和网络上的前提。
-API 用法见 [USER_GUIDE.md](USER_GUIDE.md)，输入边界见
-[ALPHA_COMPATIBILITY.md](ALPHA_COMPATIBILITY.md)。
+This guide is for engineers integrating XOffset into servers and clients. It covers the
+prerequisites for releases, security and networking. API usage is in [USER_GUIDE.md](USER_GUIDE.md),
+and the input boundary in [ALPHA_COMPATIBILITY.md](ALPHA_COMPATIBILITY.md).
 
-## 1. 适用范围
+## 1. Scope
 
-XOffset 用于**同一份 schema 的 C++ 程序之间**搬运可变状态：服务端之间，以及服务端
-与客户端之间。编译器和平台可以不同，schema 必须相同。它不是跨语言协议，也不是
-长期存储格式。
+XOffset moves mutable state **between C++ programs that share the same schema**: between servers,
+and between servers and clients. Compilers and platforms may differ; the schema must be the same.
+It is not a cross-language protocol and not a long-term storage format.
 
-服务端与客户端之间的用法目前是目标，对外不宣传。4.0.0 的现状（详见
-[CLIENT_TARGETS.md](CLIENT_TARGETS.md)）：
+Server-to-client use is currently a goal and is not advertised publicly. Status in 4.0.0 (details in
+[CLIENT_TARGETS.md](CLIENT_TARGETS.md)):
 
-- 客户端用 C++20/C++23 字段表构建（`XOFFSET_RECORD`，各平台原生编译器），服务端用 C++26
-  反射，wire 逐字节相同。Windows x64（MSVC 19.44、clang-cl 19、MinGW GCC 16）和 Android arm64（NDK r29/r30，云端 qemu-aarch64 运行）在 4.0.0 上全量测试通过，读入服务端写出的
-  参照语料，改过后再存出与服务端相同的字节；macOS arm64 和 iOS 模拟器（Apple clang）的同样结果
-  来自 3.3.0，4.0.0 没有重跑（3.3.1 起发版只用云端）。
-- 端到端 demo（`demo/mapstate`）：Linux 服务端到 Windows、Android 模拟器、iOS 模拟器、macOS
-  客户端都已跑通。真机：3.2.0-rc.1 在一台 Android 11 手机上功能全部通过（记录见
-  [validation/2026-10-28-rc1-platform](validation/2026-10-28-rc1-platform/README.md)），iPhone 15 Pro Max
-  （iOS 26.6.2）上 CTest、参照语料和两个 demo 客户端全部通过；步骤见 [DEVICE_TESTING.md](DEVICE_TESTING.md)。
-- 客户端性能只有 iPhone 15 Pro Max 一台的 slg 数据（[DEVICE_TESTING.md](DEVICE_TESTING.md) 第 9 节：A、B、C
-  场景 xoffset 用时是 FlatBuffers 的 0.18 到 0.31，D 战报只读 0.86），其余计时来自 Apple M4。
+- Clients build with the C++20/C++23 field lists (`XOFFSET_RECORD`, each platform's native
+  compiler) and servers with C++26 reflection; the wire is byte-identical. Windows x64 (MSVC 19.44,
+  clang-cl 19, MinGW GCC 16) and Android arm64 (NDK r29/r30, run under cloud qemu-aarch64) pass the
+  full tests on 4.0.0, read the reference corpus written by the server, and after editing save the
+  same bytes as the server; the same results for macOS arm64 and the iOS simulator (Apple clang) come
+  from 3.3.0 and were not re-run for 4.0.0 (releases since 3.3.1 use the cloud only).
+- End-to-end demo (`demo/mapstate`): a Linux server to Windows, Android emulator, iOS simulator and
+  macOS clients all run. Real devices: 3.2.0-rc.1 passed every functional check on one Android 11
+  phone (record in [validation/2026-10-28-rc1-platform](validation/2026-10-28-rc1-platform/README.md)),
+  and on an iPhone 15 Pro Max (iOS 26.6.2) CTest, the reference corpus and both demo clients all
+  passed; steps in [DEVICE_TESTING.md](DEVICE_TESTING.md).
+- Client performance data exists only for slg on one iPhone 15 Pro Max ([DEVICE_TESTING.md](DEVICE_TESTING.md)
+  section 9: in scenarios A, B and C xoffset takes 0.18 to 0.31 of FlatBuffers' time, D read-only
+  battle report 0.86); all other timing comes from Apple M4.
 
-## 2. 同版本发布
+## 2. Same-version releases
 
-- wire 头里的 schema 指纹必须与接收方类型完全一致（核心承诺 K6），不同就拒绝。
-  当前版本不支持 schema 演进。
-- 所有互相收发数据的程序（各服务端、各平台客户端）必须用**同一份 schema 定义**
-  构建，并一起发布。
-- **任何改了 schema 的服务端更新，都必须和客户端同时发版。** 手游客户端要过应用
-  商店审核，发版周期要按客户端来排。
-- 客户端版本落后时，应在登录或握手阶段用版本号拒绝，不要等到 `load_verified`
-  报错。可以把 `wire_schema_hash_v<T>()` 作为握手的一部分，在建立会话时比较。
-- 服务端之间滚动升级时，新旧版本不能混用同一类数据。可以分批切换（同一时间只让
-  同版本的服务端互相通信），或在切换期间用旧版本程序导出、新版本程序导入。
-- schema 演进（新旧版本互通）从 3.2.0 起提供，见下面 2.1 节。
+- The schema fingerprint in the wire header must match the receiver's type exactly (core guarantee
+  K6); otherwise the wire is rejected. Without the evolution support of section 2.1, schemas cannot
+  evolve.
+- All programs that exchange data (every server, every platform's clients) must be built from **the
+  same schema definitions** and released together.
+- **Any server update that changes the schema must ship together with the clients.** Mobile game
+  clients go through app store review, so plan release cycles around the clients.
+- When a client version is behind, reject it by version number at login or handshake instead of
+  waiting for `load_verified` to fail. `wire_schema_hash_v<T>()` can be part of the handshake and
+  compared when the session is set up.
+- During rolling upgrades between servers, old and new versions must not mix the same kind of data.
+  Switch in batches (only servers of the same version talk to each other at any time), or export with
+  the old program and import with the new one during the switch.
+- Schema evolution (interop between old and new versions) is available since 3.2.0; see section 2.1.
 
-### 2.1 3.2 起：版本链与三条发版规则
+### 2.1 Since 3.2: version chains and three release rules
 
-3.2 的服务端可以同时和多个版本的对端收发（[SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)）：
-连接建立时客户端发 `XSchemaHello`，服务端用 `XPeerSchemas` 判定并回 ack，之后按对端
-的版本收发。用它时，上面“服务端与客户端同时发版”换成下面三条：
+A 3.2 server can exchange data with peers on several versions at once
+([SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)): on connect the client sends an `XSchemaHello`, the
+server judges it with `XPeerSchemas` and acks, and afterwards sends and receives in the peer's
+version. With it, "server and clients release together" above is replaced by three rules:
 
-1. **服务端先于客户端发版。** 转换都在服务端，客户端只认识自己的版本。
-2. **服务端的版本链覆盖线上还在用的所有客户端版本。** 保留几个由业务定；被移出链的
-   版本在握手时得到 `reject_unknown`，客户端据此提示更新。
-3. **要能回滚服务端时分两步发。** 先发一个认识新版本、但仍以旧版本工作的服务端，下一次
-   再切工作版本。回滚到上一个服务端时，它仍认识已经升级的客户端。
+1. **Servers release before clients.** All conversion happens on the server; clients only know their
+   own version.
+2. **The server's version chain covers every client version still in use.** How many to keep is a
+   business decision; versions removed from the chain get `reject_unknown` at handshake, and the
+   client can prompt for an update.
+3. **Release in two steps when the server must be able to roll back.** First release a server that
+   knows the new version but still works in the old one, then switch the working version in the next
+   release. A rollback to the previous server then still knows the already upgraded clients.
 
-发版时用 `schema_freeze freeze` 冻结当前版本，`schema_freeze check` 放进 CTest，
-防止只改字段名不改布局、或忘了把上一版放进版本链。
+At release, freeze the current version with `schema_freeze freeze` and put `schema_freeze check` in
+CTest, to catch renaming fields without a layout change or forgetting to add the previous version to
+the chain.
 
-## 3. 构建一致性
+## 3. Build consistency
 
-3.1.0 已验证的工具链（本地平台矩阵，3.1.0 RC e913d22，GitHub CI 自 2026-10-23 停用）：
+Toolchains verified for 3.1.0 (local platform matrix, 3.1.0 RC e913d22; GitHub CI has been off since
+2026-10-23):
 
-| 用途 | 平台 | 编译器与标准库 |
+| Use | Platform | Compiler and standard library |
 | --- | --- | --- |
-| 服务端 | Linux x86-64、Linux arm64 | GCC 16.2（libstdc++），或 clang-p2996 `d77eff1`（配套 libc++）。两者 wire 逐字节一致，可以混用 |
-| 客户端 | Windows x64 | MinGW-w64 GCC 16.2（`tools/build_mingw_toolchain.sh`、`cmake/toolchains/mingw-w64-x86_64.cmake`）。GCC 的 MinGW TLS 是模拟的，每线程缓存在这个目标上关闭（`XOFFSET_THREAD_CACHES=0`） |
-| 客户端 | Android、iOS、macOS、Windows（MSVC、clang-cl） | 3.1.0 无可用工具链；3.2.0 起用 C++20 字段表构建：Android NDK r29/r30、MSVC 19.44、clang-cl 19，iOS 用 Apple clang（Xcode 27.1，模拟器 129/129），macOS 用 Apple clang（Xcode 27.1，C++20、C++23 各 137/137），见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md) |
+| Server | Linux x86-64, Linux arm64 | GCC 16.2 (libstdc++), or clang-p2996 `d77eff1` (with its libc++). Both produce byte-identical wires and can be mixed |
+| Client | Windows x64 | MinGW-w64 GCC 16.2 (`tools/build_mingw_toolchain.sh`, `cmake/toolchains/mingw-w64-x86_64.cmake`). GCC's MinGW TLS is emulated, so per-thread caches are off on this target (`XOFFSET_THREAD_CACHES=0`) |
+| Client | Android, iOS, macOS, Windows (MSVC, clang-cl) | No usable toolchain for 3.1.0; since 3.2.0 they use the C++20 field-list build: Android NDK r29/r30, MSVC 19.44, clang-cl 19, Apple clang for iOS (Xcode 27.1, simulator 129/129) and macOS (Xcode 27.1, C++20 and C++23 137/137 each), see [CLIENT_TARGETS.md](CLIENT_TARGETS.md) |
 
-- 固定的编译器来源：clang-p2996 见 `toolchains/README.md`，GCC 16 镜像 digest 见
-  `tools/local_validate.sh`，MinGW 工具链的构建配方是 `tools/build_mingw_toolchain.sh`。
-  MSVC、clang-cl 没有反射，只能用 C++20 字段表构建。
-- MinGW 和 MSVC 的 C++ ABI 不同：MinGW 编的 XOffset 模块只能通过 C 接口给 MSVC 编的
-  引擎使用。
-- 同一可执行文件内，所有翻译单元的头文件版本、编译选项和依赖必须一致。加固开关
-  （`XOFFSET_HARDENED` 和 `XOFFSET_SCRUB_*` 等，V2_THREAT_MODEL 4.1 节）也一样：它们改变
-  内联函数的行为。收发两端的开关不必相同，wire 格式不随开关变化。
-- 类型签名（K7）：用 `XOFFSET_PIN_SCHEMA` 固定每个收发的根类型
-  （[SCHEMA_PINS.md](SCHEMA_PINS.md)），把固定文件放进服务端和每个客户端的构建。任何
-  一个构建算出的布局不一致，编译直接失败，不必等到运行时被 `load_verified` 拒绝。
-  有意改 schema 时重新生成固定文件，评审时看它的 diff。固定只发现布局变化，版本错位
-  仍然按第 2 节处理。
-- 只支持 64 位小端平台；32 位安卓渠道包不支持。
+- Pinned compiler sources: clang-p2996 in `toolchains/README.md`, the GCC 16 image digest in
+  `tools/local_validate.sh`, and the MinGW toolchain recipe in `tools/build_mingw_toolchain.sh`.
+  MSVC and clang-cl have no reflection and can only use the C++20 field-list build.
+- MinGW and MSVC have different C++ ABIs: an XOffset module built with MinGW can only be used by an
+  MSVC-built engine through a C interface.
+- Within one executable, all translation units must use the same header version, compile options
+  and dependencies. The same applies to the hardening switches (`XOFFSET_HARDENED`,
+  `XOFFSET_SCRUB_*` and others, V2_THREAT_MODEL section 4.1): they change the behavior of inline
+  functions. Sender and receiver need not use the same switches; the wire format does not depend on
+  them.
+- Type signatures (K7): pin every root type you send or receive with `XOFFSET_PIN_SCHEMA`
+  ([SCHEMA_PINS.md](SCHEMA_PINS.md)) and put the pin file in the server's and every client's build.
+  If any build computes a different layout, compilation fails right away instead of `load_verified`
+  rejecting at run time. When changing the schema on purpose, regenerate the pin file and review its
+  diff. Pins only detect layout changes; version mismatches are still handled per section 2.
+- Only 64-bit little-endian platforms are supported; 32-bit Android builds are not.
 
-## 4. 不可信输入
+## 4. Untrusted input
 
-客户端发给服务端的数据，以及任何来自网络的数据，都按不可信输入处理。
+Data sent by clients to the server, and any data from the network, is untrusted input.
 
-- **一律用 `load_verified`**（或 `TypedXBuffer<T>::load`、`begin_verified_receive`），
-  **并且一定设置 `maximum_capacity`**（见第 5 节）。只检查 wire 的实际长度不够：
-  稀疏 wire 可以用几百字节声明接近 payload 上限（约 2 GiB）的大小，让接收方按声明
-  大小预留并做全图校验，造成资源耗尽。不传上限时，库按默认上限（64 MiB，可用
-  `XOFFSET_DEFAULT_MAXIMUM_CAPACITY` 调整）在预留之前拒绝更大的 wire，报错里写明
-  声明大小和上限；但默认值是兜底，不是给每个请求的预算，接收不可信数据时要按第 5
-  节显式设置。结构安全的承诺（K4）以设置上限为前提。
-- 客户端上行用 `XReceiver<XLink::from_client>` 接收：它默认检查（`view` 边界档，`reload` 等完整档），
-  写信任档编译不过。`-DXOFFSET_CHECK_UPLINK=0` 会关掉这个默认（2026-11-17 起的开关，默认 1），客户端链路
-  变成和可信链路一样只查 wire 头；**对外服务端不要用它编译**，否则任何客户端发一条构造的消息就能让服务端
-  越界读写（V2_THREAT_MODEL 4.1 节）。
-- `load_unverified` 只用于进程内或已经认证过的数据。
-- **校验保证什么**：通过校验后，对根对象图的类型化访问不会越界，结构与 schema 一致
-  （截断、越界、重叠、未铺满、非法 bool、乱序集合、schema 不符都会被拒绝）。
-- **校验不保证什么**：内容的真实性和完整性。只改动某个整数字段值的数据会被接受。
-  wire 头（格式 2.1）没有校验和字段，也没有签名或 MAC。
-- **因此必须在外层做**：
-  - 来源认证和防篡改：TLS 或消息签名；
-  - 业务合法性检查：字段值范围、权限、频率，按普通业务输入处理；
-  - 资源上限（见第 5 节）。
+- **Always use `load_verified`** (or `TypedXBuffer<T>::load`, `begin_verified_receive`), **and always
+  set `maximum_capacity`** (section 5). Checking the actual wire length is not enough: a sparse wire
+  can declare a size close to the payload limit (about 2 GiB) in a few hundred bytes and make the
+  receiver reserve that size and validate the whole graph, exhausting resources. Without a limit,
+  the library rejects larger wires before reserving, using the default limit (64 MiB, adjustable with
+  `XOFFSET_DEFAULT_MAXIMUM_CAPACITY`), and the error names the declared size and the limit; but the
+  default is a fallback, not a budget for each request, so set it explicitly per section 5 when
+  receiving untrusted data. The structural safety guarantee (K4) assumes a limit is set.
+- Receive client uplink with `XReceiver<XLink::from_client>`: it checks by default (`view` uses the
+  bounds tier, `reload` and the others the full tier), and the trusted tier does not compile on it.
+  `-DXOFFSET_CHECK_UPLINK=0` turns that default off (a switch since 2026-11-17, default 1): the client
+  link then checks only the wire header, like the trusted links. **Do not build a server that faces
+  outside clients with it**; any client could then send one crafted message that makes the server
+  read or write out of bounds (V2_THREAT_MODEL section 4.1).
+- `load_unverified` is only for in-process or already authenticated data.
+- **What validation guarantees**: after validation passes, typed access to the root object graph does
+  not go out of bounds, and the structure matches the schema (truncation, out-of-bounds, overlap,
+  incomplete tiling, invalid bools, unordered sets and schema mismatch are all rejected).
+- **What validation does not guarantee**: authenticity and integrity of the content. Data in which only
+  an integer field value was changed is accepted. The wire header (format 2.1) has no checksum field,
+  no signature and no MAC.
+- **So these must be done outside the library**:
+  - Source authentication and integrity: TLS or message signatures;
+  - Business validity checks: field value ranges, permissions, rates, as for any business input;
+  - Resource limits (section 5).
 
-### 4.1 发出的 wire 里不带旧数据
+### 4.1 No stale data in the wires you send
 
-wire 是 arena 的原始字节，发给客户端之前要确认里面没有不该发的内容。威胁模型
-（`docs/V2_THREAT_MODEL.md`）实测过下面几类来源。
+A wire is the raw bytes of the arena, so before sending to clients make sure it contains nothing that
+should not be sent. The threat model (`docs/V2_THREAT_MODEL.md`) measured the sources below.
 
-**2026-11-16 起默认构建不清零后两类字节，2026-11-17 起重置也不清零**（性能优先，V2_THREAT_MODEL 4.1 节）。
-`save_verified`、`freeze_verified` 和增量同步发出的数据，可能带有容器里已经删掉的元素，
-以及这个 buffer 重置之前存过的内容。
-发给不该看到这些内容的接收方（典型是客户端）时，二选一：
+**Since 2026-11-16 the default build does not zero the second and third kinds of bytes, and since
+2026-11-17 a reset does not zero either** (performance first, V2_THREAT_MODEL section 4.1). Data sent
+by `save_verified`, `freeze_verified` and delta sync may contain elements already erased from
+containers, and content the buffer held before it was reset. When sending to receivers that should not see that
+content (typically clients), choose one:
 
-- 用 `-DXOFFSET_HARDENED=1`（CMake：`-DXOFFSET_HARDENED=ON`）编译服务端，恢复清零；
-- 或者这条路径用 `save_compact` 发送：它不写空洞，余量和字符串尾部重写为 0。
+- Build the server with `-DXOFFSET_HARDENED=1` (CMake: `-DXOFFSET_HARDENED=ON`) to restore zeroing;
+- Or send on that path with `save_compact`: it writes no holes, and rewrites slack and string tails
+  as 0.
 
-| 来源 | 默认构建 | `XOFFSET_HARDENED=1` 构建 | 你需要做的 |
+| Source | Default build | `XOFFSET_HARDENED=1` build | What you need to do |
 | --- | --- | --- | --- |
-| P1 已释放块（空洞）：字符串换成更长的值、删除元素、vector 迁移后留下的旧块 | 块在释放时清零，arena 里的空洞本身就是 0（不是开关） | 同左 | 转发收到的数据时，发送方 wire 空洞里的字节会原样再发出（那是发送方的字节，不是本端内存）。转发前用 `save_compact` 重建，见 4.2 节 |
-| P2 容器的空余容量：`clear()`、`resize()` 变小、`erase`、`pop_back` 之后 `[size, capacity)` 里的旧元素；字符串变短后的旧尾部 | 旧元素、旧字符留在余量里，随 wire 发出，直到下一次追加覆盖 | 腾出的字节在缩小时清零（`XOFFSET_SCRUB_ERASED`、`XOFFSET_SCRUB_POPPED`；`clear()` 因此是 O(n)） | 默认构建下，删过不该给接收方看的内容的 buffer 用 `save_compact` 发送 |
-| P3 结构体的隐式填充字节 | 填充带着构造这个元素的值里的字节（通常是栈上的），同样内容的 wire 可能不同 | 库构造或搬移的容器元素（含 `XMap` 的键值对）把填充清零（`XOFFSET_SCRUB_PADDING`） | 发给客户端的 schema 加 `XOFFSET_REQUIRE_NO_PADDING(T)`，或全局定义 `XOFFSET_REJECT_IMPLICIT_PADDING`，有隐式填充就编译失败，按报错补显式字段。没有隐式填充的类型不受这一项影响 |
-| P4 重置前的内容：`reset<T>()` 之后，上一份内容的字节留在新内容的块余量、字符串尾部和填充里 | 不清零。**轮流给不同接收方构建消息的同一个发送 buffer，会把上一个接收方的消息内容夹在下一条 wire 里** | `reset` 把用过的字节全部清零（`XOFFSET_SCRUB_RESET`） | 默认构建下，给不同接收方轮流用的发送 buffer：用 `-DXOFFSET_SCRUB_RESET=1` 编译，或用 `save_compact` 发送，或每个接收方用自己的 buffer |
+| P1 freed blocks (holes): old blocks left after replacing a string with a longer value, erasing elements, or vector migration | Blocks are zeroed when freed, so holes in the arena are themselves 0 (not a switch) | Same | When forwarding received data, the bytes in the sender's wire holes are sent on unchanged (they are the sender's bytes, not this end's memory). Rebuild with `save_compact` before forwarding, see section 4.2 |
+| P2 spare container capacity: old elements in `[size, capacity)` after `clear()`, shrinking `resize()`, `erase`, `pop_back`; old string tails after shortening | Old elements and characters stay in the slack and are sent with the wire until a later append overwrites them | Vacated bytes are zeroed on shrink (`XOFFSET_SCRUB_ERASED`, `XOFFSET_SCRUB_POPPED`; `clear()` is therefore O(n)) | In the default build, send buffers from which content the receiver must not see was erased with `save_compact` |
+| P3 implicit padding bytes in structs | Padding carries bytes from the value the element was built from (usually on the stack), so wires with the same content may differ | Container elements built or moved by the library (including `XMap` key-value pairs) have their padding zeroed (`XOFFSET_SCRUB_PADDING`) | Add `XOFFSET_REQUIRE_NO_PADDING(T)` to schemas sent to clients, or define `XOFFSET_REJECT_IMPLICIT_PADDING` globally, so implicit padding fails to compile; add explicit fields per the error. Types without implicit padding are not affected |
+| P4 content from before a reset: after `reset<T>()`, bytes of the previous content stay in the slack, string tails and padding of the new content's blocks | Not zeroed. **One send buffer that builds messages for different receivers in turn carries content of the previous receiver's message inside the next wire** | `reset` zeroes all used bytes (`XOFFSET_SCRUB_RESET`) | In the default build, for a send buffer used for different receivers in turn: build with `-DXOFFSET_SCRUB_RESET=1`, or send with `save_compact`, or give each receiver its own buffer |
 
-仍然需要注意：
+Still keep in mind:
 
-- 同一个 buffer 里**当前还活着**的数据都会发出。服务端内部字段、其他玩家的数据
-  不要和下发内容放在同一个 buffer 里，下发前单独构建一个只含可见数据的 buffer。
-- 校验只保证结构安全，不检查内容；见上文「校验不保证什么」。
+- All data **currently alive** in a buffer is sent. Do not put server-internal fields or other
+  players' data in the same buffer as what you send down; build a separate buffer containing only
+  visible data before sending.
+- Validation only guarantees structural safety and does not check content; see "What validation does
+  not guarantee" above.
 
-### 4.2 转发客户端上行数据：用 `save_compact` 重建
+### 4.2 Forwarding client uplink data: rebuild with `save_compact`
 
-服务端把客户端 A 的上行数据转给客户端 B（聊天、组队、交易、观战）时，**不要**
-`load_verified` 之后直接 `save_verified` 或 `freeze_verified`。校验只检查结构，不检查
-空洞和容器余量里的字节是不是 0，所以 A 可以在这些字节里写任意内容，`load_verified`
-照样接受，`save_verified` 再把它们原样发给 B。这不是内存安全问题，是一条绕过业务
-检查的夹带通道。
+When the server forwards client A's uplink data to client B (chat, parties, trading, spectating), do
+**not** `load_verified` and then directly `save_verified` or `freeze_verified`. Validation checks only
+structure, not whether the bytes in holes and container slack are 0, so A can write anything there,
+`load_verified` still accepts it, and `save_verified` sends it to B unchanged. This is not a memory
+safety problem; it is a side channel that bypasses business checks.
 
-转发前用 `save_compact` 重建：
+Rebuild with `save_compact` before forwarding:
 
 ```cpp
 XBuffer in = XBuffer::load_verified<ChatMsg>(wire_from_a, XBuffer::maximum_capacity(1u << 20));
-// ……业务检查……
-std::string to_b = in.save_compact<ChatMsg>();   // 不要 in.save_verified<ChatMsg>()
+// ... business checks ...
+std::string to_b = in.save_compact<ChatMsg>();   // not in.save_verified<ChatMsg>()
 ```
 
-`save_compact` 按对象图重新写出 wire，A 能写的位置里它会清掉这些：
+`save_compact` rewrites the wire from the object graph, and clears these places that A could write:
 
-- 空洞：不写出；
-- 容器余量（`[size, capacity)`）：按新的容量重新分配，余量写成 0；
-- 字符串长度之后的字节：清零（内联字符串的这部分，校验本来就要求是 0）。
+- Holes: not written;
+- Container slack (`[size, capacity)`): reallocated at the new capacity, with the slack written as 0;
+- Bytes after a string's length: zeroed (for inline strings validation already requires this part to
+  be 0).
 
-它**管不到**两处，要另外处理：
+It **does not cover** two places, which need separate handling:
 
-- **结构体的隐式填充**：根对象和容器元素按字节整体复制，填充里的字节会原样带过去，
-  而校验不检查填充。转发的类型要没有隐式填充：给转发的根类型加
-  `XOFFSET_REQUIRE_NO_PADDING(T)`（连同它包含的记录和容器元素一起检查），或全局定义
-  `XOFFSET_REJECT_IMPLICIT_PADDING`，有填充就编译失败，按报错补显式字段。
-- **字段值本身**：标量、字符串内容都是 A 发的内容，`save_compact` 照原样转发。按
-  普通业务输入检查（长度、范围、敏感词等）。
+- **Implicit padding in structs**: the root object and container elements are copied as whole bytes,
+  so padding bytes are carried along, and validation does not check padding. Forwarded types must
+  have no implicit padding: add `XOFFSET_REQUIRE_NO_PADDING(T)` to the forwarded root type (it also
+  checks the records and container elements it contains), or define `XOFFSET_REJECT_IMPLICIT_PADDING`
+  globally, so padding fails to compile; add explicit fields per the error.
+- **The field values themselves**: scalars and string contents are what A sent, and `save_compact`
+  forwards them as they are. Check them as ordinary business input (length, range, banned words and
+  so on).
 
-只读的转发可以传 `XCompactOptions{.slack_div = 0}`，wire 最小；B 会接着修改时用默认余量。
+Read-only forwarding can pass `XCompactOptions{.slack_div = 0}` for the smallest wire; use the default
+slack when B will keep modifying.
 
-### 4.3 收到、修改、再发出：互传规则
+### 4.3 Receive, modify, send again: rules for passing data along
 
-64 位小端机之间，wire 就是 buffer 本身：接收方 `load_verified` 之后直接在 buffer 里读写，不逐字段
-解码；改完 `save_verified` 发出，下一跳再 `load_verified`。`demo/mapstate` 的客户端 `--edits` 跑的就是
-这条链：客户端收到快照后在自己的 buffer 里删一个单位、改 hp 和行为、加一个单位、把一个短名字改长，
-`save_verified` 上行；服务端 A 收下、核对，用 `save_compact` 重建后转给另一个客户端，对方再校验。
-规则有四条。
+Between 64-bit little-endian machines the wire is the buffer itself: after `load_verified` the
+receiver reads and writes directly in the buffer, with no field-by-field decoding; when done it sends
+with `save_verified`, and the next hop runs `load_verified` again. The `demo/mapstate` client's
+`--edits` runs exactly this chain: after receiving a snapshot the client deletes a unit in its own
+buffer, changes hp and behavior, adds a unit and makes a short name longer, then sends it up with
+`save_verified`; server A accepts and checks it, rebuilds it with `save_compact` and forwards it to
+another client, which validates it again. There are four rules.
 
-1. **从对端收，一律完整校验，并设上限。** 上行数据用 `load_verified` 加 `maximum_capacity`（demo 用
-   1 MiB，见第 5 节）。校验只证明结构安全，内容是对端写的，要另外查：
-   - 业务字段按普通输入检查。demo 的 `checks::edit_sanity_of` 查坐标在视野内、hp 和行为的取值范围、
-     名字长度、id 不重复。
-   - 要确认收到的就是对端想发的，就在协议里带一个应用层摘要。demo 的帧头带客户端算的内容摘要，
-     A 收下后自己算一遍再比。这只检查传输和实现错误：摘要和数据走同一条通道，对端要改可以一起改，
-     **不防篡改**。来源认证和防篡改仍然交给 TLS 或签名（第 4 节）。
-2. **转发前重建。** 服务端把一个客户端的数据转给别人之前，先用 `save_compact` 重建（4.2 节）。不要
-   原样转发收到的 wire，也不要 `load_verified` 之后直接 `save_verified`。demo 自测
-   （`mapdemo_selftest` 的 `writeback`）实测过：客户端写在容器余量里的字节，`load_verified` 照样接受，
-   `save_compact` 重建后就没有了。
-3. **客户端之间直连，只限同版本。** 两个客户端直接互传、中间没有服务端时，没有一方负责版本转换，
-   握手（`XSchemaHello`，2.1 节）的结论必须是 `same`，否则拒绝。经服务端中转时，服务端可以按 2.1 节
-   替旧版本的客户端转换下发的数据。demo 的转发只发给同版本的客户端：A 按握手时的版本给客户端分组。
-4. **关异常的客户端，给 `maximum_capacity` 留余量。** 在收到的 buffer 上修改会让它增长。compact
-   wire 没有空余，插入一个元素、把短字符串改长都要增长。增长超过 `maximum_capacity` 时，开异常的
-   构建抛 `XBadAlloc`，可以捕获后放弃这次修改。关异常的构建（`-fno-exceptions`、`/EHs-c-`）只能进致命
-   错误处理，进程终止。所以关异常的客户端，凡是要修改的 buffer，上限都要按「最大合法消息 + 一次
-   修改最多增加的量」再留余量，并在修改前自己检查规模。demo 的快照上限是 16 MiB；视野快照约 15 KB，
-   一次修改增加不到 1 KB。只读的 buffer 不增长，不受这条影响。`mapdemo_selftest` 的 `writeback` 用一个
-   上限只比 wire 大 256 字节的 buffer 验证了：插入时抛 `XBadAlloc`。
+1. **Always fully validate what you receive from a peer, with a limit.** Uplink data uses
+   `load_verified` with `maximum_capacity` (the demo uses 1 MiB, see section 5). Validation only
+   proves structural safety; the content was written by the peer and needs separate checks:
+   - Check business fields as ordinary input. The demo's `checks::edit_sanity_of` checks that
+     coordinates are in view, the ranges of hp and behavior, name length and that ids are unique.
+   - To confirm that what arrived is what the peer meant to send, carry an application-level digest
+     in the protocol. The demo's frame header carries a content digest computed by the client, and A
+     recomputes and compares it on receipt. This only catches transport and implementation errors:
+     the digest travels on the same channel as the data and a peer can change both, so **it does not
+     stop tampering**. Source authentication and integrity are still left to TLS or signatures
+     (section 4).
+2. **Rebuild before forwarding.** Before the server forwards one client's data to others, rebuild it
+   with `save_compact` (section 4.2). Do not forward the received wire as is, and do not
+   `load_verified` and then `save_verified` directly. The demo self-test (`writeback` in
+   `mapdemo_selftest`) measured it: bytes a client wrote into container slack are accepted by
+   `load_verified` and gone after a `save_compact` rebuild.
+3. **Direct client-to-client links only for the same version.** When two clients exchange data
+   directly with no server in between, nobody converts versions, so the handshake (`XSchemaHello`,
+   section 2.1) must conclude `same`; otherwise reject. When relayed through a server, the server can
+   convert data sent down to older clients per section 2.1. The demo forwards only to clients of the
+   same version: A groups clients by their handshake version.
+4. **No-exception clients: leave headroom in `maximum_capacity`.** Modifying a received buffer makes
+   it grow. A compact wire has no slack, so inserting an element or making a short string longer must
+   grow it. When growth exceeds `maximum_capacity`, builds with exceptions throw `XBadAlloc`, which
+   can be caught to abandon the edit. Builds without exceptions (`-fno-exceptions`, `/EHs-c-`) can
+   only enter fatal error handling and the process terminates. So on no-exception clients, every
+   buffer that will be modified needs a limit of "largest valid message + the most one edit can add"
+   plus headroom, and the client should check sizes itself before modifying. The demo's snapshot
+   limit is 16 MiB; a view snapshot is about 15 KB and one edit adds less than 1 KB. Read-only buffers
+   do not grow and are not affected. `writeback` in `mapdemo_selftest` verified this with a buffer
+   whose limit is only 256 bytes larger than the wire: inserting throws `XBadAlloc`.
 
-## 5. 容量与资源上限
+## 5. Capacity and resource limits
 
-`maximum_capacity` 同时决定每个 buffer 预留的虚拟地址空间。默认 64 MiB（或初始
-长度，取较大者）；payload 的硬上限是 `0x7ffffff8`（约 2 GiB），这不是建议给每个
-请求的预算。
+`maximum_capacity` also determines the virtual address space each buffer reserves. The default is
+64 MiB (or the initial length, whichever is larger); the hard payload limit is `0x7ffffff8` (about
+2 GiB), which is not a recommended per-request budget.
 
-| 场景 | 建议 | 依据 |
+| Scenario | Recommendation | Basis |
 | --- | --- | --- |
-| 服务端接收客户端数据 | 默认 `maximum_capacity` 设为 **1 MiB**；读取 wire 前先检查长度，超过就丢弃 | 客户端上行消息多为 KB 级；按业务最大合法消息的 2 倍向上调整 |
-| 服务端之间 | 按该类状态的最大合法大小设上限（单块状态可以到数百 MB） | 服务端间数据视为已认证，但仍需防止异常数据拖垮进程 |
-| 客户端接收或构建 | 设较小的 `maximum_capacity`（按最大下发消息的 2 倍）；频繁创建、销毁 buffer 时用 `XBufferPool` 复用空闲预留；**iOS 上所有存活 buffer 的 `maximum_capacity` 之和控制在 3 GiB 以内** | 每个存活的 buffer 默认预留 64 MiB 地址空间，池只复用空闲预留、不减少存活 buffer 的预留。iPhone 实测见下 |
+| Server receiving client data | Default `maximum_capacity` of **1 MiB**; check the length before reading a wire and drop it if larger | Client uplink messages are mostly KB-sized; adjust upward to 2x the largest valid business message |
+| Server to server | Set the limit to the largest valid size of that kind of state (one state block can reach hundreds of MB) | Data between servers counts as authenticated, but abnormal data must still not bring down the process |
+| Client receiving or building | Use a smaller `maximum_capacity` (2x the largest message sent down); when creating and destroying buffers often, reuse free reservations with `XBufferPool`; **on iOS keep the sum of `maximum_capacity` over all live buffers within 3 GiB** | Each live buffer reserves 64 MiB of address space by default; a pool only reuses free reservations and does not shrink those of live buffers. iPhone measurements below |
 
-iPhone 实测（iPhone 15 Pro Max，iOS 26.6.2，8 GB 内存，免费开发者账号签名，`xo_mem_probe`，2026-10-28）：
+iPhone measurements (iPhone 15 Pro Max, iOS 26.6.2, 8 GB RAM, signed with a free developer account,
+`xo_mem_probe`, 2026-10-28):
 
-- 一个进程能预留的地址空间约 3.4 GiB：64 MiB 一个的 buffer 最多 54 个（3.375 GiB），1 GiB 一个的最多 2 个；
-  单个 buffer 的 `maximum_capacity` 最大 2047 MiB。之后创建 buffer 抛 `XBadAlloc`，进程不会被杀。
-- 实际写入：单个 buffer 写到 1920 MiB 时分配失败，进程仍在，启动时 `os_proc_available_memory` 约 3.4 GiB。
-- 所以按默认 64 MiB，同时存活的 buffer 不能超过约 50 个。持有很多 buffer 的客户端要把每个的上限设小：
-  SLG 压测 M 规模（512 个玩家各一个 buffer）每个玩家、战斗、报告 buffer 用 2 MiB（`SLG_XOFFSET_CAP_MIB=2`），
-  地图分片 256 MiB；每个 256 MiB 时 S 规模（64 个玩家）就会失败。
-- Android（64 位 Linux 内核）和桌面系统的地址空间大得多，没有这个限制；它们的上限是实际写入的内存。
-- 3.4 起 VM buffer 的宿主头放在负载第一页的前 64 字节，上限正好是 4 MiB 整数倍时（如 64 MiB）
-  每个 buffer 多映射一个 4 MiB 粒度（未用时不可访问、不驻留），对齐不变。如果 iOS 的限制按已映射的
-  地址空间计，按默认 64 MiB 同时存活的 buffer 约 50 个（上面的 54 是 3.3 实测，3.4 还没在 iPhone 上
-  复测）。把上限设成 4 MiB 整数倍减 64 字节（如 `64 MiB - 64`）可以避免多映射这一粒度。
+- One process can reserve about 3.4 GiB of address space: at most 54 buffers of 64 MiB (3.375 GiB),
+  or 2 of 1 GiB; one buffer's `maximum_capacity` can be at most 2047 MiB. Creating buffers after that
+  throws `XBadAlloc`; the process is not killed.
+- Actual writes: one buffer failed to allocate at 1920 MiB written, the process stayed up, and
+  `os_proc_available_memory` was about 3.4 GiB at startup.
+- So with the default 64 MiB, no more than about 50 buffers can be alive at once. Clients that hold
+  many buffers must set small limits on each: the SLG stress test at M scale (one buffer per each of
+  512 players) uses 2 MiB per player, battle and report buffer (`SLG_XOFFSET_CAP_MIB=2`) and 256 MiB
+  for map shards; with 256 MiB each, even S scale (64 players) fails.
+- Android (64-bit Linux kernel) and desktop systems have much larger address spaces and no such
+  limit; their limit is the memory actually written.
+- Since 3.4 the host header of a VM buffer sits in the first 64 bytes of the payload's first page; when
+  the limit is exactly a multiple of 4 MiB (such as 64 MiB), each buffer maps one more 4 MiB granule
+  (inaccessible and not resident while unused), with alignment unchanged. If iOS's limit counts mapped
+  address space, about 50 buffers of the default 64 MiB can be alive at once (the 54 above was measured
+  on 3.3; 3.4 has not been re-measured on an iPhone). Setting the limit to a multiple of 4 MiB minus 64
+  bytes (such as `64 MiB - 64`) avoids mapping the extra granule.
 
-另外：
+Also:
 
-- 单个 buffer 合法不等于总资源受控：还要限制并发 buffer 数、队列长度、总内存或
-  虚拟地址预算，以及单个请求的处理时间。
-- 每条 wire 有一个 40 字节的头，每个 buffer 有一个虚拟内存预留。百字节级的高频小消息
-  成本没有测过，这类场景先用实测确认。
-- 上表中的 1 MiB 和「2 倍」是建议起点，不是测量结果，接入时按业务数据调整。
+- One valid buffer does not mean total resources are controlled: also limit the number of concurrent
+  buffers, queue lengths, total memory or virtual address budget, and the processing time of a single
+  request.
+- Every wire has a 40-byte header and every buffer has a virtual memory reservation. The cost of
+  high-frequency messages of about a hundred bytes has not been measured; measure first for such
+  cases.
+- The 1 MiB and "2x" in the table above are suggested starting points, not measurements; adjust them
+  to your business data when integrating.
 
-## 6. 网络传输
+## 6. Network transport
 
-- wire 是原始内存布局，比 varint 类格式大。SLG M 规模第 20 周期的玩家状态消息：
-  3.1.0 稠密 wire 13,667 B，FlatBuffers 8,423 B；protobuf 约 4.5 KB（2026-10-21 原型）。
-  大出来的主要是容器余量和空洞；只读下发用 `save_compact` 加
-  `XCompactOptions{.slack_div = 0}` 可以去掉，估算与 FlatBuffers 持平（3.1.0 上没有实测）。
-- 服务端机房内的链路通常不需要压缩。
-- **客户端链路（尤其移动网络）建议在外层加 zstd 压缩**，或 lz4（更快、压缩率较低）。
-  压缩在 `save_verified` 之后、`load_verified` 之前做，不影响库的校验。解压时同样
-  要限制解压后的长度，防止压缩炸弹。
-- 数据只能整块发送，没有增量同步；需要增量时由上层协议拆分 schema。
+- A wire is the raw memory layout and is larger than varint-style formats. SLG M scale, player state
+  message in cycle 20: 3.1.0 dense wire 13,667 B, FlatBuffers 8,423 B; protobuf about 4.5 KB
+  (2026-10-21 prototype). The extra size is mostly container slack and holes; for read-only messages
+  sent down, `save_compact` with `XCompactOptions{.slack_div = 0}` removes it, estimated on par with
+  FlatBuffers (not measured on 3.1.0).
+- Links inside the server data center usually do not need compression.
+- **On client links (especially mobile networks) add zstd compression outside the library**, or lz4
+  (faster, lower ratio). Compress after `save_verified` and decompress before `load_verified`; the
+  library's validation is unaffected. Also limit the decompressed length to guard against compression
+  bombs.
+- A whole-buffer wire carries the whole state; for incremental updates use delta sync
+  ([USER_GUIDE.md](USER_GUIDE.md) sections 4.5 and 4.6).
 
-### 6.1 压缩怎么选
+### 6.1 Choosing compression
 
-压缩不在库里，库只管 wire 的生成和校验。按消息大小选：
+Compression is not in the library; the library only produces and validates wires. Choose by message
+size:
 
-| 消息 | 选择 | 依据（云上 x86-64 实测） |
+| Message | Choice | Basis (measured on cloud x86-64) |
 | --- | --- | --- |
-| 大快照（KB 级以上：整场景、视野、全量状态） | **zstd level 3**，标准帧 | demo 整场景 321 KB → 123 KB（0.38），视野 15.1 KB → 6.4 KB（0.42）；`save_compact` + `XCompactOptions{0}` 再加 zstd-3，SLG A/B/C 比 FlatBuffers 原始大小小 7–9% |
-| 小消息（几十到几百字节：事件、战报、指令） | **zstd 字典**；同一时刻要发多条时**再批量**（多条一帧） | 不用字典时 zstd 对小消息几乎没用：SLG 战报（D 类，XOffset 197 B、FlatBuffers 158 B）压缩后 XOffset 135.9 B、FlatBuffers 114.0 B（1.19 倍）；用 16 KB 字典：单条 56.2 B 对 56.3 B（1.00），每批 8 / 32 / 128 条平均 40.4 / 37.2 / 34.5 B 对 41.9 / 38.1 / 35.3 B（0.96 / 0.98 / 0.98）。编码约 1.2–1.5 µs、解码约 0.5–0.7 µs 每条 |
-| CPU 紧张（低端手机、每帧预算很小） | **lz4** | 压缩率比 zstd 低、速度快；本项目没有测 lz4 的数字，接入时实测 |
+| Large snapshots (KB and above: whole scene, view, full state) | **zstd level 3**, standard frame | Demo whole scene 321 KB → 123 KB (0.38), view 15.1 KB → 6.4 KB (0.42); `save_compact` + `XCompactOptions{0}` plus zstd-3 makes SLG A/B/C 7–9% smaller than FlatBuffers' raw size |
+| Small messages (tens to hundreds of bytes: events, battle reports, commands) | **zstd dictionary**; when several are sent at the same moment, **also batch** them (several per frame) | Without a dictionary zstd barely helps small messages: an SLG battle report (class D, XOffset 197 B, FlatBuffers 158 B) compresses to XOffset 135.9 B, FlatBuffers 114.0 B (1.19x); with a 16 KB dictionary: single message 56.2 B versus 56.3 B (1.00), batches of 8 / 32 / 128 average 40.4 / 37.2 / 34.5 B versus 41.9 / 38.1 / 35.3 B (0.96 / 0.98 / 0.98). Encoding about 1.2–1.5 µs and decoding about 0.5–0.7 µs per message |
+| Tight CPU (low-end phones, small per-frame budget) | **lz4** | Lower ratio than zstd, faster; this project has no lz4 numbers, measure when integrating |
 
-小消息的字典压缩用 `contrib/zstd_dict`（独立组件，C++17，要链接 zstd 1.5.x，不进库）：
+Dictionary compression for small messages uses `contrib/zstd_dict` (a separate component, C++17, links
+zstd 1.5.x, not part of the library):
 
-- **字典从服务端样本训练**：`xoffset_zstd_dict train --id N --binding auto INPUT...`，样本是真实的
-  XOffset wire（几千条以上）。训练是确定的，同样的样本得到同样的字典。
-- **两端都带字典版本**：字典 id 就是版本号，写在每一帧的帧头里。客户端订阅时报自己的字典 id，
-  服务端不一致就拒绝订阅；解码端遇到别的 id 的帧在解码前就拒绝（`dict_id_mismatch`）。
-  换字典 = 换 id，新旧字典同时在服务端保留到旧客户端升级完。
-- **字典绑定 schema**：`--binding auto` 把字典绑到样本 wire 头里的 schema 指纹，编码端拒绝别的
-  schema 的 wire；绑定后每帧省掉 wire 头里固定的 24 字节，解码端补回。改 schema 就要重训字典。
-- **限长**：解码前按帧头声明的长度和调用方给的上限拒绝，不先分配；批量帧限制条数和每条长度。
-  解出来的仍是未校验的 wire，照常走 `load_verified`。
-- 帧不带校验和，完整性交给传输层（TCP/TLS）和 `load_verified`。
+- **Train the dictionary from server samples**: `xoffset_zstd_dict train --id N --binding auto INPUT...`,
+  where the samples are real XOffset wires (several thousand or more). Training is deterministic: the
+  same samples give the same dictionary.
+- **Both ends carry the dictionary version**: the dictionary id is the version number and is written
+  in every frame header. A client reports its dictionary id when subscribing, and the server rejects
+  the subscription on a mismatch; the decoder rejects frames with another id before decoding
+  (`dict_id_mismatch`). Changing the dictionary = changing the id; keep old and new dictionaries on
+  the server until old clients have upgraded.
+- **Dictionaries are bound to a schema**: `--binding auto` binds the dictionary to the schema
+  fingerprint in the sample wire headers, and the encoder rejects wires of other schemas; once bound,
+  each frame saves the fixed 24 bytes of the wire header, which the decoder restores. Changing the
+  schema means retraining the dictionary.
+- **Length limits**: before decoding, frames are rejected by their declared length and the caller's
+  limit, with no allocation first; batch frames limit the count and the length of each message. What
+  comes out is still an unvalidated wire and goes through `load_verified` as usual.
+- Frames carry no checksum; integrity is left to the transport (TCP/TLS) and `load_verified`.
 
-`demo/mapstate` 的事件流是完整例子：A 每 20 tick 推送一批 UnitEvent（每条 144–168 B），
-客户端按 `--events raw|zstd|zdict|batch` 订阅。10000 单位档每条平均网络字节：
-raw 146、zstd 152、字典 68、每帧 100 条批量 52。
+The `demo/mapstate` event stream is a complete example: A pushes a batch of UnitEvents every 20 ticks
+(144–168 B each), and clients subscribe with `--events raw|zstd|zdict|batch`. Average network bytes
+per message at the 10000-unit tier: raw 146, zstd 152, dictionary 68, batches of 100 per frame 52.
 
+## 7. Integration checklist
 
-## 7. 接入检查清单
-
-- [ ] 所有收发端使用同一份 schema；改 schema 时服务端和客户端同时发版（3.2 起可改用 2.1 节的版本链和三条规则）
-- [ ] 握手阶段比较版本或 schema 指纹（3.2 起用 `XSchemaHello` / `XPeerSchemas`）
-- [ ] 每个平台使用第 3 节表里已验证的工具链构建，且只面向 64 位小端平台
-- [ ] 收发的根类型都用 `XOFFSET_PIN_SCHEMA` 固定，固定文件进了服务端和每个客户端的构建
-- [ ] 网络输入只走 `load_verified` 路径，并设置了 `maximum_capacity`
-- [ ] 对外服务端没有用 `XOFFSET_CHECK_UPLINK=0` 编译，客户端连接的接收器是 `XReceiver<XLink::from_client>`（第 4 节）
-- [ ] 下发给客户端的 schema 没有隐式填充（`XOFFSET_REQUIRE_NO_PADDING` 或 `XOFFSET_REJECT_IMPLICIT_PADDING`），下发 buffer 只含客户端可见的数据
-- [ ] 下发给客户端的 buffer 里删过客户端不该看到的元素，或者同一个发送 buffer 轮流给不同客户端用时：服务端用 `XOFFSET_HARDENED=1` 编译，或这条路径用 `save_compact` 发送（4.1 节；默认构建不清零容器腾出的字节，重置也不清零）
-- [ ] 服务端接收客户端数据时有 wire 长度上限（建议起点 1 MiB）
-- [ ] 转发客户端上行数据前用 `save_compact` 重建，转发的类型没有隐式填充（4.2 节）
-- [ ] 收到的数据改完再发出时：收端完整校验加业务检查（需要时加应用层摘要），客户端直连只限同版本，关异常的客户端给要修改的 buffer 留上限余量（4.3 节）
-- [ ] 客户端用较小的 `maximum_capacity` 或 `XBufferPool`
-- [ ] 外层有认证（TLS 或签名）和业务字段检查
-- [ ] 限制了并发 buffer 数和总内存预算
-- [ ] 客户端链路按 6.1 节选了压缩（大快照 zstd-3，小消息字典或批量，CPU 紧张用 lz4），并限制了解压后长度
-- [ ] 用字典时：两端比较字典 id，字典绑定 schema，改 schema 时重训并换 id
+- [ ] All senders and receivers use the same schema; when the schema changes, server and clients release together (since 3.2 the version chain and three rules of section 2.1 can be used instead)
+- [ ] Versions or schema fingerprints are compared at handshake (since 3.2 with `XSchemaHello` / `XPeerSchemas`)
+- [ ] Every platform builds with a verified toolchain from the table in section 3, targeting only 64-bit little-endian platforms
+- [ ] Every root type sent or received is pinned with `XOFFSET_PIN_SCHEMA`, and the pin file is in the server's and every client's build
+- [ ] Network input only goes through `load_verified` paths, with `maximum_capacity` set
+- [ ] A server that faces outside clients is not built with `XOFFSET_CHECK_UPLINK=0`, and the receiver of a client connection is `XReceiver<XLink::from_client>` (section 4)
+- [ ] Schemas sent to clients have no implicit padding (`XOFFSET_REQUIRE_NO_PADDING` or `XOFFSET_REJECT_IMPLICIT_PADDING`), and buffers sent down contain only data visible to the client
+- [ ] When a buffer sent to clients had elements erased that clients must not see, or one send buffer is used for different clients in turn: the server is built with `XOFFSET_HARDENED=1`, or that path sends with `save_compact` (section 4.1; the default build does not zero bytes vacated by containers, and a reset does not zero either)
+- [ ] The server has a wire length limit for client data (suggested starting point 1 MiB)
+- [ ] Client uplink data is rebuilt with `save_compact` before forwarding, and forwarded types have no implicit padding (section 4.2)
+- [ ] When received data is modified and sent again: the receiver fully validates and runs business checks (adding an application-level digest when needed), direct client links are same-version only, and no-exception clients leave limit headroom on buffers they modify (section 4.3)
+- [ ] Clients use a smaller `maximum_capacity` or `XBufferPool`
+- [ ] There is authentication outside the library (TLS or signatures) and business field checks
+- [ ] The number of concurrent buffers and the total memory budget are limited
+- [ ] Client links chose compression per section 6.1 (zstd-3 for large snapshots, dictionary or batching for small messages, lz4 when CPU is tight), with a limit on the decompressed length
+- [ ] When using dictionaries: both ends compare the dictionary id, the dictionary is bound to the schema, and it is retrained with a new id when the schema changes

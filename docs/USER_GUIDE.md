@@ -1,24 +1,27 @@
-# XOffsetDatastructure 用户指南（4.0.0，wire 格式 2.1）
+# XOffsetDatastructure User Guide (4.0.0, wire format 2.1)
 
-本文面向使用者，说明怎么定义类型、构建、修改、保存、加载，以及必须遵守的约束。
-第一次用先看 [GETTING_STARTED.md](GETTING_STARTED.md)：按场景（服务端发往客户端、客户端上行、服务端之间）
-各有一个能运行的推荐写法示例。
-部署要求见 [DEPLOYMENT.md](DEPLOYMENT.md)，格式细节见 [V2_FORMAT.md](V2_FORMAT.md)，输入与兼容边界见
-[ALPHA_COMPATIBILITY.md](ALPHA_COMPATIBILITY.md)。
+This guide is for users of the library. It explains how to define types, build,
+modify, save and load them, and the constraints you must follow.
+If this is your first time, start with [GETTING_STARTED.md](GETTING_STARTED.md): it has one runnable
+example of the recommended pattern per use case (server to client, client uplink, server to server).
+Deployment requirements are in [DEPLOYMENT.md](DEPLOYMENT.md), format details in [V2_FORMAT.md](V2_FORMAT.md),
+and the input and compatibility boundary in [ALPHA_COMPATIBILITY.md](ALPHA_COMPATIBILITY.md).
 
-## 1. 基本模型
+## 1. Basic model
 
-- 一个 `XBuffer` 拥有一块连续的 arena。根对象和它引用的所有字符串、数组、集合都放在
-  这块 arena 里，彼此之间用相对偏移相连，所以 arena 放在哪里都一样（存储见 3.4 节）。
-- arena 的字节就是序列化结果，读写字段不需要编码或解码。
-- `save_verified` 把 arena 复制成一份调用方独占的 wire（`std::string`），发送方之后
-  可以继续修改原 buffer。
-- `load_verified` 先完整校验 wire，再把字节复制进新的 arena。校验通过之后，读取
-  就是普通的成员访问。
-- 所以发送不需要编码和解码，但不是零拷贝：发送方保存时拷贝一次，接收方装载时拷贝一次
-  （直接读进最终 arena 的接收入口也是这一次拷贝）。
+- An `XBuffer` owns one contiguous arena. The root object and every string, array and set it
+  references live in that arena and point at each other with relative offsets, so the arena
+  works at any address (storage: section 3.4).
+- The arena bytes are the serialized form; reading and writing fields needs no encoding or decoding.
+- `save_verified` copies the arena into a wire (`std::string`) owned by the caller; the sender
+  can keep modifying the original buffer afterwards.
+- `load_verified` first validates the whole wire, then copies the bytes into a new arena. Once
+  validation passes, reading is plain member access.
+- So sending needs no encode or decode, but it is not zero-copy: the sender copies once when
+  saving and the receiver copies once when loading (the receive entry point that reads straight
+  into the final arena is that same single copy).
 
-## 2. 定义类型
+## 2. Defining types
 
 ```cpp
 #include "xoffsetdatastructure.hpp"
@@ -26,30 +29,34 @@ using namespace XOffsetDatastructure;
 
 struct Profile {
     std::int32_t           id{0};
-    XString                name;     // ≤10 字节的字符串内联在 12 字节头里
-    XString                bio;      // 更长的字符串占一个 arena 块
+    XString                name;     // strings of <= 10 bytes are stored inline in the 12-byte header
+    XString                bio;      // longer strings take one arena block
     XVector<std::int32_t>  scores;
     XSet<std::int32_t>     tags;
     XMap<XString, std::int32_t> stats;
 };
-XOFFSET_RECORD(Profile, id, name, bio, scores, tags, stats)   // 字段表（2.1 节）
+XOFFSET_RECORD(Profile, id, name, bio, scores, tags, stats)   // field list (section 2.1)
 XOFFSET_REGISTER_SCHEMA_NAME(Profile, "example.Profile")
 ```
 
-- 普通聚合体即可，不需要 IDL。推荐每个记录都在全局作用域写一行 `XOFFSET_RECORD`（2.1 节）：
-  C++20/C++23 构建（客户端）靠它知道记录的形状，C++26 构建用反射逐条核对它，所以同一份源码在
-  两种构建下都能编、wire 字节相同，字段还有同名的访问函数（第 3.5 节）。只在 C++26 下编的代码可以
-  不写，布局和 schema 身份由 P2996 反射得出。
-- 成员只能是标量、枚举、定长数组、库容器（`XString`、`XVector`、`XFixedVector`、
-  `XSet`、`XMap`）和递归满足这些条件的结构体。原生指针、引用、`union`、多态类型、
-  `std::string`/`std::vector` 等都会在编译期被拒绝。
-- 每种根类型用 `XOFFSET_REGISTER_SCHEMA_NAME` 注册一个唯一且稳定的名称。
+- Plain aggregates are enough; there is no IDL. Write one `XOFFSET_RECORD` line at global scope
+  for every record (section 2.1): C++20/C++23 builds (clients) learn the record's shape from it,
+  and C++26 builds check it entry by entry against reflection, so the same source compiles in both
+  builds with identical wire bytes, and every field gets an accessor of the same name (section 3.5).
+  Code compiled only as C++26 may omit it; layout and schema identity then come from P2996 reflection.
+- Members may only be scalars, enums, fixed-size arrays, library containers (`XString`, `XVector`,
+  `XFixedVector`, `XSet`, `XMap`) and structs that recursively satisfy these rules. Raw pointers,
+  references, `union`, polymorphic types, `std::string`/`std::vector` and the like are rejected at
+  compile time.
+- Register a unique and stable name for each root type with `XOFFSET_REGISTER_SCHEMA_NAME`.
 
-### 2.1 字段表：`XOFFSET_RECORD`
+### 2.1 Field lists: `XOFFSET_RECORD`
 
-没有反射的构建（C++20/C++23，或 `XOFFSET_SCHEMA_BACKEND_DESCRIBE=1`）里，库从一行字段表
-知道记录的形状。C++26 构建可以不写；写了，宏会和反射逐条核对（成员、顺序、偏移、类型、基类），
-不一致就编译失败，所以同一份源码在两种构建下描述的是同一个 schema，wire 字节相同。
+In builds without reflection (C++20/C++23, or `XOFFSET_SCHEMA_BACKEND_DESCRIBE=1`) the library
+learns a record's shape from a one-line field list. C++26 builds may omit it; if it is written,
+the macro checks it against reflection entry by entry (members, order, offsets, types, bases) and
+fails to compile on any mismatch, so the same source describes the same schema in both builds and
+the wire bytes are identical.
 
 ```cpp
 struct Troop { std::int32_t type{}; std::int32_t count{}; };
@@ -57,58 +64,74 @@ struct March { std::int64_t id{}; std::int32_t eta{}; XVector<Troop> troops; };
 struct Entity { std::int64_t id{}; };
 struct Player : Entity { std::int32_t level{}; XVector<std::int32_t> items; };
 
-// 全局作用域，放在类型定义之后、第一次使用之前；被包含的记录写在前面。
+// Global scope, after the type definitions and before first use; contained records come first.
 XOFFSET_RECORD(Troop, type, count)
 XOFFSET_RECORD(March, id, eta, troops)
 XOFFSET_RECORD(Entity, id)
-XOFFSET_RECORD_DERIVED(Player, (Entity), level, items)   // 基类按声明顺序写在括号里
+XOFFSET_RECORD_DERIVED(Player, (Entity), level, items)   // bases in parentheses, in declaration order
 ```
 
-- 按声明顺序列出**全部**非静态数据成员。写错名字编译不过；漏写、重复、顺序错由编译期
-  完整性证明拦下：偏移严格递增且不重叠，加上聚合体初始化计数（`T{x1..xE}` 合法而
-  `T{x1..xE+1}` 不合法）。只看 `sizeof` 不够：漏掉一个看起来像补齐的 1 字节成员，大小不变。
-- 因此记录必须是聚合体（没有用户声明的构造函数、私有或受保护成员、虚函数）。类型名带逗号时用别名。
-- `XOFFSET_RECORD` 同时就是 `XOFFSET_ORDINARY_RECORDS` 的声明（第 3.1 节），两者不要对同一个
-  类型都写。没有反射时，「普通记录」的声明（不论用哪个宏，还是手写 `wire_record_layout`
-  特化）还承诺记录没有用户声明的析构、拷贝/移动构造或赋值。没有反射时库只能部分检查：
-  所有基类和成员的析构（或赋值）都平凡、记录本身却不平凡，就是用户提供的，判为不普通；有成员
-  本身不平凡（例如 `XString`）时查不出来，仍是承诺。C++26 构建会完整检查。
-  不能作这个承诺的记录用 `XOFFSET_RECORD_DERIVED(T, (), 成员...)`：只给字段表，不声明普通记录。
-  **注意：这样写的记录不走 SHIFT。** 它作为 `XVector` 元素时，中间插入、删除和扩容逐个元素
-  搬移（订单簿实测：每插入一个价位约 1,000 条指令，SHIFT 是一次 memmove）。没有用户声明的特殊成员函数的记录，写 `XOFFSET_RECORD`（或另加
-  `XOFFSET_ORDINARY_RECORDS(T)`），不要为了“不带基类”而用 `XOFFSET_RECORD_DERIVED(T, (), ...)`。
-- wire 里的枚举必须有固定底层类型（`enum class`，或 `enum E : std::uint8_t {...}`），否则编译报错
-  并给出改法（第 2.2 节）。
-- `XString`、`XVector`、`XSet`、`XMap`、`XKeyValue` 和 `std::array` 由库自带字段表。
-- 联合体和非聚合体类（`std::string`、带虚函数或构造函数的类）写不了字段表。没有反射时库把它们
-  当作不透明类型：不准入（`is_byte_copy_safe_v` 为 false），也不报“缺字段表”。
-- 迁移助手 `tools/describe_dump`：在 GCC 16 或 P2996 上编译，传入根类型，用反射按依赖顺序印出
-  所有可达记录的这几行（`bench/slg` 的 13 行就是它的输出，`describe_dump_slg` 测试保持一致）。
-  写不了的类型（非聚合体、重叠的 `[[no_unique_address]]` 成员等）印成一行注释说明原因。
-- 发布前至少用一个 C++26 编译器把 schema 编一次，让反射核对字段表和承诺。
-- 字段表同时给记录的 proxy 生成按名字的访问函数（第 3.5 节）：`u.hp()` 就是
-  `u.field<&Unit::hp>()`。只靠反射描述、没写字段表的记录没有访问函数，用 `field<&T::m>()`。
+- List **all** non-static data members in declaration order. A misspelled name does not compile;
+  a missing, duplicated or misordered member is caught by a compile-time completeness proof:
+  offsets strictly increasing and non-overlapping, plus the aggregate initialization count
+  (`T{x1..xE}` is valid and `T{x1..xE+1}` is not). `sizeof` alone is not enough: leaving out a
+  1-byte member that looks like padding does not change the size.
+- Records must therefore be aggregates (no user-declared constructors, private or protected
+  members, or virtual functions). Use an alias when a type name contains a comma.
+- `XOFFSET_RECORD` is also the `XOFFSET_ORDINARY_RECORDS` declaration (section 3.1); do not write
+  both for the same type. Without reflection, the "ordinary record" declaration (whichever macro,
+  or a hand-written `wire_record_layout` specialization) also promises that the record has no
+  user-declared destructor, copy/move constructor or assignment. Without reflection the library can
+  only partly check this: if every base and member destructor (or assignment) is trivial but the
+  record's own is not, it is user-provided and the record is judged not ordinary; when a member is
+  itself non-trivial (for example `XString`) this cannot be detected and remains a promise. C++26
+  builds check it fully.
+  A record that cannot make this promise uses `XOFFSET_RECORD_DERIVED(T, (), members...)`: field
+  list only, no ordinary-record declaration.
+  **Note: records written this way do not take the SHIFT path.** As `XVector` elements, middle
+  inserts, erases and growth move elements one by one (measured on an order book: about 1,000
+  instructions per inserted price level, where SHIFT is one memmove). For records without
+  user-declared special member functions, write `XOFFSET_RECORD` (or add
+  `XOFFSET_ORDINARY_RECORDS(T)`); do not use `XOFFSET_RECORD_DERIVED(T, (), ...)` just because the
+  record has no base.
+- Enums on the wire must have a fixed underlying type (`enum class`, or
+  `enum E : std::uint8_t {...}`); otherwise compilation fails with a suggested fix (section 2.2).
+- `XString`, `XVector`, `XSet`, `XMap`, `XKeyValue` and `std::array` come with library field lists.
+- Unions and non-aggregate classes (`std::string`, classes with virtual functions or constructors)
+  cannot have a field list. Without reflection the library treats them as opaque: not admitted
+  (`is_byte_copy_safe_v` is false), and no "missing field list" error.
+- Migration helper `tools/describe_dump`: compile it with GCC 16 or P2996, pass a root type, and it
+  uses reflection to print these lines for every reachable record in dependency order (the 13
+  lines in `bench/slg` are its output; the `describe_dump_slg` test keeps them in sync). Types that
+  cannot be written (non-aggregates, overlapping `[[no_unique_address]]` members, ...) are printed
+  as a comment line giving the reason.
+- Before release, compile the schema at least once with a C++26 compiler so reflection checks the
+  field lists and the promises.
+- The field list also generates by-name accessors on the record's proxy (section 3.5): `u.hp()` is
+  `u.field<&Unit::hp>()`. Records described only by reflection, with no field list, have no
+  accessors; use `field<&T::m>()`.
 
-### 2.2 可移植标量
+### 2.2 Portable scalars
 
-要在 Linux、Windows、Android、iOS、macOS 之间互传（都是 64 位小端），schema 里只用左列的类型。
+To exchange data between Linux, Windows, Android, iOS and macOS (all 64-bit little-endian), use
+only the types in the left column in a schema.
 
-| 用 | 不用 | 不用的原因 |
+| Use | Do not use | Why |
 | --- | --- | --- |
-| `std::int8_t` … `std::int64_t`、`std::uint8_t` … `std::uint64_t` | `long`、`unsigned long`、`std::size_t`、`std::ptrdiff_t`、`std::intptr_t`、`std::time_t` | 宽度或底层类型随平台变：`long` 在 Windows 上 32 位，`std::size_t` 在 Linux 上是 `unsigned long`、在 Windows 上是 `unsigned long long`。在某个平台上它们恰好就是 `std::int64_t` 或 `std::uint64_t`，编译能过；换个平台就编译失败（例如 `long` 在 Windows 和苹果平台，`std::size_t` 在苹果平台）。库在 Linux 上拦不下，因为在那里它们和定宽整数是同一个类型 |
-| `float`、`double` | `long double` | Linux x86-64 和 MinGW 上 16 字节，MSVC 和苹果平台上 8 字节；编译期拒绝 |
-| `bool`、`std::byte` | `wchar_t`、`char16_t`、`char32_t` | `wchar_t` 在 Windows 上 2 字节、别处 4 字节；这几种都编译期拒绝 |
-| 普通字段用 `char`；集合、映射的键用 `std::int8_t`、`std::uint8_t` 或 `XString` | 以 `char` 排序的键：`XSet<char>`、`XMap<char, V>`，以及键里含 `char` 的数组、记录成员，底层类型是 `char` 的枚举 | `char` 在 x86-64、苹果和 Windows 上有符号，在 Linux 和 Android 的 arm64 上无符号，两边给键排出的顺序不同，互相拒收对方的 wire，而 schema 哈希相同、握手发现不了；编译期拒绝。`XString` 在各平台都按无符号字节比较，可以做键 |
-| 写明底层类型的枚举：`enum class E { ... }`、`enum E : std::uint32_t { ... }` | 没写底层类型的 `enum E { ... }` | 底层类型由编译器选：MSVC 是 `int`，GCC 和 Clang 在没有负值时是 `unsigned int`，两边 schema 不同；编译期拒绝 |
+| `std::int8_t` … `std::int64_t`, `std::uint8_t` … `std::uint64_t` | `long`, `unsigned long`, `std::size_t`, `std::ptrdiff_t`, `std::intptr_t`, `std::time_t` | Width or underlying type varies by platform: `long` is 32-bit on Windows; `std::size_t` is `unsigned long` on Linux and `unsigned long long` on Windows. On a platform where they happen to be `std::int64_t` or `std::uint64_t` they compile; on another platform compilation fails (for example `long` on Windows and Apple platforms, `std::size_t` on Apple platforms). The library cannot catch this on Linux, where they are the same types as the fixed-width integers |
+| `float`, `double` | `long double` | 16 bytes on Linux x86-64 and MinGW, 8 bytes on MSVC and Apple platforms; rejected at compile time |
+| `bool`, `std::byte` | `wchar_t`, `char16_t`, `char32_t` | `wchar_t` is 2 bytes on Windows and 4 bytes elsewhere; all of these are rejected at compile time |
+| `char` for plain fields; `std::int8_t`, `std::uint8_t` or `XString` for set and map keys | Keys ordered by `char`: `XSet<char>`, `XMap<char, V>`, and arrays or record members containing `char` in a key, enums whose underlying type is `char` | `char` is signed on x86-64, Apple and Windows and unsigned on Linux and Android arm64, so the two sides order keys differently and reject each other's wire, while the schema hash is the same and the handshake cannot notice; rejected at compile time. `XString` compares as unsigned bytes on every platform and can be a key |
+| Enums with an explicit underlying type: `enum class E { ... }`, `enum E : std::uint32_t { ... }` | `enum E { ... }` without an underlying type | The compiler picks the underlying type: `int` on MSVC, `unsigned int` on GCC and Clang when there are no negative values, so the schemas differ; rejected at compile time |
 
-## 3. 构建与修改
+## 3. Building and modifying
 
-推荐写法（README 和 `examples/helloworld.cpp` 用的也是它）：
+The recommended pattern (also used by the README and `examples/helloworld.cpp`):
 
 ```cpp
-auto cap = XBuffer::maximum_capacity(32u << 20);   // 硬上限
+auto cap = XBuffer::maximum_capacity(32u << 20);   // hard limit
 auto buf = TypedXBuffer<Profile>::create(4096, cap);
-auto p = buf.root();                    // proxy（XRef<Profile>）：buffer 搬家后照样有效（第 3.5 节）
+auto p = buf.root();                    // proxy (XRef<Profile>): stays valid when the buffer moves (section 3.5)
 p.id() = 7;
 p.name() = "Alice";
 p.bio() = "a much longer biography text";
@@ -116,52 +139,62 @@ p.scores().push_back(90);
 p.tags().insert(3);
 p.stats().insert_or_assign("hp", 100);
 
-buf.edit([](Profile& r) {               // 热循环：钉住作用域里是普通引用，速度同普通结构体
+buf.edit([](Profile& r) {               // hot loop: plain references inside the pinned scope, as fast as a plain struct
     std::vector<std::int32_t> v{1, 2, 3, 4};
-    r.scores.assign(v.begin(), v.end());   // 连续且平凡可复制：一次精确分配
+    r.scores.assign(v.begin(), v.end());   // contiguous and trivially copyable: one exact allocation
 });
-if (!buf.ok()) { /* buf.error()：第一次失败的原因；失败不抛异常 */ }
+if (!buf.ok()) { /* buf.error(): reason for the first failure; failures do not throw */ }
 ```
 
-不用包装时写 `XBuffer::create<Profile>(initial, cap)` 和 `buf.root<Profile>()`，拿到的是普通引用：
-没有 proxy 的保护，buffer 搬家后悬空，空间不够时抛异常。下面几条增长规则说的是这种写法。
+Without the wrapper, `XBuffer::create<Profile>(initial, cap)` and `buf.root<Profile>()` give a
+plain reference: no proxy protection, it dangles when the buffer moves, and running out of space
+throws. The growth rules below describe this form.
 
-- 默认增长策略是 `XGrowPolicy::Explicit`，空间不够时抛 `XBadAlloc`；需要自动增长时
-  显式选择 `XGrowPolicy::Automatic`。`maximum_capacity` 始终是硬上限。
-- 一个 payload 最大 2 GiB - 8 字节（`XBufferCore::MAX_PAYLOAD`，payload 内的偏移是 32 位）。
-  `maximum_capacity` 超过它时，建立 buffer 当场失败：`XBadAlloc`，错误码
-  `capacity_exceeded`，消息写明这个上限。更大的数据请分到多个 buffer。
-- 自动增长通常把逻辑长度翻倍；`reload_verified` 之后，在以前用过的范围内
-  每次只增长 4 KiB（重新露出的字节要清零，按需清零更省），越过以前的最高位置后恢复
-  翻倍。逻辑长度只影响 `get_size()`，不影响 wire。
-- 容器头必须位于所属 arena 内。给插入接口传 `std::string_view`、`std::string` 等
-  原生值，不要在栈上构造绑定 arena 的 `XString` 临时对象。
-- 容器扩容、插入、删除会移动元素，规则和 `std::vector` 相同；`XSet`、`XMap` 是有序
-  平铺数组，规则和 `std::flat_set`、`std::flat_map` 相同，**和 `std::set`、`std::map`
-  不同**。逐个操作的规则见第 3.2 节。Automatic 增长和容器操作不移动 arena；显式 `grow()`
-  在可搬槽位上可能移动它（第 3.4 节）。
-- **元素是含 `XString`、`XVector`、`XMap` 等成员的记录类型时，先把这些记录声明为
-  普通记录（第 3.1 节），例如在全局作用域写 `XOFFSET_ORDINARY_RECORDS(Troop, March)`。**
-  不声明也完全正确，只是中间插入删除、扩容要逐个元素搬移：
-  云端 GCC 16 微基准里（只看比例，不是正式测量），元素带字符串和向量成员的
-  `XVector` 中间删除，不声明约是 `std::vector` 的 1.6 倍，声明后约 0.73 倍。
-- 能改什么、不能改什么（schema、写者、所有权）见第 3.3 节。
-- 带类型的包装 `TypedXBuffer<T>` 有 `create`、`root()`、`edit`/`read`、`save_verified()`、
-  `load()`（走校验路径）。`root()` 返回 proxy（`XRef<T>`），不是普通引用，写法见第 3.5 节；
-  需要普通引用时用 `edit`/`read`，或者 `plain_root()`。
+- The default growth policy is `XGrowPolicy::Explicit`: running out of space throws `XBadAlloc`.
+  Choose `XGrowPolicy::Automatic` explicitly when you need automatic growth. `maximum_capacity` is
+  always a hard limit.
+- One payload is at most 2 GiB - 8 bytes (`XBufferCore::MAX_PAYLOAD`; offsets inside a payload
+  are 32-bit). If `maximum_capacity` exceeds it, creating the buffer fails immediately with
+  `XBadAlloc`, error code `capacity_exceeded`, and a message stating the limit. Split larger data
+  across several buffers.
+- Automatic growth usually doubles the logical length; after `reload_verified`, within the range
+  used before, it grows by only 4 KiB at a time (re-exposed bytes must be zeroed, and zeroing on
+  demand is cheaper), and goes back to doubling past the previous high-water mark. The logical
+  length only affects `get_size()`, not the wire.
+- Container headers must live inside their arena. Pass native values such as `std::string_view`
+  or `std::string` to insert functions; do not build arena-bound `XString` temporaries on the stack.
+- Growth, insertion and erasure move elements under the same rules as `std::vector`; `XSet` and
+  `XMap` are sorted flat arrays with the same rules as `std::flat_set` and `std::flat_map`,
+  **not like `std::set` and `std::map`**. Per-operation rules are in section 3.2. Automatic growth
+  and container operations do not move the arena; an explicit `grow()` may move it on a movable
+  slot (section 3.4).
+- **When elements are record types with `XString`, `XVector`, `XMap` or similar members, first
+  declare those records ordinary (section 3.1), for example `XOFFSET_ORDINARY_RECORDS(Troop, March)`
+  at global scope.** Without the declaration everything is still correct, but middle
+  insert/erase and growth move elements one by one: in a cloud GCC 16 microbenchmark (ratios
+  only, not a formal measurement), a middle erase in an `XVector` whose elements have string and
+  vector members was about 1.6x `std::vector` without the declaration and about 0.73x with it.
+- What you can and cannot change (schema, writers, ownership) is in section 3.3.
+- The typed wrapper `TypedXBuffer<T>` has `create`, `root()`, `edit`/`read`, `save_verified()` and
+  `load()` (the validating path). `root()` returns a proxy (`XRef<T>`), not a plain reference; see
+  section 3.5. When you need a plain reference use `edit`/`read`, or `plain_root()`.
 
-### 3.1 删除与插入的性能
+### 3.1 Erase and insert performance
 
-`XVector` 从中间 `erase`/`insert` 一个元素，要把后面的元素整体挪一格，成本与后面
-的元素个数成正比。在循环里逐条从中间删除是 O(n·k)，元素含容器头时尤其明显
-（SLG 原型里 2000 条行军每 tick 逐条删除，每周期约 160 万次元素搬移）。
+Erasing or inserting one element in the middle of an `XVector` shifts all following elements by
+one, at a cost proportional to their number. Erasing from the middle one by one in a loop is
+O(n·k), especially visible when elements contain container headers (in the SLG prototype, erasing
+2000 marches one by one per tick moved about 1.6 million elements per cycle).
 
-- 批量删除用 `stable_erase_if`：一次遍历，保持原顺序，每个保留的元素最多挪一次。
-- 元素是含 `XString`/`XVector`/`XMap` 等成员的记录类型时，用 `XOFFSET_ORDINARY_RECORDS`
-  声明这些记录类型（连同它们作为成员用到的记录类型），会打开更快的路径：中间
-  `erase`/`insert`、追加扩容和 `reserve` 都用一次 memmove/memcpy 挪动整段元素，只重建
-  内联容器头；`stable_erase_if` 也随之可用。声明是对**源码**的承诺：记录只有普通的非静态
-  成员，没有基类、`union`、位域、`[[no_unique_address]]`，成员互不重叠。
+- For bulk erasure use `stable_erase_if`: one pass, original order kept, each kept element moved at
+  most once.
+- When elements are record types with `XString`/`XVector`/`XMap` members, declare those record
+  types (and the record types they use as members) with `XOFFSET_ORDINARY_RECORDS`. This enables a
+  faster path: middle `erase`/`insert`, append growth and `reserve` move the whole element range
+  with one memmove/memcpy and only rebuild the inline container headers; `stable_erase_if` becomes
+  available too. The declaration is a promise about the **source**: the record has only ordinary
+  non-static members, no bases, `union`, bit-fields or `[[no_unique_address]]`, and members do not
+  overlap.
 
 ```cpp
 struct Troop { std::int32_t type{}; std::int32_t count{}; };
@@ -171,136 +204,158 @@ struct March {
     XVector<Troop> troops;
 };
 
-// 全局作用域，放在类型定义之后、第一次在容器里使用之前。
+// Global scope, after the type definitions and before first use in a container.
 XOFFSET_ORDINARY_RECORDS(Troop, March)
 
 marches.stable_erase_if([](const March& m) { return m.eta <= 0; });
 ```
 
-- 宏对每个类型做编译期检查：必须是类（不是 `union`），没有基类和位域，成员的
-  `[偏移, 偏移 + sizeof)` 两两不相交。共享存储的 `[[no_unique_address]]` 成员会被
-  查出来；但「可以重叠、只是这次没重叠」的成员查不出来，所以声明仍然是源码承诺，
-  声明错了是未定义行为。库不会在没有声明时自动认定。
-- 宏展开成 `wire_record_layout<T>::ordinary_members = true` 和
-  `StableEraseOrdinaryMembers<T>` 两个特化；手写这两个特化效果相同，但没有检查。
-- 不写声明时，行为和结果完全相同，只是走逐元素搬移的较慢路径，并且
-  `stable_erase_if` 不可用（编译期报错）。两条路径输出的 wire 字节相同。
+- The macro checks each type at compile time: it must be a class (not a `union`), with no bases or
+  bit-fields, and the members' `[offset, offset + sizeof)` ranges must be pairwise disjoint.
+  `[[no_unique_address]]` members that share storage are detected; members that "could overlap but
+  do not this time" cannot be, so the declaration remains a promise about the source, and a wrong
+  declaration is undefined behavior. The library never assumes it without a declaration.
+- The macro expands to two specializations, `wire_record_layout<T>::ordinary_members = true` and
+  `StableEraseOrdinaryMembers<T>`; writing them by hand has the same effect but no checks.
+- Without the declaration, behavior and results are identical; only the slower element-by-element
+  path is taken, and `stable_erase_if` is unavailable (compile error). Both paths produce the same
+  wire bytes.
 
-### 3.2 引用和迭代器什么时候失效
+### 3.2 When references and iterators are invalidated
 
-库不替你跟踪指向元素的引用，和 std 容器一样要按操作判断。地址分三层：
+The library does not track references to elements for you; as with std containers you reason per
+operation. Addresses come in three levels:
 
-| 层 | 指什么 | 例子 |
+| Level | What | Example |
 | --- | --- | --- |
-| 元素 | 容器里的元素对象，包括元素里嵌套的容器头 | `p.scores[0]`、`marches[3]`、`marches[3].troops` 这个头本身 |
-| 子数据 | 元素拥有的块 | `p.bio.view()` 指向的字符、`marches[3].troops` 的元素数组 |
-| 区域 | 整个 payload：根对象和它能到达的一切 | `buf.root<Profile>()` |
+| Element | Element objects in a container, including container headers nested in elements | `p.scores[0]`, `marches[3]`, the header `marches[3].troops` itself |
+| Child data | Blocks owned by an element | The characters `p.bio.view()` points at, the element array of `marches[3].troops` |
+| Region | The whole payload: the root object and everything reachable from it | `buf.root<Profile>()` |
 
-**容器操作只影响这个容器自己。** 分配只从空闲块或区域尾部取新块，释放只把块记进
-空闲表，不会挪动别的容器的元素或子数据。
+**Container operations only affect that container.** Allocation takes new blocks only from free
+blocks or the end of the region, and freeing only records blocks in the free table; elements and
+child data of other containers never move.
 
-| 操作 | 本容器元素的引用、指针、迭代器 | 对照 |
+| Operation | References, pointers, iterators to this container's elements | Compare |
 | --- | --- | --- |
-| `push_back`、`emplace_back` | 没扩容时都有效；扩容时全部失效 | 同 `std::vector` |
-| `insert(pos, …)` | `pos` 及之后失效；扩容时全部失效 | 同 `std::vector` |
-| `erase(pos)`、`pop_back()` | 被删的及之后失效 | 同 `std::vector` |
-| `stable_erase_if(pred)` | 第一个被删的位置及之后失效 | 同 `std::erase_if` |
-| `reserve(n)`、`resize(n)` 超过容量 | 全部失效 | 同 `std::vector` |
-| `resize(n)` 不超过容量 | 缩小时第 n 个及之后失效，增大时都有效 | 同 `std::vector` |
-| `clear()`、`assign(…)` | 全部失效 | 同 `std::vector`；`clear()` 保留容量。旧元素的字节默认留在余量里，`XOFFSET_SCRUB_ERASED=1` 时清零（DEPLOYMENT 4.1 节） |
-| `XString` 的赋值、`clear()`、`reserve()` | 之前取到的 `view()`、`data()`、`c_str()` 失效 | 同 `std::string` |
-| `XSet` 的 `insert`、`emplace`；`XMap` 的 `try_emplace`、`emplace`，以及 `insert_or_assign`、`operator[]` 插入新键 | 插入位置及之后失效；扩容时全部失效 | 同 `std::flat_set`、`std::flat_map`；**不同于 `std::set`、`std::map`**（它们插入不影响别的元素） |
-| `XMap` 的 `insert_or_assign` 给已有键赋值 | 其他元素不受影响 | 同 std |
-| `XSet`、`XMap` 的 `erase(key)` | 被删的及之后失效 | 同 `std::flat_map`；不同于 `std::map` |
-| 读、改已有元素的值（不改变容器长度） | 都有效 | 同 std |
-| 同一个 buffer 里的移动赋值 `a = std::move(b)` | `b` 的元素不挪动，改归 `a`，`b` 变空；`a` 原来的元素失效。跨 buffer 时是复制，`b` 不变 | 同 `std::vector` 的移动赋值 |
+| `push_back`, `emplace_back` | All valid without growth; all invalidated on growth | Same as `std::vector` |
+| `insert(pos, …)` | `pos` and later invalidated; all on growth | Same as `std::vector` |
+| `erase(pos)`, `pop_back()` | The erased element and later invalidated | Same as `std::vector` |
+| `stable_erase_if(pred)` | From the first erased position on | Same as `std::erase_if` |
+| `reserve(n)`, `resize(n)` beyond capacity | All invalidated | Same as `std::vector` |
+| `resize(n)` within capacity | Shrinking invalidates element n and later; growing keeps all valid | Same as `std::vector` |
+| `clear()`, `assign(…)` | All invalidated | Same as `std::vector`; `clear()` keeps capacity. The old elements' bytes stay in the slack by default; `XOFFSET_SCRUB_ERASED=1` zeroes them (DEPLOYMENT section 4.1) |
+| `XString` assignment, `clear()`, `reserve()` | Previously obtained `view()`, `data()`, `c_str()` invalidated | Same as `std::string` |
+| `XSet` `insert`, `emplace`; `XMap` `try_emplace`, `emplace`, and `insert_or_assign` / `operator[]` inserting a new key | Insert position and later invalidated; all on growth | Same as `std::flat_set`, `std::flat_map`; **unlike `std::set`, `std::map`** (where inserts do not affect other elements) |
+| `XMap` `insert_or_assign` on an existing key | Other elements unaffected | Same as std |
+| `XSet`, `XMap` `erase(key)` | The erased element and later invalidated | Same as `std::flat_map`; unlike `std::map` |
+| Reading or changing existing element values (container length unchanged) | All valid | Same as std |
+| Move assignment within one buffer, `a = std::move(b)` | `b`'s elements do not move; they now belong to `a`, and `b` becomes empty; `a`'s old elements are invalidated. Across buffers it is a copy and `b` is unchanged | Same as `std::vector` move assignment |
 
-- 扩容有时能原地完成（容器的块正好在区域尾部时），这时地址不变。这不在承诺里，
-  请按"扩容即全部失效"写代码。
-- 元素搬家时，它拥有的子数据通常不动：容器头在新位置重建，仍指向原来的块。这也
-  只是实现细节，和 `std::vector<std::string>` 的短字符串优化一样，不要依赖。
-- `XSet`、`XMap` 查找是 O(log n)，插入、删除是 O(n)，要和 `std::flat_set`、
-  `std::flat_map` 比，而不是和基于节点的 `std::set`、`std::map` 比。
+- Growth can sometimes happen in place (when the container's block is at the end of the region),
+  and then addresses do not change. That is not promised; write code as if "growth invalidates
+  everything".
+- When an element moves, the child data it owns usually stays put: the container header is rebuilt
+  at the new position and still points at the original block. This is also an implementation detail,
+  like small-string optimization in `std::vector<std::string>`; do not rely on it.
+- `XSet`/`XMap` lookups are O(log n) and inserts and erases O(n); compare them with
+  `std::flat_set`/`std::flat_map`, not the node-based `std::set`/`std::map`.
 
-**buffer 操作影响整块区域。** epoch 是 buffer 对象上的计数，`XHandle` 看到它变了就
-重新解析根。
+**Buffer operations affect the whole region.** The epoch is a counter on the buffer object;
+`XHandle` re-resolves the root when it sees the epoch change.
 
-| 操作 | 根对象和区域的地址 | 指进 payload 的引用、span、迭代器 | epoch |
+| Operation | Root and region address | References, spans, iterators into the payload | Epoch |
 | --- | --- | --- | --- |
-| 容器操作触发的 Automatic 增长；显式 `grow()` 没有超出当前存储 | 不变（在预留或槽位里扩展） | 只按上表失效 | 不变 |
-| 可搬槽位上显式 `grow()` 超出槽位（第 3.4 节） | 改变：搬到新存储 | 全部失效 | 加一 |
-| `save_verified`、`save_verified_into`、`save` | 不变（只收缩逻辑长度） | 有效 | 不变 |
-| `reload_verified`、`begin_verified_reload`、`reset<T>()` | 不变（复用映射）；可搬槽位放不下新内容时换存储（第 3.4 节） | 全部失效（`begin_verified_reload` 在开始时就失效，不等 `finish()`） | 加一 |
-| `src.clone_into(dst)` | dst 不变（复用映射）；dst 是可搬槽位且放不下时换存储（第 3.4 节） | dst 原有的全部失效；`src` 不受影响 | dst 加一（自拷贝被拒绝时不变） |
-| `clone()` | 结果是新 buffer，存储种类与源相同（可搬槽位或地址稳定） | 源 buffer 不受影响 | 新 buffer 从 0 开始 |
-| `load_verified`、`load_unverified`、`XCompactor::compact` | 结果是新 buffer | 源 buffer 不受影响（压实只读源，换更大的容量重试时也不动它） | 新 buffer 从 0 开始 |
-| `freeze_verified(std::move(buf))` | payload 不动，改归快照 | 成功后 `buf` 变空，payload 只能通过快照读；抛异常时 `buf` 不变 | `buf` 加一 |
-| `begin_verified_receive` / `finish_verified` | 结果 buffer 的 payload 就是收包时写入的那块内存（`payload_address()`） | 收包用的 span 在 `finish_verified` 之后不能再写 | 新 buffer 从 0 开始 |
-| `XBuffer` 的移动构造、移动赋值、`swap` | 不变，存储随对象转移 | 仍然有效，但现在属于另一个对象 | 两边都加一 |
-| 析构 | 释放 | 全部失效 | 不涉及 |
+| Automatic growth triggered by container operations; explicit `grow()` within current storage | Unchanged (extends within the reservation or slot) | Invalidated only per the table above | Unchanged |
+| Explicit `grow()` past a movable slot (section 3.4) | Changes: moves to new storage | All invalidated | +1 |
+| `save_verified`, `save_verified_into`, `save` | Unchanged (only shrinks the logical length) | Valid | Unchanged |
+| `reload_verified`, `begin_verified_reload`, `reset<T>()` | Unchanged (mapping reused); a movable slot that cannot hold the new content switches storage (section 3.4) | All invalidated (`begin_verified_reload` invalidates at the start, not at `finish()`) | +1 |
+| `src.clone_into(dst)` | dst unchanged (mapping reused); a movable-slot dst that cannot hold it switches storage (section 3.4) | Everything previously in dst invalidated; `src` unaffected | dst +1 (unchanged when a self-copy is rejected) |
+| `clone()` | The result is a new buffer with the same storage kind as the source (movable slot or address-stable) | Source unaffected | New buffer starts at 0 |
+| `load_verified`, `load_unverified`, `XCompactor::compact` | The result is a new buffer | Source unaffected (compaction only reads the source, also when retrying with a larger capacity) | New buffer starts at 0 |
+| `freeze_verified(std::move(buf))` | Payload stays put and now belongs to the snapshot | On success `buf` is empty and the payload is read only through the snapshot; if it throws, `buf` is unchanged | `buf` +1 |
+| `begin_verified_receive` / `finish_verified` | The result buffer's payload is the memory written during receive (`payload_address()`) | The receive span must not be written after `finish_verified` | New buffer starts at 0 |
+| `XBuffer` move construction, move assignment, `swap` | Unchanged; storage moves with the object | Still valid, but now belong to the other object | Both +1 |
+| Destruction | Released | All invalidated | n/a |
 
-- `XHandle` 每次解引用比较一次 epoch（两次读加一次比较，内联）；epoch 变了才重新解析
-  （不内联）。处理一个包里的多条事件时，**每个包解析一次**：`auto& book = *handle;`，
-  包内都用这个引用（包内不能有移动、重载 buffer 的操作）。逐事件解引用在订单簿测试里
-  每个事件多约 7 条指令，还会妨碍编译器内联调用方的循环。
-- `XHandle` 绑在 buffer 对象上，不跟着 payload 走：移动之后原对象为空，绑在它上面的
-  `XHandle` 解析为空指针；`swap` 之后解析到这个对象现在的内容。要跟着数据走，在新
-  对象上重新建 `XHandle`。
-- payload 里没有绝对地址，任何两次操作之间都可以把区域的字节整块复制到别处继续
-  用（保存、加载就是这样做的）；但复制得到的是新 buffer，旧地址上的引用不会指过去。
+- `XHandle` compares the epoch on every dereference (two loads and a compare, inlined); it
+  re-resolves (not inlined) only when the epoch changed. When handling several events from one
+  packet, **resolve once per packet**: `auto& book = *handle;`, and use that reference inside the
+  packet (no operations that move or reload the buffer inside the packet). Dereferencing per event
+  cost about 7 more instructions per event in the order book test and keeps the compiler from
+  inlining the caller's loop.
+- `XHandle` is bound to the buffer object, not to the payload: after a move the original object is
+  empty and an `XHandle` bound to it resolves to null; after `swap` it resolves to that object's
+  current content. To follow the data, create a new `XHandle` on the new object.
+- The payload contains no absolute addresses, so between any two operations the region's bytes can
+  be copied elsewhere as a whole and used there (that is what save and load do); but the copy is a
+  new buffer and references at the old address do not point into it.
 
-### 3.3 能改什么、不能改什么
+### 3.3 What you can and cannot change
 
-能改的：任意字段写入；变长修改，也就是字符串、数组、集合、映射的增删改；空闲块
-复用；收到（`load_verified`）之后接着改、再发出。
+You can: write any field; make variable-length changes, that is, add, remove and change strings,
+arrays, sets and maps; reuse free blocks; keep modifying after receiving (`load_verified`) and send
+again.
 
-不能做的有三条，是这种数据结构本身的限制：
+Three things you cannot do; they are limits of this kind of data structure:
 
-1. **不能改 schema。** 增加、删除、重排或改变任何字段，旧 wire 都会被拒绝（第 7 节）。
-   类型定义要在收发两端同时更新。
-2. **一个 buffer 同一时刻只能有一个写者。** 库不加锁，写操作要和这个 buffer 上的其他
-   读写互斥，由调用方同步（第 5 节）。多个进程通过共享内存同时读写一个 buffer 不在
-   支持范围内。
-3. **所有权是一棵树。** 每个块只属于一个容器头：两个容器不能共享同一块子数据，对象
-   之间不能互相引用，也不能成环。原生指针和引用在编译期就被拒绝（第 2 节）；要表达
-   图，存元素下标或 ID（例如 `std::uint32_t` 下标，或 `XMap` 的键）。拷贝赋值是深拷贝，
-   同一个 buffer 里的移动赋值是转移所有权。**不要把一个容器移动赋值给它自己子树里的
-   容器，或者反过来**：Release 构建不检查这种情况，结果是未定义行为。
+1. **You cannot change the schema.** Adding, removing, reordering or changing any field makes old
+   wires rejected (section 7). Update the type definition on both ends together.
+2. **One buffer has one writer at a time.** The library does not lock; writes must be mutually
+   exclusive with other reads and writes on that buffer, synchronized by the caller (section 5).
+   Several processes reading and writing one buffer through shared memory at the same time is not
+   supported.
+3. **Ownership is a tree.** Each block belongs to exactly one container header: two containers
+   cannot share child data, objects cannot reference each other, and there are no cycles. Raw
+   pointers and references are rejected at compile time (section 2); to express a graph, store
+   element indices or IDs (for example a `std::uint32_t` index, or an `XMap` key). Copy assignment
+   is a deep copy; move assignment within one buffer transfers ownership. **Do not move-assign a
+   container into a container in its own subtree, or the other way round**: Release builds do not
+   check this, and the result is undefined behavior.
 
-### 3.4 存储：VM、钉住槽位、可搬槽位
+### 3.4 Storage: VM, pinned slot, movable slot
 
-创建 buffer（`create`、构造函数、`load*`）时按参数选存储，`storage_kind()` 可以查：
+When a buffer is created (`create`, constructors, `load*`) the storage is chosen from the
+parameters; `storage_kind()` reports it:
 
-| 存储 | 什么时候选 | 地址 |
+| Storage | Chosen when | Address |
 | --- | --- | --- |
-| VM（`XStorageKind::Vm`） | 带 `XBufferPool`；`with_storage(XStorage::Pinned)`；Automatic 且上限大于 `XBuffer::SLOT_MAX`；初始大小大于 `SLOT_MAX` | 整个生命周期不变 |
-| 钉住槽位（`PinnedSlot`） | 上限不超过 `SLOT_MAX`（任何增长策略） | 整个生命周期不变 |
-| 可搬槽位（`MovableSlot`） | 其余情况：Explicit 增长（默认）、上限更大、初始大小放得进槽位 | 只在下面几个显式点改变 |
+| VM (`XStorageKind::Vm`) | With an `XBufferPool`; `with_storage(XStorage::Pinned)`; Automatic with a limit above `XBuffer::SLOT_MAX`; initial size above `SLOT_MAX` | Fixed for the whole lifetime |
+| Pinned slot (`PinnedSlot`) | Limit not above `SLOT_MAX` (any growth policy) | Fixed for the whole lifetime |
+| Movable slot (`MovableSlot`) | Everything else: Explicit growth (the default), a larger limit, an initial size that fits a slot | Changes only at the explicit points below |
 
-- `SLOT_MAX` 默认是 256 KiB − 64 B，编译期可以用 `XOFFSET_SLOT_MAX_BYTES`（2 的幂，0 表示
-  不用槽位）调整。槽位来自库内的 slab，按 2 的幂分级，小消息不再每个 buffer 预留一段
-  虚拟地址；建立和销毁一个槽位不走系统调用。
-- 可搬槽位的搬家点：`grow()` 超出当前槽位时搬到更大的槽位（超过 `SLOT_MAX` 时搬到 VM，
-  之后钉住）；`reload_verified`、`begin_verified_reload` 收到放不下的内容时先换存储（不复制
-  旧内容）；`set_growth_policy(XGrowPolicy::Automatic)` 会先搬到 VM，因为自动增长发生在
-  容器操作内部，那里不能搬。
-- 搬家后，之前拿到的根引用、元素指针、`allocator<T>()`、`arena()` 和借用的 span 全部失效，
-  `epoch()` 改变。用 `XHandle`（自动重新定位）或重新调用 `root<T>()`。`address_stable()` 为
-  真时不会搬；需要地址永远不变就写 `with_storage(XStorage::Pinned)`。
-- Automatic 增长、容器操作、`save*`、`shrink_to_fit`、`reset<T>()` 都不搬。
-- 不要在同一个 buffer 的宿主回调（`new_handler`、`stable_erase_if` 的谓词）里调 `grow()`。
-- 释放的槽位留在进程里供下一个 buffer 复用（重新暴露前清零），和池一样计入常驻内存；
-  `XBuffer::trim_slot_storage()` 丢弃空闲槽位的页，`XBuffer::slot_storage_stats()` 查看用量。
-- 槽位空闲表、宿主空闲表和 owner 查找各有一份每线程缓存。GCC 编 MinGW/Cygwin 时 TLS 是
-  模拟的（emutls），线程退出时缓存可能先于析构被释放，所以这些目标上缓存关闭，全部走全局
-  结构（`XOFFSET_THREAD_CACHES` 默认 0，其他目标默认 1；Clang 编 MinGW 用原生 TLS，保留缓存）。
-- 默认构造的空 `XBuffer` 可以直接 `reload_verified` 或 `begin_verified_reload`，按
-  `load_verified` 不带上限时的规则（64 MiB、Explicit）建存储。
+- `SLOT_MAX` defaults to 256 KiB − 64 B and can be changed at compile time with
+  `XOFFSET_SLOT_MAX_BYTES` (a power of two; 0 disables slots). Slots come from a slab inside the
+  library, in power-of-two classes, so small messages no longer reserve a range of virtual address
+  space per buffer; creating and destroying a slot takes no system call.
+- A movable slot moves at these points: `grow()` past the current slot moves to a larger slot
+  (past `SLOT_MAX` it moves to VM and is pinned from then on); `reload_verified` and
+  `begin_verified_reload` switch storage first when the incoming content does not fit (without
+  copying the old content); `set_growth_policy(XGrowPolicy::Automatic)` first moves to VM, because
+  automatic growth happens inside container operations, where moving is impossible.
+- After a move, previously obtained root references, element pointers, `allocator<T>()`, `arena()`
+  and borrowed spans are all invalid, and `epoch()` changes. Use `XHandle` (relocates
+  automatically) or call `root<T>()` again. When `address_stable()` is true the buffer never moves;
+  write `with_storage(XStorage::Pinned)` when you need an address that never changes.
+- Automatic growth, container operations, `save*`, `shrink_to_fit` and `reset<T>()` never move.
+- Do not call `grow()` from a host callback of the same buffer (`new_handler`, the predicate of
+  `stable_erase_if`).
+- Released slots stay in the process for the next buffer to reuse (zeroed before being exposed
+  again) and count toward resident memory like a pool; `XBuffer::trim_slot_storage()` drops the
+  pages of free slots and `XBuffer::slot_storage_stats()` reports usage.
+- The slot free list, the host free list and the owner lookup each have a per-thread cache. When
+  GCC targets MinGW/Cygwin, TLS is emulated (emutls) and caches may be freed before destructors
+  run at thread exit, so on those targets the caches are off and everything uses the global
+  structures (`XOFFSET_THREAD_CACHES` defaults to 0 there and to 1 elsewhere; Clang targeting
+  MinGW uses native TLS and keeps the caches).
+- A default-constructed empty `XBuffer` can go straight to `reload_verified` or
+  `begin_verified_reload`; storage is created by the rules of `load_verified` without a limit
+  (64 MiB, Explicit).
 
-### 3.5 会搬家的 buffer：proxy、字段访问函数、钉住作用域
+### 3.5 Buffers that move: proxies, field accessors, pinned scopes
 
-`XBuffer::relocating()` 的 buffer 先预留 1 MiB，用完就搬到更大的预留，所以普通引用可能
-悬空。安全的访问方式有两种：
+A buffer from `XBuffer::relocating()` first reserves 1 MiB and moves to a larger reservation when
+that is used up, so plain references can dangle. There are two safe ways to access it:
 
 ```cpp
 struct Unit { std::uint32_t id; std::int32_t hp; XString name; XVector<std::int32_t> items; };
@@ -310,194 +365,233 @@ XOFFSET_RECORD(View, tick, units)
 
 auto world = TypedXBuffer<View>::create(4096, XBuffer::relocating());
 auto v = world.root();                     // XRef<View>
-auto u = v.units().emplace_back();         // XRef<Unit>；可能搬家，u 仍然有效
+auto u = v.units().emplace_back();         // XRef<Unit>; the buffer may move, u stays valid
 u.id() = 7;
 u.hp() -= 3;
 u.name() = "unit-7";
 u.items().push_back(42);
-std::int32_t hp = u.hp();                  // 读：转成值
-for (auto x : v.units()) total += x.hp();  // 迭代器也是 proxy
-if (!world.ok()) { /* world.error()：第一次失败的原因 */ }
+std::int32_t hp = u.hp();                  // read: converts to a value
+for (auto x : v.units()) total += x.hp();  // iterators are proxies too
+if (!world.ok()) { /* world.error(): reason for the first failure */ }
 
-world.edit([&](View& w) {                  // 钉住作用域：普通引用，速度同普通结构体
+world.edit([&](View& w) {                  // pinned scope: plain references, as fast as a plain struct
     for (Unit& x : w.units) x.hp -= dmg;
 });
 ```
 
-- **proxy（`XRef<T>`）**：`TypedXBuffer<T>::root()`、`reset()` 和 `XBuffer::ref<T>()` 返回它。
-  它记着 buffer 的控制块和路径（根偏移；容器 + 下标；map + key），每次访问比较一次版本号，
-  buffer 搬家（包括 `XBuffer` 对象本身被 move）后照样有效；buffer 销毁或内容被
-  `reset`/`reload` 换掉后变成 stale，读得到值初始化的结果，写返回 false。
-- **字段访问函数**：`XOFFSET_RECORD` / `XOFFSET_RECORD_DERIVED` 为每个列出的字段生成一个
-  同名成员函数，返回该字段的 proxy；基类也写了字段表时，派生记录也有基类字段的访问函数。字段名和 proxy 自己的
-  函数同名时（`get`、`set`、`field`、`member`、`valid`、`error`）proxy 的函数优先，这个字段用
-  `field<&T::m>()`。C 数组字段的 proxy 有 `size()`、下标和迭代器，越界得到空 proxy。
-  访问函数是普通成员函数，不依赖反射和异常，MSVC 和关异常构建都能用。
-- **失败不抛、不崩**：会分配的操作做不到时没有效果，返回 false（或空 proxy），并在 buffer 里
-  记下第一个错误（`error()`：`capacity_exceeded`、`out_of_storage`、`borrowed`、`stale`、
-  `out_of_range`）；之后的分配类操作直接失败，buffer 拒绝发送，直到 `clear_error()`。
-- **钉住作用域** `edit(f)` / `read(f)`：f 拿到普通引用，速度和普通结构体相同。作用域内 buffer
-  不搬（需要搬的操作失败并记 `borrowed`）。容器自己的失效规则照旧（上表，同 `std::vector`）：
-  扩容或删除之后，之前取的引用不能再用，回收的块可能马上被别的容器复用。用
-  `XOFFSET_PIN_QUARANTINE=1` 编译时，回收的块等作用域结束才复用，失效的引用读到的还是旧
-  内容。f 不能返回指针、引用、`string_view` 或 `span`（编译期检查）。
-  热路径和要交给接受 `T&` 的已有代码时用它。
-- `plain_root()` 是原来的 `root()`：没有保护的普通引用，buffer 搬家后悬空。只在确定不搬的
-  存储上用（钉住槽位、VM、Pinned），或者干脆不用。
+- **Proxy (`XRef<T>`)**: returned by `TypedXBuffer<T>::root()`, `reset()` and `XBuffer::ref<T>()`.
+  It remembers the buffer's control block and a path (root offset; container + index; map + key),
+  compares a version number on every access, and stays valid when the buffer moves (including when
+  the `XBuffer` object itself is moved); after the buffer is destroyed or its content is replaced by
+  `reset`/`reload` it becomes stale: reads give value-initialized results and writes return false.
+- **Field accessors**: `XOFFSET_RECORD` / `XOFFSET_RECORD_DERIVED` generate a member function of the
+  same name for each listed field that returns the field's proxy; when the bases also have field
+  lists, derived records get accessors for the base fields too. When a field name equals one of
+  the proxy's own functions (`get`, `set`, `field`, `member`, `valid`, `error`) the proxy's function
+  wins; use `field<&T::m>()` for that field. Proxies of C array fields have `size()`, subscripts and
+  iterators; out of range gives an empty proxy. Accessors are ordinary member functions with no
+  reflection or exceptions, and work on MSVC and in no-exception builds.
+- **Failures do not throw or crash**: an allocating operation that cannot be done has no effect,
+  returns false (or an empty proxy), and records the first error in the buffer (`error()`:
+  `capacity_exceeded`, `out_of_storage`, `borrowed`, `stale`, `out_of_range`); later allocating
+  operations fail immediately and the buffer refuses to send until `clear_error()`.
+- **Pinned scope** `edit(f)` / `read(f)`: f gets plain references and runs as fast as a plain
+  struct. The buffer does not move inside the scope (operations that would need to move fail and
+  record `borrowed`). Containers keep their own invalidation rules (table above, same as
+  `std::vector`): after growth or erasure, earlier references must not be used, and reclaimed blocks
+  may be reused by another container right away. When compiled with `XOFFSET_PIN_QUARANTINE=1`,
+  reclaimed blocks are reused only after the scope ends, so invalidated references still read the
+  old content. f must not return a pointer, reference, `string_view` or `span` (checked at compile
+  time). Use it on hot paths and to hand data to existing code that takes `T&`.
+- `plain_root()` is the old `root()`: an unprotected plain reference that dangles when the buffer
+  moves. Use it only on storage that never moves (pinned slot, VM, Pinned), or not at all.
 
-## 4. 保存与加载
+## 4. Saving and loading
 
 ```cpp
-std::string wire = buf.save_verified();                 // 不用包装时：buf.save_verified<Profile>()
+std::string wire = buf.save_verified();                 // without the wrapper: buf.save_verified<Profile>()
 
-auto in = TypedXBuffer<Profile>::load(wire, cap);       // 先完整校验；同 XBuffer::load_verified<Profile>(wire, cap)
-std::int32_t id = in.root().id();                       // proxy 读出来是值
-in.read([](const Profile& r) { print(r.name.view()); });   // 钉住作用域里读普通成员
+auto in = TypedXBuffer<Profile>::load(wire, cap);       // full validation first; same as XBuffer::load_verified<Profile>(wire, cap)
+std::int32_t id = in.root().id();                       // a proxy read gives a value
+in.read([](const Profile& r) { print(r.name.view()); });   // read plain members inside a pinned scope
 ```
 
-- wire 由 40 字节头、payload 和空洞表组成（稀疏 wire 在头后多一张段表，见
-  [V2_FORMAT.md](V2_FORMAT.md) 第 3 节）。默认只跳过「不短于 4 KiB、由不小于 256 B 的
-  空闲块连成」的段（例如一次删掉大量记录留下的空洞），其余 payload 一次拷贝。
-  `XSaveOptions{.emission = XWireEmission::dense}` 强制整段拷贝。
-- 跨机器发送时可以打开零段省略：
+- A wire consists of a 40-byte header, the payload and a hole table (a sparse wire has an extent
+  table after the header; see [V2_FORMAT.md](V2_FORMAT.md) section 3). By default only runs that
+  are "at least 4 KiB long and made of free blocks of at least 256 B" are skipped (for example the
+  hole left by deleting many records at once); the rest of the payload is copied in one go.
+  `XSaveOptions{.emission = XWireEmission::dense}` forces a full copy.
+- When sending across machines you can turn on zero-run omission:
   `save_verified<Profile>(XSaveOptions{.emission = XWireEmission::zero_runs})`
-  （`save_verified_into` 同样接受这个参数）。它跳过不短于 64 字节的全零段（容器余量、
-  空洞、为 0 的字段），接收方按原偏移填零，装载后的 payload 与稠密 wire 逐字节相同，
-  余量照样保留、接着改不变慢。代价是发送时多扫描一遍 payload；payload 不足 4 KiB
-  或省不到 max(256 B, payload 的 1/16) 时自动退回稠密。同机共享内存或进程内传递保持默认。
-  接收方不需要任何设置，三种 wire 都接受。
-- 想让 wire 更小时可以用 `save_compact<Profile>()`（或 `save_compact_into<Profile>(out)`）：
-  它直接按校验顺序遍历对象图写出紧凑 wire（无空洞），不建临时 buffer，源 buffer 不变。
-  默认给不少于 8 个元素的容器（字符串除外）留 size/8+1 个余量，接收方修改时不必马上搬家。
-  只读或归档的接收方传 `XCompactOptions{.slack_div = 0}`：容量等于长度、wire 最小，
-  与 `XCompactor::compact<Profile>(b).save_verified<Profile>()` 逐字节相同，
-  但接收方第一次增长任何容器都要搬家。
-- 把收到的数据转发给第三方（例如服务端把客户端 A 的上行消息转给客户端 B）时，用
-  `save_compact` 重建后再发，不要 `load_verified` 之后直接 `save_verified`：后者会把
-  A 写在空洞和容器余量里的字节原样带给 B。规则和 `save_compact` 管不到的部分见
-  [DEPLOYMENT.md](DEPLOYMENT.md) 4.2 节。
-- 把几段现有状态拼成一条消息时，用 `save_compact_into` 的组合写出重载，不必先赋值：
+  (`save_verified_into` takes the same option). It skips all-zero runs of at least 64 bytes
+  (container slack, holes, zero fields); the receiver fills zeros at the original offsets, the
+  loaded payload is byte-identical to a dense wire, and slack is kept, so further edits are not
+  slower. The cost is one extra scan of the payload when sending; when the payload is under 4 KiB
+  or the saving is less than max(256 B, 1/16 of the payload) it falls back to dense. Keep the
+  default for same-machine shared memory or in-process transfer. The receiver needs no setting and
+  accepts all three wire kinds.
+- To make the wire smaller, use `save_compact<Profile>()` (or `save_compact_into<Profile>(out)`):
+  it walks the object graph in validation order and writes a compact wire (no holes) directly,
+  without a temporary buffer, and leaves the source buffer unchanged. By default containers
+  (except strings) with at least 8 elements get size/8+1 elements of slack, so the receiver does
+  not have to move them as soon as it modifies them. Read-only or archiving receivers pass
+  `XCompactOptions{.slack_div = 0}`: capacity equals length and the wire is smallest,
+  byte-identical to `XCompactor::compact<Profile>(b).save_verified<Profile>()`, but the receiver
+  must move any container the first time it grows it.
+- When forwarding received data to a third party (for example a server forwarding client A's uplink
+  message to client B), rebuild it with `save_compact` before sending; do not `load_verified` and
+  then `save_verified` directly: the latter carries whatever bytes A wrote into holes and container
+  slack to B unchanged. The rules and what `save_compact` does not cover are in
+  [DEPLOYMENT.md](DEPLOYMENT.md) section 4.2.
+- To assemble one message from several pieces of existing state, use the composing overload of
+  `save_compact_into` instead of assigning first:
 
   ```cpp
-  auto& msg = req.root<BattleMsg>();          // 草稿，标量照常直接改
+  auto& msg = req.root<BattleMsg>();          // draft; scalars are set directly as usual
   msg.battle_id = id;
   req.save_compact_into<BattleMsg>(out, {}, xassign(msg.attacker, att), xassign(msg.defender, def));
   ```
 
-  写出的 wire 等于先做 `msg.attacker = att; msg.defender = def;` 再 `save_compact_into`
-  的结果（tight 和默认余量都一样），但草稿和 `att`、`def` 都不变，也不在草稿里分配。
-  规则：每个 target 是根对象里的成员子对象或数组元素（任意层级，标量也可以），不能是
-  容器里的元素；多个 target 不能重叠；source 与 target 同类型，可以在任何 buffer 里，
-  也可以是草稿自己的另一部分（所有 source 都按调用前的值读取）；含容器的 source 必须
-  是某个 XOffset buffer 里的有效对象，发送端不校验它。target 的隐式填充字节写成 0。
-  违反规则或超过 wire 上限时抛 `XException`，`out` 为空串。
-- 加载时的校验包括：头部与版本、schema 身份、空洞表、从根出发的整图遍历，以及
-  「活块 + 空洞恰好铺满已用区」。任何一项不满足都会抛 `XException`，不会发布根对象。
-  不想用异常时调用 `try_load_verified`，见第 6.1 节。
-- 加载后的 buffer 可以继续修改再保存；保存前的空闲空间会随空洞表带过去并继续复用。
-- `load_unverified` 跳过校验，只适合调用方已经信任的数据。
-- 直接把数据收进最终 arena 的接收接口是 `begin_verified_receive<T>` /
-  `finish_verified`（`xoffset_verified_receive.hpp`），校验强度与 `load_verified` 相同。
+  The wire written equals the result of `msg.attacker = att; msg.defender = def;` followed by
+  `save_compact_into` (both tight and default slack), but the draft, `att` and `def` are unchanged
+  and nothing is allocated in the draft. Rules: each target is a member subobject or array element
+  of the root object (any depth, scalars allowed), not an element inside a container; targets must
+  not overlap; a source has the same type as its target and may live in any buffer, or be another
+  part of the draft itself (all sources are read with their values from before the call); a source
+  containing containers must be a valid object in some XOffset buffer, which the sender does not
+  validate. Implicit padding bytes of a target are written as 0. Breaking a rule or exceeding the
+  wire limit throws `XException` and leaves `out` empty.
+- Validation on load covers: header and version, schema identity, hole table, a full graph walk
+  from the root, and "live blocks + holes exactly tile the used area". If any check fails it throws
+  `XException` and the root is never published. To avoid exceptions call `try_load_verified`; see
+  section 6.1.
+- A loaded buffer can be modified and saved again; free space from before the save comes along with
+  the hole table and keeps being reused.
+- `load_unverified` skips validation and is only for data the caller already trusts.
+- The receive interface that reads straight into the final arena is `begin_verified_receive<T>` /
+  `finish_verified` (`xoffset_verified_receive.hpp`), with the same validation strength as
+  `load_verified`.
 
-### 4.1 大量小消息：槽位，或用 `XBufferPool` 复用映射
+### 4.1 Many small messages: slots, or reuse mappings with `XBufferPool`
 
-VM 存储的 `XBuffer` 都有自己的虚拟内存预留：建立时预留 `maximum_capacity` 并开启宿主
-前缀页和载荷页，销毁时整块释放。这套系统调用和缺页在 Apple M4 上约 4.4 µs，
-与预留大小关系不大。消息只有几 KB、而且每条都新建、销毁一个 buffer 时（战斗服往返、
-只读战报、客户端收包），这部分开销会远大于校验本身。
+Every VM-backed `XBuffer` has its own virtual memory reservation: on creation it reserves
+`maximum_capacity` and enables the host prefix page and payload pages, and on destruction it
+releases the whole range. These system calls and page faults cost about 4.4 µs on Apple M4, mostly
+independent of the reservation size. When messages are only a few KB and each one creates and
+destroys a buffer (battle server round trips, read-only battle reports, client receive), this
+overhead is far larger than the validation itself.
 
-不带池、Explicit 增长（默认）的小消息落在槽位上（3.4 节），不走这套系统调用。
-Automatic 增长且上限较大的用法仍是 VM，这类接收方和发送方应当共用一个池，让销毁后的
-映射留给下一条消息复用：
+Small messages without a pool and with Explicit growth (the default) land on slots (section 3.4)
+and skip these system calls. Automatic growth with a large limit still uses VM; such receivers and
+senders should share a pool so a destroyed mapping is kept for the next message to reuse:
 
 ```cpp
-XBufferPool pool({16, 16 * cap_bytes, 64u << 20});   // 最多缓存 16 块空闲映射
+XBufferPool pool({16, 16 * cap_bytes, 64u << 20});   // caches at most 16 free mappings
 const auto cap = XBuffer::maximum_capacity(cap_bytes).with_pool(pool);
 
-XBuffer in = XBuffer::load_verified<Msg>(wire, cap);  // 仍是完整校验
-// ... 使用 in；离开作用域时映射回到池里，而不是还给操作系统
+XBuffer in = XBuffer::load_verified<Msg>(wire, cap);  // still fully validated
+// ... use in; when it goes out of scope the mapping returns to the pool instead of the OS
 ```
 
-- 池只复用映射，不跳过任何校验，也不改变 wire。复用的映射在重新暴露前会清零。
-- 池按 `maximum_capacity` 的精确值匹配，同一类消息请用同一个上限。
-- 池里的空闲映射仍占着虚拟地址和已触碰的页，`Limits` 的三个上限（块数、预留字节、
-  可访问字节）决定最多留多少；`pool.clear()` 立即全部释放。
-- `XBufferPool` 目前属于实验接口（见第 8 节）。
+- The pool only reuses mappings; it skips no validation and does not change the wire. Reused
+  mappings are zeroed before being exposed again.
+- The pool matches on the exact `maximum_capacity`; use the same limit for the same kind of message.
+- Free mappings in the pool still hold virtual address space and touched pages; the three `Limits`
+  (block count, reserved bytes, accessible bytes) cap how much is kept; `pool.clear()` releases
+  everything immediately.
+- `XBufferPool` is currently an experimental interface (see section 8).
 
-SLG 原型（M 规模，Apple M4，原型数据，非正式验收）的效果：
+Effect in the SLG prototype (M scale, Apple M4, prototype data, not a formal acceptance):
 
-| 场景 | 每条消息新建映射 | 用池 |
+| Scenario | New mapping per message | With pool |
 | --- | ---: | ---: |
-| 战斗服往返，XOffset ÷ cereal / FlatBuffers / protobuf（几何均值） | 2.91 / 4.16 / 1.28 | 0.58 / 0.85 / 0.25 |
-| 只读战报，每次读取 | 4.9 µs | 0.44 µs |
+| Battle server round trip, XOffset ÷ cereal / FlatBuffers / protobuf (geometric mean) | 2.91 / 4.16 / 1.28 | 0.58 / 0.85 / 0.25 |
+| Read-only battle report, per read | 4.9 µs | 0.44 µs |
 
-只读战报用池后仍慢于 cereal（约 2.6 倍），剩余开销在建立 owner 和"先拷贝再校验"。
+With the pool the read-only battle report is still slower than cereal (about 2.6x); the remaining
+cost is setting up the owner and "copy first, then validate".
 
-### 4.2 同进程整块复制：`clone()` / `clone_into()`
+### 4.2 Whole-buffer copies in one process: `clone()` / `clone_into()`
 
-同一进程里需要一份独立副本时（状态分叉、回滚、快照后继续改），不必经过 wire：
+When you need an independent copy in the same process (forking state, rollback, continuing to edit
+after a snapshot), there is no need to go through a wire:
 
 ```cpp
-XBuffer snapshot = buf.clone();     // 新 owner：大小、maximum_capacity、增长策略、池、存储种类都同 buf
-buf.clone_into(scratch);            // 复用 scratch 的映射和地址，像 reload_verified
+XBuffer snapshot = buf.clone();     // new owner: size, maximum_capacity, growth policy, pool and storage kind same as buf
+buf.clone_into(scratch);            // reuses scratch's mapping and address, like reload_verified
 ```
 
-- 只拷贝一次已用区，空闲表、类型化根访问和 schema 绑定一起带过去，不生成 wire、
-  不校验（源是本进程正在用的 buffer）。副本与源完全独立，之后同样的修改得到同样的字节，
-  `save_verified` 输出也相同。
-- 未校验的源（`load_unverified`）复制后仍未校验：`root<T>()` 照样拒绝。
-- `clone_into(dst)` 之后，dst 原有内容的根引用、元素指针、`string_view`、span 全部失效，
-  `dst.epoch()` 加一，`XHandle` 按新内容重新解析；dst 的地址、`maximum_capacity` 和增长
-  策略不变，大小变成源的大小（不超过 dst 的上限）。
-- 失败：`clone_into(dst)` 的源就是 dst 时抛 `XException`，什么都不改；源的已用区超过 dst
-  的 `maximum_capacity` 时抛 `XBadAlloc`；除自拷贝外的任何失败都让 dst 成为没有根的空
-  arena，与 `reload_verified` 失败相同，之后可以再 `clone_into` 或 `reset<T>()`。
-  `clone()` 失败不会改动源。
-- 详细语义见 [BUFFER_REUSE.md](BUFFER_REUSE.md)。
+- Copies the used area once and carries the free table, typed root access and schema binding along;
+  no wire is produced and nothing is validated (the source is a buffer this process is using). The
+  copy is fully independent of the source; the same edits afterwards give the same bytes, and
+  `save_verified` output is identical too.
+- An unvalidated source (`load_unverified`) stays unvalidated after copying: `root<T>()` still refuses.
+- After `clone_into(dst)`, root references, element pointers, `string_view`s and spans into dst's
+  old content are all invalid, `dst.epoch()` is incremented, and `XHandle` re-resolves to the new
+  content; dst's address, `maximum_capacity` and growth policy are unchanged, and its size becomes
+  the source's (not above dst's limit).
+- Failures: `clone_into(dst)` with dst as its own source throws `XException` and changes nothing;
+  a source whose used area exceeds dst's `maximum_capacity` throws `XBadAlloc`; any failure other
+  than self-copy leaves dst as an empty arena without a root, as when `reload_verified` fails, after
+  which you can `clone_into` or `reset<T>()` again. A failed `clone()` never changes the source.
+- Detailed semantics are in [BUFFER_REUSE.md](BUFFER_REUSE.md).
 
-### 4.3 设计约定：哪些开销是契约带来的
+### 4.3 Design conventions: which costs come from the contract
 
-有两条约定是整块可搬（K0）和「发出去的就是 arena 字节」（K3、K5）的前提，它们的代价
-落在固定的几类操作上，库不打算靠改契约把它们压掉。v1.0 检查点（Apple M4，SLG 原型 M 规模，
-对 zpp_bits）上最明显的两处是战斗服往返里的 A.apply（约 2.0 倍）和 A.simulate（约 1.3 倍）；
-A 场景整体仍快于 zpp_bits（上界 0.78）。下面是来源和使用方能做的事。
+Two conventions are prerequisites for whole-region relocation (K0) and "what is sent is the arena
+bytes" (K3, K5). Their cost falls on a few fixed kinds of operations, and the library does not plan
+to remove it by changing the contract. At the v1.0 checkpoint (Apple M4, SLG prototype M scale,
+against zpp_bits) the two most visible places were A.apply (about 2.0x) and A.simulate (about 1.3x)
+in the battle server round trip; scenario A as a whole was still faster than zpp_bits (upper bound
+0.78). Below are the causes and what users can do.
 
-**约定一：每个 buffer 一个 arena，带自己的空闲表。** 空闲空间记在这个 buffer 自己的表里，
-随空洞表一起发出、装载，所以整块搬走或发出之后，接着改不退化（K5），也不依赖进程全局的
-分配器状态。代价是元数据按 buffer 分散：一个 buffer 第一次用到某个大小档时，那一档的
-元数据是冷的。很多 buffer 各改一两次的负载（例如 SLG 原型里的 512 个玩家 buffer）几乎每次都碰到
-冷元数据，这就是 A.apply 的差距。
+**Convention one: one arena per buffer, with its own free table.** Free space is recorded in the
+buffer's own table and is sent and loaded with the hole table, so after a whole-region move or send,
+further edits do not degrade (K5) and nothing depends on process-global allocator state. The cost is
+that metadata is spread per buffer: the first time a buffer uses a size class, that class's metadata
+is cold. Loads where many buffers are each edited once or twice (for example the 512 player buffers
+in the SLG prototype) hit cold metadata almost every time; that is the A.apply gap.
 
-- 对策：长期持有、逐条复用 buffer（`reload_verified` / `reset<T>()`，见
-  [BUFFER_REUSE.md](BUFFER_REUSE.md)），空闲表和映射都留在原处；能合并的修改集中到少数
-  buffer 上做。
-- 知道哪些 buffer 马上要改、而改动的数据还在路上（例如战斗结果正在接收、解码）时，先对这些
-  buffer 调 `prefetch_for_update()`。它只发出不等待的缓存预取（owner 映射项、owner 字、arena
-  头、空闲表的计数、位图和前几档小 bin），不改任何内容和分配决定；冷元数据的缺失就和接收重叠，
-  不在修改里一个接一个地等。SLG 原型的 A 场景对两个玩家各调一次（算在 A.res_decode 里）。
+- Remedies: keep buffers long-lived and reuse them message by message (`reload_verified` /
+  `reset<T>()`, see [BUFFER_REUSE.md](BUFFER_REUSE.md)), so the free table and mapping stay in
+  place; concentrate mergeable edits on a few buffers.
+- When you know which buffers are about to be edited while the data for the edit is still on its way
+  (for example a battle result is being received and decoded), call `prefetch_for_update()` on those
+  buffers first. It only issues non-blocking cache prefetches (owner map entry, owner word, arena
+  header, free-table counters, bitmap and the first few small bins) and changes no content or
+  allocation decision; the cold-metadata misses then overlap with receiving instead of being waited
+  for one by one during the edit. Scenario A of the SLG prototype calls it once for each of the two
+  players (counted in A.res_decode).
 
-**约定二：容器余量是 payload 的一部分。** 容器的余量和其他字节一样随 wire 发出，扩容新露出
-的字节必须先清零（不能把未初始化的字节发出去）。所以库不替你多留：一个空容器第一次
-`assign`、拷贝赋值都只分配到长度（之后的扩容才翻倍），`save_compact` 的
-`slack_div = 0` 也让容量等于长度。代价是收到的消息在接收方被编辑时，容器第一次增长就要
-扩容、搬元素并清零新露出的部分；每条新消息都会重来一次，这就是 A.simulate 的差距。
+**Convention two: container slack is part of the payload.** Slack is sent with the wire like any
+other bytes, and bytes newly exposed by growth must be zeroed first (uninitialized bytes must never
+be sent). So the library does not reserve extra on your behalf: the first `assign` or copy
+assignment into an empty container allocates only the length (later growth doubles), and
+`save_compact` with `slack_div = 0` also makes capacity equal length. The cost is that when a
+received message is edited on the receiver, the first growth of a container must allocate, move the
+elements and zero the newly exposed part; every new message starts over. That is the A.simulate gap.
 
-- 已知终态大小时先调 `XVector` / `XString` 的 `reserve`，一次分配到位，不走多次翻倍。
-- 发给会编辑的接收方时用 `save_compact` 的默认余量（`slack_div = 8`：不少于 8 个元素的容器
-  （字符串除外）留 size/8+1 个），接收方第一次插入不搬家；只读或归档的接收方用 `slack_div = 0`，wire 最小。
-- 跨机器发送带余量的状态时用 `XWireEmission::zero_runs`（第 4 节），余量里不短于 64 字节的零段
-  不占线路字节，接收方装载后余量照样在。
-- 接收方复用 buffer 时，`reload_verified` 之后在以前用过的范围内每次只增长 4 KiB（第 3 节），
-  清零按需进行。
+- When the final size is known, call `reserve` on the `XVector` / `XString` first to allocate once
+  instead of doubling several times.
+- When sending to a receiver that edits, use the default slack of `save_compact` (`slack_div = 8`:
+  containers (except strings) with at least 8 elements get size/8+1), so the receiver's first insert
+  does not move; read-only or archiving receivers use `slack_div = 0` for the smallest wire.
+- When sending state with slack across machines, use `XWireEmission::zero_runs` (section 4): zero
+  runs of at least 64 bytes in the slack take no bytes on the wire, and the slack is still there
+  after the receiver loads it.
+- When the receiver reuses buffers, after `reload_verified` growth within the previously used range
+  is 4 KiB at a time (section 3), with zeroing done on demand.
 
-两条约定都不影响正确性和 wire 格式；上面的对策也只改性能，不改语义和 wire 的接受集合。
+Neither convention affects correctness or the wire format; the remedies above change only
+performance, not semantics or the set of accepted wires.
 
-### 4.4 定长消息：不经 XBuffer，按自身字节收发
+### 4.4 Fixed-size messages: sent as their own bytes, without XBuffer
 
-只含标量、枚举、数组和由它们组成的记录、内部没有任何 arena 容器（`XString`、`XVector`、
-`XSet`、`XMap`、`XBlob`）、也没有隐式填充的类型是定长消息（`is_fixed_message_v<T>`）：
-行情更新、委托、回报这类小消息。它的字节里没有偏移，所以不需要 arena、根和 wire 线头，
-`xoffset_fixed_message.hpp` 让它直接按自身的字节收发：
+A type that contains only scalars, enums, arrays and records made of them, with no arena container
+inside (`XString`, `XVector`, `XSet`, `XMap`, `XBlob`) and no implicit padding, is a fixed-size
+message (`is_fixed_message_v<T>`): small messages such as quote updates, orders and execution
+reports. Its bytes contain no offsets, so it needs no arena, root or wire header, and
+`xoffset_fixed_message.hpp` sends and receives it directly as its own bytes:
 
 ```cpp
 #include "xoffset_fixed_message.hpp"
@@ -507,145 +601,169 @@ struct alignas(8) Quote { std::uint64_t ts; std::int64_t price; std::uint32_t qt
 XOFFSET_RECORD(Quote, ts, price, qty, instrument, side, flags, reserved)
 XOFFSET_REGISTER_SCHEMA_NAME(Quote, "mkt.Quote")
 
-// 连接建立时：像其他根类型一样列进握手（xoffset_handshake.hpp），之后每条消息不带线头。
+// On connect: list it in the handshake like any other root type (xoffset_handshake.hpp); after that messages carry no header.
 std::string hello = make_schema_hello<Quote, Ack>("feed-1");
 
-// 发送：一条就是 sizeof(Quote) 字节；一批是 8 字节头 {条数, 类型标签} 加记录。
-std::size_t n = write_fixed_batch<Quote>(send_buf, quotes);      // 或 place_fixed_batch 原地填
-// 接收：在收到的字节上直接读，不复制。
+// Send: one message is sizeof(Quote) bytes; a batch is an 8-byte header {count, type tag} plus the records.
+std::size_t n = write_fixed_batch<Quote>(send_buf, quotes);      // or place_fixed_batch to fill in place
+// Receive: read directly on the received bytes, no copy.
 if (auto v = view_fixed_batch<Quote>(recv_bytes))
     for (const Quote& q : v.records) on_quote(q);
 ```
 
-- 视图检查长度（单条恰好 `sizeof(T)`，一批与条数相符）、`T` 的对齐、批的类型标签，以及每个
-  `bool` 的字节是 0 或 1（与 `load_verified` 相同；枚举不查范围）。这就是定长消息的全部
-  结构校验：没有偏移，就没有越界可查。没有 `bool` 的类型，取值检查在编译期消失；有 `bool`
-  时单条消息约多 5 条指令，一批每条记录约多 4 条、另有约 10 条固定开销。标志位用
-  `std::uint8_t` 就没有这项检查。
-  失败时 `status` 说明原因（`wrong_size`、`misaligned`、`wrong_tag`、`invalid_value`）。
-- 单条消息不带标签，只在只传一种类型的连接上发单条；一个连接传多种定长类型时发批，
-  按 `peek_fixed_batch_tag(bytes)` 对 `fixed_message_tag_v<T>` 分发。
-- 视图就地读取，收到的字节在用完之前不能改动或释放。字节须由会隐式创建对象的操作写入：
-  `memcpy`、读 socket 到字节缓冲区，或这里的写函数。
-- 同一个类型也可以作为普通根里的元素（例如快照里的 `XVector<Quote>`），两边记录的字节相同。
-- 不抛异常，不分配内存。属于实验接口（第 8 节 E6）。
+- The view checks the length (exactly `sizeof(T)` for one message, consistent with the count for a
+  batch), the alignment of `T`, the batch type tag, and that every `bool` byte is 0 or 1 (as in
+  `load_verified`; enum ranges are not checked). That is all the structural validation a fixed-size
+  message has: with no offsets there is nothing to bound-check. For types without `bool` the value
+  check disappears at compile time; with `bool` a single message costs about 5 more instructions,
+  and a batch about 4 more per record plus about 10 fixed. Use `std::uint8_t` for flags to avoid the
+  check. On failure `status` gives the reason (`wrong_size`, `misaligned`, `wrong_tag`,
+  `invalid_value`).
+- A single message carries no tag; send single messages only on a connection that carries one type.
+  When a connection carries several fixed-size types, send batches and dispatch on
+  `peek_fixed_batch_tag(bytes)` against `fixed_message_tag_v<T>`.
+- The view reads in place; the received bytes must not be changed or freed until you are done. The
+  bytes must be written by an operation that implicitly creates objects: `memcpy`, reading a socket
+  into a byte buffer, or the write functions here.
+- The same type can also be an element in an ordinary root (for example `XVector<Quote>` in a
+  snapshot); the record bytes are the same in both.
+- No exceptions, no allocation. Experimental interface (section 8, E6).
 
-成本（云端 callgrind，40 字节记录，见 `bench/fixedmsg/README.md`）：编码比手写结构体多
-1 到 8 条指令，每个读者多 5 到 8 条；与把同样记录放进 XOffset 根相比，编码少 6 到 12 倍，
-读少 1.7 到 6 倍。
+Cost (cloud callgrind, 40-byte record, see `bench/fixedmsg/README.md`): encoding takes 1 to 8 more
+instructions than a hand-written struct and each reader 5 to 8 more; compared with putting the same
+record in an XOffset root, encoding takes 6 to 12 times fewer and reading 1.7 to 6 times fewer.
 
-### 4.5 增量同步：只发改过的字节
+### 4.5 Delta sync: send only the changed bytes
 
-接收方手里已经有一份副本（客户端握着自己的单位或玩家数据，存储服务器握着玩家）时，发送方改了几个字段
-不必再发整块：`xoffset_delta.hpp`（主头文件已包含）只发变了的载荷字节，接收方就地补进副本，补完后两边
-载荷逐字节相同。格式、检查和保证见 [DELTA_SYNC.md](DELTA_SYNC.md)，完整的收发循环见
-`examples/delta_sync.cpp`。
+When the receiver already holds a copy (a client holding its own units or player data, a storage
+server holding a player) and the sender changed a few fields, there is no need to send the whole
+buffer: `xoffset_delta.hpp` (included by the main header) sends only the changed payload bytes, the
+receiver patches its copy in place, and afterwards both payloads are byte-identical. Format, checks
+and guarantees are in [DELTA_SYNC.md](DELTA_SYNC.md); a complete send/receive loop is in
+`examples/delta_sync.cpp`.
 
 ```cpp
-// 发送方：每个接收方一个基线（总是收同样增量的一组接收方可以共用一个）。
-XDeltaBaseline base;                                   // 对方手里还什么都没有
+// Sender: one baseline per receiver (a group of receivers that always get the same deltas can share one).
+XDeltaBaseline base;                                   // the peer holds nothing yet
 std::string d;
-world.save_delta_into<View>(d, base);                  // 第一次是关键增量（整份状态）
-// ... 原地修改 world：root<View>().units[i].hp -= 3 ...
-if (world.save_delta_into<View>(d, base); !d.empty()) send(d);   // 以后只发改过的
-base.reset();                                          // 对方要求重来时：下一条是关键增量
+world.save_delta_into<View>(d, base);                  // the first one is a key delta (the whole state)
+// ... modify world in place: root<View>().units[i].hp -= 3 ...
+if (world.save_delta_into<View>(d, base); !d.empty()) send(d);   // afterwards only what changed
+base.reset();                                          // when the peer asks to start over: the next one is a key delta
 
-// 接收方：按链路建接收器（第 8 节 K4），游标记住副本处在哪条流的哪个版本。
+// Receiver: build the receiver per link (section 8, K4); the cursor records which stream and version the copy is at.
 XReceiver<XLink::from_server> rx(XBuffer::maximum_capacity(1 << 20));
 XDeltaCursor cursor;
 if (XStatus r = rx.apply_delta<View>(held, d, cursor); !r) ask_for_key_delta();
-const View& v = held.root<View>();                     // 就地读
+const View& v = held.root<View>();                     // read in place
 ```
 
-- 丢包、乱序、重复或客户端重启后，增量对不上副本的版本，返回 `delta_base_mismatch`，副本和游标不变；
-  请发送方 `reset()` 基线发关键增量即可恢复。中途加入的接收方从 `key_delta_into` 起步，之后和其他人
-  收同一串增量。
-- 副本只读：接收方改了自己的副本，下一条增量的结果就不再是发送方的数据（带 `digest` 发送时会被发现
-  并回滚）。要回传修改，接收方用自己的 buffer 和基线反方向发增量。
-- 两端 schema 相同才发增量：连接时握手（`xoffset_handshake.hpp`）对根类型答 `same` 就发增量，答
-  `convert` 就发转换过的整块（第 7 节）。收到 `schema_mismatch` 说明握手结果不对，要重连，再要关键
-  增量没有用。
-- 可信链路（服务端之间、服务端发往客户端）默认 admit：只查增量的格式、流和版本、每个块和空洞在已用
-  载荷之内，不建检查表；从客户端收的增量只能完整校验（DELTA_SYNC.md 第 3 节）。
-- 增量格式 1.0 从 3.4.0 起在 3.x 内冻结（DELTA_SYNC.md 第 2 节），`tests/test_delta_format.cpp`
-  逐字节固定了一小串增量。
+- After loss, reordering, duplication or a client restart, a delta that does not match the copy's
+  version returns `delta_base_mismatch` and leaves the copy and the cursor unchanged; ask the sender
+  to `reset()` its baseline and send a key delta to recover. A receiver joining midway starts from
+  `key_delta_into` and then receives the same delta stream as everyone else.
+- The copy is read-only: if the receiver modifies its copy, the result of the next delta is no
+  longer the sender's data (detected and rolled back when sent with `digest`). To send changes back,
+  the receiver sends deltas in the other direction with its own buffer and baseline.
+- Send deltas only when both ends have the same schema: when the handshake on connect
+  (`xoffset_handshake.hpp`) answers `same` for the root type, send deltas; when it answers
+  `convert`, send converted whole buffers (section 7). Receiving `schema_mismatch` means the
+  handshake result is wrong; reconnect, since asking for another key delta will not help.
+- Trusted links (server to server, server to client) admit by default: only the delta's format,
+  stream and version, and that every block and hole lies within the used payload, are checked, and no
+  check table is built; deltas received from clients can only be fully validated (DELTA_SYNC.md
+  section 3).
+- Delta format 1.0 is frozen within 3.x since 3.4.0 (DELTA_SYNC.md section 2), and
+  `tests/test_delta_format.cpp` pins a short sequence of deltas byte for byte.
 
-### 4.6 共享增量：视口同步
+### 4.6 Shared deltas: viewport sync
 
-服务端给每个客户端发它看得到的那部分共享世界（视口里的单位、行军、地块）时，4.5 节的增量要给每个客户端
-各存一份基线、各比较一遍。共享增量（`xoffset_shared_delta.hpp`，XS 2.0）按记录写：服务端每个实体每 tick
-只编码一次，看得到它的连接都收同一段字节的拷贝；客户端按操作的 id 在自己的存储里找到记录就地写入，布局是
-自己的。id 可以是服务端替这个客户端分配的槽号（客户端直接按槽号取记录，不用查表），也可以是实体 id（客户端
-用 `xsync::XSyncSlots` 查）。格式、目标接口、检查和保证见 [SHARED_DELTA.md](SHARED_DELTA.md)，完整的收发
-循环见 `examples/shared_delta.cpp`。
+When a server sends each client the part of a shared world it can see (units, marches, tiles in its
+viewport), the deltas of section 4.5 need a baseline and a comparison per client. Shared deltas
+(`xoffset_shared_delta.hpp`, XS 2.0) are written per record: the server encodes each entity once per
+tick, and every connection that can see it receives a copy of the same bytes; the client finds the
+record by the operation's id in its own storage and writes it in place, with its own layout. The id
+can be a slot number the server assigned for this client (the client fetches the record by slot
+number with no lookup) or the entity id (the client looks it up with `xsync::XSyncSlots`). Format,
+target interface, checks and guarantees are in [SHARED_DELTA.md](SHARED_DELTA.md); a complete
+send/receive loop is in `examples/shared_delta.cpp`.
 
-服务端用库里的发布器（`xoffset_shared_publisher.hpp`，4.0 起）：它按实体记着这个 tick 的变化和进入的编码
-（第一次用到时编码一次）以及有几个连接持有它，按连接记着版本和客户端的空闲槽号。应用只管自己的世界，
-每条消息告诉它哪些实体离开、留下、进入。
+The server uses the library's publisher (`xoffset_shared_publisher.hpp`, since 4.0): per entity it
+keeps this tick's change and enter encodings (encoded once on first use) and how many connections
+hold the entity; per connection it keeps the version and the client's free slot numbers. The
+application only manages its own world and tells it, per message, which entities left, stayed and
+entered.
 
 ```cpp
 #include "xoffset_shared_publisher.hpp"
 namespace xs = XOffsetDatastructure::xsync;
-using Conn = xs::XSyncConn<xs::XSyncFreeSlots<kUnit, 16>>;        // 每连接：版本和空闲槽号（热的部分）
+using Conn = xs::XSyncConn<xs::XSyncFreeSlots<kUnit, 16>>;        // per connection: version and free slots (the hot part)
 xs::XSyncPublisher pub;
-xs::XSyncDirtyTable<kUnit, Unit> units;                           // 应用按成员标脏
+xs::XSyncDirtyTable<kUnit, Unit> units;                           // the application marks members dirty
 xs::XSyncOut out;
 
-// 服务端：每 tick 在第一条消息之前，不论有几个客户端，每个变了的实体只编码一次。
+// Server: each tick, before the first message, every changed entity is encoded once, however many clients there are.
 pub.begin_tick(tick);
-units.publish(pub, changed, src);                                 // src：应用对自己世界的视图（SHARED_DELTA.md 第 1 节）
+units.publish(pub, changed, src);                                 // src: the application's view of its world (SHARED_DELTA.md section 1)
 
-// 每个客户端一条消息：根记录（表 0）随每条消息整条带上，然后每张表、每种操作调一次。
-xs::XSyncMessage<Conn> m(pub, conn, cold, out, head);             // 关键消息：(..., head, stream)
-units.leaves(m, left_index, left_slot);                           // 离开视口
-units.changes(m, src, kept_index, kept_slot);                     // 留在视口：共享的那段变化，换成这个客户端的槽号
-units.enters(m, src, new_index, [&](std::size_t r, std::uint32_t slot) { held_slot[r] = slot; });   // 进入：整条记录
+// One message per client: the root record (table 0) is carried whole in every message, then one call per table and operation.
+xs::XSyncMessage<Conn> m(pub, conn, cold, out, head);             // key message: (..., head, stream)
+units.leaves(m, left_index, left_slot);                           // left the viewport
+units.changes(m, src, kept_index, kept_slot);                     // stayed in the viewport: the shared change, with this client's slot
+units.enters(m, src, new_index, [&](std::size_t r, std::uint32_t slot) { held_slot[r] = slot; });   // entered: the whole record
 m.finish();
 send(client, out.view());
 
-// 客户端：目标把 id 映射到自己的记录（SHARED_DELTA.md 第 1 节），接收器按链路建（第 8 节 K4）。
+// Client: the target maps ids to its own records (SHARED_DELTA.md section 1); build the receiver per link (section 8, K4).
 XReceiver<XLink::from_server> rx(XBuffer::maximum_capacity(1 << 20));
-xs::XSyncCursor cursor;                                           // 跟的是哪条流的哪个版本
-if (xs::is_key(msg)) target.empty_units();                        // 关键消息重新进入全部条目
+xs::XSyncCursor cursor;                                           // which stream and version it follows
+if (xs::is_key(msg)) target.empty_units();                        // a key message re-enters every entry
 if (XStatus r = rx.apply_sync(msg, cursor, target); !r) ask_for_key();
 ```
 
-- 目标说明有哪些表、每张表的记录类型，按 id 找记录（`find`、`record`）；表 0 是根记录（不含容器，每条
-  消息整条带上）；单位、行军这类会进出视口的表再加 `enter`、`leave`。进入时整条记录写入（每个普通字节和
-  每个容器，不用先清零）；离开时记录原样交给目标，要让空槽读出来是空的就在 `leave` 里清
-  （`XRecordBody<R>::clear`）。
-- 丢消息、乱序或客户端重启后版本对不上，返回 `delta_base_mismatch`，什么都不改；请服务端发关键消息。
-- 档位跟链路走：`from_server`、`server_peer` 默认 admit，查消息头、流和版本、每段的表和种类、每条操作的
-  id，消息体信任发送方；`apply_sync<XCheck::full>` 先逐条检查消息体再写，拒绝的消息什么都不改。
-  `from_client` 上 `apply_sync` 编译不过：服务端不把客户端上行当共享增量读。
-- XS 2.0 从 4.0 起取代 XS 1.0（不带旧格式），`tests/test_shared_delta_format.cpp` 逐字节固定了一条关键消息
-  和其后的一条增量；改这些字节就是新格式、新格式字节。
+- The target states which tables exist and each table's record type, and finds records by id
+  (`find`, `record`); table 0 is the root record (no containers, carried whole in every message);
+  tables that enter and leave the viewport, such as units and marches, also have `enter` and
+  `leave`. On enter the whole record is written (every plain byte and every container, no zeroing
+  first); on leave the record is handed to the target as is; to make empty slots read as empty,
+  clear it in `leave` (`XRecordBody<R>::clear`).
+- After a lost or reordered message or a client restart the version does not match: it returns
+  `delta_base_mismatch` and changes nothing; ask the server for a key message.
+- The check tier follows the link: `from_server` and `server_peer` admit by default and check the
+  message header, stream and version, each section's table and kind, and each operation's id; the
+  message body is trusted. `apply_sync<XCheck::full>` checks every body first and then writes; a
+  rejected message changes nothing. `apply_sync` does not compile on `from_client`: the server does
+  not read client uplink as shared deltas.
+- XS 2.0 replaces XS 1.0 since 4.0 (no old format), and `tests/test_shared_delta_format.cpp` pins a
+  key message and the delta after it byte for byte; changing those bytes means a new format with new
+  format bytes.
 
-## 5. 必须遵守的约束
+## 5. Constraints you must follow
 
-| 约束 | 不遵守的后果 |
+| Constraint | Consequence if broken |
 | --- | --- |
-| 手动分配（如 `XBuffer::allocator<T>()`、`arena()->allocate_aligned`）且不能从根到达的内存，必须在 `save_verified` 前释放 | 保存出的 wire 无法通过加载校验（铺满检查失败） |
-| 同一个 buffer 的写操作由调用方同步 | 数据竞争，行为未定义 |
-| 不把容器移动赋值给它自己子树里的容器（或反过来，第 3.3 节） | Release 构建下行为未定义 |
-| buffer 对象要比它的 `XHandle`、借用的 span 活得久 | 悬垂访问 |
-| 同一可执行文件内所有翻译单元使用相同的头文件版本、编译选项和工具链 | 布局或 schema 身份不一致 |
-| 接收不可信输入前限制 wire 长度、`maximum_capacity` 和并发 buffer 数 | 单个合法 wire 也可能占用大量内存 |
-| 只用于 64 位小端平台（不支持 32 位安卓渠道包） | 其他平台编译期 `#error` |
-| 苹果平台部署目标不低于 macOS 14、iOS 17（tvOS 17、watchOS 10）：校验载入等接口用系统 libc++ 的 `std::pmr`，苹果从这些版本起才提供，且 SDK 不做可用性标注 | 部署目标更低时编译期 `#error`（否则会在旧系统上启动失败） |
+| Memory allocated by hand (for example `XBuffer::allocator<T>()`, `arena()->allocate_aligned`) that is not reachable from the root must be freed before `save_verified` | The saved wire fails validation on load (the tiling check fails) |
+| Writes to one buffer are synchronized by the caller | Data race, undefined behavior |
+| Never move-assign a container into a container in its own subtree (or the other way round, section 3.3) | Undefined behavior in Release builds |
+| The buffer object outlives its `XHandle`s and borrowed spans | Dangling access |
+| All translation units in one executable use the same header version, compile options and toolchain | Inconsistent layout or schema identity |
+| Before receiving untrusted input, limit the wire length, `maximum_capacity` and the number of concurrent buffers | Even a single valid wire can use a lot of memory |
+| 64-bit little-endian platforms only (32-bit Android builds are not supported) | `#error` at compile time on other platforms |
+| Apple deployment targets of at least macOS 14 and iOS 17 (tvOS 17, watchOS 10): validated loading and related interfaces use `std::pmr` from the system libc++, which Apple ships only from these versions, and the SDK has no availability annotations | `#error` at compile time for lower deployment targets (otherwise it would fail to launch on older systems) |
 
-## 6. 错误处理
+## 6. Error handling
 
-- 所有库错误都是 `XException`（派生自 `std::runtime_error`）；空间不足是它的子类
-  `XBadAlloc`。每个 `XException` 都带错误码：`e.code()` 返回 `XErrc`
-  （`xoffset_error.hpp`，例如 `bad_magic`、`schema_mismatch`、`invalid_payload`、
-  `capacity_exceeded`，`to_string(code)` 给出名字）。
+- All library errors are `XException` (derived from `std::runtime_error`); running out of space is
+  its subclass `XBadAlloc`. Every `XException` carries an error code: `e.code()` returns an `XErrc`
+  (`xoffset_error.hpp`, for example `bad_magic`, `schema_mismatch`, `invalid_payload`,
+  `capacity_exceeded`; `to_string(code)` gives the name).
 
-### 6.1 不抛异常的接收入口
+### 6.1 Non-throwing receive entry points
 
-接收入口都有一个不抛异常的版本，返回 `XResult<T>`（值或 `XError{code, message}`）或
-`XStatus`。校验与抛出版本完全相同；失败时的错误码和错误文字就是抛出版本会抛的那个，
-buffer 留下的状态也相同（reload 失败后为空、无根）。
+Every receive entry point has a non-throwing version that returns `XResult<T>` (a value or
+`XError{code, message}`) or `XStatus`. Validation is exactly the same as in the throwing version; on
+failure the error code and text are what the throwing version would throw, and the buffer is left
+in the same state (empty, without a root, after a failed reload).
 
 ```cpp
 auto in = XBuffer::try_load_verified<Profile>(wire, cap);     // XResult<XBuffer>
@@ -655,188 +773,228 @@ const Profile& r = in->root<Profile>();
 if (auto s = buf.try_reload_verified<Profile>(wire); !s) drop(s.error());
 
 auto token = buf.try_begin_verified_reload<Profile>(used, holes, extents);
-// ... 写入 token->header_bytes() / payload_bytes() / hole_bytes()，complete(...)
+// ... write token->header_bytes() / payload_bytes() / hole_bytes(), complete(...)
 XStatus done = token ? token->try_finish() : XStatus(token.error());
 ```
 
-还有 `try_load_verified_with_resource`、`try_reload_verified_with_resource` 和
-`TypedXBuffer<T>::try_load_verified / try_reload_verified`。`XResult::value()` 在没有值时
-抛出（关异常构建里调用致命处理器）；`*r` / `r->` 不检查。
+There are also `try_load_verified_with_resource`, `try_reload_verified_with_resource` and
+`TypedXBuffer<T>::try_load_verified / try_reload_verified`. `XResult::value()` throws when there is
+no value (in no-exception builds it calls the fatal handler); `*r` / `r->` do not check.
 
-### 6.2 关异常构建（`-fno-exceptions`、MSVC `/EHs-c-`）
+### 6.2 No-exception builds (`-fno-exceptions`, MSVC `/EHs-c-`)
 
-整个库可以在关异常的编译选项下使用，面向不开异常的客户端引擎。检测
-`__cpp_exceptions` / `_CPPUNWIND`，也可以用 `-DXOFFSET_NO_EXCEPTIONS=1` 强制。不需要 RTTI。
+The whole library can be used with exceptions disabled, for client engines that do not enable them.
+It detects `__cpp_exceptions` / `_CPPUNWIND`; `-DXOFFSET_NO_EXCEPTIONS=1` forces it. RTTI is not
+required.
 
-- 接收路径（wire 头、extent 表、容量检查、OS 存储预留与拷贝、owner 登记、整图校验、
-  空闲表装载）沿调用链返回第一个失败，由上面的 `try_*` 入口交给调用方。同一条 wire 在
-  开、关异常两种构建里得到同样的结果和同样的错误文字（`tools/no_exceptions_differential.sh`
-  对 20 万条变异 wire 逐条比对）。
-- 其他失败（修改时 arena 空间不足、`root<T>()` 没有根、保存时超过 wire 上限、调用抛出版本
-  的接收入口被拒等）没有调用方可以返回，调用致命处理器后 `abort()`。引擎用
-  `set_fatal_handler(fn)` 接入自己的崩溃上报；`fn(XErrc, const char*)` 不能返回。
-- 宿主 `operator new` 失败按标准库在关异常下的行为终止。
-- 开异常时会从 `XBadAlloc` 恢复的两处，关异常时也是致命的：容器拷贝赋值的整块拷贝
-  （开异常时退回逐元素拷贝）和 `XCompactor::compact` 的倍数重试（2 倍已用空间足够时不会
-  走到）。客户端只接收、读取、做少量修改时不受影响。
-- `receive_raw::validate` 和 `begin_verified_receive` / `finish_verified` 还没有不抛出的
-  版本，关异常时它们的拒绝是致命的；客户端请用 `try_load_verified`、
-  `try_reload_verified` 或 `try_begin_verified_reload`。
-- 库容器的修改在分配失败时保留原有逻辑内容，但容量和分配器记账不一定回滚。多步
-  业务操作不是事务。
+- The receive path (wire header, extent table, capacity checks, OS storage reservation and copy,
+  owner registration, graph validation, free-table loading) returns the first failure up the call
+  chain, and the `try_*` entry points above hand it to the caller. The same wire gives the same
+  result and the same error text in builds with and without exceptions
+  (`tools/no_exceptions_differential.sh` compares 200,000 mutated wires one by one).
+- Other failures (arena out of space while modifying, `root<T>()` with no root, exceeding the wire
+  limit when saving, a rejection in a throwing receive entry point, ...) have no caller to return to;
+  they call the fatal handler and then `abort()`. Engines plug in their own crash reporting with
+  `set_fatal_handler(fn)`; `fn(XErrc, const char*)` must not return.
+- A failing host `operator new` terminates as the standard library does without exceptions.
+- Two places that recover from `XBadAlloc` when exceptions are on are fatal when they are off: the
+  whole-block copy in container copy assignment (with exceptions it falls back to element-by-element
+  copy) and the doubling retry in `XCompactor::compact` (never reached when 2x the used space is
+  enough). Clients that only receive, read and make small edits are not affected.
+- `receive_raw::validate` and `begin_verified_receive` / `finish_verified` have no non-throwing
+  versions yet, so their rejections are fatal without exceptions; clients should use
+  `try_load_verified`, `try_reload_verified` or `try_begin_verified_reload`.
+- When an allocation fails during a library container modification, the original logical content is
+  kept, but capacity and allocator accounting are not necessarily rolled back. Multi-step business
+  operations are not transactions.
 
-## 7. schema 变更
+## 7. Schema changes
 
-3.1.0 及更早版本**不支持 schema 演进**：
+3.1.0 and earlier **do not support schema evolution**:
 
-- wire 头里的 schema 身份必须与读取方类型完全一致。增加、删除、重排或改变任何
-  一个字段，旧 wire 都会被拒绝。
-- 适合收发双方使用同一版本类型定义的场景（同一次构建部署的进程之间）。客户端场景下，
-  任何改了 schema 的服务端更新都必须和客户端同时发版。
-- 需要长期保存或跨版本读取的数据，应保留能读取原版本的程序，自行导出再导入。
+- The schema identity in the wire header must match the reader's type exactly. Adding, removing,
+  reordering or changing any field makes old wires rejected.
+- This fits cases where sender and receiver use the same version of the type definitions (processes
+  deployed from the same build). For clients, any server update that changes the schema must ship
+  together with the clients.
+- For data that is stored long-term or read across versions, keep a program that can read the
+  original version and export and re-import it yourself.
 
-3.2.0 起加入 schema 演进：服务端保存一条版本链，收到旧版本
-的 wire 先按旧版本完整校验再按字段名升级，发给旧客户端时降级后写出；客户端只多一次
-握手。用法、发版规则和代价见 [SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)。wire 格式不变。
-- 不同编译器、不同平台之间的 wire 兼容只在已验证的工具链上成立（见第 8 节 K7）。
-  用 `XOFFSET_PIN_SCHEMA` 固定自己的 schema（[SCHEMA_PINS.md](SCHEMA_PINS.md)），
-  任一构建算出的布局和固定文本不一致时编译失败；它发现布局变化，但不提供演进。
+Since 3.2.0 schema evolution is available: the server keeps a version chain, fully validates a wire
+from an old version against that old version and then upgrades it by field name, and downgrades
+before writing to old clients; the client only adds a handshake. Usage, release rules and costs are
+in [SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md). The wire format is unchanged.
+- Wire compatibility between compilers and platforms holds only on verified toolchains (section 8,
+  K7). Pin your schema with `XOFFSET_PIN_SCHEMA` ([SCHEMA_PINS.md](SCHEMA_PINS.md)): any build whose
+  computed layout differs from the pinned text fails to compile; it detects layout changes but does
+  not provide evolution.
 
-## 8. 核心承诺与 API 稳定性
+## 8. Core guarantees and API stability
 
-版本之间不承诺源码 API 或 ABI 稳定。下面 K0–K9 是核心承诺（整块搬运），后续版本不得回退；
-相关接口如有改名或签名变化，会在 CHANGELOG 中单独列出并给出替代写法。
+Source API and ABI stability between versions are not promised. K0–K9 below are the core guarantees
+(whole-region transfer), and later versions must not regress them; if a related interface is renamed
+or its signature changes, CHANGELOG lists it separately with the replacement.
 
-| # | 承诺 | 接口 / 机制 |
+| # | Guarantee | Interface / mechanism |
 | --- | --- | --- |
-| K0 | 可重定位：payload 里没有任何绝对地址，任何修改之后仍可整块复制到任意地址接着读写；同一进程、跨进程、跨机器搬的是同一份字节。K2、K3、K5 都建立在它上面 | 编译期准入（`is_byte_copy_safe_v`：XOffset 沿用 TypeLayout 的规则，按字段接口递归，凡含裸指针、成员指针、引用和虚表的类型一律拒绝）。两条路径规则相同：服务端的 C++26 构建从反射拿字段，并与 TypeLayout 的判定交叉核对；客户端的 C++20/C++23 构建从 `XOFFSET_RECORD` 字段表拿字段，写不了字段表的联合体和非聚合体类一律不准入。容器头只存相对偏移，根用基址偏移 |
-| K1 | 用普通 C++ 聚合体定义 schema，不用 IDL：服务端（C++26）由反射自动得出布局和指纹，不写样板；客户端（C++20/C++23）每个记录加一行字段表，由编译器证明列全（偏移严格递增 + 聚合初始化元数相符），C++26 构建同时用反射核对字段表，两种构建的 wire 字节相同（第 2.1 节） | `XOFFSET_REGISTER_SCHEMA_NAME`、`XOFFSET_RECORD`、`XOFFSET_RECORD_DERIVED`、`XString`、`XVector`、`XFixedVector`、`XSet`、`XMap` |
-| K2 | 对象直接建在 arena 里，原地读、原地改（含变长修改），空闲块复用 | `XBuffer::create<T>`、`root<T>`、`has_root<T>`、容器的公开成员函数、`maximum_capacity`、`with_growth`、`XGrowPolicy` |
-| K3 | 独立输出：发出的是调用方独占的副本，发完可以继续改 | `save_verified<T>` |
-| K4 | 接收检查分三档（见下）：完整档做全图结构校验，截断、越界、重叠、未铺满、非法值、schema 不符一律拒绝；3.4 加信任档和边界档。增量输入（K9）同样适用。每次发版前对每个接收入口（三档，含增量 apply）跑一轮 ASan fuzz，无发现才发版 | `load_verified<T>`、`XException`、增量 apply |
-| K5 | 接收后接着改、再发出，空闲空间随空洞表带过去，不退化 | 同上 |
-| K6 | schema 指纹精确匹配，不同就拒绝；版本不同的两端走演进握手和转换（E0） | wire 头 `schema_hash` |
-| K7 | 跨编译器、跨平台的对象表示一致 | 用户 schema：`XOFFSET_PIN_SCHEMA`；库自带类型：`tools/sigs/` 签名基线；跨编译器 wire 语料比对（`tools/platform_matrix.sh`） |
-| K8 | 客户端与服务端用同一套库、同一 wire：客户端（iOS、Android、Windows，64 位小端）用字段表后端，按 C++20 用各平台原生编译器构建，能接收、读写、校验、再发（3.2.0 交付，2026-11-04 升为核心承诺） | 字段表后端（`XOFFSET_RECORD`，第 2.1 节）；`tools/native_targets.sh` |
-| K9 | 原生增量同步：程序改完工作状态后只发改过的字节；接收方把增量合并进自己的副本，按链路的档检查后接着读写。整份状态用增量 1.0（`XReceiver<L>::apply_delta`，3.4 起冻结），视口用共享增量（`XReceiver<L>::apply_sync`，3.5 起；4.0 起格式为 XS 2.0，取代 XS 1.0）；schema 版本不同时按握手回落整份 wire。增量 apply 在每次发版前的 ASan fuzz 里（K4）（3.5.0 升为核心承诺） | `apply_delta`、`XDeltaCursor`、`apply_sync`、`xsync::XSyncCursor`（[DELTA_SYNC.md](DELTA_SYNC.md)、[SHARED_DELTA.md](SHARED_DELTA.md)） |
+| K0 | Relocatable: the payload contains no absolute addresses, so after any modification it can be copied as a whole to any address and read and written there; moving within a process, across processes and across machines moves the same bytes. K2, K3 and K5 build on it | Compile-time admission (`is_byte_copy_safe_v`: XOffset follows TypeLayout's rules, recursing over the field interface and rejecting every type that contains raw pointers, member pointers, references or vtables). Both paths apply the same rules: the server's C++26 build gets fields from reflection and cross-checks against TypeLayout's verdict; the client's C++20/C++23 build gets fields from the `XOFFSET_RECORD` field list, and unions and non-aggregate classes, which cannot have a field list, are never admitted. Container headers store only relative offsets, and the root uses a base-relative offset |
+| K1 | Schemas are plain C++ aggregates, no IDL: on the server (C++26) reflection derives layout and fingerprint with no boilerplate; on the client (C++20/C++23) each record adds a one-line field list whose completeness the compiler proves (strictly increasing offsets + matching aggregate-initialization arity); C++26 builds also check the field list against reflection, and both builds produce the same wire bytes (section 2.1) | `XOFFSET_REGISTER_SCHEMA_NAME`, `XOFFSET_RECORD`, `XOFFSET_RECORD_DERIVED`, `XString`, `XVector`, `XFixedVector`, `XSet`, `XMap` |
+| K2 | Objects are built directly in the arena and read and modified in place (including variable-length changes), with free-block reuse | `XBuffer::create<T>`, `root<T>`, `has_root<T>`, the containers' public member functions, `maximum_capacity`, `with_growth`, `XGrowPolicy` |
+| K3 | Independent output: what is sent is a copy owned by the caller, and the sender can keep modifying afterwards | `save_verified<T>` |
+| K4 | Receive checks come in three tiers (below): the full tier validates the whole graph structure and rejects truncation, out-of-bounds, overlap, incomplete tiling, invalid values and schema mismatch; 3.4 added the trusted and bounds tiers. Delta input (K9) is covered the same way. Before every release one round of ASan fuzzing runs against every receive entry point (all three tiers, including delta apply), and the release ships only with no findings | `load_verified<T>`, `XException`, delta apply |
+| K5 | After receiving, keep modifying and send again; free space comes along with the hole table, with no degradation | Same as above |
+| K6 | Schema fingerprints must match exactly and are rejected otherwise; ends on different versions use the evolution handshake and conversion (E0) | Wire header `schema_hash` |
+| K7 | Object representation is consistent across compilers and platforms | User schemas: `XOFFSET_PIN_SCHEMA`; library types: signature baselines in `tools/sigs/`; cross-compiler wire corpus comparison (`tools/platform_matrix.sh`) |
+| K8 | Clients and servers use the same library and the same wire: clients (iOS, Android, Windows, 64-bit little-endian) use the field-list backend, build as C++20 with each platform's native compiler, and can receive, read, write, validate and send again (delivered in 3.2.0, made a core guarantee on 2026-11-04) | Field-list backend (`XOFFSET_RECORD`, section 2.1); `tools/native_targets.sh` |
+| K9 | Native delta sync: after changing its working state a program sends only the changed bytes; the receiver merges the delta into its copy, checks it at the link's tier and keeps reading and writing. Whole state uses delta 1.0 (`XReceiver<L>::apply_delta`, frozen since 3.4), viewports use shared deltas (`XReceiver<L>::apply_sync`, since 3.5; format XS 2.0 since 4.0, replacing XS 1.0); with different schema versions it falls back to whole wires per the handshake. Delta apply is part of the pre-release ASan fuzzing (K4) (core guarantee since 3.5.0) | `apply_delta`, `XDeltaCursor`, `apply_sync`, `xsync::XSyncCursor` ([DELTA_SYNC.md](DELTA_SYNC.md), [SHARED_DELTA.md](SHARED_DELTA.md)) |
 
-K0 的边界：搬的单位是整个区域，不是其中单个对象（容器头禁止拷贝和移动）。正在使用的
-buffer 地址固定（在 VM 预留内增长），只在显式时间点搬：输出、接收、reload、`XCompactor`
-压缩；`XHandle` 用 epoch 在搬动后重新定位。同 ABI、已信任的数据可以用 `load_unverified`
-省掉校验，不可信输入走 K4。
+Scope of K0: the unit that moves is the whole region, not individual objects in it (container
+headers cannot be copied or moved). A buffer in use has a fixed address (it grows within the VM
+reservation) and moves only at explicit points: output, receive, reload, `XCompactor` compaction;
+`XHandle` uses the epoch to relocate after a move. Same-ABI, already-trusted data can skip validation
+with `load_unverified`; untrusted input goes through K4.
 
-接收检查分三档（2026-11-04 定）。3.3.x 及以前只有完整档：`load_verified`、`reload_verified`、增量 apply
-等现有入口都做全图校验。3.4 起整块接收和增量 apply 的信任档由 `XReceiver`（`xoffset_receiver.hpp`）提供，
-3.5 起客户端上行的边界档由 `XReceiver<XLink::from_client>::view` 提供。各链路的默认如下：
+Receive checks have three tiers (decided 2026-11-04). 3.3.x and earlier had only the full tier: all
+existing entry points such as `load_verified`, `reload_verified` and delta apply validate the whole
+graph. Since 3.4 the trusted tier for whole-buffer receive and delta apply is provided by
+`XReceiver` (`xoffset_receiver.hpp`), and since 3.5 the bounds tier for client uplink by
+`XReceiver<XLink::from_client>::view`. The defaults per link are:
 
-| 档 | 默认用在哪 | 查什么 | 收到后能做什么 |
+| Tier | Default for | What it checks | What you can do after receiving |
 | --- | --- | --- | --- |
-| 信任 | 服务端之间、服务端发往客户端、自己写的存档 | wire 头准入（指纹、上限、根偏移）和空洞表边界；跳过图遍历和增量的检查维护 | 直接读写 |
-| 边界 | 客户端发往服务端（`view`） | wire 头准入同上；从根走一遍容器头：每个块在负载内且对齐，size 不超 capacity，堆字符串以 NUL 结尾，内联字符串不超 10 字节，bool 只能是 0 或 1，遍历的元素字节总数不超负载大小。不查块重叠、覆盖、set/map 键序、填充字节 | 就地只读（`XView<T>`，只有 const 访问），不复制 |
-| 完整 | 要原地修改客户端发来的数据时；任何链路都可以显式打开 | 全图结构校验 | 原地读写、再发 |
+| Trusted | Server to server, server to client, your own saved files | Wire header admission (fingerprint, limit, root offset) and hole-table bounds; skips the graph walk and delta check-table maintenance | Read and write directly |
+| Bounds | Client to server (`view`) | Wire header admission as above; one walk of the container headers from the root: every block inside the payload and aligned, size not above capacity, heap strings NUL-terminated, inline strings at most 10 bytes, bools only 0 or 1, total element bytes walked not above the payload size. Does not check block overlap, tiling, set/map key order or padding bytes | Read-only in place (`XView<T>`, const access only), no copy |
+| Full | When modifying data sent by clients in place; can be turned on explicitly on any link | Full graph structure validation | Read and write in place, send again |
 
-信任档的前提是发送方是自己的同构建服务，链路有 TLS、mTLS 或在内网；它不是不可信输入的入口。调试和
-sanitizer 构建里信任档照样做完整校验。客户端发来的数据是不可信输入：边界档只保证读取不越界，数据只读
-使用；要原地修改时走完整档。客户端也是自己的代码、链路受保护的部署可以用 `-DXOFFSET_CHECK_UPLINK=0` 编译，
-让客户端链路也默认信任档（SLG 上行指令的接收少 9.6% 的指令）；对外服务端不要这样编译。
+The trusted tier assumes the sender is your own service from the same build and the link has TLS or
+mTLS or is on an internal network; it is not an entry point for untrusted input. Debug and sanitizer
+builds still run full validation in the trusted tier. Data sent by clients is untrusted input: the
+bounds tier only guarantees that reads stay in bounds, and the data is used read-only; to modify it
+in place, use the full tier. A deployment whose clients are also its own code over a protected link
+can build with `-DXOFFSET_CHECK_UPLINK=0`, so that the client link defaults to the trusted tier too
+(receiving an SLG uplink order takes 9.6% fewer instructions); do not build a server that faces
+outside clients that way.
 
 ```cpp
 #include "xoffset_receiver.hpp"
 
-// 接收器按连接类型建，档位由类型决定；没有全局开关，XBuffer 上也没有 trusted 成员。
-XReceiver<XLink::from_server> rx(XBuffer::maximum_capacity(16 << 20));   // 客户端收服务端
-XStatus st = rx.reload<Profile>(held, wire);        // 信任档：解析 wire 头和表、复制、装空闲表，不遍历对象图
-XStatus full = rx.reload<Profile, XCheck::full>(held, wire);   // 同一链路显式完整校验
-auto fresh = rx.load<Profile>(wire);                // 新建 buffer（每次新映射，热路径用 reload）
-XDeltaCursor cur;                                   // held 跟着哪条增量流
-XStatus d = rx.apply_delta<Profile>(held, delta, cur);   // 信任档增量：只查格式、流和版本、块和空洞的边界
+// Receivers are built per connection type, and the type decides the tier; there is no global switch and no trusted member on XBuffer.
+XReceiver<XLink::from_server> rx(XBuffer::maximum_capacity(16 << 20));   // client receiving from the server
+XStatus st = rx.reload<Profile>(held, wire);        // trusted tier: parse header and tables, copy, load the free table, no graph walk
+XStatus full = rx.reload<Profile, XCheck::full>(held, wire);   // explicit full validation on the same link
+auto fresh = rx.load<Profile>(wire);                // new buffer (a new mapping each time; use reload on hot paths)
+XDeltaCursor cur;                                   // which delta stream held follows
+XStatus d = rx.apply_delta<Profile>(held, delta, cur);   // trusted-tier delta: checks only format, stream and version, block and hole bounds
 
-XReceiver<XLink::from_client> up(XBuffer::maximum_capacity(64 << 10));   // 服务端收客户端
-if (auto v = up.view<Order>(wire)) {                // 边界档：就地只读，不复制
-    const Order& o = v->root();                     // 只有 const 访问，写操作编译不过
-    apply_order(world, o);                          // 读出需要的字段，写进服务端自己的状态
+XReceiver<XLink::from_client> up(XBuffer::maximum_capacity(64 << 10));   // server receiving from a client
+if (auto v = up.view<Order>(wire)) {                // bounds tier: read-only in place, no copy
+    const Order& o = v->root();                     // const access only; writes do not compile
+    apply_order(world, o);                          // read the fields you need and write them into the server's own state
 }
-(void)up.reload<Profile>(state, wire);              // 要保留并修改客户端的整份数据：只能完整档；写 XCheck::admit 编译不过
+(void)up.reload<Profile>(state, wire);              // keeping and modifying a client's whole data: full tier only; XCheck::admit does not compile
 ```
 
-`view` 的前提：wire 是稠密的（没有 extent 表；4 KiB 以下的 wire 总是稠密的，更大的用
-`XSaveOptions{XWireEmission::dense}` 发），字节从 8 字节边界开始，并且在用完视图之前不被改动或释放。稀疏
-wire 和没对齐的字节返回 `XErrc::invalid_argument`。边界档的结果可能是垃圾值（例如两个容器共用一个块、
-set 的键乱序时查找会找不到），但任何 const 访问都不会读出 wire 之外；块可以重叠，所以遍历按负载大小
-限总量，一条小消息不能让遍历反复走同一个大块。可信链路上 `view` 默认信任档（只查 wire 头和根在负载内），
-也可以显式写 `view<T, XCheck::bounds>`。`XOFFSET_FORCE_FULL_CHECK=1` 时 `view` 另外在一份拷贝上跑完整校验，
-完整档拒绝的也拒绝。
+Preconditions of `view`: the wire is dense (no extent table; wires under 4 KiB are always dense, send
+larger ones with `XSaveOptions{XWireEmission::dense}`), the bytes start on an 8-byte boundary, and
+they are not changed or freed until you are done with the view. Sparse wires and misaligned bytes
+return `XErrc::invalid_argument`. Bounds-tier results may be garbage (for example when two containers
+share a block, or set keys are out of order and lookups miss), but no const access reads outside the
+wire; since blocks may overlap, the walk is capped in total by the payload size, so a small message
+cannot make the walk revisit the same large block over and over. On trusted links `view` defaults to
+the trusted tier (only the wire header and that the root is inside the payload are checked); you can
+also write `view<T, XCheck::bounds>` explicitly. With `XOFFSET_FORCE_FULL_CHECK=1`, `view` also runs
+full validation on a copy and rejects whatever the full tier rejects.
 
-信任档接受任何 V2 wire（`save_verified` 的各种 emission、`save_compact`），结果和完整档一样可以原地读写、
-再发。增量的信任档不建、不维护检查表（docs/DELTA_SYNC.md 第 3 节），同一个游标之后若改走完整档，第一次会
-整块校验一遍再重建检查表。`XOFFSET_FORCE_FULL_CHECK=1` 让信任档改走完整校验：没有 `NDEBUG` 的构建和 ASan、TSan 构建默认如此，
-发布构建可以手动打开做压测或灰度。
+The trusted tier accepts any V2 wire (every `save_verified` emission, `save_compact`), and as with the
+full tier the result can be read and written in place and sent again. The trusted tier for deltas does
+not build or maintain a check table (docs/DELTA_SYNC.md section 3); if the same cursor later switches
+to the full tier, the first full delta validates the whole buffer once and rebuilds the check table.
+`XOFFSET_FORCE_FULL_CHECK=1` makes the trusted tier run full validation: this is the default in builds
+without `NDEBUG` and in ASan and TSan builds, and release builds can turn it on by hand for stress
+tests or staged rollouts.
 
-K7 的现状：
+Status of K7:
 
-- **用户 schema**：`XOFFSET_PIN_SCHEMA` 把类型的 wire 布局固定成一段签名文本，每个包含
-  固定文件的构建都由它自己的编译器求值，不一致就编译失败（[SCHEMA_PINS.md](SCHEMA_PINS.md)，
-  CTest `schema_pin_mismatch` 确认确实会失败）。服务端的 GCC 16、P2996 Clang 如此；客户端的
-  字段表构建不需要反射，同一份 pin 也由原生编译器求值，NDK r29/r30 Clang、MSVC 19.44、
-  clang-cl 19、MinGW GCC 13 和 Apple clang（iOS、macOS）的全量 CTest 都包含这项检查。
-- **库自带类型**：x86-64 Linux、x86-64 Windows、arm64 iOS、arm64 Android 四个目标的签名
-  基线在 `tools/sigs/`，在 CTest 里核对（`check_compat`、
-  `check_signature_regeneration`）。
-- **跨编译器 wire**：3.1.0 RC 的本地平台矩阵里，Linux x86-64（GCC 16、P2996）、
-  Linux arm64（GCC 16、P2996）和 Windows x64（MinGW-w64 GCC 16）写出的 2.1 语料逐字节
-  一致，互相接受。字段表构建合入后（3.2.0 起），Android arm64（NDK r29/r30）和
-  Windows x64（MSVC 19.44 的 C++20 与 C++23、clang-cl 19、MinGW GCC 13）、macOS arm64 和
-  iOS 模拟器（Apple clang）都读入服务端 C++26 反射构建写出的参照语料并全部接受，写出的语料
-  与它逐字节一致（[CLIENT_TARGETS.md](CLIENT_TARGETS.md)）。3.2.0 起，在不同平台上含义不同的
-  schema（按普通 `char` 排序的键、没有固定底层类型的 enum）编译期就被拒绝（第 2.2 节）。
-- **边界**：只覆盖跑过上面检查的工具链。真机：3.2.0-rc.1 在一台 Android 11 手机上通过；
-  一台 iPhone 15 Pro Max（iOS 26.6.2）上 CTest 和 24 个参照 wire 都通过（[DEVICE_TESTING.md](DEVICE_TESTING.md) 第 9 节）。库自带类型的签名基线目前只在 CTest 里核对，不会让用户构建失败；目标是为用户
-  schema 导出签名、不一致时构建失败，并把 GCC 16 并入同一门禁（实现中）。
+- **User schemas**: `XOFFSET_PIN_SCHEMA` pins a type's wire layout as signature text; every build that
+  includes the pin file evaluates it with its own compiler and fails to compile on a mismatch
+  ([SCHEMA_PINS.md](SCHEMA_PINS.md); CTest `schema_pin_mismatch` confirms that it really fails). This
+  holds for the server's GCC 16 and P2996 Clang; the client's field-list builds need no reflection,
+  and the same pin is evaluated by the native compilers: full CTest runs on NDK r29/r30 Clang,
+  MSVC 19.44, clang-cl 19, MinGW GCC 13 and Apple clang (iOS, macOS) all include this check.
+- **Library types**: signature baselines for four targets (x86-64 Linux, x86-64 Windows, arm64 iOS,
+  arm64 Android) are in `tools/sigs/` and checked in CTest (`check_compat`,
+  `check_signature_regeneration`).
+- **Cross-compiler wires**: in the 3.1.0 RC local platform matrix, the 2.1 corpora written by Linux
+  x86-64 (GCC 16, P2996), Linux arm64 (GCC 16, P2996) and Windows x64 (MinGW-w64 GCC 16) were
+  byte-identical and accepted by each other. Since the field-list build landed (3.2.0), Android arm64
+  (NDK r29/r30), Windows x64 (MSVC 19.44 C++20 and C++23, clang-cl 19, MinGW GCC 13), macOS arm64 and
+  the iOS simulator (Apple clang) all read and accept the reference corpus written by the server's
+  C++26 reflection build, and the corpora they write are byte-identical to it
+  ([CLIENT_TARGETS.md](CLIENT_TARGETS.md)). Since 3.2.0, schemas that mean different things on
+  different platforms (keys ordered by plain `char`, enums without a fixed underlying type) are
+  rejected at compile time (section 2.2).
+- **Boundary**: only toolchains that ran the checks above are covered. Real devices: 3.2.0-rc.1 passed
+  on one Android 11 phone; on one iPhone 15 Pro Max (iOS 26.6.2) CTest and all 24 reference wires
+  passed ([DEVICE_TESTING.md](DEVICE_TESTING.md) section 9). The library-type signature baselines are
+  currently checked only in CTest and do not fail user builds; the goal is to export signatures for
+  user schemas, fail the build on a mismatch, and bring GCC 16 into the same gate (in progress).
 
-K4 的前提：接收方必须设置 `maximum_capacity`。否则发送方可以发接近 payload 上限
-（约 2 GiB）的数据，让接收方复制并做全图校验，造成资源耗尽。默认上限建议见
-[DEPLOYMENT.md](DEPLOYMENT.md) 第 5 节。
+Precondition of K4: the receiver must set `maximum_capacity`. Otherwise a sender can send data close
+to the payload limit (about 2 GiB) and make the receiver copy and fully validate it, exhausting
+resources. Suggested default limits are in [DEPLOYMENT.md](DEPLOYMENT.md) section 5.
 
-校验的承诺边界：对不可信输入（客户端上行），边界档保证读取不越界，完整档才保证结构合法和 schema 一致；
-任何档都**不保证内容完整性**。
-只改动某个标量字段值的数据会被接受，因此不能把校验当作防篡改手段。
+Boundary of the validation guarantee: for untrusted input (client uplink), the bounds tier guarantees
+that reads stay in bounds, and only the full tier guarantees a legal structure and a matching schema;
+no tier **guarantees content integrity**. Data in which only a scalar field value was changed is
+accepted, so validation is not a way to detect tampering.
 
-K8 的现状（4.0.0）：客户端用字段表后端（第 2.1 节），按 C++20 用各平台原生编译器构建（Apple clang、
-Android NDK Clang、Windows 编译器），服务端照旧用 C++26 反射。Windows（MSVC 19.44、clang-cl 19、MinGW）
-和 Android（NDK r29/r30，云端 qemu-aarch64 运行）在 4.0.0 上全量 CTest 都通过，语料与服务端逐字节一致；macOS 和 iOS 模拟器（Apple clang，部署目标 macOS 14.0 /
-iOS 17.0）的同样结果来自 3.3.0，4.0.0 没有重跑（逐目标的数字见
-[CLIENT_TARGETS.md](CLIENT_TARGETS.md)）。真机（3.2.x，4.0.0 没有重跑）：iPhone 15 Pro Max（iOS 26.6.2）
-CTest 138/138、语料逐字节一致、demo 通过；3.2.0-rc.1 在一台 Android 11 手机上功能全部通过。
-保证的范围：三个客户端目标都原生构建、CTest 通过，跨目标 wire 语料一致，签名与 `tools/sigs/` 基线一致；
-iOS 的地址空间和最低部署目标（系统 libc++ 的 `std::pmr` 在 macOS 14 / iOS 17 以下加载失败）见
-[DEPLOYMENT.md](DEPLOYMENT.md)。客户端在手机上的速度数字等真机复核后再对外宣传（Android 还没有计时）。
-3.1.0 没有这条构建路径：Android、iOS 和 MSVC 编不了。
+Status of K8 (4.0.0): clients use the field-list backend (section 2.1) and build as C++20 with each
+platform's native compiler (Apple clang, Android NDK Clang, Windows compilers); the server still uses
+C++26 reflection. Windows (MSVC 19.44, clang-cl 19, MinGW) and Android (NDK r29/r30, run under cloud
+qemu-aarch64) pass full CTest on 4.0.0 with corpora byte-identical to the server's; the same results
+for macOS and the iOS simulator (Apple clang, deployment target macOS 14.0 / iOS 17.0) come from 3.3.0
+and were not re-run for 4.0.0 (per-target numbers in [CLIENT_TARGETS.md](CLIENT_TARGETS.md)). Real
+devices (3.2.x, not re-run for 4.0.0): iPhone 15 Pro Max (iOS 26.6.2) CTest 138/138, corpus
+byte-identical, demo passed; 3.2.0-rc.1 passed every functional check on one Android 11 phone.
+Scope of the guarantee: all three client targets build natively and pass CTest, the cross-target wire
+corpora match, and signatures match the `tools/sigs/` baselines; iOS address space and the minimum
+deployment target (the system libc++ `std::pmr` fails to load below macOS 14 / iOS 17) are in
+[DEPLOYMENT.md](DEPLOYMENT.md). Client speed numbers on phones will be published only after a
+real-device review (Android has no timing yet). 3.1.0 has no such build path: Android, iOS and MSVC
+cannot build it.
 
-K9 的现状（3.5.0 起为核心承诺）：整份状态的增量（格式 1.0，3.4.0 冻结）和视口的共享增量（3.5.0 起 XS 1.0，4.0 起 XS 2.0）
-都有拒绝用例、随机流测试和逐字节的金标准测试（[STABILITY_TESTS.md](STABILITY_TESTS.md)）；两种增量的 apply 都在发版前
-ASan fuzz 的目标里（`fuzz_delta_sync`、`fuzz_shared_delta`，服务端和客户端两种构建），3.5.0、3.6.0 和 4.0.0 在发版前各跑过一轮、
-没有发现；地图 demo 端到端用原生增量。schema 版本不同的两端不发增量：连接时握手答 `convert` 就发转换后的整份
-wire（DELTA_SYNC.md 第 5 节）。性能只报：Mac SLG340 上客户端原生增量 NP 对 zpp_bits 0.766；服务端逐客户端原生增量
-（非产品路径，视口走共享增量）仍慢于对手，见 [PERFORMANCE.md](PERFORMANCE.md)。
+Status of K9 (core guarantee since 3.5.0): whole-state deltas (format 1.0, frozen in 3.4.0) and
+viewport shared deltas (XS 1.0 since 3.5.0, XS 2.0 since 4.0) both have rejection cases, random
+stream tests and byte-exact golden tests ([STABILITY_TESTS.md](STABILITY_TESTS.md)); the apply of both
+kinds of delta is among the pre-release ASan fuzz targets (`fuzz_delta_sync`, `fuzz_shared_delta`, in
+both server and client builds), and 3.5.0, 3.6.0 and 4.0.0 each ran one round before release with no
+findings; the map demo uses native deltas end to end. Ends with different schema versions do not send
+deltas: when the handshake on connect answers `convert`, the converted whole wire is sent
+(DELTA_SYNC.md section 5). Performance is report-only: on the Mac SLG340 the client native delta NP
+against zpp_bits is 0.766; server per-client native deltas (not a product path; viewports use shared
+deltas) are still slower than the rivals, see [PERFORMANCE.md](PERFORMANCE.md).
 
-以下接口提供但属于可选或实验性质，可能在后续版本中改变：
+The following interfaces are provided but optional or experimental and may change in later versions:
 
-| # | 接口 | 说明 |
+| # | Interface | Notes |
 | --- | --- | --- |
-| E0 | schema 演进：`xoffset_evolution.hpp`（版本链、`evolve_load_verified`、`XPeerSchemas` 握手）、freeze 工具 | 版本不同的两端互通（3.2.0 起，[SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)）；转换在服务端，客户端不含转换代码 |
-| E1 | `freeze_verified`、`begin_verified_receive` / `finish_verified` | 冻结的快照按段交给发送调用（不先拼成 wire 串）、接收直接读进最终 arena；两端仍各拷贝一次，不是零拷贝 |
-| E2 | `save_verified_into`、`TypedXBuffer<T>` | `TypedXBuffer<T>` 是第 3 节的推荐写法；两者的形状可能还会调整 |
-| E3 | `XBufferPool`、预留与增长策略细节、`XStorage` / `storage_kind()`、`SLOT_MAX`、`trim_slot_storage` | 小 buffer 高频场景 |
-| E4 | `load_unverified` | 只用于调用方已信任的数据 |
-| E5 | `XCompactor` | 同类型压缩整理 |
-| E6 | `xoffset_fixed_message.hpp`（定长消息，4.4 节） | 不经 XBuffer 收发定长记录 |
+| E0 | Schema evolution: `xoffset_evolution.hpp` (version chain, `evolve_load_verified`, `XPeerSchemas` handshake), freeze tool | Interop between ends on different versions (since 3.2.0, [SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)); conversion runs on the server, clients contain no conversion code |
+| E1 | `freeze_verified`, `begin_verified_receive` / `finish_verified` | A frozen snapshot is handed to the send call in segments (without first concatenating a wire string), and receive reads straight into the final arena; each end still copies once, not zero-copy |
+| E2 | `save_verified_into`, `TypedXBuffer<T>` | `TypedXBuffer<T>` is the recommended pattern of section 3; the shape of both may still change |
+| E3 | `XBufferPool`, reservation and growth policy details, `XStorage` / `storage_kind()`, `SLOT_MAX`, `trim_slot_storage` | High-frequency small buffers |
+| E4 | `load_unverified` | Only for data the caller already trusts |
+| E5 | `XCompactor` | Same-type compaction |
+| E6 | `xoffset_fixed_message.hpp` (fixed-size messages, section 4.4) | Send and receive fixed-size records without XBuffer |
 
-`XHandle`、诊断与统计接口、`XBufferCore` 的底层成员不属于承诺范围。
+`XHandle`, diagnostic and statistics interfaces, and the low-level members of `XBufferCore` are not
+covered by the guarantees.
 
-## 9. 性能数据的口径
+## 9. How performance numbers are measured
 
-正式计时只来自一台 Apple M4、一个游戏服务器负载（`bench/slg`），六家在同一进程里对比
-zpp_bits、cista、cereal、protobuf、FlatBuffers；每个版本的数字、测法和局限见
-[PERFORMANCE.md](PERFORMANCE.md)。引用时请同时说明机器、负载和适配写法；
-没有 Linux 或 Windows 的正式计时结论（云端 x86-64 的只报数字见 PERFORMANCE.md 第 6 节）。第 3 节那组云端比例（GCC 16，Linux 虚拟机）只用来
-说明声明普通记录的量级，不是正式测量。
+Formal timing comes from one Apple M4 and one game server workload (`bench/slg`), comparing six
+formats in one process: zpp_bits, cista, cereal, protobuf, FlatBuffers; the numbers, methods and
+limits per release are in [PERFORMANCE.md](PERFORMANCE.md). When quoting, also state the machine,
+the workload and the adapter style; there are no formal timing conclusions for Linux or Windows
+(cloud x86-64 numbers are report-only, see PERFORMANCE.md section 6). The set of cloud ratios in
+section 3 (GCC 16, Linux VM) only illustrates the order of magnitude of declaring ordinary records;
+it is not a formal measurement.

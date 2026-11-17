@@ -2,8 +2,8 @@
 
 A trading state service built on a real Nasdaq feed, once with XOffset and
 once with each format an HFT reader would compare it with. It measures the
-four claims of the HFT demo design (Claude doc "高频交易数据协议调研与对比
-demo 设计"):
+four claims of the HFT demo design (Claude doc "HFT data protocol survey, comparison and
+demo design"):
 
 | Claim | What is measured here |
 | --- | --- |

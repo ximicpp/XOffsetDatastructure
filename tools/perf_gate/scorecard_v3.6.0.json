@@ -1,7 +1,7 @@
 {
  "cells": [
   {
-   "group": "服务端之间",
+   "group": "server to server",
    "cell": "A",
    "kind": "main",
    "best": "zpp_bits",
@@ -25,7 +25,7 @@
    }
   },
   {
-   "group": "服务端之间",
+   "group": "server to server",
    "cell": "B",
    "kind": "main",
    "best": "cista_unchecked",
@@ -49,7 +49,7 @@
    }
   },
   {
-   "group": "服务端之间",
+   "group": "server to server",
    "cell": "S",
    "kind": "main",
    "best": "cista_unchecked",
@@ -73,7 +73,7 @@
    }
   },
   {
-   "group": "服务端之间",
+   "group": "server to server",
    "cell": "SD",
    "kind": "main",
    "best": "cista_unchecked",
@@ -97,7 +97,7 @@
    }
   },
   {
-   "group": "服务端发送",
+   "group": "server send",
    "cell": "L.send",
    "kind": "main",
    "best": "zpp_bits",
@@ -121,7 +121,7 @@
    }
   },
   {
-   "group": "服务端发送",
+   "group": "server send",
    "cell": "EB.send",
    "kind": "main",
    "best": "zpp_bits",
@@ -145,7 +145,7 @@
    }
   },
   {
-   "group": "服务端发送",
+   "group": "server send",
    "cell": "LD.send",
    "kind": "main",
    "best": "zpp_bits",
@@ -169,7 +169,7 @@
    }
   },
   {
-   "group": "服务端发送",
+   "group": "server send",
    "cell": "UP.send",
    "kind": "main",
    "best": "zpp_bits",
@@ -193,7 +193,7 @@
    }
   },
   {
-   "group": "服务端发送",
+   "group": "server send",
    "cell": "UC.send",
    "kind": "main",
    "best": "zpp_bits",
@@ -217,7 +217,7 @@
    }
   },
   {
-   "group": "服务端发送",
+   "group": "server send",
    "cell": "DP",
    "kind": "main",
    "best": "zpp_bits",
@@ -241,7 +241,7 @@
    }
   },
   {
-   "group": "服务端发送",
+   "group": "server send",
    "cell": "DC",
    "kind": "main",
    "best": "zpp_bits",
@@ -265,7 +265,7 @@
    }
   },
   {
-   "group": "客户端接收",
+   "group": "client receive",
    "cell": "L.recv",
    "kind": "main",
    "best": "zpp_bits",
@@ -289,7 +289,7 @@
    }
   },
   {
-   "group": "客户端接收",
+   "group": "client receive",
    "cell": "EBW.recv",
    "kind": "main",
    "best": "cista_unchecked",
@@ -313,7 +313,7 @@
    }
   },
   {
-   "group": "客户端接收",
+   "group": "client receive",
    "cell": "LDW.recv",
    "kind": "main",
    "best": "cista_unchecked",
@@ -337,7 +337,7 @@
    }
   },
   {
-   "group": "客户端接收",
+   "group": "client receive",
    "cell": "UPW.recv",
    "kind": "main",
    "best": "cista_unchecked",
@@ -361,7 +361,7 @@
    }
   },
   {
-   "group": "客户端接收",
+   "group": "client receive",
    "cell": "UCW.recv",
    "kind": "main",
    "best": "cista_unchecked",
@@ -385,7 +385,7 @@
    }
   },
   {
-   "group": "客户端接收",
+   "group": "client receive",
    "cell": "DPTW.recv",
    "kind": "main",
    "best": "cista_unchecked",
@@ -409,7 +409,7 @@
    }
   },
   {
-   "group": "客户端接收",
+   "group": "client receive",
    "cell": "DCTW.recv",
    "kind": "main",
    "best": "cista_unchecked",
@@ -433,7 +433,7 @@
    }
   },
   {
-   "group": "上行",
+   "group": "uplink",
    "cell": "UL.recv",
    "kind": "main",
    "best": "zpp_bits",
@@ -457,7 +457,7 @@
    }
   },
   {
-   "group": "上行",
+   "group": "uplink",
    "cell": "UL.send",
    "kind": "report",
    "best": "zpp_bits",
@@ -481,7 +481,7 @@
    }
   },
   {
-   "group": "只报",
+   "group": "report only",
    "cell": "US.send",
    "kind": "report",
    "best": "zpp_bits",
@@ -505,7 +505,7 @@
    }
   },
   {
-   "group": "只报",
+   "group": "report only",
    "cell": "DS",
    "kind": "report",
    "best": "zpp_bits",
@@ -529,7 +529,7 @@
    }
   },
   {
-   "group": "只报",
+   "group": "report only",
    "cell": "USW.recv",
    "kind": "report",
    "best": "cista_unchecked",
@@ -553,7 +553,7 @@
    }
   },
   {
-   "group": "只报",
+   "group": "report only",
    "cell": "DSTW.recv",
    "kind": "report",
    "best": "cista_unchecked",
@@ -577,7 +577,7 @@
    }
   },
   {
-   "group": "只报",
+   "group": "report only",
    "cell": "EB.recv",
    "kind": "report",
    "best": "cista_unchecked",
@@ -601,7 +601,7 @@
    }
   },
   {
-   "group": "只报",
+   "group": "report only",
    "cell": "LD recv+apply",
    "kind": "report",
    "best": "cista_unchecked",
@@ -625,7 +625,7 @@
    }
   },
   {
-   "group": "只报",
+   "group": "report only",
    "cell": "UP recv+apply",
    "kind": "report",
    "best": "zpp_bits",
@@ -649,7 +649,7 @@
    }
   },
   {
-   "group": "只报",
+   "group": "report only",
    "cell": "UC recv+apply",
    "kind": "report",
    "best": "cista_unchecked",
@@ -681,7 +681,7 @@
  },
  "bytes": [
   {
-   "label": "A 请求",
+   "label": "A request",
    "xo_key": "A.req",
    "rival_key": "A.req",
    "xo": 586340.0,
@@ -691,7 +691,7 @@
    }
   },
   {
-   "label": "A 结果",
+   "label": "A result",
    "xo_key": "A.res",
    "rival_key": "A.res",
    "xo": 744936.0,
@@ -701,7 +701,7 @@
    }
   },
   {
-   "label": "B 迁服",
+   "label": "B migration",
    "xo_key": "B.out",
    "rival_key": "B.out",
    "xo": 3357584.0,
@@ -711,7 +711,7 @@
    }
   },
   {
-   "label": "S 存盘",
+   "label": "S save",
    "xo_key": "S.player",
    "rival_key": "S.player",
    "xo": 3345596.0,
@@ -721,7 +721,7 @@
    }
   },
   {
-   "label": "SD 增量存盘",
+   "label": "SD delta save",
    "xo_key": "SD.modules",
    "rival_key": "SD.modules",
    "xo": 1077448.0,
@@ -731,7 +731,7 @@
    }
   },
   {
-   "label": "L 登录",
+   "label": "L login",
    "xo_key": "L.player_zstd",
    "rival_key": "L.player_zstd",
    "xo": 210581.5,
@@ -741,7 +741,7 @@
    }
   },
   {
-   "label": "EB 浏览",
+   "label": "EB browse",
    "xo_key": "EB.window_zstd",
    "rival_key": "EB.window_zstd",
    "xo": 119795995.0,
@@ -751,7 +751,7 @@
    }
   },
   {
-   "label": "LD 自身增量",
+   "label": "LD own delta",
    "xo_key": "LD.patch_zstd",
    "rival_key": "LD.patch_zstd",
    "xo": 337870.5,
@@ -761,7 +761,7 @@
    }
   },
   {
-   "label": "UP 视野和平",
+   "label": "UP view peace",
    "xo_key": "UP.delta_zstd",
    "rival_key": "UP.delta_zstd",
    "xo": 1086986.5,
@@ -771,7 +771,7 @@
    }
   },
   {
-   "label": "UC 视野冲突",
+   "label": "UC view conflict",
    "xo_key": "UC.delta_zstd",
    "rival_key": "UC.delta_zstd",
    "xo": 7531022.0,
@@ -781,7 +781,7 @@
    }
   },
   {
-   "label": "DP 共享和平 ÷ 对手 UP",
+   "label": "DP shared peace ÷ rival UP",
    "xo_key": "DP.delta_zstd",
    "rival_key": "UP.delta_zstd",
    "xo": 453310.5,
@@ -791,7 +791,7 @@
    }
   },
   {
-   "label": "DC 共享冲突 ÷ 对手 UC",
+   "label": "DC shared conflict ÷ rival UC",
    "xo_key": "DC.delta_zstd",
    "rival_key": "UC.delta_zstd",
    "xo": 1446062.5,
@@ -801,7 +801,7 @@
    }
   },
   {
-   "label": "UL 上行指令",
+   "label": "UL uplink orders",
    "xo_key": "UL.order_zstd",
    "rival_key": "UL.order_zstd",
    "xo": 107670.0,

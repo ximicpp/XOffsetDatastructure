@@ -1,0 +1,6 @@
+g++ (GCC) 16.2.0
+libcapnp-dev:amd64	1.1.0-2
+libflatbuffers-dev:amd64	23.5.26+dfsg-4
+libmsgpack-cxx-dev:amd64	7.0.0-1+b1
+libprotobuf-dev:amd64	3.21.12-11+deb13u1
+libzstd-dev:amd64	1.5.7+dfsg-1

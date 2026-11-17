@@ -38,6 +38,45 @@
   unchanged. `test_receiver` and `test_receiver_view` are built a second time
   with the switch off (`*_uplink_unchecked`); the fuzz harness names
   `XCheck::bounds` on the client link, so it tests the walk in either build.
+- `XVector` growth, for the read/write loop of the CppCon 2024 comparison
+  (2024 layout: four times per iteration it appends an equipment record with
+  8 float attributes and removes it). An empty vector's first block now holds
+  4 elements and at least 32 bytes (`max(4, 32 / sizeof(T))` elements): 8
+  floats or 32-bit ids instead of 4, 32 bytes instead of 4. The 16-byte first
+  block of a `float` vector was outgrown by its fifth element, which cost a
+  second allocation, a copy and a retirement per vector. A vector grown by
+  `push_back` / `emplace_back` that ends with 1 to 4 such scalars takes 16
+  bytes more than before (24 more for 1- and 2-byte elements); `reserve()`
+  and the range assignments size their block exactly, as before, and the
+  wire format is unchanged. `push_back` of a value of at most 16 bytes into a
+  full vector grows and stores without the staged copy and insert checks of
+  the general path. Instructions per loop iteration (GCC 16.2, callgrind):
+  2024 layout 3489 -> 2187; tuned layout unchanged (813). Timing, 15
+  alternating process pairs on the fair case: 2024 layout 202.6 -> 143.5 ns
+  (XOffset ÷ cista 0.84 / 0.80 -> 0.61 / 0.55, ÷ Protocol Buffers 0.35 ->
+  0.24), tuned layout 61.3 -> 60.4 ns (unchanged). Send + receive of the 2024
+  layout also drops, 102.7 -> 83.2 ns (1445 -> 994 instructions): the sent
+  state no longer carries the retired 16-byte first blocks, and its wire is
+  48 bytes smaller (3,112 -> 3,064). Results in
+  `bench/cppcon2024/results/2026-11-17-first-block/`; README tables updated.
+  Golden wire pins in `tests/test_v2_golden.cpp` move by 16 bytes each (block
+  placement, not the format).
+- Repository is English only (susu 2026-11-17): `README.zh-CN.md` removed;
+  current documents under `docs/` translated into English; large frozen
+  historical evidence written in Chinese (`docs/validation/vm-final/`,
+  `docs/handoff-history/`, older `docs/perf/` run notes) removed, retrievable
+  from commit 837c9d4 (see `docs/ARCHIVED_EVIDENCE.md`). Comments, strings and
+  tool output in code translated too; `tools/check_no_cjk.py`, run by the
+  `meta` step of `tools/local_validate.sh` (every tier), fails when CJK
+  characters come back in tracked text files.
+- CppCon 2024 bench made fairer (susu 2026-11-17): Protocol Buffers now frees
+  removed equipment and waypoint messages (`DeleteSubrange`) like every other
+  library; its default `RemoveLast` reuse is a report-only row. The item key
+  is new every iteration (was a 1024-entry ring, which let the branch predictor
+  learn the std / cista binary searches). Read/write, XOffset ÷ rival: 2024
+  layout cista 0.92 / 0.82, Protocol Buffers 0.38; tuned cista 0.94 / 0.90,
+  Protocol Buffers 0.18. Results in `bench/cppcon2024/results/2026-11-17-fair/`;
+  README tables updated. Bench and docs only.
 - README rewritten as an introduction: core features, a server/client
   example (compiled and run with GCC 13 C++20), how the arena, offsets, wire
   and check tiers work, and the current comparisons (CppCon 2024 `Character`
@@ -187,7 +226,7 @@ fell in the 1.02-1.08 band and were re-judged over three code layouts
   tracker and holder-count rule as XOffset's D3), and the diagnostic format
   `zpp_bits_dirty` the dirty-mask variant. `scorecard.py` scores the D cells
   against the rival's strongest approach (per-client `U*` or the shared `D*`
-  rows, column "zpp_bits 共享"); `repro_scorecard.sh` runs the shared rivals'
+  rows, column "zpp_bits shared"); `repro_scorecard.sh` runs the shared rivals'
   `SLG_D3=1` processes (`SHARED`, skipped for an older ref).
 - UL.send (client uplink send) is report-only; the 1.80 ceiling is gone.
 - `tools/perf_gate/x86_columns.sh D3=1` produced no D rows (its D3 processes

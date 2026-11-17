@@ -19,7 +19,7 @@ the point estimate is the geometric mean over batches. The D cells pair
 XOffset's D* rows (d3 processes) with every approach a rival has (susu, 4.0
 plan: scored against the rival's strongest approach): each rival's per-client
 U* rows (main processes), and each shared-encoding rival's own D* rows (its d3
-processes, the same keys as XOffset's; column "<format> 共享"). A run without
+processes, the same keys as XOffset's; column "<format> shared"). A run without
 a rival's d3 processes (an older tree) scores the D cells against U* only.
 
 Per cell the scorecard names the strongest rival (the one XOffset is slowest
@@ -45,46 +45,46 @@ SD_KEYS = ["SD.save_encode", "SD.store_recv"]
 
 # (group, name, label, xo tag kind, xo keys, rival keys, kind). kind: main | report.
 CELLS = [
-    ("服务端之间", "A", "战斗请求和结果", "main", A_KEYS, A_KEYS, "main"),
-    ("服务端之间", "B", "迁服", "main", B_KEYS, B_KEYS, "main"),
-    ("服务端之间", "S", "存盘和读盘", "main", S_KEYS, S_KEYS, "main"),
-    ("服务端之间", "SD", "增量存盘", "main", SD_KEYS, SD_KEYS, "main"),
-    ("服务端发送", "L.send", "登录全量", "main", ["L.send"], ["L.send"], "main"),
-    ("服务端发送", "EB.send", "浏览全量", "main", ["EB.send"], ["EB.send"], "main"),
-    ("服务端发送", "LD.send", "自身增量", "main", ["LD.send"], ["LD.send"], "main"),
-    ("服务端发送", "UP.send", "视野增量，和平", "main", ["UP.send"], ["UP.send"], "main"),
-    ("服务端发送", "UC.send", "视野增量，冲突", "main", ["UC.send"], ["UC.send"], "main"),
-    ("服务端发送", "DP", "共享增量，和平：发布加发送 ÷ 对手 UP.send 或其共享编码 DP", "d3", ["DP.pub", "DP.send"], ["UP.send"], "main"),
-    ("服务端发送", "DC", "共享增量，冲突：发布加发送 ÷ 对手 UC.send 或其共享编码 DC", "d3", ["DC.pub", "DC.send"], ["UC.send"], "main"),
-    ("客户端接收", "L.recv", "登录全量", "main", ["L.recv"], ["L.recv"], "main"),
-    ("客户端接收", "EBW.recv", "浏览全量（热视图）", "main", ["EBW.recv"], ["EBW.recv"], "main"),
-    ("客户端接收", "LDW.recv", "自身增量（热视图）", "main", ["LDW.recv"], ["LDW.recv"], "main"),
-    ("客户端接收", "UPW.recv", "视野增量，和平（热视图）", "main", ["UPW.recv"], ["UPW.recv"], "main"),
-    ("客户端接收", "UCW.recv", "视野增量，冲突（热视图）", "main", ["UCW.recv"], ["UCW.recv"], "main"),
-    ("客户端接收", "DPTW.recv", "共享增量，和平 ÷ 对手 UPW.recv 或其共享编码 DPTW", "d3", ["DPTW.recv"], ["UPW.recv"], "main"),
-    ("客户端接收", "DCTW.recv", "共享增量，冲突 ÷ 对手 UCW.recv 或其共享编码 DCTW", "d3", ["DCTW.recv"], ["UCW.recv"], "main"),
-    ("上行", "UL.recv", "服务端收指令（边界检查）", "main", ["UL.recv"], ["UL.recv"], "main"),
-    ("上行", "UL.send", "客户端发指令（只报）", "main", ["UL.send"], ["UL.send"], "report"),
+    ("server to server", "A", "battle request and result", "main", A_KEYS, A_KEYS, "main"),
+    ("server to server", "B", "server migration", "main", B_KEYS, B_KEYS, "main"),
+    ("server to server", "S", "save and load", "main", S_KEYS, S_KEYS, "main"),
+    ("server to server", "SD", "delta save", "main", SD_KEYS, SD_KEYS, "main"),
+    ("server send", "L.send", "login full state", "main", ["L.send"], ["L.send"], "main"),
+    ("server send", "EB.send", "browse full state", "main", ["EB.send"], ["EB.send"], "main"),
+    ("server send", "LD.send", "own delta", "main", ["LD.send"], ["LD.send"], "main"),
+    ("server send", "UP.send", "view delta, peace", "main", ["UP.send"], ["UP.send"], "main"),
+    ("server send", "UC.send", "view delta, conflict", "main", ["UC.send"], ["UC.send"], "main"),
+    ("server send", "DP", "shared delta, peace: publish + send ÷ rival UP.send or its shared encoding DP", "d3", ["DP.pub", "DP.send"], ["UP.send"], "main"),
+    ("server send", "DC", "shared delta, conflict: publish + send ÷ rival UC.send or its shared encoding DC", "d3", ["DC.pub", "DC.send"], ["UC.send"], "main"),
+    ("client receive", "L.recv", "login full state", "main", ["L.recv"], ["L.recv"], "main"),
+    ("client receive", "EBW.recv", "browse full state (warm view)", "main", ["EBW.recv"], ["EBW.recv"], "main"),
+    ("client receive", "LDW.recv", "own delta (warm view)", "main", ["LDW.recv"], ["LDW.recv"], "main"),
+    ("client receive", "UPW.recv", "view delta, peace (warm view)", "main", ["UPW.recv"], ["UPW.recv"], "main"),
+    ("client receive", "UCW.recv", "view delta, conflict (warm view)", "main", ["UCW.recv"], ["UCW.recv"], "main"),
+    ("client receive", "DPTW.recv", "shared delta, peace ÷ rival UPW.recv or its shared encoding DPTW", "d3", ["DPTW.recv"], ["UPW.recv"], "main"),
+    ("client receive", "DCTW.recv", "shared delta, conflict ÷ rival UCW.recv or its shared encoding DCTW", "d3", ["DCTW.recv"], ["UCW.recv"], "main"),
+    ("uplink", "UL.recv", "server receives orders (bounds check)", "main", ["UL.recv"], ["UL.recv"], "main"),
+    ("uplink", "UL.send", "client sends orders (report only)", "main", ["UL.send"], ["UL.send"], "report"),
     # Report-only rows outside the 20 cells.
-    ("只报", "US.send", "视野增量，围城", "main", ["US.send"], ["US.send"], "report"),
-    ("只报", "DS", "共享增量，围城：发布加发送 ÷ 对手 US.send 或其共享编码 DS", "d3", ["DS.pub", "DS.send"], ["US.send"], "report"),
-    ("只报", "USW.recv", "视野增量，围城（热视图）", "main", ["USW.recv"], ["USW.recv"], "report"),
-    ("只报", "DSTW.recv", "共享增量，围城 ÷ 对手 USW.recv 或其共享编码 DSTW", "d3", ["DSTW.recv"], ["USW.recv"], "report"),
-    ("只报", "EB.recv", "浏览全量（冷）", "main", ["EB.recv"], ["EB.recv"], "report"),
-    ("只报", "LD recv+apply", "自身增量（冷）", "main", ["LD.recv", "LD.apply"], ["LD.recv", "LD.apply"], "report"),
-    ("只报", "UP recv+apply", "视野增量，和平（冷）", "main", ["UP.recv", "UP.apply"], ["UP.recv", "UP.apply"], "report"),
-    ("只报", "UC recv+apply", "视野增量，冲突（冷）", "main", ["UC.recv", "UC.apply"], ["UC.recv", "UC.apply"], "report"),
+    ("report only", "US.send", "view delta, siege", "main", ["US.send"], ["US.send"], "report"),
+    ("report only", "DS", "shared delta, siege: publish + send ÷ rival US.send or its shared encoding DS", "d3", ["DS.pub", "DS.send"], ["US.send"], "report"),
+    ("report only", "USW.recv", "view delta, siege (warm view)", "main", ["USW.recv"], ["USW.recv"], "report"),
+    ("report only", "DSTW.recv", "shared delta, siege ÷ rival USW.recv or its shared encoding DSTW", "d3", ["DSTW.recv"], ["USW.recv"], "report"),
+    ("report only", "EB.recv", "browse full state (cold)", "main", ["EB.recv"], ["EB.recv"], "report"),
+    ("report only", "LD recv+apply", "own delta (cold)", "main", ["LD.recv", "LD.apply"], ["LD.recv", "LD.apply"], "report"),
+    ("report only", "UP recv+apply", "view delta, peace (cold)", "main", ["UP.recv", "UP.apply"], ["UP.recv", "UP.apply"], "report"),
+    ("report only", "UC recv+apply", "view delta, conflict (cold)", "main", ["UC.recv", "UC.apply"], ["UC.recv", "UC.apply"], "report"),
 ]
 BYTE_ROWS = [  # (label, xo tag kind, xo key, rival key)
-    ("A 请求", "main", "A.req", "A.req"), ("A 结果", "main", "A.res", "A.res"),
-    ("B 迁服", "main", "B.out", "B.out"), ("S 存盘", "main", "S.player", "S.player"),
-    ("SD 增量存盘", "main", "SD.modules", "SD.modules"),
-    ("L 登录", "main", "L.player{z}", "L.player{z}"), ("EB 浏览", "main", "EB.window{z}", "EB.window{z}"),
-    ("LD 自身增量", "main", "LD.patch{z}", "LD.patch{z}"),
-    ("UP 视野和平", "main", "UP.delta{z}", "UP.delta{z}"), ("UC 视野冲突", "main", "UC.delta{z}", "UC.delta{z}"),
-    ("DP 共享和平 ÷ 对手 UP", "d3", "DP.delta{z}", "UP.delta{z}"),
-    ("DC 共享冲突 ÷ 对手 UC", "d3", "DC.delta{z}", "UC.delta{z}"),
-    ("UL 上行指令", "main", "UL.order{z}", "UL.order{z}"),
+    ("A request", "main", "A.req", "A.req"), ("A result", "main", "A.res", "A.res"),
+    ("B migration", "main", "B.out", "B.out"), ("S save", "main", "S.player", "S.player"),
+    ("SD delta save", "main", "SD.modules", "SD.modules"),
+    ("L login", "main", "L.player{z}", "L.player{z}"), ("EB browse", "main", "EB.window{z}", "EB.window{z}"),
+    ("LD own delta", "main", "LD.patch{z}", "LD.patch{z}"),
+    ("UP view peace", "main", "UP.delta{z}", "UP.delta{z}"), ("UC view conflict", "main", "UC.delta{z}", "UC.delta{z}"),
+    ("DP shared peace ÷ rival UP", "d3", "DP.delta{z}", "UP.delta{z}"),
+    ("DC shared conflict ÷ rival UC", "d3", "DC.delta{z}", "UC.delta{z}"),
+    ("UL uplink orders", "main", "UL.order{z}", "UL.order{z}"),
 ]
 # One-sided 95% Student t quantiles by degrees of freedom (>= 30: normal).
 T95 = {1: 6.314, 2: 2.920, 3: 2.353, 4: 2.132, 5: 2.015, 6: 1.943, 7: 1.895, 8: 1.860,
@@ -165,12 +165,12 @@ def classify(gm):
     return "loss" if gm > LOSS else "tie"
 
 
-CLASS_ZH = {"win": "赢", "tie": "平", "loss": "输"}
+CLASS_LABEL = {"win": "win", "tie": "tie", "loss": "loss"}
 
 
 def shared_col(r):
     """Column name of rival r's shared-encoding approach (its D* rows)."""
-    return f"{r} 共享"
+    return f"{r} shared"
 
 
 def evaluate(raw, xo_name, rivals, main_tag, d3_tag, shared_rivals=()):
@@ -239,43 +239,43 @@ def render(rows, batches, rivals, brows, zstd, env, baseline):
     rivals = list(rivals) + sorted({c for r in rows for c in r["rivals"] if c not in rivals})
     main = [r for r in rows if r["kind"] == "main"]
     counts = {c: sum(1 for r in main if r["class"] == c) for c in ("win", "tie", "loss", "missing")}
-    out.append("# SLG 计分卡\n")
+    out.append("# SLG scorecard\n")
     if env:
         src = env.get("source", {})
-        out.append(f"- 提交：`{src.get('ref', '?')}` = `{src.get('commit', '?')}`")
+        out.append(f"- Commit: `{src.get('ref', '?')}` = `{src.get('commit', '?')}`")
         tc = env.get("toolchain", {})
-        out.append(f"- 编译：{tc.get('compiler', '?')}，镜像 `{tc.get('image', '?')}`")
+        out.append(f"- Compiler: {tc.get('compiler', '?')}, image `{tc.get('image', '?')}`")
         if tc.get("extra_cxxflags"):
-            out.append(f"- 追加编译参数：`{tc['extra_cxxflags']}`（EXTRA_CXXFLAGS，所有格式同样）")
+            out.append(f"- Extra compile flags: `{tc['extra_cxxflags']}` (EXTRA_CXXFLAGS, the same for every format)")
         deps = env.get("deps", {})
-        out.append("- 对手：" + "，".join(f"{k} `{v.get('commit', '?')[:12]}`" for k, v in deps.items()))
+        out.append("- Rivals: " + ", ".join(f"{k} `{v.get('commit', '?')[:12]}`" for k, v in deps.items()))
         host = env.get("host", {})
-        out.append(f"- 机器：{host.get('cpu_model', '?')}，{host.get('nproc', '?')} 核，钉核 {env.get('run', {}).get('cpu', '?')}")
+        out.append(f"- Machine: {host.get('cpu_model', '?')}, {host.get('nproc', '?')} cores, pinned to CPU {env.get('run', {}).get('cpu', '?')}")
         run = env.get("run", {})
-        out.append(f"- 跑法：{run.get('scale', 'M')} 规模，{run.get('batches', '?')} 批 × {run.get('cycles', '?')} 周期，"
-                   f"种子 {run.get('seed', '?')}，每个格式每批一个进程，批间交错")
-    out.append(f"- 批数：" + "，".join(f"{k} {v}" for k, v in batches.items()))
-    out.append(f"- 比值 = xoffset_trusted ÷ 最强对手（XOffset 比它慢得最多的那家），批间几何均值，方括号是批的最小–最大。"
-               f"D 格的对手包括它们的共享编码做法（「共享」列，4.0 W1）。"
-               f"赢 < {WIN:.2f}，平 {WIN:.2f}–{LOSS:.2f}，输 > {LOSS:.2f}。\n")
-    out.append(f"**主格 {len(main)}：赢 {counts['win']}，平 {counts['tie']}，输 {counts['loss']}"
-               + (f"，缺 {counts['missing']}" if counts['missing'] else "") + "。** UL.send 只报，不计。\n")
+        out.append(f"- Run: {run.get('scale', 'M')} scale, {run.get('batches', '?')} batches × {run.get('cycles', '?')} cycles, "
+                   f"seed {run.get('seed', '?')}, one process per format per batch, formats interleaved")
+    out.append(f"- Batches: " + ", ".join(f"{k} {v}" for k, v in batches.items()))
+    out.append(f"- Ratio = xoffset_trusted ÷ the strongest rival (the one XOffset is slowest against), geometric mean over batches; brackets are the batch min–max. "
+               f"Rivals of the D cells include their shared-encoding approach (the \"shared\" columns, 4.0 W1). "
+               f"Win < {WIN:.2f}, tie {WIN:.2f}–{LOSS:.2f}, loss > {LOSS:.2f}.\n")
+    out.append(f"**Main cells {len(main)}: win {counts['win']}, tie {counts['tie']}, loss {counts['loss']}"
+               + (f", missing {counts['missing']}" if counts['missing'] else "") + ".** UL.send is report only and not counted.\n")
     has_base = bool(baseline)
-    head = "| 组 | 格 | 场景 | ÷ 最强对手 | 最强对手 | 判定 | " + " | ".join(f"÷ {r}" for r in rivals)
+    head = "| Group | Cell | Scenario | ÷ strongest rival | Strongest rival | Verdict | " + " | ".join(f"÷ {r}" for r in rivals)
     sep = "| --- | --- | --- | ---: | --- | --- | " + " | ".join("---:" for _ in rivals)
     if has_base:
-        head += " | 基线 | 差"
+        head += " | Baseline | Change"
         sep += " | ---: | ---:"
     out.append(head + " |")
     out.append(sep + " |")
     base_map = {b["cell"]: b for b in (baseline or {}).get("cells", [])}
     for r in rows:
         best = r["rivals"].get(r["best"]) if r["best"] else None
-        verdict = CLASS_ZH.get(r["class"], "缺")
+        verdict = CLASS_LABEL.get(r["class"], "missing")
         if r["kind"] == "report" and best:
-            verdict = f"只报（{verdict}）"
+            verdict = f"report only ({verdict})"
         line = (f"| {r['group']} | {r['cell']} | {r['label']} | {best['gm']:.3f} | {r['best']} | {verdict} | "
-                if best else f"| {r['group']} | {r['cell']} | {r['label']} | | | 缺 | ")
+                if best else f"| {r['group']} | {r['cell']} | {r['label']} | | | missing | ")
         line += " | ".join(fmt_ratio(r["rivals"].get(x)) for x in rivals)
         if has_base:
             b = base_map.get(r["cell"])
@@ -285,9 +285,9 @@ def render(rows, batches, rivals, brows, zstd, env, baseline):
                 line += " | | "
         out.append(line + " |")
     if brows:
-        what = "zstd-3 压缩后" if zstd else "未压缩（这次没跑压缩构建）"
-        out.append(f"\n## 字节（只报，每周期中位数，{what}；A/B/S/SD 不压缩）\n")
-        out.append("| 消息 | 键 | XOffset | " + " | ".join(rivals) + " | " + " | ".join(f"÷ {r}" for r in rivals) + " |")
+        what = "after zstd-3" if zstd else "uncompressed (no compression build in this run)"
+        out.append(f"\n## Bytes (report only, per-cycle median, {what}; A/B/S/SD not compressed)\n")
+        out.append("| Message | Key | XOffset | " + " | ".join(rivals) + " | " + " | ".join(f"÷ {r}" for r in rivals) + " |")
         out.append("| --- | --- | ---: | " + " | ".join("---:" for _ in rivals) + " | " + " | ".join("---:" for _ in rivals) + " |")
         for b in brows:
             vals = [b["rivals"].get(r) for r in rivals]

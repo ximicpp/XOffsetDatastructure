@@ -36,8 +36,24 @@ scratch/
 temp/
 tmp/
 
-# Local agent/app configuration
+# AI assistant / agent files (kept local, not committed)
+CLAUDE.md
+CLAUDE.local.md
+**/CLAUDE.md
+AGENTS.md
+**/AGENTS.md
+GEMINI.md
 .claude/
+.cursor/
+.cursorrules
+.windsurf/
+.windsurfrules
+.aider*
+.codex/
+.github/copilot-instructions.md
+.github/instructions/
+.github/prompts/
+/openspec/
 
 # Expanded frozen cross-machine evidence; the capsule ZIP is committed.
 /handoff/continuation-20261019-v1/
