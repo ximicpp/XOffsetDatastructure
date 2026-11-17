@@ -17,8 +17,9 @@ Server-to-client use is currently a goal and is not advertised publicly. Status 
   compiler) and servers with C++26 reflection; the wire is byte-identical. Windows x64 (MSVC 19.44,
   clang-cl 19, MinGW GCC 16) and Android arm64 (NDK r29/r30, run under cloud qemu-aarch64) pass the
   full tests on 4.1.0, read the reference corpus written by the server, and after editing save the
-  same bytes as the server; the same results for macOS arm64 and the iOS simulator (Apple clang) come
-  from 3.3.0 and were not re-run for 4.1.0 (releases since 3.3.1 use the cloud only).
+  same bytes as the server; macOS arm64 and the iOS simulator (Apple clang 21)
+  give the same results on the v4.1.0 tag (211/211 each, run on a Mac after the release; release
+  validation itself uses the cloud only).
 - End-to-end demo (`demo/mapstate`): a Linux server to Windows, Android emulator, iOS simulator and
   macOS clients all run. Real devices: 3.2.0-rc.1 passed every functional check on one Android 11
   phone (record in [validation/2026-10-28-rc1-platform](validation/2026-10-28-rc1-platform/README.md)),
@@ -74,7 +75,7 @@ Toolchains verified for 3.1.0 (local platform matrix, 3.1.0 RC e913d22; GitHub C
 | --- | --- | --- |
 | Server | Linux x86-64, Linux arm64 | GCC 16.2 (libstdc++), or clang-p2996 `d77eff1` (with its libc++). Both produce byte-identical wires and can be mixed |
 | Client | Windows x64 | MinGW-w64 GCC 16.2 (`tools/build_mingw_toolchain.sh`, `cmake/toolchains/mingw-w64-x86_64.cmake`). GCC's MinGW TLS is emulated, so per-thread caches are off on this target (`XOFFSET_THREAD_CACHES=0`) |
-| Client | Android, iOS, macOS, Windows (MSVC, clang-cl) | No usable toolchain for 3.1.0; since 3.2.0 they use the C++20 field-list build: Android NDK r29/r30, MSVC 19.44, clang-cl 19, Apple clang for iOS (Xcode 27.1, simulator 129/129) and macOS (Xcode 27.1, C++20 and C++23 137/137 each), see [CLIENT_TARGETS.md](CLIENT_TARGETS.md) |
+| Client | Android, iOS, macOS, Windows (MSVC, clang-cl) | No usable toolchain for 3.1.0; since 3.2.0 they use the C++20 field-list build: Android NDK r29/r30, MSVC 19.44, clang-cl 19, Apple clang for iOS (Xcode 27.1, simulator 211/211 on 4.1.0) and macOS (Xcode 27.1, C++20 and C++23 211/211 each on 4.1.0), see [CLIENT_TARGETS.md](CLIENT_TARGETS.md) |
 
 - Pinned compiler sources: clang-p2996 in `toolchains/README.md`, the GCC 16 image digest in
   `tools/local_validate.sh`, and the MinGW toolchain recipe in `tools/build_mingw_toolchain.sh`.
