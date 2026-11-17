@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | `pr`（默认） | 改了库的 PR（S、L 类，以及改库源文件的 0 类） | meta、gcc、asan、fuzz、diff、smoke、ir、p2996、p2996-ir、asm，加 diff-c++20 和一个 C++20 客户端列（client-c++20，MSVC 优先） |
 | `quick` | 不碰库的 PR（只改 bench/、tools/、tests/、docs/） | meta、gcc、smoke、p2996；顶层源文件、CMakeLists.txt 或 cmake/ 和 base 不同时拒绝运行 |
-| `daily` | 每天一次，在 `next_cpp26` 的最新提交上 | tsan、整个 C++20/C++23 矩阵、全部客户端列、wire-matrix（`pr` 层省掉的部分） |
+| `daily` | 每天一次，在 `main` 的最新提交上 | tsan、整个 C++20/C++23 矩阵、全部客户端列、wire-matrix（`pr` 层省掉的部分） |
 | `release`（= `--release`） | 发版候选 | 全部步骤 |
 
 `daily` 发现的失败当天开修复 PR，修好之前不发版。`full` 是 11-11 之前的默认步骤，需要时仍可指定。
@@ -21,7 +21,7 @@
 
 ## 1. 它做什么
 
-`.github/workflows/perf-gate.yml` 在 PR 指向 `next_cpp26`（忽略只改 `docs/**`、`*.md` 的 PR）、push 到 `next_cpp26` 和手动触发时运行，GCC 16 和 P2996 Clang 各一个作业，两个都判定：
+`.github/workflows/perf-gate.yml` 在 PR 指向 `main`（忽略只改 `docs/**`、`*.md` 的 PR）、push 到 `main` 和手动触发时运行，GCC 16 和 P2996 Clang 各一个作业，两个都判定：
 
 1. 在同一个作业里导出三份库代码：**anchor**（`bench/perf/ANCHOR`）、**base**（PR 是 merge-base，push 是第一父提交）、**head**。
 2. 三份都用 **head 里的基准代码**（手动回放时用所选分支的基准代码）（`bench/slg/`、`bench/formal/`、`bench/reloc/`）编译 `slg_bench`、`sc_xoffset` 和 `reloc_bench`。base 或 anchor 用 head 的基准编不过（公开 API 改了）时，改用它自己那一版的基准，标"基准不同"并警告；仍编不过就标"不可比"，作业不失败；这个 PR 合并前要在 PR 正文里说明，并附 cache-sim 对比（第 5a 节），合并后的 Mac 复核要覆盖它。`reloc_bench` 是可选的：base 或 anchor 编不过它时只少 `reloc.*` 的比较（警告），head 编不过就是构建失败。
@@ -120,7 +120,7 @@ Ir 看不到内存访问的变化（第 8 节），所以 L 类 PR 合并前另�
 
 ## 6. 手动触发与回放
 
-Actions → "Perf gate (instruction counts)" → Run workflow，选一个带 `bench/` 的分支（通常是 next_cpp26），输入 `base`、`head`、`anchor`（可选，默认取该分支的 `bench/perf/ANCHOR`）、`compilers`。基准代码取自所选分支，所以可以回放 `bench/` 入库之前的提交，也可以给 Mac 候选预检。回放 GCC 16 支持合入之前的提交时，GCC 一侧不可比，只看 P2996。回放历史提交时把 `anchor` 设成 `base`，否则 head÷anchor 比的是一个更新的提交。
+Actions → "Perf gate (instruction counts)" → Run workflow，选一个带 `bench/` 的分支（通常是 main），输入 `base`、`head`、`anchor`（可选，默认取该分支的 `bench/perf/ANCHOR`）、`compilers`。基准代码取自所选分支，所以可以回放 `bench/` 入库之前的提交，也可以给 Mac 候选预检。回放 GCC 16 支持合入之前的提交时，GCC 一侧不可比，只看 P2996。回放历史提交时把 `anchor` 设成 `base`，否则 head÷anchor 比的是一个更新的提交。
 
 本地（需要 GCC 16 或 P2996 Clang、valgrind、python3）：
 
@@ -128,7 +128,7 @@ Actions → "Perf gate (instruction counts)" → Run workflow，选一个带 `be
 git submodule update --init external/typelayout
 git clone https://github.com/USCiLab/cereal.git /tmp/cereal && git -C /tmp/cereal checkout ebef1e92
 W=build/perf-gate
-python3 tools/perf_gate/perf_gate.py prepare --work $W --base origin/next_cpp26 --head HEAD
+python3 tools/perf_gate/perf_gate.py prepare --work $W --base origin/main --head HEAD
 python3 tools/perf_gate/perf_gate.py run --work $W --compiler gcc16 --cereal /tmp/cereal/include
 python3 tools/perf_gate/test_perf_gate.py   # 判定逻辑自测，不需要编译器
 ```

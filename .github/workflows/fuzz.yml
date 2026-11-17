@@ -5,7 +5,7 @@ name: Fuzz
 # target.
 #
 # Modes:
-#   pr       pushes to next_cpp26 and pull requests into it: 300 s per target,
+#   pr       pushes to main and pull requests into it: 300 s per target,
 #            one process, stops at the first crash.
 #   nightly  started every night by .github/workflows/nightly-fuzz-dispatch.yml
 #            on main (GitHub reads `schedule` only from the default branch):
@@ -16,7 +16,7 @@ name: Fuzz
 #
 # Each target keeps its own corpus in the Actions cache, merged (-merge=1)
 # before it is saved. Nightly and manual runs also upload the merged corpus;
-# a run that finds no cache starts from the latest such upload on next_cpp26.
+# a run that finds no cache starts from the latest such upload on main.
 # Crash, leak, timeout and OOM inputs are replayed, minimized and given a
 # signature by tools/fuzz_findings.py, which writes findings.json into the
 # fuzz-<target> artifact. A job fails when it has findings, not on the
@@ -31,9 +31,9 @@ name: Fuzz
 
 on:
   push:
-    branches: [ next_cpp26 ]
+    branches: [ main ]
   pull_request:
-    branches: [ next_cpp26 ]
+    branches: [ main ]
   workflow_dispatch:
     inputs:
       mode:
@@ -188,10 +188,10 @@ jobs:
           key: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: fuzz-corpus-${{ matrix.target }}-
 
-      # A cache miss (evicted, or a branch that cannot read next_cpp26's
+      # A cache miss (evicted, or a branch that cannot read main's
       # cache) falls back to the newest corpus uploaded by a nightly or
-      # manual run on next_cpp26.
-      - name: Corpus fallback from the latest next_cpp26 upload
+      # manual run on main.
+      - name: Corpus fallback from the latest main upload
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -204,7 +204,7 @@ jobs:
           if [ -z "$MATCHED" ]; then
             SOURCE=none
             ROW=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=fuzz-corpus-$T&per_page=50" \
-              --jq '[.artifacts[] | select(.expired == false and .workflow_run.head_branch == "next_cpp26")][0] // empty | "\(.id) \(.workflow_run.id)"' || true)
+              --jq '[.artifacts[] | select(.expired == false and .workflow_run.head_branch == "main")][0] // empty | "\(.id) \(.workflow_run.id)"' || true)
             if [ -n "$ROW" ]; then
               read -r ART RUN <<< "$ROW"
               if gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ART/zip" > build/corpus-fallback.zip \
@@ -278,7 +278,7 @@ jobs:
             2>&1 | tee "build/fuzz-$T.log"
           echo "fuzzer exit code: $(cat "build/fuzz-exit-$T" 2>/dev/null || echo missing)"
 
-      # Value profile is on for every merge, so a pr-mode run on next_cpp26
+      # Value profile is on for every merge, so a pr-mode run on main
       # does not drop the inputs a nightly run kept for value-profile features.
       - name: Merge corpus
         if: always() && steps.fuzz.outcome == 'success'

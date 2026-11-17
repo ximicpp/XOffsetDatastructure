@@ -29,7 +29,7 @@ sparse，以及 `save_compact` 存出的 compact_slack0、compact_slack8），�
 `mingw-c++20`、`ndk29-c++20`、`ndk30-c++20`），参照语料由同一提交的 GCC 16 C++26 构建现写。
 CTest 里包括关异常的 `*_noexc` 程序。默认的 PR 层（`--tier pr`）里的 `client-c++20` 步骤保证每个 PR 至少跑一个
 C++20 客户端列：按 MSVC、clang-cl、NDK r29、NDK r30、MinGW 的顺序取本机能跑的第一个；一个都跑不了
-时这一步失败。`--clients`、`--tier daily`（每天一次，在 `next_cpp26` 上）和 `--release` 跑全部客户端列。云端新容器装 MSVC 用
+时这一步失败。`--clients`、`--tier daily`（每天一次，在 `main` 上）和 `--release` 跑全部客户端列。云端新容器装 MSVC 用
 `tools/msvc-wine/fetch_msvc.py /opt/msvc`（再跑 `tools/msvc-wine/case_links.py /opt/msvc` 给 clang-cl 用）。
 
 | 目标 | 编译器 | 标准 | 实际运行方式 | 结果 |
