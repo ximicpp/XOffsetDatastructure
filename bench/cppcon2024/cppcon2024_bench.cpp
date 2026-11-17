@@ -106,6 +106,16 @@ static stdm::Character g_char;
 static uint64_t g_sum;      // checksum of the data every format sends
 static uint64_t g_rw_sum;   // checksum after the timed read/write rounds (the std model's, computed first)
 static std::vector<OpSet> g_ops;
+// One item key per iteration (kRwIters distinct values, read in order; the same for every
+// library). The other values come from the 1024-entry ring, but a key from the ring would
+// repeat about 100 times per round, and a branchy binary search (std::lower_bound in the
+// std and cista flat maps) then has its 1024 search paths learned by the branch predictor.
+static std::vector<uint64_t> g_keys;
+static const OpSet& op_at(size_t i) {
+  OpSet& o = g_ops[i & (kOpRing - 1)];
+  o.key = g_keys[i];
+  return o;
+}
 static volatile uint64_t g_sink;
 
 // send+recv timing; f(i) does one message and returns something read from the receiver's state.
@@ -114,7 +124,7 @@ template <class F> static double time_sr(F&& f) {
   g_sink = g_sink + acc; return ns;
 }
 template <class F> static double time_rw(F&& f) {
-  return median_of(kRounds, [&] { return ns_per(kRwIters, [&](size_t i) { f(g_ops[i & (kOpRing - 1)]); }); });
+  return median_of(kRounds, [&] { return ns_per(kRwIters, [&](size_t i) { f(op_at(i)); }); });
 }
 
 // ============================ std model (rw shared by zpp::bits, MessagePack, FlatBuffers, Cap'n Proto) ============================
@@ -286,7 +296,7 @@ static void bench_xoffset_layout(const char* name) {
     const auto start = Clock::now();
     if (!src.edit([&](C& r) {
       for (size_t i = 0; i < kRwIters; ++i)
-        rw_xoffset_bulk(r, g_ops[i & (kOpRing - 1)]);
+        rw_xoffset_bulk(r, op_at(i));
     })) throw std::runtime_error("xoffset layout edit failed");
     const auto end = Clock::now();
     return std::chrono::duration<double, std::nano>(end - start).count() / double(kRwIters);
@@ -352,9 +362,12 @@ static uint64_t checksum_pb(const protobuf_test::Character& m) {
   return checksum(c);
 }
 // Bulk: the 8 equipment attributes are added as one range, the one bulk call that helps
-// here. A message has no inline scalar array, and RemoveLast already keeps the cleared
-// objects for reuse (DeleteSubrange and erase-by-iterator would free them instead).
-template <bool Bulk> static void pb_rw(protobuf_test::Character& r, const OpSet& o) {
+// here (a message has no inline scalar array).
+// Free (the scored rows): removed equipment and path messages are deleted with
+// DeleteSubrange, so protobuf allocates and frees them every iteration like every other
+// library. RemoveLast instead keeps the cleared message objects in the repeated field and
+// the next add_ reuses them, so nothing is allocated; that row is report-only.
+template <bool Bulk, bool Reuse = false> static void pb_rw(protobuf_test::Character& r, const OpSet& o) {
   r.set_level(r.level() + 1); r.set_healthpoint(r.healthpoint() + 1); r.set_manapoint(r.manapoint() + 1); r.set_speed(r.speed() + 1);
   auto* p = r.mutable_pos(); p->set_x(o.pos[0]); p->set_y(o.pos[1]); p->set_z(o.pos[2]);
   if (kEquipPart) for (const auto& eo : o.equip) {
@@ -362,7 +375,8 @@ template <bool Bulk> static void pb_rw(protobuf_test::Character& r, const OpSet&
     if constexpr (Bulk) e->mutable_attributes()->Add(std::begin(eo.attr), std::end(eo.attr));
     else for (float a : eo.attr) e->add_attributes(a);
     observe(*e);
-    r.mutable_equips()->RemoveLast();
+    if constexpr (Reuse) r.mutable_equips()->RemoveLast();
+    else r.mutable_equips()->DeleteSubrange(r.equips_size() - 1, 1);
   }
   if (kPathPart) {
     for (const auto& q : o.path) { auto* x = r.add_path(); x->set_x(q[0]); x->set_y(q[1]); x->set_z(q[2]); }
@@ -373,7 +387,8 @@ template <bool Bulk> static void pb_rw(protobuf_test::Character& r, const OpSet&
   if (kItemPart) r.mutable_items()->erase(o.key);
   if (kPathPart) {
     r.mutable_attributes()->RemoveLast();
-    for (int i = 0; i < 8; ++i) r.mutable_path()->RemoveLast();
+    if constexpr (Reuse) for (int i = 0; i < 8; ++i) r.mutable_path()->RemoveLast();
+    else r.mutable_path()->DeleteSubrange(r.path_size() - 8, 8);
   }
   r.set_speed(r.speed() - 1); r.set_manapoint(r.manapoint() - 1); r.set_healthpoint(r.healthpoint() - 1); r.set_level(r.level() - 1);
 }
@@ -400,6 +415,9 @@ static void bench_protobuf() {
   protobuf_test::Character rb; fill_pb(rb, g_char);
   put("Protocol Buffers bulk", "rw", time_rw([&](const OpSet& o) { pb_rw<true>(rb, o); }));
   expect("protobuf bulk rw", checksum_pb(rb), g_rw_sum);
+  protobuf_test::Character rr; fill_pb(rr, g_char);
+  put("Protocol Buffers reuse", "rw", time_rw([&](const OpSet& o) { pb_rw<false, true>(rr, o); }));
+  expect("protobuf reuse rw", checksum_pb(rr), g_rw_sum);
 }
 
 // ============================ FlatBuffers (state: std model; recv unpacks into it) ============================
@@ -575,7 +593,7 @@ template <class Ch, class ItemT, class PosT, cista::mode Mode, bool Tuned> stati
 
 int main(int argc, char** argv) {
   if (argc > 1 && std::string_view(argv[1]) == "--quick") { kRwIters = 10000; kSrIters = 2000; kRounds = 3; }
-  g_char = make_character(); g_sum = checksum(g_char); g_ops = make_ops();
+  g_char = make_character(); g_sum = checksum(g_char); g_ops = make_ops(); g_keys = make_keys(kRwIters);
   std::printf("# cppcon2024 rerun: rw %zu iters, send+recv %zu msgs, median of %d rounds, ns per iteration/message\n", kRwIters, kSrIters, kRounds);
   bench_std_rw();   // first: its end state is the reference for every other rw
   bench_xoffset();
