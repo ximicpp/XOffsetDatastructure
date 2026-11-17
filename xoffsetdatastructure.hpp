@@ -1437,6 +1437,17 @@ namespace XOffsetDatastructure {
         }
 
         bool free_table_complete() const noexcept { return !free_table_lost_; }
+#if defined(XOFFSET_TEST_EAGER_HOLE_TABLE)
+        // Test hook (tests/test_hole_table_differential.cpp only): while set,
+        // a hole table load on this thread builds the bin index at once,
+        // the way every load did before the lazy hole table, so a test can
+        // run the same operations on an eagerly and a lazily loaded buffer
+        // and compare every allocation, hole table and saved byte.
+        static bool& test_eager_hole_table() noexcept {
+            static thread_local bool eager = false;
+            return eager;
+        }
+#endif
         // Small holes of one size a free table with no other small holes
         // records without host storage (its inline word pool, shared by all
         // sizes); the next one of that size allocates a pool.
@@ -2126,7 +2137,10 @@ namespace XOffsetDatastructure {
             // Removes every entry but keeps the pool's storage, so refilling
             // the table needs no host allocation.
             static void clear_entries(FreeTable& table) noexcept {
-                for (std::uint32_t word = 0; word < FreeTable::small_bins / 64u; ++word) {
+                // Only the bitmap words that hold an entry (nonempty_words
+                // names them): an emptied table visits none.
+                for (auto words = table.nonempty_words; words != 0; words &= words - 1u) {
+                    const auto word = static_cast<std::uint32_t>(std::countr_zero(words));
                     for (auto bits = table.nonempty[word]; bits != 0; bits &= bits - 1u)
                         table.head[word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits))] = 0;
                     table.nonempty[word] = 0;
@@ -10701,13 +10715,23 @@ namespace XOffsetDatastructure {
                 sizeof(Storage) > used - header.root_offset) {
                 XOFFSET_VFAIL(XException, XErrc::root_mismatch, std::string(who) + ": root not found");
             }
+            // One pass over the hole table with no early exit: each hole ORs
+            // its out-of-range bits into `bad` (an unaligned or empty hole,
+            // one before the payload begins or one ending past `used`; offset
+            // and size are 32-bit, so their sum cannot wrap in 64 bits), and
+            // the verdict is taken once at the end. A rejected table is the
+            // rare case, so a branch per hole buys nothing, and without it
+            // the loop has no data-dependent branch to mispredict.
+            std::uint64_t bad = 0;
             for (std::size_t i = 0; i < hole_count; ++i) {
                 WireHole hole;
                 std::memcpy(&hole, holes + i * sizeof(hole), sizeof(hole));
-                if (hole.offset < XWIRE_PAYLOAD_BEGIN || hole.bytes == 0 || ((hole.offset | hole.bytes) & 7u) != 0 ||
-                    hole.bytes > used - hole.offset || hole.offset > used) [[unlikely]] {
-                    XOFFSET_VFAIL(XException, XErrc::invalid_payload, std::string(who) + ": hole out of range");
-                }
+                const std::uint64_t offset = hole.offset, bytes = hole.bytes;
+                bad |= ((offset | bytes) & 7u) | std::uint64_t(offset < XWIRE_PAYLOAD_BEGIN) |
+                       std::uint64_t(bytes == 0) | std::uint64_t(offset + bytes > used);
+            }
+            if (bad != 0) [[unlikely]] {
+                XOFFSET_VFAIL(XException, XErrc::invalid_payload, std::string(who) + ": hole out of range");
             }
             XOFFSET_VTRY(this->load_free_blocks(holes, hole_count));
             typed_root_access_allowed_ = true;
