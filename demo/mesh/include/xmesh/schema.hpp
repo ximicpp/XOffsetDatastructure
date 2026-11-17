@@ -1,7 +1,7 @@
 // Device mesh demo: the wire schema every device and the hub share.
 // FROZEN INTERFACE (demo/mesh/INTERFACES.md section 3). A change here
 // changes every wire and every device's handshake; it goes through the
-// design thread (「跨设备数据互传 demo」) first.
+// design thread ("cross-device data exchange demo") first.
 //
 // Six data roots, one per common shape of application data (not a game):
 // Document, Order, SensorSeries, KvConfig, SceneTree, ChatRoom. Together

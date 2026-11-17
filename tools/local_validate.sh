@@ -22,7 +22,8 @@
 # columns and "clients" = the client columns):
 #   meta      the library's own files (top-level *.hpp, *.cpp) use reflection (std::meta, ^^)
 #             only in xoffset_schema_reflect.hpp; every other walk goes through the schema
-#             interface (xoffset_schema.hpp), so the field-list builds see the same code
+#             interface (xoffset_schema.hpp), so the field-list builds see the same code;
+#             and no tracked text file has CJK characters (tools/check_no_cjk.py)
 #   gcc       GCC 16 Release: build + full CTest
 #   asan      GCC 16 Debug, -fsanitize=address,undefined -fno-sanitize-recover=undefined
 #             (no exclusions): build + full CTest
@@ -236,7 +237,7 @@ in_gcc() {
 ctest_line() { grep -E 'tests passed|tests failed' "$1" | tail -n 1; }
 
 step_meta() {
-    python3 - "$REPO" <<'PY'
+    python3 - "$REPO" <<'PY' || return 1
 import pathlib, re, subprocess, sys
 repo = pathlib.Path(sys.argv[1])
 files = subprocess.run(["git", "-C", str(repo), "ls-files", "*.hpp", "*.cpp", "*.h"],
@@ -257,6 +258,7 @@ checked = sum(1 for f in files if "/" not in f)
 print(f"reflection outside the backend: {bad} lines in {checked} library files")
 sys.exit(1 if bad else 0)
 PY
+    python3 "$REPO/tools/check_no_cjk.py" "$REPO"
 }
 
 step_gcc() {
@@ -533,7 +535,7 @@ print(f"{n} C++26-only tests/tools not built")' "$WORK/m-$s/test-inventory.json"
         p2996) { ctest_line "$f"; grep -m1 -E 'type signatures changed|completed successfully' "$f"; } | paste -sd ';' ;;
         fuzz) grep -E '^test_v2_fuzz: seed=' "$f" | sed -E 's/.*seed=([0-9]+).* cases=([0-9]+).*inconsistencies=([0-9]+).*/seed \1: \2 cases, \3 inconsistencies/' | paste -sd ';' ;;
         diff) grep -E '^seed [0-9]+:' "$f" | paste -sd ';' ;;
-        meta) tail -n 1 "$f" ;;
+        meta) tail -n 2 "$f" | paste -sd ';' ;;
         smoke) grep -E 'bench smoke passed|input wire' "$f" | tail -n 1 ;;
         asm) for c in gcc16 p2996; do [[ -f $WORK/asm-$c.json ]] && python3 -c 'import json, sys
 print(sys.argv[2] + ": " + json.load(open(sys.argv[1]))["verdict"])' "$WORK/asm-$c.json" "$c"; done | paste -sd ';' ;;

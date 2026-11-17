@@ -1,14 +1,14 @@
-# 用户 schema 签名固定（K7）
+# Pinning user schema signatures (K7)
 
-`XOFFSET_PIN_SCHEMA` 把一个类型的 wire 布局固定成一段签名文本。任何编译器、任何
-目标平台算出的布局和这段文本不一致时，**编译直接失败**，错误信息里给出这个编译器
-算出的布局。收发两端（服务端、各平台客户端）的构建都包含同一份固定文件，就能在
-构建阶段发现对象表示不一致，而不是等到运行时 `load_verified` 因 schema 指纹不同而
-拒绝。
+`XOFFSET_PIN_SCHEMA` pins a type's wire layout to a piece of signature text. When the layout computed by
+any compiler for any target platform differs from that text, **compilation fails** right away, and the
+error message gives the layout that compiler computed. When the builds of both sending and receiving ends
+(the server and each platform's clients) include the same pin file, object representation mismatches are
+found at build time, rather than at run time when `load_verified` rejects a different schema fingerprint.
 
-## 用法
+## Usage
 
-1. 生成固定文本（只需在任意一个受支持的编译器上运行一次）：
+1. Generate the pin text (run once, on any one supported compiler):
 
    ```cpp
    #include "my_schema.hpp"
@@ -18,26 +18,28 @@
    }
    ```
 
-   输出形如：
+   The output looks like:
 
    ```cpp
    XOFFSET_PIN_SCHEMA(game::Player, "record[s:96,a:8]{@0:u64,...}");
    ```
 
-2. 把输出放进一个固定文件（例如 `my_schema_pins.hpp`），提交到代码库，并在每个
-   收发数据的构建里至少包含一次（任意一个翻译单元即可）。
+2. Put the output into a pin file (for example `my_schema_pins.hpp`), commit it, and include it at least
+   once in every build that sends or receives the data (any one translation unit is enough).
 
-3. 有意修改 schema 时，重新生成并提交固定文件。评审时看固定文件的 diff，就能看到
-   布局的变化。
+3. When you change the schema on purpose, regenerate and commit the pin file. Reviewers see the layout
+   change in the pin file's diff.
 
-## 说明
+## Notes
 
-- 签名覆盖布局的全部内容：字段偏移、标量类型和宽度、容器头格式、对齐、数组长度、
-  enum 的底层类型。它就是 wire 头里 schema 指纹的输入（指纹另外包含注册的 schema
-  名称）。
-- 宏可以放在命名空间作用域或函数体内。类型名里有逗号时，先用 `using` 起别名。
-- 每个构建由它自己的编译器求值，交叉编译时就是目标平台的编译器，所以 Windows（MinGW）
-  客户端的构建同样受约束。Android、iOS 客户端用 C++20 字段表构建（3.2.0 起），见
-  [CLIENT_TARGETS.md](CLIENT_TARGETS.md)。
-- 这是构建期检查，不替代运行时校验：`load_verified` 仍然完整校验每个 wire。
-- CTest 里的 `schema_pin_mismatch` 测试确认不一致时确实编译失败。
+- The signature covers the whole layout: field offsets, scalar types and widths, container header format,
+  alignment, array lengths, and enum underlying types. It is the input of the schema fingerprint in the
+  wire header (the fingerprint also includes the registered schema name).
+- The macro can go at namespace scope or inside a function body. When the type name contains a comma,
+  give it an alias with `using` first.
+- Each build is evaluated by its own compiler, which when cross-compiling is the target platform's
+  compiler, so Windows (MinGW) client builds are bound by it too. Android and iOS clients use the C++20
+  field-list build (since 3.2.0), see [CLIENT_TARGETS.md](CLIENT_TARGETS.md).
+- This is a build-time check and does not replace run-time validation: `load_verified` still fully
+  validates every wire.
+- The `schema_pin_mismatch` test in CTest confirms that a mismatch really fails to compile.

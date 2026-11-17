@@ -1,70 +1,77 @@
-# 源码包、安装包与外部消费
+# Source archives, install archives and external consumption
 
-本库面向能够固定实验性编译器、依赖与 schema 的使用者。版本之间不承诺源码 API、ABI 或任意工具链/layout 的长期 wire 兼容。
-先阅读 [兼容与输入边界](ALPHA_COMPATIBILITY.md)。本版本使用 V2 存储与 wire 格式，不读取 V1 wire；
-save/load 仍复制字节，不是零复制接口。
+This library is for users who can pin an experimental compiler, dependencies and schemas. Source API,
+ABI and long-term wire compatibility across arbitrary toolchains or layouts are not promised between
+versions. Read [compatibility and input boundary](ALPHA_COMPATIBILITY.md) first. This version uses the
+V2 storage and wire format and does not read V1 wires; save/load still copy bytes and are not zero-copy
+interfaces.
 
-## 三类交付物
+## Three deliverables
 
-| 交付物 | 内容 | 不包含的环境输入 |
+| Deliverable | Contents | Environment inputs not included |
 | --- | --- | --- |
-| `xoffsetdatastructure-<VERSION>.tar.gz` 源码包 | 两个生产头、CMake、tests/examples、必要工具与用户文档、固定的 851 个依赖头及许可证 | 编译器、libc++/系统 runtime、SDK、构建输出、实验目录与历史大型证据 |
-| `xoffsetdatastructure-<VERSION>-full.tar.gz` 安装包 | 两个生产头、`XOffset::xoffset` 与 `XOffset::storage`、851 个私有依赖头、CMake 配置、版本/兼容文档与许可证 | 编译器、SDK、runtime、原生程序二进制 |
-| `xoffsetdatastructure-<VERSION>-storage.tar.gz` 安装包 | OS 头 `xoffset_virtual_memory.hpp`、`XOffset::storage`、CMake 配置、版本/兼容文档与项目许可证 | 完整 XBuffer/容器头、Boost、TypeLayout、编译器、SDK、runtime |
+| `xoffsetdatastructure-<VERSION>.tar.gz` source archive | The two production headers, CMake, tests/examples, required tools and user documentation, the 851 pinned dependency headers and their licenses | Compiler, libc++/system runtime, SDK, build outputs, experiment directories and large historical evidence |
+| `xoffsetdatastructure-<VERSION>-full.tar.gz` install archive | The two production headers, `XOffset::xoffset` and `XOffset::storage`, the 851 private dependency headers, CMake config, version/compatibility documents and licenses | Compiler, SDK, runtime, native program binaries |
+| `xoffsetdatastructure-<VERSION>-storage.tar.gz` install archive | The OS header `xoffset_virtual_memory.hpp`, `XOffset::storage`, CMake config, version/compatibility documents and the project license | Full XBuffer/container headers, Boost, TypeLayout, compiler, SDK, runtime |
 
-源码包的依赖闭包可在没有 `.git` 的解压目录中通过内容锁检查。它不是完整 Boost
-发行版，也不是包含全部历史原始证据的离线研究档案。源码归档中的
-`VALIDATION_RUNNER.md` 保留部分历史入口说明；本包包含的运行入口是 native
-full/storage 及 package 验证，历史 wire fixture、日期专用 Windows/network runner
-和实验工具不在发行范围内。
+The source archive's dependency closure can be checked by content lock in an extracted directory with
+no `.git`. It is not a complete Boost distribution, nor an offline research archive containing all
+historical raw evidence. `VALIDATION_RUNNER.md` in the source archive keeps some historical entry-point
+notes; the run entry points included in this archive are native full/storage and package validation;
+historical wire fixtures, date-specific Windows/network runners and experiment tools are outside the
+distribution.
 
 ## Requirements
 
-| 目标 | 最低要求 |
+| Target | Minimum requirements |
 | --- | --- |
-| `XOffset::storage` | C++17，CMake 3.13+，Linux/macOS/Windows VM API，线程支持 |
-| `XOffset::xoffset` | GCC 16+（libstdc++），或 P2996 Clang（配套 libc++）；CMake 3.30+；64-bit little-endian |
-| 维护的 Python 验证入口及其测试 | Python 3.10+；storage 的 JUnit 验证需要 CMake/CTest 3.21+，full 需要 3.30+；C++ 库没有 Python 运行依赖 |
+| `XOffset::storage` | C++17, CMake 3.13+, Linux/macOS/Windows VM APIs, thread support |
+| `XOffset::xoffset` | GCC 16+ (libstdc++) or P2996 Clang (with its libc++); CMake 3.30+; 64-bit little-endian |
+| The maintained Python validation entry points and their tests | Python 3.10+; storage JUnit validation needs CMake/CTest 3.21+ and full needs 3.30+; the C++ library has no Python run-time dependency |
 
-完整目标传播 `cxx_std_26`、reflection 与 Threads；用 Clang 时另外传播 expansion
-statements 和 libc++，用 GCC 时用 libstdc++。消费项目自行设置 C++17 不会覆盖完整目标的
-要求；没有 P2996 反射的 C++26 编译器（例如 NDK、Xcode、MSVC 自带的版本）不能替代。
-Windows x64 上完整库用 MinGW-w64 GCC 16 验证过（本地平台矩阵，全量 CTest 与 wire 语料，
-见 [CLIENT_TARGETS.md](CLIENT_TARGETS.md)）；MSVC 和 clang-cl 只有 V1 时期的 storage
-记录，完整库不支持。
+The full target propagates `cxx_std_26`, reflection and Threads; with Clang it also propagates
+expansion statements and libc++, and with GCC it uses libstdc++. A consumer project setting C++17 does
+not override the full target's requirements; C++26 compilers without P2996 reflection (for example the
+versions shipped with NDK, Xcode or MSVC) cannot substitute. On Windows x64 the full library was
+verified with MinGW-w64 GCC 16 (local platform matrix, full CTest and wire corpus, see
+[CLIENT_TARGETS.md](CLIENT_TARGETS.md)); MSVC and clang-cl only have V1-era storage records, and the
+full library is not supported there.
 
 ## Fixed inputs
 
-[toolchains/README.md](../toolchains/README.md) 和
-[vm-validation.json](../toolchains/vm-validation.json) 记录固定镜像、编译器来源、
-依赖和官方 CMake 4.2.3 archive 的 SHA-256。历史 Linux Docker 输入为 immutable
-registry digest，编译器 revision 是 `a5270822dede40aaaf2c62381b89f110d2cfda4c`；
-新 WSL 接续编译器是 `9ffb96e3ce362289008e14ad2a79a249f58aa90a`，二者不是同一 profile。
-Dockerfile 是固定编译器源码的构建配方，但其 Ubuntu base tag/apt 输入仍可变，
-不能将重建镜像说成已验证 registry digest 的字节副本。
+[toolchains/README.md](../toolchains/README.md) and
+[vm-validation.json](../toolchains/vm-validation.json) record the SHA-256 of the pinned image, compiler
+sources, dependencies and the official CMake 4.2.3 archive. The historical Linux Docker input is an
+immutable registry digest with compiler revision `a5270822dede40aaaf2c62381b89f110d2cfda4c`; the newer
+WSL continuation compiler is `9ffb96e3ce362289008e14ad2a79a249f58aa90a`, and the two are not the same
+profile. The Dockerfile is a recipe that builds the pinned compiler source, but its Ubuntu base tag and
+apt inputs are still mutable, so a rebuilt image must not be described as a byte copy of the verified
+registry digest.
 
-源码包已包含固定依赖，不需要下载子模块。Git 检出则使用父 gitlink，保持 LF 字节：
+The source archive already includes the pinned dependencies and needs no submodule download. A Git
+checkout uses the parent gitlinks and keeps LF bytes:
 
 ```sh
 git -c core.autocrlf=false -c core.eol=lf submodule update --init -- external/boost external/typelayout
 git -c core.autocrlf=false -c core.eol=lf -C external/boost submodule update --init -- libs/container libs/core libs/config libs/throw_exception libs/static_assert libs/container_hash libs/type_traits libs/winapi libs/intrusive libs/predef
 ```
 
-Boost 固定于 `da041154c6bac1a4aa98254a7d6819059e8ac0b0`，TypeLayout 固定于
-`fe295929d0a5bfa7809fb737a6eb3db279599346`。完整配置按
-`cmake/XOffsetDependencyLock.cmake` 核对 11 个 include tree 与 3 个许可证的内容，
-不依赖 Git 元数据。不要使用 `--remote` 升级依赖，也不要改锁来接受 CRLF 或其他差异。
-已有检出的字节不匹配时，先保护修改并诊断，重复 update 不代表已修复。
+Boost is pinned at `da041154c6bac1a4aa98254a7d6819059e8ac0b0` and TypeLayout at
+`fe295929d0a5bfa7809fb737a6eb3db279599346`. The full configuration checks the contents of 11 include
+trees and 3 licenses against `cmake/XOffsetDependencyLock.cmake`, independent of Git metadata. Do not
+upgrade dependencies with `--remote`, and do not change the lock to accept CRLF or other differences.
+When the bytes of an existing checkout do not match, protect your changes and diagnose first; repeating
+the update does not mean it is fixed.
 
-准备固定 CMake 的例子（输出必须为新目录）：
+Example of preparing the pinned CMake (the output must be a new directory):
 
 ```sh
 python3 tools/prepare_vm_cmake.py --platform linux-x86_64 --out build/cmake-alpha
 ```
 
-该工具下载并核对锁定 archive，也可用 `--archive` 指向已下载文件；CMake 位于
-`build/cmake-alpha/root/bin`。固定 Linux 镜像自带的 CMake 3.28.3 不足以构建 full。
-例如在 Linux shell 中以固定镜像运行 full 检查：
+The tool downloads and checks the locked archive, or `--archive` can point to an already downloaded
+file; CMake ends up in `build/cmake-alpha/root/bin`. The CMake 3.28.3 shipped in the pinned Linux image
+is not enough to build full. For example, run the full check in the pinned image from a Linux shell:
 
 ```sh
 XOFFSET_IMAGE=$(python3 -c 'import json; print(json.load(open("toolchains/vm-validation.json"))["profiles"]["linux-p2996"]["image"])')
@@ -74,18 +81,22 @@ docker run --rm --platform linux/amd64 -v "$PWD":/workspace -w /workspace \
   --build-dir build/docker-alpha-full -j 2
 ```
 
-`tools/prepare_vm_linux_current.py --compiler-root /opt/p2996-toolchain --out <新目录>`
-是另一条恢复已存在 `9ffb96e...` 编译器的本机配方：校验编译器并准备固定的私有
-runtime/link wrapper；它不下载该编译器，也不将宿主系统头冒充完整 sysroot。
-选择该路径后，以输出的 `bin/clang++` 显式构建；不要用历史 `linux-p2996` 身份
-检查把新 revision 重标为旧镜像。macOS 的固定 compiler/SDK 输入也单独列于 toolchain 锁。
+`tools/prepare_vm_linux_current.py --compiler-root /opt/p2996-toolchain --out <new directory>` is
+another local recipe that restores an existing `9ffb96e...` compiler: it checks the compiler and
+prepares the pinned private runtime/link wrapper; it does not download the compiler, and it does not
+pass off host system headers as a complete sysroot. When taking this path, build explicitly with the
+output `bin/clang++`; do not relabel the new revision as the old image with the historical
+`linux-p2996` identity check. The pinned compiler/SDK inputs for macOS are listed separately in the
+toolchain lock.
 
-SDK、标准库 include/library 和运行时搜索路径由调用方 toolchain 文件或显式参数提供。
-本机便利检测路径不会写进导出目标。不要把实验性 libc++ 全局加入系统工具加载路径。
+SDK, standard library include/library and run-time search paths are supplied by the caller's toolchain
+file or explicit arguments. Convenience paths detected on the local machine are never written into the
+exported targets. Do not add the experimental libc++ to the system tool loader path globally.
 
-## 创建、审计与解压归档
+## Creating, auditing and extracting archives
 
-在已经准备好固定依赖的源码树执行（下文 `<VERSION>` 是 `XOFFSET_VERSION` 的内容，`prepare_release.py` 从同一源码树的这个文件读版本）：
+Run in a source tree whose pinned dependencies are prepared (`<VERSION>` below is the content of
+`XOFFSET_VERSION`; `prepare_release.py` reads the version from that file in the same source tree):
 
 ```sh
 python3 tools/prepare_release.py create --source-dir . --out build/release-source
@@ -98,14 +109,14 @@ python3 tools/prepare_release.py extract \
   --out build/release-source-extracted
 ```
 
-创建输出含 archive、同名 `.manifest.json` 及 `SHA256SUMS`；归档根目录为
-`xoffsetdatastructure-<VERSION>/`，内含 `SOURCE_MANIFEST.json`。
-`audit` 可不传外部 manifest/checksums，但对外分发时应另行固定 archive/manifest 身份。
-`extract` 先审计再提取，源码位于
-`build/release-source-extracted/xoffsetdatastructure-<VERSION>/`。
-完整性哈希不是签名或来源认证。
+The create output contains the archive, a `.manifest.json` with the same name and `SHA256SUMS`; the
+archive root is `xoffsetdatastructure-<VERSION>/`, which contains `SOURCE_MANIFEST.json`. `audit` can
+run without an external manifest/checksums, but for external distribution the archive/manifest identity
+should be pinned separately. `extract` audits before extracting, and the source ends up in
+`build/release-source-extracted/xoffsetdatastructure-<VERSION>/`. Integrity hashes are not signatures
+or source authentication.
 
-已验证的安装 prefix 可分别包装为 full/storage 归档：
+Verified install prefixes can be packed into full/storage archives:
 
 ```sh
 python3 tools/prepare_release.py pack-prefix --prefix /path/to/verified-full-prefix \
@@ -117,18 +128,21 @@ python3 tools/prepare_release.py extract \
   --out build/release-full-extracted
 ```
 
-安装归档同样带外部 `.manifest.json`/`SHA256SUMS`，内部为 `INSTALL_MANIFEST.json`。
-full 解压后 prefix 为 `build/release-full-extracted/xoffsetdatastructure-<VERSION>-full`，
-将它传给消费项目的 `CMAKE_PREFIX_PATH`；storage 的根名以 `-storage` 结尾。
-`audit`/`extract` 同时支持三类 archive。包装/哈希通过不能替代实际解压后的消费构建。
+Install archives also carry an external `.manifest.json`/`SHA256SUMS`, with `INSTALL_MANIFEST.json`
+inside. After extracting full, the prefix is
+`build/release-full-extracted/xoffsetdatastructure-<VERSION>-full`; pass it to the consumer project's
+`CMAKE_PREFIX_PATH`; the storage root name ends with `-storage`. `audit`/`extract` support all three
+archive kinds. Passing packing and hashing does not replace an actual consumer build from the extracted
+archive.
 
-所有输出使用新目录；source/out 不接受 symlink。create 输出不能等于或包围源码，
-也不能位于待复制的 cmake/tests/tools/examples/include/external/docs/toolchains 内；
-`build/release-source` 这类独立目录可用。工具不会覆盖已有产物或触发 CI/发布。
+All outputs use new directories; source/out do not accept symlinks. The create output must not equal or
+contain the source, and must not be inside the cmake/tests/tools/examples/include/external/docs/toolchains
+directories being copied; a separate directory such as `build/release-source` works. The tool never
+overwrites existing artifacts or triggers CI or a release.
 
-## 构建和安装
+## Building and installing
 
-在源码根目录构建 full：
+Build full from the source root:
 
 ```sh
 cmake -S . -B build/alpha-package \
@@ -139,15 +153,16 @@ cmake --build build/alpha-package --config Release
 cmake --install build/alpha-package --config Release
 ```
 
-storage-only 加 `-DXOFFSET_STORAGE_ONLY=ON`，使用普通平台编译器，跳过完整头、依赖和
-P2996 检查。full 安装同时提供 full/storage，storage 安装请求 full 会明确失败。
-源树顶层默认构建 tests/tools/examples；作为 `add_subdirectory` 依赖时，以下四项
-默认关闭，可分别显式开启：`XOFFSET_BUILD_TESTS`、`XOFFSET_BUILD_TOOLS`、
-`XOFFSET_BUILD_EXAMPLES`、`XOFFSET_INSTALL`。完整配置始终执行反射 compile/link 探测。
+For storage only, add `-DXOFFSET_STORAGE_ONLY=ON`: it uses an ordinary platform compiler and skips the
+full headers, dependencies and P2996 checks. A full install provides both full and storage; requesting
+full from a storage install fails explicitly. At the top level of the source tree, tests/tools/examples
+are built by default; as an `add_subdirectory` dependency these four are off by default and can each be
+turned on explicitly: `XOFFSET_BUILD_TESTS`, `XOFFSET_BUILD_TOOLS`, `XOFFSET_BUILD_EXAMPLES`,
+`XOFFSET_INSTALL`. The full configuration always runs the reflection compile/link probes.
 
-## 安装与源码消费
+## Consuming installs and sources
 
-full 安装消费的最小 `CMakeLists.txt`：
+Minimal `CMakeLists.txt` consuming a full install:
 
 ```cmake
 cmake_minimum_required(VERSION 3.30)
@@ -167,39 +182,42 @@ cmake -S /path/to/consumer -B build/consumer \
 cmake --build build/consumer --config Release
 ```
 
-storage 使用 `COMPONENTS storage`、`XOffset::storage` 和 CMake 3.13+。未指定组件默认
-请求 full。安装配置暴露 `XOffsetDatastructure_VERSION="0.2.0-alpha.1"`、
-`XOffsetDatastructure_VERSION_NUMERIC="0.2.0"`、
-`XOffsetDatastructure_VERSION_PRERELEASE="alpha.1"`。
-**任何数字、EXACT 或范围版本请求均保守拒绝**，避免 CMake 把 alpha 当作稳定版本。
-不要写 `find_package(XOffsetDatastructure 0.2.0 ...)`，也不要把带 alpha 的字符串放在
-CMake 数字版本实参中；采用无版本查找再核对完整字符串。
+Storage uses `COMPONENTS storage`, `XOffset::storage` and CMake 3.13+. With no component specified,
+full is requested. The install config exposes `XOffsetDatastructure_VERSION="0.2.0-alpha.1"`,
+`XOffsetDatastructure_VERSION_NUMERIC="0.2.0"` and `XOffsetDatastructure_VERSION_PRERELEASE="alpha.1"`.
+**Any numeric, EXACT or range version request is conservatively rejected**, so that CMake does not
+treat an alpha as a stable version. Do not write `find_package(XOffsetDatastructure 0.2.0 ...)`, and do
+not put a string with alpha in a CMake numeric version argument; find without a version and then check
+the full string.
 
-源码消费：
+Source consumption:
 
 ```cmake
 add_subdirectory(path/to/XOffsetDatastructure)
 target_link_libraries(my_app PRIVATE XOffset::xoffset)
 ```
 
-需要 storage 时，在 `add_subdirectory` 前设置 `XOFFSET_STORAGE_ONLY=ON` 并改链
-`XOffset::storage`。根 `project()` 的版本为数字 `0.2.0`；源码树的完整 prerelease
-变量是 `XOFFSET_VERSION_FULL`，不要把根 project 数字变量当成安装配置的完整版本。
+When you need storage, set `XOFFSET_STORAGE_ONLY=ON` before `add_subdirectory` and link
+`XOffset::storage` instead. The root `project()` version is the numeric `0.2.0`; the source tree's full
+prerelease variable is `XOFFSET_VERSION_FULL`; do not take the root project's numeric variable as the
+install config's full version.
 
-## 安装内容和许可证
+## Install contents and licenses
 
-full 的私有 include 根为 `include/xoffset-deps/`，包含 TypeLayout 的 19 个 include
-文件和 Boost container/core/config/throw_exception/static_assert/container_hash/
-type_traits/winapi/intrusive/predef，共 851 个依赖头，保留原版权标注。
+The full private include root is `include/xoffset-deps/`, containing TypeLayout's 19 include files and
+Boost container/core/config/throw_exception/static_assert/container_hash/type_traits/winapi/intrusive/predef,
+851 dependency headers in total, with their original copyright notices kept.
 
-- `share/XOffsetDatastructure/xoffset-third-party-manifest.txt` 记录来源版本和逐文件 SHA-256。
-- 两种安装都包含 `share/XOffsetDatastructure/VERSION`、`CHANGELOG.md` 和
-  `ALPHA_COMPATIBILITY.md`。
-- `share/XOffsetDatastructure/licenses/` 包含项目 MIT 许可证；full 另含 Boost
-  `LICENSE_1_0.txt`、TypeLayout `LICENSE` 与 `LICENSE_1_0.txt`。
-- include/lib/share 子目录必须位于 prefix 内；导出目标只使用可重定位安装路径。
+- `share/XOffsetDatastructure/xoffset-third-party-manifest.txt` records source versions and per-file
+  SHA-256.
+- Both installs contain `share/XOffsetDatastructure/VERSION`, `CHANGELOG.md` and
+  `ALPHA_COMPATIBILITY.md`.
+- `share/XOffsetDatastructure/licenses/` contains the project's MIT license; full also contains Boost's
+  `LICENSE_1_0.txt` and TypeLayout's `LICENSE` and `LICENSE_1_0.txt`.
+- The include/lib/share subdirectories must be inside the prefix; exported targets only use relocatable
+  install paths.
 
-## 消费验收与平台边界
+## Consumer acceptance and platform boundary
 
 ```sh
 python3 tools/validate_vm_package.py --suite storage --out build/alpha-package-storage
@@ -207,89 +225,110 @@ python3 tools/validate_vm_package.py --suite full --out build/alpha-package-full
   --compiler /path/to/p2996/bin/clang++ --library-dir /path/to/matching/libcxx
 ```
 
-Windows 从 x64 MSVC 开发者终端用 `python` 执行第一条命令即可；此处不依赖日期专用
-Windows runner。可指定 `--source-dir`、`--sdk`、`--generator`、`--jobs`。
-使用新输出目录，避免放入验证器待复制的源码目录范围。工具不下载依赖。
+On Windows, running the first command with `python` from an x64 MSVC developer prompt is enough; this
+does not depend on the date-specific Windows runner. `--source-dir`, `--sdk`, `--generator` and
+`--jobs` can be given. Use a new output directory, outside the source directories the validator copies.
+The tool does not download dependencies.
 
-验证器固定源码副本、构建安装、核对精确包内容/许可证/版本策略，然后移动 prefix，
-使原生产源码路径不可用，运行 installed 3 项和源码 subproject 3 项多翻译单元消费。
-覆盖 owner 转移、池归还/重用、live owner 下 clear、handle 先销毁及跨翻译单元静态析构，
-并核对源码/安装包前后不变。它不代替 full、sanitizer、TSan 或 wire 验证。
-共享库、动态插件、跨 CRT、混合工具链或混合头版本未获此验收。
+The validator pins a copy of the source, builds the install, checks the exact package contents,
+licenses and version policy, then moves the prefix so the original production source path is
+unavailable, and runs 3 installed and 3 source-subproject multi-translation-unit consumers. It covers
+owner transfer, pool return/reuse, clear with a live owner, destroying the handle first and static
+destruction across translation units, and checks that the source and install packages are unchanged
+before and after. It does not replace full, sanitizer, TSan or wire validation. Shared libraries,
+dynamic plugins, cross-CRT use, mixed toolchains or mixed header versions are not covered by this
+acceptance.
 
-以下为 0.1.0-alpha.1（V1 格式）时期的已记录基线，不代表 V2；V2 的验证记录见 README 的 Validation scope（GitHub CI 自 2026-10-23 停用，之后以 `tools/local_validate.sh` 和 `tools/platform_matrix.sh` 的本地验证为准）。归档自身的验收另行报告，不从基线自动继承：
+Below are recorded baselines from the 0.1.0-alpha.1 (V1 format) era, not V2; V2 validation records are
+in README's Validation scope (GitHub CI has been off since 2026-10-23; since then the local validation of
+`tools/local_validate.sh` and `tools/platform_matrix.sh` is the record). Acceptance of an archive itself
+is reported separately and is not inherited from the baselines:
 
-| 环境/配置 | 已记录结果 | 口径 |
+| Environment/configuration | Recorded result | Scope |
 | --- | --- | --- |
-| Windows x64 MSVC 19.44 | storage 2/2；installed 3/3、subproject 3/3 | 2026-10-16 原生运行；full P2996 未支持/未验 |
-| WSL2 x86_64 GCC 11.4 | storage 2/2；installed 3/3、subproject 3/3 | 当前同架构虚拟机功能证据 |
-| WSL2 P2996，初始恢复 profile | full 48/48，另 3 个 configure 检查 | `linux-current-20261016` |
-| WSL2 P2996，最终完整 profile | full installed 3/3、subproject 3/3；网络 ASan/UBSan 34 组/182 子场景；2 个受控缺陷检出 | `linux-current-complete-v2-20261016`；不是最终 profile 重跑全部 full 48 项 |
-| 历史 macOS arm64，固定 P2996/AppleClang storage | full 48/48；full 与 storage 各 installed 3/3、subproject 3/3 | 以前记录，非本机新跑 |
-| 历史 Linux x86_64 固定 Docker 镜像 | full 安装与源码消费各 3 项 | 在 arm64 宿主模拟执行，仅功能证据 |
+| Windows x64 MSVC 19.44 | storage 2/2; installed 3/3, subproject 3/3 | Native run on 2026-10-16; full P2996 not supported/not verified |
+| WSL2 x86_64 GCC 11.4 | storage 2/2; installed 3/3, subproject 3/3 | Functional evidence from a same-architecture VM |
+| WSL2 P2996, initial recovery profile | full 48/48, plus 3 configure checks | `linux-current-20261016` |
+| WSL2 P2996, final complete profile | full installed 3/3, subproject 3/3; network ASan/UBSan 34 groups/182 sub-scenarios; 2 controlled defects detected | `linux-current-complete-v2-20261016`; not a re-run of all 48 full items on the final profile |
+| Historical macOS arm64, pinned P2996/AppleClang storage | full 48/48; full and storage each installed 3/3, subproject 3/3 | Earlier record, not a new local run |
+| Historical Linux x86_64 pinned Docker image | full install and source consumption 3 items each | Emulated on an arm64 host, functional evidence only |
 
-上述证据与身份原在 `docs/VM_FINAL_DELIVERY.md`，2026-10-27 已移出源码树，取回方法见
-[ARCHIVED_EVIDENCE.md](ARCHIVED_EVIDENCE.md)；精简源码包不含这些研究记录。
-WSL 或 Docker 可用于后续 Linux 性能工作，不要求独立物理机作为当前准入条件；
-仍须注明虚拟化类别并先取得噪声资格。本次 WSL 唯一 78 进程 F/F 校准的四指标均未通过
-局部 anchor 和 drift 门槛，未建立 2% 比较能力，没有 D/F、ablation 或 adoption 结论。
-背景负载/平衡电源观测不构成因果归因，历史原记录不因此改写。
+This evidence and its identities were in `docs/VM_FINAL_DELIVERY.md`, which was moved out of the source
+tree on 2026-10-27; how to retrieve it is in [ARCHIVED_EVIDENCE.md](ARCHIVED_EVIDENCE.md); the slimmed
+source archive does not contain these research records. WSL or Docker can be used for later Linux
+performance work, and a separate physical machine is not currently an admission requirement; the
+virtualization class must still be stated and noise qualification obtained first. In this WSL's only
+78-process F/F calibration, none of the four metrics passed the local anchor and drift thresholds, so no
+2% comparison capability was established, and there are no D/F, ablation or adoption conclusions.
+Observations of background load or balanced power do not amount to causal attribution, and the original
+historical records are not rewritten because of them.
 
-本版本不承诺 N7 三项 I/O 扩展、生产异步 transport 或业务网络整合。当前已验
-网络范围是同步 TCP 回环参考与独立生命周期模型；缺少真实业务前提仍保留 F。
+This version does not promise the three N7 I/O extensions, a production asynchronous transport or
+business network integration. The network scope verified so far is a synchronous TCP loopback reference
+and a separate lifecycle model; without real business prerequisites, F stays.
 
-## 客户端体积与编译时间（SC-14）
+## Client binary size and compile time (SC-14)
 
-客户端引入 XOffset 后安装包变大多少，每多一个根 schema 再大多少，单个翻译单元编译多久。
-测量程序是 `tools/client_size/size_client.cpp`：收到一条消息后 `try_load_verified`、读字段、改一个字段、
-`save_compact`，按第一个字节分派到 N 个根 schema（`Msg1`..`MsgN`，每个含 `XString`、两个 `XVector`
-和一个定长数组，`XOFFSET_RECORD` 字段表）。N=0 的基线是同一个程序但不含 XOffset。
-构建方式与正式 App 相同：`MinSizeRel`（`-Os`）、`-ffunction-sections -fdata-sections` 加
-`--gc-sections`（Apple 用 `-dead_strip`）、strip 后的字节数。
+How much larger a client's install package gets after adding XOffset, how much more each additional
+root schema adds, and how long one translation unit takes to compile. The measurement program is
+`tools/client_size/size_client.cpp`: after receiving a message it runs `try_load_verified`, reads fields,
+changes one field, `save_compact`, and dispatches on the first byte to N root schemas (`Msg1`..`MsgN`,
+each with an `XString`, two `XVector`s and a fixed-size array, with `XOFFSET_RECORD` field lists). The
+N=0 baseline is the same program without XOffset. Built the same way as a real app: `MinSizeRel`
+(`-Os`), `-ffunction-sections -fdata-sections` plus `--gc-sections` (`-dead_strip` on Apple), bytes
+after strip.
 
 ```sh
-tools/client_size/measure.sh android-arm64 OUT [--std 20|23]   # 需要 ANDROID_NDK
-tools/client_size/measure.sh ios-device OUT                      # Mac，Xcode
+tools/client_size/measure.sh android-arm64 OUT [--std 20|23]   # needs ANDROID_NDK
+tools/client_size/measure.sh ios-device OUT                      # Mac, Xcode
 ```
 
-Android arm64-v8a，NDK r29 Clang 21.0.0，API 28，`c++_static`，C++20 字段表构建，提交 af601ea（字节）：
+Android arm64-v8a, NDK r29 Clang 21.0.0, API 28, `c++_static`, C++20 field-list build, commit af601ea
+(bytes):
 
-| 异常 | 基线（无 XOffset） | 1 个 schema | 库本身（1 个 schema 减基线） | 2 | 4 | 8 | 每多一个 schema |
+| Exceptions | Baseline (no XOffset) | 1 schema | Library itself (1 schema minus baseline) | 2 | 4 | 8 | Per additional schema |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 开 | 193,416 | 261,248 | **+67,832** | 273,312 | 297,456 | 348,144 | **+12,414** |
-| 关（`-fno-exceptions`） | 193,320 | 258,040 | **+64,720** | 267,752 | 287,176 | 327,752 | **+9,959** |
+| On | 193,416 | 261,248 | **+67,832** | 273,312 | 297,456 | 348,144 | **+12,414** |
+| Off (`-fno-exceptions`) | 193,320 | 258,040 | **+64,720** | 267,752 | 287,176 | 327,752 | **+9,959** |
 
-演示客户端（`demo/mapstate` 的 `mapdemo_client`，含网络、握手、三种编码和全部校验）：
+Demo client (`mapdemo_client` of `demo/mapstate`, with networking, handshake, three encodings and all
+validation):
 
-| 构建 | 带 zstd 1.5.7 | 不带 zstd |
+| Build | With zstd 1.5.7 | Without zstd |
 | --- | ---: | ---: |
-| 开异常 | 1,006,176 | 639,792 |
-| 关异常 | 973,368 | 607,720 |
+| Exceptions on | 1,006,176 | 639,792 |
+| Exceptions off | 973,368 | 607,720 |
 
-- 库本身约 65 KB，每个根 schema 约 10–12 KB（关异常时小约 2.5 KB）。C++23 构建的结果相差 0.5% 以内
-  （+67,960 / +12,745，关异常 +64,864 / +10,279）。
-- 演示客户端里 zstd 占约 366 KB；不压缩的客户端去掉它。
-- 单个翻译单元编译时间（3 次取中位数，云端 Xeon，`-Os`）：不含 XOffset 的程序 0.56 s，1 个 schema 2.64 s，
-  8 个 schema 5.09 s，演示的 `client_core.cpp` 5.15 s。头文件解析约 2 s，之后每个 schema 约 0.35 s；
-  把收发代码集中在少数几个翻译单元里，不要在每个文件里都包含 schema。
+- The library itself is about 65 KB and each root schema about 10–12 KB (about 2.5 KB less without
+  exceptions). C++23 builds differ by under 0.5% (+67,960 / +12,745; without exceptions
+  +64,864 / +10,279).
+- zstd takes about 366 KB of the demo client; clients that do not compress drop it.
+- Compile time of one translation unit (median of 3, cloud Xeon, `-Os`): the program without XOffset
+  0.56 s, 1 schema 2.64 s, 8 schemas 5.09 s, the demo's `client_core.cpp` 5.15 s. Header parsing takes
+  about 2 s, then about 0.35 s per schema; keep send/receive code in a few translation units instead of
+  including the schemas in every file.
 
-iOS arm64（`ios-device`），Xcode 27.1 的 Apple Clang 21.0.0（clang-2100.3.34.2），`-dead_strip`、`strip -x`，
-C++20 字段表构建，提交 eb171ab（库头文件与 af601ea 相同，只多了 Mach-O 上把 64 MiB 所有者表放进零填充段）（字节）：
+iOS arm64 (`ios-device`), Apple Clang 21.0.0 from Xcode 27.1 (clang-2100.3.34.2), `-dead_strip`,
+`strip -x`, C++20 field-list build, commit eb171ab (library headers identical to af601ea except that on
+Mach-O the 64 MiB owner table is put in a zero-fill section) (bytes):
 
-| 异常 | 基线（无 XOffset） | 1 个 schema | 库本身（1 个 schema 减基线） | 2 | 4 | 8 | 每多一个 schema |
+| Exceptions | Baseline (no XOffset) | 1 schema | Library itself (1 schema minus baseline) | 2 | 4 | 8 | Per additional schema |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 开 | 50,448 | 108,648 | **+58,200** | 125,288 | 142,136 | 175,856 | **+9,601** |
-| 关（`-fno-exceptions`） | 50,328 | 107,848 | **+57,520** | 108,088 | 124,920 | 158,608 | **+7,251** |
+| On | 50,448 | 108,648 | **+58,200** | 125,288 | 142,136 | 175,856 | **+9,601** |
+| Off (`-fno-exceptions`) | 50,328 | 107,848 | **+57,520** | 108,088 | 124,920 | 158,608 | **+7,251** |
 
-| 构建 | 带 zstd 1.5.7 | 不带 zstd |
+| Build | With zstd 1.5.7 | Without zstd |
 | --- | ---: | ---: |
-| 开异常 | 676,848 | 294,160 |
-| 关异常 | 641,296 | 258,616 |
+| Exceptions on | 676,848 | 294,160 |
+| Exceptions off | 641,296 | 258,616 |
 
-- iOS 上库本身约 57 KB，每个根 schema 约 7–10 KB，都比 Android 小约 15%；C++23 构建相差不到 0.1%
-  （+58,216 / +9,602，关异常 +57,536 / +7,254）。
-- 单个翻译单元编译时间（3 次取中位数，Mac，`-Os`）：不含 XOffset 0.18 s，1 个 schema 0.77 s，8 个 schema
-  1.44 s，`client_core.cpp` 1.36 s。
-- 修正前 iOS 的每个程序都多出 64 MiB：Mach-O 编译器把带 `inline` 的零初始化变量放进 `__DATA,__data`，
-  所有者表因此整块写进可执行文件。`xoffset_slot_storage.hpp` 在 Apple 上把它放进 `__DATA,__bss`
-  （3.2，PR #162）；ELF 上它本来就在 `.bss`，不占文件。用到 3.1 的 iOS 客户端要升级到含这个修正的版本。
+- On iOS the library itself is about 57 KB and each root schema about 7–10 KB, both about 15% smaller
+  than on Android; C++23 builds differ by under 0.1% (+58,216 / +9,602; without exceptions
+  +57,536 / +7,254).
+- Compile time of one translation unit (median of 3, Mac, `-Os`): without XOffset 0.18 s, 1 schema
+  0.77 s, 8 schemas 1.44 s, `client_core.cpp` 1.36 s.
+- Before the fix, every iOS program was 64 MiB larger: the Mach-O compiler put zero-initialized
+  variables declared `inline` in `__DATA,__data`, so the whole owner table was written into the
+  executable. `xoffset_slot_storage.hpp` puts it in `__DATA,__bss` on Apple (3.2, PR #162); on ELF it
+  was already in `.bss` and takes no file space. iOS clients on 3.1 should upgrade to a version with
+  this fix.

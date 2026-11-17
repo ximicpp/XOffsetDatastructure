@@ -33,7 +33,7 @@ void mark(Root& r, std::uint32_t hop, std::string_view device) {
 
 inline std::string tag_name(Rng& r) {
     static constexpr std::string_view kTags[] = {"draft", "final", "legal", "team", "urgent", "q3", "review",
-                                                 "数据", "café", "spec", "howto", "old"};
+                                                 "\xE6\x95\xB0\xE6\x8D\xAE" /* "data" in Chinese, UTF-8 */, "café", "spec", "howto", "old"};
     const std::uint32_t t = r.below(sizeof kTags / sizeof kTags[0]);
     const std::uint32_t n = r.below(60);
     return std::string(kTags[t]) + "-" + std::to_string(n);

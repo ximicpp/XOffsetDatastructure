@@ -7,9 +7,9 @@
       "metric": "reloc.vec.push_back",
       "compiler": "p2996",
       "max_ratio": 1.045,
-      "reason": "加固开关默认关闭后 clear() 不再调 memset，基准里 8 个批次被展开，计时 lambda 不再内联进调用者，每个元素多 0.75 条指令（1300626 → 1352217，1.0397）；push_back 快路径的指令没有变",
-      "evidence": "PR #293 函数差异表：{lambda()#1}::operator() 只在 head 出现 +1,352,031，__func::operator() −1,278,576，memset −21,864（疑似内联变化）。试过让 clear() 对可平凡析构的元素直接写 size_ = 0，结果相同（1352169）；-DXOFFSET_SCRUB_ERASED=1 时回到 1300626。cache-sim：该项 D1、LL 缺失都是 0",
-      "approved_by": "susu（2026-11-17 01:01Z 在本 PR 线程的卡片上选「放行并合入」，cmsg_01W8h2niLCspyDhp6DxMomYu8P7pYnSg9zEHFgwY6XwcYo）"
+      "reason": "With the hardening switches off by default, clear() no longer calls memset; the bench unrolls 8 batches, the timed lambda is no longer inlined into its caller, and each element costs 0.75 more instructions (1300626 -> 1352217, 1.0397); the push_back fast path instructions did not change",
+      "evidence": "PR #293 function diff table: {lambda()#1}::operator() appears only in head +1,352,031, __func::operator() -1,278,576, memset -21,864 (suspected inlining change). Tried making clear() write size_ = 0 directly for trivially destructible elements: same result (1352169); with -DXOFFSET_SCRUB_ERASED=1 it returns to 1300626. cache-sim: D1 and LL misses of this item are both 0",
+      "approved_by": "susu (2026-11-17 01:01Z, chose \"allow and merge\" on the card in this PR's thread, cmsg_01W8h2niLCspyDhp6DxMomYu8P7pYnSg9zEHFgwY6XwcYo)"
     },
     {
       "id": "pr293-str-assign-short-copy-gcc16",
@@ -17,9 +17,9 @@
       "metric": "reloc.str.assign_short.copy",
       "compiler": "gcc16",
       "max_ratio": 1.045,
-      "reason": "加固开关默认关闭后 GCC 16 在基准循环里每次赋值多 1 条指令（640434 → 665292，1.0388）；被测路径是 operator= 里 12 字节的内联拷贝，本 PR 没有改它",
-      "evidence": "PR #293 函数差异表：增量全部在基准的 _M_invoke 里（640,326 → 665,184）。试过把 assign_general 在 GCC 上也放到行外，结果相同（665871）；-DXOFFSET_SCRUB_ERASED=1 时回到 640434。cache-sim：该项 D1、LL 缺失都是 0",
-      "approved_by": "susu（2026-11-17 01:01Z 在本 PR 线程的卡片上选「放行并合入」，cmsg_01W8h2niLCspyDhp6DxMomYu8P7pYnSg9zEHFgwY6XwcYo）"
+      "reason": "With the hardening switches off by default, GCC 16 spends 1 more instruction per assignment in the bench loop (640434 -> 665292, 1.0388); the measured path is the 12-byte inline copy in operator=, which this PR did not change",
+      "evidence": "PR #293 function diff table: the whole increase is in the bench's _M_invoke (640,326 -> 665,184). Tried moving assign_general out of line on GCC too: same result (665871); with -DXOFFSET_SCRUB_ERASED=1 it returns to 640434. cache-sim: D1 and LL misses of this item are both 0",
+      "approved_by": "susu (2026-11-17 01:01Z, chose \"allow and merge\" on the card in this PR's thread, cmsg_01W8h2niLCspyDhp6DxMomYu8P7pYnSg9zEHFgwY6XwcYo)"
     }
   ]
 }
