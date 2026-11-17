@@ -148,40 +148,40 @@ held.root().tick() += 1;                        // 仍然是普通的、可修�
 
 CppCon 2024 分享里的游戏角色（64 个物品的 map、路径点、属性、8 件各带属性的装备），用 4.0.0 和现在的规则重跑：
 随机数在计时前生成，各家的物品 map 都是同一种有序扁平 map，“接收”指接收方能读也能改，循环里删掉的东西各家都
-真释放，物品 key 每次迭代不同。15 个进程取中位数，e36cf44 的库（[测法和全部数据](bench/cppcon2024/README.md)）。
+真释放，物品 key 每次迭代不同。15 个进程取中位数，main 18a37f39 的库（[测法和全部数据](bench/cppcon2024/README.md)）。
 
 **发送 + 接收**（每条消息，复用 buffer，XOffset 用信任档）：
 
 | 库 | ns / 条 | XOffset ÷ 对手 |
 | --- | ---: | ---: |
-| XOffset | 83 | 1.00 |
-| zpp::bits | 340 | 0.24 |
-| FlatBuffers（构建 + 读出） | 614 | 0.14 |
-| cista（raw / offset，不校验） | 637 / 639 | 0.13 |
-| Cap'n Proto | 2,268 | 0.037 |
-| MessagePack | 6,112 | 0.014 |
-| Protocol Buffers | 8,789 | 0.009 |
+| XOffset | 87 | 1.00 |
+| zpp::bits | 265 | 0.33 |
+| FlatBuffers（构建 + 读出） | 543 | 0.16 |
+| cista（raw / offset，不校验） | 540 / 547 | 0.16 |
+| Cap'n Proto | 1,924 | 0.045 |
+| MessagePack | 5,335 | 0.016 |
+| Protocol Buffers | 6,892 | 0.013 |
 
-换成完整校验档，XOffset 是 171 ns，仍是 zpp::bits 的 0.50。
+换成完整校验档，XOffset 是 202 ns，仍是 zpp::bits 的 0.76。
 
 **读写循环**（每次：改标量和位置，增删装备、路径点、一个属性和一个物品）：
 
 | 布局 | XOffset | std 容器 | cista raw / offset | Protocol Buffers |
 | --- | ---: | ---: | ---: | ---: |
-| 2024 原样，ns | 144 | 343 | 236 / 259 | 592 |
-| XOffset ÷ 对手 | | 0.42 | 0.61 / 0.55 | 0.24 |
-| 调优写法\*，ns | 60 | 83 | 66 / 67 | 368 |
-| XOffset ÷ 对手 | | 0.72 | 0.91 / 0.90 | 0.16 |
+| 2024 原样，ns | 171 | 274 | 184 / 207 | 451 |
+| XOffset ÷ 对手 | | 0.62 | 0.92 / 0.82 | 0.38 |
+| 调优写法\*，ns | 51 | 70 | 54 / 57 | 288 |
+| XOffset ÷ 对手 | | 0.73 | 0.94 / 0.90 | 0.18 |
 
 \* 小的属性数组内联存放、按范围追加、按已知位置删除；每个能这样写的库都这样写。
 
-两种布局下原地读写都是这几个库里最快的，15 个进程里每一个都是。调优写法下对 cista 领先不多（0.90–0.91）。
-Protocol Buffers 默认的 `RemoveLast` 把删掉的 message 留给下一次 `add_` 复用，整个循环不分配（2024 原样
-77 ns，只报告，约是 XOffset 144 ns 的一半）；计分行和其他库一样真释放。**读写一次 + 发送一次 + 接收一次**，
-XOffset 144 ns（调优写法），zpp::bits（std 容器）390 ns（0.37），cista 661–682 ns（0.21–0.22），
-Protocol Buffers 9,157 ns（0.016）。
+两种布局下原地读写都是这几个库里最快的；逐进程比，XOffset 对 cista raw 15 个进程赢 14 个，对其他库全赢。
+对 cista 领先不多（调优写法 0.90–0.94）。Protocol Buffers 默认的 `RemoveLast` 把删掉的 message 留给下一次
+`add_` 复用，整个循环不分配（2024 原样 65.5 ns，只报告）；计分行和其他库一样真释放。**读写一次 + 发送一次 +
+接收一次**，XOffset 122 ns（调优写法），zpp::bits（std 容器）327 ns（0.37），cista 578–591 ns（0.21），
+Protocol Buffers 7,180 ns（0.017）。
 
-大小：`Character` 的 wire 原始 3,064 字节，zstd-3 后 2,986 字节（zpp::bits 2,926，Protocol Buffers 3,800）。
+大小：`Character` 的 wire 原始 3,112 字节，zstd-3 后 3,006 字节（zpp::bits 2,926，Protocol Buffers 3,804）。
 wire 头让 XOffset 的小消息比 zpp::bits 多约 100 字节；这是设计上接受的，只报告，不为此改格式。
 
 ### SLG 游戏服务器计分卡
