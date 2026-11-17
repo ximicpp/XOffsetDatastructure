@@ -167,80 +167,43 @@ The format is specified in [V2_FORMAT.md](docs/V2_FORMAT.md) (wire format 2.1).
 
 ## Performance
 
-Two comparisons, both on a cloud x86-64 Linux host (Xeon, GCC 16 `-O3`,
-pinned core). The host is noisy, so each figure is a median over many
-processes and ratios between 0.95 and 1.05 count as a tie. Ratios are
-XOffset ÷ rival: **below 1 means XOffset is faster**. Compression is never
-timed; sizes are reported after zstd level 3.
+Cloud x86-64 Linux (Xeon, GCC 16 `-O3`, pinned core), medians over many
+processes; 0.95–1.05 counts as a tie. Ratios are XOffset ÷ rival: **below 1
+means XOffset is faster**. Compression is not timed.
 
-### CppCon 2024 `Character`
+**CppCon 2024 `Character`** (64-item map, waypoints, attributes, 8 pieces of
+equipment; same sorted flat map and same rules for every library; 15
+processes; [method and all rows](bench/cppcon2024/README.md)):
 
-The game character from the CppCon 2024 talk (64-item map, waypoints,
-attributes, 8 pieces of equipment with attributes each), rerun with 4.0.0 and
-current rules: random numbers are drawn before timing, every library's map is
-the same sorted flat map, receiving means "the receiver can read and modify
-the state", every library really frees what the loop removes, and each
-iteration uses a new map key. Median of 15 processes, library at e36cf44
-([method and all rows](bench/cppcon2024/README.md)).
+| ns per operation | XOffset | zpp::bits\* | cista raw | FlatBuffers | Protocol Buffers |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Send + receive, buffer as filled | 83 | 340 | 637 | 614 | 8,789 |
+| Read/write loop, 2024 layout | 144 | 343 | 236 | | 592 |
+| Read/write loop, tuned layout | 60 | 83 | 66 | | 368 |
 
-**Send + receive** (one message, buffers reused, XOffset trusted tier):
+\* The read/write rows of zpp::bits are std containers.
 
-| Library | ns / message | XOffset ÷ lib |
-| --- | ---: | ---: |
-| XOffset | 83 | 1.00 |
-| zpp::bits | 340 | 0.24 |
-| FlatBuffers (build + read back) | 614 | 0.14 |
-| cista (raw / offset, unchecked) | 637 / 639 | 0.13 |
-| Cap'n Proto | 2,268 | 0.037 |
-| MessagePack | 6,112 | 0.014 |
-| Protocol Buffers | 8,789 | 0.009 |
+- Send + receive is XOffset's best case when the buffer was filled once: its
+  wire is the buffer. After the read/write loop has churned it, the wire grows
+  from 3,064 to 7,928 bytes and send + receive takes 181 ns, 0.57 of
+  zpp::bits (trusted tier) or 1.04, a tie (full validation tier).
+- Read/write is the fastest of the scored rows in both layouts. Against cista
+  on the tuned layout the margin is small (0.90–0.98): a tie to a small win.
+  Protocol Buffers' default `RemoveLast` keeps removed messages for reuse and
+  then takes 77 ns on the 2024 layout (report only; the scored row frees them
+  like every other library).
+- Sizes after zstd-3: XOffset 2,986 bytes, zpp::bits 2,926, Protocol Buffers
+  3,800. The wire header makes small messages about 100 bytes larger than
+  zpp::bits; this is by design.
 
-With the full validation tier instead, XOffset takes 171 ns, still 0.50 of
-zpp::bits.
+**SLG game-server scorecard** (`bench/slg`: login state, per-client and shared
+viewport deltas, client orders, server hand-offs; XOffset trusted tier against
+the strongest unchecked rival per cell): **19 cells, 14 wins, 5 ties, 0
+losses** on 4.0.0. XOffset messages are 1.11–1.46x zpp_bits after zstd-3.
 
-**Read/write loop** (one iteration: change scalars and position, add and
-remove equipment, waypoints, an attribute and a map item):
-
-| Layout | XOffset | std containers | cista raw / offset | Protocol Buffers |
-| --- | ---: | ---: | ---: | ---: |
-| 2024 layout, ns | 144 | 343 | 236 / 259 | 592 |
-| XOffset ÷ lib | | 0.42 | 0.61 / 0.55 | 0.24 |
-| Tuned layout\*, ns | 60 | 83 | 66 / 67 | 368 |
-| XOffset ÷ lib | | 0.72 | 0.91 / 0.90 | 0.16 |
-
-\* Small attribute arrays stored inline, range append, erase at a known
-position; applied to every library that can express it.
-
-In-place read/write is the fastest of these libraries in both layouts, in
-every one of the 15 processes. The margin over cista is small on the tuned
-layout (0.90–0.91). Protocol Buffers' default `RemoveLast` keeps the removed
-messages for the next `add_`, so its loop allocates nothing (77 ns on the
-2024 layout, report-only, about half of XOffset's 144 ns); the scored row
-frees them like every other library. **One read/write iteration plus one
-send and receive** costs XOffset 144 ns (tuned), against 390 ns for zpp::bits
-on std containers (0.37), 661–682 ns for cista (0.21–0.22) and 9,157 ns for
-Protocol Buffers (0.016).
-
-Size: the `Character` wire is 3,064 bytes raw and 2,986 bytes after zstd-3
-(zpp::bits 2,926, Protocol Buffers 3,800). The wire header makes small
-XOffset messages about 100 bytes larger than zpp::bits; this is accepted by
-design and reported, not optimized away.
-
-### SLG game-server scorecard
-
-`bench/slg` models a strategy game server end to end: whole state on login,
-per-client deltas, a shared map viewport, client orders going up, and players
-moving between servers. Each cell times only data writing, sending and
-receiving, against the strongest rival for that cell (zpp_bits or unchecked
-cista, both without verification, XOffset on its trusted tier). For the 4.0.0
-release ([PERFORMANCE.md 6b](docs/PERFORMANCE.md)): **19 gated cells, 14 wins,
-5 ties, 0 losses**, 8 batches × 21 cycles, the borderline shared-delta cells
-re-judged under three code layouts.
-
-These numbers hold for these workloads, adapters and hosts. A different
-workload or a different way of writing the rival adapters can change them.
-[PERFORMANCE.md](docs/PERFORMANCE.md) has the per-release history (including
-the earlier Apple M4 results), the protocol and the limits.
+These numbers hold for these workloads, adapters and hosts.
+[PERFORMANCE.md](docs/PERFORMANCE.md) has the method, the reading notes of the
+2026-11-17 review and the limits.
 
 ## Quick start (C++20)
 

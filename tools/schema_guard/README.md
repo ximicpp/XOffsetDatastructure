@@ -284,8 +284,6 @@ capable of executing each binary. A successful link is not an execution result.
 Windows ARM64 needs a real matching Windows runtime; an unverified compatibility
 layer must not be reported as a native Windows pass.
 
-See VALIDATION_WINDOWS_20261028.md for the latest run and limitations.
-
 ## iOS simulator x64
 
 build_wire_apple.py accepts --include-simulator-x64 to emit an additional x64

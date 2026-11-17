@@ -49,6 +49,8 @@ part of the read/write loop, to see where the time goes.
   - XOffset: `save_verified_into` / `save_verified`; receiving uses the trusted tier
     `XReceiver<XLink::server_peer>` (`reload` into a reused buffer / `load` a new one). The full
     validation tier (`reload_verified` / `load`) is report only.
+    The scored rows send a buffer that was filled once. `sr_reuse_after_rw` (report only) sends the
+    buffer the read/write loop has run on, whose wire also carries spare capacity and freed blocks.
   - zpp::bits, MessagePack: encode std objects, decode into std objects.
   - Protocol Buffers: as in 2024, the state is the mutable protobuf message: `SerializeToString` +
     `ParseFromString`.
@@ -86,288 +88,66 @@ part of the read/write loop, to see where the time goes.
 - Both sets of XOffset read/write rows use one `edit()` per iteration. One `edit()` around all
   iterations of a round is report only (`rw_one_scope`).
 
-## Latest results: XVector first block of at least 32 bytes (2026-11-17)
+## Results
 
-This set supersedes the next section as the one the top-level README quotes.
+Library e36cf44 (main after PR #298), cloud x86-64, GCC 16.2, median of 15 processes; ratios between
+0.95 and 1.05 count as a tie. Full tables and the raw output of every process:
+[`results/2026-11-17-first-block/summary.md`](results/2026-11-17-first-block/summary.md) (the library
+before PR #298 on the same machine: [`before.md`](results/2026-11-17-first-block/before.md)).
 
-One library change (e36cf44): the block an empty `XVector` takes on its first append holds at least 32 bytes
-(8 floats or 32-bit ids; it was 4 elements, 16 bytes), and a `push_back` of a small scalar that triggers growth
-skips the staged copy and insert checks of the general path. The case is the fair case of the next section,
-unchanged. The library before (main 837c9d4f) and after ran 15 processes each on the same cloud machine,
-alternating; medians below. All tables and the raw output of every process:
-[`results/2026-11-17-first-block/summary.md`](results/2026-11-17-first-block/summary.md) (after) and
-[`before.md`](results/2026-11-17-first-block/before.md) (before). The machine was about 1.2 times slower this
-time than in the next section, so compare ratios across sections, not nanoseconds.
+**Send + receive** (ns per message, buffers reused; XOffset trusted tier):
 
-| Row | Before | After |
+| Library | ns | XOffset ÷ lib |
 | --- | ---: | ---: |
-| Read/write, 2024 layout: XOffset ns | 202.6 | 143.5 |
-| ÷ std / cista raw / cista offset / Protocol Buffers | 0.59 / 0.84 / 0.80 / 0.35 | 0.42 / 0.61 / 0.55 / 0.24 |
-| Read/write, tuned layout: XOffset ns | 61.3 | 60.4 |
-| ÷ std / cista raw / cista offset / Protocol Buffers | 0.72 / 0.96 / 0.91 / 0.17 | 0.72 / 0.91 / 0.90 / 0.16 |
-| Send + receive reuse, 2024 layout: XOffset ns (÷ zpp::bits) | 102.7 (0.31) | 83.2 (0.24) |
-| Send + receive reuse, full validation tier: XOffset ns (÷ zpp::bits) | 218.1 (0.65) | 170.5 (0.50) |
-| One read/write + send + receive, tuned: XOffset ns (÷ zpp::bits / cista) | 145.4 (0.36 / 0.22) | 144.4 (0.37 / 0.21–0.22) |
-| Wire bytes (zstd-3) | 3,112 (3,006) | 3,064 (2,986) |
+| XOffset | 83 | 1.00 |
+| zpp::bits | 340 | 0.24 |
+| FlatBuffers | 614 | 0.14 |
+| cista raw / offset | 637 / 639 | 0.13 |
+| Cap'n Proto | 2,268 | 0.037 |
+| MessagePack | 6,112 | 0.014 |
+| Protocol Buffers | 8,789 | 0.009 |
 
-- Read/write, 2024 layout: faster in every pair, median after ÷ before 0.71. Instructions per iteration
-  (GCC 16.2, callgrind) 3,489 -> 2,187. Four times per iteration the loop appends an equipment record with 8
-  float attributes and removes it; the attribute vector used to take 16 bytes and move to 32 bytes at the fifth
-  attribute (one more allocation, a copy and a retirement), and now takes 32 bytes at once. The equipment step
-  alone goes from 2,771 to 1,491 instructions per iteration.
-- Read/write, tuned layout: instructions unchanged (813), timing unchanged (pair ratio median 1.00). The move
-  from 0.96 to 0.91 against cista raw is jitter of the cista row (63.8 vs 66.3 ns). After the change XOffset
-  wins both read/write rows against every rival in all 15 processes.
-- Send + receive, 2024 layout: faster in every pair (median 0.81), 1,445 -> 994 instructions per message. The
-  sent state is built with `push_back`; each attribute vector used to leave a retired 16-byte block that was
-  saved and loaded with the wire's hole table. Those blocks are gone and the wire is 48 bytes smaller. The
-  inline-layout rows have no such vector and do not change (84 ns).
-- The report-only Protocol Buffers row that reuses removed messages (`RemoveLast`) takes 76.8 ns and is still
-  faster than XOffset's 143.5 ns: its loop allocates nothing. Doing the same in the library would keep removed
-  slots owning blocks, which changes the wire contract, so it is not done.
-- The report-only row `xoffset bulk` (2024 layout, bulk calls) reads 113.8 -> 119.9 ns with the same
-  instruction count (1,749). A separate program with only these rows, alternating on the same machine, gives
-  115.4 vs 113.4 ns, so this is code placement in the bench binary, not a slower library.
-- Cost: a vector grown one element at a time with `push_back` / `emplace_back` that ends with 1 to 4 four-byte
-  scalars takes 16 bytes more than before (24 more for 1- and 2-byte elements). `reserve()` and the range
-  assignments still size their block exactly. The wire format is unchanged.
+XOffset's full validation tier: 171 ns (0.50 of zpp::bits). New buffers per message: XOffset 204 ns,
+0.19 of zpp::bits.
 
-## Fair cases (2026-11-17)
+**Read/write loop** (ns per iteration):
 
-Two changes to the cases (the two items marked 2026-11-17 in "Scenario and rules" above): messages
-removed by Protocol Buffers are really freed, and item keys differ on every iteration. The library is
-main 18a37f39 (after PRs #292 and #293, hardening off by default). Cloud x86-64, GCC 16.2, median of 15
-processes. All tables and each process's raw output:
-[`results/2026-11-17-fair/`](results/2026-11-17-fair/summary.md). This machine differs from the ones in
-the sections below, so absolute nanoseconds cannot be compared across sections; ratios can.
-
-| Item | XOffset ns | std | cista raw / offset | Protocol Buffers |
+| Layout | XOffset | std | cista raw / offset | Protocol Buffers |
 | --- | ---: | ---: | ---: | ---: |
-| Read/write, 2024 layout: rival ns | 170.5 | 273.9 | 184.3 / 207.0 | 450.7 |
-| &emsp;XOffset ÷ rival | | 0.62 | 0.92 / 0.82 | 0.38 |
-| Read/write, tuned style: rival ns | 51.1 | 70.0 | 54.3 / 56.5 | 288.2 |
-| &emsp;XOffset ÷ rival | | 0.73 | 0.94 / 0.90 | 0.18 |
+| 2024 layout | 144 | 343 | 236 / 259 | 592 |
+| XOffset ÷ lib | | 0.42 | 0.61 / 0.55 | 0.24 |
+| Tuned | 60 | 83 | 66 / 67 | 368 |
+| XOffset ÷ lib | | 0.72 | 0.91 / 0.90 | 0.16 |
 
-- In both styles XOffset's read/write is the fastest. Per process, XOffset beats cista raw in 14 of 15
-  processes (in both the 2024 layout and the tuned style), and beats cista offset and Protocol Buffers in
-  all of them.
-- Protocol Buffers reusing objects with `RemoveLast` takes 65.5 ns in the 2024 layout (report only) and
-  450.7 ns when really freeing: its earlier 3x lead came entirely from object reuse.
-- Send+receive reuse: XOffset 87 ns, 0.33 of zpp::bits, 0.16 of FlatBuffers and cista, 0.045 of Cap'n
-  Proto, 0.016 of MessagePack, 0.013 of Protocol Buffers. The full validation tier is 202 ns (0.76 of
-  zpp::bits).
-- One read/write + send + receive (tuned style): XOffset 122 ns, zpp::bits (std containers) 327 ns
-  (0.37), cista 578–591 ns (0.21), Protocol Buffers 7,180 ns (0.017).
+XOffset is the fastest scored row in both layouts, in all 15 processes. Report only: Protocol Buffers
+with `RemoveLast` reuse takes 77 ns on the 2024 layout, faster than XOffset, because its loop allocates
+nothing.
 
-## After PR #292 (2026-11-16, old cases)
+**Size** (zstd-3): XOffset 2,986 bytes, zpp::bits 2,926, cista 2,992, FlatBuffers 3,128, Cap'n Proto
+3,131, MessagePack 3,391, Protocol Buffers 3,800.
 
-The library before and after PR #292 (`emplace_back` no longer looks up the owner, `pop_back` no longer
-zeroes by default, a fast path for `erase`), run with this directory's bench on the same cloud machine,
-15 processes each, alternating before and after, medians. All tables:
-[`results/2026-11-16-pr292/after.md`](results/2026-11-16-pr292/after.md) (after the merge) and
-[`before.md`](results/2026-11-16-pr292/before.md) (before the merge, same machine). The top-level README
-quoted the after-merge set.
+### Send + receive of a modified buffer
 
-| Item (XOffset ÷ rival) | Before | After |
-| --- | ---: | ---: |
-| Read/write, 2024 layout: XOffset ns | 257.6 | 239.0 |
-| &emsp;÷ std / cista raw / cista offset / Protocol Buffers | 0.74 / 1.15 / 1.05 / 3.28 | 0.70 / 1.07 / 0.97 / 3.06 |
-| Read/write, tuned style: XOffset ns | 67.7 | 62.1 |
-| &emsp;÷ std / cista raw / cista offset / Protocol Buffers | 0.85 / 1.40 / 1.39 / 0.92 | 0.79 / 1.34 / 1.16 / 0.86 |
-| Send+receive reuse: XOffset ns (÷ zpp::bits) | 99.4 (0.31) | 95.8 (0.28) |
-| One read/write + send + receive, tuned style: XOffset ns (÷ zpp::bits / cista) | 148.4 (0.38 / 0.21–0.22) | 143.1 (0.36 / 0.20–0.21) |
+The scored rows send a buffer that was filled once: XOffset's best case, since its wire is the buffer and
+carries spare capacity and freed blocks. The report-only rows `sr_reuse_after_rw` send the buffer the
+read/write loop has just run on (same state, after heavy churn). A separate run of 15 processes
+(library b25e0cfc, [`results/2026-11-17-modified-buffer/summary.md`](results/2026-11-17-modified-buffer/summary.md)):
 
-This machine differs from the one in the next section, so absolute nanoseconds cannot be compared across
-sections; ratios can. The tuned read/write still loses to cista by 1.16–1.34x. After #292, PR #293 turned
-the hardening measures into compile switches that are off by default; CHANGELOG records the default
-build's instruction counts against `XOFFSET_HARDENED=1` (read/write loop, 2024 layout −14.4%, tuned
-−7.6%), without re-timing.
-
-## Earlier results (old cases: Protocol Buffers reuses removed objects, item keys come from a 1024-entry ring; cloud x86-64, GCC 16.2, median of 15 processes, 2026-11-16, next_cpp26 3f25b76c + this directory's changes at the time)
-
-The "2024" column is the 2024 README's numbers converted to nanoseconds per operation (milliseconds for
-100,000 operations × 10). The 2024 XOffset send+receive of 0.5 ns was mismeasured: the first loop
-iteration moved the sender's buffer away, and what was timed afterwards was an empty move; the 2024
-FlatBuffers and Cap'n Proto rows also counted random numbers and building. So the 2024 column is only
-for reference and cannot be divided directly by the 4.0 column. cista's read/write and size in the 2024
-column are from when it used `hash_map`.
-
-The cloud machine of this run is about 1.3x slower than the one of the previous run (PR #289), and every
-row was re-run on this machine; absolute nanoseconds cannot be compared with the previous run, ratios
-can.
-
-### Send + receive (ns per message)
-
-| Library | 2024 encode+decode | 4.0 reuse | 4.0 fresh | XOffset ÷ lib (reuse) | XOffset ÷ lib (fresh) |
+| XOffset, 2024 layout | Wire bytes | zstd-3 | ns | ÷ zpp::bits | ÷ cista raw |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| xoffset 4.0 | 0.5 | 107.9 | 275.4 | 1.000 | 1.000 |
-| zpp::bits | 4,531.4 | 409.8 | 1,298.2 | 0.263 | 0.212 |
-| MessagePack | 9,577.0 | 7,594.7 | 7,718.3 | 0.014 | 0.036 |
-| Protocol Buffers | 15,780.6 | 10,596.2 | 18,000.5 | 0.010 | 0.015 |
-| FlatBuffers | 6,794.4 | 718.7 | 1,321.9 | 0.150 | 0.208 |
-| Cap'n Proto | 2,592.2 | 2,610.3 | 3,232.1 | 0.041 | 0.085 |
-| cista raw | 5,315.6 | 739.9 | 899.6 | 0.146 | 0.306 |
-| cista offset | 5,845.5 | 736.1 | 882.0 | 0.147 | 0.312 |
+| Trusted tier, as filled | 3,064 | 2,986 | 78 | 0.25 | 0.12 |
+| Trusted tier, after the read/write loop | 7,928 | 3,173 | 181 | 0.57 | 0.27 |
+| Full validation tier, as filled | 3,064 | 2,986 | 191 | 0.60 | 0.28 |
+| Full validation tier, after the read/write loop | 7,928 | 3,173 | 331 | 1.04 | 0.49 |
 
-Report-only rows:
-
-| Row | reuse | fresh |
-| --- | ---: | ---: |
-| xoffset 4.0 full | 245.4 | 409.7 |
-| FlatBuffers view | 571.0 |  |
-
-### Read/write loop (ns per iteration)
-
-| Library | Containers | 2024 | 4.0 | XOffset ÷ lib |
-| --- | --- | ---: | ---: | ---: |
-| xoffset 4.0 | XOffset (edit() per iteration) | 498.5 | 280.2 | 1.000 |
-| zpp::bits | std::* (shared, items = sorted vector) | 753.2 | 406.7 | 0.689 |
-| MessagePack | std::* (shared, items = sorted vector) | 680.4 | 406.7 | 0.689 |
-| Protocol Buffers | google::protobuf message | 565.4 | 89.3 | 3.138 |
-| FlatBuffers | std::* (shared, items = sorted vector) | 680.4 | 406.7 | 0.689 |
-| Cap'n Proto | std::* (shared, items = sorted vector) | 680.4 | 406.7 | 0.689 |
-| cista raw | cista::raw::* (items = sorted vector) | 655.4 | 275.3 | 1.018 |
-| cista offset | cista::offset::* (items = sorted vector) | 692.2 | 291.8 | 0.960 |
-| xoffset 4.0 plain_root (report-only) | XOffset, plain reference | | 246.9 | |
-
-### Wire size (bytes)
-
-| Library | 2024 raw | 2024 zlib | 4.0 raw | 4.0 zstd-3 |
-| --- | ---: | ---: | ---: | ---: |
-| xoffset 4.0 | 4,184 | 3,075 | 3,232 | 3,001 |
-| zpp::bits | 2,916 | 2,769 | 2,916 | 2,926 |
-| MessagePack | 3,222 | 3,064 | 3,542 | 3,391 |
-| Protocol Buffers | 4,100 | 3,759 | 4,095 | 3,799 |
-| FlatBuffers | 3,672 | 3,247 | 3,680 | 3,128 |
-| Cap'n Proto | 3,656 | 3,205 | 3,656 | 3,131 |
-| cista raw | 5,392 | 3,294 | 3,216 | 2,992 |
-| cista offset | 5,392 | 3,336 | 3,216 | 2,992 |
-
-XOffset after the read/write rounds (report-only): save_verified 8,600 B, save_compact 3,552 B.
-
-### Tuned layout and loop: read/write (ns per iteration)
-
-| Library | Tuning applied | 2024 layout | Tuned | XOffset inline ÷ lib |
-| --- | --- | ---: | ---: | ---: |
-| xoffset inline | inline attributes, range append, erase at position; edit() per iteration | 280.2 | 80.1 | 1.000 |
-| std inline | inline attributes, range insert, erase at position | 406.7 | 86.8 | 0.923 |
-| Protocol Buffers bulk | attributes added as one range (no inline array in a message) | 89.3 | 82.6 | 0.970 |
-| cista raw inline | inline attributes, range insert, erase at position | 275.3 | 53.5 | 1.497 |
-| cista offset inline | inline attributes, range insert, erase at position | 291.8 | 55.6 | 1.441 |
-
-Report-only rows:
-
-| Row | ns |
-| --- | ---: |
-| xoffset inline, one edit() around all iterations of a round | 74.7 |
-| xoffset bulk (2024 layout, bulk calls, edit() per iteration) | 157.3 |
-
-### Tuned layout: send + receive (ns per message)
-
-| Library | reuse | fresh | XOffset inline ÷ lib (reuse) | XOffset inline ÷ lib (fresh) | raw bytes | zstd-3 |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| xoffset inline | 93.3 | 272.2 | 1.000 | 1.000 | 3,128 | 2,977 |
-| zpp::bits inline | 368.0 | 927.7 | 0.254 | 0.293 | 2,948 | 2,958 |
-| cista raw inline | 726.0 | 863.7 | 0.129 | 0.315 | 3,280 | 2,994 |
-| cista offset inline | 710.2 | 851.7 | 0.131 | 0.320 | 3,280 | 2,994 |
-
-XOffset inline after the read/write rounds (report-only): save_verified 9,048 B (zstd-3 3,059), save_compact 3,632 B (zstd-3 3,006).
-
-### One read/write iteration + one send + receive (reuse), ns (sum of the medians above)
-
-| Library | 2024 layout | Tuned | XOffset ÷ lib (2024 layout) | XOffset inline ÷ lib (tuned) |
-| --- | ---: | ---: | ---: | ---: |
-| xoffset | 388.1 | 173.4 | 1.000 | 1.000 |
-| zpp::bits (std model) | 816.5 | 454.8 | 0.475 | 0.381 |
-| Protocol Buffers | 10,685.5 | 10,678.8 | 0.036 | 0.016 |
-| cista raw | 1,015.2 | 779.5 | 0.382 | 0.222 |
-| cista offset | 1,027.9 | 765.8 | 0.378 | 0.226 |
-
-Cloud timing jitters (on this machine about a third of the processes run 1.3–1.7x slower overall), so
-the tables above take the median of 15 processes; ratios between 0.95 and 1.05 count as a tie.
-
-## How to read it
-
-(This reads the "Earlier results" set with the old cases; current conclusions are in "Latest results".)
-
-- **Send+receive**: XOffset 4.0 (trusted tier) reuse takes about 108 ns per message: 0.26 of zpp::bits,
-  0.15 of FlatBuffers and cista, 0.04 of Cap'n Proto, 0.01 of MessagePack / Protocol Buffers. In fresh
-  mode every message creates a new receive buffer (a new mapping); XOffset takes about 275 ns, ratios
-  0.02–0.31 against the others. The full validation tier with reuse takes about 245 ns, still about 0.60
-  of zpp::bits. With the rivals switched to the inline layout the conclusion is the same (XOffset inline
-  against zpp::bits inline 0.25, against cista inline 0.13).
-- **Read/write, 2024 layout**: XOffset 280 ns, faster than the std model (0.69), tied with cista
-  (0.96–1.02), slower than Protocol Buffers (3.14).
-- **Read/write, tuned style**: XOffset 80 ns, tied with Protocol Buffers (83 ns, 0.97), faster than the
-  std model (0.92), slower than cista (54–56 ns, 1.4–1.5x). One `edit()` around all iterations of a round
-  is only about 5 ns faster than one `edit()` per iteration.
-- **Modify once + send once + receive once** (sum of two medians, for reference only): XOffset is
-  lowest, 173 ns in the tuned style, 0.38 of zpp::bits, 0.22 of cista, 0.02 of Protocol Buffers. The
-  roughly 25 ns lost to cista on read/write is far smaller than the roughly 630 ns won back on
-  send+receive.
-- **Size**: XOffset 4.0's wire shrank from 4,184 bytes in 2024 to 3,232 bytes (V2 format), 3,001 bytes
-  after zstd-3, in the same range as the other formats (2,926–3,799). After the read/write loop,
-  `save_verified` with the hole table is 8,600 bytes and `save_compact` 3,552 bytes (report only).
-
-## Where the read/write time goes
-
-(Numbers from the old cases: Protocol Buffers reuses removed objects, item keys come from a 1024-entry
-ring.)
-
-The three parts of the loop timed separately with `-DCC24_PARTS` (cloud, median of 3 processes per
-variant, ns per iteration; the "All" column is the 15-process number above; scalar and position reads
-and writes are in every variant at about 1–2 ns, so the three parts add up to slightly more than "All"):
-
-| Row | All | Equipment ×4 | Path points and attributes | Items |
-| --- | ---: | ---: | ---: | ---: |
-| XOffset, 2024 layout | 280.2 | 207.9 | 22.9 | 63.9 |
-| XOffset, 2024 layout, plain_root (report only) | 246.9 | 160.4 | 21.2 | 63.2 |
-| std, 2024 layout | 406.7 | 290.1 | 17.1 | 76.9 |
-| Protocol Buffers, 2024 layout | 89.3 | 39.1 | 31.7 | 53.1 |
-| cista raw, 2024 layout | 275.3 | 199.8 | 17.5 | 36.8 |
-| cista offset, 2024 layout | 291.8 | 212.5 | 17.9 | 34.7 |
-| XOffset, tuned style | 80.1 | 28.1 | 11.6 | 46.7 |
-| std, tuned style | 86.8 | 23.4 | 11.3 | 66.0 |
-| Protocol Buffers, range add | 82.6 | 22.3 | 32.1 | 51.9 |
-| cista raw, tuned style | 53.5 | 19.6 | 11.6 | 31.7 |
-| cista offset, tuned style | 55.6 | 21.1 | 13.5 | 29.8 |
-
-- Appending and then removing equipment, 2024 layout: each piece of equipment's attribute vector is
-  allocated and then freed once. std and cista go through `new`/`delete`; blocks XOffset frees inside
-  `edit()` are reused only when `edit()` ends (so plain references stay safe), so every iteration
-  allocates anew; Protocol Buffers' `RemoveLast` keeps the cleared objects and the next `add_` reuses
-  them without allocating. The inline layout removes this allocation, and everyone drops to 20–28 ns.
-- Inserting and then erasing an item: XOffset, std and cista are all sorted flat maps and all have to
-  shift the following elements. std and cista run the same code, cista about 30–37 ns, std about
-  66–77 ns; XOffset's `XMap` about 47–64 ns; Protocol Buffers' `map<>` about 52 ns. Of the roughly 25 ns
-  XOffset loses to cista in the tuned style, about 15 ns are here and about 8 ns in the equipment part.
-- Equipment, tuned style: std about 23 ns, cista about 20 ns, Protocol Buffers about 22 ns, XOffset
-  about 28 ns.
-- Path points: all within 11–32 ns.
-
-With the same container kinds, XOffset and cista tie on 2024-layout read/write; in the tuned style there
-is still a 1.4–1.5x gap, in `XMap` insert/erase and in appending equipment inside `edit()`, not yet
-profiled down to specific instructions.
-
-PR #289 also changed one place in the library: at the end of `edit()`, returning the list of blocks
-awaiting reclamation also freed the list's host memory, so the next `edit()` had to allocate it again.
-Now the list's capacity is kept (up to 1024 entries). The 2024-layout loop went from 4,794 Ir to 4,121
-Ir per iteration (GCC 16.2, −14%), and the timing from 260 ns to 213 ns (on that machine, 7 alternating
-pairs of processes on the same machine); the inline layout rows are unaffected.
-
-## Historical results
-
-`results/2026-11-16/` is the record of PR #287 (another Linux x86-64 and a Mac mini M4 Pro, 9 pairs of
-processes each). That run's `xoffset inline` read/write row used one `edit()` around all iterations of a
-round while the rivals all used the 2024 layout and style, so its "read/write against the fastest rival
-0.889 / 0.755" is not a like-for-like comparison; the "tuned style" tables on this page are
-authoritative. That run's send+receive data (against zpp::bits 0.19 / 0.31) point the same way as this
-page.
-
-Up to PR #289, cista's item map kept the 2024 `hash_map`, and read/write XOffset ÷ cista was 1.17–1.34
-(2024 layout) and 2.18–2.59 (tuned style). That compared an ordered flat map with a hash map; it was
-dropped in this version, cista now uses the same sorted vector as the other models, and the tables on
-this page are authoritative.
+- On the trusted tier a modified buffer is still faster than zpp::bits in all 15 processes; on the full
+  validation tier it ties.
+- One read/write iteration plus one send + receive of the modified buffer: 331 ns (2024 layout) and
+  250 ns (tuned), 0.51 and 0.63 of zpp::bits on std containers, 0.36–0.37 of cista.
+- `save_compact` writes the state without spare capacity and free blocks in 3,552 bytes; it walks the
+  state, so it is not free.
+- In this run the tuned read/write loop against cista raw was 0.98 (faster in 9 of 15 processes): read
+  that margin as a tie to a small win.
 
 ## The 2024 demo
 
