@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- `XVector` growth, for the read/write loop of the CppCon 2024 comparison
+  (2024 layout: four times per iteration it appends an equipment record with
+  8 float attributes and removes it). An empty vector's first block now holds
+  4 elements and at least 32 bytes (`max(4, 32 / sizeof(T))` elements): 8
+  floats or 32-bit ids instead of 4, 32 bytes instead of 4. The 16-byte first
+  block of a `float` vector was outgrown by its fifth element, which cost a
+  second allocation, a copy and a retirement per vector. A vector grown by
+  `push_back` / `emplace_back` that ends with 1 to 4 such scalars takes 16
+  bytes more than before (24 more for 1- and 2-byte elements); `reserve()`
+  and the range assignments size their block exactly, as before, and the
+  wire format is unchanged. `push_back` of a value of at most 16 bytes into a
+  full vector grows and stores without the staged copy and insert checks of
+  the general path. Instructions per loop iteration (GCC 16.2, callgrind):
+  2024 layout 3487 -> 2187; tuned layout unchanged (813).
 - CppCon 2024 bench made fairer (susu 2026-11-17): Protocol Buffers now frees
   removed equipment and waypoint messages (`DeleteSubrange`) like every other
   library; its default `RemoveLast` reuse is a report-only row. The item key
