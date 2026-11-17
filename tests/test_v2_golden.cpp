@@ -64,14 +64,20 @@ XOFFSET_REGISTER_SCHEMA_NAME(golden::Model, "golden.v2.model")
 // 2026-10-27 (V2.1 R7): 40-byte wire header and the 48-byte payload header is
 // no longer on the wire (104 bytes less): dense 1648 -> 1544, large dense
 // 9840 -> 9736, zero-run elided 1520 -> 1416, free runs 1656 -> 1552.
-#define GOLDEN_DENSE_SIZE 1544u
-#define GOLDEN_DENSE_FNV 0x2ead9bf530e5c143ull
-#define GOLDEN_LARGE_DENSE_SIZE 9736u
-#define GOLDEN_LARGE_DENSE_FNV 0x7dedb7e5dc8be9caull
-#define GOLDEN_ELIDED_SIZE 1416u
-#define GOLDEN_ELIDED_FNV 0x7950b2e24c2be667ull
-#define GOLDEN_N10_SIZE 1552u
-#define GOLDEN_N10_FNV 0xa8c268362947aaacull
+// 2026-11-17: an empty vector's first block holds at least 32 bytes
+// (fixed_detail::first_capacity), so the model's push_back-grown uint32
+// vectors start with room for 8 values instead of 4 and their blocks are
+// placed differently (16 bytes more in each wire: dense 1544 -> 1560, large
+// dense 9736 -> 9752, zero-run elided 1416 -> 1432, free runs 1552 -> 1568).
+// The format itself is unchanged.
+#define GOLDEN_DENSE_SIZE 1560u
+#define GOLDEN_DENSE_FNV 0x1ba424ecb02e0e9full
+#define GOLDEN_LARGE_DENSE_SIZE 9752u
+#define GOLDEN_LARGE_DENSE_FNV 0x5d59d165086b6797ull
+#define GOLDEN_ELIDED_SIZE 1432u
+#define GOLDEN_ELIDED_FNV 0x87ebe0d74339f27eull
+#define GOLDEN_N10_SIZE 1568u
+#define GOLDEN_N10_FNV 0xb284b6f43874a081ull
 
 namespace {
 using Buffer = xo::TypedXBuffer<golden::Model>;
