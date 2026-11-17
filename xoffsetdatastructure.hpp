@@ -5597,6 +5597,19 @@ namespace XOffsetDatastructure {
         // restate.
         template <typename V>
         XOFFSET_DETAIL_NOINLINE Grown push_back_general(V value) {
+            if constexpr (std::is_same_v<V, T> && std::is_trivially_copyable_v<T> && !std::is_array_v<T> &&
+                          !detail::future_custom_lifetime_supported<T>()) {
+                // The value arrived by value, so it cannot lie in the block
+                // this growth retires: grow, then store, with no staged copy
+                // and none of the insert checks. An empty vector takes its
+                // first block through reserve's first-storage path.
+                const size_type n = size_;
+                if (n >= capacity_) [[likely]] reserve_first_or_grow(grown_capacity());
+                T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + n;
+                fixed_detail::transfer_construct(slot, static_cast<const T&>(value), element_binding());
+                size_ = n + 1u;
+                return {data_delta, capacity_};
+            }
             append_construct([&](T* dst) {
                 fixed_detail::transfer_construct(dst, static_cast<const T&>(value), element_binding());
             });
