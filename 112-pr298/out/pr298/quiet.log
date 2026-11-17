@@ -1,0 +1,224 @@
+2026-11-17T03:35:06Z slg 837c9d4f head xoffset_trusted 1 quiet after 180s load 1.43
+2026-11-17T03:35:51Z slg 837c9d4f head xoffset_trusted 1 done load 1.50
+2026-11-17T03:36:01Z slg 837c9d4f head zpp_bits 1 quiet after 10s load 1.46
+2026-11-17T03:36:35Z slg 837c9d4f head zpp_bits 1 done load 1.64
+2026-11-17T03:36:45Z slg 837c9d4f d3 xoffset_trusted 1 quiet after 10s load 1.51
+2026-11-17T03:37:42Z slg 837c9d4f d3 xoffset_trusted 1 done load 1.63
+2026-11-17T03:37:53Z slg 837c9d4f d3 zpp_bits 1 quiet after 10s load 1.58
+2026-11-17T03:38:38Z slg 837c9d4f d3 zpp_bits 1 done load 1.80
+2026-11-17T03:38:48Z slg 837c9d4f d3 zpp_bits_dirty 1 quiet after 10s load 1.73
+2026-11-17T03:39:29Z slg 837c9d4f d3 zpp_bits_dirty 1 done load 1.63
+2026-11-17T03:39:39Z slg 3b77dd76 head xoffset_trusted 1 quiet after 10s load 1.58
+2026-11-17T03:40:25Z slg 3b77dd76 head xoffset_trusted 1 done load 1.75
+2026-11-17T03:40:35Z slg 3b77dd76 head zpp_bits 1 quiet after 10s load 1.69
+2026-11-17T03:41:10Z slg 3b77dd76 head zpp_bits 1 done load 1.93
+2026-11-17T03:41:20Z slg 3b77dd76 d3 xoffset_trusted 1 quiet after 10s load 1.93
+2026-11-17T03:42:18Z slg 3b77dd76 d3 xoffset_trusted 1 done load 1.86
+2026-11-17T03:42:28Z slg 3b77dd76 d3 zpp_bits 1 quiet after 10s load 1.87
+2026-11-17T03:43:14Z slg 3b77dd76 d3 zpp_bits 1 done load 1.68
+2026-11-17T03:43:24Z slg 3b77dd76 d3 zpp_bits_dirty 1 quiet after 10s load 1.63
+2026-11-17T03:44:05Z slg 3b77dd76 d3 zpp_bits_dirty 1 done load 2.49
+2026-11-17T03:44:15Z cc24 837c9d4f 1 quiet after 10s load 2.37
+2026-11-17T03:44:27Z cc24 837c9d4f 1 done load 2.15
+2026-11-17T03:44:38Z cc24 3b77dd76 1 quiet after 10s load 2.06
+2026-11-17T03:44:47Z cc24 3b77dd76 1 done load 2.04
+2026-11-17T03:44:57Z cc24 3b77dd76 2 quiet after 10s load 1.95
+2026-11-17T03:45:07Z cc24 3b77dd76 2 done load 1.89
+2026-11-17T03:45:17Z cc24 837c9d4f 2 quiet after 10s load 2.38
+2026-11-17T03:45:27Z cc24 837c9d4f 2 done load 2.23
+2026-11-17T03:45:37Z slg 3b77dd76 head xoffset_trusted 2 quiet after 10s load 2.13
+2026-11-17T03:46:22Z slg 3b77dd76 head xoffset_trusted 2 done load 2.00
+2026-11-17T03:46:32Z slg 3b77dd76 head zpp_bits 2 quiet after 10s load 2.24
+2026-11-17T03:47:07Z slg 3b77dd76 head zpp_bits 2 done load 3.46
+2026-11-17T03:47:33Z slg 3b77dd76 d3 xoffset_trusted 2 quiet after 25s load 2.76
+2026-11-17T03:48:30Z slg 3b77dd76 d3 xoffset_trusted 2 done load 2.54
+2026-11-17T03:48:40Z slg 3b77dd76 d3 zpp_bits 2 quiet after 10s load 2.42
+2026-11-17T03:49:26Z slg 3b77dd76 d3 zpp_bits 2 done load 2.01
+2026-11-17T03:49:36Z slg 3b77dd76 d3 zpp_bits_dirty 2 quiet after 10s load 1.93
+2026-11-17T03:50:18Z slg 3b77dd76 d3 zpp_bits_dirty 2 done load 1.91
+2026-11-17T03:50:28Z slg 837c9d4f head xoffset_trusted 2 quiet after 10s load 2.08
+2026-11-17T03:51:14Z slg 837c9d4f head xoffset_trusted 2 done load 1.81
+2026-11-17T03:51:24Z slg 837c9d4f head zpp_bits 2 quiet after 10s load 1.74
+2026-11-17T03:51:59Z slg 837c9d4f head zpp_bits 2 done load 1.80
+2026-11-17T03:52:09Z slg 837c9d4f d3 xoffset_trusted 2 quiet after 10s load 1.82
+2026-11-17T03:53:07Z slg 837c9d4f d3 xoffset_trusted 2 done load 1.97
+2026-11-17T03:53:17Z slg 837c9d4f d3 zpp_bits 2 quiet after 10s load 1.89
+2026-11-17T03:54:03Z slg 837c9d4f d3 zpp_bits 2 done load 1.70
+2026-11-17T03:54:13Z slg 837c9d4f d3 zpp_bits_dirty 2 quiet after 10s load 1.64
+2026-11-17T03:54:55Z slg 837c9d4f d3 zpp_bits_dirty 2 done load 1.78
+2026-11-17T03:55:05Z cc24 3b77dd76 3 quiet after 10s load 1.96
+2026-11-17T03:55:14Z cc24 3b77dd76 3 done load 1.97
+2026-11-17T03:55:24Z cc24 837c9d4f 3 quiet after 10s load 1.97
+2026-11-17T03:55:34Z cc24 837c9d4f 3 done load 1.77
+2026-11-17T03:55:44Z cc24 837c9d4f 4 quiet after 10s load 1.79
+2026-11-17T03:55:54Z cc24 837c9d4f 4 done load 1.69
+2026-11-17T03:56:04Z cc24 3b77dd76 4 quiet after 10s load 1.64
+2026-11-17T03:56:14Z cc24 3b77dd76 4 done load 1.71
+2026-11-17T03:56:24Z slg 837c9d4f head xoffset_trusted 3 quiet after 10s load 1.65
+2026-11-17T03:57:10Z slg 837c9d4f head xoffset_trusted 3 done load 2.11
+2026-11-17T03:57:20Z slg 837c9d4f head zpp_bits 3 quiet after 10s load 2.18
+2026-11-17T03:57:56Z slg 837c9d4f head zpp_bits 3 done load 2.29
+2026-11-17T03:58:07Z slg 837c9d4f d3 xoffset_trusted 3 quiet after 10s load 2.19
+2026-11-17T03:59:05Z slg 837c9d4f d3 xoffset_trusted 3 done load 2.16
+2026-11-17T03:59:15Z slg 837c9d4f d3 zpp_bits 3 quiet after 10s load 2.07
+2026-11-17T04:00:03Z slg 837c9d4f d3 zpp_bits 3 done load 2.51
+2026-11-17T04:00:13Z slg 837c9d4f d3 zpp_bits_dirty 3 quiet after 10s load 2.47
+2026-11-17T04:00:56Z slg 837c9d4f d3 zpp_bits_dirty 3 done load 2.33
+2026-11-17T04:01:06Z slg 3b77dd76 head xoffset_trusted 3 quiet after 10s load 2.47
+2026-11-17T04:01:53Z slg 3b77dd76 head xoffset_trusted 3 done load 3.04
+2026-11-17T04:02:08Z slg 3b77dd76 head zpp_bits 3 quiet after 15s load 2.73
+2026-11-17T04:02:45Z slg 3b77dd76 head zpp_bits 3 done load 3.57
+2026-11-17T04:03:31Z slg 3b77dd76 d3 xoffset_trusted 3 quiet after 45s load 2.80
+2026-11-17T04:04:36Z slg 3b77dd76 d3 xoffset_trusted 3 done load 3.81
+2026-11-17T04:05:52Z slg 3b77dd76 d3 zpp_bits 3 quiet after 75s load 2.99
+2026-11-17T04:06:39Z slg 3b77dd76 d3 zpp_bits 3 done load 2.88
+2026-11-17T04:06:49Z slg 3b77dd76 d3 zpp_bits_dirty 3 quiet after 10s load 2.73
+2026-11-17T04:07:31Z slg 3b77dd76 d3 zpp_bits_dirty 3 done load 3.46
+2026-11-17T04:08:06Z cc24 837c9d4f 5 quiet after 35s load 2.63
+2026-11-17T04:08:16Z cc24 837c9d4f 5 done load 2.57
+2026-11-17T04:08:26Z cc24 3b77dd76 5 quiet after 10s load 2.44
+2026-11-17T04:08:36Z cc24 3b77dd76 5 done load 2.20
+2026-11-17T04:08:46Z cc24 3b77dd76 6 quiet after 10s load 2.11
+2026-11-17T04:08:56Z cc24 3b77dd76 6 done load 2.09
+2026-11-17T04:09:06Z cc24 837c9d4f 6 quiet after 10s load 2.00
+2026-11-17T04:09:15Z cc24 837c9d4f 6 done load 1.86
+2026-11-17T04:09:26Z slg 3b77dd76 head xoffset_trusted 4 quiet after 10s load 1.79
+2026-11-17T04:10:12Z slg 3b77dd76 head xoffset_trusted 4 done load 1.84
+2026-11-17T04:10:22Z slg 3b77dd76 head zpp_bits 4 quiet after 10s load 1.77
+2026-11-17T04:10:57Z slg 3b77dd76 head zpp_bits 4 done load 1.95
+2026-11-17T04:11:07Z slg 3b77dd76 d3 xoffset_trusted 4 quiet after 10s load 1.95
+2026-11-17T04:12:05Z slg 3b77dd76 d3 xoffset_trusted 4 done load 1.94
+2026-11-17T04:12:15Z slg 3b77dd76 d3 zpp_bits 4 quiet after 10s load 1.95
+2026-11-17T04:13:01Z slg 3b77dd76 d3 zpp_bits 4 done load 2.03
+2026-11-17T04:13:11Z slg 3b77dd76 d3 zpp_bits_dirty 4 quiet after 10s load 2.03
+2026-11-17T04:13:53Z slg 3b77dd76 d3 zpp_bits_dirty 4 done load 1.66
+2026-11-17T04:14:03Z slg 837c9d4f head xoffset_trusted 4 quiet after 10s load 1.53
+2026-11-17T04:14:49Z slg 837c9d4f head xoffset_trusted 4 done load 1.58
+2026-11-17T04:14:59Z slg 837c9d4f head zpp_bits 4 quiet after 10s load 1.53
+2026-11-17T04:15:34Z slg 837c9d4f head zpp_bits 4 done load 1.64
+2026-11-17T04:15:45Z slg 837c9d4f d3 xoffset_trusted 4 quiet after 10s load 1.59
+2026-11-17T04:16:43Z slg 837c9d4f d3 xoffset_trusted 4 done load 1.65
+2026-11-17T04:16:53Z slg 837c9d4f d3 zpp_bits 4 quiet after 10s load 1.60
+2026-11-17T04:17:39Z slg 837c9d4f d3 zpp_bits 4 done load 1.73
+2026-11-17T04:17:49Z slg 837c9d4f d3 zpp_bits_dirty 4 quiet after 10s load 1.67
+2026-11-17T04:18:31Z slg 837c9d4f d3 zpp_bits_dirty 4 done load 1.60
+2026-11-17T04:18:41Z cc24 3b77dd76 7 quiet after 10s load 1.64
+2026-11-17T04:18:50Z cc24 3b77dd76 7 done load 2.52
+2026-11-17T04:19:01Z cc24 837c9d4f 7 quiet after 10s load 2.40
+2026-11-17T04:19:10Z cc24 837c9d4f 7 done load 2.24
+2026-11-17T04:19:20Z cc24 837c9d4f 8 quiet after 10s load 2.14
+2026-11-17T04:19:30Z cc24 837c9d4f 8 done load 2.12
+2026-11-17T04:19:40Z cc24 3b77dd76 8 quiet after 10s load 2.03
+2026-11-17T04:19:50Z cc24 3b77dd76 8 done load 1.88
+2026-11-17T04:20:00Z slg 837c9d4f head xoffset_trusted 5 quiet after 10s load 1.81
+2026-11-17T04:20:46Z slg 837c9d4f head xoffset_trusted 5 done load 1.64
+2026-11-17T04:20:56Z slg 837c9d4f head zpp_bits 5 quiet after 10s load 1.58
+2026-11-17T04:21:31Z slg 837c9d4f head zpp_bits 5 done load 1.54
+2026-11-17T04:21:41Z slg 837c9d4f d3 xoffset_trusted 5 quiet after 10s load 1.50
+2026-11-17T04:22:39Z slg 837c9d4f d3 xoffset_trusted 5 done load 1.61
+2026-11-17T04:22:49Z slg 837c9d4f d3 zpp_bits 5 quiet after 10s load 1.72
+2026-11-17T04:23:36Z slg 837c9d4f d3 zpp_bits 5 done load 1.75
+2026-11-17T04:23:46Z slg 837c9d4f d3 zpp_bits_dirty 5 quiet after 10s load 1.69
+2026-11-17T04:24:27Z slg 837c9d4f d3 zpp_bits_dirty 5 done load 1.58
+2026-11-17T04:24:37Z slg 3b77dd76 head xoffset_trusted 5 quiet after 10s load 1.54
+2026-11-17T04:25:24Z slg 3b77dd76 head xoffset_trusted 5 done load 1.66
+2026-11-17T04:25:34Z slg 3b77dd76 head zpp_bits 5 quiet after 10s load 1.53
+2026-11-17T04:26:09Z slg 3b77dd76 head zpp_bits 5 done load 2.03
+2026-11-17T04:26:19Z slg 3b77dd76 d3 xoffset_trusted 5 quiet after 10s load 1.94
+2026-11-17T04:27:17Z slg 3b77dd76 d3 xoffset_trusted 5 done load 1.84
+2026-11-17T04:27:28Z slg 3b77dd76 d3 zpp_bits 5 quiet after 10s load 1.78
+2026-11-17T04:28:14Z slg 3b77dd76 d3 zpp_bits 5 done load 1.63
+2026-11-17T04:28:24Z slg 3b77dd76 d3 zpp_bits_dirty 5 quiet after 10s load 1.58
+2026-11-17T04:29:06Z slg 3b77dd76 d3 zpp_bits_dirty 5 done load 1.51
+2026-11-17T04:29:16Z cc24 837c9d4f 9 quiet after 10s load 1.47
+2026-11-17T04:29:26Z cc24 837c9d4f 9 done load 4.88
+2026-11-17T04:30:47Z cc24 3b77dd76 9 quiet after 80s load 2.91
+2026-11-17T04:30:56Z cc24 3b77dd76 9 done load 2.64
+2026-11-17T04:31:06Z cc24 3b77dd76 10 quiet after 10s load 2.43
+2026-11-17T04:31:16Z cc24 3b77dd76 10 done load 2.49
+2026-11-17T04:31:26Z cc24 837c9d4f 10 quiet after 10s load 2.45
+2026-11-17T04:31:36Z cc24 837c9d4f 10 done load 2.13
+2026-11-17T04:31:46Z slg 3b77dd76 head xoffset_trusted 6 quiet after 10s load 2.04
+2026-11-17T04:32:32Z slg 3b77dd76 head xoffset_trusted 6 done load 1.91
+2026-11-17T04:32:42Z slg 3b77dd76 head zpp_bits 6 quiet after 10s load 1.83
+2026-11-17T04:33:17Z slg 3b77dd76 head zpp_bits 6 done load 1.61
+2026-11-17T04:33:27Z slg 3b77dd76 d3 xoffset_trusted 6 quiet after 10s load 1.56
+2026-11-17T04:34:25Z slg 3b77dd76 d3 xoffset_trusted 6 done load 1.89
+2026-11-17T04:34:36Z slg 3b77dd76 d3 zpp_bits 6 quiet after 10s load 1.90
+2026-11-17T04:35:22Z slg 3b77dd76 d3 zpp_bits 6 done load 1.79
+2026-11-17T04:35:32Z slg 3b77dd76 d3 zpp_bits_dirty 6 quiet after 10s load 1.72
+2026-11-17T04:36:13Z slg 3b77dd76 d3 zpp_bits_dirty 6 done load 1.80
+2026-11-17T04:36:24Z slg 837c9d4f head xoffset_trusted 6 quiet after 10s load 1.98
+2026-11-17T04:37:10Z slg 837c9d4f head xoffset_trusted 6 done load 1.66
+2026-11-17T04:37:20Z slg 837c9d4f head zpp_bits 6 quiet after 10s load 1.69
+2026-11-17T04:37:55Z slg 837c9d4f head zpp_bits 6 done load 1.98
+2026-11-17T04:38:05Z slg 837c9d4f d3 xoffset_trusted 6 quiet after 10s load 1.90
+2026-11-17T04:39:04Z slg 837c9d4f d3 xoffset_trusted 6 done load 2.12
+2026-11-17T04:39:14Z slg 837c9d4f d3 zpp_bits 6 quiet after 10s load 2.03
+2026-11-17T04:40:00Z slg 837c9d4f d3 zpp_bits 6 done load 1.91
+2026-11-17T04:40:11Z slg 837c9d4f d3 zpp_bits_dirty 6 quiet after 10s load 1.92
+2026-11-17T04:40:52Z slg 837c9d4f d3 zpp_bits_dirty 6 done load 1.67
+2026-11-17T04:41:02Z cc24 3b77dd76 11 quiet after 10s load 1.62
+2026-11-17T04:41:12Z cc24 3b77dd76 11 done load 1.56
+2026-11-17T04:41:22Z cc24 837c9d4f 11 quiet after 10s load 1.52
+2026-11-17T04:41:32Z cc24 837c9d4f 11 done load 1.71
+2026-11-17T04:41:42Z cc24 837c9d4f 12 quiet after 10s load 1.66
+2026-11-17T04:41:52Z cc24 837c9d4f 12 done load 1.52
+2026-11-17T04:42:02Z cc24 3b77dd76 12 quiet after 10s load 1.48
+2026-11-17T04:42:11Z cc24 3b77dd76 12 done load 1.45
+2026-11-17T04:42:21Z slg 837c9d4f head xoffset_trusted 7 quiet after 10s load 1.58
+2026-11-17T04:43:07Z slg 837c9d4f head xoffset_trusted 7 done load 1.62
+2026-11-17T04:43:18Z slg 837c9d4f head zpp_bits 7 quiet after 10s load 1.57
+2026-11-17T04:43:53Z slg 837c9d4f head zpp_bits 7 done load 1.97
+2026-11-17T04:44:03Z slg 837c9d4f d3 xoffset_trusted 7 quiet after 10s load 1.81
+2026-11-17T04:45:01Z slg 837c9d4f d3 xoffset_trusted 7 done load 1.65
+2026-11-17T04:45:11Z slg 837c9d4f d3 zpp_bits 7 quiet after 10s load 1.60
+2026-11-17T04:45:58Z slg 837c9d4f d3 zpp_bits 7 done load 1.68
+2026-11-17T04:46:08Z slg 837c9d4f d3 zpp_bits_dirty 7 quiet after 10s load 1.71
+2026-11-17T04:46:49Z slg 837c9d4f d3 zpp_bits_dirty 7 done load 1.72
+2026-11-17T04:46:59Z slg 3b77dd76 head xoffset_trusted 7 quiet after 10s load 1.74
+2026-11-17T04:47:46Z slg 3b77dd76 head xoffset_trusted 7 done load 1.73
+2026-11-17T04:47:56Z slg 3b77dd76 head zpp_bits 7 quiet after 10s load 1.76
+2026-11-17T04:48:31Z slg 3b77dd76 head zpp_bits 7 done load 1.67
+2026-11-17T04:48:41Z slg 3b77dd76 d3 xoffset_trusted 7 quiet after 10s load 1.62
+2026-11-17T04:49:40Z slg 3b77dd76 d3 xoffset_trusted 7 done load 1.76
+2026-11-17T04:49:50Z slg 3b77dd76 d3 zpp_bits 7 quiet after 10s load 1.70
+2026-11-17T04:50:36Z slg 3b77dd76 d3 zpp_bits 7 done load 1.79
+2026-11-17T04:50:46Z slg 3b77dd76 d3 zpp_bits_dirty 7 quiet after 10s load 1.73
+2026-11-17T04:51:28Z slg 3b77dd76 d3 zpp_bits_dirty 7 done load 1.72
+2026-11-17T04:51:38Z cc24 837c9d4f 13 quiet after 10s load 1.67
+2026-11-17T04:51:48Z cc24 837c9d4f 13 done load 1.82
+2026-11-17T04:51:58Z cc24 3b77dd76 13 quiet after 10s load 1.75
+2026-11-17T04:52:08Z cc24 3b77dd76 13 done load 1.66
+2026-11-17T04:52:18Z cc24 3b77dd76 14 quiet after 10s load 1.61
+2026-11-17T04:52:27Z cc24 3b77dd76 14 done load 1.56
+2026-11-17T04:52:38Z cc24 837c9d4f 14 quiet after 10s load 1.51
+2026-11-17T04:52:47Z cc24 837c9d4f 14 done load 1.54
+2026-11-17T04:52:58Z slg 3b77dd76 head xoffset_trusted 8 quiet after 10s load 1.50
+2026-11-17T04:53:44Z slg 3b77dd76 head xoffset_trusted 8 done load 1.75
+2026-11-17T04:53:54Z slg 3b77dd76 head zpp_bits 8 quiet after 10s load 1.69
+2026-11-17T04:54:29Z slg 3b77dd76 head zpp_bits 8 done load 1.74
+2026-11-17T04:54:39Z slg 3b77dd76 d3 xoffset_trusted 8 quiet after 10s load 1.68
+2026-11-17T04:55:37Z slg 3b77dd76 d3 xoffset_trusted 8 done load 1.78
+2026-11-17T04:55:47Z slg 3b77dd76 d3 zpp_bits 8 quiet after 10s load 1.72
+2026-11-17T04:56:34Z slg 3b77dd76 d3 zpp_bits 8 done load 1.89
+2026-11-17T04:56:44Z slg 3b77dd76 d3 zpp_bits_dirty 8 quiet after 10s load 1.82
+2026-11-17T04:57:25Z slg 3b77dd76 d3 zpp_bits_dirty 8 done load 1.79
+2026-11-17T04:57:35Z slg 837c9d4f head xoffset_trusted 8 quiet after 10s load 1.72
+2026-11-17T04:58:22Z slg 837c9d4f head xoffset_trusted 8 done load 2.04
+2026-11-17T04:58:32Z slg 837c9d4f head zpp_bits 8 quiet after 10s load 1.95
+2026-11-17T04:59:07Z slg 837c9d4f head zpp_bits 8 done load 1.96
+2026-11-17T04:59:17Z slg 837c9d4f d3 xoffset_trusted 8 quiet after 10s load 1.88
+2026-11-17T05:00:16Z slg 837c9d4f d3 xoffset_trusted 8 done load 3.95
+2026-11-17T05:01:07Z slg 837c9d4f d3 zpp_bits 8 quiet after 50s load 2.69
+2026-11-17T05:01:53Z slg 837c9d4f d3 zpp_bits 8 done load 2.20
+2026-11-17T05:02:03Z slg 837c9d4f d3 zpp_bits_dirty 8 quiet after 10s load 2.10
+2026-11-17T05:02:45Z slg 837c9d4f d3 zpp_bits_dirty 8 done load 2.01
+2026-11-17T05:02:55Z cc24 3b77dd76 15 quiet after 10s load 2.01
+2026-11-17T05:03:05Z cc24 3b77dd76 15 done load 1.86
+2026-11-17T05:03:15Z cc24 837c9d4f 15 quiet after 10s load 1.79
+2026-11-17T05:03:24Z cc24 837c9d4f 15 done load 1.70
+2026-11-17T05:03:35Z cc24 837c9d4f 16 quiet after 10s load 1.96
+2026-11-17T05:03:44Z cc24 837c9d4f 16 done load 1.83
+2026-11-17T05:03:54Z cc24 3b77dd76 16 quiet after 10s load 1.76
+2026-11-17T05:04:04Z cc24 3b77dd76 16 done load 1.74
