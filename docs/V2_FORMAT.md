@@ -232,51 +232,7 @@ through the per-block header self-check. In V2, a redirected pointer leaves its
 original block uncovered or overlaps another block, and the coverage check
 rejects it. V2 also rejects unreachable dead regions, which V1 accepted.
 
-## 6. API changes from V1
-
-**Removed:**
-
-- `XAllocatorStateV1`
-- `XBuffer::allocator_state()`
-- containers' `XAllocatorStateV1*` constructors, `allocator_state()`, and
-  `stored_allocator_proxy::state`
-- `XBufferCore::AllocationHeader`
-- `arena_header::allocator_offset`
-- `find_allocator_storage` and `construct_allocator_storage`
-- `fixed_detail::release_cached_blocks` and `FreeBlockHeader`
-- the FreelistIndex diagnostics
-- `XWireHeaderV1`, `XWIRE_*_V1` and `wire_magic_matches_v1` (readers recognize
-  V1 input by its first bytes and reject it)
-- `RawActivationStats::{allocation_headers, allocator_states, free_block_headers}`
-
-**Changed:**
-
-- `fixed_detail::allocator_ref` is now `{XArena* segment}`.
-- `try_expand_dynamic_bytes(alloc, ptr, old_bytes, new_bytes, align)`
-- `XArena::deallocate(ptr, bytes)`
-- `XArena::try_expand(ptr, old_bytes, new_bytes)`
-- `XArenaAllocator::deallocate` now uses its `n` argument.
-- `receive_raw::validate(..., holes, hole_count, scratch, gaps, gap_count)`
-- `begin_verified_receive<T>(payload, cap, holes, extents)`
-- `Operation::complete(header, payload, holes, extents)`
-- `VerifiedSnapshot::segments()` now returns 3 spans: header, payload, holes.
-- Arena memory that is not reachable from the root must be released before a
-  verified save, because exact coverage would otherwise reject it.
-
-**Added:**
-
-- `XBufferCore::{allocate_block, retire_block, try_expand_block, free_block_count, free_block_bytes, free_table_complete, for_each_free_block, write_free_blocks, load_free_blocks, replace_free_blocks, owner_from_arena}`
-- `XBufferCore::WireHole`
-- `XWireHeaderV2`
-- `XFixedVector::assign(first, last)`
-- `XFixedString::{is_inline, owned_extent}`
-- `Operation::{hole_bytes, extent_bytes}`
-
-**Move ownership checks** (`XOFFSET_MOVE_OWNERSHIP_CHECKS`): the check that
-excludes moving a container into or out of its own subobject runs only in debug
-builds by default.
-
-## 7. Changes in format 2.1
+## 6. Changes in format 2.1
 
 Format 2.1 is a breaking change: 2.1 readers reject 2.0 wires and 2.0
 readers reject 2.1 wires, so senders and receivers upgrade together. Every

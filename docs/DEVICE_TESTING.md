@@ -194,24 +194,11 @@ the memory limit being measured.
 
 ## 9. Existing results
 
-| Version | Phone | Computer | Result | Record |
-| --- | --- | --- | --- | --- |
-| 3.2.0-rc.1 (39de636), 2026-10-28 | Xiaomi M2102K1C, Android 11 (API 30), arm64-v8a | Windows 11 + WSL2, server in WSL2 Docker | Compile-fail tests 15/15, phone CTest 114/114, 6 reference wires byte-identical, both demo clients E2E PASSED (the first two attempts failed because of ports and the adb path respectively; records kept) | [validation/2026-10-28-rc1-platform/README.md](validation/2026-10-28-rc1-platform/README.md) |
-| a473fb27 (after 3.2.0-rc.2, with #178, #181), 2026-10-28 | iPhone 15 Pro Max (iPhone16,2), iOS 26.6.2, 8 GB, signed with a free Apple ID, USB | Mac mini M4, server in colima (GCC 16, arm64) | Test host app with 104 libraries; CTest 138/138; all 24 reference wires accepted, written bytes identical; slg (SC-6) verify passed, 3 runs × M scale × 41 cycles, thermal state 0; memory probe (SC-12) see [DEPLOYMENT.md](DEPLOYMENT.md) section 5; both demo clients E2E PASSED. The 5th attempt did not fully pass because of fork and slg address space, and the 6th regressed in resident mode, recorded under section 7 | Table below |
-| 8cf9e16c (= the content of ea7edd3a merged by #185, with #183), 2026-10-29 | Same as above | Same as above | Resident mode (one app runs all programs in sequence; slg timing and the memory probe each use a freshly launched app): CTest 138/138; 24 reference wires byte-identical; slg verify passed, 3 runs × M × 41 cycles, thermal state 0; memory probe passed; both demo clients E2E PASSED; no CoreDeviceError 7000. The 8th attempt (084d4859) did not fully pass because of `.ready` copy errors (fixed by #185) | Test host section of [CLIENT_TARGETS.md](CLIENT_TARGETS.md) |
+| Version | Phone | Result |
+| --- | --- | --- |
+| 3.2.0-rc.1 (39de636), 2026-10-28 | Xiaomi M2102K1C, Android 11, arm64-v8a | Compile-fail tests 15/15, CTest 114/114, reference wires byte-identical, both demo clients passed ([record](validation/2026-10-28-rc1-platform/README.md)) |
+| 3.2.x (8cf9e16c), 2026-10-29 | iPhone 15 Pro Max, iOS 26.6.2 | Resident test host: CTest 138/138, 24 reference wires byte-identical, slg verify and memory probe passed, both demo clients passed |
 
-SC-6 on the iPhone 15 Pro Max (slg M scale, 3 runs pooled, xoffset against FlatBuffers 25.12.19 on the
-same device, geometric mean / one-sided 95% upper bound, < 1 means xoffset is faster; player, battle and
-report buffers reserve 2 MiB each, `SLG_REUSE=1`):
-
-| Scenario | xoffset ÷ FlatBuffers | xoffset median (ms per cycle) | FlatBuffers median (ms per cycle) |
-| --- | --- | ---: | ---: |
-| A battle server round trip | 0.305 / 0.322 | 0.609 | 2.176 |
-| B cross-server migration | 0.179 / 0.183 | 1.752 | 9.890 |
-| C zone snapshot | 0.252 / 0.267 | 0.294 | 1.211 |
-| D read-only battle report | 0.858 / 0.909 | 0.072 | 0.081 |
-
-Against FlatBuffers reading in place after verification (no copy, no unpacking), D is 1.204x for
-xoffset (reference only). Wire bytes (per-cycle totals): B's player state is about 64% larger for xoffset
-and D's battle report about 25% larger. Phone numbers are compared only with the same phone, not with the
-Mac gate numbers.
+On the iPhone, SLG M scale against FlatBuffers 25.12.19 on the same phone (3 runs pooled, geometric
+mean / one-sided 95% upper bound): A 0.305 / 0.322, B 0.179 / 0.183, C 0.252 / 0.267, D 0.858 / 0.909.
+XOffset's wire is larger (B about 64%, D about 25%). Compare phone numbers only with the same phone.
