@@ -58,7 +58,7 @@ namespace detail {
         // validation: a callback during finish must not reach this Core.
         target.free_table_.reset();
         target.free_table_lost_ = false;
-        target.growth_policy_ = growth;
+        target.packed_.growth_policy = growth;
         target.typed_root_access_allowed_ = false;
         target.schema_bound_ = false;
         target.root_type_identity_ = nullptr;

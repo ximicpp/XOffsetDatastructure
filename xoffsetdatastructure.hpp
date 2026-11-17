@@ -769,7 +769,7 @@ namespace XOffsetDatastructure {
         }
 
     public:
-        XGrowPolicy growth_policy() const noexcept { return growth_policy_; }
+        XGrowPolicy growth_policy() const noexcept { return packed_.growth_policy; }
         // Automatic growth runs inside container operations, where the payload
         // must not move: a movable slot switched to Automatic first moves to a
         // VM reservation (pinned from then on). That move invalidates pointers
@@ -784,14 +784,14 @@ namespace XOffsetDatastructure {
                     "XGrowPolicy::Relocating needs storage without a pool"));
             if (policy == XGrowPolicy::Automatic &&
                 (buffer_.movable() || buffer_.reservation_limit() < buffer_.maximum_capacity())) {
-                const auto previous = growth_policy_;
-                growth_policy_ = XGrowPolicy::Automatic;
+                const auto previous = packed_.growth_policy;
+                packed_.growth_policy = XGrowPolicy::Automatic;
                 if (!replace_storage(buffer_.size(), true, true)) {
-                    growth_policy_ = previous;
+                    packed_.growth_policy = previous;
                     XOFFSET_THROW(XBadAlloc());
                 }
             }
-            growth_policy_ = policy;
+            packed_.growth_policy = policy;
         }
         XStorageKind storage_kind() const noexcept {
             if (!buffer_.is_slot()) return XStorageKind::Vm;
@@ -799,7 +799,7 @@ namespace XOffsetDatastructure {
         }
         // False only on a movable slot, whose payload address can change.
         bool address_stable() const noexcept {
-            return !buffer_.movable() && growth_policy_ != XGrowPolicy::Relocating;
+            return !buffer_.movable() && packed_.growth_policy != XGrowPolicy::Relocating;
         }
         // The largest payload this buffer reaches without moving (a
         // relocating buffer's current reservation).
@@ -836,7 +836,7 @@ namespace XOffsetDatastructure {
             XOFFSET_VREQUIRE(init_fresh(size, capacity_from_hint(size, max_reserved)));
         }
 
-        XBufferCore(size_type size, MaximumCapacity cap) : growth_policy_(cap.growth) {
+        XBufferCore(size_type size, MaximumCapacity cap) : packed_{.growth_policy = cap.growth} {
             XOFFSET_VREQUIRE(init_fresh(size, cap.value, cap.pool, cap.storage, cap.reserve));
         }
 
@@ -848,7 +848,7 @@ namespace XOffsetDatastructure {
             XOFFSET_VREQUIRE(init_from_bytes(data, size, capacity_from_hint(size, max_reserved)));
         }
 
-        XBufferCore(const char* data, size_type size, MaximumCapacity cap) : growth_policy_(cap.growth) {
+        XBufferCore(const char* data, size_type size, MaximumCapacity cap) : packed_{.growth_policy = cap.growth} {
             XOFFSET_VREQUIRE(init_from_bytes(data, size, cap.value, cap.pool, cap.storage, cap.reserve));
         }
 
@@ -861,7 +861,7 @@ namespace XOffsetDatastructure {
             const void* extents;
             std::size_t extent_count;
         };
-        XBufferCore(WirePayload wire, size_type size, MaximumCapacity cap) : growth_policy_(cap.growth) {
+        XBufferCore(WirePayload wire, size_type size, MaximumCapacity cap) : packed_{.growth_policy = cap.growth} {
             XOFFSET_VREQUIRE(init_from_wire(wire, size, cap.value, cap.pool, cap.storage, cap.reserve));
         }
 
@@ -877,7 +877,7 @@ namespace XOffsetDatastructure {
             // A movable slot or a relocating buffer that is too small moves to
             // a larger owner: every pointer into the payload is invalidated
             // (epoch), XHandles re-resolve.
-            return (buffer_.movable() || growth_policy_ == XGrowPolicy::Relocating) &&
+            return (buffer_.movable() || packed_.growth_policy == XGrowPolicy::Relocating) &&
                 target > buffer_.reservation_limit() && replace_storage(target, true);
         }
 
@@ -912,10 +912,10 @@ namespace XOffsetDatastructure {
             const size_type need = used + bytes;
             if (need <= buffer_.size()) return XErrc::ok;
             if (need > buffer_.maximum_capacity()) return XErrc::capacity_exceeded;
-            if (growth_policy_ == XGrowPolicy::Explicit) return XErrc::out_of_storage;
-            if (need > buffer_.reservation_limit()) return pinned_ ? XErrc::borrowed : XErrc::out_of_storage;
+            if (packed_.growth_policy == XGrowPolicy::Explicit) return XErrc::out_of_storage;
+            if (need > buffer_.reservation_limit()) return packed_.pinned ? XErrc::borrowed : XErrc::out_of_storage;
             // ensure_allocation_extent's growth, without its throw.
-            const size_type maximum = growth_policy_ == XGrowPolicy::Automatic
+            const size_type maximum = packed_.growth_policy == XGrowPolicy::Automatic
                 ? buffer_.maximum_capacity() : buffer_.reservation_limit();
             if (buffer_.grow_to(extent_target(need, maximum)) || buffer_.grow_to(need)) return XErrc::ok;
             return XErrc::out_of_storage;
@@ -950,7 +950,7 @@ namespace XOffsetDatastructure {
             if (auto* ctl = control(); ctl && ctl->sticky == XErrc::ok) ctl->sticky = code;
         }
         // An open pin scope: the payload does not move, retired blocks wait.
-        bool pinned() const noexcept { return pinned_; }
+        bool pinned() const noexcept { return packed_.pinned; }
 
         // A buffer with a recorded failure emits nothing: `out` is cleared
         // and, with exceptions, XException(error()) is thrown; without them
@@ -976,7 +976,7 @@ namespace XOffsetDatastructure {
             auto* ctl = control();
             if (!ctl) return false;
             ++ctl->borrow;
-            pinned_ = true;
+            packed_.pinned = true;
             return true;
         }
         // pin_enter when nothing has to happen first: a live lineage with no
@@ -984,13 +984,13 @@ namespace XOffsetDatastructure {
         // or a reservation at most half used). False: take the full entry.
         bool pin_quiet() noexcept {
             detail::XCtl* const live = ctl_;
-            if (!live || live->sticky != XErrc::ok || pinned_) return false;
+            if (!live || live->sticky != XErrc::ok || packed_.pinned) return false;
             if (!address_stable()) {
                 const auto* sm = arena();
                 if (!sm || static_cast<size_type>(sm->used_end) > buffer_.reservation_limit() / 2) return false;
             }
             ++live->borrow;
-            pinned_ = true;
+            packed_.pinned = true;
             return true;
         }
         // Closes a scope opened by pin_enter on this lineage. `ctl` is the
@@ -1000,7 +1000,7 @@ namespace XOffsetDatastructure {
             if (!ctl || ctl->borrow == 0) return;
             if (--ctl->borrow != 0) return;
             if (auto* core = ctl->core) {
-                core->pinned_ = false;
+                core->packed_.pinned = false;
                 core->release_quarantine();
 #if defined(XOFFSET_STRESS_RELOCATE)
                 core->stress_relocate();
@@ -1009,7 +1009,7 @@ namespace XOffsetDatastructure {
         }
 
         // XBuffer::build's scope: counted on this lineage's block, or, when
-        // there is none (no proxy was ever made), bare: only pinned_, and no
+        // there is none (no proxy was ever made), bare: only the pin flag, and no
         // block to renew per message. `*slot` is the block the scope counts
         // on; a block made while a bare scope is open goes there (make_ctl).
         // Close with pin_exit(*slot), or pin_close_bare() while it is null.
@@ -1018,11 +1018,11 @@ namespace XOffsetDatastructure {
             *slot = ctl;
             if (ctl) ++ctl->borrow;
             else bare_slot_ = slot;
-            pinned_ = true;
+            packed_.pinned = true;
         }
         void pin_close_bare() noexcept {
             bare_slot_ = nullptr;
-            pinned_ = false;
+            packed_.pinned = false;
             release_quarantine();
 #if defined(XOFFSET_STRESS_RELOCATE)
             stress_relocate();
@@ -1039,7 +1039,7 @@ namespace XOffsetDatastructure {
             if (ctl_) {
                 ctl_->core = this;
                 ctl_->base = buffer_.data();
-                if (pinned_) [[unlikely]] {
+                if (packed_.pinned) [[unlikely]] {
                     // Made inside a bare scope (a nested scope, a recorded
                     // failure, a move): the block counts that scope, which
                     // now closes on it.
@@ -1049,10 +1049,17 @@ namespace XOffsetDatastructure {
                 }
             }
         }
+        // packed_ as one integer (see Packed). 0 is the default word.
+        std::uint64_t packed_bits() const noexcept {
+            std::uint64_t bits;
+            std::memcpy(&bits, &packed_, sizeof(bits));
+            return bits;
+        }
+        void set_packed_bits(std::uint64_t bits) noexcept { std::memcpy(&packed_, &bits, sizeof(bits)); }
         // A bare scope that the content may leave (move, swap) gets its
         // block first, so the scope follows the content as a counted one.
         void promote_bare_pin() noexcept {
-            if (pinned_ && !ctl_) [[unlikely]] make_ctl();
+            if (packed_.pinned && !ctl_) [[unlikely]] make_ctl();
         }
         // After ctl_ changed hands: point it at this owner, mirror its pins.
         void adopt_ctl() noexcept {
@@ -1060,13 +1067,13 @@ namespace XOffsetDatastructure {
                 ctl_->core = this;
                 ctl_->base = buffer_.data();
             }
-            pinned_ = ctl_ && ctl_->borrow != 0;
+            packed_.pinned = ctl_ && ctl_->borrow != 0;
         }
         void retire_ctl() noexcept {
             if (!ctl_) return;
             detail::XCtlPool::release(ctl_);
             ctl_ = nullptr;
-            pinned_ = false;
+            packed_.pinned = false;
             quarantine_.clear();
         }
         // The content is replaced (reload, reset, clone_into): proxies of the
@@ -1120,7 +1127,7 @@ namespace XOffsetDatastructure {
         // Stress mode: every pin scope's end moves the payload, so a plain
         // reference kept past the scope points at released storage.
         void stress_relocate() noexcept {
-            if (growth_policy_ != XGrowPolicy::Relocating || buffer_.empty()) return;
+            if (packed_.growth_policy != XGrowPolicy::Relocating || buffer_.empty()) return;
             (void)replace_storage(buffer_.size(), true);
         }
 #endif
@@ -1129,12 +1136,12 @@ namespace XOffsetDatastructure {
             if (need > buffer_.maximum_capacity()) return XErrc::capacity_exceeded;
             const size_type limit = buffer_.reservation_limit();
             if (need <= limit) {
-                const size_type target = growth_policy_ == XGrowPolicy::Explicit
+                const size_type target = packed_.growth_policy == XGrowPolicy::Explicit
                     ? need : extent_target(need, limit);
                 return buffer_.grow_to(target) || buffer_.grow_to(need) ? XErrc::ok : XErrc::out_of_storage;
             }
-            if (!buffer_.movable() && growth_policy_ != XGrowPolicy::Relocating) return XErrc::out_of_storage;
-            if (pinned_) return XErrc::borrowed;
+            if (!buffer_.movable() && packed_.growth_policy != XGrowPolicy::Relocating) return XErrc::out_of_storage;
+            if (packed_.pinned) return XErrc::borrowed;
             return replace_storage(need, true) ? XErrc::ok : XErrc::out_of_storage;
         }
 
@@ -1166,6 +1173,13 @@ namespace XOffsetDatastructure {
             promote_bare_pin();
             other.promote_bare_pin();
             std::swap(ctl_, other.ctl_);
+            // Policy and reset mark follow the content, as one word; the pin
+            // flag in it is set again by adopt_ctl below.
+            {
+                const auto mine = packed_bits();
+                set_packed_bits(other.packed_bits());
+                other.set_packed_bits(mine);
+            }
             quarantine_.swap(other.quarantine_);
             buffer_.swap(other.buffer_);
             // After the payloads swapped: each block names its content's base.
@@ -1174,12 +1188,8 @@ namespace XOffsetDatastructure {
             owner_record_.swap(other.owner_record_);
             free_table_.swap(other.free_table_);
             std::swap(free_table_lost_, other.free_table_lost_);
-#if !XOFFSET_SCRUB_RESET
-            std::swap(reset_dirty_end_, other.reset_dirty_end_);
-#endif
             publish_host_owner();
             other.publish_host_owner();
-            std::swap(growth_policy_, other.growth_policy_);
             std::swap(root_type_identity_, other.root_type_identity_);
             std::swap(typed_root_access_allowed_, other.typed_root_access_allowed_);
             std::swap(schema_bound_, other.schema_bound_);
@@ -1374,7 +1384,7 @@ namespace XOffsetDatastructure {
             // Stress mode: in a Relocating buffer a container always regrows
             // into a fresh block (and the old one is poisoned when retired),
             // as std::vector would. Other policies keep their layout.
-            if (growth_policy_ == XGrowPolicy::Relocating) return false;
+            if (packed_.growth_policy == XGrowPolicy::Relocating) return false;
 #endif
             if (new_bytes > MAX_PAYLOAD - offset || !ensure_allocation_extent(offset + new_bytes)) return false;
             arena()->used_end = offset + new_bytes;
@@ -1391,12 +1401,12 @@ namespace XOffsetDatastructure {
 #if defined(XOFFSET_STRESS_RELOCATE)
             // Stress mode: a retired block is poisoned, in a pin scope too (a
             // reference the container's own rules invalidated reads garbage).
-            if (growth_policy_ == XGrowPolicy::Relocating) stress_poison_block(ptr, bytes);
+            if (packed_.growth_policy == XGrowPolicy::Relocating) stress_poison_block(ptr, bytes);
 #endif
 #if XOFFSET_PIN_QUARANTINE
             // Inside a pin scope a retired block is not reused until the
             // scope closes: plain references into it stay harmless.
-            if (pinned_) [[unlikely]] return quarantine_block(ptr, bytes);
+            if (packed_.pinned) [[unlikely]] return quarantine_block(ptr, bytes);
 #endif
             const auto base = reinterpret_cast<std::uintptr_t>(buffer_.data());
             const auto address = reinterpret_cast<std::uintptr_t>(ptr);
@@ -2676,12 +2686,12 @@ namespace XOffsetDatastructure {
             size = std::max(size, min_payload_size());
             if (size > max_reserved) XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, detail::arena_failure_message);
             StoragePlan plan;
-            XOFFSET_VTRY(plan_storage(size, max_reserved, growth_policy_, pool.enabled(), request, plan));
+            XOFFSET_VTRY(plan_storage(size, max_reserved, packed_.growth_policy, pool.enabled(), request, plan));
             XOFFSET_VTRY(as_arena_failure([&]() -> detail::vstatus {
                 free_table_.reset();
                 free_table_lost_ = false;
                 detail::VirtualMemoryStorage owner;
-                if (growth_policy_ == XGrowPolicy::Relocating) {
+                if (packed_.growth_policy == XGrowPolicy::Relocating) {
                     if (!relocating_owner(owner, size, max_reserved, std::max(size, reserve_or_default(reserve, size))))
                         XOFFSET_VFAIL_BAD_ALLOC();
                     if (!owner.grow_to(size)) XOFFSET_VFAIL_BAD_ALLOC();
@@ -2712,9 +2722,9 @@ namespace XOffsetDatastructure {
                                         const XBufferPool& pool = {}, XStorage request = XStorage::Auto,
                                         size_type reserve = 0) {
             StoragePlan plan;
-            XOFFSET_VTRY(plan_storage(size, max_reserved, growth_policy_, pool.enabled(), request, plan));
+            XOFFSET_VTRY(plan_storage(size, max_reserved, packed_.growth_policy, pool.enabled(), request, plan));
             return init_from_storage(data, size, max_reserved, [&](detail::VirtualMemoryStorage& owner) -> detail::vstatus {
-                if (growth_policy_ == XGrowPolicy::Relocating) {
+                if (packed_.growth_policy == XGrowPolicy::Relocating) {
                     if (!relocating_owner(owner, size, max_reserved, std::max(size, reserve_or_default(reserve, size))))
                         XOFFSET_VFAIL_BAD_ALLOC();
                     return owner.assign_bytes_v(data, size);
@@ -2732,10 +2742,10 @@ namespace XOffsetDatastructure {
                                        const XBufferPool& pool = {}, XStorage request = XStorage::Auto,
                                        size_type reserve = 0) {
             StoragePlan plan;
-            XOFFSET_VTRY(plan_storage(size, max_reserved, growth_policy_, pool.enabled(), request, plan));
+            XOFFSET_VTRY(plan_storage(size, max_reserved, packed_.growth_policy, pool.enabled(), request, plan));
             return init_from_storage(wire.stored, size, max_reserved,
                                      [&](detail::VirtualMemoryStorage& owner) -> detail::vstatus {
-                if (growth_policy_ == XGrowPolicy::Relocating && size <= max_reserved) {
+                if (packed_.growth_policy == XGrowPolicy::Relocating && size <= max_reserved) {
                     if (!relocating_owner(owner, size, max_reserved, std::max(size, reserve_or_default(reserve, size))))
                         XOFFSET_VFAIL_BAD_ALLOC();
                     if (wire.extent_count == 0)
@@ -2810,11 +2820,8 @@ namespace XOffsetDatastructure {
                 owner_record_.swap(other.owner_record_);
                 free_table_.swap(other.free_table_);
                 free_table_lost_ = std::exchange(other.free_table_lost_, false);
-#if !XOFFSET_SCRUB_RESET
-                reset_dirty_end_ = std::exchange(other.reset_dirty_end_, 0u);
-#endif
                 publish_host_owner();
-                if (ctl_ || other.ctl_ || pinned_ || other.pinned_) [[unlikely]] {
+                if (ctl_ || other.ctl_ || packed_.pinned || other.packed_.pinned) [[unlikely]] {
                     promote_bare_pin();
                     other.promote_bare_pin();
                     retire_ctl();
@@ -2822,8 +2829,16 @@ namespace XOffsetDatastructure {
                     quarantine_.swap(other.quarantine_);
                     adopt_ctl();
                     other.adopt_ctl();
+                    // adopt_ctl set each pin flag: the rest moves by member.
+                    packed_.growth_policy = std::exchange(other.packed_.growth_policy, XGrowPolicy::Explicit);
+                    packed_.reset_dirty_end = std::exchange(other.packed_.reset_dirty_end, 0u);
+                } else {
+                    // Neither side is pinned: policy and reset mark move as
+                    // one word and other gets the default one.
+                    const auto theirs = other.packed_bits();
+                    other.set_packed_bits(0);
+                    set_packed_bits(theirs);
                 }
-                growth_policy_ = std::exchange(other.growth_policy_, XGrowPolicy::Explicit);
                 root_type_identity_ = std::exchange(other.root_type_identity_, nullptr);
                 typed_root_access_allowed_ = std::exchange(other.typed_root_access_allowed_, true);
                 schema_bound_ = std::exchange(other.schema_bound_, false);
@@ -2932,12 +2947,12 @@ namespace XOffsetDatastructure {
             const auto maximum = buffer_.maximum_capacity();
             if (logical > maximum) return false;
             // A pin scope holds plain references into the payload.
-            if (pinned_) return false;
+            if (packed_.pinned) return false;
             detail::VirtualMemoryStorage next;
             PreparedOwner prepared;
             XOFFSET_TRY {
                 const auto cls = pin ? detail::SlotGeometry::classes : detail::SlotGeometry::class_for(logical);
-                if (growth_policy_ == XGrowPolicy::Relocating && !pin) {
+                if (packed_.growth_policy == XGrowPolicy::Relocating && !pin) {
                     if (!relocating_owner(next, logical, maximum, relocation_target(logical))) return false;
                     if (copy) XOFFSET_VTRY_OR(false, next.assign_bytes_v(buffer_.data(), used_end_clamped()));
                 } else if (cls != detail::SlotGeometry::classes) {
@@ -2966,7 +2981,7 @@ namespace XOffsetDatastructure {
 #if defined(XOFFSET_STRESS_RELOCATE)
             // Stress mode: a Relocating buffer's old storage becomes
             // inaccessible instead.
-            if (growth_policy_ == XGrowPolicy::Relocating) detail::StressGraveyard::bury(std::move(next));
+            if (packed_.growth_policy == XGrowPolicy::Relocating) detail::StressGraveyard::bury(std::move(next));
 #endif
             return true;
             // `next` (the old storage) is released here.
@@ -3076,9 +3091,9 @@ namespace XOffsetDatastructure {
 
         bool ensure_allocation_extent(size_type required, bool allow_growth = true) {
             if (required <= buffer_.size()) return true;
-            if (!allow_growth || growth_policy_ == XGrowPolicy::Explicit || buffer_.empty()) return false;
+            if (!allow_growth || packed_.growth_policy == XGrowPolicy::Explicit || buffer_.empty()) return false;
             // Relocating: in place up to the current reservation only.
-            const auto maximum = growth_policy_ == XGrowPolicy::Automatic
+            const auto maximum = packed_.growth_policy == XGrowPolicy::Automatic
                 ? buffer_.maximum_capacity() : buffer_.reservation_limit();
             if (required > maximum) return false;
             // Throw on an OS/preparation failure. In particular, a container's
@@ -3194,7 +3209,7 @@ namespace XOffsetDatastructure {
         // The WirePayload constructor's body, for a default-constructed
         // buffer: the non-throwing load entries report failure instead.
         detail::vstatus init_wire_v(const WirePayload& wire, size_type size, MaximumCapacity cap) {
-            growth_policy_ = cap.growth;
+            packed_.growth_policy = cap.growth;
             return init_from_wire(wire, size, cap.value, cap.pool, cap.storage, cap.reserve);
         }
 
@@ -3325,7 +3340,7 @@ namespace XOffsetDatastructure {
             // A movable slot too small for the new content moves first; the
             // old content is discarded anyway, so nothing is copied.
             if ((buffer_.is_slot() ? size > buffer_.accessible_bytes()
-                                   : growth_policy_ == XGrowPolicy::Relocating && size > buffer_.reservation_limit()) &&
+                                   : packed_.growth_policy == XGrowPolicy::Relocating && size > buffer_.reservation_limit()) &&
                 !replace_storage(size, false))
                 XOFFSET_VFAIL(XBadAlloc, XErrc::out_of_storage, detail::arena_failure_message);
             // Holes are unknown until verification supplies the hole table.
@@ -3414,7 +3429,7 @@ namespace XOffsetDatastructure {
         void copy_clone_state(const XBufferCore& src) {
             const auto logical = std::min(src.buffer_.size(), buffer_.maximum_capacity());
             if (logical > buffer_.size() && !buffer_.grow_to(logical) &&
-                !((buffer_.movable() || growth_policy_ == XGrowPolicy::Relocating) && replace_storage(logical, true)))
+                !((buffer_.movable() || packed_.growth_policy == XGrowPolicy::Relocating) && replace_storage(logical, true)))
                 XOFFSET_THROW(XBadAlloc());
             if (!src.free_table_lost_) {
                 XOFFSET_TRY {
@@ -3457,12 +3472,12 @@ namespace XOffsetDatastructure {
         // owner onto VM, a pinned slot onto a pinned slot (Auto picks one,
         // since its maximum fits a slot).
         MaximumCapacity clone_capacity() const noexcept {
-            if (growth_policy_ == XGrowPolicy::Relocating)
-                return MaximumCapacity{buffer_.maximum_capacity(), growth_policy_, {}, XStorage::Auto, 0};
+            if (packed_.growth_policy == XGrowPolicy::Relocating)
+                return MaximumCapacity{buffer_.maximum_capacity(), packed_.growth_policy, {}, XStorage::Auto, 0};
             const auto storage = buffer_.movable() ? XStorage::Movable
                                  : buffer_.is_slot() ? XStorage::Auto
                                                      : XStorage::Pinned;
-            return MaximumCapacity{buffer_.maximum_capacity(), growth_policy_, buffer_.pool(), storage};
+            return MaximumCapacity{buffer_.maximum_capacity(), packed_.growth_policy, buffer_.pool(), storage};
         }
 
         // Empty arena: header only, no root, empty exact free table.
@@ -3472,9 +3487,9 @@ namespace XOffsetDatastructure {
         // XOFFSET_SCRUB_RESET that offset is used_end: a reset that keeps the
         // logical length clears exactly [header, used_end), live blocks and
         // holes alike. Without it the reset clears nothing and remembers how
-        // far the discarded content reached (reset_dirty_end_): the bytes in
-        // [used_end, reset_dirty_end_) are the old content's until the new
-        // content's blocks take them. When the logical length changes, bytes
+        // far the discarded content reached (packed_.reset_dirty_end): the
+        // bytes in [used_end, packed_.reset_dirty_end) are the old content's
+        // until the new content's blocks take them. When the logical length changes, bytes
         // above the header become dirty-below-zero_from_ and are zeroed by
         // the regrowth to `logical` (or by any later growth). noexcept: if
         // the storage cannot hold a header the owner simply stays without one.
@@ -3499,7 +3514,7 @@ namespace XOffsetDatastructure {
 #if XOFFSET_SCRUB_RESET
             std::memset(buffer_.data() + min_payload_size(), 0, used - min_payload_size());
 #else
-            if (used > reset_dirty_end_) reset_dirty_end_ = static_cast<std::uint32_t>(used);
+            if (used > packed_.reset_dirty_end) packed_.reset_dirty_end = static_cast<std::uint32_t>(used);
 #  if defined(XOFFSET_STRESS_RELOCATE)
             // Stress mode: nothing may count on a block from the tail being
             // zero, so what the reset leaves is made unmistakable.
@@ -3516,14 +3531,14 @@ namespace XOffsetDatastructure {
 #if XOFFSET_SCRUB_RESET
             return used;
 #else
-            return used > reset_dirty_end_ ? used : size_type(reset_dirty_end_);
+            return used > packed_.reset_dirty_end ? used : size_type(packed_.reset_dirty_end);
 #endif
         }
         // The storage was replaced, or everything a reset left lies past the
         // logical length (the storage's zero_from covers it from there).
         void forget_reset_dirt() noexcept {
 #if !XOFFSET_SCRUB_RESET
-            reset_dirty_end_ = 0;
+            packed_.reset_dirty_end = 0;
 #endif
         }
 
@@ -3625,16 +3640,25 @@ namespace XOffsetDatastructure {
     private:
         uint64_t dirty_epoch_ = 0;  // m_epoch when dirty_step_ was last reset
         const void* root_type_identity_ = nullptr;
-        XGrowPolicy growth_policy_ = XGrowPolicy::Explicit;
-        // Growth policy part 2: an open pin scope (mirrors ctl_->borrow), the
-        // lineage's control block, and blocks retired inside the scope
+        // Three small members in one 8-byte word, so that a move or a swap
+        // carries all of them with one load and one store per side (what the
+        // policy byte alone took). It sits before ctl_, whose line a reset
+        // and a reload read anyway. No padding bytes: the word is copied as
+        // one integer (take_packed, swap).
+        struct Packed {
+            XGrowPolicy growth_policy = XGrowPolicy::Explicit;
+            // Growth policy part 2: an open pin scope (mirrors ctl_->borrow).
+            bool pinned = false;
+            std::uint16_t reserved = 0;
+            // Bytes in [used_end, reset_dirty_end) may be nonzero: the content
+            // a reset discarded without clearing (always 0 with
+            // XOFFSET_SCRUB_RESET).
+            std::uint32_t reset_dirty_end = 0;
+        };
+        static_assert(sizeof(Packed) == sizeof(std::uint64_t) && std::has_unique_object_representations_v<Packed>);
+        Packed packed_;
+        // The lineage's control block, and blocks retired inside a pin scope
         // (payload offset << 32 | bytes).
-        bool pinned_ = false;
-        // Bytes in [used_end, reset_dirty_end_) may be nonzero: the content a
-        // reset discarded without clearing (always 0 with XOFFSET_SCRUB_RESET).
-        // In the padding before ctl_, whose line a reset and a reload read
-        // anyway (XGrowPolicy is one byte for this).
-        [[maybe_unused]] std::uint32_t reset_dirty_end_ = 0;
         detail::XCtl* ctl_ = nullptr;
         std::vector<std::uint64_t> quarantine_;
         // Largest quarantine list (entries) kept between pin scopes: 8 KiB.
