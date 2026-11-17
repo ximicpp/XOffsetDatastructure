@@ -10,8 +10,8 @@ XOffset moves mutable state **between C++ programs that share the same schema**:
 and between servers and clients. Compilers and platforms may differ; the schema must be the same.
 It is not a cross-language protocol and not a long-term storage format.
 
-Server-to-client use is currently a goal and is not advertised publicly. Status in 4.1.0 (details in
-[CLIENT_TARGETS.md](CLIENT_TARGETS.md)):
+Server to client is a core use case, next to server to server ([README](../README.md)). Client status
+in 4.1.0 (details in [CLIENT_TARGETS.md](CLIENT_TARGETS.md)):
 
 - Clients build with the C++20/C++23 field lists (`XOFFSET_RECORD`, each platform's native
   compiler) and servers with C++26 reflection; the wire is byte-identical. Windows x64 (MSVC 19.44,
