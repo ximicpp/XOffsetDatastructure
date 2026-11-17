@@ -58,7 +58,7 @@ void verify(Vector vector, Fill fill, Generate generate) {
                                  std::to_integer<int>(writer.wire()[i]));
             throw std::runtime_error("output differs from save_compact");
         }
-        const auto view = receiver.template view<Root, xo::XCheck::bounds>(writer.wire());
+        const auto view = receiver.template view<Root>(writer.wire());
         auto checked = xo::XBuffer::try_load_verified<Root>(writer.wire(), cap);
         if (!view || !checked || vector(view->root()).size() != count ||
             vector(checked->template root<Root>()).size() != count)
