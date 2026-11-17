@@ -37,7 +37,11 @@ void check_exact(const XString& s, const std::string& want) {
     }
     if (s.capacity() == 0) { assert(want.empty()); return; }
     const char* chars = s.data();
+    assert(chars[want.size()] == '\0');
+#if XOFFSET_SCRUB_ERASED
+    // M4: nothing of an older value stays after the terminator.
     for (std::size_t i = want.size(); i <= s.capacity(); ++i) assert(chars[i] == '\0');
+#endif
 }
 
 std::string piece(std::mt19937& rng, std::size_t length) {

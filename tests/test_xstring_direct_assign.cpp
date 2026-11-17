@@ -228,7 +228,11 @@ bool test_heap_reassign_in_place() {
     auto check = [&](const std::string& want) {
         assert(s.view() == want);
         assert(s.data() == block && s.capacity() == cap);
+        assert(block[want.size()] == '\0');
+#if XOFFSET_SCRUB_ERASED
+        // M4: the old characters after the terminator are zeroed.
         for (std::size_t i = want.size(); i <= cap; ++i) assert(block[i] == '\0');
+#endif
     };
 
     std::cout << "Test 14: Every old and new length... ";

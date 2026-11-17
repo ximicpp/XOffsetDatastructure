@@ -4,6 +4,14 @@
 // N10 sparse wire of earlier releases (a >= 4 KiB free run skipped) must
 // still load to the same payload. A V1 wire header is rejected with an
 // explicit "format version 1" error.
+//
+// The pinned bytes are those of a build that zeroes what containers vacate
+// (M4, XOFFSET_HARDENED): the model erases elements, and without the scrub
+// switches their old bytes stay in spare capacity. The format is the same in
+// both builds; this single-file program always builds the scrubbed one.
+#ifndef XOFFSET_HARDENED
+#define XOFFSET_HARDENED 1
+#endif
 #include "xoffsetdatastructure.hpp"
 
 #include <algorithm>

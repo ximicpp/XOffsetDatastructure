@@ -20,6 +20,11 @@ option(XOFFSET_FUZZ_INJECT_CRASH "Fuzz drill builds only: inputs starting with X
 # Relocating payload and makes the old storage inaccessible; containers always
 # regrow into fresh blocks and retired blocks are poisoned.
 option(XOFFSET_STRESS_RELOCATE "Test builds only: force moves at pin scope exit, poison retired storage" OFF)
+# Hardening (docs/V2_THREAT_MODEL.md section 4): zero vacated, freed and padding
+# bytes, keep blocks retired inside edit()/read() unused until the scope ends,
+# re-check the sender's own state per save. Off by default (speed first); ON
+# defines XOFFSET_HARDENED=1 for every target that links XOffset::xoffset.
+option(XOFFSET_HARDENED "Turn on every hardening switch (XOFFSET_HARDENED=1)" OFF)
 # 26: P2996 reflection describes every record (no boilerplate). 20 and 23: one
 # XOFFSET_RECORD line per record; no <meta>, no -freflection, no TypeLayout.
 # Not given on the first configure: 26 when the toolchain has C++26 reflection,
@@ -107,6 +112,9 @@ if(NOT XOFFSET_STORAGE_ONLY)
     xoffset_configure_full_interface(xoffset_common)
     if(XOFFSET_STRESS_RELOCATE)
         target_compile_definitions(xoffset_common INTERFACE XOFFSET_STRESS_RELOCATE=1)
+    endif()
+    if(XOFFSET_HARDENED)
+        target_compile_definitions(xoffset_common INTERFACE XOFFSET_HARDENED=1)
     endif()
 
     # An imported interface transfers the real settings to try_compile().

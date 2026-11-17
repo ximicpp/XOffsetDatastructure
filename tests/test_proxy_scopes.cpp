@@ -292,7 +292,8 @@ bool test_pin_scopes() {
     for (int i = 0; i < 100000; ++i) CHECK(ints.push_back(i));   // outside: moves
     CHECK(small.data() != where && small.ok());
 
-    // Blocks retired inside a scope are not reused before it closes.
+    // With XOFFSET_PIN_QUARANTINE, blocks retired inside a scope are not
+    // reused before it closes; without it they are reusable at once.
     auto q = make_relocating();
     ok = q.edit<Root>([&](Root& root) {
         for (int i = 0; i < 4; ++i) root.ints.push_back(i);
@@ -301,10 +302,12 @@ bool test_pin_scopes() {
         root.ints.push_back(4);             // regrows: the old block is retired
         CHECK_SCOPE(old_block != root.ints.data());
         for (int i = 0; i < 64; ++i) root.players.emplace_back().items.push_back(i);
+#if XOFFSET_PIN_QUARANTINE
         for (auto& p : root.players) CHECK_SCOPE(p.items.data() != old_block);
+#endif
 #if defined(XOFFSET_STRESS_RELOCATE)
         CHECK_SCOPE(old_block[0] == std::int32_t(0xDBDBDBDB));  // stress mode: poisoned
-#else
+#elif XOFFSET_PIN_QUARANTINE
         CHECK_SCOPE(old_block[0] == 0 && old_block[3] == 3);   // still readable, not reused
 #endif
     });
@@ -329,7 +332,11 @@ bool test_pin_scopes() {
     CHECK(churn.save_verified<Root>().size() == small_wire);
     CHECK(churn_scope(5000));
     const auto large_wire = churn.save_verified<Root>().size();
-    CHECK(large_wire > small_wire);
+#if XOFFSET_PIN_QUARANTINE
+    CHECK(large_wire > small_wire);    // the scope held every block it retired
+#else
+    CHECK(large_wire == small_wire);   // blocks are reused inside the scope
+#endif
     for (int i = 0; i < 2000; ++i) CHECK(churn_scope(4));
     CHECK(churn.save_verified<Root>().size() == large_wire && churn.ok());
     CHECK(churn.root<Root>().players.empty());

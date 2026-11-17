@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+- Hardening is now opt-in (susu 2026-11-16: speed first). Five measures that
+  cost time on the mutate and send paths are compile-time switches, all 0 by
+  default; `XOFFSET_HARDENED=1` (CMake `-DXOFFSET_HARDENED=ON`) turns on every
+  one a build does not set itself, which is the behaviour up to 4.0.0:
+  `XOFFSET_SCRUB_POPPED` (M4, `pop_back`), `XOFFSET_SCRUB_ERASED` (M4:
+  `clear`, shrinking `resize`, `erase`, shorter assignment),
+  `XOFFSET_SCRUB_PADDING` (M6: implicit padding of stored elements),
+  `XOFFSET_PIN_QUARANTINE` (blocks retired inside `edit()` / `read()` wait
+  for the scope's end) and `XOFFSET_SAVE_SELF_CHECK` (arena header and
+  output-alias checks on the small-message save path). **Behaviour change:**
+  a default build no longer defends threat T5 for container contents:
+  `save_verified`, `freeze_verified` and deltas can carry elements a
+  container has removed, and padding bytes from the sender's stack. Send
+  with `save_compact`, or build with `XOFFSET_HARDENED=1`, where the
+  receiver must not see them. Unchanged: retired blocks are still zeroed
+  (M3; deltas from touch marks rely on zero holes), resetting a buffer still
+  zeroes it, the receive checks (`XCheck` tiers), the wire format.
+  A subtree copy of a heap string now writes its terminator (a hole a loaded
+  wire brought in may hold any bytes). `docs/V2_THREAT_MODEL.md` 3.2 and
+  4.1, `docs/DEPLOYMENT.md` 4.1. Tests of the switches are built twice
+  (`*_hardened`); the two that compare one edit sequence through two code
+  paths (`test_shift_relocate`, `test_ordinary_records`) compare compact
+  wires without the switches. Instruction counts, P2996 Clang x86-64, default
+  against `XOFFSET_HARDENED=1`: CppCon 2024 read/write loop -14.4% (2024
+  layout) and -7.6% (tuned layout); its send/receive round +5.9%, because
+  blocks reused at once leave the filled character with 2 holes in a
+  3112-byte wire instead of 1 hole in 3232 bytes. Per switch and for the SLG
+  cells: threat model 4.1.
 - `XVector::pop_back()` no longer zeroes the removed element's bytes by
   default (threat model M4 exception, susu 2026-11-16): the next append
   there constructs over them, owned blocks are still retired and zeroed (M3).
