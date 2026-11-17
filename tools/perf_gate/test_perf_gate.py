@@ -101,7 +101,7 @@ def row(out, metric):
 
 def entry(**kw):
     e = {"id": "L1", "pr": 99, "metric": "formal.mutate", "compiler": "*", "max_ratio": 1.03,
-         "reason": "test", "evidence": "test", "approved_by": "性能优化"}
+         "reason": "test", "evidence": "test", "approved_by": "performance thread"}
     e.update(kw)
     return e
 
@@ -185,7 +185,7 @@ def main():
 
     f = dict(BASE_FORMAL, load=int(52_000_000 * 0.95))
     rc, out = run_case(tree(formal=f))
-    expect("an Ir drop below 0.97 gets the note", rc == 0 and any("指令数下降" in x for x in out["notes"]))
+    expect("an Ir drop below 0.97 gets the note", rc == 0 and any("instruction count dropped" in x for x in out["notes"]))
 
     with tempfile.TemporaryDirectory() as d:
         cg = Path(d) / "cg.out"
@@ -205,10 +205,10 @@ def main():
     rc, out = run_case(tree(slg=s, functions=fh), base_tree=tree(functions=fb))
     d = row(out, "slg.D").get("functions") or {}
     expect("inlining change: function only on one side is flagged",
-           rc == 1 and d.get("inline_suspect") and any("helper" in x and "只在 head" in x for x in d["suspects"])
-           and d["top"][0]["function"] == "helper" and any("疑似内联" in x for x in out["notes"]))
+           rc == 1 and d.get("inline_suspect") and any("helper" in x and "appears only in head" in x for x in d["suspects"])
+           and d["top"][0]["function"] == "helper" and any("suspected inlining" in x for x in out["notes"]))
     expect("inlining change: opposite caller/callee pair is flagged",
-           any("caller" in x and "一升一降" in x for x in d["suspects"]))
+           any("caller" in x and "opposite directions" in x for x in d["suspects"]))
 
     fh = dict(keys, **{"slg.D.read": prof({"caller": 932_000, "other": 100_000})})
     rc, out = run_case(tree(slg=s, functions=fh), base_tree=tree(functions=fb))
@@ -241,9 +241,9 @@ def main():
     expect("allocator calls replaced by recycling are flagged, verdict unchanged",
            rc == 1 and row(out, "slg.B.in_decode")["verdict"] == "fail" and d["alloc_recycle"]
            and d["alloc_recycle"]["kind"] == "alloc_calls_removed" and d["alloc_recycle"]["alloc"] == -211_700
-           and any("分配器回收型" in x and "D2 型" in x for x in out["notes"]))
+           and any("allocator recycling type" in x and "type D2" in x for x in out["notes"]))
     summary = pg.render_summary(out, {}, {})
-    expect("the function table header carries the recycle flag", "分配器回收型（只是诊断，不放行）" in summary)
+    expect("the function table header carries the recycle flag", "allocator recycling type (diagnostic only, exempts nothing)" in summary)
 
     # The same recycle growth without fewer allocator calls: more bins to recycle (COPS).
     fb3 = dict(keys, **{"slg.B.in_decode": prof({rec: 400_000, "malloc": 63_000, "other": 4_537_000})})
@@ -252,7 +252,7 @@ def main():
     d = row(out, "slg.B.in_decode")["functions"]
     expect("more recycle work with the same allocator calls is flagged as the COPS kind",
            d["alloc_recycle"] and d["alloc_recycle"]["kind"] == "more_recycle_work"
-           and any("COPS 型" in x for x in out["notes"]))
+           and any("type COPS" in x for x in out["notes"]))
 
     # A noise-level allocator drop next to the recycle growth (COPS slg.B: -1,730 against +132,242) is still COPS.
     fh = dict(keys, **{"slg.B.in_decode": prof({rec: 900_000, "malloc": 56_500, "other": 4_574_500})})
@@ -266,7 +266,7 @@ def main():
     rc, out = run_case(tree(slg=s3, functions=fh), base_tree=tree(functions=fb3))
     expect("recycle growth below half of the increase is not flagged",
            row(out, "slg.B.in_decode")["functions"]["alloc_recycle"] is None
-           and not any("分配器回收型" in x for x in out["notes"]))
+           and not any("allocator recycling type" in x for x in out["notes"]))
 
     r = dict(BASE_RELOC, **{"map.insert.fresh": int(900_000 * 1.06)})
     rc, out = run_case(tree(reloc=r))
@@ -321,7 +321,7 @@ def main():
     expect("a judged phase with D1 misses +5% is a cache warning, the Ir verdict and rc stay pass",
            rc == 0 and out["verdict"] == "pass" and out["cache"]["verdict"] == "warn" and cr["verdict"] == "warn"
            and abs(cr["ratio_D1"] - 1.05) < 1e-3 and not out["warnings"]
-           and "缓存 ⚠️ 警告" in summary and "slg.B.in_decode" in summary)
+           and "cache ⚠️ warning" in summary and "slg.B.in_decode" in summary)
 
     bs = tree(); bs["cache"] = cache_of(); bs["cache"]["slg.C.restore"].update(D1mr=40, DLmr=10)
     hs = tree(); hs["cache"] = cache_of(); hs["cache"]["slg.C.restore"].update(D1mr=43, DLmr=12)

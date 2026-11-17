@@ -51,11 +51,12 @@ inline Rng stream(std::uint64_t purpose, std::uint16_t type, std::uint64_t seed,
 
 // Words of generated text, a few of them not ASCII (bytes are bytes on
 // every device; only the lengths and the order of keys matter).
+// The first three non-ASCII words are Chinese, written as UTF-8 hex escapes.
 inline constexpr std::string_view kWords[] = {
     "the", "data", "moves", "between", "devices", "without", "any", "parsing", "step", "and", "each",
     "receiver", "checks", "changes", "sends", "it", "on", "offset", "arena", "wire", "byte", "copy",
     "server", "client", "phone", "window", "linux", "tablet", "note", "draft", "review", "update",
-    "数据", "设备", "互传", "café", "naïve", "Grüße", "один", "δ", "🙂", "order", "sensor", "scene", "chat",
+    "\xE6\x95\xB0\xE6\x8D\xAE", "\xE8\xAE\xBE\xE5\xA4\x87", "\xE4\xBA\x92\xE4\xBC\xA0", "café", "naïve", "Grüße", "один", "δ", "🙂", "order", "sensor", "scene", "chat",
 };
 inline constexpr std::uint32_t kWordCount = sizeof kWords / sizeof kWords[0];
 

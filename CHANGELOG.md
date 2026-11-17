@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Repository is English only (susu 2026-11-17): `README.zh-CN.md` removed;
+  current documents under `docs/` translated into English; large frozen
+  historical evidence written in Chinese (`docs/validation/vm-final/`,
+  `docs/handoff-history/`, older `docs/perf/` run notes) removed, retrievable
+  from commit 837c9d4 (see `docs/ARCHIVED_EVIDENCE.md`). Comments, strings and
+  tool output in code translated too; `tools/check_no_cjk.py`, run by the
+  `meta` step of `tools/local_validate.sh` (every tier), fails when CJK
+  characters come back in tracked text files.
 - CppCon 2024 bench made fairer (susu 2026-11-17): Protocol Buffers now frees
   removed equipment and waypoint messages (`DeleteSubrange`) like every other
   library; its default `RemoveLast` reuse is a report-only row. The item key
@@ -159,7 +167,7 @@ fell in the 1.02-1.08 band and were re-judged over three code layouts
   tracker and holder-count rule as XOffset's D3), and the diagnostic format
   `zpp_bits_dirty` the dirty-mask variant. `scorecard.py` scores the D cells
   against the rival's strongest approach (per-client `U*` or the shared `D*`
-  rows, column "zpp_bits 共享"); `repro_scorecard.sh` runs the shared rivals'
+  rows, column "zpp_bits shared"); `repro_scorecard.sh` runs the shared rivals'
   `SLG_D3=1` processes (`SHARED`, skipped for an older ref).
 - UL.send (client uplink send) is report-only; the 1.80 ceiling is gone.
 - `tools/perf_gate/x86_columns.sh D3=1` produced no D rows (its D3 processes

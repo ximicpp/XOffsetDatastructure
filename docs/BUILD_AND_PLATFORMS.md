@@ -16,7 +16,7 @@ start and the overview; the [user guide](USER_GUIDE.md) is the full reference.
 Ordinary C++26 support does not imply P2996 support. In 3.1.0 the full API had
 no non-reflection fallback. Since 3.2.0 (field-list backend), clients (Windows, Android, iOS) build the same library with
 C++20/C++23 and a one-line field list per record
-([user guide 2.1](USER_GUIDE.md#21-字段表xoffset_record)); servers keep
+([user guide 2.1](USER_GUIDE.md#21-field-lists-xoffset_record)); servers keep
 C++26 reflection, which also checks each field list, and both builds write the
 same wire bytes ([CLIENT_TARGETS.md](CLIENT_TARGETS.md)). The supported
 reflection compilers are the Bloomberg clang-p2996
@@ -107,7 +107,7 @@ validation (`tools/local_validate.sh`) and the local platform matrix
 | macOS 26.3 arm64 (Apple M4), clang-p2996 `d77eff1` | Debug 78/78; TSan 75/75; ASan+UBSan passes except 8 cases inside the 9 known platform-limit cases (Darwin ASan replaces `operator new`, so injected host allocation failures cannot fire) | Recorded on 2026-10-21 for the V2 merge |
 | Linux x86_64, pinned P2996 Docker image | Full build, CTest, signature check and package consumption run in CI ([ci.yml](../.github/workflows/ci.yml)); a separate CI job runs ASan+UBSan on the allocator, wire and V2 tests | CI is the record; see the workflow runs |
 | Linux x86_64, GCC 16.2.0 (`gcc:16` image) | Debug build, CTest and ASan+UBSan in CI; cross-compiler wire corpus exchanged with P2996 Clang (byte-identical, mutually accepted) | No x86_64 performance comparison with P2996 Clang (cloud GCC timing is reference only) |
-| Linux arm64 VM on Apple M4 (colima vz), GCC 16.2.0 vs clang-p2996 `d77eff1` | Release CTest 98/98 with both; per-cycle state and wire bytes identical across the two compilers; SLG A–C xoffset÷baseline ≤ 0.50 under GCC in both batches (reference only) | GCC÷Clang wall-clock has no verdict: both allowed batches were invalid by their A/A and bridge rules; directions in [docs/perf/gcc16-20261026](perf/gcc16-20261026/README.md) (2026-10-26) |
+| Linux arm64 VM on Apple M4 (colima vz), GCC 16.2.0 vs clang-p2996 `d77eff1` | Release CTest 98/98 with both; per-cycle state and wire bytes identical across the two compilers; SLG A–C xoffset÷baseline ≤ 0.50 under GCC in both batches (reference only) | GCC÷Clang wall-clock has no verdict: both allowed batches were invalid by their A/A and bridge rules; directions in the 2026-10-26 run notes, removed from the tree and retrievable per [ARCHIVED_EVIDENCE.md](ARCHIVED_EVIDENCE.md) |
 | Linux arm64 (native runner), GCC 16 | Full Debug CTest in CI; wire corpus byte-identical with Linux x86-64 | CI is the record ([client-targets.yml](../.github/workflows/client-targets.yml)) |
 | Windows x64, MSYS2 UCRT64 MinGW-w64 GCC 16.2 | Full Debug CTest in CI; wire corpus byte-identical with Linux x86-64 | No reflection compiler for MSVC, Android or iOS; those clients use the field-list backend (row above) |
 | Native Windows x64, MSVC | storage only (V1-era record) | Full library through the field-list backend only (row above) |
@@ -164,7 +164,7 @@ says how to retrieve them. They do not describe the V2 format.
 Both public headers are required for full consumers. Keep header versions,
 compile-time options and toolchain settings consistent across translation units.
 A release does not promise stable source API, ABI or arbitrary cross-toolchain
-wire compatibility; the [user guide](USER_GUIDE.md#8-核心承诺与-api-稳定性) lists the
+wire compatibility; the [user guide](USER_GUIDE.md#8-core-guarantees-and-api-stability) lists the
 core guarantees (K0–K9, starting with K0: the payload holds no absolute
 address, so after any modification the whole region can still be copied to
 another address, process or machine) and which interfaces they cover. K8,
