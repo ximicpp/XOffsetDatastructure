@@ -17,7 +17,7 @@
   旧 v1 库，带公开 Release）和 `v2.0-*` 属于前两代实现，版本号不能和它们重名，发版前用
   `git ls-remote --tags origin` 核对一次。
 - 安装包只接受完整版本字符串：`find_package` 的数字、`EXACT` 和范围请求一律拒绝，
-  消费方用 `XOffsetDatastructure_VERSION STREQUAL "<版本>"` 自己核对（README「Build and consume」）。
+  消费方用 `XOffsetDatastructure_VERSION STREQUAL "<版本>"` 自己核对（[BUILD_AND_PLATFORMS.md](BUILD_AND_PLATFORMS.md)「Build and consume」）。
   任何两个版本之间都不承诺 API、ABI 或 wire 兼容；1.x 内 wire 的冻结范围以 CHANGELOG 为准。
 
 ## 2. 发版前：云端性能判定
@@ -154,8 +154,10 @@ PASS。有发现：`tools/fuzz_report.py` 开 issue（用法见 `tools/fuzz_nigh
 2. `CHANGELOG.md`：把 `## Unreleased` 下的条目整段移到新标题 `## X.Y.Z: <一句话主题>` 下，
    标题下先写两三句这一版的范围（对上一个 tag 的主要变化、已知缺口），上面留一个空的
    `## Unreleased`。
-3. 当前文档里的旧版本号改成新版本：`git grep -n '<旧版本号>' -- README.md 'docs/*.md'` 列出的
-   README 第一段和消费示例、用户指南等文档标题、`ALPHA_COMPATIBILITY.md` 的消费示例。
+3. 当前文档里的旧版本号改成新版本：`git grep -n '<旧版本号>' -- 'README*.md' 'docs/*.md'` 列出的
+   两份 README（`README.md`、`README.zh-CN.md`）开头的版本、`BUILD_AND_PLATFORMS.md` 的消费示例、用户指南等
+   文档标题、`ALPHA_COMPATIBILITY.md` 的消费示例。README 性能一节引用的数字和测法（某个版本上测的）不改，
+   有新的计分卡或对比结果时再换。
    `docs/perf/`、`docs/validation/` 等历史记录不改。
 4. 重新生成源码清单 `SOURCE_MANIFEST.json`，并确认打包工具在这个提交上能完整跑通：
 

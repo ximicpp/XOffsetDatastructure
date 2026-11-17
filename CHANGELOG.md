@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- README rewritten as an introduction: core features, a server/client
+  example (compiled and run with GCC 13 C++20), how the arena, offsets, wire
+  and check tiers work, and the current comparisons (CppCon 2024 `Character`
+  after PR #292, the 4.0.0 SLG scorecard). New `README.zh-CN.md` (Chinese).
+  The requirements, build and consume, validation scope and storage rules
+  sections moved unchanged to `docs/BUILD_AND_PLATFORMS.md`; the PR #292
+  before/after CppCon 2024 tables are in
+  `bench/cppcon2024/results/2026-11-16-pr292/`. Docs only.
 - Hardening is now opt-in (susu 2026-11-16: speed first). Five measures that
   cost time on the mutate and send paths are compile-time switches, all 0 by
   default; `XOFFSET_HARDENED=1` (CMake `-DXOFFSET_HARDENED=ON`) turns on every
