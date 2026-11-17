@@ -1,0 +1,18 @@
+Monitoring boot status for iPhone 17 (BF939968-6A21-42F1-88EB-D44C85C3E0FC).
+[2026-11-17 13:51:24 +0000] Status=2, isTerminal=NO, Elapsed=00:01.
+	Waiting on Data Migration
+		Reason:(null)
+		Migration Elapsed:00:00 seconds
+
+[2026-11-17 13:51:25 +0000] Status=4, isTerminal=NO, Elapsed=00:02.
+	Waiting on System App
+
+[2026-11-17 13:51:25 +0000] Status=4, isTerminal=NO, Elapsed=00:02.
+	Waiting on System App
+
+[2026-11-17 13:51:26 +0000] Status=4, isTerminal=NO, Elapsed=00:03.
+	Waiting on System App
+
+[2026-11-17 13:51:27 +0000] Status=4294967295, isTerminal=YES, Elapsed=00:04.
+	Finished
+

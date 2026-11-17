@@ -1,0 +1,29 @@
+reference corpus: /Volumes/XOffsetCS/apple410/ref-corpus (24 files)
+== 13:51:27Z macos-c++20
+macos-c++20 rc=0
+- reference corpus: `/Volumes/XOffsetCS/apple410/ref-corpus` (      24 files)
+| configure | passed | `native-logs/configure.log` |
+| build | passed | `native-logs/build.log` |
+| ctest summary | 100% tests passed out of 211 | |
+| corpus write | passed | `native-logs/corpus-write.log` |
+| corpus read (reference wires accepted, same bytes) | passed | `native-logs/corpus-read.log` |
+| corpus diff -r against reference | passed | `native-logs/corpus-diff.log` |
+== 13:53:09Z macos-c++23
+macos-c++23 rc=0
+- reference corpus: `/Volumes/XOffsetCS/apple410/ref-corpus` (      24 files)
+| configure | passed | `native-logs/configure.log` |
+| build | passed | `native-logs/build.log` |
+| ctest summary | 100% tests passed out of 211 | |
+| corpus write | passed | `native-logs/corpus-write.log` |
+| corpus read (reference wires accepted, same bytes) | passed | `native-logs/corpus-read.log` |
+| corpus diff -r against reference | passed | `native-logs/corpus-diff.log` |
+== 13:54:35Z ios-sim-c++20
+ios-sim-c++20 rc=0
+- reference corpus: `/Volumes/XOffsetCS/apple410/ref-corpus` (      24 files)
+| configure | passed | `native-logs/configure.log` |
+| build | passed | `native-logs/build.log` |
+| ctest summary | 100% tests passed out of 211 | |
+| corpus write | passed | `native-logs/corpus-write.log` |
+| corpus read (reference wires accepted, same bytes) | passed | `native-logs/corpus-read.log` |
+| corpus diff -r against reference | passed | `native-logs/corpus-diff.log` |
+result tarball sha256 cbdc5c9f8db0a9838df5b57d027937d3366b5bbc91355676ccbf9a0cfe7a157d
