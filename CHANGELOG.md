@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- Performance documents: results of the 2026-11-17 review of the published
+  comparisons. No library change. `bench/cppcon2024` gains report-only rows
+  `sr_reuse_after_rw`: send + receive of the buffer the read/write loop has
+  run on, whose wire carries spare capacity and freed blocks (the scored rows
+  send a buffer that was filled once). 15 processes, GCC 16.2: wire 3,064 ->
+  7,928 bytes (zstd-3 2,986 -> 3,173), trusted tier 78 -> 181 ns (0.25 ->
+  0.57 of zpp::bits), full validation tier 191 -> 331 ns (0.60 -> 1.04, a
+  tie). The README now states both. Reading notes for the 4.0.0 SLG scorecard
+  in `docs/PERFORMANCE.md` 6b and the README: S and SD against zpp_bits
+  include a storage decode (same basis 0.24 and 0.41, not 0.17 and 0.28; the
+  strongest rival there is cista and the verdicts stand); the UL cells mostly
+  time the clock on the cloud host; UL.send 1.33 is superseded by #290; the
+  Apple M4 run (18 / 1 / 0) is against zpp_bits only; zpp_bits always
+  bounds-checks; byte ratios; the scorecard predates #290, #292, #293 and
+  #298. Results in `bench/cppcon2024/results/2026-11-17-modified-buffer/`.
 - `XVector` growth, for the read/write loop of the CppCon 2024 comparison
   (2024 layout: four times per iteration it appends an equipment record with
   8 float attributes and removes it). An empty vector's first block now holds
