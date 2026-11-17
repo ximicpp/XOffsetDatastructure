@@ -8639,67 +8639,132 @@ namespace XOffsetDatastructure {
         // ---- Free-run emission (XWireEmission::free_runs, the default) ------
         // Candidates are free blocks of at least wire_free_run_min_block
         // bytes (only those bins and the large blocks are visited); sorted by
-        // offset (LSD radix, 11-bit digits), adjacent candidates merge, and
-        // every merged run of at least wire_free_run_min_gap is skipped.
+        // offset, adjacent candidates merge, and every merged run of at least
+        // wire_free_run_min_gap is skipped. Up to wire_free_run_local
+        // candidates (sorted by insertion) and wire_free_run_local_runs runs
+        // stay in local storage, so such a save allocates nothing for them;
+        // more go to the heap, and the candidates are then sorted with one
+        // counting pass.
         inline constexpr std::uint32_t wire_free_run_min_block = 256;
         inline constexpr std::uint32_t wire_free_run_min_gap = 4096;
+        inline constexpr std::size_t wire_free_run_local = 64;
+        inline constexpr std::size_t wire_free_run_local_runs = 8;
+
+        // The skipped runs, ascending and disjoint: the first
+        // wire_free_run_local_runs inline, all of them on the heap once there
+        // are more.
+        class WireRuns {
+        public:
+            void push_back(XBufferCore::WireHole run) {
+                if (count_ < local_.size() && heap_.empty()) {
+                    local_[count_] = run;
+                } else {
+                    if (heap_.empty()) heap_.assign(local_.begin(), local_.end());
+                    heap_.push_back(run);
+                }
+                ++count_;
+            }
+            const XBufferCore::WireHole* begin() const noexcept { return heap_.empty() ? local_.data() : heap_.data(); }
+            const XBufferCore::WireHole* end() const noexcept { return begin() + count_; }
+            std::size_t size() const noexcept { return count_; }
+            bool empty() const noexcept { return count_ == 0; }
+            const XBufferCore::WireHole& back() const noexcept { return begin()[count_ - 1u]; }
+
+        private:
+            std::array<XBufferCore::WireHole, wire_free_run_local_runs> local_{};
+            std::vector<XBufferCore::WireHole> heap_;
+            std::size_t count_ = 0;
+        };
 
         struct WireGaps {
-            std::vector<XBufferCore::WireHole> runs; // ascending, disjoint
+            WireRuns runs; // ascending, disjoint
             std::uint64_t skipped = 0;
             std::size_t extent_count = 0;
         };
 
-        inline WireGaps wire_free_runs(const XBufferCore& core, std::uint64_t used) {
-            WireGaps gaps;
-            if (core.free_block_bytes() < wire_free_run_min_gap || used == 0) return gaps;
-            std::vector<XBufferCore::WireHole> candidates;
-            std::uint64_t total = 0;
-            std::uint32_t low = ~std::uint32_t(0), high = 0;
-            core.for_each_free_block_at_least(wire_free_run_min_block, [&](XBufferCore::WireHole hole) {
-                candidates.push_back(hole);
-                total += hole.bytes;
-                low = (std::min)(low, hole.offset);
-                high = (std::max)(high, hole.offset);
-            });
-            if (total < wire_free_run_min_gap) return gaps;
-            // Sort by offset with one counting pass. Candidates are disjoint
-            // and at least 256 bytes, so a bucket 2^shift >= 256 bytes wide
-            // holds at most 2^shift / 256 of them: about four buckets per
-            // candidate over [low, high] usually leaves one per bucket (a
-            // bucket that gets more is sorted by insertion, or std::sort over
-            // 32). Offsets are distinct.
+        // A candidate free block. Unlike XBufferCore::WireHole it has no
+        // member initializers, so the local array and the heap buffers below
+        // are not zeroed before they are written.
+        struct WireCandidate {
+            std::uint32_t offset;
+            std::uint32_t bytes;
+        };
+
+        // Sorts holes[first, last) by offset (distinct) by insertion.
+        inline void wire_insertion_sort(WireCandidate* holes, std::size_t first, std::size_t last) noexcept {
+            for (std::size_t i = first + 1u; i < last; ++i) {
+                const auto hole = holes[i];
+                std::size_t j = i;
+                for (; j > first && holes[j - 1u].offset > hole.offset; --j) holes[j] = holes[j - 1u];
+                holes[j] = hole;
+            }
+        }
+
+        // Sorts in[0, count) by offset into a new buffer with one counting
+        // pass. Candidates are disjoint and at least 256 bytes, so a bucket
+        // 2^shift >= 256 bytes wide holds at most 2^shift / 256 of them:
+        // about four buckets per candidate over [low, high] usually leaves
+        // one per bucket (a bucket that gets more is sorted by insertion, or
+        // std::sort over 32). Offsets are distinct.
+        inline std::unique_ptr<WireCandidate[]> wire_bucket_sort(const WireCandidate* in, std::size_t count,
+                                                                 std::uint32_t low, std::uint32_t high) {
             std::size_t limit = 4;
-            while (limit < 4u * candidates.size() && limit < (std::size_t(1) << 18)) limit <<= 1;
+            while (limit < 4u * count && limit < (std::size_t(1) << 18)) limit <<= 1;
             unsigned shift = 8;
             while (((high - low) >> shift) >= limit) ++shift;
             std::vector<std::uint32_t> bucket_end(std::size_t((high - low) >> shift) + 2u, 0u);
             bool crowded = false;
-            for (const auto& hole : candidates)
-                crowded |= ++bucket_end[((hole.offset - low) >> shift) + 1u] > 1u;
+            for (std::size_t i = 0; i < count; ++i)
+                crowded |= ++bucket_end[((in[i].offset - low) >> shift) + 1u] > 1u;
             for (std::size_t i = 1; i < bucket_end.size(); ++i) bucket_end[i] += bucket_end[i - 1u];
-            std::vector<XBufferCore::WireHole> sorted(candidates.size());
-            for (const auto& hole : candidates) sorted[bucket_end[(hole.offset - low) >> shift]++] = hole;
+            std::unique_ptr<WireCandidate[]> sorted(new WireCandidate[count]);
+            for (std::size_t i = 0; i < count; ++i) sorted[bucket_end[(in[i].offset - low) >> shift]++] = in[i];
             // bucket_end[b] is now where bucket b ends (and bucket b + 1 starts).
             if (crowded) {
                 std::uint32_t first = 0;
                 for (std::size_t b = 0; b + 1u < bucket_end.size(); ++b) {
                     const std::uint32_t last = bucket_end[b];
                     if (last - first > 32u) {
-                        std::sort(sorted.begin() + first, sorted.begin() + last,
+                        std::sort(sorted.get() + first, sorted.get() + last,
                                   [](const auto& x, const auto& y) { return x.offset < y.offset; });
                     } else {
-                        for (std::uint32_t i = first + 1u; i < last; ++i) {
-                            const auto hole = sorted[i];
-                            std::uint32_t j = i;
-                            for (; j > first && sorted[j - 1u].offset > hole.offset; --j) sorted[j] = sorted[j - 1u];
-                            sorted[j] = hole;
-                        }
+                        wire_insertion_sort(sorted.get(), first, last);
                     }
                     first = last;
                 }
             }
-            candidates.swap(sorted);
+            return sorted;
+        }
+
+        inline WireGaps wire_free_runs(const XBufferCore& core, std::uint64_t used) {
+            WireGaps gaps;
+            if (core.free_block_bytes() < wire_free_run_min_gap || used == 0) return gaps;
+            // The candidates fill the local array first and move to a heap
+            // buffer (doubled as needed) only past wire_free_run_local of
+            // them: one capacity check per candidate, as a vector push_back.
+            std::array<WireCandidate, wire_free_run_local> local;
+            std::unique_ptr<WireCandidate[]> heap;
+            WireCandidate* store = local.data();
+            std::size_t count = 0, capacity = local.size();
+            std::uint64_t total = 0;
+            std::uint32_t low = ~std::uint32_t(0), high = 0;
+            core.for_each_free_block_at_least(wire_free_run_min_block, [&](XBufferCore::WireHole hole) {
+                if (count == capacity) [[unlikely]] {
+                    std::unique_ptr<WireCandidate[]> bigger(new WireCandidate[2u * capacity]);
+                    std::copy(store, store + count, bigger.get());
+                    heap = std::move(bigger);
+                    store = heap.get();
+                    capacity *= 2u;
+                }
+                store[count++] = {hole.offset, hole.bytes};
+                total += hole.bytes;
+                low = (std::min)(low, hole.offset);
+                high = (std::max)(high, hole.offset);
+            });
+            if (total < wire_free_run_min_gap) return gaps;
+            if (count <= local.size()) wire_insertion_sort(store, 0, count);
+            else heap = wire_bucket_sort(store, count, low, high);
+            const WireCandidate* const candidates = count <= local.size() ? store : heap.get();
             std::uint64_t start = 0, end = 0;
             auto close = [&] {
                 // The first extent starts at 48 and is not empty: a run there
@@ -8710,7 +8775,8 @@ namespace XOffsetDatastructure {
                     gaps.skipped += end - start;
                 }
             };
-            for (const auto& hole : candidates) {
+            for (std::size_t i = 0; i < count; ++i) {
+                const auto hole = candidates[i];
                 if (hole.offset == end && end != 0) { end += hole.bytes; continue; }
                 // close() only ever shortens a run, so most (lone) candidates
                 // skip the call.
