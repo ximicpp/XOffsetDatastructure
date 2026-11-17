@@ -181,22 +181,22 @@ attributes, 8 pieces of equipment with attributes each), rerun with 4.0.0 and
 current rules: random numbers are drawn before timing, every library's map is
 the same sorted flat map, receiving means "the receiver can read and modify
 the state", every library really frees what the loop removes, and each
-iteration uses a new map key. Median of 15 processes, library at main
-18a37f39 ([method and all rows](bench/cppcon2024/README.md)).
+iteration uses a new map key. Median of 15 processes, library at e36cf44
+([method and all rows](bench/cppcon2024/README.md)).
 
 **Send + receive** (one message, buffers reused, XOffset trusted tier):
 
 | Library | ns / message | XOffset ÷ lib |
 | --- | ---: | ---: |
-| XOffset | 87 | 1.00 |
-| zpp::bits | 265 | 0.33 |
-| FlatBuffers (build + read back) | 543 | 0.16 |
-| cista (raw / offset, unchecked) | 540 / 547 | 0.16 |
-| Cap'n Proto | 1,924 | 0.045 |
-| MessagePack | 5,335 | 0.016 |
-| Protocol Buffers | 6,892 | 0.013 |
+| XOffset | 83 | 1.00 |
+| zpp::bits | 340 | 0.24 |
+| FlatBuffers (build + read back) | 614 | 0.14 |
+| cista (raw / offset, unchecked) | 637 / 639 | 0.13 |
+| Cap'n Proto | 2,268 | 0.037 |
+| MessagePack | 6,112 | 0.014 |
+| Protocol Buffers | 8,789 | 0.009 |
 
-With the full validation tier instead, XOffset takes 202 ns, still 0.76 of
+With the full validation tier instead, XOffset takes 171 ns, still 0.50 of
 zpp::bits.
 
 **Read/write loop** (one iteration: change scalars and position, add and
@@ -204,26 +204,26 @@ remove equipment, waypoints, an attribute and a map item):
 
 | Layout | XOffset | std containers | cista raw / offset | Protocol Buffers |
 | --- | ---: | ---: | ---: | ---: |
-| 2024 layout, ns | 171 | 274 | 184 / 207 | 451 |
-| XOffset ÷ lib | | 0.62 | 0.92 / 0.82 | 0.38 |
-| Tuned layout\*, ns | 51 | 70 | 54 / 57 | 288 |
-| XOffset ÷ lib | | 0.73 | 0.94 / 0.90 | 0.18 |
+| 2024 layout, ns | 144 | 343 | 236 / 259 | 592 |
+| XOffset ÷ lib | | 0.42 | 0.61 / 0.55 | 0.24 |
+| Tuned layout\*, ns | 60 | 83 | 66 / 67 | 368 |
+| XOffset ÷ lib | | 0.72 | 0.91 / 0.90 | 0.16 |
 
 \* Small attribute arrays stored inline, range append, erase at a known
 position; applied to every library that can express it.
 
-In-place read/write is the fastest of these libraries in both layouts; per
-process XOffset beats cista raw in 14 of 15 runs and every other library in
-all 15. The margin over cista is small (0.90–0.94 tuned). Protocol Buffers'
-default `RemoveLast` keeps the removed messages for the next `add_`, so its
-loop allocates nothing (65.5 ns on the 2024 layout, report-only); the scored
-row frees them like every other library. **One read/write iteration plus one
-send and receive** costs XOffset 122 ns (tuned), against 327 ns for zpp::bits
-on std containers (0.37), 578–591 ns for cista (0.21) and 7,180 ns for
-Protocol Buffers (0.017).
+In-place read/write is the fastest of these libraries in both layouts, in
+every one of the 15 processes. The margin over cista is small on the tuned
+layout (0.90–0.91). Protocol Buffers' default `RemoveLast` keeps the removed
+messages for the next `add_`, so its loop allocates nothing (77 ns on the
+2024 layout, report-only, about half of XOffset's 144 ns); the scored row
+frees them like every other library. **One read/write iteration plus one
+send and receive** costs XOffset 144 ns (tuned), against 390 ns for zpp::bits
+on std containers (0.37), 661–682 ns for cista (0.21–0.22) and 9,157 ns for
+Protocol Buffers (0.016).
 
-Size: the `Character` wire is 3,112 bytes raw and 3,006 bytes after zstd-3
-(zpp::bits 2,926, Protocol Buffers 3,804). The wire header makes small
+Size: the `Character` wire is 3,064 bytes raw and 2,986 bytes after zstd-3
+(zpp::bits 2,926, Protocol Buffers 3,800). The wire header makes small
 XOffset messages about 100 bytes larger than zpp::bits; this is accepted by
 design and reported, not optimized away.
 

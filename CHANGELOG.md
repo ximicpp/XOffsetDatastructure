@@ -15,7 +15,16 @@
   wire format is unchanged. `push_back` of a value of at most 16 bytes into a
   full vector grows and stores without the staged copy and insert checks of
   the general path. Instructions per loop iteration (GCC 16.2, callgrind):
-  2024 layout 3487 -> 2187; tuned layout unchanged (813).
+  2024 layout 3489 -> 2187; tuned layout unchanged (813). Timing, 15
+  alternating process pairs on the fair case: 2024 layout 202.6 -> 143.5 ns
+  (XOffset ÷ cista 0.84 / 0.80 -> 0.61 / 0.55, ÷ Protocol Buffers 0.35 ->
+  0.24), tuned layout 61.3 -> 60.4 ns (unchanged). Send + receive of the 2024
+  layout also drops, 102.7 -> 83.2 ns (1445 -> 994 instructions): the sent
+  state no longer carries the retired 16-byte first blocks, and its wire is
+  48 bytes smaller (3,112 -> 3,064). Results in
+  `bench/cppcon2024/results/2026-11-17-first-block/`; README tables updated.
+  Golden wire pins in `tests/test_v2_golden.cpp` move by 16 bytes each (block
+  placement, not the format).
 - CppCon 2024 bench made fairer (susu 2026-11-17): Protocol Buffers now frees
   removed equipment and waypoint messages (`DeleteSubrange`) like every other
   library; its default `RemoveLast` reuse is a report-only row. The item key
