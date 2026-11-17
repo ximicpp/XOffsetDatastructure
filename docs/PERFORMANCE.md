@@ -381,6 +381,50 @@ than the hand-written version (d_send Ir 1.02x, the rest identical); the differe
 instruction cache set conflicts across the whole binary. Raw data: `release-4.0.0/scorecard-default/`,
 `release-4.0.0/rejudge/` (project files).
 
+### Reading this scorecard (review of 2026-11-17)
+
+A review of every published comparison on 2026-11-17 found the directions sound: XOffset leads where
+encoding and decoding are skipped, by more for larger messages, ties on small messages, and pays about
+1.0–1.4x where containers are read and written through relative offsets. It also found places where a
+number of this scorecard says more, or less, than it seems to. None changes a verdict.
+
+- **S and SD against zpp_bits include a decode that the trusted tier does not need.** In these cells
+  the storage process checks the player it receives and keeps the bytes. For a format with no
+  stand-alone check, `store_check` (`bench/slg/bench/runner.hpp`) decodes the whole player; that was
+  set on 2026-11-03, when XOffset ran its full check there too. On the trusted tier XOffset only copies
+  the bytes, while zpp_bits still decodes. With zpp_bits's `store_recv` replaced by a copy (XOffset's
+  own `store_recv` time, recomputed from this scorecard's raw data), S is 0.24 against zpp_bits, not
+  0.171, and SD is 0.41, not 0.276. The strongest rival of both cells is cista_unchecked (0.409 and
+  0.386), whose storage receive costs about what XOffset's does, so both stay wins at those values.
+- **UL.recv and UL.send mostly time the clock on this host.** `timed()` reads `steady_clock` twice per
+  message, and on this kind of cloud machine one such pair puts about 30 ns into the measured interval
+  (measured 2026-11-17). UL.recv is 41.7 ns per order for XOffset and 42.6 ns for zpp_bits, so about
+  30 ns of each is the clock and the ratio is pulled toward 1: the tie at 0.968 understates XOffset.
+  On the Mac, where the clock costs less, the same cell is 0.82. Every other cell spends 380 ns or
+  more per message and moves by under 8%.
+- **UL.send 1.33 is superseded.** In this scorecard the order's values (army, target, troop counts)
+  were drawn inside the timed stage, about 60% of zpp_bits's time there. PR #290 draws them before the
+  timer for every format; after it UL.send is 0.93 [0.87, 0.99] on a cloud host (P2996 Clang, 8
+  batches) and 0.76 on the Mac.
+- **The Mac run of this scorecard is against zpp_bits only.** After PR #290 the scorecard ran on the
+  Mac mini (158d0754, `mac-results` branch, `110-slg290`): 18 wins, 1 tie and 0 losses over the 19
+  cells, with zpp_bits and its two shared encodings as the rivals. cista_unchecked was not run. On the
+  cloud host it is the strongest rival of six cells (B, S, SD, EBW.recv, UPW.recv, UCW.recv; UPW.recv
+  is 1.025 against cista_unchecked and 0.826 against zpp_bits), so the Mac count is not the same
+  measure as the 14 / 5 / 0 above, and its S 0.171 and SD 0.215 include the storage decode of the
+  first note.
+- **zpp_bits always checks bounds.** It has no unchecked mode; every read of its decoder is checked
+  against the input size. The receive cells whose strongest rival is zpp_bits therefore compare
+  XOffset's trusted tier (no check) with a checked decoder, as the trust model of 3.4 intends. The
+  equal-check figures are the uplink cell UL.recv (bounds tier) and the full-validation rows of
+  [bench/cppcon2024](../bench/cppcon2024/README.md).
+- **Bytes.** XOffset's wire carries spare capacity and free blocks: after zstd-3 the messages of this
+  scorecard are 1.11–1.46 times zpp_bits's, and the uncompressed server-to-server ones 1.34–2.07
+  times (B and S about 2.05). Bytes are report only and the wire format is not tuned for them.
+- **Age.** The scorecard was measured on 4.0.0, before PR #290 (same apply algorithm and untimed order
+  values for every format), #292 and #293 (zeroing and hardening behind switches, off by default) and
+  #298 (`XVector` first block). No full scorecard has been run on a later tree yet.
+
 ## 7. Limits
 
 - Formal timing comes from one M4 only. On other arm64 cores (different store forwarding and branch

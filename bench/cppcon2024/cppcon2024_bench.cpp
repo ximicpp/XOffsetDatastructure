@@ -256,6 +256,19 @@ static void bench_xoffset() {
   put("xoffset 4.0", "bytes_after_rw_zstd3", double(zstd3(after.data(), after.size())));
   put("xoffset 4.0", "bytes_after_rw_compact", double(compact.size()));
   put("xoffset 4.0", "bytes_after_rw_compact_zstd3", double(zstd3(compact.data(), compact.size())));
+  // report-only: send + receive of that buffer. The rows above send a buffer that was
+  // filled once and never modified; this one has spare capacity and free blocks, and
+  // they are part of the wire. The rivals' wire depends only on the state.
+  put("xoffset 4.0", "sr_reuse_after_rw", time_sr([&](size_t) {
+    rwb.save_verified_into(w);
+    if (!rx.reload(held, w)) throw std::runtime_error("trusted reload rejected");
+    return held.plain_root().id; }));
+  put("xoffset 4.0 full", "sr_reuse_after_rw", time_sr([&](size_t) {
+    rwb.save_verified_into(w);
+    held.reload_verified(w);
+    if (!held.ok()) throw std::runtime_error("full reload rejected");
+    return held.plain_root().id; }));
+  expect("xoffset after rw", checksum(held.plain_root()), g_rw_sum);
 }
 
 template<class C>
@@ -308,6 +321,13 @@ static void bench_xoffset_layout(const char* name) {
   const auto compact = src.save_compact();
   put(name, "bytes_after_rw_compact", double(compact.size()));
   put(name, "bytes_after_rw_compact_zstd3", double(zstd3(compact.data(), compact.size())));
+  // report-only: send + receive of the buffer after the rounds (see bench_xoffset)
+  put(name, "sr_reuse_after_rw", time_sr([&](size_t) {
+    src.save_verified_into(w);
+    if (!rx.reload(held, w)) throw std::runtime_error("trusted layout reload rejected");
+    return held.plain_root().id;
+  }));
+  expect(name, checksum(held.plain_root()), g_rw_sum);
   auto recovered = TypedXBuffer<C>::load(after, cap);
   expect(name, checksum(recovered.plain_root()), g_rw_sum);
   auto recovered_compact = TypedXBuffer<C>::load(compact, cap);
