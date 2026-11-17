@@ -10715,22 +10715,26 @@ namespace XOffsetDatastructure {
                 sizeof(Storage) > used - header.root_offset) {
                 XOFFSET_VFAIL(XException, XErrc::root_mismatch, std::string(who) + ": root not found");
             }
-            // One pass over the hole table with no early exit: each hole ORs
-            // its out-of-range bits into `bad` (an unaligned or empty hole,
-            // one before the payload begins or one ending past `used`; offset
-            // and size are 32-bit, so their sum cannot wrap in 64 bits), and
-            // the verdict is taken once at the end. A rejected table is the
-            // rare case, so a branch per hole buys nothing, and without it
-            // the loop has no data-dependent branch to mispredict.
-            std::uint64_t bad = 0;
+            // One pass over the hole table with no early exit and no branch
+            // per hole; the verdict is taken once at the end. A hole is valid
+            // when offset >= 48, bytes >= 1 and offset + bytes <= used. With
+            // o = offset - 48 and b = bytes - 1 in 32-bit arithmetic (an
+            // offset below 48 or a size of 0 wraps to near 2^32) that is
+            // o + b < used - 48 in 64-bit arithmetic, as used (this arena's
+            // used_end) is at most MAX_PAYLOAD < 2^31: so only the largest
+            // o + b is compared. Alignment: no low bit set in the OR of all
+            // offsets and sizes.
+            std::uint32_t low_bits = 0;
+            std::uint64_t reach = 0;
             for (std::size_t i = 0; i < hole_count; ++i) {
                 WireHole hole;
                 std::memcpy(&hole, holes + i * sizeof(hole), sizeof(hole));
-                const std::uint64_t offset = hole.offset, bytes = hole.bytes;
-                bad |= ((offset | bytes) & 7u) | std::uint64_t(offset < XWIRE_PAYLOAD_BEGIN) |
-                       std::uint64_t(bytes == 0) | std::uint64_t(offset + bytes > used);
+                low_bits |= hole.offset | hole.bytes;
+                const std::uint64_t r = std::uint64_t(std::uint32_t(hole.offset - std::uint32_t(XWIRE_PAYLOAD_BEGIN))) +
+                                        std::uint32_t(hole.bytes - 1u);
+                reach = r > reach ? r : reach;
             }
-            if (bad != 0) [[unlikely]] {
+            if ((low_bits & 7u) != 0 || reach >= used - XWIRE_PAYLOAD_BEGIN) [[unlikely]] {
                 XOFFSET_VFAIL(XException, XErrc::invalid_payload, std::string(who) + ": hole out of range");
             }
             XOFFSET_VTRY(this->load_free_blocks(holes, hole_count));
