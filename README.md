@@ -157,10 +157,11 @@ server to client (`server_to_client.cpp`), deltas (`delta_sync.cpp`,
    tier checks content: a well-formed message with odd field values is
    accepted, so the server still applies its own game rules to client input.
 6. **Speed first by default.** Hardening that costs time on mutate and send
-   (zeroing removed elements and padding, delayed reuse inside `edit()`, save
-   self-checks) is off by default and turned on together with
-   `-DXOFFSET_HARDENED=1`. Without it, bytes of elements a container removed
-   can travel in `save_verified` output; use `save_compact` or a hardened
+   (zeroing removed elements, padding and a reset buffer, delayed reuse inside
+   `edit()`, save self-checks) is off by default and turned on together with
+   `-DXOFFSET_HARDENED=1`. Without it, bytes of elements a container removed,
+   and of what a reused buffer held before `reset()`, can travel in
+   `save_verified` output; use `save_compact` or a hardened
    build where a receiver must not see them
    ([threat model 4.1](docs/V2_THREAT_MODEL.md)).
 

@@ -87,7 +87,7 @@ int main() {
                 const auto reference_wire = canonical.save_compact<xm::March>(xo::XCompactOptions{.slack_div = 0});
                 if (!std::ranges::equal(wire, std::as_bytes(std::span(reference_wire))))
                     throw std::runtime_error("order differs from independent canonical frame");
-                const auto view = receiver.view<xm::March>(wire);
+                const auto view = receiver.view<xm::March, xo::XCheck::bounds>(wire);
                 auto full = xo::XBuffer::try_load_verified<xm::March>(wire, cap);
                 if (!view || !full)
                     throw std::runtime_error("order failed bounds or full verification");

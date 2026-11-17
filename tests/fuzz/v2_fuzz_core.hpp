@@ -559,7 +559,7 @@ void check_view(const std::string& w, const Oracle& o, Buffer* typed, const std:
     // Exactly the wire's bytes on the heap (8-aligned): a read past them is an ASan error.
     const std::unique_ptr<std::byte[]> exact(new std::byte[w.size() ? w.size() : 1]);
     if (!w.empty()) std::memcpy(exact.get(), w.data(), w.size());
-    const auto v = rx.view<fz::Root>(std::span<const std::byte>(exact.get(), w.size()));
+    const auto v = rx.view<fz::Root, xo::XCheck::bounds>(std::span<const std::byte>(exact.get(), w.size()));
     xo::XWireHeaderV2 h{};
     if (w.size() >= kHeader) std::memcpy(&h, w.data(), kHeader);
     const bool sparse = w.size() >= kHeader && h.extent_count != 0;

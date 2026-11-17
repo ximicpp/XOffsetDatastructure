@@ -514,8 +514,9 @@ void subtree_release(fixed_detail::allocator_ref alloc, T* old, std::uint32_t si
 // only its live prefix (capacity = size), strings of at most inline_max bytes
 // become inline, and empty containers own no block: the element-wise copy's
 // shape, packed with no holes. Block tails are not cleared: the segment is a
-// fresh tail or a hole zeroed on retirement (M3); only a hole a loaded wire
-// brought in can hold other bytes, so string terminators are written.
+// fresh tail or a hole zeroed on retirement (M3); a hole a loaded wire
+// brought in, or a tail that a reset without XOFFSET_SCRUB_RESET left, can
+// hold other bytes, so string terminators are written.
 template<class E>
 char* subtree_compact_elements(const E* source, std::uint32_t size,
                                char*& cursor) noexcept;
