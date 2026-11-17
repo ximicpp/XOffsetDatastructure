@@ -244,7 +244,7 @@ namespace XOffsetDatastructure {
     // one move, to a reservation of the whole maximum; phones: 16 MiB on iOS,
     // 64 MiB on Android, then doubling). A move invalidates every pointer and
     // reference into the payload (epoch); see make_room().
-    enum class XGrowPolicy { Explicit, Automatic, Relocating };
+    enum class XGrowPolicy : std::uint8_t { Explicit, Automatic, Relocating };
     using XBufferPool = detail::VmStoragePool;
     // Storage request of a MaximumCapacity (R1). Auto picks by the rule in
     // XBufferCore::plan_storage; Pinned is always a VM reservation (address
@@ -323,9 +323,23 @@ namespace XOffsetDatastructure {
 //                            its old bytes.
 //   XOFFSET_SAVE_SELF_CHECK  save_verified(_into) re-checks the arena header
 //                            and that the output does not overlap the source.
-// Not switches, because deltas rely on them (a hole's bytes and the bytes
-// past used_end are zero on both sides): a retired block is always zeroed
-// (M3) and a reset always zeroes the used payload (N2).
+//   XOFFSET_SCRUB_RESET      reset() zeroes the payload it discards. Off: the
+//                            old bytes stay past the new used_end and the next
+//                            content's blocks start with them (a block's slack
+//                            and padding then carry the previous content).
+// Not a switch, because deltas rely on it (a hole's bytes are zero on both
+// sides): a retired block is always zeroed (M3).
+//
+// One check is a switch that is ON by default (2026-11-17), because without
+// it any client can make a server read or write outside the wire:
+//   XOFFSET_CHECK_UPLINK     XReceiver<XLink::from_client> checks by default
+//                            (bounds for view(), full for a mutable result)
+//                            and refuses XCheck::admit. -DXOFFSET_CHECK_UPLINK=0,
+//                            for a deployment whose clients are its own code
+//                            over a protected transport: a client link
+//                            defaults to XCheck::admit like the trusted links;
+//                            XCheck::bounds and XCheck::full remain per call.
+//                            XOFFSET_HARDENED does not change it.
 #ifndef XOFFSET_HARDENED
 #  define XOFFSET_HARDENED 0
 #endif
@@ -343,6 +357,12 @@ namespace XOffsetDatastructure {
 #endif
 #ifndef XOFFSET_SAVE_SELF_CHECK
 #  define XOFFSET_SAVE_SELF_CHECK XOFFSET_HARDENED
+#endif
+#ifndef XOFFSET_SCRUB_RESET
+#  define XOFFSET_SCRUB_RESET XOFFSET_HARDENED
+#endif
+#ifndef XOFFSET_CHECK_UPLINK
+#  define XOFFSET_CHECK_UPLINK 1
 #endif
 
     namespace fixed_detail {
@@ -1154,6 +1174,9 @@ namespace XOffsetDatastructure {
             owner_record_.swap(other.owner_record_);
             free_table_.swap(other.free_table_);
             std::swap(free_table_lost_, other.free_table_lost_);
+#if !XOFFSET_SCRUB_RESET
+            std::swap(reset_dirty_end_, other.reset_dirty_end_);
+#endif
             publish_host_owner();
             other.publish_host_owner();
             std::swap(growth_policy_, other.growth_policy_);
@@ -2670,6 +2693,7 @@ namespace XOffsetDatastructure {
                     XOFFSET_VTRY(detail::VirtualMemoryStorage::create_v(owner, size, max_reserved, pool));
                 }
                 buffer_ = std::move(owner);
+                forget_reset_dirt();
                 return detail::vok();
             }));
             auto* sm = arena();
@@ -2756,6 +2780,7 @@ namespace XOffsetDatastructure {
                 detail::VirtualMemoryStorage owner;
                 XOFFSET_VTRY(make(owner));
                 buffer_ = std::move(owner);
+                forget_reset_dirt();
                 return detail::vok();
             }));
             typed_root_access_allowed_ = false;
@@ -2785,6 +2810,9 @@ namespace XOffsetDatastructure {
                 owner_record_.swap(other.owner_record_);
                 free_table_.swap(other.free_table_);
                 free_table_lost_ = std::exchange(other.free_table_lost_, false);
+#if !XOFFSET_SCRUB_RESET
+                reset_dirty_end_ = std::exchange(other.reset_dirty_end_, 0u);
+#endif
                 publish_host_owner();
                 if (ctl_ || other.ctl_ || pinned_ || other.pinned_) [[unlikely]] {
                     promote_bare_pin();
@@ -2928,6 +2956,7 @@ namespace XOffsetDatastructure {
             }
             insert_owner_keeping(prepared);
             buffer_.swap(next);
+            forget_reset_dirt();  // the new storage holds the used bytes and zeros
             publish_host_owner();
             advance_epoch();
             if (ctl_) {
@@ -3243,8 +3272,9 @@ namespace XOffsetDatastructure {
 
         // In-place loads and the zero watermark. On a settled owner (exact
         // free table, nothing dirty past the logical length) N2 makes every
-        // byte in [used_end, logical) zero, so after an in-place load of `size`
-        // bytes into the same storage only [size, old used_end) can be dirty.
+        // byte in [tail_clean_from(), logical) zero, so after an in-place load
+        // of `size` bytes into the same storage only [size, that offset) can
+        // be dirty.
         // Without this, the watermark stays at the old logical length and
         // later growth clears bytes that are already zero (the 4 KiB regrow
         // steps and the geometric slack of the previous content).
@@ -3266,10 +3296,17 @@ namespace XOffsetDatastructure {
         ZeroTail settled_zero_tail() const noexcept {
             const auto logical = buffer_.size();
             if (buffer_.zero_from() != logical || free_table_lost_ || logical < min_payload_size()) return {};
-            const auto used = static_cast<size_type>(arena()->used_end);
+            const auto used = tail_clean_from();
             return {buffer_.data(), used < logical ? used : logical};
         }
         void note_reinit_zero_tail(const ZeroTail& tail, size_type size) noexcept {
+            // A load ends at its logical length: what a reset left dirty is
+            // overwritten or lies past it, where the storage's own watermark
+            // (zero_from) clears it on growth. Forgotten here, on the two
+            // out-of-line shrinking loads, and not on every reload: a mark
+            // that outlives a reload only keeps this function from lowering
+            // the watermark once.
+            forget_reset_dirt();
             if (tail.base && tail.base == buffer_.data())
                 buffer_.note_zero_from(std::max<std::size_t>(size, tail.used_end));
         }
@@ -3429,14 +3466,18 @@ namespace XOffsetDatastructure {
         }
 
         // Empty arena: header only, no root, empty exact free table.
-        // N2: every logical byte at or past used_end is zero (growth zeroes
-        // what it exposes, used_end only rises until a reset, and loads zero
-        // the bytes past the loaded used_end), so a reset that keeps the
-        // logical length clears exactly [header, used_end): live blocks and
-        // holes alike. Otherwise bytes above the header become
-        // dirty-below-zero_from_ and are zeroed by the regrowth to `logical`
-        // (or by any later growth). noexcept: if the storage cannot hold a
-        // header the owner simply stays without one.
+        // N2: every logical byte at or past tail_clean_from() is zero (growth
+        // zeroes what it exposes, used_end only rises until a reset, and
+        // loads zero the bytes past the loaded used_end). With
+        // XOFFSET_SCRUB_RESET that offset is used_end: a reset that keeps the
+        // logical length clears exactly [header, used_end), live blocks and
+        // holes alike. Without it the reset clears nothing and remembers how
+        // far the discarded content reached (reset_dirty_end_): the bytes in
+        // [used_end, reset_dirty_end_) are the old content's until the new
+        // content's blocks take them. When the logical length changes, bytes
+        // above the header become dirty-below-zero_from_ and are zeroed by
+        // the regrowth to `logical` (or by any later growth). noexcept: if
+        // the storage cannot hold a header the owner simply stays without one.
         void reset_arena(size_type logical) noexcept {
             begin_reinit(true);
             // size() <= maximum_capacity(): the common reset (same logical
@@ -3448,14 +3489,42 @@ namespace XOffsetDatastructure {
             if (buffer_.maximum_capacity() < min_payload_size()) return;
             if (buffer_.size() < min_payload_size() && !buffer_.grow_to(min_payload_size())) return;
             if (buffer_.size() > min_payload_size()) buffer_.resize_logical(min_payload_size());
+            forget_reset_dirt();  // all of it now lies past the logical length
             write_empty_header();
             if (logical > min_payload_size()) (void)buffer_.grow_to(std::min(logical, buffer_.maximum_capacity()));
         }
 
         XOFFSET_DETAIL_MOVE_INLINE void clear_used_payload() noexcept {
             const auto used = used_end_clamped();
+#if XOFFSET_SCRUB_RESET
             std::memset(buffer_.data() + min_payload_size(), 0, used - min_payload_size());
+#else
+            if (used > reset_dirty_end_) reset_dirty_end_ = static_cast<std::uint32_t>(used);
+#  if defined(XOFFSET_STRESS_RELOCATE)
+            // Stress mode: nothing may count on a block from the tail being
+            // zero, so what the reset leaves is made unmistakable.
+            std::memset(buffer_.data() + min_payload_size(), detail::stress_poison_byte, used - min_payload_size());
+#  endif
+#endif
             write_empty_header();
+        }
+
+        // The offset from which every logical byte is zero (N2): used_end,
+        // or the end of what a reset without XOFFSET_SCRUB_RESET left behind.
+        size_type tail_clean_from() const noexcept {
+            const auto used = static_cast<size_type>(arena()->used_end);
+#if XOFFSET_SCRUB_RESET
+            return used;
+#else
+            return used > reset_dirty_end_ ? used : size_type(reset_dirty_end_);
+#endif
+        }
+        // The storage was replaced, or everything a reset left lies past the
+        // logical length (the storage's zero_from covers it from there).
+        void forget_reset_dirt() noexcept {
+#if !XOFFSET_SCRUB_RESET
+            reset_dirty_end_ = 0;
+#endif
         }
 
         void write_empty_header() noexcept {
@@ -3561,6 +3630,11 @@ namespace XOffsetDatastructure {
         // lineage's control block, and blocks retired inside the scope
         // (payload offset << 32 | bytes).
         bool pinned_ = false;
+        // Bytes in [used_end, reset_dirty_end_) may be nonzero: the content a
+        // reset discarded without clearing (always 0 with XOFFSET_SCRUB_RESET).
+        // In the padding before ctl_, whose line a reset and a reload read
+        // anyway (XGrowPolicy is one byte for this).
+        [[maybe_unused]] std::uint32_t reset_dirty_end_ = 0;
         detail::XCtl* ctl_ = nullptr;
         std::vector<std::uint64_t> quarantine_;
         // Largest quarantine list (entries) kept between pin scopes: 8 KiB.

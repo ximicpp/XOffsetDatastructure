@@ -306,7 +306,7 @@ bool test_pin_scopes() {
 #if XOFFSET_PIN_QUARANTINE
         for (auto& p : root.players) CHECK_SCOPE(p.items.data() != old_block);
 #endif
-#if defined(XOFFSET_STRESS_RELOCATE)
+#if defined(XOFFSET_STRESS_RELOCATE) && XOFFSET_PIN_QUARANTINE
         CHECK_SCOPE(old_block[0] == std::int32_t(0xDBDBDBDB));  // stress mode: poisoned
 #elif XOFFSET_PIN_QUARANTINE
         CHECK_SCOPE(old_block[0] == 0 && old_block[3] == 3);   // still readable, not reused

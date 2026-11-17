@@ -105,6 +105,12 @@ Data sent by clients to the server, and any data from the network, is untrusted 
   `XOFFSET_DEFAULT_MAXIMUM_CAPACITY`), and the error names the declared size and the limit; but the
   default is a fallback, not a budget for each request, so set it explicitly per section 5 when
   receiving untrusted data. The structural safety guarantee (K4) assumes a limit is set.
+- Receive client uplink with `XReceiver<XLink::from_client>`: it checks by default (`view` uses the
+  bounds tier, `reload` and the others the full tier), and the trusted tier does not compile on it.
+  `-DXOFFSET_CHECK_UPLINK=0` turns that default off (a switch since 2026-11-17, default 1): the client
+  link then checks only the wire header, like the trusted links. **Do not build a server that faces
+  outside clients with it**; any client could then send one crafted message that makes the server
+  read or write out of bounds (V2_THREAT_MODEL section 4.1).
 - `load_unverified` is only for in-process or already authenticated data.
 - **What validation guarantees**: after validation passes, typed access to the root object graph does
   not go out of bounds, and the structure matches the schema (truncation, out-of-bounds, overlap,
@@ -120,11 +126,12 @@ Data sent by clients to the server, and any data from the network, is untrusted 
 ### 4.1 No stale data in the wires you send
 
 A wire is the raw bytes of the arena, so before sending to clients make sure it contains nothing that
-should not be sent. The threat model (`docs/V2_THREAT_MODEL.md`) measured three sources.
+should not be sent. The threat model (`docs/V2_THREAT_MODEL.md`) measured the sources below.
 
-**Since 2026-11-16 the default build does not zero the last two kinds of bytes** (performance first,
-V2_THREAT_MODEL section 4.1). Data sent by `save_verified`, `freeze_verified` and delta sync may
-contain elements already erased from containers. When sending to receivers that should not see that
+**Since 2026-11-16 the default build does not zero the second and third kinds of bytes, and since
+2026-11-17 a reset does not zero either** (performance first, V2_THREAT_MODEL section 4.1). Data sent
+by `save_verified`, `freeze_verified` and delta sync may contain elements already erased from
+containers, and content the buffer held before it was reset. When sending to receivers that should not see that
 content (typically clients), choose one:
 
 - Build the server with `-DXOFFSET_HARDENED=1` (CMake: `-DXOFFSET_HARDENED=ON`) to restore zeroing;
@@ -136,10 +143,7 @@ content (typically clients), choose one:
 | P1 freed blocks (holes): old blocks left after replacing a string with a longer value, erasing elements, or vector migration | Blocks are zeroed when freed, so holes in the arena are themselves 0 (not a switch) | Same | When forwarding received data, the bytes in the sender's wire holes are sent on unchanged (they are the sender's bytes, not this end's memory). Rebuild with `save_compact` before forwarding, see section 4.2 |
 | P2 spare container capacity: old elements in `[size, capacity)` after `clear()`, shrinking `resize()`, `erase`, `pop_back`; old string tails after shortening | Old elements and characters stay in the slack and are sent with the wire until a later append overwrites them | Vacated bytes are zeroed on shrink (`XOFFSET_SCRUB_ERASED`, `XOFFSET_SCRUB_POPPED`; `clear()` is therefore O(n)) | In the default build, send buffers from which content the receiver must not see was erased with `save_compact` |
 | P3 implicit padding bytes in structs | Padding carries bytes from the value the element was built from (usually on the stack), so wires with the same content may differ | Container elements built or moved by the library (including `XMap` key-value pairs) have their padding zeroed (`XOFFSET_SCRUB_PADDING`) | Add `XOFFSET_REQUIRE_NO_PADDING(T)` to schemas sent to clients, or define `XOFFSET_REJECT_IMPLICIT_PADDING` globally, so implicit padding fails to compile; add explicit fields per the error. Types without implicit padding are not affected |
-
-Bytes that were used are still all zeroed when a buffer is reset (`reset<T>()`), so a buffer that
-builds messages for different receivers in turn does not carry one message into the next; the table
-is about content erased while one buffer is alive.
+| P4 content from before a reset: after `reset<T>()`, bytes of the previous content stay in the slack, string tails and padding of the new content's blocks | Not zeroed. **One send buffer that builds messages for different receivers in turn carries content of the previous receiver's message inside the next wire** | `reset` zeroes all used bytes (`XOFFSET_SCRUB_RESET`) | In the default build, for a send buffer used for different receivers in turn: build with `-DXOFFSET_SCRUB_RESET=1`, or send with `save_compact`, or give each receiver its own buffer |
 
 Still keep in mind:
 
@@ -289,8 +293,9 @@ Dictionaries use `contrib/zstd_dict` (separate C++17 component, zstd 1.5.x; see 
 - [ ] Every platform builds with a verified toolchain from the table in section 3, targeting only 64-bit little-endian platforms
 - [ ] Every root type sent or received is pinned with `XOFFSET_PIN_SCHEMA`, and the pin file is in the server's and every client's build
 - [ ] Network input only goes through `load_verified` paths, with `maximum_capacity` set
+- [ ] A server that faces outside clients is not built with `XOFFSET_CHECK_UPLINK=0`, and the receiver of a client connection is `XReceiver<XLink::from_client>` (section 4)
 - [ ] Schemas sent to clients have no implicit padding (`XOFFSET_REQUIRE_NO_PADDING` or `XOFFSET_REJECT_IMPLICIT_PADDING`), and buffers sent down contain only data visible to the client
-- [ ] When a buffer sent to clients had elements erased that clients must not see: the server is built with `XOFFSET_HARDENED=1`, or that path sends with `save_compact` (section 4.1; the default build does not zero bytes vacated by containers)
+- [ ] When a buffer sent to clients had elements erased that clients must not see, or one send buffer is used for different clients in turn: the server is built with `XOFFSET_HARDENED=1`, or that path sends with `save_compact` (section 4.1; the default build does not zero bytes vacated by containers, and a reset does not zero either)
 - [ ] The server has a wire length limit for client data (suggested starting point 1 MiB)
 - [ ] Client uplink data is rebuilt with `save_compact` before forwarding, and forwarded types have no implicit padding (section 4.2)
 - [ ] When received data is modified and sent again: the receiver fully validates and runs business checks (adding an application-level digest when needed), direct client links are same-version only, and no-exception clients leave limit headroom on buffers they modify (section 4.3)

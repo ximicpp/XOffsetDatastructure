@@ -737,7 +737,10 @@ The trusted tier assumes the sender is your own service from the same build and 
 mTLS or is on an internal network; it is not an entry point for untrusted input. Debug and sanitizer
 builds still run full validation in the trusted tier. Data sent by clients is untrusted input: the
 bounds tier only guarantees that reads stay in bounds, and the data is used read-only; to modify it
-in place, use the full tier.
+in place, use the full tier. A deployment whose clients are also its own code over a protected link
+can build with `-DXOFFSET_CHECK_UPLINK=0`, so that the client link defaults to the trusted tier too
+(receiving an SLG uplink order takes 9.6% fewer instructions); do not build a server that faces
+outside clients that way.
 
 ```cpp
 #include "xoffset_receiver.hpp"

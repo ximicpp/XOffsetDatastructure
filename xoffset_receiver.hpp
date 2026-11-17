@@ -8,8 +8,10 @@
 //
 //   XLink::server_peer   server <-> server        default XCheck::admit
 //   XLink::from_server   a client receiving        default XCheck::admit
-//   XLink::from_client   a server receiving        XCheck::full only (admit does
-//                        from a client             not compile)
+//   XLink::from_client   a server receiving        full for a mutable result,
+//                        from a client             bounds for a view; admit does
+//                                                  not compile (unless the build
+//                                                  sets XOFFSET_CHECK_UPLINK=0)
 //
 //   XCheck::admit  the wire framing only: magic, flags, root type id and
 //                  schema hash, used_bytes within the maximum capacity, the
@@ -31,8 +33,8 @@
 //                  (blocks may overlap, so this caps the work). Not checked:
 //                  overlap and coverage, set and map key order, padding. The
 //                  result is an XView (const access only), read in place.
-//                  Default for view() on from_client; on trusted links view()
-//                  defaults to admit (framing and the root only).
+//                  Default for view() on from_client; on the other links
+//                  view() defaults to admit (framing and the root only).
 //   XCheck::full   load_verified / reload_verified: every check.
 //
 // Shared deltas (XS 2.0, xoffset_shared_delta.hpp, docs/SHARED_DELTA.md) go
@@ -48,9 +50,16 @@
 // skips the graph walk, so a reload into a buffer whose pages are already
 // touched costs about one copy of the payload plus a fixed amount.
 //
-// There is no global switch and no trusted member on XBuffer: only a receiver
-// built for a trusted link can admit. Building a client connection's receiver
-// as server_peer is not caught by the types; that is left to review.
+// Client uplinks: XReceiver<XLink::from_client> checks what a client sends
+// unless the call names another check, and XCheck::admit does not compile on
+// it. Building a client connection's receiver as server_peer is not caught by
+// the types; that is left to review. A deployment whose clients are its own
+// code over a protected transport can build with -DXOFFSET_CHECK_UPLINK=0
+// (2026-11-17): a client link then defaults to XCheck::admit like the trusted
+// links, a crafted message can make the server read or write outside the wire,
+// and only a call that names XCheck::bounds or XCheck::full is checked.
+// Measured: the bounds walk is about 46 instructions of an SLG march order's
+// 482 (UL.recv, 9.6%).
 //
 // Safety net: with XOFFSET_FORCE_FULL_CHECK=1 every admit runs the full check
 // instead (a sender bug is then rejected rather than used). It defaults to 1
@@ -93,11 +102,13 @@ enum class XCheck : std::uint8_t { admit, bounds, full };
 
 /// The check a receiver for link L applies to a mutable result when none is named.
 template <XLink L>
-inline constexpr XCheck default_mutable_check = L == XLink::from_client ? XCheck::full : XCheck::admit;
+inline constexpr XCheck default_mutable_check =
+    XOFFSET_CHECK_UPLINK && L == XLink::from_client ? XCheck::full : XCheck::admit;
 
 /// The check a receiver for link L applies to a view when none is named.
 template <XLink L>
-inline constexpr XCheck default_view_check = L == XLink::from_client ? XCheck::bounds : XCheck::admit;
+inline constexpr XCheck default_view_check =
+    XOFFSET_CHECK_UPLINK && L == XLink::from_client ? XCheck::bounds : XCheck::admit;
 
 /// A read-only view of a wire's root, in the wire's own bytes (XReceiver::view):
 /// nothing is copied. Only const access is given, so no write compiles; to
@@ -512,11 +523,11 @@ public:
     }
 
     /// A read-only view of `wire`'s root in the wire's own bytes, without a
-    /// copy (XView<T>). XCheck::bounds (the default on from_client) walks the
-    /// containers once so that no const access reads outside the payload;
-    /// XCheck::admit (the default on server_peer and from_server) checks the
-    /// framing and that the root lies in the payload. Either way the framing
-    /// is checked as for reload (magic, flags, root type and schema
+    /// copy (XView<T>). XCheck::bounds (the default on from_client, unless the
+    /// build sets XOFFSET_CHECK_UPLINK=0) walks the containers once so that no
+    /// const access reads outside the payload; XCheck::admit (the default
+    /// otherwise) checks the framing and that the root lies in the payload.
+    /// Either way the framing is checked as for reload (magic, flags, root type and schema
     /// fingerprint, used_bytes within maximum_capacity(), root offset, section
     /// lengths). The wire must be dense (no extent table: wires below 4 KiB
     /// always are, larger ones when sent with XWireEmission::dense), start on
@@ -604,7 +615,7 @@ private:
         static_assert(C != XCheck::full,
                       "XReceiver::view: a view is read-only (XCheck::bounds or XCheck::admit); "
                       "the full check gives a mutable XBuffer through reload or load");
-        static_assert(!(L == XLink::from_client && C == XCheck::admit),
+        static_assert(!(XOFFSET_CHECK_UPLINK && L == XLink::from_client && C == XCheck::admit),
                       "XReceiver<XLink::from_client>: data from a client is never admitted unchecked; "
                       "view it with XCheck::bounds");
     }
@@ -614,7 +625,7 @@ private:
         static_assert(C != XCheck::bounds,
                       "XReceiver: XCheck::bounds gives a read-only result (view()); "
                       "a mutable result takes XCheck::admit or XCheck::full");
-        static_assert(!(L == XLink::from_client && C == XCheck::admit),
+        static_assert(!(XOFFSET_CHECK_UPLINK && L == XLink::from_client && C == XCheck::admit),
                       "XReceiver<XLink::from_client>: data from a client is never admitted unchecked; "
                       "use XCheck::full");
     }
