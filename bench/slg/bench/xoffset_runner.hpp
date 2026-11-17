@@ -490,9 +490,7 @@ public:
         const xm::PlayerPatch& patch() { return pr->template root<xm::PlayerPatch>(); }
         // UL (uplink.hpp): the client writes a march order (below); the server receives it through XReceiver<from_client>: xoffset reloads it
         // with the full check into a reused buffer, xoffset_trusted views it in place
-        // with the bounds check (and times the full check as ULF.recv). Both
-        // checks are named, so the cells mean the same in a build with
-        // XOFFSET_CHECK_UPLINK=0.
+        // with the bounds check (and times the full check as ULF.recv).
         // UL.send writes the order straight into a prepared V2 frame: the
         // frame for each small troop count keeps its header and vector head,
         // and the order's scalars and troops are copied into it (bytes are
@@ -521,13 +519,13 @@ public:
         }
         uint64_t up_recv_checked() {
             if (!ur) ur.emplace(XBuffer::create<xm::March>(kUplinkInitial, cap()));
-            const XOffsetDatastructure::XStatus r = uplink_rx().template reload<xm::March, XOffsetDatastructure::XCheck::full>(*ur, ul_writer.wire());
+            const XOffsetDatastructure::XStatus r = uplink_rx().template reload<xm::March>(*ur, ul_writer.wire());
             if (!r) throw std::runtime_error("uplink receive rejected: " + std::string(r.error().message));
             return query_order(ur->template root<xm::March>());
         }
         uint64_t up_recv() {
             if constexpr (Trusted) {
-                const auto v = uplink_rx().template view<xm::March, XOffsetDatastructure::XCheck::bounds>(ul_writer.wire());
+                const auto v = uplink_rx().template view<xm::March>(ul_writer.wire());
                 if (!v) throw std::runtime_error("uplink view rejected: " + std::string(v.error().message));
                 return query_order(v->root());
             } else {

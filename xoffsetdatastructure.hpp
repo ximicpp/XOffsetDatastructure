@@ -3213,10 +3213,6 @@ namespace XOffsetDatastructure {
             if (ctl_) [[unlikely]] end_lineage();
             advance_epoch();
             empty_free_table(reset);
-            // A load ends at its logical length: what a reset left dirty is
-            // overwritten or lies past it, where the storage's own watermark
-            // (zero_from) clears it on growth.
-            if (!reset) forget_reset_dirt();
             free_table_lost_ = false;
             typed_root_access_allowed_ = false;
             schema_bound_ = false;
@@ -3304,6 +3300,13 @@ namespace XOffsetDatastructure {
             return {buffer_.data(), used < logical ? used : logical};
         }
         void note_reinit_zero_tail(const ZeroTail& tail, size_type size) noexcept {
+            // A load ends at its logical length: what a reset left dirty is
+            // overwritten or lies past it, where the storage's own watermark
+            // (zero_from) clears it on growth. Forgotten here, on the two
+            // out-of-line shrinking loads, and not on every reload: a mark
+            // that outlives a reload only keeps this function from lowering
+            // the watermark once.
+            forget_reset_dirt();
             if (tail.base && tail.base == buffer_.data())
                 buffer_.note_zero_from(std::max<std::size_t>(size, tail.used_end));
         }

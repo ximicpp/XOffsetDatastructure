@@ -36,9 +36,8 @@
   protected transport: with it any client can make the server read or write
   out of bounds. `XOFFSET_HARDENED` does not change it. Default builds are
   unchanged. `test_receiver` and `test_receiver_view` are built a second time
-  with the switch off (`*_uplink_unchecked`); the SLG bench and the fuzz
-  harness name `XCheck::bounds` / `XCheck::full` on the client link, so their
-  cells mean the same in either build.
+  with the switch off (`*_uplink_unchecked`); the fuzz harness names
+  `XCheck::bounds` on the client link, so it tests the walk in either build.
 - README rewritten as an introduction: core features, a server/client
   example (compiled and run with GCC 13 C++20), how the arena, offsets, wire
   and check tiers work, and the current comparisons (CppCon 2024 `Character`
