@@ -65,7 +65,7 @@ class PackageAuditTests(unittest.TestCase):
 
     def test_complete_storage_package(self):
         audit = self.audit()
-        self.assertEqual(audit["file_count"], 10)
+        self.assertEqual(audit["file_count"], 11)
         self.assertEqual(audit["version"], self.version)
 
     def test_required_release_metadata_is_exact(self):
