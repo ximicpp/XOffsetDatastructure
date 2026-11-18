@@ -122,11 +122,11 @@ void reject(const std::string& bytes, const char* expected = nullptr) {
 
 // Payload offset of the block a head's data_delta resolves to.
 std::size_t head_target(const std::string& payload, std::size_t head_offset) {
-    const auto origin = head_offset + offsetof(XFixedString, data_delta);
+    const auto origin = head_offset + offsetof(XString, data_delta);
     return static_cast<std::size_t>(static_cast<std::int64_t>(origin) + read<std::int32_t>(payload, origin));
 }
 void set_head_target(std::string& payload, std::size_t head_offset, std::size_t target) {
-    const auto origin = head_offset + offsetof(XFixedString, data_delta);
+    const auto origin = head_offset + offsetof(XString, data_delta);
     write(payload, origin, static_cast<std::int32_t>(static_cast<std::int64_t>(target) - std::int64_t(origin)));
 }
 
@@ -351,7 +351,7 @@ int main() {
     }
     {
         auto bytes = original;
-        const auto origin = root + offsetof(CheckedRoot, map) + offsetof(XFixedVector<int32_t>, data_delta);
+        const auto origin = root + offsetof(CheckedRoot, map) + offsetof(XVectorCore<int32_t>, data_delta);
         const auto data = origin + read<int32_t>(bytes, origin);
         write(bytes, data + sizeof(XKeyValue<int32_t, int32_t>), int32_t(1));
         reject(bytes, "wire validation: map keys not strictly ordered");
@@ -361,9 +361,9 @@ int main() {
     {
         auto bytes = original; // values aliases the root block
         const auto vec = root + offsetof(CheckedRoot, values);
-        const auto origin = vec + offsetof(XFixedVector<int32_t>, data_delta);
+        const auto origin = vec + offsetof(XVectorCore<int32_t>, data_delta);
         write(bytes, origin, static_cast<int32_t>(root - origin));
-        write(bytes, vec + offsetof(XFixedVector<int32_t>, capacity_), uint32_t(1));
+        write(bytes, vec + offsetof(XVectorCore<int32_t>, capacity_), uint32_t(1));
         reject(bytes, kLiveLive);
     }
     {
@@ -372,8 +372,8 @@ int main() {
         const auto label2_head = head_target(base.payload, proot + offsetof(CheckedRoot, labels)) + 2 * sizeof(XString);
         auto p = base; // name now shares the heap label's block
         set_head_target(p.payload, name_head, head_target(p.payload, label2_head));
-        write(p.payload, name_head + offsetof(XFixedString, capacity_), uint32_t(20));
-        write(p.payload, name_head + offsetof(XFixedString, size_), uint32_t(20));
+        write(p.payload, name_head + offsetof(XString, capacity_), uint32_t(20));
+        write(p.payload, name_head + offsetof(XString, size_), uint32_t(20));
         reject(build(p), kLiveLive);
         p = base; // values moved onto the hole (derived extent: 16 * 4 bytes)
         set_head_target(p.payload, values_head, hole.offset);
@@ -383,14 +383,14 @@ int main() {
         reject(build(p));
         p = base; // values moved to an address that is not 8-aligned
         set_head_target(p.payload, values_head, head_target(base.payload, values_head) + 4);
-        write(p.payload, values_head + offsetof(XFixedVector<int32_t>, capacity_), uint32_t(4)); // stays in bounds
+        write(p.payload, values_head + offsetof(XVectorCore<int32_t>, capacity_), uint32_t(4)); // stays in bounds
         reject(build(p), "wire validation: allocation out of bounds");
         // Relabelling the hole as live is valid only together with the old
         // block becoming the hole.
         p = base;
         const auto old_values = head_target(base.payload, values_head);
         set_head_target(p.payload, values_head, hole.offset);
-        write(p.payload, values_head + offsetof(XFixedVector<int32_t>, capacity_), uint32_t(4));
+        write(p.payload, values_head + offsetof(XVectorCore<int32_t>, capacity_), uint32_t(4));
         std::memcpy(p.payload.data() + hole.offset, base.payload.data() + old_values, 16);
         reject(build(p), kLiveFree);
         p.holes = {{static_cast<uint32_t>(old_values), 64}};
@@ -402,40 +402,40 @@ int main() {
         const auto values_head = proot + offsetof(CheckedRoot, values);
         const auto name_head = proot + offsetof(CheckedRoot, name);
         auto p = base; // smaller capacity_: the tail of the real block is unaccounted
-        write(p.payload, values_head + offsetof(XFixedVector<int32_t>, capacity_), uint32_t(8));
+        write(p.payload, values_head + offsetof(XVectorCore<int32_t>, capacity_), uint32_t(8));
         reject(build(p), kCoverage);
         p = base; // capacity rounding: 15 * 4 = 60 -> 64, the same derived extent
-        write(p.payload, values_head + offsetof(XFixedVector<int32_t>, capacity_), uint32_t(15));
+        write(p.payload, values_head + offsetof(XVectorCore<int32_t>, capacity_), uint32_t(15));
         accept(build(p), "capacity with an identical derived extent must be valid");
         p = base; // larger capacity_: the derived block runs past its real extent
-        write(p.payload, values_head + offsetof(XFixedVector<int32_t>, capacity_), uint32_t(18));
+        write(p.payload, values_head + offsetof(XVectorCore<int32_t>, capacity_), uint32_t(18));
         reject(build(p));
         p = base;
-        write(p.payload, values_head + offsetof(XFixedVector<int32_t>, size_), uint32_t(17));
-        reject(build(p), "wire validation failed: XFixedVector size exceeds capacity");
+        write(p.payload, values_head + offsetof(XVectorCore<int32_t>, size_), uint32_t(17));
+        reject(build(p), "wire validation failed: XVector size exceeds capacity");
         p = base;
-        write(p.payload, values_head + offsetof(XFixedVector<int32_t>, capacity_), uint32_t(0));
-        write(p.payload, values_head + offsetof(XFixedVector<int32_t>, size_), uint32_t(0));
-        reject(build(p), "wire validation failed: empty XFixedVector has invalid payload");
+        write(p.payload, values_head + offsetof(XVectorCore<int32_t>, capacity_), uint32_t(0));
+        write(p.payload, values_head + offsetof(XVectorCore<int32_t>, size_), uint32_t(0));
+        reject(build(p), "wire validation failed: empty XVector has invalid payload");
         p = base; // string capacity 30 -> 17: block 32 -> 24 bytes, 8 bytes unaccounted
-        write(p.payload, name_head + offsetof(XFixedString, capacity_), uint32_t(17));
+        write(p.payload, name_head + offsetof(XString, capacity_), uint32_t(17));
         reject(build(p), kCoverage);
         p = base; // string capacity 30 -> 24: round8(25) == round8(31) == 32
-        write(p.payload, name_head + offsetof(XFixedString, capacity_), uint32_t(24));
+        write(p.payload, name_head + offsetof(XString, capacity_), uint32_t(24));
         accept(build(p), "string capacity with an identical derived extent must be valid");
         p = base;
-        write(p.payload, name_head + offsetof(XFixedString, size_), uint32_t(31));
-        reject(build(p), "wire validation failed: XFixedString size exceeds capacity");
+        write(p.payload, name_head + offsetof(XString, size_), uint32_t(31));
+        reject(build(p), "wire validation failed: XString size exceeds capacity");
         p = base; // terminator required at data[size_]
-        write(p.payload, name_head + offsetof(XFixedString, size_), uint32_t(16));
-        reject(build(p), "wire validation failed: XFixedString missing terminator");
+        write(p.payload, name_head + offsetof(XString, size_), uint32_t(16));
+        reject(build(p), "wire validation failed: XString missing terminator");
         p = base;
-        write(p.payload, name_head + offsetof(XFixedString, capacity_), uint32_t(0x7ffffff8));
-        reject(build(p), "wire validation failed: XFixedString size exceeds capacity");
+        write(p.payload, name_head + offsetof(XString, capacity_), uint32_t(0x7ffffff8));
+        reject(build(p), "wire validation failed: XString size exceeds capacity");
         p = base;
-        write(p.payload, name_head + offsetof(XFixedString, capacity_), uint32_t(0));
-        write(p.payload, name_head + offsetof(XFixedString, size_), uint32_t(0));
-        reject(build(p), "wire validation failed: empty XFixedString has invalid payload");
+        write(p.payload, name_head + offsetof(XString, capacity_), uint32_t(0));
+        write(p.payload, name_head + offsetof(XString, size_), uint32_t(0));
+        reject(build(p), "wire validation failed: empty XString has invalid payload");
     }
 
     // ---- Inline (I1) string bytes -----------------------------------------
@@ -444,22 +444,22 @@ int main() {
         const auto label1 = label0 + sizeof(XString);
         auto p = base; // length byte 11 > inline_max
         p.payload[label1 + 11] = static_cast<char>(0x80 | 11);
-        reject(build(p), "wire validation failed: inline XFixedString length exceeds 10");
+        reject(build(p), "wire validation failed: inline XString length exceeds 10");
         p = base;
         p.payload[label1 + 11] = static_cast<char>(0xff);
-        reject(build(p), "wire validation failed: inline XFixedString length exceeds 10");
+        reject(build(p), "wire validation failed: inline XString length exceeds 10");
         p = base; // terminator (data[len]) must be zero: "array-one" has len 9
         p.payload[label1 + 9] = 'x';
-        reject(build(p), "wire validation failed: inline XFixedString has nonzero padding");
+        reject(build(p), "wire validation failed: inline XString has nonzero padding");
         p = base; // last padding byte (head byte 10)
         p.payload[label1 + 10] = 1;
-        reject(build(p), "wire validation failed: inline XFixedString has nonzero padding");
+        reject(build(p), "wire validation failed: inline XString has nonzero padding");
         p = base; // a 10-byte inline string still needs data[10] == 0
         p.payload[label0 + 10] = 1;
-        reject(build(p), "wire validation failed: inline XFixedString has nonzero padding");
+        reject(build(p), "wire validation failed: inline XString has nonzero padding");
         p = base; // shorter length: the cut-off characters become nonzero padding
         p.payload[label0 + 11] = static_cast<char>(0x80 | 5);
-        reject(build(p), "wire validation failed: inline XFixedString has nonzero padding");
+        reject(build(p), "wire validation failed: inline XString has nonzero padding");
         p = base; // longer length over zero padding is a well-formed (different) value
         p.payload[label1 + 11] = static_cast<char>(0x80 | 10);
         {
@@ -479,7 +479,7 @@ int main() {
                 p.payload[label1 + 11] = static_cast<char>(0x80 | length);
                 p.payload[label1 + at] = 1;
                 if (at >= length) {
-                    reject(build(p), "wire validation failed: inline XFixedString has nonzero padding");
+                    reject(build(p), "wire validation failed: inline XString has nonzero padding");
                 } else {
                     auto b = XBuffer::load_verified<CheckedRoot>(build(p));
                     const auto& label = b.root<CheckedRoot>().labels[1];

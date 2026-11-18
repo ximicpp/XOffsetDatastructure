@@ -326,7 +326,7 @@ namespace XOffsetDatastructure::xsync {
             const std::uint32_t n = load<std::uint32_t>(p);
             p += 4;
             if constexpr (is_fixed_string_v<C>) {
-                static_cast<XFixedString&>(c).assign(std::string_view(p, n));
+                static_cast<XString&>(c).assign(std::string_view(p, n));
                 return p + n;
             } else {
                 using E = typename C::value_type;

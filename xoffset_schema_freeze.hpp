@@ -147,9 +147,7 @@ namespace XOffsetDatastructure {
             }                                                                               \
         };
         XOFFSET_FREEZE_CONTAINER_(XVector)
-        XOFFSET_FREEZE_CONTAINER_(XFixedVector)
         XOFFSET_FREEZE_CONTAINER_(XSet)
-        XOFFSET_FREEZE_CONTAINER_(XFixedFlatSet)
 #undef XOFFSET_FREEZE_CONTAINER_
 #define XOFFSET_FREEZE_CONTAINER_(Tmpl)                                                     \
         template <typename K, typename V>                                                   \
@@ -161,7 +159,6 @@ namespace XOffsetDatastructure {
             }                                                                               \
         };
         XOFFSET_FREEZE_CONTAINER_(XMap)
-        XOFFSET_FREEZE_CONTAINER_(XFixedFlatMap)
 #undef XOFFSET_FREEZE_CONTAINER_
 
         template <typename E>
@@ -263,7 +260,6 @@ namespace XOffsetDatastructure {
                 define_enum<U>(s);
                 return local_name<U>();
             } else if constexpr (std::is_same_v<U, XString>) return "XOffsetDatastructure::XString";
-            else if constexpr (std::is_same_v<U, XFixedString>) return "XOffsetDatastructure::XFixedString";
             else if constexpr (container<U>::known) return container<U>::spell(s);
             else if constexpr (detail::schema_names::is_std_array<U>::value) {
                 return "std::array<" + spell<typename U::value_type>(s) + ", " + std::to_string(std::tuple_size_v<U>) + ">";

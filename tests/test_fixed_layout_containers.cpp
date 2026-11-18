@@ -1,6 +1,6 @@
 // ============================================================================
 // Test: Phase-2 Fixed-Layout Container Skeletons
-// Purpose: Validate the frozen-layout XFixedString / XFixedVector<T> skeletons
+// Purpose: Validate the frozen-layout XString / XVector<T> heads
 //          alongside the existing runtime.
 // ============================================================================
 
@@ -14,25 +14,25 @@ using namespace XOffsetDatastructure;
 
 struct FixedRoot {
     int32_t id{0};
-    XFixedString name;
-    XFixedVector<int32_t> values;
+    XString name;
+    XVector<int32_t> values;
 };
 
 struct FixedItem {
     int32_t code{0};
-    XFixedString label;
+    XString label;
 };
 
 struct FixedNestedRoot {
-    XFixedString owner;
-    XFixedVector<FixedItem> items;
+    XString owner;
+    XVector<FixedItem> items;
 };
 
 struct FixedAssocRoot {
-    XFixedFlatSet<int32_t> ids;
-    XFixedFlatSet<XFixedString> names;
-    XFixedFlatMap<int32_t, XFixedString> by_id;
-    XFixedFlatMap<XFixedString, int32_t> by_name;
+    XSet<int32_t> ids;
+    XSet<XString> names;
+    XMap<int32_t, XString> by_id;
+    XMap<XString, int32_t> by_name;
 };
 XOFFSET_RECORD_DERIVED(FixedRoot, (), id, name, values)
 XOFFSET_RECORD_DERIVED(FixedItem, (), code, label)
@@ -43,10 +43,10 @@ XOFFSET_REGISTER_SCHEMA_NAME(FixedRoot, "test.FixedRoot")
 XOFFSET_REGISTER_SCHEMA_NAME(FixedNestedRoot, "test.FixedNestedRoot")
 XOFFSET_REGISTER_SCHEMA_NAME(FixedAssocRoot, "test.FixedAssocRoot")
 
-static_assert(sizeof(XFixedString) == 12);
-static_assert(sizeof(XFixedVector<int32_t>) == 12);
-static_assert(sizeof(XFixedFlatSet<int32_t>) == 12);
-static_assert(sizeof(XFixedFlatMap<int32_t, int32_t>) == 12);
+static_assert(sizeof(XString) == 12);
+static_assert(sizeof(XVector<int32_t>) == 12);
+static_assert(sizeof(XSet<int32_t>) == 12);
+static_assert(sizeof(XMap<int32_t, int32_t>) == 12);
 static_assert(is_byte_copy_safe_v<FixedRoot>);
 static_assert(is_byte_copy_safe_v<FixedItem>);
 static_assert(is_byte_copy_safe_v<FixedNestedRoot>);
@@ -82,10 +82,10 @@ bool verified_load_rejects(const std::string& data) {
 }
 
 template <typename Root>
-bool rejects_inline_length(const XBuffer& xbuf, std::string data, const XFixedString& value) {
+bool rejects_inline_length(const XBuffer& xbuf, std::string data, const XString& value) {
     assert(value.is_inline() && dense_wire(data));
     const std::size_t length_byte = sizeof(XWireHeaderV2) + payload_offset(xbuf, &value) - XWIRE_PAYLOAD_BEGIN + 11;
-    data[length_byte] = static_cast<char>(0x80 | (XFixedString::inline_max + 1));
+    data[length_byte] = static_cast<char>(0x80 | (XString::inline_max + 1));
     return verified_load_rejects<Root>(data);
 }
 

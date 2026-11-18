@@ -365,7 +365,7 @@ void leaf_owns_and_binding_reuse() {
     // Alias guard on a leaf vector: a destination head placed inside the
     // source's own element storage must still take the copy fallback.
     r.b.resize(8, 0x11111111u); auto* storage = r.b.data();
-    auto* inner = std::construct_at(reinterpret_cast<XFixedVector<std::uint32_t>*>(storage + 4), r.b.binding());
+    auto* inner = std::construct_at(reinterpret_cast<XVectorCore<std::uint32_t>*>(storage + 4), r.b.binding());
     *inner = std::move(r.b);
     require(r.b.data() == storage && r.b.size() == 8 && inner->data() != storage && inner->size() == 8,
         "leaf descendant destination stole its own owning allocation");
@@ -458,9 +458,8 @@ void cross_arena_failure_guarantees() {
 
 int main() {
     try {
-        static_assert(!std::is_move_constructible_v<XFixedString>);
-        static_assert(!std::is_move_constructible_v<XFixedVector<std::uint32_t>>);
-        static_assert(sizeof(XFixedString) == 12 && sizeof(XFixedVector<std::uint32_t>) == 12);
+        static_assert(!std::is_move_constructible_v<XVectorCore<std::uint32_t>>);
+        static_assert(sizeof(XString) == 12 && sizeof(XVectorCore<std::uint32_t>) == 12);
         same_arena_and_self(); empty_capacity_transfer(); cross_arena_and_provenance();
         reconstructed_heads_bound(); nested_compaction_and_rebuild(); parent_child_alias_guards();
         reloaded_moves(); retire_metadata_failure(); cross_arena_failure_guarantees();

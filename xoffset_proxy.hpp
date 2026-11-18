@@ -270,7 +270,7 @@ namespace proxy_detail {
     };
 
     template <class K>
-    using lookup_key_t = std::conditional_t<std::is_base_of_v<XFixedString, K>, std::string, K>;
+    using lookup_key_t = std::conditional_t<std::is_base_of_v<XString, K>, std::string, K>;
 
     // The value of `key` in the map at `parent` (+ `sub` bytes into the
     // entry). The index is a hint, checked against the key on every access.
@@ -301,7 +301,7 @@ namespace proxy_detail {
         KeyPath copy() const noexcept { return {parent.copy(), key, hint, sub}; }
     };
 
-    // The most elements a container of E can hold (XFixedVector::max_size).
+    // The most elements a container of E can hold (XVectorCore::max_size).
     template <class E>
     inline constexpr std::size_t max_elements = (XBufferCore::MAX_PAYLOAD - 8u) / sizeof(E);
 
@@ -368,16 +368,16 @@ namespace proxy_detail {
 
     enum class Kind { value, record, string, vector, set, map, array };
 
-    template <class E> std::true_type is_vec_test(const XFixedVector<E>*);
+    template <class E> std::true_type is_vec_test(const XVectorCore<E>*);
     std::false_type is_vec_test(...);
-    template <class E> std::true_type is_set_test(const XFixedFlatSet<E>*);
+    template <class E> std::true_type is_set_test(const XSet<E>*);
     std::false_type is_set_test(...);
-    template <class K, class V> std::true_type is_map_test(const XFixedFlatMap<K, V>*);
+    template <class K, class V> std::true_type is_map_test(const XMap<K, V>*);
     std::false_type is_map_test(...);
 
     template <class T>
     consteval Kind kind_of() {
-        if constexpr (std::is_base_of_v<XFixedString, T>) return Kind::string;
+        if constexpr (std::is_base_of_v<XString, T>) return Kind::string;
         else if constexpr (decltype(is_map_test(static_cast<T*>(nullptr)))::value) return Kind::map;
         else if constexpr (decltype(is_set_test(static_cast<T*>(nullptr)))::value) return Kind::set;
         else if constexpr (decltype(is_vec_test(static_cast<T*>(nullptr)))::value) return Kind::vector;
@@ -742,7 +742,7 @@ public:
 
 private:
     static XOFFSET_DETAIL_INLINE bool fits(const T& s, std::size_t n) noexcept {
-        return n <= (s.is_inline() || s.data_delta == 0 ? std::size_t(XFixedString::inline_max)
+        return n <= (s.is_inline() || s.data_delta == 0 ? std::size_t(XString::inline_max)
                                                          : std::size_t(s.capacity()));
     }
     // A view into this payload is rebased when the payload moves.

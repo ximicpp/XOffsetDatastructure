@@ -173,9 +173,9 @@ void hygiene_member(const T& value, const std::string& where, bool padding) {
 template <class T>
 void hygiene(const T& value, const std::string& where, bool padding) {
     if constexpr (xd::is_fixed_string_v<T>) {
-        const xo::XFixedString& head = value;
+        const xo::XString& head = value;
         auto* bytes = reinterpret_cast<const unsigned char*>(&head);
-        if (head.capacity_ & xo::XFixedString::inline_flag) {
+        if (head.capacity_ & xo::XString::inline_flag) {
             const auto len = (head.capacity_ >> 24) & 0x7fu;
             if (!all_zero(bytes + len, 11 - len)) fail(where + ": inline string tail not zero");
         } else if (head.capacity_ != 0) {
@@ -186,7 +186,7 @@ void hygiene(const T& value, const std::string& where, bool padding) {
         }
     } else if constexpr (xd::is_fixed_vector_v<T>) {
         using E = typename T::value_type;
-        const xo::XFixedVector<E>& head = value;
+        const xo::XVectorCore<E>& head = value;
         if (head.capacity_ != 0) {
             auto* data = reinterpret_cast<const unsigned char*>(head.data());
             const auto block = xo::fixed_detail::block_bytes_of(static_cast<std::uint32_t>(head.capacity_ * sizeof(E)));

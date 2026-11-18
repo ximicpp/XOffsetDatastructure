@@ -82,7 +82,7 @@ static_assert(XOFFSET_LITTLE_ENDIAN,
 #endif
 
 namespace XOffsetDatastructure {
-    template <typename T> struct XFixedVector;
+    template <typename T> struct XVectorCore;
 
     namespace detail {
         template<class T> T* begin_dynamic_array(void*, std::size_t) noexcept;
@@ -95,7 +95,7 @@ namespace XOffsetDatastructure {
         template<class T> void zero_implicit_padding(T*) noexcept;
         template<class T> void scrub_implicit_padding(T*) noexcept;
         template<class T> consteval bool subtree_copy_supported();
-        template<class T> bool subtree_copy_assign(XFixedVector<T>&, const XFixedVector<T>&);
+        template<class T> bool subtree_copy_assign(XVectorCore<T>&, const XVectorCore<T>&);
 #if defined(XOFFSET_TEST_HOOKS)
         // Test hooks: a per-thread switch that sends container copy
         // assignment down the element-wise reference path, and counters.
@@ -207,10 +207,10 @@ namespace XOffsetDatastructure {
     template <typename T>
     inline constexpr bool has_schema_name_v = !schema_name<T>::value.empty();
 
-    struct XFixedString;
-    template <typename T> struct XFixedVector;
-    template <typename T> class XFixedFlatSet;
-    template <typename K, typename V> class XFixedFlatMap;
+    class XString;
+    template <typename T> struct XVectorCore;
+    template <typename T> class XSet;
+    template <typename K, typename V> class XMap;
     template <typename K, typename V> struct XKeyValue;
 
     // Explicit: the payload grows only at grow(). Automatic: container
@@ -3614,7 +3614,7 @@ namespace XOffsetDatastructure {
 
         // allocate_dynamic_bytes for an alignment known at compile time, of
         // at most 8 (every element type that takes the first-storage path of
-        // XFixedVector::reserve): the same checks, errors and placement, with
+        // XVectorCore::reserve): the same checks, errors and placement, with
         // the alignment tests folded away and allocate_block inlined at the
         // caller. Anything else takes allocate_dynamic_bytes.
         template <std::size_t Alignment>
@@ -3642,7 +3642,7 @@ namespace XOffsetDatastructure {
         // (allocate_block's inline ones) call nothing and keep no frame;
         // any other request takes publish_first_block_general.
         [[noreturn]] XOFFSET_DETAIL_COLD inline void throw_vector_unbound() {
-            XOFFSET_THROW(XException(XErrc::invalid_state, "XFixedVector needs a block but lies outside every XOffset payload"));
+            XOFFSET_THROW(XException(XErrc::invalid_state, "XVector needs a block but lies outside every XOffset payload"));
         }
         XOFFSET_DETAIL_NOINLINE inline void* publish_first_block_general(std::int32_t& data_delta, std::uint32_t bytes) {
             auto* const segment = reinterpret_cast<XArena*>(detail::OwnerMap::payload_of(&data_delta));
@@ -3665,7 +3665,7 @@ namespace XOffsetDatastructure {
             return block;
         }
 
-        // The same for a string's first out-of-line block (XFixedString::
+        // The same for a string's first out-of-line block (XString::
         // move_to_heap, alignment 1), whose head already holds its binding.
         // Inlined into move_to_heap: GCC inlines assign_general, and so
         // move_to_heap, at every assign() caller, and a call here instead
@@ -3732,7 +3732,7 @@ namespace XOffsetDatastructure {
 
         // ---- fail-soft support ----------------------
 
-        template <class E> std::true_type deep_is_vector(const XFixedVector<E>*);
+        template <class E> std::true_type deep_is_vector(const XVectorCore<E>*);
         std::false_type deep_is_vector(...);
 
         // Arena bytes copying `value` into a payload can take beyond its own
@@ -3750,7 +3750,7 @@ namespace XOffsetDatastructure {
         template <class T>
         std::size_t deep_bytes(const T& value) noexcept {
             using U = std::remove_cvref_t<T>;
-            if constexpr (std::is_base_of_v<XFixedString, U>) {
+            if constexpr (std::is_base_of_v<XString, U>) {
                 return value.size() == 0 ? 0 : std::size_t(value.size()) + 24u;
             } else if constexpr (std::is_convertible_v<const U&, std::string_view> && !std::is_arithmetic_v<U>) {
                 const std::string_view view = value;
@@ -4188,7 +4188,8 @@ namespace XOffsetDatastructure {
     // V2.1: a container head is {data_delta, size_, capacity_}, 12 bytes,
     // 4-aligned. It belongs to the payload it lies in: the owner is found from
     // the head's address (detail::OwnerMap), never stored in the head.
-    struct XFixedString {
+    class XString {
+    public:
         using allocator_type = fixed_detail::allocator_ref;
         using stored_allocator_type = fixed_detail::stored_allocator_proxy;
 
@@ -4203,18 +4204,38 @@ namespace XOffsetDatastructure {
         std::uint32_t size_ = 0;
         std::uint32_t capacity_ = 0;
 
-        XFixedString() = default;
+        XString() = default;
         // The allocator names the payload this head lies in; V2.1 reads that
         // from the head's address, so the argument is not stored.
-        explicit XFixedString(allocator_type) noexcept {}
-        ~XFixedString() { release(); }
-        XFixedString(const XFixedString& other, allocator_type alloc) : XFixedString(alloc) {
-            assign(other.view());
+        template <typename Alloc>
+        explicit XString(const Alloc& alloc) {
+            static_cast<void>(fixed_detail::allocator_ref_of(alloc));
+        }
+        ~XString() { release(); }
+
+        // Move construction copies too; only move assignment (below) can
+        // take the source's block, when both heads lie in one payload.
+        XString(const XString& other)
+            : XString() {
+            *this = other;
         }
 
-        XFixedString(const XFixedString&) = delete;
-        XFixedString(XFixedString&&) = delete;
-        XFixedString& operator=(const XFixedString& other) {
+        XString(XString&& other)
+            : XString(static_cast<const XString&>(other)) {}
+
+        template <fixed_detail::string_view_like ViewLike, typename Alloc>
+        XString(const ViewLike& value, const Alloc& alloc)
+            : XString(alloc) {
+            assign(std::string_view(value));
+        }
+
+        template <typename Alloc>
+        XString(const XString& other, const Alloc& alloc)
+            : XString(alloc) {
+            *this = other;
+        }
+
+        XString& operator=(const XString& other) {
             if (this == &other) return *this;
             if (other.is_inline() && is_inline()) [[likely]] {
                 // Inline into an inline head: the 12 inline bytes are the
@@ -4228,7 +4249,7 @@ namespace XOffsetDatastructure {
             assign(other.view());
             return *this;
         }
-        XFixedString& operator=(XFixedString&& other) {
+        XString& operator=(XString&& other) {
             if (this == &other) return *this;
             if (other.is_inline()) {
                 // An inline source owns no storage: copy its bytes, no allocator.
@@ -4265,7 +4286,7 @@ namespace XOffsetDatastructure {
                     return *this;
                 }
             }
-            return (*this = static_cast<const XFixedString&>(other));
+            return (*this = static_cast<const XString&>(other));
         }
 
         // Bound = the head lies in a registered payload. Each call is one
@@ -4284,7 +4305,7 @@ namespace XOffsetDatastructure {
             return {a};
         }
         [[noreturn]] XOFFSET_DETAIL_COLD static void throw_unbound() {
-            XOFFSET_THROW(XException(XErrc::invalid_state, "XFixedString needs a block but lies outside every XOffset payload"));
+            XOFFSET_THROW(XException(XErrc::invalid_state, "XString needs a block but lies outside every XOffset payload"));
         }
 
         XOFFSET_DETAIL_INLINE XArena* arena() const noexcept {
@@ -4497,12 +4518,12 @@ namespace XOffsetDatastructure {
         }
 
     public:
-        XFixedString& operator=(std::string_view rhs) {
+        XString& operator=(std::string_view rhs) {
             assign(rhs);
             return *this;
         }
 
-        XFixedString& operator=(const char* rhs) {
+        XString& operator=(const char* rhs) {
             assign(rhs ? std::string_view(rhs) : std::string_view{});
             return *this;
         }
@@ -4510,7 +4531,7 @@ namespace XOffsetDatastructure {
         // Appends rhs, which may view this string's own characters. Growth at
         // least doubles the capacity, so a run of appends is amortized O(1)
         // per character.
-        XFixedString& append(std::string_view rhs) {
+        XString& append(std::string_view rhs) {
             const auto count = rhs.size();
             if (!is_inline() && count - 1u < std::size_t(capacity_ - size_)) [[likely]] {
                 // Nonempty and fits the out-of-line block (capacity_ != 0
@@ -4527,38 +4548,38 @@ namespace XOffsetDatastructure {
             return *this;
         }
 
-        XFixedString& operator+=(std::string_view rhs) { return append(rhs); }
+        XString& operator+=(std::string_view rhs) { return append(rhs); }
 
-        bool operator==(const XFixedString& rhs) const noexcept { return view() == rhs.view(); }
+        bool operator==(const XString& rhs) const noexcept { return view() == rhs.view(); }
         bool operator==(std::string_view rhs) const noexcept { return view() == rhs; }
         bool operator==(const char* rhs) const noexcept {
             return view() == (rhs ? std::string_view(rhs) : std::string_view{});
         }
-        bool operator<(const XFixedString& rhs) const noexcept { return view() < rhs.view(); }
+        bool operator<(const XString& rhs) const noexcept { return view() < rhs.view(); }
         bool operator<(std::string_view rhs) const noexcept { return view() < rhs; }
         bool operator<(const char* rhs) const noexcept {
             return view() < (rhs ? std::string_view(rhs) : std::string_view{});
         }
-        friend bool operator==(std::string_view lhs, const XFixedString& rhs) noexcept {
+        friend bool operator==(std::string_view lhs, const XString& rhs) noexcept {
             return lhs == rhs.view();
         }
-        friend bool operator==(const char* lhs, const XFixedString& rhs) noexcept {
+        friend bool operator==(const char* lhs, const XString& rhs) noexcept {
             return (lhs ? std::string_view(lhs) : std::string_view{}) == rhs.view();
         }
-        friend bool operator<(std::string_view lhs, const XFixedString& rhs) noexcept {
+        friend bool operator<(std::string_view lhs, const XString& rhs) noexcept {
             return lhs < rhs.view();
         }
-        friend bool operator<(const char* lhs, const XFixedString& rhs) noexcept {
+        friend bool operator<(const char* lhs, const XString& rhs) noexcept {
             return (lhs ? std::string_view(lhs) : std::string_view{}) < rhs.view();
         }
 
-        friend std::ostream& operator<<(std::ostream& os, const XFixedString& value) {
+        friend std::ostream& operator<<(std::ostream& os, const XString& value) {
             return os << value.view();
         }
 
         // Moves this head's payload into dst (a freshly bound head) and empties
         // this head. Inline bytes are copied; out-of-line storage is rebased.
-        void relocate_payload_to(XFixedString& dst) noexcept {
+        void relocate_payload_to(XString& dst) noexcept {
             if (is_inline()) {
                 std::memcpy(dst.inline_bytes(), inline_bytes(), 12);
             } else {
@@ -4694,7 +4715,7 @@ namespace XOffsetDatastructure {
     };
 
     namespace fixed_detail {
-        // XFixedVector's iterator: a pointer whose operator* returns T&. The
+        // XVectorCore's iterator: a pointer whose operator* returns T&. The
         // reference return tells the optimizer each element is dereferenceable,
         // so a user loop over a container can load fields unconditionally
         // (select, vectorization) as it does over std::vector or std::span; a
@@ -4740,8 +4761,10 @@ namespace XOffsetDatastructure {
         };
     } // namespace fixed_detail
 
+    // The head and element operations that XVector, XSet and XMap share: a
+    // base class only, never a field type.
     template <typename T>
-    struct XFixedVector {
+    struct XVectorCore {
         using allocator_type = fixed_detail::allocator_ref;
         using stored_allocator_type = fixed_detail::stored_allocator_proxy;
         using value_type = T;
@@ -4757,17 +4780,17 @@ namespace XOffsetDatastructure {
         char32_t size_ = 0;
         char32_t capacity_ = 0;
 
-        XFixedVector() = default;
-        // As XFixedString: the head's address names its payload.
-        explicit XFixedVector(allocator_type) noexcept {}
-        ~XFixedVector() { release(); }
-        XFixedVector(const XFixedVector& other, allocator_type alloc) : XFixedVector(alloc) {
+        XVectorCore() = default;
+        // As XString: the head's address names its payload.
+        explicit XVectorCore(allocator_type) noexcept {}
+        ~XVectorCore() { release(); }
+        XVectorCore(const XVectorCore& other, allocator_type alloc) : XVectorCore(alloc) {
             copy_from(other);
         }
 
-        XFixedVector(const XFixedVector&) = delete;
-        XFixedVector(XFixedVector&&) = delete;
-        XFixedVector& operator=(const XFixedVector& other) {
+        XVectorCore(const XVectorCore&) = delete;
+        XVectorCore(XVectorCore&&) = delete;
+        XVectorCore& operator=(const XVectorCore& other) {
             if constexpr (detail::subtree_copy_supported<T>() && std::is_trivially_copyable_v<T> &&
                           std::is_trivially_copy_constructible_v<T> &&
                           std::is_trivially_destructible_v<T> &&
@@ -4797,11 +4820,11 @@ namespace XOffsetDatastructure {
 
     private:
         // The POD fast path's fallback stays out of line, so that path inlines small.
-        XOFFSET_DETAIL_NOINLINE XFixedVector& assign_general_out_of_line(const XFixedVector& other) {
+        XOFFSET_DETAIL_NOINLINE XVectorCore& assign_general_out_of_line(const XVectorCore& other) {
             return assign_general(other);
         }
 
-        XFixedVector& assign_general(const XFixedVector& other) {
+        XVectorCore& assign_general(const XVectorCore& other) {
             if (this == &other) return *this;
             // An empty source keeps the capacity and needs no binding.
             if (other.size_ == 0) { clear(); return *this; }
@@ -4831,7 +4854,7 @@ namespace XOffsetDatastructure {
         }
 
     public:
-        XFixedVector& operator=(XFixedVector&& other) {
+        XVectorCore& operator=(XVectorCore&& other) {
             if (this == &other) return *this;
             if constexpr (fixed_detail::can_relocate_without_allocation<T>()) {
                 if (auto* const shared = reinterpret_cast<XArena*>(detail::OwnerMap::same_payload(this, &other))) {
@@ -4863,7 +4886,7 @@ namespace XOffsetDatastructure {
                     }
                 }
             }
-            return (*this = static_cast<const XFixedVector&>(other));
+            return (*this = static_cast<const XVectorCore&>(other));
         }
 
         // Bound = the head lies in a registered payload. Each call is one
@@ -4882,7 +4905,7 @@ namespace XOffsetDatastructure {
             return {a};
         }
         [[noreturn]] XOFFSET_DETAIL_COLD static void throw_unbound() {
-            XOFFSET_THROW(XException(XErrc::invalid_state, "XFixedVector needs a block but lies outside every XOffset payload"));
+            XOFFSET_THROW(XException(XErrc::invalid_state, "XVector needs a block but lies outside every XOffset payload"));
         }
 
         // Elements without heads never use the binding, so building one does
@@ -5441,7 +5464,7 @@ namespace XOffsetDatastructure {
 
         // Replaces all elements with count elements built in order by
         // construct(dst, *it) from [first, last): the sorted bulk fills of
-        // XFixedFlatSet and XFixedFlatMap (one exact block, no lookup). An
+        // XSet and XMap (one exact block, no lookup). An
         // empty vector builds in place, growing first if needed; otherwise a
         // fresh exact block is built before the old one is released, so the
         // source may alias this container, as for assign().
@@ -5961,7 +5984,7 @@ namespace XOffsetDatastructure {
             }
         }
 
-        void copy_from(const XFixedVector& other) {
+        void copy_from(const XVectorCore& other) {
             if (other.size_ == 0) return;
             XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::deep_bytes(other) + fixed_detail::array_bytes<T>(other.size_), );
             if constexpr (detail::subtree_copy_supported<T>()) {
@@ -5994,7 +6017,7 @@ namespace XOffsetDatastructure {
 
         // POD: assign_range (in place when the capacity suffices, else one
         // exact block), then the M6 padding zeroing transfer_construct does.
-        void assign_trivial_copy(const XFixedVector& other) {
+        void assign_trivial_copy(const XVectorCore& other) {
             assign_range(std::span<const T>(other.data(), other.size_));
             auto* items = data();
             for (size_type i = 0; i < size_; ++i) detail::scrub_implicit_padding(items + i);
@@ -6027,15 +6050,38 @@ namespace XOffsetDatastructure {
     };
 
     template <typename T>
-    class XFixedFlatSet : public XFixedVector<T> {
-        using Base = XFixedVector<T>;
+    class XSet : public XVectorCore<T> {
+        using Base = XVectorCore<T>;
 
     public:
+        using key_type = T;
         using value_type = typename Base::value_type;
         using allocator_type = typename Base::allocator_type;
         using iterator = typename Base::iterator;
         using const_iterator = typename Base::const_iterator;
-        using Base::Base;
+
+        XSet() = default;
+
+        template <typename Alloc>
+        explicit XSet(const Alloc& alloc)
+            : Base(fixed_detail::allocator_ref_of(alloc)) {}
+
+        XSet(const XSet& other)
+            : Base() {
+            Base::operator=(other);
+        }
+
+        XSet(XSet&& other)
+            : XSet(static_cast<const XSet&>(other)) {}
+
+        template <typename Alloc>
+        XSet(const XSet& other, const Alloc& alloc)
+            : Base(fixed_detail::allocator_ref_of(alloc)) {
+            Base::operator=(other);
+        }
+
+        XSet& operator=(const XSet&) = default;
+        XSet& operator=(XSet&&) = default;
 
         template <typename KeyLike>
         iterator find(const KeyLike& key) {
@@ -6092,7 +6138,7 @@ namespace XOffsetDatastructure {
         }
 
         template <std::ranges::forward_range R>
-            requires requires(R& range) { std::declval<XFixedFlatSet&>().assign_sorted(std::ranges::begin(range), std::ranges::end(range)); }
+            requires requires(R& range) { std::declval<XSet&>().assign_sorted(std::ranges::begin(range), std::ranges::end(range)); }
         void assign_sorted(R&& range) {
             assign_sorted(std::ranges::begin(range), std::ranges::end(range));
         }
@@ -6174,11 +6220,21 @@ namespace XOffsetDatastructure {
             Base::erase_index(index);
             return 1;
         }
+
+        iterator insert(const_iterator, const T& value) {
+            return insert(value).first;
+        }
+
+        template <typename Arg>
+            requires alloc_aware_convertible<T, Arg>
+        iterator insert(const_iterator, Arg&& arg) {
+            return insert(std::forward<Arg>(arg)).first;
+        }
     };
 
     template <typename K, typename V>
-    class XFixedFlatMap : public XFixedVector<XKeyValue<K, V>> {
-        using value_base = XFixedVector<XKeyValue<K, V>>;
+    class XMap : public XVectorCore<XKeyValue<K, V>> {
+        using value_base = XVectorCore<XKeyValue<K, V>>;
 
     public:
         using key_type = K;
@@ -6187,7 +6243,29 @@ namespace XOffsetDatastructure {
         using allocator_type = typename value_base::allocator_type;
         using iterator = typename value_base::iterator;
         using const_iterator = typename value_base::const_iterator;
-        using value_base::value_base;
+
+        XMap() = default;
+
+        template <typename Alloc>
+        explicit XMap(const Alloc& alloc)
+            : value_base(fixed_detail::allocator_ref_of(alloc)) {}
+
+        XMap(const XMap& other)
+            : value_base() {
+            value_base::operator=(other);
+        }
+
+        XMap(XMap&& other)
+            : XMap(static_cast<const XMap&>(other)) {}
+
+        template <typename Alloc>
+        XMap(const XMap& other, const Alloc& alloc)
+            : value_base(fixed_detail::allocator_ref_of(alloc)) {
+            value_base::operator=(other);
+        }
+
+        XMap& operator=(const XMap&) = default;
+        XMap& operator=(XMap&&) = default;
 
         template <typename KeyLike>
         iterator find(const KeyLike& key) {
@@ -6274,7 +6352,7 @@ namespace XOffsetDatastructure {
         }
 
         template <std::ranges::forward_range R>
-            requires requires(R& range) { std::declval<XFixedFlatMap&>().assign_sorted(std::ranges::begin(range), std::ranges::end(range)); }
+            requires requires(R& range) { std::declval<XMap&>().assign_sorted(std::ranges::begin(range), std::ranges::end(range)); }
         void assign_sorted(R&& range) {
             assign_sorted(std::ranges::begin(range), std::ranges::end(range));
         }
@@ -6354,65 +6432,18 @@ namespace XOffsetDatastructure {
         }
     };
 
-    static_assert(sizeof(XFixedString) == 12 && alignof(XFixedString) == 4,
-        "XFixedString ABI must stay frozen at 12 bytes, 4-aligned (wire V2.1)");
-    static_assert(sizeof(XFixedVector<int>) == 12 && alignof(XFixedVector<int>) == 4,
-        "XFixedVector ABI must stay frozen at 12 bytes, 4-aligned (wire V2.1)");
-    static_assert(sizeof(XFixedFlatSet<int>) == sizeof(XFixedVector<int>),
-        "XFixedFlatSet ABI must stay frozen at 12 bytes");
-    static_assert(sizeof(XFixedFlatMap<int, int>) == sizeof(XFixedVector<XKeyValue<int, int>>),
-        "XFixedFlatMap ABI must stay frozen at 12 bytes");
-
-    class XString : public XFixedString {
-        using Base = XFixedString;
-
-    public:
-        using allocator_type = typename Base::allocator_type;
-        using Base::operator=;
-        using Base::view;
-        using Base::size;
-        using Base::empty;
-        using Base::clear;
-        using Base::reserve;
-        using Base::append;
-        using Base::operator+=;
-        using Base::data;
-        using Base::c_str;
-
-        XString() = default;
-
-        template <typename Alloc>
-        explicit XString(const Alloc& alloc)
-            : Base(fixed_detail::allocator_ref_of(alloc)) {}
-
-        XString(const XString& other)
-            : Base() {
-            Base::operator=(other);
-        }
-
-        XString(XString&& other)
-            : XString(static_cast<const XString&>(other)) {}
-
-        template <fixed_detail::string_view_like ViewLike, typename Alloc>
-        XString(const ViewLike& value, const Alloc& alloc)
-            : Base(fixed_detail::allocator_ref_of(alloc)) {
-            Base::assign(std::string_view(value));
-        }
-
-        template <typename Alloc>
-        XString(const XString& other, const Alloc& alloc)
-            : Base(fixed_detail::allocator_ref_of(alloc)) {
-            Base::operator=(other);
-        }
-
-        XString& operator=(const XString&) = default;
-        XString& operator=(XString&&) = default;
-
-    };
+    static_assert(sizeof(XString) == 12 && alignof(XString) == 4,
+        "XString ABI must stay frozen at 12 bytes, 4-aligned (wire V2.1)");
+    static_assert(sizeof(XVectorCore<int>) == 12 && alignof(XVectorCore<int>) == 4,
+        "XVectorCore ABI must stay frozen at 12 bytes, 4-aligned (wire V2.1)");
+    static_assert(sizeof(XSet<int>) == sizeof(XVectorCore<int>),
+        "XSet ABI must stay frozen at 12 bytes");
+    static_assert(sizeof(XMap<int, int>) == sizeof(XVectorCore<XKeyValue<int, int>>),
+        "XMap ABI must stay frozen at 12 bytes");
 
     template <typename T>
-    class XVector : public XFixedVector<T> {
-        using Base = XFixedVector<T>;
+    class XVector : public XVectorCore<T> {
+        using Base = XVectorCore<T>;
 
         std::uint32_t index_from(typename Base::const_iterator pos) const noexcept {
             auto* begin = Base::data();
@@ -6569,121 +6600,8 @@ namespace XOffsetDatastructure {
         }
     };
 
-    static_assert(sizeof(XString) == sizeof(XFixedString),
-        "Main XString wrapper must stay zero-overhead over XFixedString");
-    static_assert(sizeof(XVector<int>) == sizeof(XFixedVector<int>),
-        "Main XVector wrapper must stay zero-overhead over XFixedVector");
-
-    template <typename T>
-    class XSet : public XFixedFlatSet<T> {
-        using Base = XFixedFlatSet<T>;
-
-    public:
-        using allocator_type = typename Base::allocator_type;
-        using key_type = T;
-        using value_type = typename Base::value_type;
-        using iterator = typename Base::iterator;
-        using const_iterator = typename Base::const_iterator;
-        using Base::begin;
-        using Base::end;
-        using Base::size;
-        using Base::empty;
-        using Base::clear;
-        using Base::find;
-        using Base::contains;
-        using Base::erase;
-        using Base::emplace;
-        using Base::insert;
-        using Base::assign_sorted;
-
-        XSet() = default;
-
-        template <typename Alloc>
-        explicit XSet(const Alloc& alloc)
-            : Base(fixed_detail::allocator_ref_of(alloc)) {}
-
-        XSet(const XSet& other)
-            : Base() {
-            Base::operator=(other);
-        }
-
-        XSet(XSet&& other)
-            : XSet(static_cast<const XSet&>(other)) {}
-
-        template <typename Alloc>
-        XSet(const XSet& other, const Alloc& alloc)
-            : Base(fixed_detail::allocator_ref_of(alloc)) {
-            Base::operator=(other);
-        }
-
-        XSet& operator=(const XSet&) = default;
-        XSet& operator=(XSet&&) = default;
-
-        iterator insert(const_iterator, const T& value) {
-            return Base::insert(value).first;
-        }
-
-        template <typename Arg>
-            requires alloc_aware_convertible<T, Arg>
-        iterator insert(const_iterator, Arg&& arg) {
-            return Base::insert(std::forward<Arg>(arg)).first;
-        }
-    };
-
-    template <typename K, typename V>
-    class XMap : public XFixedFlatMap<K, V> {
-        using Base = XFixedFlatMap<K, V>;
-
-    public:
-        using allocator_type = typename Base::allocator_type;
-        using key_type = typename Base::key_type;
-        using mapped_type = typename Base::mapped_type;
-        using value_type = typename Base::value_type;
-        using iterator = typename Base::iterator;
-        using const_iterator = typename Base::const_iterator;
-        using Base::begin;
-        using Base::end;
-        using Base::size;
-        using Base::empty;
-        using Base::clear;
-        using Base::find;
-        using Base::contains;
-        using Base::erase;
-        using Base::operator[];
-        using Base::try_emplace;
-        using Base::emplace;
-        using Base::insert_or_assign;
-        using Base::assign_sorted;
-
-        XMap() = default;
-
-        template <typename Alloc>
-        explicit XMap(const Alloc& alloc)
-            : Base(fixed_detail::allocator_ref_of(alloc)) {}
-
-        XMap(const XMap& other)
-            : Base() {
-            Base::operator=(other);
-        }
-
-        XMap(XMap&& other)
-            : XMap(static_cast<const XMap&>(other)) {}
-
-        template <typename Alloc>
-        XMap(const XMap& other, const Alloc& alloc)
-            : Base(fixed_detail::allocator_ref_of(alloc)) {
-            Base::operator=(other);
-        }
-
-        XMap& operator=(const XMap&) = default;
-        XMap& operator=(XMap&&) = default;
-
-    };
-
-    static_assert(sizeof(XSet<int>) == sizeof(XFixedFlatSet<int>),
-        "Main XSet wrapper must stay zero-overhead over XFixedFlatSet");
-    static_assert(sizeof(XMap<int, int>) == sizeof(XFixedFlatMap<int, int>),
-        "Main XMap wrapper must stay zero-overhead over XFixedFlatMap");
+    static_assert(sizeof(XVector<int>) == sizeof(XVectorCore<int>),
+        "XVector ABI must stay frozen at 12 bytes");
 
     using XBlob = XVector<std::byte>;
 } // namespace XOffsetDatastructure
@@ -6713,21 +6631,15 @@ namespace XOffsetDatastructure::schema {
         };
     } // namespace describe_detail
 
-    template <> struct description<XFixedString> : describe_detail::head_record<XFixedString> {};
-    template <> struct description<XString>
-        : describe_detail::record<XString, false, describe_detail::bases<XFixedString>> {};
-    template <class T> struct description<XFixedVector<T>> : describe_detail::head_record<XFixedVector<T>> {};
+    template <> struct description<XString> : describe_detail::head_record<XString> {};
+    template <class T> struct description<XVectorCore<T>> : describe_detail::head_record<XVectorCore<T>> {};
     template <class T> struct description<XVector<T>>
-        : describe_detail::record<XVector<T>, false, describe_detail::bases<XFixedVector<T>>> {};
-    template <class T> struct description<XFixedFlatSet<T>>
-        : describe_detail::record<XFixedFlatSet<T>, false, describe_detail::bases<XFixedVector<T>>> {};
+        : describe_detail::record<XVector<T>, false, describe_detail::bases<XVectorCore<T>>> {};
     template <class T> struct description<XSet<T>>
-        : describe_detail::record<XSet<T>, false, describe_detail::bases<XFixedFlatSet<T>>> {};
-    template <class K, class V> struct description<XFixedFlatMap<K, V>>
-        : describe_detail::record<XFixedFlatMap<K, V>, false,
-                                  describe_detail::bases<XFixedVector<XKeyValue<K, V>>>> {};
+        : describe_detail::record<XSet<T>, false, describe_detail::bases<XVectorCore<T>>> {};
     template <class K, class V> struct description<XMap<K, V>>
-        : describe_detail::record<XMap<K, V>, false, describe_detail::bases<XFixedFlatMap<K, V>>> {};
+        : describe_detail::record<XMap<K, V>, false,
+                                  describe_detail::bases<XVectorCore<XKeyValue<K, V>>>> {};
     template <class K, class V> struct description<XKeyValue<K, V>>
         : describe_detail::record<XKeyValue<K, V>, true, describe_detail::bases<>,
               typename describe_detail::key_value_fields<K, V>::field_first,
@@ -6761,7 +6673,7 @@ namespace XOffsetDatastructure {
     namespace detail {
         template <typename T>
         inline constexpr bool is_fixed_string_v =
-            std::is_base_of_v<XFixedString, std::remove_cv_t<T>>;
+            std::is_base_of_v<XString, std::remove_cv_t<T>>;
 
         template <typename T, typename = void>
         struct is_fixed_vector : std::false_type {};
@@ -6769,7 +6681,7 @@ namespace XOffsetDatastructure {
         struct is_fixed_vector<T, std::void_t<typename std::remove_cv_t<T>::value_type>>
             : std::bool_constant<
                 std::is_base_of_v<
-                    XFixedVector<typename std::remove_cv_t<T>::value_type>,
+                    XVectorCore<typename std::remove_cv_t<T>::value_type>,
                     std::remove_cv_t<T>>> {};
         template <typename T>
         inline constexpr bool is_fixed_vector_v = is_fixed_vector<T>::value;
@@ -6780,7 +6692,7 @@ namespace XOffsetDatastructure {
         struct is_fixed_flat_set<T, std::void_t<typename std::remove_cv_t<T>::value_type>>
             : std::bool_constant<
                 std::is_base_of_v<
-                    XFixedFlatSet<typename std::remove_cv_t<T>::value_type>,
+                    XSet<typename std::remove_cv_t<T>::value_type>,
                     std::remove_cv_t<T>>> {};
         template <typename T>
         inline constexpr bool is_fixed_flat_set_v = is_fixed_flat_set<T>::value;
@@ -6792,7 +6704,7 @@ namespace XOffsetDatastructure {
                                                 typename std::remove_cv_t<T>::mapped_type>>
             : std::bool_constant<
                 std::is_base_of_v<
-                    XFixedFlatMap<typename std::remove_cv_t<T>::key_type,
+                    XMap<typename std::remove_cv_t<T>::key_type,
                                   typename std::remove_cv_t<T>::mapped_type>,
                     std::remove_cv_t<T>>> {};
         template <typename T>
@@ -6843,19 +6755,16 @@ namespace XOffsetDatastructure {
             } else if constexpr (std::is_enum_v<CleanT>) {
                 return fixed_size_scalar<std::underlying_type_t<CleanT>>;
             } else if constexpr (is_fixed_string_v<CleanT>) {
-                return std::is_same_v<CleanT, XFixedString> || std::is_same_v<CleanT, XString>;
+                return std::is_same_v<CleanT, XString>;
             } else if constexpr (is_fixed_flat_map_v<CleanT>) {
-                return (std::is_same_v<CleanT, XFixedFlatMap<typename CleanT::key_type, typename CleanT::mapped_type>> ||
-                        std::is_same_v<CleanT, XMap<typename CleanT::key_type, typename CleanT::mapped_type>>) &&
+                return std::is_same_v<CleanT, XMap<typename CleanT::key_type, typename CleanT::mapped_type>> &&
                     is_wire_admitted_impl<typename CleanT::key_type>::value &&
                     is_wire_admitted_impl<typename CleanT::mapped_type>::value;
             } else if constexpr (is_fixed_flat_set_v<CleanT>) {
-                return (std::is_same_v<CleanT, XFixedFlatSet<typename CleanT::value_type>> ||
-                        std::is_same_v<CleanT, XSet<typename CleanT::value_type>>) &&
+                return std::is_same_v<CleanT, XSet<typename CleanT::value_type>> &&
                     is_wire_admitted_impl<typename CleanT::value_type>::value;
             } else if constexpr (is_fixed_vector_v<CleanT>) {
-                return (std::is_same_v<CleanT, XFixedVector<typename CleanT::value_type>> ||
-                        std::is_same_v<CleanT, XVector<typename CleanT::value_type>>) &&
+                return std::is_same_v<CleanT, XVector<typename CleanT::value_type>> &&
                     is_wire_admitted_impl<typename CleanT::value_type>::value;
             } else if constexpr (std::is_class_v<CleanT>) {
                 return alignof(CleanT) <= 8 &&
@@ -7422,12 +7331,12 @@ namespace XOffsetDatastructure {
         // bytes 0..7 and 8..10 (little endian). A table keeps the check free
         // of length-dependent branches.
         struct InlinePadMasks {
-            std::uint64_t low[XFixedString::inline_max + 1];
-            std::uint32_t high[XFixedString::inline_max + 1];
+            std::uint64_t low[XString::inline_max + 1];
+            std::uint32_t high[XString::inline_max + 1];
         };
         inline constexpr InlinePadMasks inline_pad_masks = [] {
             InlinePadMasks masks{};
-            for (unsigned n = 0; n <= XFixedString::inline_max; ++n)
+            for (unsigned n = 0; n <= XString::inline_max; ++n)
                 for (unsigned i = n; i < 11u; ++i) {
                     if (i < 8u) masks.low[n] |= std::uint64_t(0xff) << (8u * i);
                     else masks.high[n] |= std::uint32_t(0xff) << (8u * (i - 8u));
@@ -7443,27 +7352,27 @@ namespace XOffsetDatastructure {
             std::memcpy(&low, head, sizeof(low));
             std::memcpy(&high, head + 8, sizeof(high));
             const unsigned length = (high >> 24) & 0x7fu;
-            if (length > XFixedString::inline_max)
-                return wire_reject("wire validation failed: inline XFixedString length exceeds 10");
+            if (length > XString::inline_max)
+                return wire_reject("wire validation failed: inline XString length exceeds 10");
             // String bytes [length, 11) must be zero.
             if (((low & inline_pad_masks.low[length]) | (high & inline_pad_masks.high[length])) != 0)
-                return wire_reject("wire validation failed: inline XFixedString has nonzero padding");
+                return wire_reject("wire validation failed: inline XString has nonzero padding");
             return vok();
         }
 
-        inline vstatus validate_wire_value(const XFixedString& value,
+        inline vstatus validate_wire_value(const XString& value,
                                            WireValidationContext& ctx) {
             if (value.is_inline()) {
                 return validate_inline_string_bytes(reinterpret_cast<const char*>(&value));
             }
             if (value.size_ > value.capacity_ || value.capacity_ >= XBufferCore::MAX_PAYLOAD) {
                 return wire_reject(
-                    "wire validation failed: XFixedString size exceeds capacity");
+                    "wire validation failed: XString size exceeds capacity");
             }
             if (value.capacity_ == 0) {
                 if (value.size_ != 0 || value.data_delta != 0) {
                     return wire_reject(
-                        "wire validation failed: empty XFixedString has invalid payload");
+                        "wire validation failed: empty XString has invalid payload");
                 }
                 return vok();
             }
@@ -7475,12 +7384,12 @@ namespace XOffsetDatastructure {
                 XOFFSET_VTRY(checked_relative(value.data_delta, ctx, data));
                 XOFFSET_VTRY(validate_storage_range(data, static_cast<std::size_t>(value.capacity_) + 1,
                                                     alignof(char), ctx,
-                                                    "wire validation failed: XFixedString payload out of bounds"));
+                                                    "wire validation failed: XString payload out of bounds"));
                 XOFFSET_VTRY(register_allocation(data, block, 8, ctx));
             }
             if (data[value.size_] != '\0') {
                 return wire_reject(
-                    "wire validation failed: XFixedString missing terminator");
+                    "wire validation failed: XString missing terminator");
             }
             return vok();
         }
@@ -7495,7 +7404,7 @@ namespace XOffsetDatastructure {
         XOFFSET_DETAIL_INLINE vstatus validate_wire_element(const T& value, WireValidationContext& ctx) {
 #if XOFFSET_NO_EXCEPTIONS
             if constexpr (is_fixed_string_v<std::remove_cv_t<T>>) {
-                const XFixedString& string = value;
+                const XString& string = value;
                 if (string.is_inline())
                     return validate_inline_string_bytes(reinterpret_cast<const char*>(&string));
                 return validate_wire_value(string, ctx);
@@ -7506,17 +7415,17 @@ namespace XOffsetDatastructure {
 
 
         template <typename T>
-        vstatus validate_wire_value(const XFixedVector<T>& value,
+        vstatus validate_wire_value(const XVectorCore<T>& value,
                                     WireValidationContext& ctx) {
             if (value.size_ > value.capacity_ ||
                 value.capacity_ > (XBufferCore::MAX_PAYLOAD - 8u) / sizeof(T)) {
                 return wire_reject(
-                    "wire validation failed: XFixedVector size exceeds capacity");
+                    "wire validation failed: XVector size exceeds capacity");
             }
             if (value.capacity_ == 0) {
                 if (value.size_ != 0 || value.data_delta != 0) {
                     return wire_reject(
-                        "wire validation failed: empty XFixedVector has invalid payload");
+                        "wire validation failed: empty XVector has invalid payload");
                 }
                 return vok();
             }
@@ -7528,7 +7437,7 @@ namespace XOffsetDatastructure {
             if (!raw) [[unlikely]] {
                 XOFFSET_VTRY(checked_relative(value.data_delta, ctx, raw));
                 XOFFSET_VTRY(validate_storage_range(raw, bytes, alignof(T), ctx,
-                                                    "wire validation failed: XFixedVector payload out of bounds"));
+                                                    "wire validation failed: XVector payload out of bounds"));
                 XOFFSET_VTRY(register_allocation(raw, block, std::max<std::size_t>(alignof(T), 8), ctx));
             }
             auto* data = reinterpret_cast<const T*>(raw);
@@ -7571,10 +7480,10 @@ namespace XOffsetDatastructure {
                 if constexpr (wire_value_needs_validation_v<std::remove_extent_t<CleanT>>)
                     for (const auto& elem : value) XOFFSET_VTRY(validate_wire_element(elem, ctx));
             } else if constexpr (is_fixed_string_v<CleanT>) {
-                return validate_wire_value(static_cast<const XFixedString&>(value), ctx);
+                return validate_wire_value(static_cast<const XString&>(value), ctx);
             } else if constexpr (is_fixed_flat_set_v<CleanT>) {
                 XOFFSET_VTRY(validate_wire_value(
-                    static_cast<const XFixedVector<typename CleanT::value_type>&>(value), ctx));
+                    static_cast<const XVectorCore<typename CleanT::value_type>&>(value), ctx));
                 // No early exit: one error, and the loop vectorizes.
                 bool unordered = false;
                 for (std::uint32_t i = 1; i < value.size(); ++i)
@@ -7582,7 +7491,7 @@ namespace XOffsetDatastructure {
                 if (unordered) return wire_reject("wire validation: set keys not strictly ordered");
             } else if constexpr (is_fixed_flat_map_v<CleanT>) {
                 XOFFSET_VTRY(validate_wire_value(
-                    static_cast<const XFixedVector<typename CleanT::value_type>&>(value), ctx));
+                    static_cast<const XVectorCore<typename CleanT::value_type>&>(value), ctx));
                 // No early exit: one error, and the loop vectorizes.
                 bool unordered = false;
                 for (std::uint32_t i = 1; i < value.size(); ++i)
@@ -7590,7 +7499,7 @@ namespace XOffsetDatastructure {
                 if (unordered) return wire_reject("wire validation: map keys not strictly ordered");
             } else if constexpr (is_fixed_vector_v<CleanT>) {
                 return validate_wire_value(
-                    static_cast<const XFixedVector<typename CleanT::value_type>&>(value), ctx);
+                    static_cast<const XVectorCore<typename CleanT::value_type>&>(value), ctx);
             } else if constexpr (std::is_class_v<CleanT> && wire_value_needs_validation_v<CleanT>) {
                 return for_each_reflected_subobject_v<CleanT>(
                     [&](auto index) {
@@ -7698,13 +7607,10 @@ namespace XOffsetDatastructure {
 
     namespace fixed_detail {
         template <typename T> struct is_owning_head : std::false_type {};
-        template <> struct is_owning_head<XFixedString> : std::true_type {};
         template <> struct is_owning_head<XString> : std::true_type {};
-        template <typename T> struct is_owning_head<XFixedVector<T>> : std::true_type {};
+        template <typename T> struct is_owning_head<XVectorCore<T>> : std::true_type {};
         template <typename T> struct is_owning_head<XVector<T>> : std::true_type {};
-        template <typename T> struct is_owning_head<XFixedFlatSet<T>> : std::true_type {};
         template <typename T> struct is_owning_head<XSet<T>> : std::true_type {};
-        template <typename K, typename V> struct is_owning_head<XFixedFlatMap<K, V>> : std::true_type {};
         template <typename K, typename V> struct is_owning_head<XMap<K, V>> : std::true_type {};
 
         // Whether default_construct<T> passes its allocator to anything that
@@ -11040,7 +10946,7 @@ namespace XOffsetDatastructure {
 namespace XOffsetDatastructure {
 
 template <typename T>
-struct is_byte_copy_safe<XOffsetDatastructure::XFixedVector<T>>
+struct is_byte_copy_safe<XOffsetDatastructure::XVectorCore<T>>
     : std::bool_constant<is_byte_copy_safe_v<T>> {};
 
 template <typename T>
@@ -11048,16 +10954,8 @@ struct is_byte_copy_safe<XOffsetDatastructure::XVector<T>>
     : std::bool_constant<is_byte_copy_safe_v<T>> {};
 
 template <typename T>
-struct is_byte_copy_safe<XOffsetDatastructure::XFixedFlatSet<T>>
-    : std::bool_constant<is_byte_copy_safe_v<T>> {};
-
-template <typename T>
 struct is_byte_copy_safe<XOffsetDatastructure::XSet<T>>
     : std::bool_constant<is_byte_copy_safe_v<T>> {};
-
-template <typename K, typename V>
-struct is_byte_copy_safe<XOffsetDatastructure::XFixedFlatMap<K, V>>
-    : std::bool_constant<is_byte_copy_safe_v<K> && is_byte_copy_safe_v<V>> {};
 
 template <typename K, typename V>
 struct is_byte_copy_safe<XOffsetDatastructure::XMap<K, V>>
@@ -11146,8 +11044,8 @@ namespace XOffsetDatastructure {
     template<> struct XCompactor::migrate_as<XString> {
         static constexpr MigrateStrategy value = MigrateStrategy::AllocatorAware;
     };
-    template<> struct XCompactor::migrate_as<XFixedString> {
-        static constexpr MigrateStrategy value = MigrateStrategy::AllocatorAware;
+    template<typename T> struct XCompactor::migrate_as<XVectorCore<T>> {
+        static constexpr MigrateStrategy value = MigrateStrategy::Container;
     };
     template<typename T> struct XCompactor::migrate_as<XVector<T>> {
         static constexpr MigrateStrategy value = MigrateStrategy::Container;
@@ -11155,16 +11053,7 @@ namespace XOffsetDatastructure {
     template<typename T> struct XCompactor::migrate_as<XSet<T>> {
         static constexpr MigrateStrategy value = MigrateStrategy::Container;
     };
-    template<typename T> struct XCompactor::migrate_as<XFixedVector<T>> {
-        static constexpr MigrateStrategy value = MigrateStrategy::Container;
-    };
-    template<typename T> struct XCompactor::migrate_as<XFixedFlatSet<T>> {
-        static constexpr MigrateStrategy value = MigrateStrategy::Container;
-    };
     template<typename K, typename V> struct XCompactor::migrate_as<XMap<K, V>> {
-        static constexpr MigrateStrategy value = MigrateStrategy::Container;
-    };
-    template<typename K, typename V> struct XCompactor::migrate_as<XFixedFlatMap<K, V>> {
         static constexpr MigrateStrategy value = MigrateStrategy::Container;
     };
 }

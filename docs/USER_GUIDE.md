@@ -45,7 +45,7 @@ XOFFSET_REGISTER_SCHEMA_NAME(Profile, "example.Profile")
   builds with identical wire bytes, and every field gets an accessor of the same name (section 3.5).
   Code compiled only as C++26 may omit it; layout and schema identity then come from P2996 reflection.
 - Members may only be scalars, enums, fixed-size arrays, library containers (`XString`, `XVector`,
-  `XFixedVector`, `XSet`, `XMap`) and structs that recursively satisfy these rules. Raw pointers,
+  `XSet`, `XMap`) and structs that recursively satisfy these rules. Raw pointers,
   references, `union`, polymorphic types, `std::string`/`std::vector` and the like are rejected at
   compile time.
 - Register a unique and stable name for each root type with `XOFFSET_REGISTER_SCHEMA_NAME`.
