@@ -138,7 +138,7 @@ int main(int argc, char** argv) {
     // cycle the gate counts (setup, not counted). Scale M reserves more
     // address space than valgrind allows.
     const slg::Scale* sc = slg::find_scale("S");
-    slg::XOffsetRunnerT<slg::XoModel, false> runner;
+    slg::XOffsetRunnerT<slg::XoModel> runner;
     runner.setup(*sc, 20261021);
     slg::SampleWires keep;
     for (int c = 0; c < 5; ++c) {

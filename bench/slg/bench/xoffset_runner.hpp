@@ -61,8 +61,7 @@ struct XoOptinModel {
 };
 
 // M: the model (XoModel = model_xoffset.hpp, XoOptinModel = model_xoffset_optin.hpp).
-// Direct: receive with begin_verified_receive / finish_verified (reuse protocol only).
-template <class M, bool Direct> class XOffsetRunnerT final : public Runner {
+template <class M> class XOffsetRunnerT final : public Runner {
     using PlayerState = typename M::PlayerState;
     using BattleMsg = typename M::BattleMsg;
     using ShardState = typename M::ShardState;
@@ -116,7 +115,7 @@ template <class M, bool Direct> class XOffsetRunnerT final : public Runner {
     }
 
 public:
-    std::string name() const override { return Direct ? "xoffset_direct" : M::name; }
+    std::string name() const override { return M::name; }
 
     void setup(const Scale& sc, uint64_t seed) override {
         using namespace XOffsetDatastructure;
@@ -161,7 +160,6 @@ public:
 
     void run_cycle(int cycle, CycleStats& st, SampleWires* keep) override {
         if (reuse_mode()) return run_cycle_reuse(cycle, st, keep);
-        if (Direct) throw std::runtime_error("xoffset_direct runs only with SLG_REUSE=1");
         using namespace XOffsetDatastructure;
         const Scale& sc = *sc_;
         std::vector<stdm::Report> reports;
@@ -407,17 +405,11 @@ public:
         for (int q = 0; q < sc.report_reads && !wires.empty(); ++q) {
             const std::string& w = wires[std::size_t(q) % wires.size()];
             // One timer around receive + query, like the std formats (a second timer
-            // per read costs about 10% of D). Direct needs the untimed transport write
-            // in between, so it times the two parts separately.
-            if constexpr (!Direct) {
-                timed(st, "D.read", [&] {
-                    reload_wire<Report, kClient>(*d_, w);
-                    st.report_sum += query_report(d_->root<Report>());
-                });
-            } else {
-                recv<Report>(st, "D.read", w, d_);
-                timed(st, "D.read", [&] { st.report_sum += query_report(d_->root<Report>()); });
-            }
+            // per read costs about 10% of D).
+            timed(st, "D.read", [&] {
+                reload_wire<Report, kClient>(*d_, w);
+                st.report_sum += query_report(d_->root<Report>());
+            });
         }
     }
 
@@ -1918,55 +1910,11 @@ private:
         return p;
     }
     PlayerState& player(int i) { return players_[std::size_t(i)].template root<PlayerState>(); }
-    // Receive in the reuse protocol. Default: reload_verified copies the wire into the
-    // slot's long-lived buffer and verifies it there. Direct ("xoffset_direct", the
-    // "direct receive" column): begin_verified_receive reserves the final arena (from the
-    // pool), the transport writes header / extent table / payload / hole table
-    // straight into it (untimed: the network read every format pays outside the
-    // timer; the other formats decode from the wire buffer in place), and
-    // finish_verified runs the same verification as load_verified. Replacing the
-    // slot's previous buffer (back to the pool) is timed.
+    // Receive in the reuse protocol: reload_verified copies the wire into the slot's
+    // long-lived buffer and verifies it there.
     template <class T>
     void recv(CycleStats& st, const char* key, const std::string& wire, std::optional<XOffsetDatastructure::XBuffer>& dst) {
-        using namespace XOffsetDatastructure;
-        if constexpr (!Direct) { timed(st, key, [&] { reload_wire<T, kPeer>(*dst, wire); }); return; }
-        else {
-        XWireHeaderV2 h{};
-        if (wire.size() < sizeof(h)) throw std::runtime_error("direct receive: short wire");
-        std::memcpy(&h, wire.data(), sizeof(h));
-        const std::size_t payload = std::size_t(h.used_bytes), holes = std::size_t(h.hole_count), extents = std::size_t(h.extent_count);
-        std::optional<VerifiedReceiveToken<T>> tok;
-        timed(st, key, [&] { tok.emplace(begin_verified_receive<T>(payload, cap(), holes, extents)); });
-        {
-            auto op = tok->acquire_operation();
-            auto head = op.header_bytes(), body = op.payload_bytes(), hole = op.hole_bytes(), table = op.extent_bytes();
-            std::size_t at = 0;
-            auto take = [&](void* to, std::size_t n) {
-                if (at + n > wire.size()) throw std::runtime_error("direct receive: wire framing");
-                if (n) std::memcpy(to, wire.data() + at, n);
-                at += n;
-            };
-            take(head.data(), head.size());
-            take(table.data(), table.size());
-            // payload_bytes() is payload [begin, used): begin is 48 for wire
-            // format 2.1 (the payload header is not sent) and 0 before it; an
-            // extent at payload offset o lands at o - begin.
-            const std::size_t begin = payload - body.size();
-            if (extents == 0) take(body.data(), body.size());
-            else
-                for (std::size_t e = 0; e < extents; ++e) {
-                    uint32_t ext[2];
-                    std::memcpy(ext, table.data() + e * 8, 8);
-                    if (ext[0] < begin || std::size_t(ext[0]) - begin + ext[1] > body.size())
-                        throw std::runtime_error("direct receive: extent bounds");
-                    take(body.data() + (ext[0] - begin), ext[1]);
-                }
-            take(hole.data(), hole.size());
-            if (at != wire.size()) throw std::runtime_error("direct receive: trailing bytes");
-            op.complete(head.size(), body.size(), hole.size(), table.size());
-        }
-        timed(st, key, [&] { dst.emplace(finish_verified(*tok)); });
-        }
+        timed(st, key, [&] { reload_wire<T, kPeer>(*dst, wire); });
     }
 
     const Scale* sc_ = nullptr;
@@ -1985,7 +1933,7 @@ private:
     std::vector<int64_t> lseq_;
 };
 
-using XOffsetRunner = XOffsetRunnerT<XoModel, false>;
-using XOffsetTrustedRunner = XOffsetRunnerT<XoTrustedModel, false>;
+using XOffsetRunner = XOffsetRunnerT<XoModel>;
+using XOffsetTrustedRunner = XOffsetRunnerT<XoTrustedModel>;
 
 } // namespace slg

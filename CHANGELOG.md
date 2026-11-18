@@ -5,6 +5,16 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- Removed the experimental direct receive (`begin_verified_receive`, `finish_verified`, the second
+  validator `receive_raw::validate`, the custom lifetime hooks `wire_activation` and
+  `wire_future_lifetime`, `canonical_bytes_at`, `freeze_verified` / `VerifiedSnapshot` and
+  `VirtualMemoryStorage::for_receive`), the optional shared validation scratch pool
+  (`XOFFSET_BUILD_VALIDATION_SCRATCH_RUNTIME`, `XOffset::ValidationScratch`) and the snapshot index
+  (`XOFFSET_BUILD_SNAPSHOT_INDEX_RUNTIME`). Receiving goes through `load_verified`, `reload_verified`,
+  `begin_verified_reload` and `XReceiver` as before. With them went the owner index and the storage's
+  second byte origin that only the direct receive used (the storage is 8 bytes smaller, the owner keeps
+  its size and its per-line layout), and an empty loop over the live elements that in-place container
+  growth still ran.
 - A vector that grows into a new block moves trivially copyable elements of up to 16 bytes with one
   block copy instead of one element at a time (the loop reloaded the size on every element). 64
   `push_back` calls of a `float` into an empty vector, regrowing on the way: 2,097 -> 1,885

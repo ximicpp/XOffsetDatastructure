@@ -24,7 +24,7 @@ int main() {
         auto source = XBuffer::create<xm::PlayerState>(16 * 1024, cap);
         auto output = XBuffer::create<xm::PlayerPatch>(4096, cap);
         std::string wire;
-        slg::XOffsetRunnerT<slg::XoTrustedModel, false>::StoreOps store;
+        slg::XOffsetRunnerT<slg::XoTrustedModel>::StoreOps store;
         for (int seq = 0; seq < 256; ++seq) {
             auto original = slg::make_player(20261116 + seq, 17 + seq);
             auto& player = source.reset<xm::PlayerState>();

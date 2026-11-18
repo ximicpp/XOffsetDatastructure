@@ -388,7 +388,7 @@ private:
     // Receive. Default: copy the wire into the owned buffer and deserialize, all timed.
     // Direct: the transport writes into the owned buffer (untimed: the network read,
     // which every format pays outside the timer), then the checked deserialize runs in
-    // place (timed), like xoffset_direct's begin_verified_receive / finish_verified.
+    // place (timed).
     template <class T> static void recv(CycleStats& st, const char* key, Held<T>& h, const Bytes& in) {
         if constexpr (!Direct) { timed(st, key, [&] { h.receive({in.data(), in.size()}); }); return; }
         timed(st, key, [&] { h.drop(); });

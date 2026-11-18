@@ -11,9 +11,6 @@ else()
 endif()
 set(XOFFSET_CXX26_ONLY_TESTS
     test_admission_typelayout
-    test_canonical_cold_no_callback
-    test_canonical_zero_target
-    test_custom_future_lifetime
     test_enum_support
     test_field_limit_fix
     test_reflection_advanced
@@ -561,7 +558,6 @@ set(XOFFSET_SCHEMA_DESCRIBE_FAIL_TESTS
     "duplicate|list every member once, in declaration order"
     "array|the list does not name every non-static data member"
     "padding|the list does not name every non-static data member"
-    "enum|the enumerators of an enum without a fixed underlying type are unknown"
     "undescribed|this record has no field list")
 if(NOT XOFFSET_SCHEMA_BACKEND STREQUAL "describe" AND
    (NOT DEFINED XOFFSET_CXX_STANDARD OR XOFFSET_CXX_STANDARD STREQUAL "26"))
@@ -613,21 +609,6 @@ foreach(entry
         set_tests_properties(${name} PROPERTIES LABELS "schema")
     endif()
 endforeach()
-
-# Without reflection, raw receive of an enum without a fixed underlying type
-# must fail the build clearly (test_receive_raw runs these enums only in C++26).
-if(NOT XOFFSET_TESTS_REFLECTION)
-    foreach(enum Nonfixed Negative Zero EmptyEnum Wide UnsignedWide)
-        add_executable(receive_raw_nonfixed_${enum}_fail EXCLUDE_FROM_ALL receive_raw/nonfixed_enum_fail.cpp)
-        configure_xoffset_target(receive_raw_nonfixed_${enum}_fail)
-        target_compile_definitions(receive_raw_nonfixed_${enum}_fail PRIVATE XOFFSET_TEST_ENUM=${enum})
-        add_test(NAME receive_raw_nonfixed_${enum}_fail
-            COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target receive_raw_nonfixed_${enum}_fail --config $<CONFIG>)
-        set_tests_properties(receive_raw_nonfixed_${enum}_fail PROPERTIES
-            LABELS "schema" PASS_REGULAR_EXPRESSION
-            "the enumerators of an enum without a fixed underlying type are unknown")
-    endforeach()
-endif()
 
 # Explicit new common programs; no source glob or handwritten total.
 include("${PROJECT_SOURCE_DIR}/cmake/XOffsetFourPathTests.cmake")

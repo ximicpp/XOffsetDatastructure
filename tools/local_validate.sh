@@ -48,8 +48,9 @@
 #   gcc16-c++26d         GCC 16 image, C++26 with the field-list schema backend (M26D)
 #   p2996-c++20          P2996 Clang + libc++, C++20 (no reflection)
 #   diff-c++20           GCC 16: tools/validation_differential.sh, the C++26 reflection build
-#                        against the C++20 field-list build of HEAD, 200000 cases, seeds 1 2;
-#                        the wires must be the same bytes and the outcomes identical
+#                        against the C++20 field-list build of HEAD, 200000 cases, seeds 1 2,
+#                        both with XOFFSET_SCRUB_POPPED/ERASED; the wires must be the same
+#                        bytes and the outcomes identical
 #   wire-matrix          after the columns: tools/wire_matrix.sh over the C++26 GCC 16
 #                        build (the reference, built if missing), the C++26 P2996 build if
 #                        present and every non-ASan column: each writes the cross-compiler
@@ -479,8 +480,13 @@ step_matrix() {
         ndk29-c++20) client_column "$WORK/c-$s" android-arm64 20 "$NDK_R29" ;;
         ndk30-c++20) client_column "$WORK/c-$s" android-arm64 20 "$NDK_R30" ;;
         diff-c++20)
-            in_gcc "XOFFSET_DIFF_OUT='$dir' XOFFSET_DIFF_BASE_FLAGS='-std=c++26 -freflection' \
-                XOFFSET_DIFF_FLAGS='-std=c++20' XOFFSET_DIFF_SAME_INPUTS=1 \
+            # Both builds scrub popped and erased slots: with the default (no
+            # scrub) a vacated slot keeps whatever bytes the destructor left,
+            # which the optimizer may or may not have written, so the two
+            # builds' wires could differ there while the live data is equal.
+            in_gcc "XOFFSET_DIFF_OUT='$dir' \
+                XOFFSET_DIFF_BASE_FLAGS='-std=c++26 -freflection -DXOFFSET_SCRUB_POPPED=1 -DXOFFSET_SCRUB_ERASED=1' \
+                XOFFSET_DIFF_FLAGS='-std=c++20 -DXOFFSET_SCRUB_POPPED=1 -DXOFFSET_SCRUB_ERASED=1' XOFFSET_DIFF_SAME_INPUTS=1 \
                 tools/validation_differential.sh '$REPO' '$REPO' 200000 1 2" ;;
     esac
 }

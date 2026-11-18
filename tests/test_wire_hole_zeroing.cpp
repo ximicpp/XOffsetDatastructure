@@ -2,7 +2,7 @@
 // is cleared before it becomes a hole (M3), so neither the arena nor any
 // emitted wire carries freed contents; each emitted payload byte equals the
 // arena byte and every hole byte is zero (dense and sparse wires from
-// save_verified, save_verified_into and freeze_verified); holes a loaded wire
+// save_verified and save_verified_into); holes a loaded wire
 // brought in keep the sender's bytes (forwarded unchanged); and save_compact
 // carries nothing that was freed or vacated. With the M4 scrub switches
 // (XOFFSET_SCRUB_ERASED, _POPPED; this program is built again as *_hardened
@@ -172,17 +172,6 @@ void emitted_holes_are_zero() {
     }
 }
 
-void frozen_segments_are_zero() {
-    auto b = make(false);
-    const auto expected = b.save_verified();
-    auto snapshot = xo::freeze_verified(std::move(b));
-    std::string joined;
-    for (const auto& seg : snapshot.segments())
-        joined.append(reinterpret_cast<const char*>(seg.data()), seg.size());
-    if (joined != expected) fail("frozen segments differ from save_verified bytes");
-    if (joined.find(kSecret.substr(0, 12)) != std::string::npos) fail("frozen segments carry freed contents");
-}
-
 // A dense wire whose hole holds sender bytes: load accepts it, re-save forwards
 // those bytes unchanged (they are the sender's, not the receiver's), and a block
 // the receiver itself retires is cleared.
@@ -264,8 +253,6 @@ void declared_size_limits() {
     what = rejection([&] { (void)Buffer::load(claim, xo::XBuffer::maximum_capacity(1u << 20)); });
     if (what.find("exceeds maximum_capacity 1048576") == std::string::npos)
         fail("explicit limit message: " + what);
-    what = rejection([&] { (void)xo::begin_verified_receive<hz::Root>(std::size_t(1) << 30); });
-    if (what.find("begin_verified_receive") == std::string::npos) fail("receive limit message: " + what);
     // Within the default limit a claim is still accepted, and the default
     // emission skips the claimed free run again.
     const auto ok = inflate_sparse(base, 32u << 20);
@@ -281,11 +268,10 @@ void declared_size_limits() {
 
 int main() {
     emitted_holes_are_zero();
-    frozen_segments_are_zero();
     loaded_holes_keep_sender_bytes();
     compact_carries_no_freed_contents();
     declared_size_limits();
     std::cout << "wire hole zeroing (M4 scrub switches " << (kScrubbed ? "on" : "off")
-              << ") and declared-size limits: 5 groups passed\n";
+              << ") and declared-size limits: 4 groups passed\n";
     return 0;
 }

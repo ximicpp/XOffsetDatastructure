@@ -153,7 +153,6 @@ else()
 endif()
 
 include(cmake/XOffsetFourPathHeaders.cmake)
-include(cmake/XOffsetOptionalRuntimes.cmake)
 
 if(XOFFSET_BUILD_TESTS)
     add_subdirectory(tests)

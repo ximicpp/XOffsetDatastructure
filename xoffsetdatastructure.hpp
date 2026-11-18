@@ -65,7 +65,7 @@ static_assert(XOFFSET_LITTLE_ENDIAN,
     "XOffsetDatastructure requires little-endian platform");
 #endif // XOFFSET_DISABLE_PLATFORM_CHECKS
 
-// Apple: load_verified, ValidationScratch and receive_raw use std::pmr from the
+// Apple: load_verified uses std::pmr from the
 // system libc++, which Apple ships from macOS 14 / iOS 17 / tvOS 17 / watchOS 10.
 // The SDK does not mark those symbols with availability, so an older
 // deployment target compiles and links, then fails at launch on the old
@@ -102,10 +102,6 @@ namespace XOffsetDatastructure {
         template<class T> T* rebuild_dynamic_array(void*, std::size_t, std::uint32_t) noexcept;
         template<class T> T* begin_fresh_ordinary_outer(void*) noexcept;
         template<class T> T* begin_relocated_ordinary_outer(T*, const T&) noexcept;
-        template<class T> consteval bool future_custom_lifetime_supported();
-        template<class T, class Alloc> void future_default_construct(void*, const Alloc&);
-        template<class T, class Src, class Alloc> void future_transfer_construct(void*, Src&&, const Alloc&);
-        template<class T> void future_relocate_construct(T*, T&) noexcept;
         template<class T> consteval bool shift_relocate_supported();
         template<class T> void shift_rebase_moved(T*, std::size_t, std::int32_t) noexcept;
         template<class T> void empty_vacated_slot(T*) noexcept;
@@ -138,7 +134,6 @@ namespace XOffsetDatastructure {
 #define XOFFSET_DETAIL_SUBTREE_COUNT(field, n) ((void)0)
 #endif
         struct VerifiedPathsAccess;
-        struct VerifiedReceiveAccess;
         struct DeltaAccess;
         struct ReceiverAccess;
         // Registration is the only registry operation allowed to allocate.
@@ -686,104 +681,6 @@ namespace XOffsetDatastructure {
         static MaximumCapacity relocating(size_type maximum = MAX_PAYLOAD) noexcept {
             return MaximumCapacity{maximum, XGrowPolicy::Relocating, {}, XStorage::Auto, 0};
         }
-        // Host-only canonical address recovery (public API kept unchanged from
-        // R1+M2 for source compatibility). The exact numeric comparator uses
-        // the declared flat-address ABI for search; returned pointers come
-        // from the retained real placement byte[MAX] array of a receive owner.
-        // W9: the library's OWN resolution (rel32 heads, free lists, headers,
-        // wire validation, lifetime helpers) no longer calls this: receive data
-        // is resolved by flat origin + delta exactly like ordinary loads, i.e.
-        // it relies on the same disclosed implementation-defined
-        // pointer-from-address behaviour, not on the receive byte array.
-        static std::byte* canonical_bytes_at(const void* anchor,
-                std::uintptr_t target, std::size_t bytes) noexcept {
-            if (canonical_active_count_.load(std::memory_order_acquire) == 0) return nullptr;
-            return canonical_bytes_at_active(anchor, target, bytes);
-        }
-
-    private:
-        // Keep the inactive acquire-load/return in the small public helper.
-        // The active path retains all original owner/TLS/registry semantics.
-#if defined(_MSC_VER)
-        __declspec(noinline)
-#elif defined(__clang__) || defined(__GNUC__)
-        __attribute__((noinline))
-#endif
-        static std::byte* canonical_bytes_at_active(const void* anchor,
-                std::uintptr_t target, std::size_t bytes) noexcept {
-            const auto address = reinterpret_cast<std::uintptr_t>(anchor);
-            auto live = [](const OwnerRecordPtr& r) noexcept {
-                return r && r->owner.load(std::memory_order_acquire);
-            };
-            auto contains_anchor = [&](const OwnerRecordPtr& r) noexcept {
-                if (!live(r)) return false;
-                const auto base = reinterpret_cast<std::uintptr_t>(r->payload);
-                return address >= base && address - base < r->canonical_extent;
-            };
-            auto fits_target = [&](const OwnerRecordPtr& r) noexcept {
-                if (!live(r)) return false;
-                const auto base = reinterpret_cast<std::uintptr_t>(r->payload);
-                return target >= base && target - base <= r->canonical_extent &&
-                    bytes <= r->canonical_extent - (target - base);
-            };
-            auto recover = [&](const OwnerRecordPtr& r) noexcept -> std::byte* {
-                if (!fits_target(r)) std::terminate();
-                if (!r->canonical_origin) return nullptr; // disclosed legacy target domain
-                const auto offset = target - reinterpret_cast<std::uintptr_t>(r->payload);
-                return r->canonical_origin + offset;
-            };
-            OwnerCache* cache = owner_cache_available() ? &owner_cache() : nullptr;
-            if (cache) {
-                // Prefer a containing anchor for a zero-length one-past query;
-                // an adjacent reservation must not replace that array's origin.
-                for (std::size_t attempt = 0; attempt != 4; ++attempt) {
-                    const auto slot = (cache->last + attempt) % 4u;
-                    auto& r = cache->records[slot];
-                    if (contains_anchor(r) && fits_target(r)) {
-                        cache->last = slot; return recover(r);
-                    }
-                }
-                // Independently stored heads may bind another C owner or an
-                // ordinary owner. Address recovery does not impose root ownership.
-                // A zero-length target can equal the next reservation's base.
-                // If its anchor was not cached, resolve that anchor cold before
-                // allowing a target-only hit to select a different array origin.
-                if (bytes != 0) {
-                    for (std::size_t attempt = 0; attempt != 4; ++attempt) {
-                        const auto slot = (cache->last + attempt) % 4u;
-                        auto& r = cache->records[slot];
-                        if (fits_target(r)) { cache->last = slot; return recover(r); }
-                    }
-                }
-            }
-            OwnerRecordPtr record;
-            {
-                auto& state = registry_state();
-                std::lock_guard lock(state.mutex);
-                auto source = state.owners.upper_bound(address);
-                if (source != state.owners.begin()) {
-                    --source;
-                    if (contains_anchor(source->second) && fits_target(source->second)) record = source->second;
-                }
-                if (!record) {
-                    auto candidate = state.owners.upper_bound(target);
-                    if (candidate != state.owners.begin()) {
-                        --candidate;
-                        if (fits_target(candidate->second)) record = candidate->second;
-                    }
-                }
-            }
-            if (!record) return nullptr;
-            // Canonical recovery is called inside raw-owner/cache-reference
-            // critical sections. Never install a cold result in TLS here:
-            // releasing an evicted terminal record can invoke replaceable
-            // delete and move/destroy the caller's saved Core object.
-            // The live registry/owner retain this local record. Without an
-            // eviction there is no internal last-owner release or callback.
-            return recover(record);
-        }
-
-    public:
         XGrowPolicy growth_policy() const noexcept { return packed_.growth_policy; }
         // Automatic growth runs inside container operations, where the payload
         // must not move: a movable slot switched to Automatic first moves to a
@@ -2542,89 +2439,15 @@ namespace XOffsetDatastructure {
             }
         };
 
-        // Host-only identity. A record follows one payload reservation, never a
-        // particular Core object's address, and is never revived after release.
-        // Only direct-receive (canonical) records enter the global index, the
-        // sole consumer of which is canonical_bytes_at; an ordinary record is
-        // just the identity lease that host-callback revalidation reads.
-        inline static std::atomic<std::size_t> canonical_active_count_{0};
+        // Host-only identity: the lease that host-callback revalidation reads.
+        // A record follows one payload reservation, never a particular Core
+        // object's address, and is never revived after release.
         struct OwnerRecord {
             const void* const payload;
             std::atomic<XBufferCore*> owner;
-            std::byte* const canonical_origin;
-            const std::size_t canonical_extent;
-            std::atomic<bool> canonical_registered{false};
-            // Written before the record is published, then read only by its owner.
-            bool indexed = false;
-            OwnerRecord(const void* base, XBufferCore* value,
-                    std::byte* origin = nullptr, std::size_t extent = 0) noexcept
-                : payload(base), owner(value), canonical_origin(origin), canonical_extent(extent) {}
+            OwnerRecord(const void* base, XBufferCore* value) noexcept : payload(base), owner(value) {}
         };
-        // Both functions run under the existing registry mutex. No callbacks,
-        // allocations or throws may separate the flag and ledger update.
-        static void mark_canonical_registration(OwnerRecord& record) noexcept {
-            if (record.canonical_origin && !record.canonical_registered.exchange(true, std::memory_order_relaxed))
-                canonical_active_count_.fetch_add(1, std::memory_order_release);
-        }
-        static void retire_canonical_registration(OwnerRecord& record) noexcept {
-            if (record.canonical_registered.exchange(false, std::memory_order_relaxed))
-                canonical_active_count_.fetch_sub(1, std::memory_order_acq_rel);
-        }
         using OwnerRecordPtr = std::shared_ptr<OwnerRecord>;
-        struct NumericPayloadLess {
-            using is_transparent = void;
-            bool operator()(const void* a, const void* b) const noexcept {
-                return reinterpret_cast<std::uintptr_t>(a) < reinterpret_cast<std::uintptr_t>(b);
-            }
-            bool operator()(const void* a, std::uintptr_t b) const noexcept {
-                return reinterpret_cast<std::uintptr_t>(a) < b;
-            }
-            bool operator()(std::uintptr_t a, const void* b) const noexcept {
-                return a < reinterpret_cast<std::uintptr_t>(b);
-            }
-        };
-        using RegistryOwners = std::map<const void*, OwnerRecordPtr, NumericPayloadLess>;
-
-        struct RegistryState {
-            std::mutex mutex;
-            RegistryOwners owners;
-        };
-
-        // This trivial TLS flag outlives the nontrivial cache. Late thread/global
-        // destructors use the cold registry rather than a destroyed TLS object.
-        static bool& owner_cache_available() noexcept {
-#if XOFFSET_THREAD_CACHES
-            static thread_local bool available = true;
-#else
-            static bool available = false; // never set: see XOFFSET_THREAD_CACHES
-#endif
-            return available;
-        }
-
-        struct OwnerCache {
-            OwnerRecordPtr records[4];
-            std::size_t next = 0;
-            std::size_t last = 0;
-            ~OwnerCache() { owner_cache_available() = false; }
-        };
-
-        static OwnerCache& owner_cache() noexcept {
-            static thread_local OwnerCache cache;
-            return cache;
-        }
-
-        static RegistryState& registry_state() {
-            // Globals may first register in main and unregister after ordinary
-            // function statics have been destroyed. The index and mutex share
-            // process lifetime; its nodes are erased as owners are destroyed.
-            // Fork policy: no atfork handlers (VmStoragePool follows the same
-            // policy). A child forked while another thread was inside the
-            // library may only exec; forking while no other thread is inside
-            // the library is supported.
-            alignas(RegistryState) static std::byte storage[sizeof(RegistryState)];
-            static auto* state = ::new (static_cast<void*>(storage)) RegistryState;
-            return *state;
-        }
 
         template <typename T>
         static const void* type_identity() noexcept {
@@ -2948,27 +2771,11 @@ namespace XOffsetDatastructure {
             auto record = std::move(owner_record_);
             if (!record) return;
             record->owner.store(nullptr, std::memory_order_release);
-            // An ordinary record never entered the index: no mutex, no node.
-            if (!record->indexed) return;
-            RegistryOwners::node_type retired_node;
-            {
-                auto& state = registry_state();
-                std::lock_guard lock(state.mutex);
-                retire_canonical_registration(*record);
-                const auto found = state.owners.find(record->payload);
-                if (found != state.owners.end() && found->second == record)
-                    retired_node = state.owners.extract(found);
-            }
             // A cache may retain the inert record, never its released mapping.
-            // The node/control block destructor and operator delete are unlocked.
         }
 
-        // Ordinary owners (init_fresh / init_from_storage, and replace_storage,
-        // which moves only movable slots) only; direct-receive owners are
-        // indexed by VerifiedReceiveAccess. An ordinary record is not indexed:
-        // canonical_bytes_at returns null for it anyway, and reservations
-        // never overlap (each payload follows its own host header), so
-        // leaving it out cannot change any canonical query result.
+        // Owners from init_fresh / init_from_storage, and replace_storage,
+        // which moves only movable slots.
         struct PreparedOwner {
             OwnerRecordPtr record;
         };
@@ -3096,16 +2903,8 @@ namespace XOffsetDatastructure {
             return arena()->root_offset;
         }
 
-        char* payload_byte_address(size_type offset) noexcept {
-            if (auto* bytes = buffer_.canonical_byte_origin())
-                return reinterpret_cast<char*>(bytes + offset);
-            return buffer_.data() + offset;
-        }
-        const char* payload_byte_address(size_type offset) const noexcept {
-            if (auto* bytes = buffer_.canonical_byte_origin())
-                return reinterpret_cast<const char*>(bytes + offset);
-            return buffer_.data() + offset;
-        }
+        char* payload_byte_address(size_type offset) noexcept { return buffer_.data() + offset; }
+        const char* payload_byte_address(size_type offset) const noexcept { return buffer_.data() + offset; }
 
         template <typename T>
         T* object_at_offset(std::uint64_t offset) noexcept {
@@ -3663,7 +3462,6 @@ namespace XOffsetDatastructure {
 
     private:
         friend struct detail::VerifiedPathsAccess;
-        friend struct detail::VerifiedReceiveAccess;
         friend struct detail::DeltaAccess;
         friend struct fixed_detail::StableEraseOwnerWitness;
         // The owner is 64-byte aligned and its first line holds everything
@@ -3706,7 +3504,7 @@ namespace XOffsetDatastructure {
         const void* root_type_identity_ = nullptr;
         // Three small members in one 8-byte word, so that a move or a swap
         // carries all of them with one load and one store per side (what the
-        // policy byte alone took). It sits before ctl_, whose line a reset
+        // policy byte alone took). It starts the line of ctl_, which a reset
         // and a reload read anyway. No padding bytes: the word is copied as
         // one integer (take_packed, swap).
         struct Packed {
@@ -3720,7 +3518,7 @@ namespace XOffsetDatastructure {
             std::uint32_t reset_dirty_end = 0;
         };
         static_assert(sizeof(Packed) == sizeof(std::uint64_t) && std::has_unique_object_representations_v<Packed>);
-        Packed packed_;
+        alignas(64) Packed packed_;
         // The lineage's control block, and blocks retired inside a pin scope
         // (payload offset << 32 | bytes).
         detail::XCtl* ctl_ = nullptr;
@@ -4373,9 +4171,7 @@ namespace XOffsetDatastructure {
 
         template <typename T, typename Alloc>
         void default_construct(T* dst, const Alloc& alloc) {
-            if constexpr (detail::future_custom_lifetime_supported<T>()) {
-                detail::future_default_construct<T>(dst, alloc);
-            } else if constexpr (std::is_array_v<T>) {
+            if constexpr (std::is_array_v<T>) {
                 std::uint32_t built = 0;
                 XOFFSET_TRY {
                     for (; built < std::extent_v<T>; ++built) default_construct(&(*dst)[built], alloc);
@@ -4396,11 +4192,7 @@ namespace XOffsetDatastructure {
         template <typename T, typename Src, typename Alloc>
         void transfer_construct(T* dst, Src&& src, const Alloc& alloc) {
             using CleanSrc = std::remove_reference_t<Src>;
-            if constexpr (detail::future_custom_lifetime_supported<T>()) {
-                // Preserve this helper's existing nondestructive copy/fill
-                // contract even when its caller passed a temporary.
-                detail::future_transfer_construct<T>(dst, static_cast<const CleanSrc&>(src), alloc);
-            } else if constexpr (std::is_array_v<T>) {
+            if constexpr (std::is_array_v<T>) {
                 std::uint32_t built = 0;
                 XOFFSET_TRY {
                     for (; built < std::extent_v<T>; ++built) transfer_construct(&(*dst)[built], src[built], alloc);
@@ -5797,8 +5589,7 @@ namespace XOffsetDatastructure {
         Grown push_back_full(const T& value) {
             if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) {
                 return push_back_general<T>(value);
-            } else if constexpr (std::is_trivially_copyable_v<T> && !std::is_array_v<T> &&
-                                 !detail::future_custom_lifetime_supported<T>()) {
+            } else if constexpr (std::is_trivially_copyable_v<T> && !std::is_array_v<T>) {
                 XOFFSET_INDETERMINATE Staged staged;
                 std::memcpy(staged.bytes, static_cast<const void*>(std::addressof(value)), sizeof(T));
                 T* const slot = grow_back_slot();
@@ -5818,8 +5609,7 @@ namespace XOffsetDatastructure {
         // restate.
         template <typename V>
         XOFFSET_DETAIL_NOINLINE Grown push_back_general(V value) {
-            if constexpr (std::is_same_v<V, T> && std::is_trivially_copyable_v<T> && !std::is_array_v<T> &&
-                          !detail::future_custom_lifetime_supported<T>()) {
+            if constexpr (std::is_same_v<V, T> && std::is_trivially_copyable_v<T> && !std::is_array_v<T>) {
                 // The value arrived by value, so it cannot lie in the block
                 // this growth retires: grow, then store, with no staged copy
                 // and none of the insert checks. An empty vector takes its
@@ -6272,7 +6062,7 @@ namespace XOffsetDatastructure {
                     reinterpret_cast<const char*>(old) - reinterpret_cast<const char*>(fresh)));
                 for (size_type i = 0; i < size_; ++i) detail::empty_vacated_slot(old + i);
             } else if constexpr (std::is_trivially_copyable_v<T> && !std::is_array_v<T> &&
-                                 !detail::future_custom_lifetime_supported<T>() && sizeof(T) <= 16) {
+                                 sizeof(T) <= 16) {
                 // Small plain elements (a float, an id, a 12-byte point): one
                 // block copy, the bytes relocate_construct copies one element
                 // at a time. The loop below reloads size_ on every iteration
@@ -8211,8 +8001,6 @@ namespace XOffsetDatastructure {
             using U = std::remove_cv_t<T>;
             if constexpr (std::is_array_v<U>) {
                 return default_construct_reads_binding<std::remove_extent_t<U>>();
-            } else if constexpr (detail::future_custom_lifetime_supported<U>()) {
-                return true;
             } else if constexpr (is_owning_head<U>::value) {
                 return false;
             } else if constexpr (requires(const allocator_ref& value) { U(value); }) {
@@ -8266,7 +8054,6 @@ namespace XOffsetDatastructure {
         template <typename T>
         consteval bool can_relocate_without_allocation() {
             if constexpr (std::is_const_v<T> || !std::is_nothrow_destructible_v<T>) return false;
-            else if constexpr (detail::future_custom_lifetime_supported<T>()) return true;
             else if constexpr (std::is_array_v<T>) return can_relocate_without_allocation<std::remove_extent_t<T>>();
             else if constexpr (std::is_trivially_copyable_v<T> || is_owning_head<T>::value) return true;
             else if constexpr (std::is_class_v<T> && is_byte_copy_safe_v<T>) {
@@ -8334,9 +8121,7 @@ namespace XOffsetDatastructure {
         template <typename T>
         void relocate_construct(T* dst, T& src) noexcept {
             static_assert(can_relocate_without_allocation<T>());
-            if constexpr (detail::future_custom_lifetime_supported<T>()) {
-                detail::future_relocate_construct<T>(dst, src);
-            } else if constexpr (std::is_array_v<T>) {
+            if constexpr (std::is_array_v<T>) {
                 for (std::size_t i = 0; i < std::extent_v<T>; ++i) relocate_construct(&(*dst)[i], src[i]);
             } else if constexpr (std::is_trivially_copyable_v<T>) {
                 std::memcpy(dst, &src, sizeof(T));
@@ -9501,9 +9286,6 @@ namespace XOffsetDatastructure {
 
         template <typename T, typename Alloc>
         void reflect_init_all_impl(void* raw, Alloc alloc) {
-            if constexpr (future_custom_lifetime_supported<T>()) {
-                future_default_construct<T>(raw, alloc);
-            } else {
             std::size_t built = 0;
             XOFFSET_TRY {
                 for_each_reflected_subobject<T>(
@@ -9519,18 +9301,13 @@ namespace XOffsetDatastructure {
                 destroy_reflected_prefix<T>(raw, built);
                 XOFFSET_RETHROW;
             }
-            }
         }
 
         template <typename T, typename Alloc>
         void reflect_init_all(void* raw, Alloc alloc) {
-            if constexpr (future_custom_lifetime_supported<T>()) {
-                future_default_construct<T>(raw, alloc);
-            } else {
             std::memset(raw, 0, sizeof(T));  // zero ONCE at top level
             raw = static_cast<void*>(begin_fresh_ordinary_outer<T>(raw));
             reflect_init_all_impl<T>(raw, alloc);
-            }
         }
 
         // -- Reflection Transfer (move/copy with allocator injection) --
@@ -9563,9 +9340,6 @@ namespace XOffsetDatastructure {
 
         template <typename T, typename Src, typename Alloc>
         void reflect_transfer_init_all_impl(void* dst, Src&& src, Alloc alloc) {
-            if constexpr (future_custom_lifetime_supported<T>()) {
-                future_transfer_construct<T>(dst, std::forward<Src>(src), alloc);
-            } else {
             std::size_t built = 0;
             XOFFSET_TRY {
                 for_each_reflected_subobject<T>(
@@ -9581,18 +9355,13 @@ namespace XOffsetDatastructure {
                 destroy_reflected_prefix<T>(dst, built);
                 XOFFSET_RETHROW;
             }
-            }
         }
 
         template <typename T, typename Src, typename Alloc>
         void reflect_transfer_init_all(void* dst, Src&& src, Alloc alloc) {
-            if constexpr (future_custom_lifetime_supported<T>()) {
-                future_transfer_construct<T>(dst, std::forward<Src>(src), alloc);
-            } else {
             std::memset(dst, 0, sizeof(T));  // zero ONCE at top level
             dst = static_cast<void*>(begin_fresh_ordinary_outer<T>(dst));
             reflect_transfer_init_all_impl<T>(dst, std::forward<Src>(src), alloc);
-            }
         }
 
         // Internal wrapper: constructs T via reflection on raw storage.
@@ -9984,11 +9753,7 @@ namespace XOffsetDatastructure {
             template<class T> static void save_compact_into(XBufferCore&, std::string&, XCompactOptions);
             template<class T, class... M> static void save_composed_into(XBufferCore&, std::string&, XCompactOptions,
                                                                          const XAssign<M>&...);
-            static void adopt_storage(XBufferCore&, VirtualMemoryStorage&, XGrowPolicy) noexcept;
-            static void detach_host_owner(XBufferCore& core) noexcept { core.buffer_.set_host_owner(nullptr); }
             static void attach_owner(XBufferCore&);
-            static void rollback_storage(XBufferCore&, VirtualMemoryStorage&) noexcept;
-            template<class T> static void publish_received(XBufferCore&) noexcept;
         };
     }
 
@@ -11810,7 +11575,6 @@ XOFFSET_REGISTER_MIGRATION_MAP(XFixedFlatMap, Container)
 #undef XOFFSET_DETAIL_MOVE_COLD
 
 #include "xoffset_verified_paths.hpp"
-#include "xoffset_verified_receive.hpp"
 #include "xoffset_core_lifetime.hpp"
 #include "xoffset_delta.hpp"
 

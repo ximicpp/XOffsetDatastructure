@@ -663,24 +663,6 @@ void test_g1_zeroing() {
         check(s.reclaim_tail().complete(), "G1 reclaim failed");
         check(s.grow_to(max_bytes) && all_zero(s.data() + small_bytes, max_bytes - small_bytes), "G1 regrow after reclaim not zero");
     }
-    {   // Receive storage: the whole maximum is read/write before a transport
-        // writes, possibly past the logical length; growth must zero it.
-        auto r = VirtualMemoryStorage::for_receive(100, max_bytes);
-        check(r.accessible_bytes() == r.reserved_bytes(), "receive storage not fully accessible");
-        std::memset(r.data() + 100, 0xab, 8192);
-        check(r.grow_to(100 + 8192) && all_zero(r.data() + 100, 8192),
-              "receive growth exposed bytes written beyond the logical length");
-    }
-    {   // Pooled receive storage keeps its full-zeroing high-water mark.
-        VmStoragePool pool({2, 4 * max_bytes, 4 * max_bytes});
-        {
-            auto r = VirtualMemoryStorage::for_receive(100, max_bytes, pool);
-            std::memset(r.data(), 0x3c, max_bytes);
-        }
-        VirtualMemoryStorage b(0, max_bytes, pool);
-        check(pool.stats().hits == 1, "receive pool reuse not exercised");
-        check(b.grow_to(max_bytes) && all_zero(b.data(), max_bytes), "pooled receive storage exposed stale bytes");
-    }
 }
 
 } // namespace
