@@ -66,9 +66,7 @@ XOFFSET_REGISTER_SCHEMA_NAME(WireRoot, "test.WireRoot")
 XOFFSET_REGISTER_SCHEMA_NAME(WireOther, "test.WireOther")
 
 constexpr auto xstring_wire_sig = wire_abi_signature<XString>();
-constexpr auto fixed_string_wire_sig = wire_abi_signature<XFixedString>();
 constexpr auto xvector_wire_sig = wire_abi_signature<XVector<uint32_t>>();
-constexpr auto fixed_vector_wire_sig = wire_abi_signature<XFixedVector<uint32_t>>();
 constexpr auto xmap_wire_sig = wire_abi_signature<XMap<int32_t, XString>>();
 constexpr auto xset_wire_sig = wire_abi_signature<XSet<int32_t>>();
 
@@ -86,8 +84,6 @@ static_assert(!is_wire_admitted_v<HasPointer>);
 static_assert(!is_wire_admitted_v<DerivedRecord>);
 static_assert(!is_wire_admitted_v<ExtendedString>);
 static_assert(!is_wire_admitted_v<ExtendedMap>);
-static_assert(std::string_view(xstring_wire_sig) == std::string_view(fixed_string_wire_sig));
-static_assert(std::string_view(xvector_wire_sig) == std::string_view(fixed_vector_wire_sig));
 static_assert(std::string_view(xstring_wire_sig).find("[s:12,a:4]{data:rel32,size:u32,capacity:u32}") != std::string_view::npos);
 static_assert(std::string_view(xvector_wire_sig).find("xvector") != std::string_view::npos);
 static_assert(std::string_view(xmap_wire_sig).find("xflatmap") != std::string_view::npos);

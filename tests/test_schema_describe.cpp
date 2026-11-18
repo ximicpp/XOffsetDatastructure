@@ -84,7 +84,7 @@ static_assert(schema::base_count_v<sd::Player> == 1);
 static_assert(std::is_same_v<schema::base_t<sd::Player, 0>, sd::Entity>);
 static_assert(schema::member_count_v<sd::Player> == 2);
 static_assert(schema::base_count_v<xo::XVector<int>> == 1);
-static_assert(schema::member_count_v<xo::XFixedVector<int>> == 3);
+static_assert(schema::member_count_v<xo::XVectorCore<int>> == 3);
 static_assert(xo::wire_record_layout<sd::Item>::ordinary_members);
 static_assert(xo::StableEraseOrdinaryMembers<sd::Bag>::value);
 static_assert(!xo::wire_record_layout<sd::Player>::ordinary_members);
@@ -139,13 +139,10 @@ namespace {
                                             schema::only_implicit_special_members<T>()));
     }
 } // namespace
-static_assert(same_as_reflection<xo::XFixedString>());
 static_assert(same_as_reflection<xo::XString>());
-static_assert(same_as_reflection<xo::XFixedVector<sd::Item>>());
+static_assert(same_as_reflection<xo::XVectorCore<sd::Item>>());
 static_assert(same_as_reflection<xo::XVector<sd::Item>>());
-static_assert(same_as_reflection<xo::XFixedFlatSet<std::int32_t>>());
 static_assert(same_as_reflection<xo::XSet<std::int32_t>>());
-static_assert(same_as_reflection<xo::XFixedFlatMap<std::int32_t, xo::XString>>());
 static_assert(same_as_reflection<xo::XMap<std::int32_t, xo::XString>>());
 static_assert(same_as_reflection<xo::XKeyValue<std::int32_t, std::int64_t>>());
 static_assert(same_as_reflection<xo::XKeyValue<xo::XString, sd::Vec3>>());

@@ -132,10 +132,10 @@ namespace detail {
     template <typename T>
     bool bounds_value(const T& value, BoundsWalk& walk) noexcept;
 
-    inline bool bounds_string(const XFixedString& value, BoundsWalk& walk) noexcept {
+    inline bool bounds_string(const XString& value, BoundsWalk& walk) noexcept {
         if (value.is_inline()) [[likely]] {
             // Bytes past the length are not read; the length must stay in the head.
-            if (((value.capacity_ >> 24) & 0x7fu) > XFixedString::inline_max) [[unlikely]]
+            if (((value.capacity_ >> 24) & 0x7fu) > XString::inline_max) [[unlikely]]
                 return walk.fail("inline string length exceeds 10");
             return true;
         }
@@ -148,7 +148,7 @@ namespace detail {
     }
 
     template <typename E>
-    bool bounds_vector(const XFixedVector<E>& value, BoundsWalk& walk) noexcept {
+    bool bounds_vector(const XVectorCore<E>& value, BoundsWalk& walk) noexcept {
         if (value.size_ > value.capacity_) [[unlikely]] return walk.fail("vector size exceeds capacity");
         if (value.data_delta == 0) return value.size_ == 0 || walk.fail("empty vector with a size");
         const char* raw;
@@ -196,7 +196,7 @@ namespace detail {
                              is_fixed_flat_map_v<CleanT>) {
             // Sets and maps: their key order is not checked; a lookup in a
             // misordered one stays inside [0, size) and may miss.
-            return bounds_vector(static_cast<const XFixedVector<typename CleanT::value_type>&>(value), walk);
+            return bounds_vector(static_cast<const XVectorCore<typename CleanT::value_type>&>(value), walk);
         } else if constexpr (std::is_class_v<CleanT> && wire_value_needs_validation_v<CleanT>) {
             return bounds_record(value, walk, std::make_index_sequence<schema::base_count_v<CleanT>>{},
                                  std::make_index_sequence<schema::member_count_v<CleanT>>{});

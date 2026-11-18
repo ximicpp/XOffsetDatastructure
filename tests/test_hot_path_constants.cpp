@@ -23,7 +23,7 @@ XOFFSET_REGISTER_SCHEMA_NAME(HotRoot, "test.HotPathConstants")
 namespace {
 
 // I1 head bytes 0..11: characters, zero padding, then 0x80 | length.
-void check_inline(const XFixedString& s, std::string_view expected) {
+void check_inline(const XString& s, std::string_view expected) {
     assert(s.is_inline());
     assert(s.view() == expected);
     const auto* head = reinterpret_cast<const unsigned char*>(&s);
@@ -53,7 +53,7 @@ int main() {
     // a previous heap value.
     alignas(16) char source[32];
     for (std::size_t before = 0; before <= 12; ++before) {
-        for (std::size_t length = 0; length <= XFixedString::inline_max; ++length) {
+        for (std::size_t length = 0; length <= XString::inline_max; ++length) {
             for (std::size_t offset = 0; offset < 8; ++offset) {
                 s = std::string_view(pattern(before, unsigned(before)));
                 const std::string want = pattern(length, unsigned(length + offset));
@@ -62,7 +62,7 @@ int main() {
                 s = std::string_view(source + offset, length);
                 if (length == 0) {
                     assert(s.view().empty());
-                } else if (before > XFixedString::inline_max) {
+                } else if (before > XString::inline_max) {
                     // The heap block is kept and reused; contents still match.
                     assert(s.view() == want);
                 } else {
@@ -74,7 +74,7 @@ int main() {
     }
 
     // Self-aliasing views: assigning part of the current inline value.
-    for (std::size_t length = 1; length <= XFixedString::inline_max; ++length) {
+    for (std::size_t length = 1; length <= XString::inline_max; ++length) {
         for (std::size_t from = 0; from < length; ++from) {
             for (std::size_t count = 0; from + count <= length; ++count) {
                 root.strings.emplace_back();
