@@ -12,13 +12,6 @@
 #include <type_traits>
 #include <utility>
 
-#if defined(_MSC_VER)
-#define XOFFSET_DETAIL_SHIFT_INLINE __forceinline
-#elif defined(__clang__) || defined(__GNUC__)
-#define XOFFSET_DETAIL_SHIFT_INLINE inline __attribute__((always_inline))
-#else
-#define XOFFSET_DETAIL_SHIFT_INLINE inline
-#endif
 
 namespace XOffsetDatastructure {
 
@@ -131,7 +124,7 @@ template<class T> consteval bool inplace_lifetime_supported() {
                   std::is_reference_v<T> || std::is_pointer_v<T> ||
                   std::is_member_pointer_v<T> || std::is_union_v<T>)
         return false;
-    else if constexpr (!v1_wire_admitted<T>()) return false;
+    else if constexpr (!wire_admitted<T>()) return false;
     else if constexpr (std::is_array_v<T>)
         return std::extent_v<T> != 0 &&
             inplace_lifetime_supported<std::remove_extent_t<T>>();
@@ -381,13 +374,13 @@ inline std::int32_t shift_rel32(std::int32_t delta, ShiftRun& run) noexcept {
 }
 
 template<class T, std::size_t... I>
-XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_members(char* address, ShiftRun& run,
+XOFFSET_DETAIL_INLINE void shift_rebase_members(char* address, ShiftRun& run,
                                                     std::index_sequence<I...>) noexcept;
 
 // `shift` = old address - new address, so each delta grows by it. Forced
 // inline down to the heads: one moved element is a few loads and stores.
 template<class T>
-XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_inline_value(char* address, ShiftRun& run) noexcept {
+XOFFSET_DETAIL_INLINE void shift_rebase_inline_value(char* address, ShiftRun& run) noexcept {
     if constexpr (fixed_detail::is_owning_head<T>::value) {
         // Descriptor layout {data_delta, size_, capacity_} is checked by
         // owning_head_layout<T>() in shift_rebase_domain.
@@ -417,7 +410,7 @@ XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_inline_value(char* address, ShiftR
 }
 
 template<class T, std::size_t I>
-XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_member(char* address, ShiftRun& run) noexcept {
+XOFFSET_DETAIL_INLINE void shift_rebase_member(char* address, ShiftRun& run) noexcept {
     using member = schema::member_t<T, I>;
     using M = typename member::type;
     if constexpr (contains_owning_head<M>())
@@ -425,7 +418,7 @@ XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_member(char* address, ShiftRun& ru
 }
 
 template<class T, std::size_t... I>
-XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_members(char* address, ShiftRun& run,
+XOFFSET_DETAIL_INLINE void shift_rebase_members(char* address, ShiftRun& run,
                                                     std::index_sequence<I...>) noexcept {
     (shift_rebase_member<T, I>(address, run), ...);
 }
@@ -434,7 +427,7 @@ XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_members(char* address, ShiftRun& r
 // shifts by a constant.
 template<class T>
 #if XOFFSET_DETAIL_SHIFT_RUN_BOUNDS
-XOFFSET_DETAIL_SHIFT_INLINE
+XOFFSET_DETAIL_INLINE
 #endif
 void shift_rebase_moved(T* first, std::size_t count, std::int32_t shift) noexcept {
     static_assert(shift_relocate_supported<T>());
@@ -816,4 +809,3 @@ bool subtree_copy_assign(XFixedVector<T>& dst, const XFixedVector<T>& src) {
 
 } // namespace XOffsetDatastructure::detail
 
-#undef XOFFSET_DETAIL_SHIFT_INLINE

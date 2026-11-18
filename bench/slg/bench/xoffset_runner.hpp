@@ -81,7 +81,6 @@ template <class M> class XOffsetRunnerT final : public Runner {
             b.template reload_verified<T>(w);
         }
     }
-#ifdef XOFFSET_DELTA_SYNC_API
     // A delta receive: try_apply_delta_verified, or (Trusted) the receiver for link L
     // with its default check (admit for server_peer / from_server: trust tier P2).
     template <class T, XOffsetDatastructure::XLink L, class W>
@@ -95,7 +94,6 @@ template <class M> class XOffsetRunnerT final : public Runner {
             return b.template try_apply_delta_verified<T>(w, c);
         }
     }
-#endif
     static constexpr auto kPeer = XOffsetDatastructure::XLink::server_peer;
     static constexpr auto kClient = XOffsetDatastructure::XLink::from_server;
 
@@ -175,19 +173,11 @@ public:
                 XBuffer b = XBuffer::create<BattleMsg>(kBattleInitial, build_cap());
                 build_in<BattleMsg>(b, [&](BattleMsg& msg) {
                     msg.battle_id = pr.battle_id; msg.seed = pr.seed; msg.winner = 0;
-#if defined(XOFFSET_SAVE_COMPOSED_API)
                     // Adapter v3: the request is composed from the two armies straight
                     // into the wire (tight save_compact layout); the draft holds only the root.
                     b.save_compact_into<BattleMsg>(req, XCompactOptions{.slack_div = 0},
                                                    xassign(msg.attacker, att), xassign(msg.defender, def));
-#else
-                    msg.attacker = att;  // T4 adapter (c): public copy assignment
-                    msg.defender = def;
-#endif
                 });
-#if !defined(XOFFSET_SAVE_COMPOSED_API)
-                req = b.save_verified<BattleMsg>();
-#endif
             });
             timed(st, "A.req_decode", [&] { m.emplace(XBuffer::load_verified<BattleMsg>(req, cap())); });
             untimed(st, "A.simulate", [&] { simulate_battle(m->root<BattleMsg>()); });
@@ -283,7 +273,6 @@ public:
             auto& att = player(pr.ap).armies[std::size_t(pr.aa)];
             auto& def = player(pr.dp).armies[std::size_t(pr.da)];
             timed(st, "A.req_encode", [&] {
-#if defined(XOFFSET_SAVE_COMPOSED_API)
                 // Adapter v3 (see above): a_req_'s armies stay empty, nothing is reset.
                 auto compose = [&](BattleMsg& msg) {
                     msg.battle_id = pr.battle_id; msg.seed = pr.seed; msg.winner = 0;
@@ -293,14 +282,6 @@ public:
                 // Scalar stores only, nothing allocates: the payload cannot
                 // move, so the plain root reference needs no pin scope.
                 compose(a_req_->root<BattleMsg>());
-#else
-                build_in<BattleMsg>(*a_req_, [&](BattleMsg& msg) {
-                    msg.battle_id = pr.battle_id; msg.seed = pr.seed; msg.winner = 0;
-                    msg.attacker = att;  // T4 adapter (c): public copy assignment
-                    msg.defender = def;
-                });
-                a_req_->save_verified_into<BattleMsg>(req_);
-#endif
             });
             recv<BattleMsg>(st, "A.req_decode", req_, a_m_);
             untimed(st, "A.simulate", [&] { simulate_battle(a_m_->root<BattleMsg>()); });
@@ -439,13 +420,11 @@ public:
             pm.emplace(XBuffer::create<xm::PlayerPatch>(kViewInitial, build_cap()));
             pr.emplace(XBuffer::create<xm::PlayerPatch>(kViewInitial, cap()));
             for (auto& h : hw) h.reset();
-#ifdef XOFFSET_DELTA_SYNC_API
             for (auto& h : nhw) h.reset();
             ncw.assign(kWarmDevices, {});
             nb.assign(srv.size(), {});
             nc.assign(srv.size(), {});
             nh.clear(); nh.resize(srv.size());
-#endif
         }
         int online() const { return int(srv.size()); }
         PlayerState& server(int p) { return srv[std::size_t(p)].template root<PlayerState>(); }
@@ -529,7 +508,6 @@ public:
             const auto wire = ul_writer.wire();
             return {reinterpret_cast<const char*>(wire.data()), wire.size()};
         }
-#ifdef XOFFSET_DELTA_SYNC_API
         std::vector<XOffsetDatastructure::XDeltaBaseline> nb;
         std::vector<XOffsetDatastructure::XDeltaCursor> nc;
         std::vector<std::optional<XBuffer>> nh;
@@ -579,7 +557,6 @@ public:
             if (!r) throw std::runtime_error("native self delta (warm) rejected: " + std::string(r.error().message));
         }
         PlayerState& n_held_w(int d) { return nhw[std::size_t(d)]->template root<PlayerState>(); }
-#endif
     };
     // SD (login.hpp): dirty modules to storage. Native SN: a delta against what
     // storage holds of that player (one baseline per player, kept across cycles).
@@ -602,7 +579,6 @@ public:
             return send_x<xm::PlayerPatch>(*pm, w);
         }
         void modules_recv_x() { recv_x<xm::PlayerPatch, kPeer>(*pr); }
-#ifdef XOFFSET_DELTA_SYNC_API
         std::unordered_map<int, XOffsetDatastructure::XDeltaBaseline> nb;
         std::unordered_map<int, XOffsetDatastructure::XDeltaCursor> nc;
         std::unordered_map<int, XBuffer> nh;
@@ -626,7 +602,6 @@ public:
         void n_store_prime_all() {
             for (int p = 0; p < int(r->players_.size()); ++p) { n_store_diff(p); n_store_recv(p); }
         }
-#endif
     };
 
     // Held views (client replicas, server view buffers): a fixed 128 KiB slot
@@ -663,11 +638,7 @@ public:
             held_views.clear();
             held_views.resize(std::size_t(clients + kWarmDevices));   // [clients + d]: warm single device d (EBW, U*W)
             held_roots.assign(std::size_t(clients + kWarmDevices), nullptr);
-#ifdef XOFFSET_DELTA_SYNC_API
             n_setup(clients, units, marches);
-#else
-            (void)units; (void)marches;
-#endif
         }
         template <class Fill> std::size_t snap_encode(int b, Fill&& fill) {
             build_in<xm::ViewSnapshot>(*es, fill);
@@ -721,7 +692,6 @@ public:
         }
 
 
-#ifdef XOFFSET_DELTA_SYNC_API
         // Native delta (N*): the server keeps each static client's view in an
         // XBuffer with stable slots (a record that leaves zeroes its slot, a new
         // one takes the lowest free slot or is appended; tiles stay in place),
@@ -956,7 +926,6 @@ public:
             const XOffsetDatastructure::XStatus r = apply_delta_wire<xm::ViewSnapshot, kClient>(*nheld[std::size_t(c)], d, ncur[std::size_t(c)]);
             if (!r) throw std::runtime_error("native delta rejected: " + std::string(r.error().message));
         }
-#endif
 
         // ---- D3: shared deltas (xoffset_shared_delta.hpp, XS 2.0), keys D* ----
         // Server: one image of every entity as its holders have it (units in
@@ -1802,7 +1771,6 @@ public:
         }
         for (int i = 0; i < ViewCases::count; ++i) {
             view_memory(bs_[i], ViewCases::keys(i), st);
-#ifdef XOFFSET_DELTA_SYNC_API
             if (const std::size_t n = ops_[i].nb.size(); n && ops_[i].nb[0].buf) {
                 std::size_t v = 0, bl = 0, slots = 0;
                 for (auto& c : ops_[i].nb) {
@@ -1813,7 +1781,6 @@ public:
                 const std::string N = "MEM." + ViewCases::keys(i).nname;
                 st.bytes[N + ".view"] = v / n; st.bytes[N + ".baseline"] = bl / n; st.bytes[N + ".slots"] = slots / n;
             }
-#endif
             // D3 (keys D*): per connection, and what every connection shares
             // (whole server, and divided by the connections for the per-client table).
             if (const std::size_t n = ops_[i].dconn.size()) {
@@ -1823,13 +1790,11 @@ public:
                 st.bytes[D + ".shared_per_conn"] = ops_[i].d_shared_bytes() / n;
             }
         }
-#ifdef XOFFSET_DELTA_SYNC_API
         if (const std::size_t n = lops_.nb.size()) {
             std::size_t bl = 0;
             for (const auto& b : lops_.nb) bl += b.recorded_bytes();
             st.bytes["MEM.LN.baseline"] = bl / n;
         }
-#endif
     }
 
     uint64_t world_digest() override {
@@ -1868,7 +1833,6 @@ private:
                      .with_growth(XOffsetDatastructure::XGrowPolicy::Automatic);
         return use_pool() || reuse_mode() ? c.with_pool(pool()) : c;
     }
-#if defined(XOFFSET_PROXY_BATCH_API)
     // Growth policy (3.6): a buffer a sender builds its messages in is
     // Relocating (1 MiB reserved, moved only when a message outgrows it) and
     // is filled inside a pin scope: plain references at plain speed, and no
@@ -1894,13 +1858,6 @@ private:
         if (!b.template edit<T>([&](T& m) { fill(m); })) [[unlikely]]
             throw std::runtime_error(std::string("message edit failed: ") + XOffsetDatastructure::to_string(b.error()));
     }
-#else
-    static XOffsetDatastructure::XBuffer::MaximumCapacity build_cap() { return cap(); }
-    template <class T, class Fill>
-    [[gnu::always_inline]] static inline void build_in(XOffsetDatastructure::XBuffer& b, Fill&& fill) { fill(b.template reset<T>()); }
-    template <class T, class Fill>
-    [[gnu::always_inline]] static inline void edit_in(XOffsetDatastructure::XBuffer& b, Fill&& fill) { fill(b.template root<T>()); }
-#endif
     // Diagnostic only (small-message probe): SLG_XOFFSET_POOL=1 reuses idle VM
     // owners through the public XBufferPool. Every load is still load_verified.
     static bool use_pool() { static const bool on = std::getenv("SLG_XOFFSET_POOL") != nullptr; return on; }

@@ -239,14 +239,14 @@ namespace XOffsetDatastructure {
         static constexpr ::std::size_t offset = XOFFSET_SCHEMA_DETAIL_OFFSETOF(C, m); \
         static constexpr ::std::string_view name = XOFFSET_SCHEMA_DETAIL_STR(m); \
         template <class Obj>                                                   \
-        XOFFSET_SCHEMA_INLINE static constexpr decltype(auto) get(Obj&& obj) noexcept { \
+        XOFFSET_DETAIL_INLINE static constexpr decltype(auto) get(Obj&& obj) noexcept { \
             return (static_cast<Obj&&>(obj).m);                                \
         }                                                                      \
     };
 
 // The named accessor of member m: a proxy of it (see XRecordAccess).
 #define XOFFSET_SCHEMA_DETAIL_ACCESSOR(C, m)                                  \
-    XOFFSET_SCHEMA_INLINE auto m() const noexcept {                            \
+    XOFFSET_DETAIL_INLINE auto m() const noexcept {                            \
         return static_cast<const XOffsetSelf_&>(*this).template field<&C::m>(); \
     }
 

@@ -44,7 +44,7 @@ namespace XOffsetDatastructure::schema {
             std::meta::has_identifier(info) ? std::meta::identifier_of(info) : std::string_view{};
 
         template <class Obj>
-        XOFFSET_SCHEMA_INLINE static constexpr decltype(auto) get(Obj&& obj) noexcept {
+        XOFFSET_DETAIL_INLINE static constexpr decltype(auto) get(Obj&& obj) noexcept {
             return (static_cast<Obj&&>(obj).[:info:]);
         }
     };

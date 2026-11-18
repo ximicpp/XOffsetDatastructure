@@ -73,19 +73,6 @@
 #include <utility>
 #include <vector>
 
-#if defined(_MSC_VER) && !defined(__clang__)
-#define XOFFSET_SYNC_INLINE __forceinline
-#define XOFFSET_SYNC_LAMBDA_INLINE [[msvc::forceinline]]
-#define XOFFSET_SYNC_COLD __declspec(noinline)
-#elif defined(__GNUC__) || defined(__clang__)
-#define XOFFSET_SYNC_INLINE inline __attribute__((always_inline))
-#define XOFFSET_SYNC_LAMBDA_INLINE __attribute__((always_inline))
-#define XOFFSET_SYNC_COLD __attribute__((noinline, cold))
-#else
-#define XOFFSET_SYNC_INLINE inline
-#define XOFFSET_SYNC_LAMBDA_INLINE
-#define XOFFSET_SYNC_COLD
-#endif
 
 namespace XOffsetDatastructure::xsync {
 
@@ -105,16 +92,16 @@ namespace XOffsetDatastructure::xsync {
     enum XSyncKind : std::uint8_t { enter = 0, change = 1, leave = 2 };
 
     namespace sd_detail {
-        template <class M> XOFFSET_SYNC_INLINE M load(const char* p) noexcept {
+        template <class M> XOFFSET_DETAIL_INLINE M load(const char* p) noexcept {
             M v;
             std::memcpy(&v, p, sizeof v);
             return v;
         }
-        template <class M> XOFFSET_SYNC_INLINE void store(char* p, M v) noexcept { std::memcpy(p, &v, sizeof v); }
+        template <class M> XOFFSET_DETAIL_INLINE void store(char* p, M v) noexcept { std::memcpy(p, &v, sizeof v); }
 
         // n bytes from s to d. Up to 32 bytes it moves 32: d keeps kSyncSlack
         // writable and s kSyncSlack readable past n.
-        XOFFSET_SYNC_INLINE void copy_body(char* d, const char* s, std::size_t n) noexcept {
+        XOFFSET_DETAIL_INLINE void copy_body(char* d, const char* s, std::size_t n) noexcept {
             if (n <= 32) {
                 std::memcpy(d, s, 16);
                 std::memcpy(d + 16, s + 16, 16);
@@ -334,7 +321,7 @@ namespace XOffsetDatastructure::xsync {
 
         // Whether the bool bytes at the given offsets of p are 0 or 1.
         template <std::size_t N>
-        XOFFSET_SYNC_INLINE bool bools_ok(const char* p, const std::array<std::uint32_t, N>& at) noexcept {
+        XOFFSET_DETAIL_INLINE bool bools_ok(const char* p, const std::array<std::uint32_t, N>& at) noexcept {
             unsigned bad = 0;
             for (std::size_t i = 0; i < N; ++i) bad |= static_cast<unsigned char>(p[at[i]]);
             return bad <= 1;
@@ -348,23 +335,23 @@ namespace XOffsetDatastructure::xsync {
         }
 
         // f.template operator()<C, Off>(index) for every container, in order.
-        template <class... S, class F> XOFFSET_SYNC_INLINE void each(List<S...>, F&& f) {
+        template <class... S, class F> XOFFSET_DETAIL_INLINE void each(List<S...>, F&& f) {
             std::uint32_t k = 0;
             (f.template operator()<typename S::type, S::offset>(k++), ...);
         }
 
         // ---- containers in a body: u32 count, then the bytes -----------------------
 
-        template <class C> XOFFSET_SYNC_INLINE std::size_t container_bytes(const C& c) noexcept {
+        template <class C> XOFFSET_DETAIL_INLINE std::size_t container_bytes(const C& c) noexcept {
             if constexpr (is_fixed_string_v<C>) return c.view().size();
             else return c.size() * sizeof(typename C::value_type);
         }
-        template <class C> XOFFSET_SYNC_INLINE bool container_empty(const C& c) noexcept {
+        template <class C> XOFFSET_DETAIL_INLINE bool container_empty(const C& c) noexcept {
             if constexpr (is_fixed_string_v<C>) return c.view().empty();
             else return c.size() == 0;
         }
         // Writes c at d (4 + container_bytes(c) bytes); returns the end.
-        template <class C> XOFFSET_SYNC_INLINE char* put_container(char* d, const C& c) noexcept {
+        template <class C> XOFFSET_DETAIL_INLINE char* put_container(char* d, const C& c) noexcept {
             if constexpr (is_fixed_string_v<C>) {
                 const std::string_view v = c.view();
                 store<std::uint32_t>(d, std::uint32_t(v.size()));
@@ -378,7 +365,7 @@ namespace XOffsetDatastructure::xsync {
             }
         }
         // Sets c from the bytes at p (checked or the sender's); returns their end.
-        template <class C> XOFFSET_SYNC_INLINE const char* apply_container(C& c, const char* p) {
+        template <class C> XOFFSET_DETAIL_INLINE const char* apply_container(C& c, const char* p) {
             const std::uint32_t n = load<std::uint32_t>(p);
             p += 4;
             if constexpr (is_fixed_string_v<C>) {
@@ -392,7 +379,7 @@ namespace XOffsetDatastructure::xsync {
         }
         // Where the container at p ends, or nullptr when it does not fit in
         // [p, end) or an element's bool is not 0 or 1.
-        template <class C> XOFFSET_SYNC_INLINE const char* check_container(const char* p, const char* end) noexcept {
+        template <class C> XOFFSET_DETAIL_INLINE const char* check_container(const char* p, const char* end) noexcept {
             if (end - p < 4) return nullptr;
             const std::uint32_t n = load<std::uint32_t>(p);
             p += 4;
@@ -409,7 +396,7 @@ namespace XOffsetDatastructure::xsync {
                 return p + std::size_t(n) * sizeof(E);
             }
         }
-        template <class C> XOFFSET_SYNC_INLINE void clear_container(C& c) {
+        template <class C> XOFFSET_DETAIL_INLINE void clear_container(C& c) {
             if (!container_empty(c)) c.clear();
         }
         template <class C> bool same_container(const C& a, const C& b) noexcept {
@@ -440,29 +427,29 @@ namespace XOffsetDatastructure::xsync {
             static constexpr std::size_t fixed = I::plain_bytes + (C ? sizeof(CMask) : 0);
 
             // Bytes the body of r takes at most.
-            XOFFSET_SYNC_INLINE static std::size_t room(const T& r) noexcept {
+            XOFFSET_DETAIL_INLINE static std::size_t room(const T& r) noexcept {
                 std::size_t n = fixed;
                 if constexpr (C > 0)
-                    each(typename I::containers{}, [&]<class Ct, std::size_t Off>(std::uint32_t) XOFFSET_SYNC_LAMBDA_INLINE {
+                    each(typename I::containers{}, [&]<class Ct, std::size_t Off>(std::uint32_t) XOFFSET_DETAIL_LAMBDA_INLINE {
                         n += 4 + container_bytes(at<Ct, Off>(r));
                     });
                 return n;
             }
             // Writes the body of r at d (room(r) bytes); returns its end.
-            XOFFSET_SYNC_INLINE static char* put(char* d, const T& r) noexcept {
+            XOFFSET_DETAIL_INLINE static char* put(char* d, const T& r) noexcept {
                 const auto* s = reinterpret_cast<const char*>(&r);
                 if constexpr (flat) {
                     std::memcpy(d, s, sizeof(T));
                     return d + sizeof(T);
                 } else {
-                    [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_SYNC_LAMBDA_INLINE {
+                    [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_DETAIL_LAMBDA_INLINE {
                         ((std::memcpy(d, s + I::runs[K].at, I::runs[K].len), d += I::runs[K].len), ...);
                     }(std::make_index_sequence<I::run_count>{});
                     if constexpr (C > 0) {
                         char* const cm = d;
                         d += sizeof(CMask);
                         CMask m = 0;
-                        each(typename I::containers{}, [&]<class Ct, std::size_t Off>(std::uint32_t k) XOFFSET_SYNC_LAMBDA_INLINE {
+                        each(typename I::containers{}, [&]<class Ct, std::size_t Off>(std::uint32_t k) XOFFSET_DETAIL_LAMBDA_INLINE {
                             const Ct& c = at<Ct, Off>(r);
                             if (container_empty(c)) return;
                             d = put_container(d, c);
@@ -474,19 +461,19 @@ namespace XOffsetDatastructure::xsync {
                 }
             }
             // Sets r from the body at p; returns its end.
-            XOFFSET_SYNC_INLINE static const char* apply(const char* p, T& r) {
+            XOFFSET_DETAIL_INLINE static const char* apply(const char* p, T& r) {
                 auto* d = reinterpret_cast<char*>(&r);
                 if constexpr (flat) {
                     std::memcpy(d, p, sizeof(T));
                     return p + sizeof(T);
                 } else {
-                    [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_SYNC_LAMBDA_INLINE {
+                    [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_DETAIL_LAMBDA_INLINE {
                         ((std::memcpy(d + I::runs[K].at, p, I::runs[K].len), p += I::runs[K].len), ...);
                     }(std::make_index_sequence<I::run_count>{});
                     if constexpr (C > 0) {
                         const CMask m = load<CMask>(p);
                         p += sizeof(CMask);
-                        each(typename I::containers{}, [&]<class Ct, std::size_t Off>(std::uint32_t k) XOFFSET_SYNC_LAMBDA_INLINE {
+                        each(typename I::containers{}, [&]<class Ct, std::size_t Off>(std::uint32_t k) XOFFSET_DETAIL_LAMBDA_INLINE {
                             Ct& c = at<Ct, Off>(r);
                             if (m >> k & 1u) p = apply_container(c, p);
                             else clear_container(c);
@@ -506,7 +493,7 @@ namespace XOffsetDatastructure::xsync {
                     const std::uint64_t m = load<CMask>(p);
                     p += sizeof(CMask);
                     if (m & ~low_bits<C>) return nullptr;
-                    each(typename I::containers{}, [&]<class Ct, std::size_t Off>(std::uint32_t k) XOFFSET_SYNC_LAMBDA_INLINE {
+                    each(typename I::containers{}, [&]<class Ct, std::size_t Off>(std::uint32_t k) XOFFSET_DETAIL_LAMBDA_INLINE {
                         if (p && (m >> k & 1u)) p = check_container<Ct>(p, end);
                     });
                 }
@@ -574,8 +561,8 @@ namespace XOffsetDatastructure::xsync {
             static constexpr std::uint64_t container_mask = all & ~plain_mask;
 
             // f.template operator()<K>() for member k (k < N).
-            template <class F> XOFFSET_SYNC_INLINE static void member(unsigned k, F&& f) {
-                [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_SYNC_LAMBDA_INLINE {
+            template <class F> XOFFSET_DETAIL_INLINE static void member(unsigned k, F&& f) {
+                [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_DETAIL_LAMBDA_INLINE {
                     (void)((k == K ? (f.template operator()<K>(), true) : false) || ...);
                 }(std::make_index_sequence<N>{});
             }
@@ -597,12 +584,12 @@ namespace XOffsetDatastructure::xsync {
         // ---- whole bodies (enter, and the root) ----
 
         /// Bytes the whole body of r takes at most.
-        XOFFSET_SYNC_INLINE static std::size_t whole_room(const T& r) noexcept { return whole_body::room(r); }
+        XOFFSET_DETAIL_INLINE static std::size_t whole_room(const T& r) noexcept { return whole_body::room(r); }
         /// Writes the whole body of r at d (whole_room(r) writable bytes); returns its end.
-        XOFFSET_SYNC_INLINE static char* put_whole(char* d, const T& r) noexcept { return whole_body::put(d, r); }
+        XOFFSET_DETAIL_INLINE static char* put_whole(char* d, const T& r) noexcept { return whole_body::put(d, r); }
         /// Sets every plain byte and container of r from the whole body at p
         /// (checked, or the sender's); returns the body's end.
-        XOFFSET_SYNC_INLINE static const char* apply_whole(const char* p, T& r) { return whole_body::apply(p, r); }
+        XOFFSET_DETAIL_INLINE static const char* apply_whole(const char* p, T& r) { return whole_body::apply(p, r); }
         /// Where the whole body at p ends, or nullptr when it does not check.
         static const char* check_whole(const char* p, const char* end) noexcept { return whole_body::check(p, end); }
 
@@ -611,10 +598,10 @@ namespace XOffsetDatastructure::xsync {
         using members = sd_detail::Members<T>;
 
         /// Bytes the change body of the members in mask of r takes at most.
-        XOFFSET_SYNC_INLINE static std::size_t change_room(const T& r, std::uint64_t mask) noexcept {
+        XOFFSET_DETAIL_INLINE static std::size_t change_room(const T& r, std::uint64_t mask) noexcept {
             using M = members;
             std::size_t n = sizeof(typename M::Mask);
-            [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_SYNC_LAMBDA_INLINE {
+            [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_DETAIL_LAMBDA_INLINE {
                 ((mask >> K & 1u ? (void)(n += member_room<K>(r)) : (void)0), ...);
             }(std::make_index_sequence<M::N>{});
             return n;
@@ -622,14 +609,14 @@ namespace XOffsetDatastructure::xsync {
         /// Writes the change body of the members in mask (bits past the
         /// members ignored) of r at d (change_room(r, mask) writable bytes);
         /// returns its end.
-        XOFFSET_SYNC_INLINE static char* put_change(char* d, const T& r, std::uint64_t mask) noexcept {
+        XOFFSET_DETAIL_INLINE static char* put_change(char* d, const T& r, std::uint64_t mask) noexcept {
             using M = members;
             mask &= M::all;
             sd_detail::store<typename M::Mask>(d, typename M::Mask(mask));
             d += sizeof(typename M::Mask);
             const auto* s = reinterpret_cast<const char*>(&r);
             // One test per plain member, each a copy of a compile-time size.
-            [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_SYNC_LAMBDA_INLINE {
+            [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_DETAIL_LAMBDA_INLINE {
                 ((M::template kind<K> == sd_detail::kMemberPlain && (mask >> K & 1u)
                       ? (void)(std::memcpy(d, s + M::template offset<K>, M::template size<K>), d += M::template size<K>)
                       : (void)0),
@@ -637,7 +624,7 @@ namespace XOffsetDatastructure::xsync {
             }(std::make_index_sequence<M::N>{});
             if constexpr (M::container_mask != 0) {
                 for (std::uint64_t m = mask & M::container_mask; m; m &= m - 1)
-                    M::member(unsigned(std::countr_zero(m)), [&]<std::size_t K>() XOFFSET_SYNC_LAMBDA_INLINE {
+                    M::member(unsigned(std::countr_zero(m)), [&]<std::size_t K>() XOFFSET_DETAIL_LAMBDA_INLINE {
                         d = put_member<K>(d, r);
                     });
             }
@@ -659,14 +646,14 @@ namespace XOffsetDatastructure::xsync {
         /// that differ from prev, written at d (diff_room bytes), and prev
         /// takes them. Returns the end, or nullptr when nothing differs (then
         /// prev is unchanged and d holds nothing).
-        XOFFSET_SYNC_INLINE static char* put_diff(char* d, const T& now, T& prev) noexcept requires plain {
+        XOFFSET_DETAIL_INLINE static char* put_diff(char* d, const T& now, T& prev) noexcept requires plain {
             using M = members;
             char* const md = d;
             d += sizeof(typename M::Mask);
             typename M::Mask mask = 0;
             const auto* s = reinterpret_cast<const char*>(&now);
             auto* o = reinterpret_cast<char*>(&prev);
-            [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_SYNC_LAMBDA_INLINE {
+            [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_DETAIL_LAMBDA_INLINE {
                 ((std::memcmp(s + M::template offset<K>, o + M::template offset<K>, M::template size<K>) != 0
                       ? (void)(std::memcpy(d, s + M::template offset<K>, M::template size<K>),
                                std::memcpy(o + M::template offset<K>, s + M::template offset<K>, M::template size<K>),
@@ -680,12 +667,12 @@ namespace XOffsetDatastructure::xsync {
         }
         /// Sets the members the change body at p names (checked, or the
         /// sender's); returns the body's end.
-        XOFFSET_SYNC_INLINE static const char* apply_change(const char* p, T& r) {
+        XOFFSET_DETAIL_INLINE static const char* apply_change(const char* p, T& r) {
             using M = members;
             const std::uint64_t mask = sd_detail::load<typename M::Mask>(p);
             p += sizeof(typename M::Mask);
             auto* d = reinterpret_cast<char*>(&r);
-            [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_SYNC_LAMBDA_INLINE {
+            [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_DETAIL_LAMBDA_INLINE {
                 ((M::template kind<K> == sd_detail::kMemberPlain && (mask >> K & 1u)
                       ? (void)(std::memcpy(d + M::template offset<K>, p, M::template size<K>), p += M::template size<K>)
                       : (void)0),
@@ -693,7 +680,7 @@ namespace XOffsetDatastructure::xsync {
             }(std::make_index_sequence<M::N>{});
             if constexpr (M::container_mask != 0) {
                 for (std::uint64_t m = mask & M::container_mask; m; m &= m - 1)
-                    M::member(unsigned(std::countr_zero(m)), [&]<std::size_t K>() XOFFSET_SYNC_LAMBDA_INLINE {
+                    M::member(unsigned(std::countr_zero(m)), [&]<std::size_t K>() XOFFSET_DETAIL_LAMBDA_INLINE {
                         p = apply_member<K>(p, r);
                     });
             }
@@ -729,19 +716,19 @@ namespace XOffsetDatastructure::xsync {
         template <std::size_t K> using member_t = typename members::template type<K>;
         template <std::size_t K> static constexpr std::size_t member_off = members::template offset<K>;
 
-        template <std::size_t K> XOFFSET_SYNC_INLINE static std::size_t member_room(const T& r) noexcept {
+        template <std::size_t K> XOFFSET_DETAIL_INLINE static std::size_t member_room(const T& r) noexcept {
             constexpr auto kind = members::template kind<K>;
             if constexpr (kind == sd_detail::kMemberPlain) return sizeof(member_t<K>);
             else if constexpr (kind == sd_detail::kMemberWhole) return sd_detail::Whole<member_t<K>>::room(sd_detail::at<member_t<K>, member_off<K>>(r));
             else return 4 + sd_detail::container_bytes(sd_detail::at<member_t<K>, member_off<K>>(r));
         }
-        template <std::size_t K> XOFFSET_SYNC_INLINE static char* put_member(char* d, const T& r) noexcept {
+        template <std::size_t K> XOFFSET_DETAIL_INLINE static char* put_member(char* d, const T& r) noexcept {
             const auto& m = sd_detail::at<member_t<K>, member_off<K>>(r);
             if constexpr (members::template kind<K> == sd_detail::kMemberWhole) return sd_detail::Whole<member_t<K>>::put(d, m);
             else if constexpr (members::template kind<K> != sd_detail::kMemberPlain) return sd_detail::put_container(d, m);
             else return d;
         }
-        template <std::size_t K> XOFFSET_SYNC_INLINE static const char* apply_member(const char* p, T& r) {
+        template <std::size_t K> XOFFSET_DETAIL_INLINE static const char* apply_member(const char* p, T& r) {
             auto& m = sd_detail::at<member_t<K>, member_off<K>>(r);
             if constexpr (members::template kind<K> == sd_detail::kMemberWhole) return sd_detail::Whole<member_t<K>>::apply(p, m);
             else if constexpr (members::template kind<K> != sd_detail::kMemberPlain) return sd_detail::apply_container(m, p);
@@ -826,7 +813,7 @@ namespace XOffsetDatastructure::xsync {
         XSyncWriter& operator=(const XSyncWriter&) = delete;
 
         /// A section of leaves of n ids (one capacity check; nothing when n is 0).
-        template <class Id> XOFFSET_SYNC_INLINE void leaves(unsigned table, const Id* ids, std::size_t n) {
+        template <class Id> XOFFSET_DETAIL_INLINE void leaves(unsigned table, const Id* ids, std::size_t n) {
             if (n > kSyncSectionMax) [[unlikely]] too_many();
             char* d = need(4 + 4 * n);
             sd_detail::store<std::uint32_t>(d, std::uint32_t(n) << 8 | code(table, XSyncKind::leave));
@@ -834,7 +821,7 @@ namespace XOffsetDatastructure::xsync {
             q_ = d + (n ? 4 + 4 * n : 0);
         }
         /// Starts a section of ops of one table (1 to 63) and kind.
-        XOFFSET_SYNC_INLINE void begin(unsigned table, XSyncKind kind) {
+        XOFFSET_DETAIL_INLINE void begin(unsigned table, XSyncKind kind) {
             char* d = need(4);
             sec_ = d;
             cur_ = code(table, kind);
@@ -842,13 +829,13 @@ namespace XOffsetDatastructure::xsync {
             q_ = d + 4;
         }
         /// Ends the section (at most kSyncSectionMax ops); an empty one is dropped.
-        XOFFSET_SYNC_INLINE void end() {
+        XOFFSET_DETAIL_INLINE void end() {
             if (n_ > kSyncSectionMax) [[unlikely]] too_many();
             sd_detail::store<std::uint32_t>(sec_, n_ << 8 | cur_);
             q_ = n_ ? q_ : sec_;
         }
         /// A leave op of id (in a leave section).
-        XOFFSET_SYNC_INLINE void leave(std::uint32_t id) {
+        XOFFSET_DETAIL_INLINE void leave(std::uint32_t id) {
             char* d = need(4);
             sd_detail::store<std::uint32_t>(d, id);
             q_ = d + 4;
@@ -856,7 +843,7 @@ namespace XOffsetDatastructure::xsync {
         }
         /// A shared op: len bytes at op (its id, then its body), with
         /// kSyncSlack bytes readable past them.
-        XOFFSET_SYNC_INLINE void op(const char* op, std::size_t len) {
+        XOFFSET_DETAIL_INLINE void op(const char* op, std::size_t len) {
             char* d = need(len + kSyncSlack);
             sd_detail::copy_body(d, op, len);
             q_ = d + len;
@@ -864,7 +851,7 @@ namespace XOffsetDatastructure::xsync {
         }
         /// The same under id: the op's own id is replaced (the slot this
         /// receiver keeps the entity in, say).
-        XOFFSET_SYNC_INLINE void op(const char* op, std::size_t len, std::uint32_t id) {
+        XOFFSET_DETAIL_INLINE void op(const char* op, std::size_t len, std::uint32_t id) {
             char* d = need(len + kSyncSlack);
             sd_detail::copy_body(d, op, len);
             sd_detail::store<std::uint32_t>(d, id);
@@ -873,13 +860,13 @@ namespace XOffsetDatastructure::xsync {
         }
         /// A shared op of len bytes, at most N (len 0: no op), with N bytes
         /// readable at op: N bytes are copied either way, no branch on len.
-        template <std::size_t N> XOFFSET_SYNC_INLINE void op_upto(const char* op, std::size_t len) {
+        template <std::size_t N> XOFFSET_DETAIL_INLINE void op_upto(const char* op, std::size_t len) {
             char* d = need(N + kSyncSlack);
             std::memcpy(d, op, N);
             q_ = d + len;
             n_ += len != 0;
         }
-        template <std::size_t N> XOFFSET_SYNC_INLINE void op_upto(const char* op, std::size_t len, std::uint32_t id) {
+        template <std::size_t N> XOFFSET_DETAIL_INLINE void op_upto(const char* op, std::size_t len, std::uint32_t id) {
             char* d = need(N + kSyncSlack);
             std::memcpy(d, op, N);
             sd_detail::store<std::uint32_t>(d, id);   // past the op when len is 0: overwritten later
@@ -888,8 +875,8 @@ namespace XOffsetDatastructure::xsync {
         }
         /// Room for n more bytes now: ops written with op_in_room then skip
         /// the capacity check (each takes its len + kSyncSlack of the room).
-        XOFFSET_SYNC_INLINE void reserve(std::size_t n) { (void)need(n); }
-        XOFFSET_SYNC_INLINE void op_in_room(const char* op, std::size_t len, std::uint32_t id) {
+        XOFFSET_DETAIL_INLINE void reserve(std::size_t n) { (void)need(n); }
+        XOFFSET_DETAIL_INLINE void op_in_room(const char* op, std::size_t len, std::uint32_t id) {
             char* d = q_;
             sd_detail::copy_body(d, op, len);
             sd_detail::store<std::uint32_t>(d, id);
@@ -897,7 +884,7 @@ namespace XOffsetDatastructure::xsync {
             ++n_;
         }
         /// An enter op of r encoded here.
-        template <class R> XOFFSET_SYNC_INLINE void whole(std::uint32_t id, const R& r) {
+        template <class R> XOFFSET_DETAIL_INLINE void whole(std::uint32_t id, const R& r) {
             char* d = need(4 + XRecordBody<R>::whole_room(r) + kSyncSlack);
             sd_detail::store<std::uint32_t>(d, id);
             q_ = XRecordBody<R>::put_whole(d + 4, r);
@@ -905,7 +892,7 @@ namespace XOffsetDatastructure::xsync {
         }
         /// A change op of the members in mask of r encoded here; nothing when
         /// mask is 0. Returns whether it wrote one.
-        template <class R> XOFFSET_SYNC_INLINE bool change(std::uint32_t id, const R& r, std::uint64_t mask) {
+        template <class R> XOFFSET_DETAIL_INLINE bool change(std::uint32_t id, const R& r, std::uint64_t mask) {
             if (!(mask & XRecordBody<R>::members::all)) return false;
             char* d = need(4 + XRecordBody<R>::change_room(r, mask) + kSyncSlack);
             sd_detail::store<std::uint32_t>(d, id);
@@ -916,7 +903,7 @@ namespace XOffsetDatastructure::xsync {
         /// Records without containers: a change op of the members of now that
         /// differ from prev (prev takes them); nothing when none do. Returns
         /// whether it wrote one.
-        template <class R> XOFFSET_SYNC_INLINE bool diff(std::uint32_t id, const R& now, R& prev) {
+        template <class R> XOFFSET_DETAIL_INLINE bool diff(std::uint32_t id, const R& now, R& prev) {
             char* d = need(4 + XRecordBody<R>::diff_room + kSyncSlack);
             sd_detail::store<std::uint32_t>(d, id);
             char* const e = XRecordBody<R>::put_diff(d + 4, now, prev);
@@ -952,12 +939,12 @@ namespace XOffsetDatastructure::xsync {
             end_ = out.data() + out.capacity();
         }
         static constexpr std::uint32_t code(unsigned table, XSyncKind kind) noexcept { return std::uint32_t(table << 2 | unsigned(kind)); }
-        [[noreturn]] XOFFSET_SYNC_COLD static void too_many() {
+        [[noreturn]] XOFFSET_DETAIL_COLD static void too_many() {
             XOFFSET_THROW(std::length_error("xsync: more than 2^24 - 1 ops in one section"));
         }
         // The writer's address never leaves it (grow is static), so its
         // cursor can live in registers.
-        XOFFSET_SYNC_INLINE char* need(std::size_t n) {
+        XOFFSET_DETAIL_INLINE char* need(std::size_t n) {
             if (std::size_t(end_ - q_) < n) [[unlikely]] {
                 char* const old = out_->data();
                 const Span sp = grow(*out_, std::size_t(q_ - old), n);
@@ -1061,7 +1048,7 @@ namespace XOffsetDatastructure::xsync {
     class XBasicSyncSlots {
     public:
         /// The slot of id, or -1 when id is not held.
-        XOFFSET_SYNC_INLINE std::int64_t find(std::uint32_t id) const noexcept {
+        XOFFSET_DETAIL_INLINE std::int64_t find(std::uint32_t id) const noexcept {
             if (cells_.empty()) return -1;
             const Cell& c = cells_[probe(id)];
             return c.slot;   // the empty cell id would take has slot -1
@@ -1069,7 +1056,7 @@ namespace XOffsetDatastructure::xsync {
 
         /// Starts fetching the index cell id's lookup reads first (a receiver
         /// that knows a batch of ids prefetches them all, then looks them up).
-        XOFFSET_SYNC_INLINE void prefetch(std::uint32_t id) const noexcept {
+        XOFFSET_DETAIL_INLINE void prefetch(std::uint32_t id) const noexcept {
 #if defined(__GNUC__) || defined(__clang__)
             if (!cells_.empty()) __builtin_prefetch(&cells_[home(id)]);
 #else
@@ -1083,7 +1070,7 @@ namespace XOffsetDatastructure::xsync {
         /// the call; new_slot + 1 slots are given out after it), so the caller
         /// can make room for it.
         template <class Grow>
-        XOFFSET_SYNC_INLINE std::int64_t enter(std::uint32_t id, Grow&& grow) {
+        XOFFSET_DETAIL_INLINE std::int64_t enter(std::uint32_t id, Grow&& grow) {
             bool added;
             const std::int64_t s = take(id, static_cast<Grow&&>(grow), added);
             return added ? s : -1;
@@ -1092,7 +1079,7 @@ namespace XOffsetDatastructure::xsync {
         /// The slot of id, giving it one as enter does when it is not held
         /// (then added is true): one lookup either way.
         template <class Grow>
-        XOFFSET_SYNC_INLINE std::int64_t take(std::uint32_t id, Grow&& grow, bool& added) {
+        XOFFSET_DETAIL_INLINE std::int64_t take(std::uint32_t id, Grow&& grow, bool& added) {
             if (2 * (count_ + 1) > cells_.size()) [[unlikely]] rehash();
             Cell& c = cells_[probe(id)];
             if (c.slot >= 0) {
@@ -1117,7 +1104,7 @@ namespace XOffsetDatastructure::xsync {
 
         /// Removes id, which holds slot (from find or enter); the slot becomes
         /// free. The caller clears or reuses its record as it likes.
-        XOFFSET_SYNC_INLINE void leave(std::uint32_t id, std::int64_t slot) {
+        XOFFSET_DETAIL_INLINE void leave(std::uint32_t id, std::int64_t slot) {
             erase(id);
             if (nfree_ == free_.size()) [[unlikely]] grow_free();
             free_[nfree_++] = std::int32_t(slot);
@@ -1170,10 +1157,10 @@ namespace XOffsetDatastructure::xsync {
         std::int32_t used_ = 0;
         unsigned shift_ = 32;
 
-        XOFFSET_SYNC_INLINE std::size_t home(std::uint32_t id) const noexcept { return std::size_t((id * 0x9E3779B1u) >> shift_); }
-        XOFFSET_SYNC_INLINE std::size_t mask() const noexcept { return cells_.size() - 1; }
+        XOFFSET_DETAIL_INLINE std::size_t home(std::uint32_t id) const noexcept { return std::size_t((id * 0x9E3779B1u) >> shift_); }
+        XOFFSET_DETAIL_INLINE std::size_t mask() const noexcept { return cells_.size() - 1; }
         // The cell of id, or the empty cell where it would go.
-        XOFFSET_SYNC_INLINE std::size_t probe(std::uint32_t id) const noexcept {
+        XOFFSET_DETAIL_INLINE std::size_t probe(std::uint32_t id) const noexcept {
             std::size_t i = home(id);
             while (cells_[i].id != id && cells_[i].slot >= 0) i = (i + 1) & mask();
             // A stale id in an empty cell may equal id: then the cell is the empty one.
@@ -1194,7 +1181,7 @@ namespace XOffsetDatastructure::xsync {
                 if (c.slot >= 0) cells_[probe(c.id)] = c;
         }
         // Removes id (held): later cells of its run move back, so no tombstones are left.
-        XOFFSET_SYNC_INLINE void erase(std::uint32_t id) noexcept {
+        XOFFSET_DETAIL_INLINE void erase(std::uint32_t id) noexcept {
             std::size_t i = probe(id);
             for (std::size_t j = (i + 1) & mask(); cells_[j].slot >= 0; j = (j + 1) & mask()) {
                 const std::size_t h = home(cells_[j].id);
@@ -1230,7 +1217,7 @@ namespace XOffsetDatastructure::xsync {
 
         // f.template operator()<K>() for K == table (one jump; at most 64 tables).
         template <unsigned N, class F>
-        XOFFSET_SYNC_INLINE const char* sync_switch(unsigned table, F&& f) {
+        XOFFSET_DETAIL_INLINE const char* sync_switch(unsigned table, F&& f) {
             static_assert(N >= 1 && N <= kSyncTables, "XReceiver::apply_sync: a target has 1 to 64 tables");
             switch (table) {
 #define XOFFSET_SYNC_CASE(k) case k: if constexpr ((k) < N) return f.template operator()<(k)>(); else break;
@@ -1246,7 +1233,7 @@ namespace XOffsetDatastructure::xsync {
         }
 
         template <unsigned K, class Target>
-        XOFFSET_SYNC_INLINE void sync_applied(Target& t, std::uint32_t id, std::int64_t h) {
+        XOFFSET_DETAIL_INLINE void sync_applied(Target& t, std::uint32_t id, std::int64_t h) {
             if constexpr (requires { t.template applied<K>(id, h); }) t.template applied<K>(id, h);
         }
 
@@ -1260,10 +1247,10 @@ namespace XOffsetDatastructure::xsync {
         struct SyncAccess {
             using vstatus = ::XOffsetDatastructure::detail::vstatus;
 
-            XOFFSET_SYNC_COLD static vstatus fail(XErrc code, const char* why) {
+            XOFFSET_DETAIL_COLD static vstatus fail(XErrc code, const char* why) {
                 XOFFSET_VFAIL(XException, code, why);
             }
-            XOFFSET_SYNC_COLD static vstatus fail_op(const char* why) {
+            XOFFSET_DETAIL_COLD static vstatus fail_op(const char* why) {
                 return fail(why == kCut ? XErrc::truncated : XErrc::invalid_payload, why);
             }
 
@@ -1276,7 +1263,7 @@ namespace XOffsetDatastructure::xsync {
             // The head and the stream and version rules against cur, with
             // room for the root (root bytes): where the root starts, or
             // nullptr (head_error() says why).
-            XOFFSET_SYNC_INLINE static const char* head(const char* p, const char* end, const XSyncCursor& cur, SyncHead& h,
+            XOFFSET_DETAIL_INLINE static const char* head(const char* p, const char* end, const XSyncCursor& cur, SyncHead& h,
                                                         std::size_t root) noexcept {
                 if (std::size_t(end - p) < kSyncHead + root || p[0] != 'X' || p[1] != 'S' ||
                     static_cast<unsigned char>(p[2]) != kFormat) return nullptr;
@@ -1291,7 +1278,7 @@ namespace XOffsetDatastructure::xsync {
                 } else if (!cur.keyed_ || h.version != std::uint32_t(cur.version_ + 1)) return nullptr;
                 return p;
             }
-            XOFFSET_SYNC_COLD static vstatus head_error(const char* p, const char* end, const XSyncCursor& cur, std::size_t root) {
+            XOFFSET_DETAIL_COLD static vstatus head_error(const char* p, const char* end, const XSyncCursor& cur, std::size_t root) {
                 const std::size_t n = std::size_t(end - p);
                 if ((n >= 1 && p[0] != 'X') || (n >= 2 && p[1] != 'S'))
                     return fail(XErrc::bad_magic, "shared delta: not an XS message");
@@ -1346,7 +1333,7 @@ namespace XOffsetDatastructure::xsync {
                     p += 4;
                     const unsigned kind = w & 3u;
                     std::uint32_t n = w >> 8;
-                    const char* e = sync_switch<sync_tables<Target>>((w >> 2) & 63u, [&]<unsigned K>() XOFFSET_SYNC_LAMBDA_INLINE -> const char* {
+                    const char* e = sync_switch<sync_tables<Target>>((w >> 2) & 63u, [&]<unsigned K>() XOFFSET_DETAIL_LAMBDA_INLINE -> const char* {
                         if constexpr (K == 0) return kBadKind;
                         else {
                             using R = sync_record_t<Target, K>;
@@ -1441,7 +1428,7 @@ namespace XOffsetDatastructure::xsync {
                 for (std::size_t k = 0; k < n; ++k) (void)seen_add(s, op_key(ops[k]));
             }
             // Whether entry key, op n's, is one of ops 0..n-1's; notes it.
-            XOFFSET_SYNC_INLINE static bool seen_before(XSyncCursor& cur, Seen& s, const SyncOp* ops, std::size_t n, std::uint64_t key) {
+            XOFFSET_DETAIL_INLINE static bool seen_before(XSyncCursor& cur, Seen& s, const SyncOp* ops, std::size_t n, std::uint64_t key) {
                 if (n < 64) {
                     const unsigned bit = unsigned((key * 0x9E3779B97F4A7C15ull) >> 56);
                     const std::uint64_t m = std::uint64_t(1) << (bit & 63u);
@@ -1459,7 +1446,7 @@ namespace XOffsetDatastructure::xsync {
             // Applies one op checked by full(). h: find's result (a keyed
             // enter asks enter() instead).
             template <unsigned K, class Target>
-            XOFFSET_SYNC_INLINE static const char* apply_op(Target& t, const SyncOp& o) {
+            XOFFSET_DETAIL_INLINE static const char* apply_op(Target& t, const SyncOp& o) {
                 using R = sync_record_t<Target, K>;
                 const unsigned kind = o.code & 3u;
                 std::int64_t h = o.handle;
@@ -1511,7 +1498,7 @@ namespace XOffsetDatastructure::xsync {
                     if (std::size_t(end - p) / 4 < count) [[unlikely]] return fail_op(kCut);
                     if (cur.ops_.size() < n + count) cur.ops_.resize(std::max(n + count, 2 * cur.ops_.size()));
                     SyncOp* const ops = cur.ops_.data();
-                    const char* e = sync_switch<sync_tables<Target>>(table, [&]<unsigned K>() XOFFSET_SYNC_LAMBDA_INLINE -> const char* {
+                    const char* e = sync_switch<sync_tables<Target>>(table, [&]<unsigned K>() XOFFSET_DETAIL_LAMBDA_INLINE -> const char* {
                         if constexpr (K == 0) return kBadKind;
                         else {
                             using R = sync_record_t<Target, K>;
@@ -1545,7 +1532,7 @@ namespace XOffsetDatastructure::xsync {
                 sync_applied<0>(t, 0, rh);
                 const SyncOp* const ops = cur.ops_.data();
                 for (std::size_t i = 0; i < n; ++i) {
-                    const char* e = sync_switch<sync_tables<Target>>(unsigned(ops[i].code >> 2), [&]<unsigned K>() XOFFSET_SYNC_LAMBDA_INLINE -> const char* {
+                    const char* e = sync_switch<sync_tables<Target>>(unsigned(ops[i].code >> 2), [&]<unsigned K>() XOFFSET_DETAIL_LAMBDA_INLINE -> const char* {
                         if constexpr (K == 0) return kBadKind;
                         else return apply_op<K>(t, ops[i]);
                     });

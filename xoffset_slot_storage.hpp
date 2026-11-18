@@ -33,6 +33,8 @@
 // would make it 2 MiB. The retention budget counts the bytes a free slot
 // has dirtied, not its nominal size.
 
+#include "xoffset_config.hpp"
+
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -41,26 +43,7 @@
 #include <new>
 
 #if defined(_WIN32)
-// The lean <windows.h>, without min/max: no rpcndr.h (`small`, `hyper`), winsock.h or
-// shellapi.h behind a client's back. Both macros are set only for this include; a
-// client that needs more includes those headers itself (or <windows.h> first).
-#  ifndef WIN32_LEAN_AND_MEAN
-#    define WIN32_LEAN_AND_MEAN
-#    define XOFFSET_DETAIL_UNDEF_LEAN_AND_MEAN
-#  endif
-#  ifndef NOMINMAX
-#    define NOMINMAX
-#    define XOFFSET_DETAIL_UNDEF_NOMINMAX
-#  endif
-#  include <windows.h>
-#  ifdef XOFFSET_DETAIL_UNDEF_LEAN_AND_MEAN
-#    undef WIN32_LEAN_AND_MEAN
-#    undef XOFFSET_DETAIL_UNDEF_LEAN_AND_MEAN
-#  endif
-#  ifdef XOFFSET_DETAIL_UNDEF_NOMINMAX
-#    undef NOMINMAX
-#    undef XOFFSET_DETAIL_UNDEF_NOMINMAX
-#  endif
+// <windows.h> comes from xoffset_config.hpp.
 #elif defined(__linux__) || defined(__APPLE__)
 #  include <sys/mman.h>
 #  include <unistd.h>
@@ -82,22 +65,6 @@
 #  include <sanitizer/asan_interface.h>
 #endif
 
-// Per-thread caches (this slab's free lists, the free-table cache and the
-// owner cache in xoffsetdatastructure.hpp). Each keeps a trivial thread_local
-// flag that its nontrivial cache clears on thread exit, so late destructors
-// take the global path. GCC on MinGW and Cygwin emulates TLS (emutls): a
-// thread's TLS blocks can be freed before its thread_local destructors run,
-// and a TLS access from such a destructor gets a fresh block, so neither the
-// cache nor the flag is reliable there. Those targets get no per-thread
-// caches; every path uses the global structures. Clang on MinGW uses native
-// TLS and keeps them.
-#ifndef XOFFSET_THREAD_CACHES
-#  if (defined(__MINGW32__) || defined(__CYGWIN__)) && defined(__GNUC__) && !defined(__clang__)
-#    define XOFFSET_THREAD_CACHES 0
-#  else
-#    define XOFFSET_THREAD_CACHES 1
-#  endif
-#endif
 
 #ifndef XOFFSET_SLOT_MAX_BYTES
 #  define XOFFSET_SLOT_MAX_BYTES (256u * 1024u)
@@ -136,14 +103,8 @@
 
 namespace XOffsetDatastructure {
 // Owner-table lookups sit on every allocate, grow and retire; GCC stops
-// inlining them once the table reads are atomic, so force it.
-#if defined(__GNUC__) || defined(__clang__)
-#  define XOFFSET_DETAIL_OWNER_INLINE inline __attribute__((always_inline))
-#elif defined(_MSC_VER)
-#  define XOFFSET_DETAIL_OWNER_INLINE __forceinline
-#else
-#  define XOFFSET_DETAIL_OWNER_INLINE inline
-#endif
+// inlining them once the table reads are atomic, so they are forced inline
+// (XOFFSET_DETAIL_INLINE).
 
 namespace detail {
 
@@ -175,7 +136,7 @@ struct OwnerMap {
     static constexpr std::uint8_t slot_bit = 0x80;   // a region: payload 64 bytes in
     static constexpr std::uintptr_t header_bytes = 64;
     // The payload base for a nonzero entry `e` read at payload address `a`.
-    XOFFSET_DETAIL_OWNER_INLINE static std::uintptr_t decode(std::uintptr_t a, std::uint8_t e) noexcept {
+    XOFFSET_DETAIL_INLINE static std::uintptr_t decode(std::uintptr_t a, std::uint8_t e) noexcept {
         return ((a - header_bytes) & (~std::uintptr_t(0) << (e & 63u))) + header_bytes;
     }
 
@@ -190,14 +151,14 @@ struct OwnerMap {
     // a prefetch hint only (it is not an atomic access).
     static const std::uint8_t* entry_address(std::uintptr_t address) noexcept;
     // Relaxed atomic byte access; this header is C++17, without std::atomic_ref.
-    XOFFSET_DETAIL_OWNER_INLINE static std::uint8_t load(const std::uint8_t& e) noexcept {
+    XOFFSET_DETAIL_INLINE static std::uint8_t load(const std::uint8_t& e) noexcept {
 #if defined(__GNUC__) || defined(__clang__)
         return __atomic_load_n(&e, __ATOMIC_RELAXED);
 #else
         return *static_cast<const volatile std::uint8_t*>(&e);
 #endif
     }
-    XOFFSET_DETAIL_OWNER_INLINE static void store(std::uint8_t& e, std::uint8_t value) noexcept {
+    XOFFSET_DETAIL_INLINE static void store(std::uint8_t& e, std::uint8_t value) noexcept {
 #if defined(__GNUC__) || defined(__clang__)
         __atomic_store_n(&e, value, __ATOMIC_RELAXED);
 #else
@@ -260,12 +221,12 @@ inline bool OwnerMap::ready() noexcept {
     return true;
 }
 
-XOFFSET_DETAIL_OWNER_INLINE std::uint8_t OwnerMap::entry(std::uintptr_t address) noexcept {
+XOFFSET_DETAIL_INLINE std::uint8_t OwnerMap::entry(std::uintptr_t address) noexcept {
     const std::uint8_t* table = owner_map_table.load(std::memory_order_relaxed);
     return table ? load(table[index(address)]) : std::uint8_t(0);
 }
 
-XOFFSET_DETAIL_OWNER_INLINE const std::uint8_t* OwnerMap::entry_address(std::uintptr_t address) noexcept {
+XOFFSET_DETAIL_INLINE const std::uint8_t* OwnerMap::entry_address(std::uintptr_t address) noexcept {
     const std::uint8_t* table = owner_map_table.load(std::memory_order_relaxed);
     return table ? table + index(address) : nullptr;
 }
@@ -281,23 +242,23 @@ inline std::uint8_t owner_map_table[OwnerMap::entries];
 
 inline bool OwnerMap::ready() noexcept { return true; }
 
-XOFFSET_DETAIL_OWNER_INLINE std::uint8_t OwnerMap::entry(std::uintptr_t address) noexcept {
+XOFFSET_DETAIL_INLINE std::uint8_t OwnerMap::entry(std::uintptr_t address) noexcept {
     return load(owner_map_table[index(address)]);
 }
 
-XOFFSET_DETAIL_OWNER_INLINE const std::uint8_t* OwnerMap::entry_address(std::uintptr_t address) noexcept {
+XOFFSET_DETAIL_INLINE const std::uint8_t* OwnerMap::entry_address(std::uintptr_t address) noexcept {
     return owner_map_table + index(address);
 }
 #endif
 
-XOFFSET_DETAIL_OWNER_INLINE char* OwnerMap::payload_of(const void* p) noexcept {
+XOFFSET_DETAIL_INLINE char* OwnerMap::payload_of(const void* p) noexcept {
     const auto a = reinterpret_cast<std::uintptr_t>(p);
     const std::uint8_t e = entry(a);
     if (e == 0) return nullptr;
     return reinterpret_cast<char*>(decode(a, e));
 }
 
-XOFFSET_DETAIL_OWNER_INLINE char* OwnerMap::same_payload(const void* a, const void* b) noexcept {
+XOFFSET_DETAIL_INLINE char* OwnerMap::same_payload(const void* a, const void* b) noexcept {
     const auto ua = reinterpret_cast<std::uintptr_t>(a);
     const auto ub = reinterpret_cast<std::uintptr_t>(b);
     const std::uint8_t e = entry(ua);

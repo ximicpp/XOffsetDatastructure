@@ -50,31 +50,10 @@
 #define XOFFSET_DELTA_SHUFFLE_NEON 1
 #endif
 
-#define XOFFSET_DELTA_SYNC_API 1
 
-// A hint to bring the cache line at p in (a line about to be written): a
-// delta touches a few lines scattered over large buffers, and fetching them
-// all at once overlaps their misses.
-#if defined(__GNUC__) || defined(__clang__)
-#define XOFFSET_DELTA_PREFETCH(p) __builtin_prefetch((p), 1, 3)
-#elif defined(_MSC_VER) && (defined(_M_X64) || defined(_M_AMD64) || defined(_M_IX86))
-#define XOFFSET_DELTA_PREFETCH(p) _mm_prefetch(reinterpret_cast<const char*>(p), _MM_HINT_T0)
-#elif defined(_MSC_VER) && defined(_M_ARM64)
-#define XOFFSET_DELTA_PREFETCH(p) __prefetch(p)
-#else
-#define XOFFSET_DELTA_PREFETCH(p) ((void)(p))
-#endif
-
-#if defined(_MSC_VER) && !defined(__clang__)
-#define XOFFSET_DELTA_INLINE __forceinline
-#define XOFFSET_DELTA_COLD __declspec(noinline)
-#elif defined(__GNUC__) || defined(__clang__)
-#define XOFFSET_DELTA_INLINE inline __attribute__((always_inline))
-#define XOFFSET_DELTA_COLD __attribute__((noinline, cold))
-#else
-#define XOFFSET_DELTA_INLINE inline
-#define XOFFSET_DELTA_COLD
-#endif
+// XOFFSET_DETAIL_PREFETCH_WITH_MSVC(p, 1) brings in a line about to be
+// written: a delta touches a few lines scattered over large buffers, and
+// fetching them all at once overlaps their misses.
 
 namespace XOffsetDatastructure {
 
@@ -309,7 +288,7 @@ namespace XOffsetDatastructure {
         }
 
         // delta_get_varint with values of one and two bytes inline.
-        XOFFSET_DELTA_INLINE bool delta_get_varint_short(const unsigned char*& p, const unsigned char* end,
+        XOFFSET_DETAIL_INLINE bool delta_get_varint_short(const unsigned char*& p, const unsigned char* end,
                                                          std::uint32_t& out) noexcept {
             if (end - p >= 2 && (p[0] < 0x80u || p[1] < 0x80u)) [[likely]] {
                 const bool one = p[0] < 0x80u;
@@ -1064,7 +1043,7 @@ namespace XOffsetDatastructure {
         bool delta_grow_records(DeltaVerifyContext& v, std::size_t data, std::uint32_t from, std::uint32_t to);
 
         // A string with a block: its head, its terminator, and a node.
-        XOFFSET_DELTA_COLD inline void delta_mark_heap_string(const XFixedString& s, DeltaCheckMarker& m) {
+        XOFFSET_DETAIL_COLD inline void delta_mark_heap_string(const XFixedString& s, DeltaCheckMarker& m) {
             m.mark(&s, sizeof(XFixedString), false);
             m.mark(delta_heap_data<char>(s.data_delta) + s.size_, 1, false);
             DeltaCheckNode n;
@@ -1076,7 +1055,7 @@ namespace XOffsetDatastructure {
             m.node(n, m.offset_of(delta_heap_data<char>(s.data_delta)), std::size_t(s.capacity_) + 1u);
             m.live(delta_heap_data<char>(s.data_delta), std::size_t(s.capacity_) + 1u);
         }
-        XOFFSET_DELTA_INLINE void delta_mark_string(const XFixedString& s, DeltaCheckMarker& m) {
+        XOFFSET_DETAIL_INLINE void delta_mark_string(const XFixedString& s, DeltaCheckMarker& m) {
             // Inline or empty (all 12 bytes zero, as verification requires
             // of a head without a block): checked in place.
             if (s.is_inline() || s.capacity_ == 0) [[likely]]
@@ -1802,8 +1781,8 @@ namespace XOffsetDatastructure {
                 const bool holes_same = !key && b.holes_gen_ == holes_gen;
                 // The delta is written into out's storage; the old hole table
                 // is compared: their lines are fetched while the rest runs.
-                XOFFSET_DELTA_PREFETCH(out.data());
-                if (!holes_same && !b.holes_.empty()) XOFFSET_DELTA_PREFETCH(b.holes_.data());
+                XOFFSET_DETAIL_PREFETCH_WITH_MSVC(out.data(), 1);
+                if (!holes_same && !b.holes_.empty()) XOFFSET_DETAIL_PREFETCH_WITH_MSVC(b.holes_.data(), 1);
 
                 // The hole table, by offset.
                 DeltaSendScratch& scratch = send_scratch(b);
@@ -1878,7 +1857,7 @@ namespace XOffsetDatastructure {
                         const std::uint32_t* list = log->blocks;
                         const std::uint32_t listed = log->listed;
                         for (std::uint32_t q = 0; q < listed && list[q] < below; ++q)
-                            XOFFSET_DELTA_PREFETCH(base.data() + std::size_t(list[q]) * delta_block);
+                            XOFFSET_DETAIL_PREFETCH_WITH_MSVC(base.data() + std::size_t(list[q]) * delta_block, 1);
                         std::uint32_t k = 0;
                         totals = delta_scan<true>(
                             cur, base.data(), payload_begin, used, blocks,
@@ -2192,7 +2171,7 @@ namespace XOffsetDatastructure {
                 log.groups[i / delta_touch_group] = log.now;
             }
             // Records a touch of the bytes `mask` of block i.
-            XOFFSET_DELTA_INLINE static void touch_block(DeltaTouchLog& log, std::size_t i, std::uint64_t mask) noexcept {
+            XOFFSET_DETAIL_INLINE static void touch_block(DeltaTouchLog& log, std::size_t i, std::uint64_t mask) noexcept {
                 if (!log.overflow) [[likely]] {
                     const auto block = static_cast<std::uint32_t>(i);
                     const auto bit = static_cast<std::uint16_t>(1u << (block % 16u));
@@ -2208,7 +2187,7 @@ namespace XOffsetDatastructure {
                         log.blocks[log.listed] = block;
                         if (log.masks_on) log.masks[log.listed] = mask;
                         // The next delta compares this block with the baseline's copy.
-                        if (log.copy) XOFFSET_DELTA_PREFETCH(reinterpret_cast<const char*>(log.copy + i * delta_block));
+                        if (log.copy) XOFFSET_DETAIL_PREFETCH_WITH_MSVC(reinterpret_cast<const char*>(log.copy + i * delta_block), 1);
                         ++log.listed;
                     } else {
                         log.overflow = true;  // stamped from here on
@@ -2697,8 +2676,8 @@ namespace XOffsetDatastructure {
                         XOFFSET_VFAIL(XException, XErrc::size_mismatch, msg(who, "delta block table truncated"));
                     refs[k] = {static_cast<std::uint32_t>(start), static_cast<std::uint32_t>(q - p), mask};
                     if (fetch) {
-                        XOFFSET_DELTA_PREFETCH(replica + start);
-                        if (index < check_count) XOFFSET_DELTA_PREFETCH(checks + index);
+                        XOFFSET_DETAIL_PREFETCH_WITH_MSVC(replica + start, 1);
+                        if (index < check_count) XOFFSET_DETAIL_PREFETCH_WITH_MSVC(checks + index, 1);
                     }
                     q += bytes;
                     const std::size_t lo = std::max<std::size_t>(std::size_t(start), payload_begin);
@@ -3943,7 +3922,7 @@ namespace XOffsetDatastructure {
             // apply_key<T, true>); false is apply_delta_verified<T>.
             template <typename T, bool Admit = false>
             static vstatus apply(XBuffer& xbuf, std::span<const std::byte> data, XDeltaCursor& cursor) {
-                static_assert(is_v1_wire_admitted_v<T>,
+                static_assert(is_wire_admitted_v<T>,
                               "apply_delta_verified<T>() requires an admitted fixed-schema wire type.");
                 if constexpr (Admit) {
                     if (apply_small<T>(xbuf, data, cursor)) return vok();
@@ -3957,9 +3936,9 @@ namespace XOffsetDatastructure {
                 XBufferCore& core = xbuf;
                 // The cursor's fields are read throughout: fetched while the
                 // buffer's state is looked up.
-                XOFFSET_DELTA_PREFETCH(&cursor);
-                XOFFSET_DELTA_PREFETCH(reinterpret_cast<const char*>(&cursor) + 64);
-                XOFFSET_DELTA_PREFETCH(reinterpret_cast<const char*>(&cursor) + 128);
+                XOFFSET_DETAIL_PREFETCH_WITH_MSVC(&cursor, 1);
+                XOFFSET_DETAIL_PREFETCH_WITH_MSVC(reinterpret_cast<const char*>(&cursor) + 64, 1);
+                XOFFSET_DETAIL_PREFETCH_WITH_MSVC(reinterpret_cast<const char*>(&cursor) + 128, 1);
                 // A non-key delta patches a verified root of T that this
                 // cursor's key delta produced.
                 const bool has_state = core.typed_root_access_allowed_ && core.template root_type_matches<T>() &&
@@ -4032,7 +4011,7 @@ namespace XOffsetDatastructure {
 
     template <typename T>
     XDeltaStats XBuffer::save_delta_into(std::string& out, XDeltaBaseline& baseline, XDeltaOptions options) {
-        static_assert(is_v1_wire_admitted_v<T>, "save_delta<T>() requires an admitted fixed-schema wire type.");
+        static_assert(is_wire_admitted_v<T>, "save_delta<T>() requires an admitted fixed-schema wire type.");
 #ifdef XOFFSET_REJECT_IMPLICIT_PADDING
         static_assert(!has_implicit_padding_v<T>,
             "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");

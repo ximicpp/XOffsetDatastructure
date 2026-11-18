@@ -196,7 +196,7 @@ def main():
     rc2, dirty = run(["git", "status", "--porcelain"], 20)
     version_rc, version = run([args.clang, "--version"], 20) if args.clang else (None, "")
     source_files = ["xoffsetdatastructure.hpp", "xoffset_core_lifetime.hpp",
-                    "xoffset_virtual_memory.hpp", "xoffset_slot_storage.hpp",
+                    "xoffset_virtual_memory.hpp", "xoffset_slot_storage.hpp", "xoffset_config.hpp",
                     "cmake/XOffsetDependencyLock.cmake"]
     meta = {"source": str(ROOT), "git_head": git.strip() if rc == 0 else None,
             "git_status": dirty if rc2 == 0 else "unavailable",
