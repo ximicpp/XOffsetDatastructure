@@ -43,6 +43,9 @@ struct Root {
     xo::XVector<Small> smalls;
 };
 } // namespace si
+XOFFSET_RECORD(si::Item, id, number, uuid, timestamp)
+XOFFSET_RECORD(si::Big, a, b, c, d, e)
+XOFFSET_RECORD(si::Small, x, y, z)
 XOFFSET_RECORD_DERIVED(si::Root, (), items, keys, bigs, smalls)
 
 static_assert(std::is_trivially_copyable_v<xo::XKeyValue<std::uint64_t, si::Item>>);

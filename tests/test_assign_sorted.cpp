@@ -35,6 +35,7 @@ struct Root {
     xo::XSet<xo::XString> tags;
 };
 } // namespace as
+XOFFSET_RECORD(as::Item, id, number, uuid, timestamp)
 XOFFSET_RECORD_DERIVED(as::Root, (), items, ids, names, tags)
 
 namespace {
