@@ -5,6 +5,13 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- Small deltas take a shorter path on both ends; the bytes on the wire are unchanged. A sender with an
+  `XDeltaRecord::touches` baseline whose touch log lists at most 8 blocks, with the same hole table,
+  used size and root and no digest, writes the touched bytes in one pass; an admitting receiver
+  (`XReceiver` on a trusted link) applies a delta with no flags and at most 8 blocks in one pass over its
+  bytes, with the same checks. `tests/test_delta_small.cpp` holds both against the general path byte for
+  byte. One `touch_set` of a scalar plus `save_delta_into`: 926 -> 436 instructions; with the apply:
+  1,550 -> 767. `save_delta_into` also takes a root the buffer has cached instead of looking it up.
 - `XSet` / `XMap` `assign_sorted(range)` (also an iterator pair): fills from input already sorted by
   key in one exact block, without lookups; a contiguous range of the element type is one copy. 64
   entries of `XMap<std::uint64_t, 24-byte record>`: 39 ns from a same-layout vector, 58 ns converted

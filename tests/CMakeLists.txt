@@ -165,6 +165,7 @@ set(REFLECTION_TESTS
     test_reset_used_range
     test_clone
     test_delta_sync
+    test_delta_small
     test_delta_format
     test_delta_capacity
     test_shared_delta
