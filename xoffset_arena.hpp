@@ -1145,9 +1145,12 @@ namespace XOffsetDatastructure {
         // allocate_block unchanged. Same placement either way. The caller
         // found the payload (the string's own), so the buffer is not empty,
         // and used_end lies in [min_payload_size(), size()] (as in
-        // allocate_block's bump): one compare.
+        // allocate_block's bump): one compare. SizeChecked false: the caller
+        // already knows bytes <= small_block_max.
+        template <bool SizeChecked = true>
         XOFFSET_DETAIL_INLINE void* try_bump_first(std::uint32_t bytes) noexcept {
-            if (bytes > FreeTable::small_max) return nullptr;
+            if constexpr (SizeChecked)
+                if (bytes > FreeTable::small_max) return nullptr;
             if constexpr (!detail::inband_allocator) {
                 if (const FreeTable* table = free_table_.get(); table && table->count != 0) return nullptr;
             }
@@ -1316,24 +1319,14 @@ namespace XOffsetDatastructure {
             for (std::uint32_t k = n; k < cap; ++k) std::memcpy(at + 8u + 8u * k, &unused, sizeof(unused));
         }
 
-        // try_allocate_small, in-band: the exact size's head; else, with no
-        // larger block, a bump inside the current extent. Null where
-        // allocate_block takes the general path: a larger block to split,
-        // more than 8 sizes in the directory (its binary search), no room.
-        // Calls nothing, so that a caller keeps no frame for it.
+        // try_allocate_small, in-band: the exact size's head; else the first
+        // larger size with a block, split (out of line); else a bump inside
+        // the current extent. Null where allocate_block takes the general path.
         XOFFSET_DETAIL_INLINE void* inband_allocate_small(std::uint32_t bytes) noexcept {
             if (buffer_.size() < sizeof(arena_header)) [[unlikely]] return nullptr;
-            return inband_allocate_in_payload(bytes);
-        }
-        // The same for a Core that has a payload (one found from it).
-        XOFFSET_DETAIL_INLINE void* inband_allocate_in_payload(std::uint32_t bytes) noexcept {
             char* const base = buffer_.data();
             if (const std::uint32_t dir = inband_word(base + inband_dir_at); dir != 0) {
-                auto* const d = reinterpret_cast<std::uint32_t*>(base + dir);
-                // More than 8 sizes: allocate_block_general's binary search.
-                if (d[0] > 8u) [[unlikely]] return nullptr;
-                std::uint32_t* e = d + 2;
-                while (e[0] < bytes) e += 2;
+                std::uint32_t* const e = inband_find(reinterpret_cast<std::uint32_t*>(base + dir), bytes);
                 if (const std::uint32_t offset = e[1]; e[0] == bytes && offset != 0) [[likely]] {
                     check_owner_resolves();
                     e[1] = inband_word(base + offset);
@@ -1342,10 +1335,10 @@ namespace XOffsetDatastructure {
                     inband_stale();
                     return base + offset;
                 }
-                // A larger size whose stack holds a block: the general path.
-                const std::uint32_t* f = e;
+                // The first larger size whose stack holds a block: split.
+                std::uint32_t* f = e;
                 while (f[1] == 0 && f[0] != inband_end) f += 2;
-                if (f[1] != 0) return nullptr;
+                if (f[1] != 0) return inband_split(f, bytes);
             }
             // No free block of the size or larger: try_allocate_small's bump.
             auto* const sm = std::launder(reinterpret_cast<arena_header*>(base));
