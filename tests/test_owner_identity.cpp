@@ -276,15 +276,6 @@ void transfers_and_deterministic_reused_payload_base() {
     p = fd::allocate_dynamic_bytes(again, 24, 8);
     std::memset(p, 0x57, 24); fd::retire_dynamic_bytes(again, p, 24);
     need(reused.free_block_count() == 1, "reused-base retirement reached a stale owner");
-    // A frozen snapshot is immutable: its payload names no allocation owner.
-    // Its payload segment is the payload past the 48-byte payload header.
-    auto typed = xo::TypedXBuffer<OwnerRoot>::create(4096, policy());
-    typed.plain_root().numbers.resize(2, 5u);
-    const void* base = typed.data();
-    auto frozen = xo::freeze_verified(std::move(typed));
-    need(static_cast<const void*>(frozen.segments()[1].data()) ==
-             static_cast<const char*>(base) + xo::XWIRE_PAYLOAD_BEGIN &&
-         xo::XBufferCore::owner_from_arena_noexcept(base) == nullptr, "frozen payload still names an owner");
 }
 
 void callback_during_allocation_bookkeeping() {
@@ -514,7 +505,7 @@ int main() {
     const Group groups[] = {
         {"hot lookup", hot_lookup_is_nonallocating_and_does_not_change_payload},
         {"other owners/registration failures", lookup_ignores_other_owners_and_registration_failures},
-        {"transfers/reused base/freeze", transfers_and_deterministic_reused_payload_base},
+        {"transfers/reused base", transfers_and_deterministic_reused_payload_base},
         {"allocation bookkeeping callbacks", callback_during_allocation_bookkeeping},
         {"free-table retirement callbacks", callback_during_free_table_retirement},
         {"free-table host OOM", free_table_host_oom_is_recorded_and_recomputed},

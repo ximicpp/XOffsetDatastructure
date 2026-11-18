@@ -1,16 +1,14 @@
 // SLG prototype: model_xoffset.hpp's model again (namespace slg::xmr), with every
 // record type declaring XOffsetDatastructure::wire_record_layout<T>::ordinary_members
 // (the source-level promise that all members are ordinary subobjects, no
-// [[no_unique_address]]; audited: plain members only). begin_verified_receive needs
-// this declaration for every type it receives. The declaration also enables the
-// library's other paths that rely on it (e.g. shift-relocating erase of record
-// vectors), so "xoffset_optin" (this model, reload_verified) is reported next to
-// "xoffset" (the original model) and "xoffset_direct" (this model, direct receive).
+// [[no_unique_address]]; audited: plain members only). The declaration enables the
+// library's paths that rely on it (e.g. shift-relocating erase of record vectors), so
+// "xoffset_optin" (this model, reload_verified) is reported next to "xoffset" (the
+// original model).
 #pragma once
 #include <cstdint>
 #include <type_traits>
 #include "xoffsetdatastructure.hpp"
-#include "xoffset_verified_receive.hpp"
 
 namespace slg::xmr {
 using namespace XOffsetDatastructure;

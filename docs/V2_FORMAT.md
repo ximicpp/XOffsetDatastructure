@@ -145,8 +145,7 @@ encoding rule is dropped, the payload-level accept/reject set is unchanged.)
   used_bytes / 16), stay dense.
 
 The loaded payload is byte-identical in every form, so spare capacity survives
-the transfer. `freeze_verified` always emits dense wires; its segments are the
-40-byte header, the payload from offset 48, and the hole table.
+the transfer.
 
 `save_compact` emits a compact wire directly: the root at offset 48 (the first
 payload byte on the wire), then
@@ -252,13 +251,12 @@ accounts for every hole byte); `schema_hash_lo` is now `schema_hash`. Constants:
 **Heads.** 12 bytes without `arena_delta` (section 2). Removed:
 containers' `bind()`, `bind_like()` and `field_binding()`.
 
-**Direct receive and reload.** `begin_verified_receive<T>(used_bytes, ...)` and
-`begin_verified_reload<T>(used_bytes, ...)` still take `used_bytes`, but
-`payload_bytes()` now spans payload `[48, used_bytes)`: a dense wire's payload
-bytes go there whole, and a sparse extent at payload offset `o` lands at
-`o - 48`. `complete()`'s payload count is therefore `used_bytes - 48`.
-`VerifiedSnapshot::segments()[1]` likewise starts at payload offset 48.
+**Direct reload.** `begin_verified_reload<T>(used_bytes, ...)` still takes
+`used_bytes`, but `payload_bytes()` now spans payload `[48, used_bytes)`: a
+dense wire's payload bytes go there whole, and a sparse extent at payload
+offset `o` lands at `o - 48`. `complete()`'s payload count is therefore
+`used_bytes - 48`.
 
 **Added:** `XBufferCore::write_payload_header(base, root_offset, used_end)`
-for callers of the raw validator that build a payload from a wire.
+for callers that build a payload from a wire.
 

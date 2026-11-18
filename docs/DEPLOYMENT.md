@@ -98,7 +98,7 @@ Toolchains verified for 3.1.0 (local platform matrix, 3.1.0 RC e913d22; GitHub C
 
 Data sent by clients to the server, and any data from the network, is untrusted input.
 
-- **Always use `load_verified`** (or `TypedXBuffer<T>::load`, `begin_verified_receive`), **and always
+- **Always use `load_verified`** (or `TypedXBuffer<T>::load`), **and always
   set `maximum_capacity`** (section 5). Checking the actual wire length is not enough: a sparse wire
   can declare a size close to the payload limit (about 2 GiB) in a few hundred bytes and make the
   receiver reserve that size and validate the whole graph, exhausting resources. Without a limit,
@@ -131,7 +131,7 @@ should not be sent. The threat model (`docs/V2_THREAT_MODEL.md`) measured the so
 
 **Since 2026-11-16 the default build does not zero the second and third kinds of bytes, and since
 2026-11-17 a reset does not zero either** (performance first, V2_THREAT_MODEL section 4.1). Data sent
-by `save_verified`, `freeze_verified` and delta sync may contain elements already erased from
+by `save_verified` and delta sync may contain elements already erased from
 containers, and content the buffer held before it was reset. When sending to receivers that should not see that
 content (typically clients), choose one:
 
@@ -157,7 +157,7 @@ Still keep in mind:
 ### 4.2 Forwarding client uplink data: rebuild with `save_compact`
 
 When the server forwards client A's uplink data to client B (chat, parties, trading, spectating), do
-**not** `load_verified` and then directly `save_verified` or `freeze_verified`. Validation checks only
+**not** `load_verified` and then directly `save_verified`. Validation checks only
 structure, not whether the bytes in holes and container slack are 0, so A can write anything there,
 `load_verified` still accepts it, and `save_verified` sends it to B unchanged. This is not a memory
 safety problem; it is a side channel that bypasses business checks.
