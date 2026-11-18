@@ -132,11 +132,3 @@ calibration did not reach the planned 2% noise qualification, so no speedup, equ
 candidate adoption can be inferred from it. Later Linux measurements may use WSL or Docker; inputs must
 still be fixed in advance, the environment recorded, and the noise qualification passed. This version's
 documents do not rewrite the scope, failure evidence or start conditions of earlier experiments.
-
-## Address model for directly received data (W9)
-
-A buffer obtained by direct receive (verified receive), like an ordinary load, resolves internal relative
-offsets with the flat address model (`origin + delta`), relying on the same disclosed
-implementation-defined behavior. The library no longer promises that pointers into received data are
-derived from the byte array of the receiving storage; `XBufferCore::canonical_bytes_at` is kept as a
-public interface for source compatibility, but no longer takes part in resolution inside the library.

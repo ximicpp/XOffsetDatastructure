@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # SC-8 differential: builds tests/fuzz/validation_outcomes.cpp from one
 # checkout twice, with exceptions (throwing entries wrapped by the try_*
-# entries; -DXOFFSET_OUTCOMES_NO_RAW drops the raw and receive columns, which
-# a build without exceptions does not have) and with -fno-exceptions (the
-# try_* entries return failures up the receive path), and requires, per
+# entries) and with -fno-exceptions (the try_* entries return failures up the
+# receive path), and requires, per
 # seed, the same typed load, reload and direct reload outcome for every
 # mutated wire, exact error messages included.
 #
@@ -21,7 +20,7 @@ flags=(-I"$dir" -isystem "$dir/external/typelayout/include")
 for lib in container core config throw_exception static_assert container_hash type_traits winapi intrusive predef; do
     flags+=(-isystem "$dir/external/boost/libs/$lib/include")
 done
-"$cxx" -O2 "${lang[@]}" "${flags[@]}" -DXOFFSET_OUTCOMES_NO_RAW "$dir/tests/fuzz/validation_outcomes.cpp" \
+"$cxx" -O2 "${lang[@]}" "${flags[@]}" "$dir/tests/fuzz/validation_outcomes.cpp" \
     -o "$out/outcomes-exceptions" & a=$!
 "$cxx" -O2 "${lang[@]}" "${flags[@]}" -fno-exceptions "$dir/tests/fuzz/validation_outcomes.cpp" \
     -o "$out/outcomes-no-exceptions" & b=$!

@@ -2,49 +2,45 @@
 // runs in CTest) and fuzz_v2_wire (libFuzzer, coverage guided).
 //
 // Builds random valid V2 wires (inline/heap strings, nested vectors, set, map,
-// holes left by mutation), then feeds mutated wires to five acceptors:
+// holes left by mutation), then feeds mutated wires to these acceptors:
 //   1. an independent spec oracle written here from the V2 format rules,
 //   2. the typed validator (XBuffer::load_verified<T>),
-//   3. the raw validator (receive_raw::validate<T>, flat),
-//   4. the verified receive path (begin_verified_receive/finish_verified),
-//   5. the in-place reload (XBuffer::reload_verified<T>) into ONE long-lived
+//   3. the in-place reload (XBuffer::reload_verified<T>) into ONE long-lived
 //      buffer: it must accept exactly what load_verified accepts, and an
 //      accepted reload must hold byte-identical payload (in particular gap and
 //      tail bytes left by every earlier reload read as zero) and re-save
 //      byte-identically; after a reject typed root access must throw.
-//   6. the direct reload (begin_verified_reload) into one long-lived buffer,
+//   4. the direct reload (begin_verified_reload) into one long-lived buffer,
 //      plus interrupted deliveries that must all reject;
-//   7. (R1) the same on slot storage: a fresh load, a reload and a direct
+//   5. (R1) the same on slot storage: a fresh load, a reload and a direct
 //      reload on movable slots must equal the VM load byte for byte, and the
 //      same mutations on a pinned slot must re-save the same wire.
-//   8. (trust tier P1) XReceiver<server_peer>::reload with XCheck::admit into
+//   6. (trust tier P1) XReceiver<server_peer>::reload with XCheck::admit into
 //      ONE long-lived buffer. It skips the graph walk, so it is not one more
 //      vote: it must accept every wire load_verified accepts, with the same
-//      payload, free table and re-save (as acceptor 5), and reject every wire
+//      payload, free table and re-save (as acceptor 3), and reject every wire
 //      the oracle rejects at the header stage; a wire it accepts beyond those
 //      is not read (the payload is the sender's on a trusted link). Its own
 //      parse must stay in bounds on any input (ASan).
-//   9. (client uplink, 3.5) XReceiver<from_client>::view with XCheck::bounds,
+//   7. (client uplink, 3.5) XReceiver<from_client>::view with XCheck::bounds,
 //      over a copy of the wire in a heap block of exactly its size. Not one
 //      more vote either: it must accept every dense wire load_verified accepts
 //      and read the same fields, refuse every sparse wire (a view needs the
 //      payload in one piece) and every wire the oracle rejects at the header
 //      stage; a wire it accepts beyond those is read whole through the view,
 //      in bounds (ASan): the walk does not look for overlap or key order.
-// Every acceptor must agree on accept/reject (raw/receive only see inputs whose
-// wire header is well formed). Acceptors 2, 5, 6 and 7 go through the
-// non-throwing entries (try_load_verified, try_reload_verified,
+// Every acceptor must agree on accept/reject. Acceptors 2, 3, 4 and 5 go
+// through the non-throwing entries (try_load_verified, try_reload_verified,
 // try_begin_verified_reload / try_finish); with exceptions on, typed_load
 // also runs the throwing load_verified and requires the same outcome, error
-// code and message. Without exceptions (XOFFSET_NO_EXCEPTIONS) the raw and
-// verified receive acceptors (3, 4), which have no non-throwing entry yet,
-// are skipped, as is the "root() throws after a reject" check. Accepted inputs are then read, mutated and
+// code and message. Without exceptions (XOFFSET_NO_EXCEPTIONS) the "root()
+// throws after a reject" check is skipped. Accepted inputs are then read, mutated and
 // re-saved; the re-saved wire must load again and round-trip byte-identically.
 // The mutated buffer is then copied with clone() and with clone_into() into
 // ONE long-lived buffer: both copies must hold its bytes and free table,
 // re-save identically and stay identical to it under the same next mutation.
 #pragma once
-// Acceptor 8 runs the real admit, also under ASan and without NDEBUG, where
+// Acceptor 6 runs the real admit, also under ASan and without NDEBUG, where
 // XOFFSET_FORCE_FULL_CHECK would otherwise make it the full check.
 #ifndef XOFFSET_FORCE_FULL_CHECK
 #define XOFFSET_FORCE_FULL_CHECK 0
@@ -70,14 +66,11 @@
 #include <vector>
 
 namespace xo = XOffsetDatastructure;
-namespace rr = xo::detail::receive_raw;
 
 // Older libraries (the differential's base) predate the switch.
 #if !defined(XOFFSET_NO_EXCEPTIONS)
 #define XOFFSET_NO_EXCEPTIONS 0
 #endif
-// Raw and verified receive report rejection only by exception.
-constexpr bool kRawAcceptors = !XOFFSET_NO_EXCEPTIONS;
 
 // The root as a plain reference: TypedXBuffer::plain_root() (root() returns a
 // proxy), or root() in older libraries (the differential's base).
@@ -538,7 +531,7 @@ void check_admit(const std::string& w, const Oracle& o, Buffer* typed, const std
     static Buffer target = Buffer::create(
         4096, xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic));
     static xo::XReceiver<xo::XLink::server_peer> rx(xo::XBuffer::maximum_capacity(kLimit));
-    static_assert(!xo::detail::force_full_check, "acceptor 8 needs the real admit");
+    static_assert(!xo::detail::force_full_check, "acceptor 6 needs the real admit");
     const xo::XStatus st = rx.reload(target, w);
     if (typed) {
         if (!st) fail(id + ": admit rejected a wire load_verified accepts (" + st.error().message + ")");
@@ -555,7 +548,7 @@ std::string dump(const fz::Root& r);
 // Acceptor 9: the bounds-checked view of a client uplink.
 void check_view(const std::string& w, const Oracle& o, Buffer* typed, const std::string& id) {
     static const xo::XReceiver<xo::XLink::from_client> rx(xo::XBuffer::maximum_capacity(kLimit));
-    static_assert(!xo::detail::force_full_check, "acceptor 9 needs the real bounds walk");
+    static_assert(!xo::detail::force_full_check, "acceptor 7 needs the real bounds walk");
     // Exactly the wire's bytes on the heap (8-aligned): a read past them is an ASan error.
     const std::unique_ptr<std::byte[]> exact(new std::byte[w.size() ? w.size() : 1]);
     if (!w.empty()) std::memcpy(exact.get(), w.data(), w.size());
@@ -794,68 +787,6 @@ Unpacked unpack(const std::string& wire) {
     return u;
 }
 
-#if !XOFFSET_NO_EXCEPTIONS
-template <class Root = fz::Root>
-bool raw_accepts(const std::string& wire, std::string* error) {
-    auto u = unpack(wire);
-    const auto used = std::size_t(u.h.used_bytes);
-    auto* base = u.base();
-    try {
-        auto proof = rr::validate<Root>(base, used, u.h.root_offset, u.holes,
-                                            std::size_t(u.h.hole_count), std::pmr::new_delete_resource(),
-                                            u.gaps.data(), u.gaps.size());
-        (void)proof;
-        return true;
-    } catch (const xo::XException& e) {
-        if (error) *error = e.what();
-        return false;
-    }
-}
-
-template <class Root = fz::Root>
-bool receive_accepts(const std::string& wire, std::string* error) {
-    auto u = unpack(wire);
-    const auto used = std::size_t(u.h.used_bytes);
-    try {
-        auto token = xo::begin_verified_receive<Root>(used, xo::XBuffer::maximum_capacity(kLimit), std::size_t(u.h.hole_count),
-                                                          std::size_t(u.h.extent_count));
-        {
-            auto op = token.acquire_operation();
-            auto hb = op.header_bytes(); std::memcpy(hb.data(), wire.data(), kHeader);
-            // Scatter: write only extents (gap bytes stay as received
-            // storage). payload_bytes() is payload [48, used).
-            auto pb = op.payload_bytes();
-            auto put = [&](std::uint64_t from, std::uint64_t to) {
-                if (to > from) std::memcpy(pb.data() + (from - kBegin), u.base() + from, to - from);
-            };
-            if (u.h.extent_count == 0) put(kBegin, used);
-            else {
-                std::uint64_t pos = kBegin;
-                for (const auto& g : u.gaps) {
-                    put(pos, g.offset);
-                    pos = std::uint64_t(g.offset) + g.bytes;
-                }
-                put(pos, used);
-            }
-            // Empty spans have null data(); memcpy requires non-null pointers.
-            auto eb = op.extent_bytes(); if (!eb.empty()) std::memcpy(eb.data(), u.table, eb.size());
-            auto lb = op.hole_bytes(); if (!lb.empty()) std::memcpy(lb.data(), u.holes, lb.size());
-            op.complete(kHeader, pb.size(), lb.size(), eb.size());
-        }
-        auto received = xo::finish_verified<Root>(token);
-        (void)received;
-        return true;
-    } catch (const xo::XException& e) {
-        if (error) *error = e.what();
-        return false;
-    }
-}
-#else
-template <class Root = fz::Root>
-bool raw_accepts(const std::string&, std::string*) { std::abort(); }
-template <class Root = fz::Root>
-bool receive_accepts(const std::string&, std::string*) { std::abort(); }
-#endif
 
 // Semantic dump of a root (for round-trip comparison).
 std::string dump(const fz::Root& r) {
@@ -1337,7 +1268,7 @@ enum class Outcome { Accepted, HeaderReject, PayloadReject };
 // an accepted input is then read, mutated and re-saved (see exercise()).
 Outcome check_case(const std::string& w, std::mt19937_64& rng, const std::string& id) {
     const auto o = oracle(w);
-    std::string terr, rerr, verr;
+    std::string terr;
     auto typed = typed_load(w, &terr);
     outcome_add("T", bool(typed), terr);
     if (bool(typed) != o.ok)
@@ -1360,8 +1291,7 @@ Outcome check_case(const std::string& w, std::mt19937_64& rng, const std::string
     compare_inflated(w, typed, terr, o, "case " + id);
 #if defined(XOFFSET_TRY_ENTRIES_API)
     {
-        // load_verified_with_resource (what load_verified_with_scratch uses):
-        // the validation bitmaps come from another upstream (a monotonic
+        // load_verified_with_resource: the validation bitmaps come from another upstream (a monotonic
         // resource over a small stack buffer, so large payloads spill), with
         // the same verdict, message and payload.
         alignas(std::max_align_t) unsigned char arena[2048];
@@ -1377,18 +1307,6 @@ Outcome check_case(const std::string& w, std::mt19937_64& rng, const std::string
             fail("case " + id + ": load_verified_with_resource loaded a different payload");
     }
 #endif
-    if (kRawAcceptors && (o.ok || o.stage == Oracle::Stage::Payload)) {
-        const bool raw = raw_accepts(w, &rerr);
-        const bool recv = receive_accepts(w, &verr);
-        outcome_add("R", raw, rerr);
-        outcome_add("V", recv, verr);
-        if (raw != o.ok)
-            fail("case " + id + ": raw=" + (raw ? "accept" : "reject(" + rerr + ")") +
-                 " oracle=" + (o.ok ? "accept" : "reject(" + o.why + ")"));
-        if (recv != o.ok)
-            fail("case " + id + ": receive=" + (recv ? "accept" : "reject(" + verr + ")") +
-                 " oracle=" + (o.ok ? "accept" : "reject(" + o.why + ")"));
-    }
 #if defined(XOFFSET_SLOT_STORAGE_API)
     check_slots(w, bool(typed), typed ? &*typed : nullptr, "case " + id);
     if (o.ok) {

@@ -51,7 +51,7 @@ static void same_arena_held_unit_regression() {
     auto& actual = test.root<xm::ViewSnapshot>();
     stdm::ViewSnapshot expected;
     HeldIndex actual_index, expected_index;
-    XOffsetRunnerT<XoTrustedModel, false>::BlockOps ops;
+    XOffsetRunnerT<XoTrustedModel>::BlockOps ops;
 
     const auto add = [](xm::ViewDelta& delta, int32_t id, char letter) {
         WorldUnit unit;

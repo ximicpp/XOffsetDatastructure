@@ -26,15 +26,6 @@ if(NOT XOFFSET_STORAGE_ONLY)
     foreach(header IN LISTS XOFFSET_FULL_OWN_HEADERS)
         install(FILES "${PROJECT_SOURCE_DIR}/${header}" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
     endforeach()
-    foreach(runtime IN ITEMS xoffset_validation_scratch xoffset_snapshot_index_runtime)
-        if(TARGET ${runtime})
-            target_include_directories(${runtime} INTERFACE $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
-            install(TARGETS ${runtime} EXPORT XOffsetTargets
-                RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-                LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-                ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-        endif()
-    endforeach()
     foreach(include_dir IN LISTS BOOST_INCLUDE_DIRS TYPELAYOUT_INCLUDE_DIRS)
         install(DIRECTORY "${include_dir}/" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/xoffset-deps")
     endforeach()

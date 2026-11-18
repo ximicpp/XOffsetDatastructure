@@ -1,13 +1,16 @@
 #pragma once
-// Additive source seam. The complete main and strict recursive raw/future domain
-// must be available; this file does not publish a receive factory or friend.
+// Object lifetime inside the arena: the compile-time domain of types whose
+// lifetime the library restarts in place (implicit-lifetime ordinary records,
+// scalars, arrays and container heads), and the helpers that begin arrays,
+// restart inline heads after a move, and shift or copy runs of elements.
 #include "xoffsetdatastructure.hpp"
-#include "receive_raw.hpp"
 #include <cassert>
 #include <cstring>
 #include <limits>
 #include <exception>
 #include <new>
+#include <type_traits>
+#include <utility>
 
 #if defined(_MSC_VER)
 #define XOFFSET_DETAIL_SHIFT_INLINE __forceinline
@@ -17,55 +20,205 @@
 #define XOFFSET_DETAIL_SHIFT_INLINE inline
 #endif
 
+namespace XOffsetDatastructure {
+
+// P2996 has no portable query for [[no_unique_address]]. This is a source-level
+// opt-in contract, NOT inferred from physical nonoverlap alone. It promises all
+// reflected members are ordinary, non-potentially-overlapping subobjects.
+template<class T> struct wire_record_layout {
+    static constexpr bool ordinary_members = false;
+};
+template<class K, class V> struct wire_record_layout<XKeyValue<K, V>> {
+    static constexpr bool ordinary_members = true;
+};
+
+} // namespace XOffsetDatastructure
+
 namespace XOffsetDatastructure::detail {
 
-// The receive future gate checks the COMPLETE surface, real reflected fields
-// and the explicit construction frontier. It never calls this core dispatch
-// predicate, so this direction does not form a can_relocate/future-gate cycle.
+// V2.1 container head: {data_delta, size, capacity}, 12 bytes, 4-aligned. The
+// data rel32 (and an inline string's bytes) start at the head's address.
+struct OwningHeadBytes {
+    std::int32_t data_delta;
+    std::uint32_t size, capacity;
+};
+static_assert(sizeof(OwningHeadBytes) == 12);
+static_assert(offsetof(OwningHeadBytes, data_delta) == 0);
+static_assert(offsetof(OwningHeadBytes, size) == 4);
+static_assert(offsetof(OwningHeadBytes, capacity) == 8);
+
+template<class T> consteval bool implicit_lifetime_record() {
+    if constexpr (std::is_const_v<T> || std::is_volatile_v<T>) return false;
+    if constexpr (fixed_detail::std_implicit_lifetime<T>()) return true;
+    // Independent [class.prop] branch, needed by the fixed SDK whose trait can
+    // return false for an aggregate with an implicit nontrivial destructor.
+    // No std specialization or constructor call. The explicit ordinary source
+    // attestation remains necessary; a user-provided destructor is rejected.
+    if constexpr (std::is_class_v<T> && std::is_aggregate_v<T> &&
+                  wire_record_layout<T>::ordinary_members) {
+        return schema::implicit_lifetime_aggregate<T>();
+    } else return false;
+}
+
+template<class T> consteval bool owning_head_layout() {
+    // The recognition traits use is_base_of. A user-derived head with a
+    // noexcept default constructor is not thereby a no-callback library head.
+    return fixed_detail::is_owning_head<T>::value &&
+        sizeof(T) == 12 && alignof(T) == 4 &&
+        std::is_standard_layout_v<T> &&
+        std::is_nothrow_default_constructible_v<T> &&
+        offsetof(T, data_delta) == 0 && offsetof(T, size_) == 4 &&
+        offsetof(T, capacity_) == 8;
+}
+
+// Keys of an ordered set or map in the domain: integers, enums ordered by the
+// built-in < (no user operator< or operator<=>, bool excluded), and strings.
+template<class Key> consteval bool builtin_key_order() {
+    if constexpr (std::is_integral_v<Key>) return true;
+    else if constexpr (std::is_enum_v<Key>) {
+        if constexpr (std::is_same_v<std::underlying_type_t<Key>, bool>) return false;
+        else return requires(const Key& a, const Key& b) {
+                { a < b } noexcept -> std::same_as<bool>;
+            } &&
+            !requires(const Key& a, const Key& b) { operator<(a, b); } &&
+            !requires(const Key& a, const Key& b) { operator<=>(a, b); };
+        // Explicit function-call syntax considers ADL functions, never builtin
+        // operators. The expression check also rejects ambiguous/invalid comparison.
+    } else return is_fixed_string_v<Key> &&
+        (std::is_same_v<Key, XString> || std::is_same_v<Key, XFixedString>);
+}
+
+template<class T, std::size_t I, std::size_t J = I + 1>
+consteval bool member_ranges_disjoint() {
+    constexpr auto count = schema::member_count_v<T>;
+    if constexpr (J >= count) return true;
+    else {
+        using a = schema::member_t<T, I>;
+        using b = schema::member_t<T, J>;
+        if constexpr (a::is_bit_field || b::is_bit_field)
+            return false;
+        else {
+            using A = typename a::type;
+            using B = typename b::type;
+            constexpr auto x = a::offset;
+            constexpr auto y = b::offset;
+            return (x + sizeof(A) <= y || y + sizeof(B) <= x) &&
+                member_ranges_disjoint<T, I, J + 1>();
+        }
+    }
+}
+
+template<class T> consteval bool inplace_lifetime_supported();
+
+template<class T, std::size_t I> consteval bool inplace_lifetime_member() {
+    using member = schema::member_t<T, I>;
+    if constexpr (member::is_bit_field) return false;
+    else {
+        using M = typename member::type;
+        constexpr auto offset = member::offset;
+        return offset <= sizeof(T) && sizeof(M) <= sizeof(T) - offset &&
+            inplace_lifetime_supported<M>() && member_ranges_disjoint<T, I>();
+    }
+}
+
+// The library may begin and restart the lifetime of T in place: scalars,
+// non-bool enums, arrays, container heads with the descriptor layout over such
+// elements (ordered keys by builtin_key_order), and aggregate implicit-lifetime
+// standard-layout records without bases or user special members that declare
+// wire_record_layout ordinary members, recursively.
+template<class T> consteval bool inplace_lifetime_supported() {
+    if constexpr (std::is_const_v<T> || std::is_volatile_v<T> ||
+                  std::is_reference_v<T> || std::is_pointer_v<T> ||
+                  std::is_member_pointer_v<T> || std::is_union_v<T>)
+        return false;
+    else if constexpr (!v1_wire_admitted<T>()) return false;
+    else if constexpr (std::is_array_v<T>)
+        return std::extent_v<T> != 0 &&
+            inplace_lifetime_supported<std::remove_extent_t<T>>();
+    else if constexpr (fixed_size_scalar<T>) return true;
+    else if constexpr (std::is_enum_v<T>)
+        return !std::is_same_v<std::underlying_type_t<T>, bool>;
+    else if constexpr (is_fixed_string_v<T>)
+        return owning_head_layout<T>();
+    else if constexpr (is_fixed_flat_map_v<T>)
+        return owning_head_layout<T>() &&
+            inplace_lifetime_supported<typename T::value_type>() &&
+            builtin_key_order<typename T::key_type>();
+    else if constexpr (is_fixed_flat_set_v<T>)
+        return owning_head_layout<T>() &&
+            inplace_lifetime_supported<typename T::value_type>() &&
+            builtin_key_order<typename T::value_type>();
+    else if constexpr (is_fixed_vector_v<T>)
+        return owning_head_layout<T>() &&
+            inplace_lifetime_supported<typename T::value_type>();
+    else if constexpr (std::is_class_v<T>) {
+        if constexpr (!std::is_aggregate_v<T> || !implicit_lifetime_record<T>() ||
+                      !std::is_standard_layout_v<T> ||
+                      schema::base_count_v<T> != 0 ||
+                      !schema::only_implicit_special_members<T>() ||
+                      !wire_record_layout<T>::ordinary_members)
+            return false;
+        else return []<std::size_t... I>(std::index_sequence<I...>) {
+            return (inplace_lifetime_member<T, I>() && ...);
+        }(std::make_index_sequence<schema::member_count_v<T>>{});
+    } else return false;
+}
+
+template<class T> consteval bool contains_owning_head();
+// Per member, as a function template: a lambda nested in the pack expansion
+// crashes Clang 18, and consteval calls from a lambda need P2564 (C++23).
+template<class T, std::size_t I>
+consteval bool contains_owning_head_member() {
+    return contains_owning_head<typename schema::member_t<T, I>::type>();
+}
+
+// T holds a container head inline (itself, an array element or a member,
+// recursively): its lifetime is not implicit and is restarted head by head.
+template<class T> consteval bool contains_owning_head() {
+    if constexpr (fixed_detail::is_owning_head<T>::value) return true;
+    else if constexpr (std::is_array_v<T>)
+        return contains_owning_head<std::remove_extent_t<T>>();
+    else if constexpr (std::is_class_v<T>) {
+        return []<std::size_t... I>(std::index_sequence<I...>) consteval {
+            return (contains_owning_head_member<T, I>() || ...);
+        }(std::make_index_sequence<schema::member_count_v<T>>{});
+    } else return false;
+}
+
+// Restarts the inline heads of one T whose containing array or ordinary outer
+// was restarted; the head bytes are kept. Out-of-line children stay live and
+// are not reached.
 template<class T>
-consteval bool future_custom_lifetime_supported() {
-    if constexpr (wire_activation<T>::enabled && wire_future_lifetime<T>::enabled)
-        return receive_raw::future_supported<T>();
-    else return false;
+void restart_inline_heads(char* address) noexcept {
+    static_assert(inplace_lifetime_supported<T>());
+    if constexpr (fixed_detail::is_owning_head<T>::value) {
+        static_assert(owning_head_layout<T>());
+        OwningHeadBytes saved;
+        std::memcpy(&saved, address, sizeof(saved));
+        auto* object = ::new (static_cast<void*>(address)) T;
+        object->data_delta=saved.data_delta;
+        object->size_=saved.size; object->capacity_=saved.capacity;
+    } else if constexpr (std::is_array_v<T>) {
+        using E=std::remove_extent_t<T>;
+        for(std::size_t i=0;i<std::extent_v<T>;++i)
+            restart_inline_heads<E>(address+i*sizeof(E));
+    } else if constexpr (std::is_class_v<T>) {
+        static_for<schema::member_count_v<T>>([&](auto index) {
+            using member = schema::member_t<T, decltype(index)::value>;
+            using M=typename member::type;
+            restart_inline_heads<M>(address+member::offset);
+        });
+    }
 }
 
-// W9: every destination is used as given (flat address model for ordinary and
-// receive storage alike); no canonical receive-array lookup.
-template<class T>
-void* future_custom_destination(void* storage) noexcept {
-    return storage;
-}
-
-// Complete-T policies are semantic customization contracts, NOT member-only
-// activation. A throwing construction must leave no live destination T or
-// owned subobject behind; ordinary native whole-object constructors naturally
-// perform that cleanup. Source reads finish before any caller commits prefix
-// relocation. The ordinary implicit-object-creation helper is never used here.
-template<class T, class Alloc>
-void future_default_construct(void* storage, const Alloc& alloc) {
-    static_assert(future_custom_lifetime_supported<T>());
-    const auto binding = fixed_detail::allocator_ref_of(alloc);
-    wire_future_lifetime<T>::default_construct(future_custom_destination<T>(storage), binding);
-}
-
-template<class T, class Src, class Alloc>
-void future_transfer_construct(void* storage, Src&& source, const Alloc& alloc) {
-    static_assert(future_custom_lifetime_supported<T>());
-    const auto binding = fixed_detail::allocator_ref_of(alloc);
-    wire_future_lifetime<T>::transfer_construct(future_custom_destination<T>(storage),
-                                               std::forward<Src>(source), binding);
-}
-
-template<class T>
-void future_relocate_construct(T* destination, T& source) noexcept {
-    static_assert(future_custom_lifetime_supported<T>());
-    static_assert(std::is_nothrow_destructible_v<T>);
-    // The hook starts the WHOLE destination, transfers/rebases its heads, and
-    // leaves the source WHOLE T live with empty ownership. The original caller
-    // then destroys that source exactly once. No allocation/user callback is
-    // permitted by this commit-stage contract.
-    wire_future_lifetime<T>::relocate(
-        static_cast<T*>(future_custom_destination<T>(destination)), source);
+// Caller has established the complete array object at this same address, kept
+// its representation, and completed every potentially throwing preparation.
+// Only INLINE heads are restarted; still-live out-of-line children are untouched.
+template<class T> requires(inplace_lifetime_supported<T>())
+void restart_inline_prefix(T* data, std::size_t live_count) noexcept {
+    if constexpr (contains_owning_head<T>())
+        for (std::size_t i = 0; i < live_count; ++i)
+            restart_inline_heads<T>(reinterpret_cast<char*>(data + i));
 }
 
 // Private preconditions are established BEFORE the allocator call at every
@@ -77,7 +230,6 @@ T* begin_dynamic_array(void* storage, std::size_t capacity) noexcept {
     if (capacity == 0) return nullptr;
     assert(storage && capacity <= (std::numeric_limits<std::size_t>::max)() / sizeof(T));
     assert(reinterpret_cast<std::uintptr_t>(storage) % alignof(T) == 0);
-    // W9: flat storage address (no canonical receive-array lookup).
     // An explicit nonallocating allocation-function invocation implicitly
     // creates the ARRAY, even when its element is nonimplicit-lifetime.
     // Unknown-bound array pointer conversion/decay preserves that array
@@ -94,22 +246,19 @@ T* rebuild_dynamic_array(void* storage, std::size_t capacity,
     assert(storage && live_size <= capacity &&
            capacity <= (std::numeric_limits<std::size_t>::max)() / sizeof(T));
     assert(reinterpret_cast<std::uintptr_t>(storage) % alignof(T) == 0);
-    // W9: flat storage address (no canonical receive-array lookup).
-    if constexpr (receive_raw::future_supported<T>()) {
+    if constexpr (inplace_lifetime_supported<T>()) {
         // memmove's temporary character copy preserves the live representation
         // around implicit object creation. This is NOT start_lifetime_as_array:
         // no bit_cast-style determination of dirty spare bool/enum values.
         auto* first = *static_cast<T(*)[]>(std::memmove(storage, storage, capacity * sizeof(T)));
         (void)(first + capacity);
-        // Only the old LIVE prefix's inline nonimplicit heads are activated.
+        // Only the old LIVE prefix's inline nonimplicit heads are restarted.
         // Out-of-line objects remain live and are not reconstructed/scanned.
         if constexpr (!std::is_scalar_v<T>)
-            receive_raw::reactivate_inline_prefix<T>(first, live_size);
+            restart_inline_prefix<T>(first, live_size);
         return first;
     } else {
-        // Legacy unsupported/incomplete-custom types do not acquire mutable-C
-        // contract. The initial receive API must reject them recursively.
-        // Preserve their historical path instead of silently forcing fresh.
+        // Types outside the domain keep the storage address as it is.
         return static_cast<T*>(storage);
     }
 }
@@ -117,16 +266,14 @@ T* rebuild_dynamic_array(void* storage, std::size_t capacity,
 template<class T>
 consteval bool ordinary_outer_lifetime_supported() {
     if constexpr (std::is_class_v<T> && !fixed_detail::is_owning_head<T>::value &&
-                  std::is_aggregate_v<T> && !wire_activation<T>::enabled &&
-                  wire_record_layout<T>::ordinary_members)
-        return raw_implicit_lifetime<T>() && receive_raw::future_supported<T>();
+                  std::is_aggregate_v<T> && wire_record_layout<T>::ordinary_members)
+        return implicit_lifetime_record<T>() && inplace_lifetime_supported<T>();
     else return false;
 }
 
 template<class T>
 T* begin_fresh_ordinary_outer(void* zeroed) noexcept {
     if constexpr (ordinary_outer_lifetime_supported<T>()) {
-        // W9: flat slot address (no canonical receive-array lookup).
         // The original caller already zeroed this whole fresh/dead slot.
         // A supported implicit ordinary T is actually created before forming
         // member addresses. Nonimplicit heads still use the original walk.
@@ -137,7 +284,7 @@ T* begin_fresh_ordinary_outer(void* zeroed) noexcept {
 template<class T>
 T* begin_relocated_ordinary_outer(T* destination, const T& source) noexcept {
     if constexpr (ordinary_outer_lifetime_supported<T>()) {
-        void* storage = destination; // W9: flat slot address
+        void* storage = destination;
         // Disjoint live source -> dead slot, only sizeof(T) INLINE bytes.
         // The following original walk rebases heads and empties source owns.
         return static_cast<T*>(std::memcpy(storage, &source, sizeof(T)));
@@ -149,8 +296,7 @@ T* begin_relocated_ordinary_outer(T* destination, const T& source) noexcept {
 // creation of the ordinary outers and scalars as in rebuild_dynamic_array.
 // Only the INLINE heads of the moved run are then restarted, with every
 // self-relative delta rebased by the known displacement. Out-of-line payloads
-// keep their addresses and are neither scanned nor restarted. Custom activation
-// or lifetime policies keep the per-element relocate_construct path.
+// keep their addresses and are neither scanned nor restarted.
 template<class T> consteval bool shift_rebase_domain();
 // Per member, as a function template: a lambda nested in the pack expansion
 // crashes Clang 18, and consteval calls from a lambda need P2564 (C++23).
@@ -163,8 +309,7 @@ consteval bool shift_rebase_domain_member() {
 
 template<class T>
 consteval bool shift_rebase_domain() {
-    if constexpr (wire_activation<T>::enabled || future_custom_lifetime_supported<T>()) return false;
-    else if constexpr (fixed_detail::is_owning_head<T>::value) return raw_descriptor_layout<T>();
+    if constexpr (fixed_detail::is_owning_head<T>::value) return owning_head_layout<T>();
     else if constexpr (std::is_array_v<T>) return shift_rebase_domain<std::remove_extent_t<T>>();
     else if constexpr (std::is_scalar_v<T>) return true;
     else if constexpr (std::is_class_v<T>) {
@@ -179,7 +324,7 @@ template<class T>
 consteval bool shift_relocate_supported() {
     if constexpr (std::is_trivially_copyable_v<T> ||
                   !fixed_detail::can_relocate_without_allocation<T>()) return false;
-    else if constexpr (!receive_raw::future_supported<T>() || !raw_needs_activation<T>()) return false;
+    else if constexpr (!inplace_lifetime_supported<T>() || !contains_owning_head<T>()) return false;
     else if constexpr (fixed_detail::is_owning_head<T>::value) return shift_rebase_domain<T>();
     else return ordinary_outer_lifetime_supported<T>() && shift_rebase_domain<T>();
 }
@@ -245,7 +390,7 @@ template<class T>
 XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_inline_value(char* address, ShiftRun& run) noexcept {
     if constexpr (fixed_detail::is_owning_head<T>::value) {
         // Descriptor layout {data_delta, size_, capacity_} is checked by
-        // raw_descriptor_layout<T>() in shift_rebase_domain.
+        // owning_head_layout<T>() in shift_rebase_domain.
         std::int32_t data_delta;
         std::uint32_t size, capacity;
         std::memcpy(&data_delta, address, 4);
@@ -263,10 +408,10 @@ XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_inline_value(char* address, ShiftR
         object->capacity_ = capacity;
     } else if constexpr (std::is_array_v<T>) {
         using E = std::remove_extent_t<T>;
-        if constexpr (raw_needs_activation<E>())
+        if constexpr (contains_owning_head<E>())
             for (std::size_t i = 0; i < std::extent_v<T>; ++i)
                 shift_rebase_inline_value<E>(address + i * sizeof(E), run);
-    } else if constexpr (std::is_class_v<T> && raw_needs_activation<T>()) {
+    } else if constexpr (std::is_class_v<T> && contains_owning_head<T>()) {
         shift_rebase_members<T>(address, run, std::make_index_sequence<schema::member_count_v<T>>{});
     }
 }
@@ -275,7 +420,7 @@ template<class T, std::size_t I>
 XOFFSET_DETAIL_SHIFT_INLINE void shift_rebase_member(char* address, ShiftRun& run) noexcept {
     using member = schema::member_t<T, I>;
     using M = typename member::type;
-    if constexpr (raw_needs_activation<M>())
+    if constexpr (contains_owning_head<M>())
         shift_rebase_inline_value<M>(address + member::offset, run);
 }
 
@@ -313,11 +458,11 @@ void empty_vacated_slot(T* slot) noexcept {
         slot->capacity_ = 0;
     } else if constexpr (std::is_array_v<T>) {
         for (auto& element : *slot) empty_vacated_slot(&element);
-    } else if constexpr (std::is_class_v<T> && raw_needs_activation<T>()) {
+    } else if constexpr (std::is_class_v<T> && contains_owning_head<T>()) {
         static_for<schema::member_count_v<T>>([&](auto index) {
             using member = schema::member_t<T, decltype(index)::value>;
             using M = typename member::type;
-            if constexpr (raw_needs_activation<M>())
+            if constexpr (contains_owning_head<M>())
                 empty_vacated_slot(&member::get(*slot));
         });
     }
@@ -329,7 +474,7 @@ void empty_vacated_slot(T* slot) noexcept {
 // fresh segment: one memcpy plus a fix-up walk when the source tiles one byte
 // range, otherwise a compacting preorder walk. The domain is the SHIFT domain
 // extended into container elements: plain heads, scalars, arrays and ordinary
-// records, every alignment <= 8, no custom activation/lifetime.
+// records, every alignment <= 8.
 template<class T> consteval bool subtree_copy_domain();
 // Per member, as a function template: a lambda nested in the pack expansion
 // crashes Clang 18, and consteval calls from a lambda need P2564 (C++23).
@@ -342,10 +487,9 @@ consteval bool subtree_copy_domain_member() {
 
 template<class T>
 consteval bool subtree_copy_domain() {
-    if constexpr (alignof(T) > 8 || wire_activation<T>::enabled ||
-                  future_custom_lifetime_supported<T>()) return false;
+    if constexpr (alignof(T) > 8) return false;
     else if constexpr (fixed_detail::is_owning_head<T>::value) {
-        if constexpr (!raw_descriptor_layout<T>()) return false;
+        if constexpr (!owning_head_layout<T>()) return false;
         else if constexpr (is_fixed_string_v<T>) return true;
         else return subtree_copy_domain<typename T::value_type>();
     } else if constexpr (std::is_array_v<T>) return subtree_copy_domain<std::remove_extent_t<T>>();
@@ -364,8 +508,7 @@ consteval bool subtree_copy_domain() {
 // (assign_range plus padding zeroing); others need the subtree domain.
 template<class T>
 consteval bool subtree_copy_supported() {
-    if constexpr (wire_activation<T>::enabled || future_custom_lifetime_supported<T>()) return false;
-    else if constexpr (std::is_trivially_copyable_v<T>)
+    if constexpr (std::is_trivially_copyable_v<T>)
         return !std::is_const_v<T> && !std::is_volatile_v<T> &&
                std::is_trivially_copy_constructible_v<T> && std::is_trivially_destructible_v<T>;
     else return subtree_copy_domain<T>();
@@ -400,7 +543,7 @@ void subtree_measure_elements(const E* data, std::uint32_t size, std::uint32_t c
     if (!data || capacity == 0) return;
     extent.add(data, fixed_detail::block_bytes_of(static_cast<std::uint32_t>(capacity * sizeof(E))));
     if (size != 0) extent.exact += fixed_detail::block_bytes_of(static_cast<std::uint32_t>(size * sizeof(E)));
-    if constexpr (raw_needs_activation<E>())
+    if constexpr (contains_owning_head<E>())
         for (std::uint32_t i = 0; i < size; ++i) subtree_measure_value<E>(data[i], extent);
 }
 
@@ -419,11 +562,11 @@ void subtree_measure_value(const T& value, SubtreeExtent& extent) noexcept {
         subtree_measure_elements<E>(head.data(), head.size_, head.capacity_, extent);
     } else if constexpr (std::is_array_v<T>) {
         for (const auto& element : value) subtree_measure_value(element, extent);
-    } else if constexpr (std::is_class_v<T> && raw_needs_activation<T>()) {
+    } else if constexpr (std::is_class_v<T> && contains_owning_head<T>()) {
         static_for<schema::member_count_v<T>>([&](auto index) {
             using member = schema::member_t<T, decltype(index)::value>;
             using M = typename member::type;
-            if constexpr (raw_needs_activation<M>()) subtree_measure_value<M>(member::get(value), extent);
+            if constexpr (contains_owning_head<M>()) subtree_measure_value<M>(member::get(value), extent);
         });
     }
 }
@@ -446,10 +589,10 @@ template<class T> void subtree_fix_value(char* address) noexcept;
 // Live elements get the M6 padding zeroing of the element-wise path.
 template<class E>
 void subtree_fix_elements(char* data, std::uint32_t size) noexcept {
-    if constexpr (raw_needs_activation<E>() || padding_ranges<E>.size() != 0) {
+    if constexpr (contains_owning_head<E>() || padding_ranges<E>.size() != 0) {
         for (std::uint32_t i = 0; i < size; ++i) {
             char* element = data + std::size_t(i) * sizeof(E);
-            if constexpr (raw_needs_activation<E>()) subtree_fix_value<E>(element);
+            if constexpr (contains_owning_head<E>()) subtree_fix_value<E>(element);
             if constexpr (padding_ranges<E>.size() != 0)
                 scrub_implicit_padding(std::launder(reinterpret_cast<E*>(element)));
         }
@@ -459,7 +602,7 @@ void subtree_fix_elements(char* data, std::uint32_t size) noexcept {
 template<class T>
 void subtree_fix_value(char* address) noexcept {
     if constexpr (fixed_detail::is_owning_head<T>::value) {
-        // Descriptor layout is checked by raw_descriptor_layout<T>().
+        // Descriptor layout is checked by owning_head_layout<T>().
         std::int32_t data_delta;
         std::uint32_t size, capacity;
         std::memcpy(&data_delta, address, 4);
@@ -475,14 +618,14 @@ void subtree_fix_value(char* address) noexcept {
         }
     } else if constexpr (std::is_array_v<T>) {
         using E = std::remove_extent_t<T>;
-        if constexpr (raw_needs_activation<E>())
+        if constexpr (contains_owning_head<E>())
             for (std::size_t i = 0; i < std::extent_v<T>; ++i)
                 subtree_fix_value<E>(address + i * sizeof(E));
-    } else if constexpr (std::is_class_v<T> && raw_needs_activation<T>()) {
+    } else if constexpr (std::is_class_v<T> && contains_owning_head<T>()) {
         static_for<schema::member_count_v<T>>([&](auto index) {
             using member = schema::member_t<T, decltype(index)::value>;
             using M = typename member::type;
-            if constexpr (raw_needs_activation<M>())
+            if constexpr (contains_owning_head<M>())
                 subtree_fix_value<M>(address + member::offset);
         });
     }
@@ -567,14 +710,14 @@ void subtree_compact_value(char* address, const T& source, char*& cursor) noexce
         }
     } else if constexpr (std::is_array_v<T>) {
         using E = std::remove_extent_t<T>;
-        if constexpr (raw_needs_activation<E>())
+        if constexpr (contains_owning_head<E>())
             for (std::size_t i = 0; i < std::extent_v<T>; ++i)
                 subtree_compact_value<E>(address + i * sizeof(E), source[i], cursor);
-    } else if constexpr (std::is_class_v<T> && raw_needs_activation<T>()) {
+    } else if constexpr (std::is_class_v<T> && contains_owning_head<T>()) {
         static_for<schema::member_count_v<T>>([&](auto index) {
             using member = schema::member_t<T, decltype(index)::value>;
             using M = typename member::type;
-            if constexpr (raw_needs_activation<M>())
+            if constexpr (contains_owning_head<M>())
                 subtree_compact_value<M>(address + member::offset,
                                          member::get(source), cursor);
         });
@@ -590,10 +733,10 @@ char* subtree_compact_elements(const E* source, std::uint32_t size,
     const auto live = static_cast<std::uint32_t>(size * sizeof(E));
     cursor += fixed_detail::block_bytes_of(live);
     std::memcpy(block, static_cast<const void*>(source), live);
-    if constexpr (raw_needs_activation<E>() || padding_ranges<E>.size() != 0) {
+    if constexpr (contains_owning_head<E>() || padding_ranges<E>.size() != 0) {
         for (std::uint32_t i = 0; i < size; ++i) {
             char* element = block + std::size_t(i) * sizeof(E);
-            if constexpr (raw_needs_activation<E>()) subtree_compact_value<E>(element, source[i], cursor);
+            if constexpr (contains_owning_head<E>()) subtree_compact_value<E>(element, source[i], cursor);
             if constexpr (padding_ranges<E>.size() != 0)
                 scrub_implicit_padding(std::launder(reinterpret_cast<E*>(element)));
         }

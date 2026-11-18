@@ -312,45 +312,6 @@ public:
         return owner.reserve_v(logical_bytes, maximum_capacity, pool, false);
     }
 
-    // Internal direct-receive owner. All explicit maximum bytes are made
-    // accessible before beginning one byte-array lifetime. This commits virtual
-    // backing/accounting up front, but does not initialize/touch the whole max.
-    // Later grow_to retains that array and zeroes only newly logical bytes.
-    // W9: the array (canonical_byte_origin) is still begun and registered for
-    // the public canonical_bytes_at API and the raw receive validator, but the
-    // library's own resolution of received data is flat origin + delta, the
-    // same disclosed flat-address model as ordinary loads.
-    static VirtualMemoryStorage for_receive(std::size_t logical_bytes,
-                                            std::size_t maximum_capacity,
-                                            const VmStoragePool& pool = {}) {
-        VirtualMemoryStorage owner;
-        XOFFSET_VREQUIRE(for_receive_v(owner, logical_bytes, maximum_capacity, pool));
-        return owner;
-    }
-    static vstatus for_receive_v(VirtualMemoryStorage& owner, std::size_t logical_bytes,
-                                 std::size_t maximum_capacity, const VmStoragePool& pool = {}) {
-        if (logical_bytes > maximum_capacity)
-            XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument,
-                              "VM receive length exceeds maximum capacity");
-        XOFFSET_VTRY(owner.reserve_v(0, maximum_capacity, pool, false));
-        if (!maximum_capacity) return vok();
-        if (!owner.enable_prefix(maximum_capacity) || consume_vm_failure(VmOperation::Prepare))
-            XOFFSET_VFAIL_BAD_ALLOC();
-        // Standard non-allocating placement array new, with no initializer:
-        // no cookie, value initialization, payload transfer or user constructor.
-        auto* bytes = ::new (static_cast<void*>(owner.base_)) std::byte[maximum_capacity];
-        if (static_cast<void*>(bytes) != static_cast<void*>(owner.base_)) std::terminate();
-        owner.canonical_byte_origin_ = bytes;
-        // G1 does not apply to receive storage: the whole maximum is read/write
-        // before the transport writes, and bytes beyond the logical length may
-        // be written by a transport. Every growth of this owner zeroes all newly
-        // exposed bytes. (A G1 build without this line -- the early G1-only
-        // diagnostic variant -- is not shippable.)
-        owner.zero_from_ = maximum_capacity;
-        if (!owner.grow_to(logical_bytes)) XOFFSET_VFAIL_BAD_ALLOC();
-        return vok();
-    }
-
     // Internal fresh-owner load path. A complete copy initializes every logical
     // byte; normal growth (including reused pages after shrink) still zeroes.
     static VirtualMemoryStorage from_bytes(const char* bytes, std::size_t length,
@@ -603,7 +564,6 @@ public:
         return *this;
     }
 
-    std::byte* canonical_byte_origin() const noexcept { return canonical_byte_origin_; }
     // Host-only owner slot in the page preceding the payload (null if none).
     void* host_owner() const noexcept {
         return base_ ? *reinterpret_cast<void* const*>(base_ - sizeof(void*)) : nullptr;
@@ -729,7 +689,6 @@ private:
     void swap_storage(VirtualMemoryStorage& other) noexcept {
         using std::swap;
         swap(base_, other.base_);
-        swap(canonical_byte_origin_, other.canonical_byte_origin_);
         swap(reserved_bytes_, other.reserved_bytes_);
         swap(mapped_bytes_, other.mapped_bytes_);
         swap(maximum_capacity_, other.maximum_capacity_);
@@ -815,7 +774,6 @@ private:
 #endif
         }
         base_ = nullptr;
-        canonical_byte_origin_ = nullptr;
         reserved_bytes_ = mapped_bytes_ = maximum_capacity_ = accessible_bytes_ = logical_bytes_ = 0;
         zero_from_ = 0;
         page_size_ = reservation_granularity_ = 0;
@@ -825,7 +783,6 @@ private:
     // owner that embeds this storage keeps its own hot fields next to them.
     char* base_{nullptr};
     std::size_t logical_bytes_{0};
-    std::byte* canonical_byte_origin_{nullptr};
     std::size_t reserved_bytes_{0};
     // Mapped payload span: reserved_bytes_ rounded up to whole owner-map
     // granules (4 MiB). 0 for a slot owner.

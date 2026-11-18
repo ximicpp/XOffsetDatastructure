@@ -1,12 +1,10 @@
 // Validation outcome dump for differential runs across library versions:
 // build it against two checkouts (only public entry points and
 // v2_fuzz_core.hpp are used) and compare the outputs. Each case is one
-// mutated wire; its outcome is the result of typed load, in-place reload, raw
-// validation and verified receive, each "ok" or the exact error message (raw
-// and receive only for wires whose framing the oracle accepts). A library with
-// the direct reload also checks it against typed load (marked only on
-// disagreement, so the lines stay comparable with older libraries).
-// Without exceptions only typed load, reload and direct reload run.
+// mutated wire; its outcome is the result of typed load and in-place reload,
+// each "ok" or the exact error message. A library with the direct reload also
+// checks it against typed load (marked only on disagreement, so the lines stay
+// comparable with older libraries).
 //
 // usage: validation_outcomes <cases> <seed>             digest per 10000 cases
 //        validation_outcomes <cases> <seed> <from> <to> one line per case in [from, to)
@@ -28,14 +26,6 @@ std::uint64_t fnv(std::string_view s, std::uint64_t h = 0xcbf29ce484222325ull) {
     return h;
 }
 std::string outcome(bool accepted, const std::string& error) { return accepted ? "ok" : error; }
-// Builds without exceptions have no raw or receive acceptor; an exceptions
-// build compiled with -DXOFFSET_OUTCOMES_NO_RAW prints the same T:/L: lines,
-// so the two builds can be compared (tools/no_exceptions_differential.sh).
-#if defined(XOFFSET_OUTCOMES_NO_RAW)
-constexpr bool kOutcomesWithRaw = false;
-#else
-constexpr bool kOutcomesWithRaw = kRawAcceptors;
-#endif
 } // namespace
 
 int main(int argc, char** argv) {
@@ -68,10 +58,9 @@ int main(int argc, char** argv) {
         const auto mutated_fnv = fnv(w);
         inputs = fnv(w, inputs);
         if (dense) w = *dense;
-        std::string terr, lerr, rerr, verr;
+        std::string terr, lerr;
         const bool typed = bool(typed_load(w, &terr));
         const bool reload = reload_accepts(w, &lerr);
-        const auto o = oracle(w);
         std::string line = std::to_string(c) + " " + std::to_string(mutated_fnv) + (dense ? " I" : "") +
                            " T:" + outcome(typed, terr) +
                            " L:" + outcome(reload, lerr);
@@ -83,11 +72,6 @@ int main(int argc, char** argv) {
             if (direct_accepts(w, nullptr, mode)) line += " D:interrupted-accepted";
         if (direct_accepts(w, nullptr) != typed) line += " D:disagrees";
 #endif
-        if (kOutcomesWithRaw && (o.ok || o.stage == Oracle::Stage::Payload)) {
-            const bool raw = raw_accepts(w, &rerr);
-            const bool recv = receive_accepts(w, &verr);
-            line += " R:" + outcome(raw, rerr) + " V:" + outcome(recv, verr);
-        }
         ++histogram[outcome(typed, terr)];
         block = fnv(line, block);
         if (c >= from && c < to) std::cout << line << "\n";

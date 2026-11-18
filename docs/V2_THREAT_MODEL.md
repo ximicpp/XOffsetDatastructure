@@ -34,8 +34,6 @@ Untrusted bytes can only enter through the interfaces below, which all validate 
 strength:
 
 - `XBuffer::load_verified<T>`, `TypedXBuffer<T>::load`;
-- `begin_verified_receive<T>` / `finish_verified`;
-- `receive_raw::validate<T>` (internal interface);
 - 3.2 schema evolution: `XPeerSchemas::load_verified<W>`, `evolve_load_verified<W>` (pick the version on
   the chain from the wire header, then go through `load_verified` above), `XPeerSchemas::accept` and
   `read_schema_ack` (handshake messages, also through `load_verified`, with additional 64 KiB and entry
@@ -44,8 +42,8 @@ strength:
 - Reloading into an existing buffer: `reload_verified` / `try_reload_verified`, `begin_verified_reload`
   (receives directly into an existing buffer's storage), and the same entry points on movable slot
   storage (R1);
-- `load_verified_with_resource<T>` / `load_verified_with_scratch<T>` (the validation bitmap comes from a
-  memory resource supplied by the caller; validation itself is the same as `load_verified`);
+- `load_verified_with_resource<T>` (the validation bitmap comes from a memory resource supplied by the
+  caller; validation itself is the same as `load_verified`);
 - Client builds: each of the entry points above is separately compiled code in the C++20 field-list
   build and in the no-exception build (`try_` entry points).
 
@@ -82,7 +80,7 @@ in section 5.
 | T2 | Tampering with field values (A3) | **Not protected** | A wire that only changes scalar values passes validation; the wire header has no checksum (format 2.1 removed the always-zero `crc32c`) and no MAC. TLS or message signatures must be used outside the library |
 | T3 | Forging schema identity | No privilege gained | The schema fingerprint (64-bit FNV-1a) is a consistency check, not authentication: an attacker copying the fingerprint can only make the receiver fully validate against **the receiver's own type** |
 | T4 | Resource exhaustion | **Bounded by default** (M1: 64 MiB default when no limit is passed) | See 3.1; servers receiving client data should still set a smaller limit (DEPLOYMENT section 5) |
-| T5 | Old bytes of deleted data sent with the wire (A4) | **Partly protected** (since 2026-11-16, performance first); essentially protected with `XOFFSET_HARDENED=1` or `save_compact` | Freed blocks are still zeroed (P1, M3). The default build does not zero bytes vacated by containers (P2) or padding bytes (P3), and `save_verified`, `freeze_verified` and delta sync send them as they are; since 2026-11-17 `reset` does not zero either, so a reused buffer carries bytes of its previous content into the slack and padding of the next (P4). `XOFFSET_HARDENED=1` turns on M4 and M6 (the default behavior in 4.0.0 and earlier); `save_compact` never carries old bytes from container slack in any build. See 3.2 and 4.1 |
+| T5 | Old bytes of deleted data sent with the wire (A4) | **Partly protected** (since 2026-11-16, performance first); essentially protected with `XOFFSET_HARDENED=1` or `save_compact` | Freed blocks are still zeroed (P1, M3). The default build does not zero bytes vacated by containers (P2) or padding bytes (P3), and `save_verified` and delta sync send them as they are; since 2026-11-17 `reset` does not zero either, so a reused buffer carries bytes of its previous content into the slack and padding of the next (P4). `XOFFSET_HARDENED=1` turns on M4 and M6 (the default behavior in 4.0.0 and earlier); `save_compact` never carries old bytes from container slack in any build. See 3.2 and 4.1 |
 | T6 | Different compilers interpret the same wire differently | One case found and fixed | When an enum key defines only `operator<=>`, Clang and GCC order sets oppositely and reject each other's wires; the fix and the CI cross-read job are in the GCC 16 port PR |
 | T7 | Invalid business values (negative gold and the like) | **Not protected** | Not part of structural validation; check them as ordinary business input |
 | T8 | Amplifying server cost with old-version wires (3.2 schema evolution) | **Bounded** | An attacker can pick the oldest version on the chain, making the server do one more full validation plus one conversion per step; the converted object can be larger than the wire (new fields, wider types). The conversion target buffer's limit defaults to the `maximum_capacity` passed to `load_verified`, and exceeding it fails. Estimate the amplification from the chain length and shorten the chain if needed. `fuzz_schema_evolution` covers this entry point |
@@ -98,8 +96,7 @@ inside holes. A 184-byte wire can declare a `used_bytes` close to 2 GiB:
 | 184 B | 1 GiB | Accepted, reserves 1 GiB, 67 ms | Rejected |
 | 184 B | 2047 MiB | Accepted, reserves 2 GiB, 140 ms, RSS +8 MiB | Rejected |
 
-Without a limit, `load_verified` reserves the size the wire declares; `begin_verified_receive` without
-a limit also goes by the declared size. Consequences:
+Without a limit, `load_verified` reserves the size the wire declares. Consequences:
 
 - Server: every 184-byte message takes 2 GiB of address space and about 140 ms of CPU. A few dozen
   concurrent ones can exhaust the commit limit (failing outright with `vm.overcommit_memory=2`) or slow
@@ -150,7 +147,7 @@ fields and so on), and P3 could also leak data from the server's stack.
 compile switches, **off by default**; since 2026-11-17 so is the zeroing on reset (P4 below).
 `XOFFSET_HARDENED=1` turns them all on (the default behavior in
 4.0.0 and earlier), or each can be turned on separately (section 4.1). In the default build, bytes sent
-by `save_verified`, `freeze_verified` and delta sync may contain elements already erased from
+by `save_verified` and delta sync may contain elements already erased from
 containers, and content the buffer held before it was reset. `save_compact` is unaffected: it writes no holes and rewrites slack and string tails as 0.
 
 - P1: blocks are zeroed when freed (M3), holes in the arena are 0, and all output paths still copy
@@ -202,7 +199,7 @@ the zeroing on reset too, and all are turned on by the switches of section 4.1; 
 
 | ID | Mitigation | Impact |
 | --- | --- | --- |
-| M1 | When `load_verified` and `begin_verified_receive` get no limit, they use the default limit (64 MiB, adjustable with `XOFFSET_DEFAULT_MAXIMUM_CAPACITY`) and reject larger wires before reserving; pass `maximum_capacity` explicitly for larger wires | Public API behavior change: wires larger than 64 MiB need an explicit limit. Read path performance unchanged |
+| M1 | When `load_verified` gets no limit, it uses the default limit (64 MiB, adjustable with `XOFFSET_DEFAULT_MAXIMUM_CAPACITY`) and rejects larger wires before reserving; pass `maximum_capacity` explicitly for larger wires | Public API behavior change: wires larger than 64 MiB need an explicit limit. Read path performance unchanged |
 | M2 | The error for an insufficient limit became `used_bytes … exceeds maximum_capacity …` (previously the generic `XOffset arena allocation failed`) | Diagnostics only |
 | M3 | Blocks are zeroed when freed, so holes in the arena are 0 (P1); output paths unchanged | Changes the bytes of wires with holes (goldens need updating); the cost is on the free path, proportional to the bytes freed. Holes of a loaded wire keep the sender's bytes, and saving directly after loading forwards them unchanged (no local memory leaks, but a malicious sender can smuggle bytes downstream). The first implementation zero-filled holes at output time and made formal output about 22% slower, so it was changed to zeroing on free |
 | M4 | (Off by default) Zero the element bytes vacated when a container shrinks (P2): `XOFFSET_SCRUB_ERASED=1` covers `clear`, shrinking `resize`, `erase` and assigning a shorter value; `XOFFSET_SCRUB_POPPED=1` covers `pop_back` | Cost only on the modification path, proportional to the bytes removed; when on, `clear()` is O(n) |
@@ -267,11 +264,10 @@ only with no findings. Entry points and harnesses:
 | Entry point | Harness (ASan+UBSan) |
 | --- | --- |
 | `load_verified`, `TypedXBuffer<T>::load`, `try_load_verified`, `load_verified_with_resource` | `fuzz_v2_wire`, `fuzz_wire_schemas` (libFuzzer); `test_v2_fuzz` (GCC 16 differential, with an independent oracle) |
-| `begin_verified_receive` / `finish_verified`, `receive_raw::validate` | Same as above (the receive and raw columns of `v2_fuzz_core.hpp`, compared with the oracle) |
 | `reload_verified`, `begin_verified_reload`, movable slot storage | Same as above (the reload, direct and slot columns, compared byte for byte with loading into a new buffer) |
 | Schema evolution: `evolve_load_verified`, the `XPeerSchemas` handshake, `read_schema_ack` | `fuzz_schema_evolution` |
 | Delta apply: `try_apply_delta_verified` / `apply_delta_verified` (3.3) | `fuzz_delta_sync` (both reflection and field-list builds): the fast paths (none, in_place) are compared with full validation on a cloned copy for verdict, error and result; on rejection the copy and cursor are unchanged; accepted results can be validated and loaded again |
-| Trusted tier (3.4): `reload`, `load`, `apply_delta` (admit) of `XReceiver<server_peer / from_server>` | Whole buffer: column 8 of `v2_fuzz_core.hpp` (`fuzz_v2_wire`, `test_v2_fuzz`): what the full tier accepts must be accepted with byte-identical results, and what the oracle rejects at the header stage must be rejected. Deltas: `fuzz_delta_sync` runs admit on another clone: what the full tier accepts must be accepted with the same result, parse-stage errors must be the same, and on rejection the copy and cursor are unchanged. Inputs admit additionally accepts are not read |
+| Trusted tier (3.4): `reload`, `load`, `apply_delta` (admit) of `XReceiver<server_peer / from_server>` | Whole buffer: column 6 of `v2_fuzz_core.hpp` (`fuzz_v2_wire`, `test_v2_fuzz`): what the full tier accepts must be accepted with byte-identical results, and what the oracle rejects at the header stage must be rejected. Deltas: `fuzz_delta_sync` runs admit on another clone: what the full tier accepts must be accepted with the same result, parse-stage errors must be the same, and on rejection the copy and cursor are unchanged. Inputs admit additionally accepts are not read |
 | Shared deltas (3.5): `XReceiver<server_peer / from_server>::apply_sync` (XS 2.0 since 4.0, full and admit) | `fuzz_shared_delta` (both reflection and field-list builds): four kinds of input, raw root records and operation sections, real message streams with tampering, whole messages, and key messages; each first goes through full, which on rejection leaves records and cursor unchanged and whose accepted results can be validated and loaded again; what full accepts then goes through admit on a copy, and records and cursor must be the same. Admit does not read inputs full rejects (the message body trusts the sender) |
 | Bounds tier (3.5): `XReceiver<from_client>::view` (bounds) | Column 9 of `v2_fuzz_core.hpp` (`fuzz_v2_wire`, `test_v2_fuzz`): the wire is copied into a heap block of exactly its size; dense wires the full tier accepts must be accepted and every field read must be the same; sparse wires and wires the oracle rejects at the header stage must be rejected; inputs additionally accepted are read completely through the view and must stay in bounds (ASan). `test_receiver_view`: crafted out-of-bounds blocks, overlong inline strings, missing NUL, bool 2, overlap amplification and random mutation |
 | Client field-list build, no-exception build | The C++20 field-list builds of `fuzz_v2_wire` and `fuzz_wire_schemas` (libFuzzer), and `tools/fuzz_outcome_diff.sh` (compares results and error text one by one across three builds) |
@@ -314,7 +310,7 @@ are kept but do not run. The daily long runs moved to a cloud Docker host runnin
 - Remaining gap: no short PR runs (the merge evidence for PRs is `tools/local_validate.sh`).
 
 - **F1 coverage-guided fuzzing**: libFuzzer harnesses (`LLVMFuzzerTestOneInput`) with entry points
-  `load_verified`, `finish_verified` and `receive_raw::validate`, built with P2996 Clang and the
+  `load_verified`, built with P2996 Clang and the
   compiler-rt already pinned in CI; seeds are the cross-compiler wire corpus.
 - **F2 multiple schemas**: besides the existing differential fuzz schema, add the schemas of the
   cross-compiler corpus (enum keys, fixed-size arrays, floating point, bool, nested vectors).
