@@ -126,6 +126,8 @@ set(REFLECTION_TESTS
     test_same_arena_move
     test_shift_relocate
     test_append_grow
+    test_staged_insert
+    test_assign_sorted
     test_subtree_copy
     test_free_table_policy
     test_lower_bound_index
