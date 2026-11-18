@@ -170,7 +170,7 @@ namespace XOffsetDatastructure::schema {
 } // namespace XOffsetDatastructure::schema
 
 namespace XOffsetDatastructure {
-    // Named field accessors of a record proxy (growth policy part 3; the
+    // Named field accessors of a record proxy (the
     // proxies are in xoffset_proxy.hpp): XOFFSET_RECORD and
     // XOFFSET_RECORD_DERIVED specialize it for their record T with one
     // member function per listed field, so that for a proxy `u` of T,

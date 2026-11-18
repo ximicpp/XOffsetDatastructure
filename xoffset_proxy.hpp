@@ -1,44 +1,16 @@
 #ifndef X_OFFSET_PROXY_HPP
 #define X_OFFSET_PROXY_HPP
 
-// Growth policy part 2: fast proxies (XRef) and pin scopes (read / edit).
-//
-// A Relocating buffer moves when it outgrows its reservation, so a plain
-// reference into it can dangle. Two ways to reach the data stay safe:
-//
-//   XRef<T>   (buf.ref<Root>(), then .field<&T::m>(), [i], find(k) ...)
-//             A proxy holds the buffer's control block (XCtl), a cached base
-//             and version, and a path (root offset, container + index, map +
-//             key). Every access compares one version word; an allocating
-//             operation that would outgrow the reservation moves the buffer
-//             first (make_room), then runs. Container proxies keep the size
-//             in a register and only compare it with memory, so a push_back
-//             loop runs at the speed of a plain reference.
-//   edit / read (buf.edit<Root>([&](Root& r) { ... }))
-//             Plain references at plain speed. While a scope is open the
-//             buffer does not move (an operation that would need to returns
-//             `borrowed`), and blocks the containers retire wait until the
-//             scope closes, so a reference made inside the scope never points
-//             into reused storage. The callable may not return a pointer,
-//             reference, string_view or span (checked at compile time).
-//
-// Failure is soft: nothing throws or aborts. An allocating operation that
-// cannot be done has no effect, returns false (or an empty proxy) and records
-// the first failure in the buffer (XBuffer::error(): capacity_exceeded,
-// out_of_storage, borrowed, stale, out_of_range), and the buffer refuses to
-// emit a wire until clear_error().
-//
-// An allocating operation first runs in place. With exceptions, an
-// allocation the payload has no room for throws before anything changes; the
-// proxy catches it, makes room (the buffer may move) and runs the operation
-// again out of line, so the common case pays no room check. Without
-// exceptions it checks the room first (and a recorded failure refuses it).
-// Reads through an empty or stale proxy return a value-initialized T.
-//
-// Element proxies hold container + index (map: key + cached index), checked
-// against the size on every access: after the container changed they read
-// another element or nothing, never a retired block.
-
+// Proxies (XRef) and pin scopes (read / edit) for buffers that move
+// (docs/USER_GUIDE.md section 3.5). A proxy holds the buffer's control block,
+// a cached base and version, and a path (root offset; container + index; map
+// + key); every access compares one version word, and an allocating operation
+// that would outgrow the reservation moves the buffer first. Container proxies
+// keep the size in a register and only compare it with memory. Failure is
+// soft: the operation has no effect, returns false or an empty proxy, and the
+// buffer records the first failure and refuses to emit a wire until
+// clear_error(). With exceptions an allocating operation runs in place first
+// and makes room only when the arena throws; without, it checks the room first.
 
 namespace XOffsetDatastructure {
 
@@ -427,7 +399,7 @@ template <class T, class Path = proxy_detail::RootPath,
           proxy_detail::Kind K = proxy_detail::kind_of<std::remove_cv_t<T>>()>
 class XRef;
 
-// Named field accessors (growth policy part 3; declared in
+// Named field accessors (declared in
 // xoffset_schema_describe.hpp): XOFFSET_RECORD and XOFFSET_RECORD_DERIVED
 // specialize XRecordAccess<T, Self, Next> with one accessor per field. A
 // record without a field list (described by reflection only) has none: use
@@ -466,7 +438,7 @@ namespace proxy_detail {
             return XRef<M, Path>(a, path.plus(offset));
         }
 
-        // Batch scope over this object (growth policy part 4): f(T&) with a
+        // Batch scope over this object: f(T&) with a
         // plain reference, the path resolved once. Room for `expected_growth`
         // bytes is made first (the buffer may move then, while no reference
         // exists); while f runs the payload is pinned as in XBuffer::edit
@@ -1079,7 +1051,7 @@ public:
         }));
     }
 
-    // ---- batch operations (growth policy part 4): one resolve, at most one
+    // ---- batch operations: one resolve, at most one
     // make_room and one regrow per call, then a plain copy.
 
     // Appends `values` (they may live in this buffer, even in this vector).
@@ -1320,7 +1292,7 @@ public:
         });
         return inserted;
     }
-    // Batch insert (growth policy part 4): every value not yet present, one
+    // Batch insert: every value not yet present, one
     // resolve and at most one regrow. The number inserted; on failure
     // nothing is inserted (error() tells).
     std::uint32_t insert(std::span<const E> values) noexcept requires plain {
@@ -1481,7 +1453,7 @@ public:
         }
         return inserted;
     }
-    // Batch insert (growth policy part 4): every key -> value pair whose key
+    // Batch insert: every key -> value pair whose key
     // is absent (pairs of any type with .first and .second, e.g. std::pair or
     // this map's entries; any order, ascending is fastest). One resolve and
     // at most one regrow. The number inserted; on failure nothing is

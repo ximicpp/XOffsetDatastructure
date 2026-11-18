@@ -146,10 +146,7 @@ private:
 // slot's (SlotHeader); its last pointer-sized word names the current owner
 // (host_owner), and the payload starts right after it, on the same page. The
 // header is never part of the payload, so it is never copied, emitted or
-// exposed by data()/size(). (Before 3.4 it was a page of its own in front of
-// the payload: a page touched only by swap and allocation, the first to be
-// compressed or swapped out under memory pressure, plus a page table of its
-// own in the previous granule.) Accessible means payload page permissions are read/write; it
+// exposed by data()/size(). Accessible means payload page permissions are read/write; it
 // does not measure resident physical memory or promise future fault-free
 // allocation.
 class VirtualMemoryStorage {
@@ -379,7 +376,7 @@ public:
         return vok();
     }
 
-    // Slot owner (R1): an empty owner on a slot of class `cls`. The slot's
+    // Slot owner: an empty owner on a slot of class `cls`. The slot's
     // payload capacity is accessible_bytes(); maximum_capacity may exceed it
     // only for a movable owner, whose growth past the slot is the caller's
     // relocation. A slot has no OS step, so the owner never fails to grow

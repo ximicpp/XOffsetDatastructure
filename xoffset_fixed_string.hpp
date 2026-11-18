@@ -3,8 +3,7 @@
 
 // Compile-time strings for the wire ABI signature (wire_abi_signature<T>(),
 // schema hashes). Taken from TypeLayout's FixedString / to_fixed_string
-// (Boost Software License 1.0, TypeLayout Development Team) so the core
-// library no longer includes TypeLayout; the text it produces is unchanged.
+// (Boost Software License 1.0, TypeLayout Development Team).
 
 #include <compare>
 #include <cstddef>

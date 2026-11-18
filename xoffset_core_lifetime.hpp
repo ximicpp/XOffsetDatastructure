@@ -462,7 +462,7 @@ void empty_vacated_slot(T* slot) noexcept {
 }
 
 
-// T4 SUBTREE COPY: copy assignment of a container copies its source subtree
+// Subtree copy: copy assignment of a container copies its source subtree
 // (its block plus every block reachable from its live elements) into one
 // fresh segment: one memcpy plus a fix-up walk when the source tiles one byte
 // range, otherwise a compacting preorder walk. The domain is the SHIFT domain

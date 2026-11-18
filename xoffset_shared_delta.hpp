@@ -1,58 +1,15 @@
 #ifndef X_OFFSET_SHARED_DELTA_HPP
 #define X_OFFSET_SHARED_DELTA_HPP
 
-// Shared deltas: record bodies a server writes once per entity and tick and
-// copies into every message whose connection holds the entity
-// (docs/SHARED_DELTA.md). The message format is XS 2.0 (format byte 0x02;
-// tests/test_shared_delta_format.cpp pins its bytes). A client applies a
-// message with XReceiver<XLink::from_server>::apply_sync
-// (xoffset_receiver.hpp); this header has the sender side, the record codec
-// and the receive engine apply_sync runs.
-//
-// A delta of xoffset_delta.hpp carries bytes at payload offsets, so it only
-// applies to a replica with the sender's layout: one baseline per receiver.
-// Here a body is written per record, relative to the record, and applies to
-// a copy of that record held anywhere (another buffer, another slot). The
-// receiver keeps its own layout.
-//
-// Message (little endian):
-//   'X' 'S' u8 format (0x02) u8 flags u32 version          8 bytes
-//   u64 stream                                             KEY flag only
-//   root                                                   table 0's whole body
-//   sections, until the end of the message:
-//     u32 (count << 8 | table << 2 | kind), then count ops of that table and kind
-//   op:
-//     leave   u32 id
-//     enter   u32 id, whole body
-//     change  u32 id, change body
-// Table 0 is the stream's root record: a record without containers, carried
-// whole by every message and named by no op. Tables 1 to 63 hold entries:
-// keyed tables (entries enter, change and leave) and fixed ones (enter and
-// change only). The id is what the receiver's find() takes: an entity id, or
-// the slot the server gave this receiver for the entity (then the receiver
-// needs no index; XSyncWriter::op writes a shared body under another id).
-//
-// Whole body of R: R's plain bytes (scalars, enums, bools; padding and
-// container heads skipped), then, when R has containers, a container mask
-// (one bit per container, schema order, nested records walked in place; u8,
-// u16, u32 or u64 by count) and for each bit set: a string as u32 length and
-// bytes, a vector as u32 count and count * sizeof(E) element bytes. A
-// container whose bit is clear is empty: a whole body sets every plain byte
-// and every container, so an enter needs no clear first.
-// Change body of R: a member mask (one bit per member of R, declaration
-// order; u8, u16, u32 or u64 by count), then the plain members whose bit is
-// set, in order, each as its sizeof bytes, then the members with containers
-// whose bit is set, in order: a string or vector as above, any other member
-// (a nested record or array holding containers) as its own whole body.
-//
-// Supported: scalars, bools, enums with a fixed underlying type, nested
-// records and arrays of them, XString, and XVector of elements without
-// containers. Sets, maps and vectors of records with containers are rejected
-// at compile time.
-//
-// A body source (an XSyncOut the server keeps its bodies in) and every
-// message under construction keep kSyncSlack bytes past their end, so a short
-// body is copied as two 16-byte moves.
+// Shared deltas (XS 2.0): record bodies a server writes once per entity and
+// tick and copies into every message whose connection holds the entity. A
+// body is relative to its record, so it applies to a copy of that record held
+// anywhere: the receiver keeps its own layout (a delta of xoffset_delta.hpp
+// needs the sender's). This header has the sender side, the record codec and
+// the receive engine of XReceiver::apply_sync. Format, supported records and
+// checks: docs/SHARED_DELTA.md; tests/test_shared_delta_format.cpp pins the
+// bytes. A body source (XSyncOut) and every message under construction keep
+// kSyncSlack bytes past their end, so a short body is two 16-byte moves.
 
 #include "xoffsetdatastructure.hpp"
 

@@ -97,7 +97,7 @@ namespace XOffsetDatastructure {
         template<class T> consteval bool subtree_copy_supported();
         template<class T> bool subtree_copy_assign(XFixedVector<T>&, const XFixedVector<T>&);
 #if defined(XOFFSET_TEST_HOOKS)
-        // T4 test hooks: a per-thread switch that sends container copy
+        // Test hooks: a per-thread switch that sends container copy
         // assignment down the element-wise reference path, and counters.
         struct SubtreeCopyStats {
             std::uint64_t whole_hits = 0;        // contiguous source: one memcpy
@@ -225,7 +225,7 @@ namespace XOffsetDatastructure {
     // reference into the payload (epoch); see make_room().
     enum class XGrowPolicy : std::uint8_t { Explicit, Automatic, Relocating };
     using XBufferPool = detail::VmStoragePool;
-    // Storage request of a MaximumCapacity (R1). Auto picks by the rule in
+    // Storage request of a MaximumCapacity. Auto picks by the rule in
     // XBufferCore::plan_storage; Pinned is always a VM reservation (address
     // stable for life); Movable requires a slot and throws where the rule
     // cannot give one.
@@ -246,7 +246,7 @@ namespace XOffsetDatastructure {
     class XBufferCore;
 #if defined(XOFFSET_STRESS_RELOCATE)
     namespace detail {
-        // Stress mode (growth policy part 4, test builds only): a pattern no
+        // Stress mode, test builds only: a pattern no
         // live value is expected to hold, written over storage the library
         // stopped using, so a stale plain reference reads garbage at once.
         inline constexpr unsigned char stress_poison_byte = 0xDB;
@@ -319,8 +319,8 @@ namespace XOffsetDatastructure {
     }
 #endif
     namespace detail {
-        // A payload lineage's control block (growth policy, part 2). Proxies
-        // (XRef) hold a pointer to it and a copy of `base` and `version`:
+        // A payload lineage's control block. Proxies (XRef) hold a pointer
+        // to it and a copy of `base` and `version`:
         // one compare of the version tells them the payload is where they
         // last saw it. The version is even while the lineage lives and grows
         // by 2 when the payload moves; it is odd once the buffer is gone or
@@ -689,7 +689,7 @@ namespace XOffsetDatastructure {
             return make_room_slow(need);
         }
 
-        // ---- growth policy part 2: control block, sticky error, pin scopes.
+        // ---- control block, sticky error, pin scopes.
 
         // This lineage's control block (made on first use; null when no
         // block can be allocated).
@@ -961,7 +961,7 @@ namespace XOffsetDatastructure {
             // owner it names is read from the host header (record_owner). A
             // record lives on the heap and is touched by nothing else on the
             // hot paths, so under memory pressure it is cold; writing it here
-            // cost a page fault per buffer (B.install, 2026-11-05).
+            // would cost a page fault per buffer.
         }
 
         friend void swap(XBufferCore& a, XBufferCore& b) noexcept { a.swap(b); }
@@ -1064,7 +1064,7 @@ namespace XOffsetDatastructure {
         // than requested, so every live extent equals the size its owner
         // derives from its head and passes back to retire/try_expand.
         //
-        // D3: the two outcomes that need no host allocation and run no host
+        // The two outcomes that need no host allocation and run no host
         // callback are decided inline: an exact-bin hit (no split remainder,
         // no map node) and a bump without padding inside the current extent,
         // taken when the table records no hole of the size or larger (an
@@ -1166,9 +1166,9 @@ namespace XOffsetDatastructure {
         }
 
         // ptr/bytes must name exactly one live block of this arena, or a run
-        // of adjacent live blocks released together (T4 subtree retirement):
+        // of adjacent live blocks released together (subtree retirement):
         // blocks have no headers and the table records only holes.
-        // D3: a small block entering a bin that already has spare capacity
+        // A small block entering a bin that already has spare capacity
         // needs no host allocation and runs no host callback; it is published
         // inline. Everything else takes retire_block_general unchanged.
         XOFFSET_DETAIL_INLINE void retire_block(void* ptr, std::uint32_t bytes) noexcept {
@@ -1512,13 +1512,9 @@ namespace XOffsetDatastructure {
         // A bin is a 4-byte head: it holds a bin's only entry itself, or
         // names the bin's segment, a contiguous run of entries in a word pool
         // the table shares between its bins (32 words inline, more in host
-        // storage). A table is about 2.4 KiB: it used to be 12 KiB of 24-byte
-        // bin headers, mostly empty, and thousands of live buffers each keep
-        // one (game players, client views). Under memory pressure those pages
-        // were most of what a save or an allocation in a cold buffer had to
-        // bring back. A bin's entries stay contiguous, oldest first, so a
-        // save copies them as before. Which block every request takes and
-        // the order holes are written in are unchanged.
+        // storage). A table is about 2.4 KiB, kept small because thousands of
+        // live buffers each keep one. A bin's entries stay contiguous, oldest
+        // first, so a save copies them in order.
         struct FreeTable {
             static constexpr std::uint32_t small_max = small_block_max;
             static constexpr std::uint32_t small_bins = small_max / 8;
@@ -1842,7 +1838,7 @@ namespace XOffsetDatastructure {
         // A table is ~2.4 KiB (bin heads and inline pool). Constructing,
         // zeroing and releasing one per load dominated small-message loads,
         // so released tables are emptied (pool and map storage returned to
-        // the host allocator) and kept in a small per-thread cache. D2: an
+        // the host allocator) and kept in a small per-thread cache. An
         // in-place reload/reset does not release its table at all; it
         // empties it and keeps it (begin_reinit), with its pool storage (a
         // reload: up to keep_bytes), so the holes it loads and the first
@@ -2072,7 +2068,7 @@ namespace XOffsetDatastructure {
         }
 
         // A small block entering a bin that already has spare capacity needs
-        // no host allocation and runs no host callback (as D3's retire_block),
+        // no host allocation and runs no host callback (as retire_block),
         // so it is published without copying the owner record.
         bool insert_free_block_inline(std::uint32_t offset, std::uint32_t bytes) noexcept {
             if (bytes > FreeTable::small_max) return false;
@@ -2306,7 +2302,7 @@ namespace XOffsetDatastructure {
             return sizeof(arena_header); // 48: a multiple of 8 on every platform
         }
 
-        // R1 storage rule. VM: a pool, Pinned, Automatic growth with a
+        // Storage rule. VM: a pool, Pinned, Automatic growth with a
         // maximum above SLOT_MAX, or an initial size above SLOT_MAX. Pinned
         // slot: maximum <= SLOT_MAX (the slot holds the whole maximum).
         // Movable slot: otherwise, sized for the initial size.
@@ -2792,7 +2788,7 @@ namespace XOffsetDatastructure {
             const auto current = buffer_.size();
             const auto geometric = current > maximum / 2 ? maximum : current * 2;
             auto target = std::max<std::size_t>(required, geometric);
-            // D6: below zero_from() (bytes exposed before an in-place reload
+            // Below zero_from() (bytes exposed before an in-place reload
             // shrank the logical length) grow_to must memset every newly
             // exposed byte, so a doubling there clears far more than the tail
             // will use. Grow in steps inside that range; past it fresh OS
@@ -2970,7 +2966,7 @@ namespace XOffsetDatastructure {
         }
 
         // In-place loads and the zero watermark. On a settled owner (exact
-        // free table, nothing dirty past the logical length) N2 makes every
+        // free table, nothing dirty past the logical length) the zero tail invariant makes every
         // byte in [tail_clean_from(), logical) zero, so after an in-place load
         // of `size` bytes into the same storage only [size, that offset) can
         // be dirty.
@@ -3165,9 +3161,9 @@ namespace XOffsetDatastructure {
         }
 
         // Empty arena: header only, no root, empty exact free table.
-        // N2: every logical byte at or past tail_clean_from() is zero (growth
-        // zeroes what it exposes, used_end only rises until a reset, and
-        // loads zero the bytes past the loaded used_end). With
+        // Zero tail invariant: every logical byte at or past tail_clean_from()
+        // is zero (growth zeroes what it exposes, used_end only rises until a
+        // reset, and loads zero the bytes past the loaded used_end). With
         // XOFFSET_SCRUB_RESET that offset is used_end: a reset that keeps the
         // logical length clears exactly [header, used_end), live blocks and
         // holes alike. Without it the reset clears nothing and remembers how
@@ -3208,7 +3204,7 @@ namespace XOffsetDatastructure {
             write_empty_header();
         }
 
-        // The offset from which every logical byte is zero (N2): used_end,
+        // The offset from which every logical byte is zero: used_end,
         // or the end of what a reset without XOFFSET_SCRUB_RESET left behind.
         size_type tail_clean_from() const noexcept {
             const auto used = static_cast<size_type>(arena()->used_end);
@@ -3237,7 +3233,7 @@ namespace XOffsetDatastructure {
             sm->reserved1 = 0;
         }
 
-        // N2: the bytes past a loaded payload's used_end are zeroed, so the
+        // The bytes past a loaded payload's used_end are zeroed, so the
         // invariant above holds after every load. A verified load has none
         // (used_end == used_bytes); an unverified one may carry any bytes there.
         void zero_past_used_end() noexcept {
@@ -3307,7 +3303,7 @@ namespace XOffsetDatastructure {
         bool schema_bound_ = false;
 
     private:
-        // Next D6 growth step below zero_from() (ensure_allocation_extent).
+        // Next growth step below zero_from() (ensure_allocation_extent).
         std::uint32_t dirty_step_ = first_dirty_step;
         std::uint64_t m_epoch = 0;
         const void* root_cache_type_ = nullptr;
@@ -3330,7 +3326,7 @@ namespace XOffsetDatastructure {
         // one integer (take_packed, swap).
         struct Packed {
             XGrowPolicy growth_policy = XGrowPolicy::Explicit;
-            // Growth policy part 2: an open pin scope (mirrors ctl_->borrow).
+            // An open pin scope (mirrors ctl_->borrow).
             bool pinned = false;
             std::uint16_t reserved = 0;
             // Bytes in [used_end, reset_dirty_end) may be nonzero: the content
@@ -3537,10 +3533,7 @@ namespace XOffsetDatastructure {
         template <typename T> consteval bool can_relocate_without_allocation();
         template <typename T> void relocate_construct(T* dst, T& src) noexcept;
 
-        // W9: flat resolution for every storage kind (ordinary and receive):
-        // origin + delta, with no canonical lookup, atomic or window compare.
-        // Receive data no longer derives pointers from the receive byte array;
-        // it uses the same disclosed flat-address model as ordinary loads.
+        // Flat resolution for every storage kind: origin + delta.
         template <typename T>
         T* resolve_rel32(const std::int32_t* origin, std::int32_t delta) noexcept {
             if (delta == 0) return nullptr;
@@ -3740,7 +3733,7 @@ namespace XOffsetDatastructure {
                 owner->retire_block(ptr, block_bytes_of(bytes));
         }
 
-        // Fused regrowth (A_ZPP_LEVERS 2.2 item 1): a fresh block of
+        // Fused regrowth: a fresh block of
         // new_bytes, `fill` (moves the live run in, publishes the block and
         // returns the old one; must not throw), then the old block retired.
         // The binding and size checks run once; the owner is read again for
@@ -3764,7 +3757,7 @@ namespace XOffsetDatastructure {
                     now->retire_block(old, block_bytes_of(old_bytes));
         }
 
-        // ---- fail-soft support (growth policy part 2) ----------------------
+        // ---- fail-soft support ----------------------
 
         template <class E> std::true_type deep_is_vector(const XFixedVector<E>*);
         std::false_type deep_is_vector(...);
@@ -3923,7 +3916,7 @@ namespace XOffsetDatastructure {
         }
 #if defined(__linux__)
 
-        // A SHIFT erase from the middle moves the tail of records down by one
+        // A shift erase (ordinary records) from the middle moves the tail of records down by one
         // element: an overlapping memmove with the destination just below the
         // source. On x86-64 glibc, one call over a tail of tens of KiB is
         // about a third slower than the same copy in 4 KiB chunks (SLG
@@ -4214,14 +4207,14 @@ namespace XOffsetDatastructure {
         V second{};
     };
 
-    // V2.1 (R4): a container head is {data_delta, size_, capacity_}, 12 bytes,
+    // V2.1: a container head is {data_delta, size_, capacity_}, 12 bytes,
     // 4-aligned. It belongs to the payload it lies in: the owner is found from
     // the head's address (detail::OwnerMap), never stored in the head.
     struct XFixedString {
         using allocator_type = fixed_detail::allocator_ref;
         using stored_allocator_type = fixed_detail::stored_allocator_proxy;
 
-        // I1: a string of at most inline_max bytes may live in bytes 0..10 of
+        // A string of at most inline_max bytes may live in bytes 0..10 of
         // this head. Inline is marked by bit 31 of capacity_ (byte 11, which a
         // heap capacity < 2^31 never sets); bits 24..30 hold the length. The
         // byte after the last character and every unused inline byte are 0.
@@ -4661,7 +4654,7 @@ namespace XOffsetDatastructure {
             }
             // rhs may view the current characters, which reserve() may move
             // (and retire, zeroed). The new storage repeats the old extent:
-            // the characters, the terminator, then zero bytes (I1 inline
+            // the characters, the terminator, then zero bytes (inline
             // padding, M4 spare capacity). Read from there after the move.
             const char* const old_chars = data();
             const std::size_t extent = is_inline() ? 11u : std::size_t(capacity_) + 1u;
@@ -4805,7 +4798,7 @@ namespace XOffsetDatastructure {
                           std::is_trivially_copy_constructible_v<T> &&
                           std::is_trivially_destructible_v<T> &&
                           !std::is_const_v<T> && !std::is_volatile_v<T>) {
-                // T4 POD in place: assign_range's in-place case and the M6
+                // POD in place: assign_range's in-place case and the M6
                 // padding pass of assign_trivial_copy, inline. Regrowth,
                 // binding and an empty source take the general path.
                 const size_type count = other.size_;
@@ -4842,7 +4835,7 @@ namespace XOffsetDatastructure {
             // An empty source keeps the capacity and needs no binding.
             if (other.size_ == 0) { clear(); return *this; }
             XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::deep_bytes(other) + fixed_detail::array_bytes<T>(other.size_), *this);
-            // T4: a trivially copyable element is one range copy; any other
+            // A trivially copyable element is one range copy; any other
             // admitted subtree is copied into one fresh segment.
             // The range copy looks the binding up only when it regrows;
             // rebuild() checks it for the other paths.
@@ -5153,7 +5146,7 @@ namespace XOffsetDatastructure {
         XOFFSET_DETAIL_NOINLINE void assign_range_regrow(const void* src, size_type count,
                                                          std::uint32_t bytes) {
             const auto alloc = bound_binding();
-            // D8a: a container that already has capacity regrows to
+            // A container that already has capacity regrows to
             // max(count, 2 * capacity), like libc++ assign; the first block
             // stays exact.
             const size_type new_cap = capacity_ == 0 ? count
@@ -5175,7 +5168,7 @@ namespace XOffsetDatastructure {
             });
         }
 
-        // N7: replaces all elements with [first, last). A contiguous range of
+        // Replaces all elements with [first, last). A contiguous range of
         // trivially copyable T takes the assign_range path (one exact block,
         // aliasing-safe, no default fill). Other forward ranges are built in a
         // fresh exact block before the old storage is released, so the source
@@ -5293,8 +5286,8 @@ namespace XOffsetDatastructure {
         }
 
         // pop_back() leaves the removed element's bytes in spare capacity
-        // (susu 2026-11-16: a send copies them as they are; the next append
-        // there constructs over them). Its owned blocks are still retired and
+        // (a send copies them as they are; the next append there constructs
+        // over them). Its owned blocks are still retired and
         // zeroed (M3). XOFFSET_SCRUB_POPPED=1 zeroes the slot too (M4, for
         // buffers sent to readers that must not see removed elements;
         // save_compact also rewrites spare capacity as zero).
@@ -5703,7 +5696,7 @@ namespace XOffsetDatastructure {
             } else if constexpr (detail::shift_relocate_supported<T>()) {
                 with_staged(construct, [&](T& staged) {
                     if (size_ == capacity_) grow_for_insert<GrowOutOfLine>();
-                    // SHIFT: same bytes and deltas as the loop below, in one
+                    // Ordinary records: same bytes and deltas as the loop below, in one
                     // memmove plus an inline-head restart of the moved run.
                     auto* items = data();
                     const auto moved = size_ - index;
@@ -5759,7 +5752,7 @@ namespace XOffsetDatastructure {
                 std::memset(static_cast<void*>(items + (n - 1u)), 0, sizeof(T));
 #endif
             } else if constexpr (detail::shift_relocate_supported<T>()) {
-                // SHIFT: same bytes and deltas as the loop below, in one
+                // Ordinary records: same bytes and deltas as the loop below, in one
                 // memmove plus an inline-head restart of the moved run.
                 auto* items = data();
                 const auto moved = size_ - index - 1;
@@ -5854,7 +5847,7 @@ namespace XOffsetDatastructure {
 
         // Moves the size_ live elements from `old` into the separate fresh
         // block and ends their lifetimes in `old` (left emptied, bindings
-        // kept). SHIFT types: one memcpy plus an inline-head rebase by the
+        // kept). Ordinary records: one memcpy plus an inline-head rebase by the
         // block distance; same bytes and deltas as the per-element loop.
         void relocate_live_run(T* fresh, T* old) noexcept
             requires (fixed_detail::can_relocate_without_allocation<T>()) {
@@ -6040,7 +6033,7 @@ namespace XOffsetDatastructure {
             size_ = other.size_;
         }
 
-        // T4 POD: assign_range (in place when the capacity suffices, else one
+        // POD: assign_range (in place when the capacity suffices, else one
         // exact block), then the M6 padding zeroing transfer_construct does.
         void assign_trivial_copy(const XFixedVector& other) {
             assign_range(std::span<const T>(other.data(), other.size_));
@@ -7335,7 +7328,7 @@ namespace XOffsetDatastructure {
                                                           const char*& ptr) {
             auto address = static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(&delta)) + delta;
             ptr = reinterpret_cast<const char*>(static_cast<std::uintptr_t>(address));
-            // W9: flat (validated range), no canonical lookup
+            // Flat (validated range).
             return validate_storage_range(ptr, 1, 1, ctx, "wire validation: relative pointer out of bounds");
         }
 
@@ -7499,7 +7492,7 @@ namespace XOffsetDatastructure {
             return masks;
         }();
 
-        // I1: head bytes 0..11 of an inline string (byte 11 = 0x80 | length).
+        // Head bytes 0..11 of an inline string (byte 11 = 0x80 | length).
         // Forced inline only without exceptions (see validate_wire_element).
         XOFFSET_DETAIL_INLINE_NO_EXCEPTIONS vstatus validate_inline_string_bytes(const char* head) {
             std::uint64_t low;   // head bytes 0..7
@@ -7680,11 +7673,9 @@ namespace XOffsetDatastructure {
             if (!upstream)
                 XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument, "validation scratch: null upstream");
             const auto used = xbuf.arena()->used_end;
-            // W9: flat end for every storage kind. The extent check that R1+M2
-            // applied only to canonical (receive) storage now applies to all;
-            // it cannot fire for a valid ordinary arena (used_end <= size is an
-            // allocator/load invariant), so it only turns a corrupted extent
-            // into this error instead of an out-of-bounds validation context.
+            // used_end <= size is an allocator/load invariant: this only turns
+            // a corrupted extent into an error instead of an out-of-bounds
+            // validation context.
             if (used > xbuf.segment_size())
                 return wire_reject("wire validation: payload extent out of bounds");
             const char* validated_end = static_cast<const char*>(xbuf.get_address()) + used;
@@ -7853,7 +7844,7 @@ namespace XOffsetDatastructure {
             } else return false;
         }
 
-        // O3: detect a head embedded anywhere in the other's owned tree.
+        // Detect a head embedded anywhere in the other's owned tree.
         // No allocation, object relocation, or source mutation occurs here.
         template <typename T>
         bool move_assignment_owns_address(const T& value, const void* address) noexcept {
@@ -8398,7 +8389,7 @@ namespace XOffsetDatastructure {
             return vok();
         }
 
-        // E1 (N8): on Darwin, outputs of at least 1 MiB are copied in 256 KiB
+        // On Darwin, outputs of at least 1 MiB are copied in 256 KiB
         // chunks, each preceded by madvise(MADV_WILLNEED) on its pages.
 #if defined(__linux__)
         // E-2: on Linux, in an output of at least 1 MiB, each copy of at least
@@ -9697,7 +9688,7 @@ namespace XOffsetDatastructure {
         }
 
     public:
-        // ---- growth policy part 2: proxies and pin scopes (xoffset_proxy.hpp)
+        // ---- proxies and pin scopes (xoffset_proxy.hpp)
 
         // A proxy of the root: valid across moves of the payload (and of this
         // XBuffer object); fail-soft. An empty proxy when the buffer has no
@@ -10843,20 +10834,8 @@ namespace XOffsetDatastructure {
         bool complete_ = false;
     };
 
-    // ========================================================================
-    // TypedXBuffer<T> -- Type-bound buffer with compile-time root type
-    //
-    // Wraps XBuffer and binds it to a specific root type T at compile time.
-    // Eliminates the need to repeat <T> on every make/root/handle call.
-    //
-    // Usage:
-    //   TypedXBuffer<GameData> buf(4096);
-    //   auto* game = buf.make();         // no <GameData> needed
-    //   auto g = buf.root();             // a proxy (XRef<GameData>): g.level() = 3
-    //   buf.edit([](GameData& g) { ... });   // plain references, pinned
-    //   auto bytes = buf.save();          // standard save
-    //   auto loaded = TypedXBuffer<GameData>::load(bytes);
-    // ========================================================================
+    // TypedXBuffer<T>: an XBuffer bound to root type T at compile time, so
+    // make/root/edit/save/load take no <T> (docs/USER_GUIDE.md).
     template<typename T>
     class TypedXBuffer : public XBuffer {
     public:
@@ -11255,7 +11234,7 @@ struct _XOffset_NS_Sentinel {};
 // only ordinary non-static data members: no bases, unions, bit-fields or
 // [[no_unique_address]], members never overlap. It specializes
 // wire_record_layout<T>::ordinary_members and StableEraseOrdinaryMembers<T>,
-// which turns on the SHIFT path (XVector insert/erase/growth move records with
+// which turns on the shift path (XVector insert/erase/growth move records with
 // one memmove/memcpy plus an inline-head rebase), stable_erase_if and raw
 // receive for these types. The wire bytes are the same with or without it.
 // Each type is checked at compile time: a class (not a union) without bases

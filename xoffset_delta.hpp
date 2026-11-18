@@ -1,22 +1,13 @@
 #pragma once
 // Delta sync: send only what changed to a receiver that already holds a copy.
-//
-// A sender keeps one XDeltaBaseline per receiver (or per group of receivers
-// that always get the same deltas): a copy of the payload as that receiver
-// holds it. XBuffer::save_delta_into<T> compares the buffer with it in
-// 64-byte blocks and writes, for each block with a changed byte, a byte mask
-// and the changed bytes (and the hole table when it changed), then advances
-// the baseline. The receiver keeps an XDeltaCursor next to its buffer;
-// XBuffer::apply_delta_verified<T> writes the bytes into the buffer, verifies
-// the patched payload exactly as load_verified<T> verifies a wire, and rolls
-// the bytes back if it is rejected. Nothing is encoded or decoded per field:
-// the bytes are raw payload bytes at payload offsets, which mean the same
-// thing on every 64-bit little-endian target.
-//
-// The first delta of a baseline (and the first after reset()) is a key
-// delta: the difference from an all-zero payload, which any buffer accepts.
 // Format and rules: docs/DELTA_SYNC.md.
 //
+// The sender keeps one XDeltaBaseline per receiver (a copy of the payload as
+// the receiver holds it); save_delta_into<T> writes, per changed 64-byte
+// block, a byte mask and the changed bytes, then advances the baseline. The
+// receiver's apply_delta_verified<T> patches its buffer, verifies the result
+// as load_verified<T> verifies a wire, and rolls back if it is rejected. The
+// first delta of a baseline is a key delta against an all-zero payload.
 // Included at the end of xoffsetdatastructure.hpp.
 
 #include <algorithm>
@@ -3568,7 +3559,7 @@ namespace XOffsetDatastructure {
                         std::memcpy(base + lo, undo, kept);
                         undo += kept;
                     }
-                    // Bytes at or past old_used were zero (N2); the block wrote
+                    // Bytes at or past old_used were zero (zero tail); the block wrote
                     // only below used.
                     const std::size_t from = std::max(offset, old_used);
                     const std::size_t to = std::min(offset + delta_block, used);
@@ -3628,7 +3619,7 @@ namespace XOffsetDatastructure {
                 if (used > core.segment_size() && !core.grow(used - core.segment_size()))
                     XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, arena_failure_message);
 
-                // Save, then patch. Bytes at or past old_used are zero (N2).
+                // Save, then patch. Bytes at or past old_used are zero (zero tail).
                 char* base = core.data();
                 const char* const src_end = reinterpret_cast<const char*>(parsed.readable_end);
                 if (keep_undo) {
@@ -3710,7 +3701,7 @@ namespace XOffsetDatastructure {
             }
 
             // Trust tier admit of a non-key delta (XReceiver<L>::apply_delta<T,
-            // admit>, trust tier design P2). What the parse checks stays (format,
+            // admit>). What the parse checks stays (format,
             // stream and version, root type and fingerprint, every block and hole
             // inside [48, used), the root below used) and the root object must lie
             // inside the used payload, aligned; the payload itself is the sender's
@@ -3746,7 +3737,7 @@ namespace XOffsetDatastructure {
                 if (used > core.segment_size() && !core.grow(used - core.segment_size()))
                     XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, arena_failure_message);
 
-                // Bytes at or past old_used are zero (N2).
+                // Bytes at or past old_used are zero (zero tail).
                 char* base = core.data();
                 const char* const src_end = reinterpret_cast<const char*>(parsed.readable_end);
                 if (keep_undo) {

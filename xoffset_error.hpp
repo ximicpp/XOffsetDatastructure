@@ -152,7 +152,7 @@ template <class E>
 } // namespace detail
 
 namespace detail {
-// Fail-soft region (growth policy part 2: proxies and pin scopes in builds
+// Fail-soft region (proxies and pin scopes in builds
 // without exceptions). While one is open on this thread, an arena
 // allocation that fails records its code here and returns null instead of
 // calling the fatal handler; the container operation that asked for it then
