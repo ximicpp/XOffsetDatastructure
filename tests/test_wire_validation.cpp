@@ -348,8 +348,15 @@ int main() {
         reject(build(p), kCoverage);
         auto covered = p;
         covered.holes.push_back({static_cast<uint32_t>(h.used_bytes), 16});
-        if (kInband) reject(build(covered), kDirectory); // a hole the directory does not hold
-        else accept(build(covered), "tail region described by a hole must be accepted");
+        // In-band, the table's order is the stacks' order: a block after the
+        // last of its size joins that stack (its link is written on load).
+        accept(build(covered), "tail region described by a hole must be accepted");
+        if (kInband) {
+            auto other = base; // a size the directory has no stack for
+            other.payload.append(24, '\0');
+            other.holes.push_back({static_cast<uint32_t>(h.used_bytes), 24});
+            reject(build(other), kDirectory);
+        }
         auto partial = p;
         partial.holes.push_back({static_cast<uint32_t>(h.used_bytes), 8});
         reject(build(partial), kCoverage);
@@ -527,9 +534,9 @@ int main() {
         const auto sh = read<XWireHeaderV2>(dense, 0);
         const auto wh = read<XWireHeaderV2>(wire, 0);
         // In-band, the end of the retired block holds the free directory
-        // (the first hole) and a free run keeps the free block's first 8 bytes.
+        // (the first hole), which a free run leaves out.
         const std::uint32_t dir_bytes = sbuf.free_directory().bytes, freed = 8192 - dir_bytes;
-        const std::uint32_t holes = kInband ? 2u : 1u, run = kInband ? freed - 8u : freed;
+        const std::uint32_t holes = kInband ? 2u : 1u, run = freed;
         need(sh.extent_count == 0 && sh.hole_count == holes && read<Hole>(dense, dense.size() - 8).bytes == freed,
              "dense fixture layout");
         need(wh.extent_count >= 2 && wh.used_bytes == sh.used_bytes && wh.hole_count == holes &&

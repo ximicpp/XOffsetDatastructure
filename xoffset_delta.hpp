@@ -3539,7 +3539,7 @@ namespace XOffsetDatastructure {
             static XOFFSET_DETAIL_INLINE vstatus load_holes(XBufferCore& core,
                                                             const std::vector<XBufferCore::WireHole>& holes,
                                                             bool check) {
-                if constexpr (detail::inband_allocator) return core.inband_adopt(holes.data(), holes.size(), check);
+                if constexpr (detail::inband_allocator) return core.inband_adopt(holes.data(), holes.size(), check, false);
                 (void)check;
                 return core.load_free_blocks(holes.data(), holes.size());
             }
@@ -3617,11 +3617,12 @@ namespace XOffsetDatastructure {
                     header.hole_count = static_cast<std::uint32_t>(scratch.holes.size());
                     if constexpr (Admit) {
                         XOFFSET_VTRY(xbuf.template finish_admitted_load<T>(
-                            header, reinterpret_cast<const char*>(scratch.holes.data()), scratch.holes.size(), who));
+                            header, reinterpret_cast<const char*>(scratch.holes.data()), scratch.holes.size(), who,
+                            false));
                     } else {
                         XOFFSET_VTRY(xbuf.template finish_verified_load<T>(
                             header, reinterpret_cast<const char*>(scratch.holes.data()), scratch.holes.size(),
-                            default_wire_upstream(), who, &xbuf.retained_reload_scratch()));
+                            default_wire_upstream(), who, &xbuf.retained_reload_scratch(), false));
                     }
                 XOFFSET_ROLLBACK_END(core.reset_arena(0))
                 cursor.stream_ = parsed.header.stream;

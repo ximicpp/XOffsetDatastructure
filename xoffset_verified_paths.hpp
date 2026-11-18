@@ -120,7 +120,14 @@ namespace detail {
         T* const root = source.template cached_root<T>();
         if (!arena || !root || !owns_record(source) || !source.free_table_complete()) return false;
         const std::uint64_t used = arena->used_end;
-        const std::size_t holes = source.wire_hole_count();
+        // In-band, the hole table is gathered in the walk that counts it
+        // (up to small_wire_holes entries; a longer one is walked again).
+        struct NoHoles {};
+        [[maybe_unused]] std::conditional_t<detail::inband_allocator,
+                                            XBufferCore::WireHole[small_wire_holes], NoHoles> gathered;
+        std::size_t holes;
+        if constexpr (detail::inband_allocator) holes = source.inband_gather(gathered, small_wire_holes);
+        else holes = source.wire_hole_count();
         const std::size_t final_size = sizeof(XWireHeaderV2) + std::size_t(used - XWIRE_PAYLOAD_BEGIN) +
                                        holes * sizeof(XBufferCore::WireHole);
         if (used < XWIRE_PAYLOAD_BEGIN || used >= wire_zero_scan_min_payload || used > source.get_size() ||
@@ -140,6 +147,27 @@ namespace detail {
         const auto* base = static_cast<const char*>(source.get_address());
         const auto final_header = make_wire_header<T>(
             used, reinterpret_cast<std::uintptr_t>(root) - reinterpret_cast<std::uintptr_t>(base), holes);
+        if constexpr (detail::inband_allocator) {
+            struct SmallWire {
+                XWireHeaderV2 header;
+                const char* base;
+                XBufferCore* source;
+                const XBufferCore::WireHole* holes;
+                std::size_t size;
+            } const wire{final_header, base, &source, gathered, final_size};
+            out.resize_and_overwrite(final_size, [w = &wire](char* destination, std::size_t) noexcept {
+                const std::size_t payload = std::size_t(w->header.used_bytes) - XWIRE_PAYLOAD_BEGIN;
+                std::memcpy(destination, &w->header, sizeof(XWireHeaderV2));
+                std::memcpy(destination + sizeof(XWireHeaderV2), w->base + XWIRE_PAYLOAD_BEGIN, payload);
+                char* const table = destination + sizeof(XWireHeaderV2) + payload;
+                if (w->header.hole_count <= small_wire_holes)
+                    std::memcpy(table, w->holes, std::size_t(w->header.hole_count) * sizeof(XBufferCore::WireHole));
+                else
+                    w->source->write_free_blocks(table);
+                return w->size;
+            });
+            return true;
+        }
         // The copy reads one frame object, so the operation is a single
         // pointer wherever the string's resize_and_overwrite is compiled.
         struct SmallWire {

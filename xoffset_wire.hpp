@@ -1799,11 +1799,6 @@ namespace XOffsetDatastructure {
                     store = heap.get();
                     capacity *= 2u;
                 }
-                // In-band, a free block's first 8 bytes stay (its link word).
-                if constexpr (detail::inband_allocator) {
-                    hole.offset += 8u;
-                    hole.bytes -= 8u;
-                }
                 store[count++] = {hole.offset, hole.bytes};
                 total += hole.bytes;
                 low = (std::min)(low, hole.offset);
