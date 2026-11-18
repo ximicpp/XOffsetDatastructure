@@ -565,6 +565,14 @@ public:
         if (from < logical_bytes_) from = logical_bytes_;
         if (from < zero_from_) zero_from_ = from;
     }
+    // Only as the owner's last step before release: every reserved byte at
+    // or past `from` is zero, below the logical length too. The slot (its
+    // dirty_end) or the pooled mapping then hands its next owner a watermark
+    // at `from`, so that owner clears only [0, from) as it grows. This is the
+    // one place zero_from_ may drop below logical_bytes_.
+    void note_clean_tail_for_release(std::size_t from) noexcept {
+        if (from < zero_from_) zero_from_ = from;
+    }
     std::size_t accessible_bytes() const noexcept { return accessible_bytes_; }
     std::size_t page_size() const noexcept { return page_size_; }
     bool is_slot() const noexcept { return slot_class_ != no_slot; }
@@ -765,7 +773,8 @@ private:
     std::size_t maximum_capacity_{0};
     std::size_t accessible_bytes_{0};
     // Lowest offset from which every reserved byte is known to be OS-zero.
-    // Invariant: zero_from_ >= logical_bytes_ while the mapping is owned.
+    // Invariant: zero_from_ >= logical_bytes_ while the mapping is owned
+    // (note_clean_tail_for_release lowers it only on the way to release).
     std::size_t zero_from_{0};
     std::size_t page_size_{0};
     std::size_t reservation_granularity_{0};

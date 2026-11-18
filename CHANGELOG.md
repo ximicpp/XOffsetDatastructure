@@ -38,6 +38,17 @@ of this file and in the pull requests.
   block copy instead of one element at a time (the loop reloaded the size on every element). 64
   `push_back` calls of a `float` into an empty vector, regrowing on the way: 2,097 -> 1,885
   instructions, 171-184 -> 120 ns.
+- A buffer that gives its storage back (to a slot, to the pool or to the system) passes on how far it
+  actually wrote: on a settled buffer (exact free table, nothing written past its used size or the extent
+  of its last reset) that is its used size, so the next owner of that slot or mapping clears only those
+  bytes as it grows instead of the whole length the old owner reached. A buffer that is not settled (a
+  load that ended below what the storage held, an unverified load) passes on the old length. Building
+  the CppCon 2024 character into a new buffer each time with `assign_sorted`: 3,999 -> 3,283
+  instructions, 231-243 -> 184-187 ns.
+- `XString::assign(std::string_view)` is always inlined and its general path (allocation, growth,
+  checks) is out of line on every compiler, as it already was on Clang. Growing a short string to a long
+  one and back: 93 -> 64 instructions, 4.1 -> 2.6 ns; setting a short string: 43.5 -> 33.5, 1.7 -> 1.2 ns.
+  The build cells take 9 fewer instructions but measure 4-12% slower in time (cause not found).
 - Shorter small-block allocation and retirement, same placement: an empty vector's first block (from
   `assign_range`, `reserve` or a first `push_back`) is taken in one call that runs the exact-bin hit or
   the tail bump inline; a retired block entering a bin with room calls nothing; the tail bump and the

@@ -357,10 +357,9 @@ namespace XOffsetDatastructure {
 
         // The same for a string's first out-of-line block (XString::
         // move_to_heap, alignment 1), whose head already holds its binding.
-        // Inlined into move_to_heap: GCC inlines assign_general, and so
-        // move_to_heap, at every assign() caller, and a call here instead
-        // changed the registers of the caller's reuse loop (reloc
-        // str.assign_long one more instruction per assign).
+        // Inlined into move_to_heap, so a string's first block costs no call
+        // (with a call here reloc str.assign_long took one more instruction
+        // per assign, when GCC still inlined assign_general at every caller).
         XOFFSET_DETAIL_INLINE void* allocate_first_chars(const allocator_ref& alloc_ref, std::uint32_t bytes) {
             auto* owner = XBufferCore::owner_from_arena_noexcept(alloc_ref.segment);
             if (!owner || bytes > XBufferCore::MAX_PAYLOAD - 8u) [[unlikely]]
@@ -1092,7 +1091,7 @@ namespace XOffsetDatastructure {
             capacity_ = new_cap;
         }
 
-        void assign(std::string_view rhs) {
+        XOFFSET_DETAIL_INLINE void assign(std::string_view rhs) {
             // An inline head, or a null one (as emplace_back() builds it),
             // takes a nonempty short value inline: the general path below
             // would do the same after its checks.
@@ -1125,15 +1124,10 @@ namespace XOffsetDatastructure {
         }
 
     private:
-        // assign() off its two fast paths. Clang inlines assign() at the
-        // caller only with this part out of line. GCC and MSVC get back the
-        // one function they had before the split (inlined or not as they
-        // chose then).
-#if defined(__clang__)
+        // assign() off its two fast paths, out of line on every compiler (as
+        // Clang already needed to inline assign()), so a caller keeps only
+        // assign()'s checks and copy inline.
         XOFFSET_DETAIL_NOINLINE void assign_general(std::string_view rhs) {
-#else
-        XOFFSET_DETAIL_INLINE void assign_general(std::string_view rhs) {
-#endif
             if (rhs.size() > inline_max) XOFFSET_SOFT_PREFLIGHT(this, rhs.size() + 24u, );
             if (rhs.size() >= XBufferCore::MAX_PAYLOAD) XOFFSET_THROW(XBadAlloc());
             if (rhs.empty()) { clear(); return; }
@@ -1295,8 +1289,10 @@ namespace XOffsetDatastructure {
         // src may alias these inline bytes: every source byte is loaded before
         // the head is written. The 12 bytes are assembled in two registers
         // (little-endian) and written with two stores; a byte-filled stack
-        // buffer reloaded as words stalled store forwarding.
-        void store_inline(const char* src, std::uint32_t count) noexcept {
+        // buffer reloaded as words stalled store forwarding. Always inline:
+        // it is assign()'s short-value copy, and GCC called it out of line at
+        // some callers once assign() was inlined there.
+        XOFFSET_DETAIL_INLINE void store_inline(const char* src, std::uint32_t count) noexcept {
             std::uint64_t lo = 0;
             std::uint32_t hi = 0;
             if (count >= 8) {
