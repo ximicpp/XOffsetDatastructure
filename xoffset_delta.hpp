@@ -4018,7 +4018,8 @@ namespace XOffsetDatastructure {
             this->cache_root(root_ptr);
         }
         ensure_hole_table(*root_ptr);
-        if (XDeltaStats small; detail::DeltaAccess::encode_small<T>(*this, out, baseline, options, small)) return small;
+        // Not named `small`: <windows.h> (rpcndr.h) defines that as a macro.
+        if (XDeltaStats stats; detail::DeltaAccess::encode_small<T>(*this, out, baseline, options, stats)) return stats;
         return detail::DeltaAccess::encode<T>(*this, out, baseline, options);
     }
 
