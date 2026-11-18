@@ -5,6 +5,10 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- A vector that grows into a new block moves trivially copyable elements of up to 16 bytes with one
+  block copy instead of one element at a time (the loop reloaded the size on every element). 64
+  `push_back` calls of a `float` into an empty vector, regrowing on the way: 2,097 -> 1,885
+  instructions, 171-184 -> 120 ns.
 - Shorter small-block allocation and retirement, same placement: an empty vector's first block (from
   `assign_range`, `reserve` or a first `push_back`) is taken in one call that runs the exact-bin hit or
   the tail bump inline; a retired block entering a bin with room calls nothing; the tail bump and the
