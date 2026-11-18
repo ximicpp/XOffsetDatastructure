@@ -69,15 +69,9 @@ struct Counts { std::size_t accepted = 0, header_rejects = 0, payload_rejects = 
 
 // Every acceptor's outcome ("ok" or the exact error) for one input.
 std::string outcomes(const std::string& w) {
-    std::string terr, lerr, rerr, verr;
-    std::string line = std::string("T:") + (typed_load(w, &terr) ? "ok" : terr) +
-                       " L:" + (reload_accepts(w, &lerr) ? "ok" : lerr);
-    const auto o = oracle(w);
-    if (kRawAcceptors && (o.ok || o.stage == Oracle::Stage::Payload)) {
-        line += std::string(" R:") + (raw_accepts(w, &rerr) ? "ok" : rerr);
-        line += std::string(" V:") + (receive_accepts(w, &verr) ? "ok" : verr);
-    }
-    return line;
+    std::string terr, lerr;
+    return std::string("T:") + (typed_load(w, &terr) ? "ok" : terr) +
+           " L:" + (reload_accepts(w, &lerr) ? "ok" : lerr);
 }
 
 // The cursor path is a shortcut of the bitmaps: with it off, every outcome

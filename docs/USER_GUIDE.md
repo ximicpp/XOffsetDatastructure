@@ -261,8 +261,6 @@ child data of other containers never move.
 | `src.clone_into(dst)` | dst unchanged (mapping reused); a movable-slot dst that cannot hold it switches storage (section 3.4) | Everything previously in dst invalidated; `src` unaffected | dst +1 (unchanged when a self-copy is rejected) |
 | `clone()` | The result is a new buffer with the same storage kind as the source (movable slot or address-stable) | Source unaffected | New buffer starts at 0 |
 | `load_verified`, `load_unverified`, `XCompactor::compact` | The result is a new buffer | Source unaffected (compaction only reads the source, also when retrying with a larger capacity) | New buffer starts at 0 |
-| `freeze_verified(std::move(buf))` | Payload stays put and now belongs to the snapshot | On success `buf` is empty and the payload is read only through the snapshot; if it throws, `buf` is unchanged | `buf` +1 |
-| `begin_verified_receive` / `finish_verified` | The result buffer's payload is the memory written during receive (`payload_address()`) | The receive span must not be written after `finish_verified` | New buffer starts at 0 |
 | `XBuffer` move construction, move assignment, `swap` | Unchanged; storage moves with the object | Still valid, but now belong to the other object | Both +1 |
 | Destruction | Released | All invalidated | n/a |
 
@@ -456,9 +454,6 @@ in.read([](const Profile& r) { print(r.name.view()); });   // read plain members
 - A loaded buffer can be modified and saved again; free space from before the save comes along with
   the hole table and keeps being reused.
 - `load_unverified` skips validation and is only for data the caller already trusts.
-- The receive interface that reads straight into the final arena is `begin_verified_receive<T>` /
-  `finish_verified` (`xoffset_verified_receive.hpp`), with the same validation strength as
-  `load_verified`.
 
 ### 4.1 Many small messages: slots, or reuse mappings with `XBufferPool`
 
@@ -694,9 +689,6 @@ required.
   whole-block copy in container copy assignment (with exceptions it falls back to element-by-element
   copy) and the doubling retry in `XCompactor::compact` (never reached when 2x the used space is
   enough). Clients that only receive, read and make small edits are not affected.
-- `receive_raw::validate` and `begin_verified_receive` / `finish_verified` have no non-throwing
-  versions yet, so their rejections are fatal without exceptions; clients should use
-  `try_load_verified`, `try_reload_verified` or `try_begin_verified_reload`.
 - When an allocation fails during a library container modification, the original logical content is
   kept, but capacity and allocator accounting are not necessarily rolled back. Multi-step business
   operations are not transactions.
@@ -796,7 +788,6 @@ The following interfaces are provided but optional or experimental and may chang
 | # | Interface | Notes |
 | --- | --- | --- |
 | E0 | Schema evolution: `xoffset_evolution.hpp` (version chain, `evolve_load_verified`, `XPeerSchemas` handshake), freeze tool | Interop between ends on different versions (since 3.2.0, [SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)); conversion runs on the server, clients contain no conversion code |
-| E1 | `freeze_verified`, `begin_verified_receive` / `finish_verified` | A frozen snapshot is handed to the send call in segments (without first concatenating a wire string), and receive reads straight into the final arena; each end still copies once, not zero-copy |
 | E2 | `save_verified_into`, `TypedXBuffer<T>` | `TypedXBuffer<T>` is the recommended pattern of section 3; the shape of both may still change |
 | E3 | `XBufferPool`, reservation and growth policy details, `XStorage` / `storage_kind()`, `SLOT_MAX`, `trim_slot_storage` | High-frequency small buffers |
 | E4 | `load_unverified` | Only for data the caller already trusts |

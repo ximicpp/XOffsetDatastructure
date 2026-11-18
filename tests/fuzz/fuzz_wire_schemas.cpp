@@ -138,23 +138,12 @@ void edit(ms::Deep& r, std::mt19937_64& rng) {
 
 template <class Root>
 void check(const std::string& w, std::mt19937_64& rng) {
-    std::string terr, rerr, verr;
+    std::string terr;
     auto typed = typed_load<Root>(w, &terr);
     outcome_add("T", bool(typed), terr);
     if (!framing_valid<Root>(w)) {
         if (typed) fail("typed load accepted a wire with invalid framing");
         return;
-    }
-    // Builds without exceptions have no raw or receive acceptor.
-    if (kRawAcceptors) {
-        const bool raw = raw_accepts<Root>(w, &rerr);
-        const bool recv = receive_accepts<Root>(w, &verr);
-        outcome_add("R", raw, rerr);
-        outcome_add("V", recv, verr);
-        if (raw != bool(typed) || recv != bool(typed))
-            fail(std::string("acceptors disagree: typed=") + (typed ? "accept" : "reject(" + terr + ")") +
-                 " raw=" + (raw ? "accept" : "reject(" + rerr + ")") +
-                 " receive=" + (recv ? "accept" : "reject(" + verr + ")"));
     }
     if (!typed) return;
     if (typed->save_verified() != w) fail("accepted wire does not re-save byte-identically");
