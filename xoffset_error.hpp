@@ -318,6 +318,52 @@ inline XError take_pending_error() noexcept {
     pending_error().message.clear();
     return error;
 }
+
+// A try_* entry around a receive-path call `step` (returning vstatus): its
+// failure comes back as an XError instead of an exception or a fatal error.
+template <class Step>
+XOFFSET_DETAIL_INLINE XStatus try_v(Step&& step) {
+#if XOFFSET_NO_EXCEPTIONS
+    if (!step()) return take_pending_error();
+    return {};
+#else
+    try {
+        step();
+        return {};
+    } catch (...) {
+        return current_exception_error();
+    }
+#endif
+}
+
+// try_v for a call that fills `out`: `out` itself on success.
+template <class T, class Step>
+XOFFSET_DETAIL_INLINE XResult<T> try_v_into(T& out, Step&& step) {
+    XStatus status = try_v(step);
+    if (!status) return std::move(status).error();
+    return XResult<T>(std::move(out));
+}
+
+// Runs f in a fail-soft region (a pin scope): the code of a failed arena
+// allocation, or ok. With exceptions, an XException or std::bad_alloc that f
+// lets out is caught and turned into its code; others propagate.
+template <class F>
+XOFFSET_DETAIL_INLINE XErrc run_fail_soft(F&& f) {
+#if XOFFSET_NO_EXCEPTIONS
+    SoftFailScope soft;
+    f();
+    return soft.code();
+#else
+    try {
+        f();
+        return XErrc::ok;
+    } catch (const XException& e) {
+        return e.code() == XErrc::unspecified ? XErrc::out_of_storage : e.code();
+    } catch (const std::bad_alloc&) {
+        return XErrc::host_allocation_failed;
+    }
+#endif
+}
 } // namespace detail
 
 
