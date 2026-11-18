@@ -805,8 +805,8 @@ namespace XOffsetDatastructure {
             std::uint64_t local = 0;
             std::uint64_t heads = 0;
         };
-        static_assert(sizeof(XFixedString) == 12, "inline string head layout");
-        static_assert(sizeof(XFixedVector<std::uint32_t>) == 12, "vector head layout");
+        static_assert(sizeof(XString) == 12, "inline string head layout");
+        static_assert(sizeof(XVectorCore<std::uint32_t>) == 12, "vector head layout");
 
         // A container whose change is checked on its own: a heap string, a
         // set or map whose elements hold nothing verification reads but their
@@ -915,7 +915,7 @@ namespace XOffsetDatastructure {
                 if (!nodes_) return;
                 const auto index = static_cast<std::uint32_t>(nodes_->size());
                 nodes_->push_back(n);
-                ranges_->push_back({n.head, n.head + static_cast<std::uint32_t>(sizeof(XFixedString)), index});
+                ranges_->push_back({n.head, n.head + static_cast<std::uint32_t>(sizeof(XString)), index});
                 if (block_bytes != 0)
                     ranges_->push_back({static_cast<std::uint32_t>(block_begin),
                                         static_cast<std::uint32_t>(block_begin + block_bytes), index});
@@ -955,7 +955,7 @@ namespace XOffsetDatastructure {
             }
             // A head that left the inline or empty form: its bits and its head mark.
             void clear_head_at(std::size_t offset) noexcept {
-                clear_at(offset, sizeof(XFixedString));
+                clear_at(offset, sizeof(XString));
                 bits_[offset / delta_block].heads &= ~(std::uint64_t(1) << (offset % delta_block));
             }
             // The head of a vector whose elements hold nothing verification
@@ -966,12 +966,12 @@ namespace XOffsetDatastructure {
                 const std::size_t bit = i % delta_block;
                 DeltaCheckBits& b = bits_[i / delta_block];
                 b.heads |= std::uint64_t(1) << bit;
-                if (bit + sizeof(XFixedString) <= delta_block) {  // within one block (most heads)
+                if (bit + sizeof(XString) <= delta_block) {  // within one block (most heads)
                     b.checked |= std::uint64_t(0xFFF) << bit;
                     b.local |= std::uint64_t(0xF) << (bit + 4);
                     return;
                 }
-                mark_at(offset, sizeof(XFixedString), false);
+                mark_at(offset, sizeof(XString), false);
                 mark_at(offset + 4, 4, true);
             }
             // An inline string head: its length and padding are checked in
@@ -983,14 +983,14 @@ namespace XOffsetDatastructure {
                 const std::size_t bit = i % delta_block;
                 DeltaCheckBits& b = bits_[i / delta_block];
                 b.heads |= std::uint64_t(1) << bit;
-                if (bit + sizeof(XFixedString) <= delta_block) {  // within one block (most heads)
-                    const std::uint64_t m = ((std::uint64_t(1) << (sizeof(XFixedString) - length)) - 1u)
+                if (bit + sizeof(XString) <= delta_block) {  // within one block (most heads)
+                    const std::uint64_t m = ((std::uint64_t(1) << (sizeof(XString) - length)) - 1u)
                                             << (bit + length);
                     b.checked |= m;
                     b.local |= m;
                     return;
                 }
-                mark_at(offset + length, sizeof(XFixedString) - length, true);
+                mark_at(offset + length, sizeof(XString) - length, true);
             }
 
         private:
@@ -1034,8 +1034,8 @@ namespace XOffsetDatastructure {
         bool delta_grow_records(DeltaVerifyContext& v, std::size_t data, std::uint32_t from, std::uint32_t to);
 
         // A string with a block: its head, its terminator, and a node.
-        XOFFSET_DETAIL_COLD inline void delta_mark_heap_string(const XFixedString& s, DeltaCheckMarker& m) {
-            m.mark(&s, sizeof(XFixedString), false);
+        XOFFSET_DETAIL_COLD inline void delta_mark_heap_string(const XString& s, DeltaCheckMarker& m) {
+            m.mark(&s, sizeof(XString), false);
             m.mark(delta_heap_data<char>(s.data_delta) + s.size_, 1, false);
             DeltaCheckNode n;
             n.head = static_cast<std::uint32_t>(m.offset_of(&s));
@@ -1046,7 +1046,7 @@ namespace XOffsetDatastructure {
             m.node(n, m.offset_of(delta_heap_data<char>(s.data_delta)), std::size_t(s.capacity_) + 1u);
             m.live(delta_heap_data<char>(s.data_delta), std::size_t(s.capacity_) + 1u);
         }
-        XOFFSET_DETAIL_INLINE void delta_mark_string(const XFixedString& s, DeltaCheckMarker& m) {
+        XOFFSET_DETAIL_INLINE void delta_mark_string(const XString& s, DeltaCheckMarker& m) {
             // Inline or empty (all 12 bytes zero, as verification requires
             // of a head without a block): checked in place.
             if (s.is_inline() || s.capacity_ == 0) [[likely]]
@@ -1068,11 +1068,11 @@ namespace XOffsetDatastructure {
             } else if constexpr (std::is_array_v<CleanT>) {
                 for (const auto& elem : value) delta_mark_value(elem, m);
             } else if constexpr (is_fixed_string_v<CleanT>) {
-                delta_mark_string(static_cast<const XFixedString&>(value), m);
+                delta_mark_string(static_cast<const XString&>(value), m);
             } else if constexpr (is_fixed_flat_set_v<CleanT> || is_fixed_flat_map_v<CleanT> ||
                                  is_fixed_vector_v<CleanT>) {
                 using Elem = typename CleanT::value_type;
-                const auto& v = static_cast<const XFixedVector<Elem>&>(value);
+                const auto& v = static_cast<const XVectorCore<Elem>&>(value);
                 if constexpr (!is_fixed_flat_set_v<CleanT> && !is_fixed_flat_map_v<CleanT> &&
                               !wire_value_needs_validation_v<Elem>) {
                     m.vector_head_at(m.offset_of(&v));
@@ -1152,7 +1152,7 @@ namespace XOffsetDatastructure {
                         using member = schema::member_t<CleanT, decltype(index)::value>;
                         const auto& field = member::get(value);
                         if constexpr (is_fixed_string_v<std::remove_cvref_t<decltype(field)>>)
-                            delta_mark_string(static_cast<const XFixedString&>(field), m);
+                            delta_mark_string(static_cast<const XString&>(field), m);
                         else
                             delta_mark_value(field, m);
                         return vok();
@@ -1170,7 +1170,7 @@ namespace XOffsetDatastructure {
                 if constexpr (wire_value_needs_validation_v<std::remove_extent_t<CleanT>>)
                     for (const auto& elem : value) delta_mark_pinned(elem, m);
             } else if constexpr (is_fixed_string_v<CleanT>) {
-                const auto& s = static_cast<const XFixedString&>(value);
+                const auto& s = static_cast<const XString&>(value);
                 if (!s.is_inline() && s.capacity_ != 0) {
                     m.pin(delta_heap_data<char>(s.data_delta), std::size_t(s.size_) + 1u);
                     m.live(delta_heap_data<char>(s.data_delta), std::size_t(s.capacity_) + 1u);
@@ -1178,7 +1178,7 @@ namespace XOffsetDatastructure {
             } else if constexpr (is_fixed_flat_set_v<CleanT> || is_fixed_flat_map_v<CleanT> ||
                                  is_fixed_vector_v<CleanT>) {
                 using Elem = typename CleanT::value_type;
-                const auto& v = static_cast<const XFixedVector<Elem>&>(value);
+                const auto& v = static_cast<const XVectorCore<Elem>&>(value);
                 if (v.capacity_ == 0) return;
                 const Elem* data = delta_heap_data<Elem>(v.data_delta);
                 m.live(data, std::size_t(v.capacity_) * sizeof(Elem));
@@ -1258,7 +1258,7 @@ namespace XOffsetDatastructure {
                     if (!delta_verify_value(elem, v)) return false;
                 return true;
             } else if constexpr (is_fixed_string_v<CleanT>) {
-                const auto& s = static_cast<const XFixedString&>(value);
+                const auto& s = static_cast<const XString&>(value);
                 if (s.is_inline() || (s.capacity_ == 0 && s.size_ == 0 && s.data_delta == 0)) {
                     std::uint64_t low;
                     std::uint32_t high;
@@ -1266,7 +1266,7 @@ namespace XOffsetDatastructure {
                     std::memcpy(&high, reinterpret_cast<const char*>(&s) + 8, 4);
                     if ((low | high) == 0) return true;
                     const unsigned length = (high >> 24) & 0x7Fu;
-                    return (high & XFixedString::inline_flag) != 0 && length <= XFixedString::inline_max &&
+                    return (high & XString::inline_flag) != 0 && length <= XString::inline_max &&
                            ((low & inline_pad_masks.low[length]) | (high & inline_pad_masks.high[length])) == 0;
                 }
                 std::size_t begin, bytes;
@@ -1277,7 +1277,7 @@ namespace XOffsetDatastructure {
                 if constexpr (alignof(Elem) > 8) {
                     return false;  // the whole verification decides
                 } else {
-                    const auto& vec = static_cast<const XFixedVector<Elem>&>(value);
+                    const auto& vec = static_cast<const XVectorCore<Elem>&>(value);
                     std::size_t begin, bytes;
                     if (!v.block(&vec, false, sizeof(Elem), begin, bytes)) return false;
                     if (bytes == 0) return true;
@@ -2263,7 +2263,7 @@ namespace XOffsetDatastructure {
                 } else if constexpr (std::is_array_v<CleanT>) {
                     for (const auto& elem : value) touch_reached(sink, elem);
                 } else if constexpr (is_fixed_string_v<CleanT>) {
-                    const auto& str = static_cast<const XFixedString&>(value);
+                    const auto& str = static_cast<const XString&>(value);
                     // The whole block, slack included (a block freed and
                     // reused may leave its old bytes zeroed in the slack).
                     if (!str.is_inline() && str.capacity_ != 0)
@@ -2272,7 +2272,7 @@ namespace XOffsetDatastructure {
                 } else if constexpr (is_fixed_flat_set_v<CleanT> || is_fixed_flat_map_v<CleanT> ||
                                      is_fixed_vector_v<CleanT>) {
                     using Elem = typename CleanT::value_type;
-                    const auto& v = static_cast<const XFixedVector<Elem>&>(value);
+                    const auto& v = static_cast<const XVectorCore<Elem>&>(value);
                     if (v.capacity_ == 0) return;
                     const Elem* data = delta_heap_data<Elem>(v.data_delta);
                     touch_bytes(sink, data,
@@ -2954,7 +2954,7 @@ namespace XOffsetDatastructure {
                 std::memcpy(&high, head + 8, 4);
                 const unsigned length = (high >> 24) & 0x7Fu;
                 if ((low | high) == 0) return true;  // empty: no block
-                return (high & XFixedString::inline_flag) != 0 && length <= XFixedString::inline_max &&
+                return (high & XString::inline_flag) != 0 && length <= XString::inline_max &&
                        ((low & inline_pad_masks.low[length]) | (high & inline_pad_masks.high[length])) == 0;
             }
             // Bytes of the block of a container of `capacity` (rounded to 8).
@@ -3034,7 +3034,7 @@ namespace XOffsetDatastructure {
                     mv.old_begin = static_cast<std::size_t>(std::int64_t(n.head) + n.data_delta);
                     mv.old_bytes = node_block_bytes(n.kind, n.capacity, n.element);
                 }
-                if (n.kind == delta_node_string && (capacity & XFixedString::inline_flag) != 0)
+                if (n.kind == delta_node_string && (capacity & XString::inline_flag) != 0)
                     return inline_head_ok(head) ? 2 : 0;
                 if (!head_block(base, used, n.head, n.kind, n.element, mv.new_begin, mv.new_bytes)) return 0;
                 if (mv.new_bytes != 0 && n.keys_ordered && !n.keys_ordered(base + mv.new_begin, size)) return 0;
@@ -3094,10 +3094,10 @@ namespace XOffsetDatastructure {
                     for (std::uint64_t hit = written; hit != 0;) {
                         const std::size_t offset = r.offset + static_cast<std::size_t>(std::countr_zero(hit));
                         const std::size_t head =
-                            head_before<&DeltaCheckBits::heads>(bits, offset, sizeof(XFixedString) - 1);
+                            head_before<&DeltaCheckBits::heads>(bits, offset, sizeof(XString) - 1);
                         if (head != 0) {
                             // A vector head's last byte is not local, a string head's is.
-                            const std::size_t e = head + sizeof(XFixedString) - 1;
+                            const std::size_t e = head + sizeof(XString) - 1;
                             const bool vector = ((bits[e / delta_block].local >> (e % delta_block)) & 1u) == 0;
                             if (head != last_head && !(vector ? on_vector(head) : on_head(head))) return false;
                         } else {
@@ -3107,7 +3107,7 @@ namespace XOffsetDatastructure {
                         }
                         // The rest of the head in this block is done.
                         last_head = head;
-                        const std::size_t past = head + sizeof(XFixedString) - r.offset;
+                        const std::size_t past = head + sizeof(XString) - r.offset;
                         hit = past >= delta_block ? 0 : hit & ~((std::uint64_t(1) << past) - 1u);
                     }
                 }
@@ -3340,7 +3340,7 @@ namespace XOffsetDatastructure {
                             // A heap string now: its head and block on their own.
                             std::uint32_t capacity;
                             std::memcpy(&capacity, base + head + 8, 4);
-                            if ((capacity & XFixedString::inline_flag) != 0) return false;
+                            if ((capacity & XString::inline_flag) != 0) return false;
                             DeltaMove mv;
                             mv.head = static_cast<std::uint32_t>(head);
                             if (!head_block(base, used, head, delta_node_string, 1, mv.new_begin, mv.new_bytes) ||
@@ -3376,7 +3376,7 @@ namespace XOffsetDatastructure {
                     const DeltaCheckNode& n = c.nodes_[i];
                     if (n.kind == delta_node_dead) continue;
                     const auto index = static_cast<std::uint32_t>(i);
-                    c.ranges_.push_back({n.head, n.head + static_cast<std::uint32_t>(sizeof(XFixedString)), index});
+                    c.ranges_.push_back({n.head, n.head + static_cast<std::uint32_t>(sizeof(XString)), index});
                     if (n.capacity == 0 || n.kind == delta_node_vector || n.kind == delta_node_records) continue;
                     const auto data = static_cast<std::uint32_t>(std::int64_t(n.head) + n.data_delta);
                     const std::size_t bytes =
@@ -3425,10 +3425,10 @@ namespace XOffsetDatastructure {
                         continue;
                     }
                     if (n.kind != delta_node_vector) ranges_changed = true;
-                    if (n.kind == delta_node_string && (capacity == 0 || (capacity & XFixedString::inline_flag) != 0)) {
+                    if (n.kind == delta_node_string && (capacity == 0 || (capacity & XString::inline_flag) != 0)) {
                         // Inline or empty now: checked in place, no longer a node.
                         n.kind = delta_node_dead;
-                        m.clear_at(n.head, sizeof(XFixedString));
+                        m.clear_at(n.head, sizeof(XString));
                         m.inline_head_at(n.head);
                         continue;
                     }
@@ -3452,11 +3452,11 @@ namespace XOffsetDatastructure {
                     parsed, c.checks_.data(), [](std::size_t) { return true; },
                     [&](std::size_t head) {
                         if (inline_head_ok(base + head)) {
-                            m.clear_at(head, sizeof(XFixedString));
+                            m.clear_at(head, sizeof(XString));
                             m.inline_head_at(head);
                         } else {  // a heap string now: a node (within the room reserved)
                             m.clear_head_at(head);
-                            delta_mark_heap_string(*reinterpret_cast<const XFixedString*>(base + head), m);
+                            delta_mark_heap_string(*reinterpret_cast<const XString*>(base + head), m);
                             ranges_changed = true;
                         }
                         return true;

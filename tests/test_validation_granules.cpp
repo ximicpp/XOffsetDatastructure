@@ -426,18 +426,18 @@ void typed_head_checks() {
     const auto words = offsetof(GranuleRoot, words);
     const auto name = offsetof(GranuleRoot, name);
     const auto data_of = [&](const std::string& w, std::size_t member) {
-        const auto origin = field(member, offsetof(xo::XFixedVector<std::uint32_t>, data_delta));
+        const auto origin = field(member, offsetof(xo::XVectorCore<std::uint32_t>, data_delta));
         return std::size_t(std::int64_t(origin) + read_at<std::int32_t>(w, origin));
     };
     // Points a head's data_delta at payload offset `to` (file position payload_at + to).
     auto point = [&](std::string& w, std::size_t member, std::int64_t to) {
-        const auto origin = field(member, offsetof(xo::XFixedVector<std::uint32_t>, data_delta));
+        const auto origin = field(member, offsetof(xo::XVectorCore<std::uint32_t>, data_delta));
         write_at(w, origin, std::int32_t(payload_at + to - std::int64_t(origin)));
     };
     {   // bool check precedes a later bad pointer.
         auto bad = original;
         write_at(bad, rp + offsetof(GranuleRoot, flags) + 2, std::uint8_t{2});
-        write_at(bad, field(words, offsetof(xo::XFixedVector<std::uint32_t>, data_delta)), INT32_MAX);
+        write_at(bad, field(words, offsetof(xo::XVectorCore<std::uint32_t>, data_delta)), INT32_MAX);
         reject<GranuleRoot>(bad, "wire validation: invalid bool representation");
     }
     {   // Data address outside the payload, at its end, payload past the end,
@@ -447,13 +447,13 @@ void typed_head_checks() {
         point(bad, words, std::int64_t(used));
         reject<GranuleRoot>(bad, "wire validation: relative pointer out of bounds");
         point(bad, words, std::int64_t(used) - 16); // 5 x 4 bytes = 20 > 16
-        reject<GranuleRoot>(bad, "wire validation failed: XFixedVector payload out of bounds");
+        reject<GranuleRoot>(bad, "wire validation failed: XVector payload out of bounds");
         auto odd = original;
-        write_at(odd, field(words, offsetof(xo::XFixedVector<std::uint32_t>, capacity_)), std::uint32_t{5});
+        write_at(odd, field(words, offsetof(xo::XVectorCore<std::uint32_t>, capacity_)), std::uint32_t{5});
         point(odd, words, std::int64_t(used) - 20); // payload fits, round8 block does not, and 4-aligned only
         reject<GranuleRoot>(odd, "wire validation: allocation out of bounds");
         auto mis = original; point(mis, words, std::int64_t(data_of(original, words)) - payload_at + 1);
-        reject<GranuleRoot>(mis, "wire validation failed: XFixedVector payload out of bounds");
+        reject<GranuleRoot>(mis, "wire validation failed: XVector payload out of bounds");
         auto mis4 = original; point(mis4, words, std::int64_t(data_of(original, words)) - payload_at - 4);
         reject<GranuleRoot>(mis4, "wire validation: allocation out of bounds");
     }
@@ -461,9 +461,9 @@ void typed_head_checks() {
         auto bad = original; point(bad, name, std::int64_t(used) + 8);
         reject<GranuleRoot>(bad, "wire validation: relative pointer out of bounds");
         point(bad, name, std::int64_t(used) - 8); // capacity + 1 > 8
-        reject<GranuleRoot>(bad, "wire validation failed: XFixedString payload out of bounds");
+        reject<GranuleRoot>(bad, "wire validation failed: XString payload out of bounds");
         auto mis = original;
-        const auto origin = field(name, offsetof(xo::XFixedString, data_delta));
+        const auto origin = field(name, offsetof(xo::XString, data_delta));
         write_at(mis, origin, read_at<std::int32_t>(original, origin) + 4);
         reject<GranuleRoot>(mis, "wire validation: allocation out of bounds");
     }
@@ -488,7 +488,7 @@ void typed_head_checks() {
         need(header.hole_count == 1 && hole.bytes == 16, "fixture must hold one retired block");
         auto bad = valid;
         const auto origin = at + header.root_offset + offsetof(PairRoot, right) +
-                            offsetof(xo::XFixedVector<std::uint8_t>, data_delta);
+                            offsetof(xo::XVectorCore<std::uint8_t>, data_delta);
         write_at(bad, origin, std::int32_t(std::int64_t(at + hole.offset) - std::int64_t(origin)));
         reject<PairRoot>(bad, live_free);
         (void)xo::XBuffer::load_verified<PairRoot>(valid);

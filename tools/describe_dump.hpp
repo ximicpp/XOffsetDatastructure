@@ -36,13 +36,9 @@ namespace xoffset_describe_dump {
     // XOffset's own heads, by exact type: a user record derived from one (a
     // struct with an XString base, say) still needs its own line.
     template <class T> struct is_library_head : std::false_type {};
-    template <> struct is_library_head<xo::XFixedString> : std::true_type {};
     template <> struct is_library_head<xo::XString> : std::true_type {};
-    template <class E> struct is_library_head<xo::XFixedVector<E>> : std::true_type {};
     template <class E> struct is_library_head<xo::XVector<E>> : std::true_type {};
-    template <class E> struct is_library_head<xo::XFixedFlatSet<E>> : std::true_type {};
     template <class E> struct is_library_head<xo::XSet<E>> : std::true_type {};
-    template <class K, class V> struct is_library_head<xo::XFixedFlatMap<K, V>> : std::true_type {};
     template <class K, class V> struct is_library_head<xo::XMap<K, V>> : std::true_type {};
 
     consteval std::string qualified_name(std::meta::info type);

@@ -77,8 +77,7 @@ template<class Key> consteval bool builtin_key_order() {
             !requires(const Key& a, const Key& b) { operator<=>(a, b); };
         // Explicit function-call syntax considers ADL functions, never builtin
         // operators. The expression check also rejects ambiguous/invalid comparison.
-    } else return is_fixed_string_v<Key> &&
-        (std::is_same_v<Key, XString> || std::is_same_v<Key, XFixedString>);
+    } else return std::is_same_v<Key, XString>;
 }
 
 template<class T, std::size_t I, std::size_t J = I + 1>
@@ -284,7 +283,7 @@ T* begin_relocated_ordinary_outer(T* destination, const T& source) noexcept {
     } else return destination;
 }
 
-// SHIFT: XFixedVector erase/insert move a contiguous run of live elements by
+// SHIFT: XVectorCore erase/insert move a contiguous run of live elements by
 // one slot. The caller memmoves the run, which supplies implicit object
 // creation of the ordinary outers and scalars as in rebuild_dynamic_array.
 // Only the INLINE heads of the moved run are then restarted, with every
@@ -390,7 +389,7 @@ XOFFSET_DETAIL_INLINE void shift_rebase_inline_value(char* address, ShiftRun& ru
         std::memcpy(&size, address + 4, 4);
         std::memcpy(&capacity, address + 8, 4);
         bool inline_bytes = false;
-        if constexpr (is_fixed_string_v<T>) inline_bytes = (capacity & XFixedString::inline_flag) != 0;
+        if constexpr (is_fixed_string_v<T>) inline_bytes = (capacity & XString::inline_flag) != 0;
         // The checked sum comes first: with no call between the new head and
         // its three stores, the default member initializers' zero stores are dead.
         // Inline string bytes are characters, not a delta: kept as they are.
@@ -543,15 +542,15 @@ void subtree_measure_elements(const E* data, std::uint32_t size, std::uint32_t c
 template<class T>
 void subtree_measure_value(const T& value, SubtreeExtent& extent) noexcept {
     if constexpr (is_fixed_string_v<T>) {
-        const XFixedString& head = value;
-        if ((head.capacity_ & XFixedString::inline_flag) != 0 || head.capacity_ == 0) return;
+        const XString& head = value;
+        if ((head.capacity_ & XString::inline_flag) != 0 || head.capacity_ == 0) return;
         const auto* data = fixed_detail::resolve_rel32<const char>(&head.data_delta, head.data_delta);
         if (!data) return;
         extent.add(data, fixed_detail::block_bytes_of(head.capacity_ + 1u));
-        if (head.size_ > XFixedString::inline_max) extent.exact += fixed_detail::block_bytes_of(head.size_ + 1u);
+        if (head.size_ > XString::inline_max) extent.exact += fixed_detail::block_bytes_of(head.size_ + 1u);
     } else if constexpr (fixed_detail::is_owning_head<T>::value) {
         using E = typename T::value_type;
-        const XFixedVector<E>& head = value;
+        const XVectorCore<E>& head = value;
         subtree_measure_elements<E>(head.data(), head.size_, head.capacity_, extent);
     } else if constexpr (std::is_array_v<T>) {
         for (const auto& element : value) subtree_measure_value(element, extent);
@@ -660,7 +659,7 @@ char* subtree_compact_elements(const E* source, std::uint32_t size,
 template<class T>
 void subtree_compact_value(char* address, const T& source, char*& cursor) noexcept {
     if constexpr (is_fixed_string_v<T>) {
-        const XFixedString& from = source;
+        const XString& from = source;
         auto* head = ::new (static_cast<void*>(address)) T;
         const auto view = from.view();
         const auto size = static_cast<std::uint32_t>(view.size());
@@ -668,7 +667,7 @@ void subtree_compact_value(char* address, const T& source, char*& cursor) noexce
             head->data_delta = 0;
             head->size_ = 0;
             head->capacity_ = 0;
-        } else if (size <= XFixedString::inline_max) {
+        } else if (size <= XString::inline_max) {
             // Inline layout of store_inline: bytes 0..10 characters then
             // zeros, byte 11 = 0x80 | length.
             char bytes[12] = {};
@@ -688,7 +687,7 @@ void subtree_compact_value(char* address, const T& source, char*& cursor) noexce
         }
     } else if constexpr (fixed_detail::is_owning_head<T>::value) {
         using E = typename T::value_type;
-        const XFixedVector<E>& from = source;
+        const XVectorCore<E>& from = source;
         const auto size = from.size_;
         auto* head = ::new (static_cast<void*>(address)) T;
         if (size == 0) {
@@ -747,7 +746,7 @@ char* subtree_compact_elements(const E* source, std::uint32_t size,
 // fully copied before the destination is published or its old content
 // released, so the source may live inside the destination's old content.
 template<class T>
-bool subtree_copy_assign(XFixedVector<T>& dst, const XFixedVector<T>& src) {
+bool subtree_copy_assign(XVectorCore<T>& dst, const XVectorCore<T>& src) {
     static_assert(subtree_copy_supported<T>() && !std::is_trivially_copyable_v<T>);
     XArena* const arena = dst.arena();
     if (!arena || src.size_ == 0) return false;
@@ -764,7 +763,7 @@ bool subtree_copy_assign(XFixedVector<T>& dst, const XFixedVector<T>& src) {
     const auto total = whole ? extent.sum : extent.exact;
     if (total > XBufferCore::MAX_PAYLOAD) return false;
     const auto bytes = static_cast<std::uint32_t>(total);
-    const typename XFixedVector<T>::allocator_type alloc{arena};
+    const typename XVectorCore<T>::allocator_type alloc{arena};
     const auto size = src.size_;
     char* fresh = nullptr;
     XOFFSET_TRY {

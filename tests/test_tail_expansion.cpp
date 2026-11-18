@@ -383,8 +383,8 @@ void transport_and_graph_admission() {
     assert(header.extent_count == 0 && header.hole_count == 0); // dense: payload [48, used) = bytes [40, used - 8)
     auto& live = valid.root<TailExpansionRoot>();
     const auto head = sizeof(XWireHeaderV2) + offset_of(valid, &live.values) - XWIRE_PAYLOAD_BEGIN;
-    const auto size_at = head + offsetof(XFixedVector<std::int32_t>, size_);
-    const auto capacity_at = head + offsetof(XFixedVector<std::int32_t>, capacity_);
+    const auto size_at = head + offsetof(XVectorCore<std::int32_t>, size_);
+    const auto capacity_at = head + offsetof(XVectorCore<std::int32_t>, capacity_);
     std::uint32_t capacity = 0;
     std::memcpy(&capacity, wire.data() + capacity_at, sizeof(capacity));
     assert(capacity == live.values.capacity() && capacity >= 4);
