@@ -117,14 +117,19 @@ Parsed parse(std::string_view wire) {
     return p;
 }
 
-// Every emitted payload byte equals the arena byte, and is zero inside a hole.
+// Every emitted payload byte equals the arena byte, and is zero inside a hole
+// (past a free block's header; in-band, the first hole is the free
+// directory, which is not zero).
 void check_emitted(std::string_view wire, const char* arena, const char* what) {
     const auto p = parse(wire);
     std::vector<bool> in_hole(p.header.used_bytes, false);
     std::uint64_t hole_bytes = 0;
-    for (const auto& h : p.holes) {
-        for (std::uint32_t i = 0; i < h.bytes; ++i) in_hole[h.offset + i] = true;
+    constexpr std::uint32_t header = xo::XBufferCore::free_block_header_bytes;
+    for (std::size_t k = 0; k < p.holes.size(); ++k) {
+        const auto& h = p.holes[k];
         hole_bytes += h.bytes;
+        if (header != 0 && k == 0) continue;
+        for (std::uint32_t i = header; i < h.bytes; ++i) in_hole[h.offset + i] = true;
     }
     if (hole_bytes == 0) fail(std::string(what) + ": fixture has no holes");
     const char* stored = p.stored;
@@ -180,9 +185,12 @@ void loaded_holes_keep_sender_bytes() {
     std::string wire = b.save_verified();
     const auto p = parse(wire);
     if (p.holes.empty() || p.header.extent_count != 0) fail("fixture: need a dense wire with holes");
-    const auto hole = p.holes.front();
-    const auto at = static_cast<std::size_t>(p.stored - wire.data()) + hole.offset;
-    std::memset(wire.data() + at, 0x5a, hole.bytes);
+    // A free block's bytes past its header (in-band, the first hole is the
+    // free directory: the last is a free block).
+    const auto hole = p.holes.back();
+    constexpr std::uint32_t header = xo::XBufferCore::free_block_header_bytes;
+    const auto at = static_cast<std::size_t>(p.stored - wire.data()) + hole.offset - xo::XWIRE_PAYLOAD_BEGIN + header;
+    std::memset(wire.data() + at, 0x5a, hole.bytes - header);
     auto loaded = Buffer::load(wire, cap());
     if (loaded.save_verified() != wire) fail("sender hole bytes were not forwarded unchanged");
     auto& r = loaded.plain_root();
@@ -258,7 +266,10 @@ void declared_size_limits() {
     const auto ok = inflate_sparse(base, 32u << 20);
     auto loaded = Buffer::load(ok);
     const auto resent = loaded.save_verified();
-    if (resent.size() > ok.size() + 64 || Buffer::load(resent).arena()->used_end != (32u << 20))
+    // In-band, the resent wire also carries the free directory made at the
+    // run's end, the free block's header, one more extent and one more hole.
+    const std::size_t more = xo::detail::inband_allocator ? 64 + 72 + 8 + 8 + 8 : 64;
+    if (resent.size() > ok.size() + more || Buffer::load(resent).arena()->used_end != (32u << 20))
         fail("a 32 MiB sparse claim did not round-trip sparsely");
     // An explicit limit admits larger wires.
     auto large = Buffer::load(inflate_sparse(base, 96u << 20), xo::XBuffer::maximum_capacity(128u << 20));

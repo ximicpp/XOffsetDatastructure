@@ -138,7 +138,9 @@ void automatic_reuses_before_growing() {
     const auto logical = buffer.get_size();
     auto* reused = fixed_detail::allocate_dynamic_bytes(alloc, 1800, 8);
     assert(reused == left && buffer.get_size() == logical);
-    assert(buffer.free_block_count() == 1 && buffer.free_block_bytes() == 2048 - 1800);
+    // (In-band, the end of the retired block holds the free directory.)
+    assert(buffer.free_block_count() == 1 &&
+           buffer.free_block_bytes() + buffer.free_directory().bytes == 2048 - 1800);
     fixed_detail::retire_dynamic_bytes(alloc, reused, 1800);
     auto* aligned = buffer.arena()->allocate_aligned(32'768, 32'768);
     assert(reinterpret_cast<std::uintptr_t>(aligned) % 32'768 == 0);

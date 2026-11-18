@@ -85,6 +85,8 @@ namespace XOffsetDatastructure {
             // header<T>'s body, inlined into save_into's fast path.
             template<class T> XOFFSET_DETAIL_INLINE static XWireHeaderV2 header_inline(XBufferCore&);
             template<class T> static void save_into(XBufferCore&, std::string&, XSaveOptions);
+            // In-band: save_small_into's hole table gathered on its frame.
+            static constexpr std::size_t small_wire_holes = 16;
             template<class T> static bool save_small_into(XBufferCore&, std::string&, XWireEmission);
             template<class T> static void save_into_general(XBufferCore&, std::string&, XSaveOptions);
             template<class T> static void rebuild_free_table(T&, XBufferCore&);
@@ -558,7 +560,7 @@ namespace XOffsetDatastructure {
                 std::max<std::uint64_t>(this->arena()->used_end, sizeof(arena_header)), this->get_size());
             return detail::make_wire_header<T>(used,
                 reinterpret_cast<std::uintptr_t>(&root) - reinterpret_cast<std::uintptr_t>(this->get_address()),
-                this->free_block_count());
+                this->wire_hole_count());
         }
 
         template <typename T>
@@ -997,7 +999,8 @@ namespace XOffsetDatastructure {
             return finish_verified_load<T>(header, layout.holes, layout.hole_count, upstream, who, retained);
         }
 
-        template <typename T>
+        // WireOrder: false for a key delta's table (see load_free_blocks).
+        template <typename T, bool WireOrder = true>
         detail::vstatus finish_verified_load(const XWireHeaderV2& header, const char* holes, std::size_t hole_count,
                                              std::pmr::memory_resource* upstream, const char* who,
                                              detail::WireValidationScratch* retained) {
@@ -1018,7 +1021,7 @@ namespace XOffsetDatastructure {
             }
             XOFFSET_VTRY(detail::verify_structural_wire_graph(*root_ptr, *this, upstream, holes, hole_count,
                                                               true, nullptr, retained));
-            XOFFSET_VTRY(this->load_free_blocks(holes, hole_count));
+            XOFFSET_VTRY(this->template load_free_blocks<WireOrder>(holes, hole_count));
             typed_root_access_allowed_ = true;
             bind_schema<T>();
             this->cache_root(root_ptr);
@@ -1034,7 +1037,7 @@ namespace XOffsetDatastructure {
         // hole is an aligned, non-empty 8-byte multiple inside the payload
         // (allocations write into holes). Everything else about the payload is
         // the sender's promise: only for trusted links.
-        template <typename T>
+        template <typename T, bool WireOrder = true>
         detail::vstatus finish_admitted_load(const XWireHeaderV2& header, const char* holes, std::size_t hole_count,
                                              const char* who) {
             const std::uint64_t used = header.used_bytes;
@@ -1069,7 +1072,8 @@ namespace XOffsetDatastructure {
             if ((low_bits & 7u) != 0 || reach >= used - XWIRE_PAYLOAD_BEGIN) [[unlikely]] {
                 XOFFSET_VFAIL(XException, XErrc::invalid_payload, std::string(who) + ": hole out of range");
             }
-            XOFFSET_VTRY(this->load_free_blocks(holes, hole_count));
+            if constexpr (detail::inband_allocator) XOFFSET_VTRY(this->inband_adopt(holes, hole_count, false, WireOrder));
+            else XOFFSET_VTRY(this->load_free_blocks(holes, hole_count));
             typed_root_access_allowed_ = true;
             bind_schema<T>();
             this->cache_root(root_ptr);

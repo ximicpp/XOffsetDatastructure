@@ -894,7 +894,9 @@ namespace XOffsetDatastructure {
             ctx.upstream = upstream;
             ctx.retained = retained;
 #endif
-            if (ctx.segment->flags != 0 || ctx.segment->reserved0 != 0 || ctx.segment->reserved1 != 0) {
+            // In-band, reserved0 holds the free directory and the free bytes.
+            if (ctx.segment->flags != 0 ||
+                (!detail::inband_allocator && ctx.segment->reserved0 != 0) || ctx.segment->reserved1 != 0) {
                 return wire_reject("wire validation: unsupported arena header flags");
             }
             XOFFSET_VTRY(register_owned_range(ctx.base, sizeof(XArena), ctx, "wire validation: invalid arena header"));
@@ -937,8 +939,14 @@ namespace XOffsetDatastructure {
             std::vector<XBufferCore::WireHole> holes;
             const bool complete = xbuf.free_table_complete();
             if (complete) {
-                holes.reserve(xbuf.free_block_count());
-                xbuf.for_each_free_block([&](XBufferCore::WireHole hole) { holes.push_back(hole); });
+                if constexpr (detail::inband_allocator) {
+                    // The directory block too: the entries tile the payload with the live blocks.
+                    holes.reserve(xbuf.wire_hole_count());
+                    xbuf.for_each_wire_hole([&](XBufferCore::WireHole hole) { holes.push_back(hole); });
+                } else {
+                    holes.reserve(xbuf.free_block_count());
+                    xbuf.for_each_free_block([&](XBufferCore::WireHole hole) { holes.push_back(hole); });
+                }
             }
             return verify_structural_wire_graph(root, xbuf, upstream,
                 complete ? holes.data() : nullptr, holes.size(), complete);
@@ -1945,7 +1953,7 @@ namespace XOffsetDatastructure {
             }
             core.write_free_blocks(at);
             return static_cast<std::size_t>(at - out) +
-                core.free_block_count() * sizeof(XBufferCore::WireHole);
+                core.wire_hole_count() * sizeof(XBufferCore::WireHole);
         }
     }
 

@@ -138,7 +138,7 @@ XWireHeaderV2 check_verified_frame(const std::string& frame, const XBufferCore& 
     std::memcpy(&header, frame.data(), sizeof(header));
     assert(header.extent_count == 0);
     assert(header.used_bytes == buffer.arena()->used_end); // saves keep the logical length
-    assert(header.hole_count == buffer.free_block_count());
+    assert(header.hole_count == buffer.wire_hole_count());
     assert(frame.size() == sizeof(header) + header.used_bytes - XWIRE_PAYLOAD_BEGIN +
                                header.hole_count * sizeof(XBufferCore::WireHole));
     return header;
