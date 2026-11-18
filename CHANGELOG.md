@@ -5,6 +5,20 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- Shorter small-block allocation and retirement, same placement: an empty vector's first block (from
+  `assign_range`, `reserve` or a first `push_back`) is taken in one call that runs the exact-bin hit or
+  the tail bump inline; a retired block entering a bin with room calls nothing; the tail bump and the
+  retired block's range are one compare each (`used_end` stays within the payload on every load, reset
+  and delta); and a block's offset from its head is stored without the 32-bit reach check (a payload is
+  under 2 GiB). Adding an equipment record with an 8-float array and removing it: 302 -> 220
+  instructions; filling the CppCon 2024 character without its map: 1,992 -> 1,481.
+- Small deltas take a shorter path on both ends; the bytes on the wire are unchanged. A sender with an
+  `XDeltaRecord::touches` baseline whose touch log lists at most 8 blocks, with the same hole table,
+  used size and root and no digest, writes the touched bytes in one pass; an admitting receiver
+  (`XReceiver` on a trusted link) applies a delta with no flags and at most 8 blocks in one pass over its
+  bytes, with the same checks. `tests/test_delta_small.cpp` holds both against the general path byte for
+  byte. One `touch_set` of a scalar plus `save_delta_into`: 926 -> 436 instructions; with the apply:
+  1,550 -> 767. `save_delta_into` also takes a root the buffer has cached instead of looking it up.
 - `XSet` / `XMap` `assign_sorted(range)` (also an iterator pair): fills from input already sorted by
   key in one exact block, without lookups; a contiguous range of the element type is one copy. 64
   entries of `XMap<std::uint64_t, 24-byte record>`: 39 ns from a same-layout vector, 58 ns converted

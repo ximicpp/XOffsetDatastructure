@@ -1333,53 +1333,68 @@ namespace XOffsetDatastructure {
                                                         bool allow_growth = true) {
             if (bytes != 0 && (bytes & 7u) == 0 && bytes <= FreeTable::small_max &&
                 alignment - 1u < 8u && (alignment & (alignment - 1u)) == 0) [[likely]] {
-                FreeTable* table = free_table_.get();
-                if (table && table->count != 0) {
-                    const auto bin = bytes / 8u - 1u;
-                    if (!table->bin_empty(bin)) [[likely]] {
-                        check_owner_resolves();
-                        const auto offset = table->bin_pop(bin);
-                        table->bytes -= bytes;
-                        --table->count;
-                        table->bump_gen();
-                        return payload_byte_address(offset);
-                    }
-                    // A larger hole would be split: the general path. With
-                    // none, the general path bumps, as below.
-                    if (table->holds_hole_from(bin)) return allocate_block_general(bytes, alignment, allow_growth);
-                }
-                if (auto* sm = arena()) {
-                    // No free block: bump_block, whose start is the current
-                    // end when that address is already 8-byte aligned.
-                    const size_type start = used_end_clamped();
-                    if (((reinterpret_cast<std::uintptr_t>(buffer_.data()) + start) & 7u) == 0 &&
-                        start <= MAX_PAYLOAD && bytes <= MAX_PAYLOAD - start &&
-                        bytes <= buffer_.size() - start) [[likely]] {
-                        check_owner_resolves();
-                        sm->used_end = start + bytes;
-                        return payload_byte_address(start);
-                    }
-                }
+                if (void* block = try_allocate_small(bytes)) [[likely]] return block;
             }
             return allocate_block_general(bytes, alignment, allow_growth);
         }
 
-        // allocate_block for a first storage (fixed_detail::allocate_first_storage):
-        // `bytes` is block_bytes_of(n) of a nonzero n, so a nonzero multiple of
-        // 8, and every caller's alignment is at most 8, which every block of
-        // the arena has. With no hole recorded (each message built anew after
-        // a reset) this is allocate_block's bump without the request checks
-        // the contract settles; anything else returns null and the caller
-        // takes allocate_block unchanged. Same placement either way.
+        // The largest block size with an exact bin (FreeTable::small_max).
+        static constexpr std::uint32_t small_block_max = 4096;
+
+        // allocate_block's two inline outcomes for `bytes`, a nonzero multiple
+        // of 8 up to small_block_max, at an alignment of at most 8: the block,
+        // or null where allocate_block takes the general path.
+        XOFFSET_DETAIL_MOVE_INLINE void* try_allocate_small(std::uint32_t bytes) noexcept {
+            FreeTable* table = free_table_.get();
+            if (table && table->count != 0) {
+                const auto bin = bytes / 8u - 1u;
+                if (!table->bin_empty(bin)) [[likely]] {
+                    check_owner_resolves();
+                    const auto offset = table->bin_pop(bin);
+                    table->bytes -= bytes;
+                    --table->count;
+                    table->bump_gen();
+                    return payload_byte_address(offset);
+                }
+                // A larger hole would be split: the general path (null).
+                // With none, bump as below.
+                if (table->holds_hole_from(bin)) return nullptr;
+            }
+            if (auto* sm = arena()) {
+                // No free block: bump_block, whose start is the current
+                // end when that address is already 8-byte aligned. Every
+                // load, reset and delta keeps used_end in
+                // [min_payload_size(), size()] (bump_block's clamp never
+                // applies) and size() <= MAX_PAYLOAD, so with bytes <=
+                // small_max one compare is bump_block's range checks.
+                const std::uint64_t start = sm->used_end;
+                if (((reinterpret_cast<std::uintptr_t>(buffer_.data()) + start) & 7u) == 0 &&
+                    start + bytes <= buffer_.size()) [[likely]] {
+                    check_owner_resolves();
+                    sm->used_end = start + bytes;
+                    return payload_byte_address(static_cast<size_type>(start));
+                }
+            }
+            return nullptr;
+        }
+
+        // allocate_block for a string's first block (fixed_detail::
+        // allocate_first_chars): `bytes` is block_bytes_of(n) of a nonzero n,
+        // so a nonzero multiple of 8, and the alignment is 1. With no hole
+        // recorded (each message built anew after a reset) this is
+        // allocate_block's bump without the request checks the contract
+        // settles; anything else returns null and the caller takes
+        // allocate_block unchanged. Same placement either way. The caller
+        // found the payload (the string's own), so the buffer is not empty,
+        // and used_end lies in [min_payload_size(), size()] (as in
+        // allocate_block's bump): one compare.
         XOFFSET_DETAIL_MOVE_INLINE void* try_bump_first(std::uint32_t bytes) noexcept {
             if (bytes > FreeTable::small_max) return nullptr;
             if (const FreeTable* table = free_table_.get(); table && table->count != 0) return nullptr;
-            const size_type size = buffer_.size();
-            if (size < min_payload_size()) return nullptr;
             char* const data = buffer_.data();
             auto* const sm = std::launder(reinterpret_cast<arena_header*>(data));
             const std::uint64_t start = sm->used_end;
-            if (start < min_payload_size() || start + bytes > size ||
+            if (start + bytes > buffer_.size() ||
                 ((reinterpret_cast<std::uintptr_t>(data) + start) & 7u) != 0) [[unlikely]] return nullptr;
             check_owner_resolves();
             sm->used_end = start + bytes;
@@ -1423,17 +1438,18 @@ namespace XOffsetDatastructure {
             // scope closes: plain references into it stay harmless.
             if (packed_.pinned) [[unlikely]] return quarantine_block(ptr, bytes);
 #endif
-            const auto base = reinterpret_cast<std::uintptr_t>(buffer_.data());
-            const auto address = reinterpret_cast<std::uintptr_t>(ptr);
-            FreeTable* table = free_table_.get();
-            if (ptr && bytes != 0 && (bytes & 7u) == 0 && bytes <= FreeTable::small_max &&
-                address >= base && address - base < buffer_.size() &&
-                bytes <= buffer_.size() - (address - base) &&
-                (table || (table = adopt_cached_free_table()))) [[likely]] {
-                const auto bin = bytes / 8u - 1u;
-                const auto offset = static_cast<std::uint32_t>(address - base);
-                if (table->bin_try_push(bin, offset) ||
-                    (table->make_room(bin, 1) && table->bin_try_push(bin, offset))) [[likely]] {
+            // One compare is the block's range test: a ptr below the base
+            // gives an offset that wraps past size() unless the block would
+            // cross the payload's start, which no block of any payload does
+            // (the 64-byte host header lies before each payload); a null ptr
+            // is a page or more below it.
+            const std::uint64_t at = reinterpret_cast<std::uintptr_t>(ptr) -
+                                     reinterpret_cast<std::uintptr_t>(buffer_.data());
+            if (bytes != 0 && (bytes & 7u) == 0 && bytes <= FreeTable::small_max &&
+                at + bytes <= buffer_.size()) [[likely]] {
+                FreeTable* const table = free_table_.get();
+                const auto offset = static_cast<std::uint32_t>(at);
+                if (table && table->bin_try_push(bytes / 8u - 1u, offset)) [[likely]] {
                     check_owner_resolves();
                     // M3, as in retire_block_general.
                     zero_retired(ptr, bytes);
@@ -1442,13 +1458,32 @@ namespace XOffsetDatastructure {
                     table->bump_gen();
                     return;
                 }
-                // The pool needs host storage: the general insertion (the
-                // inline attempt above already failed).
-                zero_retired(ptr, bytes);
-                (void)insert_free_block_general(offset, bytes);
-                return;
+                return retire_small_block(ptr, bytes, offset);
             }
             retire_block_general(ptr, bytes);
+        }
+
+        // retire_block of a small block in range whose bin had no room (or
+        // with no table yet): out of line, so the common case above calls
+        // nothing and keeps no frame.
+        XOFFSET_DETAIL_NOINLINE void retire_small_block(void* ptr, std::uint32_t bytes, std::uint32_t offset) noexcept {
+            FreeTable* table = free_table_.get();
+            if (!table && !(table = adopt_cached_free_table())) return retire_block_general(ptr, bytes);
+            const auto bin = bytes / 8u - 1u;
+            if (table->bin_try_push(bin, offset) ||
+                (table->make_room(bin, 1) && table->bin_try_push(bin, offset))) [[likely]] {
+                check_owner_resolves();
+                // M3, as in retire_block_general.
+                zero_retired(ptr, bytes);
+                table->bytes += bytes;
+                ++table->count;
+                table->bump_gen();
+                return;
+            }
+            // The pool needs host storage: the general insertion (the
+            // inline attempt above already failed).
+            zero_retired(ptr, bytes);
+            (void)insert_free_block_general(offset, bytes);
         }
 
         bool free_table_complete() const noexcept { return !free_table_lost_; }
@@ -1741,7 +1776,7 @@ namespace XOffsetDatastructure {
         // save copies them as before. Which block every request takes and
         // the order holes are written in are unchanged.
         struct FreeTable {
-            static constexpr std::uint32_t small_max = 4096;
+            static constexpr std::uint32_t small_max = small_block_max;
             static constexpr std::uint32_t small_bins = small_max / 8;
             // A segment is [size][capacity][bin][capacity entries]; its bin
             // is dead_bin once the bin has moved to a larger segment.
@@ -3952,14 +3987,6 @@ namespace XOffsetDatastructure {
             XOFFSET_THROW(XException(XErrc::capacity_exceeded, "relative offset exceeds rel32 range"));
         }
 
-        // True when target is within rel32 range of origin.
-        XOFFSET_DETAIL_MOVE_INLINE bool rel32_reaches(const void* origin, const void* target) noexcept {
-            const auto delta = static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(target)) -
-                               static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(origin));
-            return delta >= std::numeric_limits<std::int32_t>::min() &&
-                   delta <= std::numeric_limits<std::int32_t>::max();
-        }
-
         // MV: identical checks and store; only the throw is out of line, so
         // the range test inlines at every call site.
         XOFFSET_DETAIL_MOVE_INLINE void set_rel32(std::int32_t& field, const void* origin, const void* target) {
@@ -3974,6 +4001,18 @@ namespace XOffsetDatastructure {
                 throw_rel32_range();
             }
             field = static_cast<std::int32_t>(delta);
+        }
+
+        // set_rel32 for a head and a block of the same payload: a payload is
+        // at most MAX_PAYLOAD (< 2^31) bytes, so the offset is always in range
+        // and needs no check. Every block a head allocates comes from the
+        // payload that holds the head (its binding), and allocation grows a
+        // payload in place, never moving it.
+        XOFFSET_DETAIL_MOVE_INLINE void set_rel32_in_payload(std::int32_t& field, const void* origin,
+                                                             const void* target) noexcept {
+            static_assert(XBufferCore::MAX_PAYLOAD <= std::size_t(std::numeric_limits<std::int32_t>::max()));
+            field = static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(target) -
+                                              reinterpret_cast<std::intptr_t>(origin));
         }
 
         inline std::uint32_t round_up_to_alignment(std::uint32_t value,
@@ -4024,25 +4063,38 @@ namespace XOffsetDatastructure {
             }
         }
 
-        // XFixedVector::reserve's first storage (an empty vector filled anew,
-        // as after a reset) for elements aligned to at most 8: `bytes` from
-        // the payload holding the vector at `self`, with the checks, errors
-        // and placement of allocate_dynamic_bytes_aligned. Out of line and
-        // one copy for every element type, so a message that fills vectors of
-        // several types runs the same instructions for each.
+        // An empty vector's first block (a vector filled anew, as after a
+        // reset) for elements aligned to at most 8: `bytes` (nonzero) from
+        // the payload holding the head whose offset field is `data_delta`,
+        // published there, with the checks, errors and placement of
+        // allocate_dynamic_bytes_aligned (alignments up to 8 place a block
+        // alike: every block is 8-aligned). Out of line and one copy for
+        // every element type, so a message that fills vectors of several
+        // types runs the same instructions for each. The common outcomes
+        // (allocate_block's inline ones) call nothing and keep no frame;
+        // any other request takes publish_first_block_general.
         [[noreturn]] XOFFSET_DETAIL_MOVE_COLD inline void throw_vector_unbound() {
             XOFFSET_THROW(XException(XErrc::invalid_state, "XFixedVector needs a block but lies outside every XOffset payload"));
         }
-        XOFFSET_DETAIL_NOINLINE inline void* allocate_first_storage(const void* self, std::uint32_t bytes,
-                                                                    std::size_t alignment) {
-            auto* const segment = reinterpret_cast<XArena*>(detail::OwnerMap::payload_of(self));
+        XOFFSET_DETAIL_NOINLINE inline void* publish_first_block_general(std::int32_t& data_delta, std::uint32_t bytes) {
+            auto* const segment = reinterpret_cast<XArena*>(detail::OwnerMap::payload_of(&data_delta));
             if (!segment) [[unlikely]] throw_vector_unbound();
             auto* owner = XBufferCore::owner_from_arena_noexcept(segment);
-            if (!owner || bytes > XBufferCore::MAX_PAYLOAD - 8u) [[unlikely]]
-                return allocate_dynamic_bytes(allocator_ref{segment}, bytes, alignment); // throws the usual error
-            const std::uint32_t block = block_bytes_of(bytes);
-            if (void* fresh = owner->try_bump_first(block)) [[likely]] return fresh;
-            return owner->allocate_block(block, alignment);
+            void* const block = !owner || bytes > XBufferCore::MAX_PAYLOAD - 8u
+                ? allocate_dynamic_bytes(allocator_ref{segment}, bytes, 8u) // throws the usual error
+                : owner->allocate_block(block_bytes_of(bytes), 8u);
+            set_rel32_in_payload(data_delta, &data_delta, block);
+            return block;
+        }
+        XOFFSET_DETAIL_NOINLINE inline void* publish_first_block(std::int32_t& data_delta, std::uint32_t bytes) {
+            auto* const segment = reinterpret_cast<XArena*>(detail::OwnerMap::payload_of(&data_delta));
+            auto* const owner = segment ? XBufferCore::owner_from_arena_noexcept(segment) : nullptr;
+            void* block;
+            if (!owner || bytes > XBufferCore::small_block_max ||
+                !(block = owner->try_allocate_small(block_bytes_of(bytes)))) [[unlikely]]
+                return publish_first_block_general(data_delta, bytes);
+            set_rel32_in_payload(data_delta, &data_delta, block);
+            return block;
         }
 
         // The same for a string's first out-of-line block (XFixedString::
@@ -4758,7 +4810,7 @@ namespace XOffsetDatastructure {
                 new_data[0] = '\0';
             }
 
-            fixed_detail::set_rel32(data_delta, &data_delta, new_data);
+            fixed_detail::set_rel32_in_payload(data_delta, &data_delta, new_data);
             capacity_ = new_cap;
         }
 
@@ -4863,7 +4915,7 @@ namespace XOffsetDatastructure {
                 alloc, static_cast<std::uint32_t>(new_size + 1), alignof(char)), std::size_t(new_size) + 1u);
             std::int32_t incoming_delta = 0;
             XOFFSET_TRY {
-                fixed_detail::set_rel32(incoming_delta, &data_delta, fresh);
+                fixed_detail::set_rel32_in_payload(incoming_delta, &data_delta, fresh);
             } XOFFSET_CATCH(...) {
                 fixed_detail::retire_dynamic_bytes(
                     alloc, fresh, static_cast<std::uint32_t>(new_size + 1));
@@ -5036,7 +5088,7 @@ namespace XOffsetDatastructure {
                 alloc, static_cast<std::uint32_t>(new_cap + 1)), std::size_t(new_cap) + 1u);
             std::int32_t incoming_delta = 0;
             XOFFSET_TRY {
-                fixed_detail::set_rel32(incoming_delta, &data_delta, fresh);
+                fixed_detail::set_rel32_in_payload(incoming_delta, &data_delta, fresh);
             } XOFFSET_CATCH(...) {
                 fixed_detail::retire_dynamic_bytes(
                     alloc, fresh, static_cast<std::uint32_t>(new_cap + 1));
@@ -5364,16 +5416,14 @@ namespace XOffsetDatastructure {
             if (capacity_ != 0 || requested > max_size()) return reserve_grow(requested);
             const auto new_cap = static_cast<size_type>(requested);
             // First storage: nothing to expand, move or retire.
-            void* block;
             if constexpr (alignof(T) <= 8) {
-                block = fixed_detail::allocate_first_storage(this, static_cast<std::uint32_t>(new_cap * sizeof(T)),
-                                                             alignof(T));
+                (void)detail::begin_dynamic_array<T>(fixed_detail::publish_first_block(
+                    data_delta, static_cast<std::uint32_t>(new_cap * sizeof(T))), new_cap);
             } else {
-                block = fixed_detail::allocate_dynamic_bytes_aligned<alignof(T)>(
-                    bound_binding(), static_cast<std::uint32_t>(new_cap * sizeof(T)));
+                auto* fresh = detail::begin_dynamic_array<T>(fixed_detail::allocate_dynamic_bytes_aligned<alignof(T)>(
+                    bound_binding(), static_cast<std::uint32_t>(new_cap * sizeof(T))), new_cap);
+                fixed_detail::set_rel32_in_payload(data_delta, &data_delta, fresh);
             }
-            auto* fresh = detail::begin_dynamic_array<T>(block, new_cap);
-            fixed_detail::set_rel32(data_delta, &data_delta, fresh);
             capacity_ = new_cap;
         }
 
@@ -5385,7 +5435,7 @@ namespace XOffsetDatastructure {
                 // First storage: nothing to expand, move or retire.
                 auto* fresh = detail::begin_dynamic_array<T>(fixed_detail::allocate_dynamic_bytes(
                     alloc, static_cast<std::uint32_t>(new_cap * sizeof(T)), alignof(T)), new_cap);
-                fixed_detail::set_rel32(data_delta, &data_delta, fresh);
+                fixed_detail::set_rel32_in_payload(data_delta, &data_delta, fresh);
                 capacity_ = new_cap;
                 return;
             }
@@ -5410,21 +5460,16 @@ namespace XOffsetDatastructure {
         // paths above keep their size at the caller.
         XOFFSET_DETAIL_NOINLINE void reserve_relocate(size_type new_cap, allocator_type alloc) {
             if (new_cap > max_size()) XOFFSET_THROW(XBadAlloc());
-            bool published = false;
             fixed_detail::regrow_dynamic_bytes(alloc, static_cast<std::uint32_t>(capacity_ * sizeof(T)),
                                                static_cast<std::uint32_t>(new_cap * sizeof(T)), alignof(T),
                                                [&](void* block) -> void* {
                 auto* fresh = detail::begin_dynamic_array<T>(block, new_cap);
-                // An unreachable block is never published and is retired as "old".
-                if (!fixed_detail::rel32_reaches(&data_delta, fresh)) [[unlikely]] return block;
                 auto* old = data();
                 relocate_live_run(fresh, old);
-                fixed_detail::set_rel32(data_delta, &data_delta, fresh);
+                fixed_detail::set_rel32_in_payload(data_delta, &data_delta, fresh);
                 capacity_ = new_cap;
-                published = true;
                 return old;
             });
-            if (!published) [[unlikely]] fixed_detail::throw_rel32_range();
         }
 
     public:
@@ -5493,6 +5538,17 @@ namespace XOffsetDatastructure {
                 return;
             }
             XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::array_bytes<T>(std::max<std::size_t>(n, 2u * capacity_)), );
+            // An empty vector's first block, exact: no capacity arithmetic
+            // and no old block to retire.
+            if constexpr (alignof(T) <= 8) {
+                if (capacity_ == 0) {
+                    T* const fresh = detail::begin_dynamic_array<T>(fixed_detail::publish_first_block(data_delta, bytes), n);
+                    capacity_ = n;
+                    size_ = n;
+                    std::memmove(fresh, src, bytes);
+                    return;
+                }
+            }
             assign_range_regrow(src, n, bytes);
         }
 
@@ -5511,21 +5567,16 @@ namespace XOffsetDatastructure {
             // Read the complete source before publishing/retiring old storage.
             // Retirement is allowed to overwrite its first bytes as free-list
             // metadata. memmove also covers overlapping live-element ranges.
-            bool published = false;
             fixed_detail::regrow_dynamic_bytes(alloc, static_cast<std::uint32_t>(capacity_ * sizeof(T)),
                                                cap_bytes, alignof(T), [&](void* block) -> void* {
                 auto* fresh = detail::begin_dynamic_array<T>(block, new_cap);
-                // An unreachable block is never published and is retired as "old".
-                if (!fixed_detail::rel32_reaches(&data_delta, fresh)) [[unlikely]] return block;
                 std::memmove(fresh, src, bytes);
                 void* old = data();
-                fixed_detail::set_rel32(data_delta, &data_delta, fresh);
+                fixed_detail::set_rel32_in_payload(data_delta, &data_delta, fresh);
                 size_ = count;
                 capacity_ = new_cap;
-                published = true;
                 return old;
             });
-            if (!published) [[unlikely]] fixed_detail::throw_rel32_range();
         }
 
         // N7: replaces all elements with [first, last). A contiguous range of
@@ -5821,7 +5872,7 @@ namespace XOffsetDatastructure {
             size_type constructed = 0;
             std::int32_t delta = 0;
             XOFFSET_TRY {
-                fixed_detail::set_rel32(delta, &data_delta, fresh);
+                fixed_detail::set_rel32_in_payload(delta, &data_delta, fresh);
                 for (; constructed < count; ++constructed) construct(fresh + constructed, constructed);
             } XOFFSET_CATCH(...) {
                 fixed_detail::destroy_n(fresh, constructed);
@@ -6190,7 +6241,7 @@ namespace XOffsetDatastructure {
                     fixed_detail::allocate_dynamic_bytes(alloc, new_bytes, alignof(T)), new_cap);
                 std::int32_t delta = 0;
                 XOFFSET_TRY {
-                    fixed_detail::set_rel32(delta, &data_delta, fresh);
+                    fixed_detail::set_rel32_in_payload(delta, &data_delta, fresh);
                     construct(fresh + size_);
                 } XOFFSET_CATCH(...) {
                     fixed_detail::retire_dynamic_bytes(alloc, fresh, new_bytes);
@@ -6311,7 +6362,7 @@ namespace XOffsetDatastructure {
                 size_type tail_built = 0;
                 std::int32_t delta = 0;
                 XOFFSET_TRY {
-                    fixed_detail::set_rel32(delta, &data_delta, fresh);
+                    fixed_detail::set_rel32_in_payload(delta, &data_delta, fresh);
                     for (; tail_built < count - old_size; ++tail_built)
                         construct(fresh + old_size + tail_built);
                 } XOFFSET_CATCH(...) {
