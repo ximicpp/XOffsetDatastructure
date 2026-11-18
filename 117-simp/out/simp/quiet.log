@@ -1,0 +1,352 @@
+2026-11-18T17:31:43Z sc 9a80514e head xoffset_trusted 1 quiet after 180s load 1.72
+2026-11-18T17:32:28Z sc 9a80514e head xoffset_trusted 1 done
+2026-11-18T17:32:38Z sc 9a80514e head zpp_bits 1 quiet after 10s load 1.67
+2026-11-18T17:33:12Z sc 9a80514e head zpp_bits 1 done
+2026-11-18T17:33:22Z sc 9a80514e d3 xoffset_trusted 1 quiet after 10s load 1.68
+2026-11-18T17:34:18Z sc 9a80514e d3 xoffset_trusted 1 done
+2026-11-18T17:34:29Z sc 9a80514e d3 zpp_bits 1 quiet after 10s load 2.00
+2026-11-18T17:35:14Z sc 9a80514e d3 zpp_bits 1 done
+2026-11-18T17:35:24Z sc 9a80514e d3 zpp_bits_dirty 1 quiet after 10s load 1.82
+2026-11-18T17:36:05Z sc 9a80514e d3 zpp_bits_dirty 1 done
+2026-11-18T17:36:15Z sc 2eba1655 head xoffset_trusted 1 quiet after 10s load 1.92
+2026-11-18T17:37:01Z sc 2eba1655 head xoffset_trusted 1 done
+2026-11-18T17:37:11Z sc 2eba1655 head zpp_bits 1 quiet after 10s load 2.18
+2026-11-18T17:37:46Z sc 2eba1655 head zpp_bits 1 done
+2026-11-18T17:37:56Z sc 2eba1655 d3 xoffset_trusted 1 quiet after 10s load 1.91
+2026-11-18T17:38:53Z sc 2eba1655 d3 xoffset_trusted 1 done
+2026-11-18T17:39:03Z sc 2eba1655 d3 zpp_bits 1 quiet after 10s load 1.84
+2026-11-18T17:39:49Z sc 2eba1655 d3 zpp_bits 1 done
+2026-11-18T17:39:59Z sc 2eba1655 d3 zpp_bits_dirty 1 quiet after 10s load 1.72
+2026-11-18T17:40:40Z sc 2eba1655 d3 zpp_bits_dirty 1 done
+2026-11-18T17:40:50Z def 9a80514e 1 quiet after 10s load 2.07
+2026-11-18T17:40:55Z def 9a80514e 1 done
+2026-11-18T17:41:05Z def 2eba1655 1 quiet after 10s load 1.98
+2026-11-18T17:41:09Z def 2eba1655 1 done
+2026-11-18T17:41:19Z def 2eba1655 2 quiet after 10s load 1.91
+2026-11-18T17:41:23Z def 2eba1655 2 done
+2026-11-18T17:41:34Z def 9a80514e 2 quiet after 10s load 1.86
+2026-11-18T17:41:38Z def 9a80514e 2 done
+2026-11-18T17:41:48Z reloc 9a80514e 1 quiet after 10s load 1.82
+2026-11-18T17:41:49Z reloc 9a80514e 1 done
+2026-11-18T17:41:59Z reloc 2eba1655 1 quiet after 10s load 1.69
+2026-11-18T17:41:59Z reloc 2eba1655 1 done
+2026-11-18T17:42:10Z reloc 2eba1655 2 quiet after 10s load 1.59
+2026-11-18T17:42:10Z reloc 2eba1655 2 done
+2026-11-18T17:42:20Z reloc 9a80514e 2 quiet after 10s load 1.60
+2026-11-18T17:42:21Z reloc 9a80514e 2 done
+2026-11-18T17:42:31Z cc24 9a80514e 1 quiet after 10s load 1.66
+2026-11-18T17:42:41Z cc24 9a80514e 1 done
+2026-11-18T17:42:51Z cc24 2eba1655 1 quiet after 10s load 1.55
+2026-11-18T17:43:01Z cc24 2eba1655 1 done
+2026-11-18T17:43:11Z cc24 2eba1655 2 quiet after 10s load 1.43
+2026-11-18T17:43:20Z cc24 2eba1655 2 done
+2026-11-18T17:43:30Z cc24 9a80514e 2 quiet after 10s load 1.43
+2026-11-18T17:43:40Z cc24 9a80514e 2 done
+2026-11-18T17:43:50Z sc 2eba1655 head xoffset_trusted 2 quiet after 10s load 1.38
+2026-11-18T17:44:35Z sc 2eba1655 head xoffset_trusted 2 done
+2026-11-18T17:44:46Z sc 2eba1655 head zpp_bits 2 quiet after 10s load 1.53
+2026-11-18T17:45:20Z sc 2eba1655 head zpp_bits 2 done
+2026-11-18T17:45:30Z sc 2eba1655 d3 xoffset_trusted 2 quiet after 10s load 1.75
+2026-11-18T17:46:27Z sc 2eba1655 d3 xoffset_trusted 2 done
+2026-11-18T17:46:38Z sc 2eba1655 d3 zpp_bits 2 quiet after 10s load 2.10
+2026-11-18T17:47:23Z sc 2eba1655 d3 zpp_bits 2 done
+2026-11-18T17:47:34Z sc 2eba1655 d3 zpp_bits_dirty 2 quiet after 10s load 1.77
+2026-11-18T17:48:15Z sc 2eba1655 d3 zpp_bits_dirty 2 done
+2026-11-18T17:48:25Z sc 9a80514e head xoffset_trusted 2 quiet after 10s load 1.59
+2026-11-18T17:49:11Z sc 9a80514e head xoffset_trusted 2 done
+2026-11-18T17:49:21Z sc 9a80514e head zpp_bits 2 quiet after 10s load 1.80
+2026-11-18T17:49:56Z sc 9a80514e head zpp_bits 2 done
+2026-11-18T17:50:06Z sc 9a80514e d3 xoffset_trusted 2 quiet after 10s load 1.93
+2026-11-18T17:51:03Z sc 9a80514e d3 xoffset_trusted 2 done
+2026-11-18T17:51:13Z sc 9a80514e d3 zpp_bits 2 quiet after 10s load 1.88
+2026-11-18T17:51:59Z sc 9a80514e d3 zpp_bits 2 done
+2026-11-18T17:52:09Z sc 9a80514e d3 zpp_bits_dirty 2 quiet after 10s load 1.88
+2026-11-18T17:52:51Z sc 9a80514e d3 zpp_bits_dirty 2 done
+2026-11-18T17:53:01Z def 2eba1655 3 quiet after 10s load 1.82
+2026-11-18T17:53:05Z def 2eba1655 3 done
+2026-11-18T17:53:15Z def 9a80514e 3 quiet after 10s load 1.70
+2026-11-18T17:53:19Z def 9a80514e 3 done
+2026-11-18T17:53:30Z def 9a80514e 4 quiet after 10s load 1.54
+2026-11-18T17:53:34Z def 9a80514e 4 done
+2026-11-18T17:53:44Z def 2eba1655 4 quiet after 10s load 1.70
+2026-11-18T17:53:48Z def 2eba1655 4 done
+2026-11-18T17:53:58Z reloc 2eba1655 3 quiet after 10s load 1.75
+2026-11-18T17:53:59Z reloc 2eba1655 3 done
+2026-11-18T17:54:09Z reloc 9a80514e 3 quiet after 10s load 1.64
+2026-11-18T17:54:10Z reloc 9a80514e 3 done
+2026-11-18T17:54:20Z reloc 9a80514e 4 quiet after 10s load 1.54
+2026-11-18T17:54:21Z reloc 9a80514e 4 done
+2026-11-18T17:54:31Z reloc 2eba1655 4 quiet after 10s load 1.53
+2026-11-18T17:54:32Z reloc 2eba1655 4 done
+2026-11-18T17:54:42Z cc24 2eba1655 3 quiet after 10s load 1.52
+2026-11-18T17:54:51Z cc24 2eba1655 3 done
+2026-11-18T17:55:02Z cc24 9a80514e 3 quiet after 10s load 1.52
+2026-11-18T17:55:11Z cc24 9a80514e 3 done
+2026-11-18T17:55:21Z cc24 9a80514e 4 quiet after 10s load 1.51
+2026-11-18T17:55:31Z cc24 9a80514e 4 done
+2026-11-18T17:55:41Z cc24 2eba1655 4 quiet after 10s load 1.57
+2026-11-18T17:55:51Z cc24 2eba1655 4 done
+2026-11-18T17:56:01Z sc 9a80514e head xoffset_trusted 3 quiet after 10s load 1.56
+2026-11-18T17:56:47Z sc 9a80514e head xoffset_trusted 3 done
+2026-11-18T17:56:57Z sc 9a80514e head zpp_bits 3 quiet after 10s load 1.65
+2026-11-18T17:57:31Z sc 9a80514e head zpp_bits 3 done
+2026-11-18T17:57:41Z sc 9a80514e d3 xoffset_trusted 3 quiet after 10s load 1.69
+2026-11-18T17:58:39Z sc 9a80514e d3 xoffset_trusted 3 done
+2026-11-18T17:58:49Z sc 9a80514e d3 zpp_bits 3 quiet after 10s load 1.83
+2026-11-18T17:59:35Z sc 9a80514e d3 zpp_bits 3 done
+2026-11-18T17:59:45Z sc 9a80514e d3 zpp_bits_dirty 3 quiet after 10s load 1.76
+2026-11-18T18:00:26Z sc 9a80514e d3 zpp_bits_dirty 3 done
+2026-11-18T18:00:36Z sc 2eba1655 head xoffset_trusted 3 quiet after 10s load 1.99
+2026-11-18T18:01:22Z sc 2eba1655 head xoffset_trusted 3 done
+2026-11-18T18:01:32Z sc 2eba1655 head zpp_bits 3 quiet after 10s load 1.97
+2026-11-18T18:02:07Z sc 2eba1655 head zpp_bits 3 done
+2026-11-18T18:02:18Z sc 2eba1655 d3 xoffset_trusted 3 quiet after 10s load 1.99
+2026-11-18T18:03:15Z sc 2eba1655 d3 xoffset_trusted 3 done
+2026-11-18T18:03:25Z sc 2eba1655 d3 zpp_bits 3 quiet after 10s load 1.76
+2026-11-18T18:04:11Z sc 2eba1655 d3 zpp_bits 3 done
+2026-11-18T18:04:21Z sc 2eba1655 d3 zpp_bits_dirty 3 quiet after 10s load 1.74
+2026-11-18T18:05:03Z sc 2eba1655 d3 zpp_bits_dirty 3 done
+2026-11-18T18:05:13Z def 9a80514e 5 quiet after 10s load 1.77
+2026-11-18T18:05:17Z def 9a80514e 5 done
+2026-11-18T18:05:27Z def 2eba1655 5 quiet after 10s load 1.75
+2026-11-18T18:05:31Z def 2eba1655 5 done
+2026-11-18T18:05:42Z def 2eba1655 6 quiet after 10s load 1.64
+2026-11-18T18:05:46Z def 2eba1655 6 done
+2026-11-18T18:05:56Z def 9a80514e 6 quiet after 10s load 1.57
+2026-11-18T18:06:00Z def 9a80514e 6 done
+2026-11-18T18:06:10Z reloc 9a80514e 5 quiet after 10s load 1.52
+2026-11-18T18:06:11Z reloc 9a80514e 5 done
+2026-11-18T18:06:21Z reloc 2eba1655 5 quiet after 10s load 1.51
+2026-11-18T18:06:22Z reloc 2eba1655 5 done
+2026-11-18T18:06:32Z reloc 2eba1655 6 quiet after 10s load 1.43
+2026-11-18T18:06:33Z reloc 2eba1655 6 done
+2026-11-18T18:06:43Z reloc 9a80514e 6 quiet after 10s load 1.40
+2026-11-18T18:06:43Z reloc 9a80514e 6 done
+2026-11-18T18:06:54Z cc24 9a80514e 5 quiet after 10s load 1.41
+2026-11-18T18:07:03Z cc24 9a80514e 5 done
+2026-11-18T18:07:13Z cc24 2eba1655 5 quiet after 10s load 1.57
+2026-11-18T18:07:23Z cc24 2eba1655 5 done
+2026-11-18T18:07:33Z cc24 2eba1655 6 quiet after 10s load 1.45
+2026-11-18T18:07:43Z cc24 2eba1655 6 done
+2026-11-18T18:07:53Z cc24 9a80514e 6 quiet after 10s load 1.47
+2026-11-18T18:08:03Z cc24 9a80514e 6 done
+2026-11-18T18:08:13Z sc 2eba1655 head xoffset_trusted 4 quiet after 10s load 1.41
+2026-11-18T18:08:58Z sc 2eba1655 head xoffset_trusted 4 done
+2026-11-18T18:09:08Z sc 2eba1655 head zpp_bits 4 quiet after 10s load 1.55
+2026-11-18T18:09:43Z sc 2eba1655 head zpp_bits 4 done
+2026-11-18T18:09:53Z sc 2eba1655 d3 xoffset_trusted 4 quiet after 10s load 1.51
+2026-11-18T18:10:50Z sc 2eba1655 d3 xoffset_trusted 4 done
+2026-11-18T18:11:01Z sc 2eba1655 d3 zpp_bits 4 quiet after 10s load 1.89
+2026-11-18T18:11:47Z sc 2eba1655 d3 zpp_bits 4 done
+2026-11-18T18:11:57Z sc 2eba1655 d3 zpp_bits_dirty 4 quiet after 10s load 2.14
+2026-11-18T18:12:38Z sc 2eba1655 d3 zpp_bits_dirty 4 done
+2026-11-18T18:12:48Z sc 9a80514e head xoffset_trusted 4 quiet after 10s load 1.96
+2026-11-18T18:13:34Z sc 9a80514e head xoffset_trusted 4 done
+2026-11-18T18:13:44Z sc 9a80514e head zpp_bits 4 quiet after 10s load 1.80
+2026-11-18T18:14:19Z sc 9a80514e head zpp_bits 4 done
+2026-11-18T18:14:29Z sc 9a80514e d3 xoffset_trusted 4 quiet after 10s load 1.84
+2026-11-18T18:15:27Z sc 9a80514e d3 xoffset_trusted 4 done
+2026-11-18T18:15:37Z sc 9a80514e d3 zpp_bits 4 quiet after 10s load 1.89
+2026-11-18T18:16:23Z sc 9a80514e d3 zpp_bits 4 done
+2026-11-18T18:16:33Z sc 9a80514e d3 zpp_bits_dirty 4 quiet after 10s load 1.84
+2026-11-18T18:17:14Z sc 9a80514e d3 zpp_bits_dirty 4 done
+2026-11-18T18:17:24Z def 2eba1655 7 quiet after 10s load 2.07
+2026-11-18T18:17:29Z def 2eba1655 7 done
+2026-11-18T18:17:39Z def 9a80514e 7 quiet after 10s load 1.97
+2026-11-18T18:17:43Z def 9a80514e 7 done
+2026-11-18T18:17:53Z def 9a80514e 8 quiet after 10s load 1.82
+2026-11-18T18:17:57Z def 9a80514e 8 done
+2026-11-18T18:18:08Z def 2eba1655 8 quiet after 10s load 1.64
+2026-11-18T18:18:12Z def 2eba1655 8 done
+2026-11-18T18:18:22Z reloc 2eba1655 7 quiet after 10s load 1.71
+2026-11-18T18:18:23Z reloc 2eba1655 7 done
+2026-11-18T18:18:33Z reloc 9a80514e 7 quiet after 10s load 1.68
+2026-11-18T18:18:34Z reloc 9a80514e 7 done
+2026-11-18T18:18:44Z reloc 9a80514e 8 quiet after 10s load 1.58
+2026-11-18T18:18:44Z reloc 9a80514e 8 done
+2026-11-18T18:18:54Z reloc 2eba1655 8 quiet after 10s load 1.41
+2026-11-18T18:18:55Z reloc 2eba1655 8 done
+2026-11-18T18:19:05Z cc24 2eba1655 7 quiet after 10s load 1.47
+2026-11-18T18:19:15Z cc24 2eba1655 7 done
+2026-11-18T18:19:25Z cc24 9a80514e 7 quiet after 10s load 1.63
+2026-11-18T18:19:35Z cc24 9a80514e 7 done
+2026-11-18T18:19:45Z cc24 9a80514e 8 quiet after 10s load 1.56
+2026-11-18T18:19:55Z cc24 9a80514e 8 done
+2026-11-18T18:20:05Z cc24 2eba1655 8 quiet after 10s load 1.91
+2026-11-18T18:20:14Z cc24 2eba1655 8 done
+2026-11-18T18:20:25Z sc 9a80514e head xoffset_trusted 5 quiet after 10s load 1.79
+2026-11-18T18:21:10Z sc 9a80514e head xoffset_trusted 5 done
+2026-11-18T18:21:20Z sc 9a80514e head zpp_bits 5 quiet after 10s load 1.86
+2026-11-18T18:21:55Z sc 9a80514e head zpp_bits 5 done
+2026-11-18T18:22:05Z sc 9a80514e d3 xoffset_trusted 5 quiet after 10s load 1.68
+2026-11-18T18:23:02Z sc 9a80514e d3 xoffset_trusted 5 done
+2026-11-18T18:23:12Z sc 9a80514e d3 zpp_bits 5 quiet after 10s load 1.79
+2026-11-18T18:23:58Z sc 9a80514e d3 zpp_bits 5 done
+2026-11-18T18:24:09Z sc 9a80514e d3 zpp_bits_dirty 5 quiet after 10s load 1.74
+2026-11-18T18:24:50Z sc 9a80514e d3 zpp_bits_dirty 5 done
+2026-11-18T18:25:00Z sc 2eba1655 head xoffset_trusted 5 quiet after 10s load 1.87
+2026-11-18T18:25:46Z sc 2eba1655 head xoffset_trusted 5 done
+2026-11-18T18:25:56Z sc 2eba1655 head zpp_bits 5 quiet after 10s load 1.66
+2026-11-18T18:26:31Z sc 2eba1655 head zpp_bits 5 done
+2026-11-18T18:26:41Z sc 2eba1655 d3 xoffset_trusted 5 quiet after 10s load 2.11
+2026-11-18T18:27:38Z sc 2eba1655 d3 xoffset_trusted 5 done
+2026-11-18T18:27:49Z sc 2eba1655 d3 zpp_bits 5 quiet after 10s load 1.84
+2026-11-18T18:28:35Z sc 2eba1655 d3 zpp_bits 5 done
+2026-11-18T18:28:45Z sc 2eba1655 d3 zpp_bits_dirty 5 quiet after 10s load 1.77
+2026-11-18T18:29:26Z sc 2eba1655 d3 zpp_bits_dirty 5 done
+2026-11-18T18:29:36Z def 9a80514e 9 quiet after 10s load 1.67
+2026-11-18T18:29:41Z def 9a80514e 9 done
+2026-11-18T18:29:51Z def 2eba1655 9 quiet after 10s load 1.82
+2026-11-18T18:29:55Z def 2eba1655 9 done
+2026-11-18T18:30:05Z def 2eba1655 10 quiet after 10s load 1.85
+2026-11-18T18:30:09Z def 2eba1655 10 done
+2026-11-18T18:30:20Z def 9a80514e 10 quiet after 10s load 1.79
+2026-11-18T18:30:24Z def 9a80514e 10 done
+2026-11-18T18:30:34Z reloc 9a80514e 9 quiet after 10s load 1.55
+2026-11-18T18:30:35Z reloc 9a80514e 9 done
+2026-11-18T18:30:45Z reloc 2eba1655 9 quiet after 10s load 1.46
+2026-11-18T18:30:45Z reloc 2eba1655 9 done
+2026-11-18T18:30:56Z reloc 2eba1655 10 quiet after 10s load 1.39
+2026-11-18T18:30:56Z reloc 2eba1655 10 done
+2026-11-18T18:31:06Z reloc 9a80514e 10 quiet after 10s load 1.30
+2026-11-18T18:31:07Z reloc 9a80514e 10 done
+2026-11-18T18:31:17Z cc24 9a80514e 9 quiet after 10s load 1.56
+2026-11-18T18:31:27Z cc24 9a80514e 9 done
+2026-11-18T18:31:37Z cc24 2eba1655 9 quiet after 10s load 1.47
+2026-11-18T18:31:47Z cc24 2eba1655 9 done
+2026-11-18T18:31:57Z cc24 2eba1655 10 quiet after 10s load 1.68
+2026-11-18T18:32:06Z cc24 2eba1655 10 done
+2026-11-18T18:32:16Z cc24 9a80514e 10 quiet after 10s load 1.67
+2026-11-18T18:32:26Z cc24 9a80514e 10 done
+2026-11-18T18:32:36Z sc 2eba1655 head xoffset_trusted 6 quiet after 10s load 1.62
+2026-11-18T18:33:22Z sc 2eba1655 head xoffset_trusted 6 done
+2026-11-18T18:33:32Z sc 2eba1655 head zpp_bits 6 quiet after 10s load 1.71
+2026-11-18T18:34:07Z sc 2eba1655 head zpp_bits 6 done
+2026-11-18T18:34:17Z sc 2eba1655 d3 xoffset_trusted 6 quiet after 10s load 1.74
+2026-11-18T18:35:14Z sc 2eba1655 d3 xoffset_trusted 6 done
+2026-11-18T18:35:24Z sc 2eba1655 d3 zpp_bits 6 quiet after 10s load 1.65
+2026-11-18T18:36:10Z sc 2eba1655 d3 zpp_bits 6 done
+2026-11-18T18:36:20Z sc 2eba1655 d3 zpp_bits_dirty 6 quiet after 10s load 1.69
+2026-11-18T18:37:01Z sc 2eba1655 d3 zpp_bits_dirty 6 done
+2026-11-18T18:37:11Z sc 9a80514e head xoffset_trusted 6 quiet after 10s load 1.74
+2026-11-18T18:37:57Z sc 9a80514e head xoffset_trusted 6 done
+2026-11-18T18:38:07Z sc 9a80514e head zpp_bits 6 quiet after 10s load 1.61
+2026-11-18T18:38:42Z sc 9a80514e head zpp_bits 6 done
+2026-11-18T18:38:52Z sc 9a80514e d3 xoffset_trusted 6 quiet after 10s load 1.71
+2026-11-18T18:39:50Z sc 9a80514e d3 xoffset_trusted 6 done
+2026-11-18T18:40:00Z sc 9a80514e d3 zpp_bits 6 quiet after 10s load 1.74
+2026-11-18T18:40:46Z sc 9a80514e d3 zpp_bits 6 done
+2026-11-18T18:40:56Z sc 9a80514e d3 zpp_bits_dirty 6 quiet after 10s load 1.48
+2026-11-18T18:41:37Z sc 9a80514e d3 zpp_bits_dirty 6 done
+2026-11-18T18:41:48Z def 2eba1655 11 quiet after 10s load 1.54
+2026-11-18T18:41:52Z def 2eba1655 11 done
+2026-11-18T18:42:02Z def 9a80514e 11 quiet after 10s load 1.42
+2026-11-18T18:42:06Z def 9a80514e 11 done
+2026-11-18T18:42:16Z def 9a80514e 12 quiet after 10s load 1.35
+2026-11-18T18:42:21Z def 9a80514e 12 done
+2026-11-18T18:42:31Z def 2eba1655 12 quiet after 10s load 1.35
+2026-11-18T18:42:35Z def 2eba1655 12 done
+2026-11-18T18:42:45Z reloc 2eba1655 11 quiet after 10s load 1.34
+2026-11-18T18:42:46Z reloc 2eba1655 11 done
+2026-11-18T18:42:56Z reloc 9a80514e 11 quiet after 10s load 1.45
+2026-11-18T18:42:57Z reloc 9a80514e 11 done
+2026-11-18T18:43:07Z reloc 9a80514e 12 quiet after 10s load 1.46
+2026-11-18T18:43:08Z reloc 9a80514e 12 done
+2026-11-18T18:43:18Z reloc 2eba1655 12 quiet after 10s load 1.44
+2026-11-18T18:43:18Z reloc 2eba1655 12 done
+2026-11-18T18:43:29Z cc24 2eba1655 11 quiet after 10s load 1.46
+2026-11-18T18:43:38Z cc24 2eba1655 11 done
+2026-11-18T18:43:48Z cc24 9a80514e 11 quiet after 10s load 1.47
+2026-11-18T18:43:58Z cc24 9a80514e 11 done
+2026-11-18T18:44:08Z cc24 9a80514e 12 quiet after 10s load 1.51
+2026-11-18T18:44:18Z cc24 9a80514e 12 done
+2026-11-18T18:44:28Z cc24 2eba1655 12 quiet after 10s load 1.50
+2026-11-18T18:44:38Z cc24 2eba1655 12 done
+2026-11-18T18:44:48Z sc 9a80514e head xoffset_trusted 7 quiet after 10s load 1.36
+2026-11-18T18:45:33Z sc 9a80514e head xoffset_trusted 7 done
+2026-11-18T18:45:43Z sc 9a80514e head zpp_bits 7 quiet after 10s load 1.90
+2026-11-18T18:46:18Z sc 9a80514e head zpp_bits 7 done
+2026-11-18T18:46:28Z sc 9a80514e d3 xoffset_trusted 7 quiet after 10s load 1.97
+2026-11-18T18:47:25Z sc 9a80514e d3 xoffset_trusted 7 done
+2026-11-18T18:47:36Z sc 9a80514e d3 zpp_bits 7 quiet after 10s load 1.80
+2026-11-18T18:48:22Z sc 9a80514e d3 zpp_bits 7 done
+2026-11-18T18:48:32Z sc 9a80514e d3 zpp_bits_dirty 7 quiet after 10s load 1.94
+2026-11-18T18:49:13Z sc 9a80514e d3 zpp_bits_dirty 7 done
+2026-11-18T18:49:23Z sc 2eba1655 head xoffset_trusted 7 quiet after 10s load 1.74
+2026-11-18T18:50:09Z sc 2eba1655 head xoffset_trusted 7 done
+2026-11-18T18:50:19Z sc 2eba1655 head zpp_bits 7 quiet after 10s load 1.56
+2026-11-18T18:50:54Z sc 2eba1655 head zpp_bits 7 done
+2026-11-18T18:51:04Z sc 2eba1655 d3 xoffset_trusted 7 quiet after 10s load 1.62
+2026-11-18T18:52:02Z sc 2eba1655 d3 xoffset_trusted 7 done
+2026-11-18T18:52:12Z sc 2eba1655 d3 zpp_bits 7 quiet after 10s load 1.64
+2026-11-18T18:52:58Z sc 2eba1655 d3 zpp_bits 7 done
+2026-11-18T18:53:08Z sc 2eba1655 d3 zpp_bits_dirty 7 quiet after 10s load 2.03
+2026-11-18T18:53:49Z sc 2eba1655 d3 zpp_bits_dirty 7 done
+2026-11-18T18:53:59Z def 9a80514e 13 quiet after 10s load 2.04
+2026-11-18T18:54:04Z def 9a80514e 13 done
+2026-11-18T18:54:14Z def 2eba1655 13 quiet after 10s load 1.81
+2026-11-18T18:54:18Z def 2eba1655 13 done
+2026-11-18T18:54:28Z def 2eba1655 14 quiet after 10s load 1.75
+2026-11-18T18:54:32Z def 2eba1655 14 done
+2026-11-18T18:54:43Z def 9a80514e 14 quiet after 10s load 2.20
+2026-11-18T18:54:47Z def 9a80514e 14 done
+2026-11-18T18:54:57Z reloc 9a80514e 13 quiet after 10s load 1.94
+2026-11-18T18:54:58Z reloc 9a80514e 13 done
+2026-11-18T18:55:08Z reloc 2eba1655 13 quiet after 10s load 1.79
+2026-11-18T18:55:08Z reloc 2eba1655 13 done
+2026-11-18T18:55:19Z reloc 2eba1655 14 quiet after 10s load 1.67
+2026-11-18T18:55:19Z reloc 2eba1655 14 done
+2026-11-18T18:55:29Z reloc 9a80514e 14 quiet after 10s load 1.52
+2026-11-18T18:55:30Z reloc 9a80514e 14 done
+2026-11-18T18:55:40Z cc24 9a80514e 13 quiet after 10s load 1.44
+2026-11-18T18:55:50Z cc24 9a80514e 13 done
+2026-11-18T18:56:00Z cc24 2eba1655 13 quiet after 10s load 1.46
+2026-11-18T18:56:10Z cc24 2eba1655 13 done
+2026-11-18T18:56:20Z cc24 2eba1655 14 quiet after 10s load 1.68
+2026-11-18T18:56:29Z cc24 2eba1655 14 done
+2026-11-18T18:56:40Z cc24 9a80514e 14 quiet after 10s load 1.60
+2026-11-18T18:56:49Z cc24 9a80514e 14 done
+2026-11-18T18:57:00Z sc 2eba1655 head xoffset_trusted 8 quiet after 10s load 1.56
+2026-11-18T18:57:45Z sc 2eba1655 head xoffset_trusted 8 done
+2026-11-18T18:57:55Z sc 2eba1655 head zpp_bits 8 quiet after 10s load 1.66
+2026-11-18T18:58:30Z sc 2eba1655 head zpp_bits 8 done
+2026-11-18T18:58:40Z sc 2eba1655 d3 xoffset_trusted 8 quiet after 10s load 1.79
+2026-11-18T18:59:37Z sc 2eba1655 d3 xoffset_trusted 8 done
+2026-11-18T18:59:47Z sc 2eba1655 d3 zpp_bits 8 quiet after 10s load 1.97
+2026-11-18T19:00:33Z sc 2eba1655 d3 zpp_bits 8 done
+2026-11-18T19:00:43Z sc 2eba1655 d3 zpp_bits_dirty 8 quiet after 10s load 1.96
+2026-11-18T19:01:25Z sc 2eba1655 d3 zpp_bits_dirty 8 done
+2026-11-18T19:01:35Z sc 9a80514e head xoffset_trusted 8 quiet after 10s load 1.71
+2026-11-18T19:02:21Z sc 9a80514e head xoffset_trusted 8 done
+2026-11-18T19:02:31Z sc 9a80514e head zpp_bits 8 quiet after 10s load 1.67
+2026-11-18T19:03:06Z sc 9a80514e head zpp_bits 8 done
+2026-11-18T19:03:16Z sc 9a80514e d3 xoffset_trusted 8 quiet after 10s load 1.72
+2026-11-18T19:04:13Z sc 9a80514e d3 xoffset_trusted 8 done
+2026-11-18T19:04:23Z sc 9a80514e d3 zpp_bits 8 quiet after 10s load 1.78
+2026-11-18T19:05:09Z sc 9a80514e d3 zpp_bits 8 done
+2026-11-18T19:05:20Z sc 9a80514e d3 zpp_bits_dirty 8 quiet after 10s load 1.95
+2026-11-18T19:06:01Z sc 9a80514e d3 zpp_bits_dirty 8 done
+2026-11-18T19:06:11Z def 2eba1655 15 quiet after 10s load 1.81
+2026-11-18T19:06:15Z def 2eba1655 15 done
+2026-11-18T19:06:25Z def 9a80514e 15 quiet after 10s load 1.77
+2026-11-18T19:06:29Z def 9a80514e 15 done
+2026-11-18T19:06:40Z def 9a80514e 16 quiet after 10s load 1.67
+2026-11-18T19:06:44Z def 9a80514e 16 done
+2026-11-18T19:06:54Z def 2eba1655 16 quiet after 10s load 1.65
+2026-11-18T19:06:58Z def 2eba1655 16 done
+2026-11-18T19:07:08Z reloc 2eba1655 15 quiet after 10s load 1.44
+2026-11-18T19:07:09Z reloc 2eba1655 15 done
+2026-11-18T19:07:19Z reloc 9a80514e 15 quiet after 10s load 1.44
+2026-11-18T19:07:20Z reloc 9a80514e 15 done
+2026-11-18T19:07:30Z reloc 9a80514e 16 quiet after 10s load 1.37
+2026-11-18T19:07:31Z reloc 9a80514e 16 done
+2026-11-18T19:07:41Z reloc 2eba1655 16 quiet after 10s load 1.37
+2026-11-18T19:07:42Z reloc 2eba1655 16 done
+2026-11-18T19:07:52Z cc24 2eba1655 15 quiet after 10s load 1.39
+2026-11-18T19:08:01Z cc24 2eba1655 15 done
+2026-11-18T19:08:11Z cc24 9a80514e 15 quiet after 10s load 1.42
+2026-11-18T19:08:21Z cc24 9a80514e 15 done
+2026-11-18T19:08:31Z cc24 9a80514e 16 quiet after 10s load 1.38
+2026-11-18T19:08:41Z cc24 9a80514e 16 done
+2026-11-18T19:08:51Z cc24 2eba1655 16 quiet after 10s load 1.45
+2026-11-18T19:09:01Z cc24 2eba1655 16 done

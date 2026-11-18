@@ -1,0 +1,33 @@
+reloc_bench: mode=bench rounds=201 warmup=3 (console: median ns/op, median per-round ratio xoffset/baseline)
+vec.push_back                  G9               0.41   std::vector 0.41 ratio 0.994
+vec.push_back_grow             G9               0.31   std::vector 0.41 ratio 0.762
+vec.iterate                    G9               0.03   std::vector 0.03 ratio 1.000
+vec.mid_insert                 G9              40.61   std::vector 40.61 ratio 0.998
+vec.mid_erase                  G9              39.79   std::vector 39.06 ratio 1.019
+hero.mid_erase.ord             G9             164.06   std::vector 228.52 ratio 0.718
+hero.mid_insert.ord            G9             220.70   std::vector 289.70 ratio 0.761
+hero.push_back_grow.ord        G9              25.76   std::vector 87.93 ratio 0.293
+hero.mid_erase.plain           report         910.81   std::vector 229.17 ratio 3.994
+hero.mid_insert.plain          report        1250.64   std::vector 304.69 ratio 4.094
+hero.push_back_grow.plain      report          29.05   std::vector 85.45 ratio 0.340
+str.assign_short               report           1.01   std::string 0.57 ratio 1.786
+str.assign_long                G9               2.71   std::string 3.39 ratio 0.800
+str.assign_short.view          G9               0.93   std::string 2.72 ratio 0.342
+str.assign_short.copy          report           0.64   std::string 0.57 ratio 1.115
+str.append                     G9               1.41   std::string 3.67 ratio 0.382
+map.insert.fresh               G9              31.82   std::flat_map 36.87 ratio 0.865   std::map 42.56 ratio 0.749
+map.find.fresh                 G9               5.29   std::flat_map 6.55 ratio 0.808   std::map 16.55 ratio 0.320
+map.erase.fresh                G9              32.14   std::flat_map 35.07 ratio 0.914   std::map 46.47 ratio 0.690
+set.insert.fresh               G9              28.81   std::flat_set 28.81 ratio 0.997   std::set 46.47 ratio 0.620
+set.find.fresh                 G9               4.87   std::flat_set 6.45 ratio 0.756   std::set 16.39 ratio 0.298
+set.erase.fresh                G9              28.89   std::flat_set 27.26 ratio 1.059   std::set 45.98 ratio 0.627
+map.insert.reused              report          30.03   std::flat_map 29.54 ratio 1.014   std::map 17.74 ratio 1.694
+map.find.reused                report           5.30   std::flat_map 6.55 ratio 0.808   std::map 9.30 ratio 0.570
+map.erase.reused               report          27.59   std::flat_map 27.26 ratio 1.009   std::map 18.80 ratio 1.465
+set.insert.reused              report          23.28   std::flat_set 20.92 ratio 1.112   std::set 17.42 ratio 1.333
+set.find.reused                report           4.87   std::flat_set 6.45 ratio 0.756   std::set 6.44 ratio 0.757
+set.erase.reused               report          21.24   std::flat_set 20.35 ratio 1.043   std::set 18.15 ratio 1.166
+nested.build.ord               G9             210.94   std 832.03 ratio 0.254
+reset                          G9               7.81   std 117.84 ratio 0.066
+nested.build.plain             report         217.44   std 825.50 ratio 0.261
+31 cases; checks: all passed

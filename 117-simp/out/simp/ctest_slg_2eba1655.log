@@ -1,0 +1,15 @@
+Test project /Volumes/XOffsetCS/perf-gate/build/simp-2eba1655/slg
+    Start 1: slg.flat_held_index
+1/5 Test #1: slg.flat_held_index ..............   Passed    1.85 sec
+    Start 2: slg.uplink_order_paths
+2/5 Test #2: slg.uplink_order_paths ...........   Passed    0.49 sec
+    Start 3: slg.uplink_frame
+3/5 Test #3: slg.uplink_frame .................   Passed    0.50 sec
+    Start 4: slg.packed_marches
+4/5 Test #4: slg.packed_marches ...............   Passed    0.55 sec
+    Start 5: slg.native_patch_copy
+5/5 Test #5: slg.native_patch_copy ............   Passed    0.49 sec
+
+100% tests passed out of 5
+
+Total Test time (real) =   3.89 sec
