@@ -34,11 +34,7 @@
 
 #include <cstddef>
 
-#if defined(_MSC_VER) && !defined(__clang__)
-#define XOFFSET_SCHEMA_INLINE __forceinline
-#else
-#define XOFFSET_SCHEMA_INLINE inline __attribute__((always_inline))
-#endif
+#include "xoffset_config.hpp"
 
 // GCC 16 defines __cpp_impl_reflection; the P2996 Clang fork answers
 // __has_feature(reflection). (GCC before 14 has no __has_feature.)

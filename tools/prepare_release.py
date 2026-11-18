@@ -54,7 +54,7 @@ EXPECTED_REVISIONS = {"boost": "da041154c6bac1a4aa98254a7d6819059e8ac0b0",
 FULL_OWN_HEADERS = ('xoffsetdatastructure.hpp', 'xoffset_admission.hpp', 'xoffset_core_lifetime.hpp', 'xoffset_fixed_string.hpp', 'xoffset_schema.hpp', 'xoffset_schema_describe.hpp', 'xoffset_schema_reflect.hpp', 'xoffset_verified_paths.hpp', 'xoffset_schema_names.hpp', 'xoffset_handshake.hpp', 'xoffset_evolution.hpp', 'xoffset_schema_freeze.hpp', 'xoffset_fixed_message.hpp', 'xoffset_delta.hpp', 'xoffset_receiver.hpp', 'xoffset_shared_delta.hpp', 'xoffset_shared_publisher.hpp', 'xoffset_proxy.hpp')
 ROOT_FILES = ("CMakeLists.txt", "README.md", "XOFFSET_VERSION", "CHANGELOG.md", "LICENSE",
               "build.sh", "xoffsetdatastructure.hpp", "xoffset_virtual_memory.hpp", "xoffset_slot_storage.hpp",
-              "xoffset_error.hpp", "Dockerfile", "docker-compose.yml", ".dockerignore")
+              "xoffset_error.hpp", "xoffset_config.hpp", "Dockerfile", "docker-compose.yml", ".dockerignore")
 DOC_FILES = ("docs/ALPHA_COMPATIBILITY.md", "docs/BUILD_AND_PLATFORMS.md", "docs/PACKAGING.md", "docs/VALIDATION_RUNNER.md")
 TOOLCHAIN_FILES = ("toolchains/README.md", "toolchains/vm-validation.json")
 TOOL_FILES = ("tools/CMakeLists.txt", "tools/bench_compare.cpp", "tools/export_signatures.cpp",
@@ -377,6 +377,7 @@ def install_required(component):
     if component not in ("full", "storage"):
         raise ValueError("install component must be full or storage")
     base = {"include/xoffset_virtual_memory.hpp", "include/xoffset_slot_storage.hpp", "include/xoffset_error.hpp",
+            "include/xoffset_config.hpp",
             "share/XOffsetDatastructure/licenses/LICENSE",
             "share/XOffsetDatastructure/VERSION", "share/XOffsetDatastructure/CHANGELOG.md",
             "share/XOffsetDatastructure/ALPHA_COMPATIBILITY.md"}

@@ -51,9 +51,8 @@ When persisted data must be read across versions, keep a toolchain, schema and c
 can read the original format, and validate the migration result separately.
 
 - Stored types must satisfy `XOffsetDatastructure::is_byte_copy_safe_v<T>`.
-- The fixed-schema verified path also requires `is_v1_wire_admitted_v<T>` (the name is kept from the old
-  version; the rule applies to V2); this is an extra wire admission constraint and does not mean "every
-  trivially copyable C++ type can be used".
+- The fixed-schema verified path also requires `is_wire_admitted_v<T>`; this is an extra wire admission
+  constraint and does not mean "every trivially copyable C++ type can be used".
 - Use the library's arena containers such as XString/XVector. Ordinary process addresses, native
   pointers/references, member pointers and unions cannot enter this admitted wire domain; ordinary
   `std::string/std::vector` are not substitutes for the offset containers.

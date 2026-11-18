@@ -9,8 +9,7 @@ offsets, which mean the same thing on every 64-bit little-endian target (the
 wire rule of [V2_FORMAT.md](V2_FORMAT.md)). After a delta applies, the
 receiver's payload is the sender's payload byte for byte.
 
-Header: `xoffset_delta.hpp` (included by `xoffsetdatastructure.hpp`;
-`XOFFSET_DELTA_SYNC_API` is defined). Both schema backends (C++26 reflection,
+Header: `xoffset_delta.hpp` (included by `xoffsetdatastructure.hpp`). Both schema backends (C++26 reflection,
 C++20 `XOFFSET_RECORD` field lists) and builds without exceptions.
 
 ## 1. Use

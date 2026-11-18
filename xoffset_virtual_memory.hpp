@@ -1,5 +1,7 @@
 #pragma once
 
+#include "xoffset_config.hpp"
+
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -14,26 +16,7 @@
 #include <vector>
 
 #if defined(_WIN32)
-// The lean <windows.h>, without min/max: no rpcndr.h (`small`, `hyper`), winsock.h or
-// shellapi.h behind a client's back. Both macros are set only for this include; a
-// client that needs more includes those headers itself (or <windows.h> first).
-#  ifndef WIN32_LEAN_AND_MEAN
-#    define WIN32_LEAN_AND_MEAN
-#    define XOFFSET_DETAIL_UNDEF_LEAN_AND_MEAN
-#  endif
-#  ifndef NOMINMAX
-#    define NOMINMAX
-#    define XOFFSET_DETAIL_UNDEF_NOMINMAX
-#  endif
-#  include <windows.h>
-#  ifdef XOFFSET_DETAIL_UNDEF_LEAN_AND_MEAN
-#    undef WIN32_LEAN_AND_MEAN
-#    undef XOFFSET_DETAIL_UNDEF_LEAN_AND_MEAN
-#  endif
-#  ifdef XOFFSET_DETAIL_UNDEF_NOMINMAX
-#    undef NOMINMAX
-#    undef XOFFSET_DETAIL_UNDEF_NOMINMAX
-#  endif
+// <windows.h> comes from xoffset_config.hpp.
 #elif defined(__linux__) || defined(__APPLE__)
 #  include <sys/mman.h>
 #  include <unistd.h>
@@ -530,11 +513,6 @@ public:
     // Nothing is cleared here. Returns the previous zero_from_: bytes at or
     // beyond it are still zero, so a writer that skips ranges (sparse gaps)
     // clears only below it. A failure leaves the old bytes and length.
-    std::size_t expose_for_overwrite(std::size_t length) {
-        std::size_t clean_from = 0;
-        XOFFSET_VREQUIRE(expose_for_overwrite_v(length, clean_from));
-        return clean_from;
-    }
     vstatus expose_for_overwrite_v(std::size_t length, std::size_t& clean_from) {
         if (length > maximum_capacity_) {
             XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument,

@@ -949,10 +949,6 @@ namespace XOffsetDatastructure {
             }
         }
 
-        inline std::size_t capacity_of(std::optional<XBuffer::MaximumCapacity> cap, std::size_t fallback) noexcept {
-            return cap ? cap->value : fallback;
-        }
-
         // Loads a wire of any version of W's lineage and upgrades it to W. A
         // wire of no version goes to load_verified<W>, which rejects it with
         // its usual message.

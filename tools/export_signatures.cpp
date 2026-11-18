@@ -18,7 +18,7 @@
 
 namespace {
 
-using XOffsetDatastructure::is_v1_wire_admitted_v;
+using XOffsetDatastructure::is_wire_admitted_v;
 
 struct ExportedTypeEntry {
     std::string name;
@@ -67,14 +67,14 @@ std::string cxx_escape(std::string_view value) {
 std::vector<ExportedTypeEntry> collect_exported_type_entries() {
     std::vector<ExportedTypeEntry> entries;
     xoffset::signature::visit_exported_types([&]<typename T>(const char* name) {
-        static_assert(is_v1_wire_admitted_v<T>,
+        static_assert(is_wire_admitted_v<T>,
             "target-matrix signature export only supports v1-admitted root/data types");
         constexpr auto wire_sig = XOffsetDatastructure::wire_abi_signature<T>();
         entries.push_back({
             .name = name,
             .guard_name = make_identifier(name),
             .wire_abi_signature = std::string(std::string_view(wire_sig)),
-            .byte_copy_safe = is_v1_wire_admitted_v<T>,
+            .byte_copy_safe = is_wire_admitted_v<T>,
         });
     });
     return entries;

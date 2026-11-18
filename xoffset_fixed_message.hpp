@@ -90,7 +90,7 @@ namespace XOffsetDatastructure {
         consteval bool is_fixed_message() {
             using C = std::remove_cv_t<T>;
             if constexpr (!std::is_class_v<C> || std::is_union_v<C>) return false;
-            else if constexpr (!v1_wire_admitted<C>()) return false;
+            else if constexpr (!wire_admitted<C>()) return false;
             else if constexpr (!no_arena_container<C>()) return false;
             else return !has_implicit_padding_v<C>;
         }

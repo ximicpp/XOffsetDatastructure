@@ -455,17 +455,6 @@ namespace XOffsetDatastructure {
         }
     } // namespace detail::freeze
 
-    // The snapshot text of the current Roots (what `freeze` writes), for tests.
-    template <typename... Roots>
-    std::string schema_snapshot_body(std::string_view ns) {
-        detail::freeze::Snapshot s;
-        detail::freeze::Lock empty;
-        s.ns = std::string(ns);
-        s.lock = &empty;
-        (detail::freeze::spell<Roots>(s), ...);
-        return s.body;
-    }
-
     template <typename... Roots>
     int schema_freeze_main(int argc, char** argv) {
         const std::string cmd = argc > 1 ? argv[1] : "";

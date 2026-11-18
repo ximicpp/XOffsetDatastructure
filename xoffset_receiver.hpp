@@ -69,31 +69,7 @@
 #include "xoffsetdatastructure.hpp"
 #include "xoffset_shared_delta.hpp"
 
-// XReceiver::view and XView (XCheck::bounds for client uplinks, 3.5).
-#define XOFFSET_RECEIVER_VIEW_API 1
 
-#ifndef XOFFSET_FORCE_FULL_CHECK
-#  if !defined(NDEBUG) || defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_THREAD__)
-#    define XOFFSET_FORCE_FULL_CHECK 1
-#  elif defined(__has_feature)
-#    if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
-#      define XOFFSET_FORCE_FULL_CHECK 1
-#    endif
-#  endif
-#  ifndef XOFFSET_FORCE_FULL_CHECK
-#    define XOFFSET_FORCE_FULL_CHECK 0
-#  endif
-#endif
-
-// A hint to bring the cache line at p in for reading; nothing where the
-// compiler has no prefetch intrinsic.
-#if defined(__GNUC__) || defined(__clang__)
-#define XOFFSET_RECEIVER_PREFETCH(p) __builtin_prefetch((p), 0, 3)
-#elif defined(_MSC_VER) && (defined(_M_X64) || defined(_M_AMD64))
-#define XOFFSET_RECEIVER_PREFETCH(p) _mm_prefetch(reinterpret_cast<const char*>(p), _MM_HINT_T0)
-#else
-#define XOFFSET_RECEIVER_PREFETCH(p) ((void)(p))
-#endif
 
 namespace XOffsetDatastructure {
 
@@ -536,7 +512,7 @@ public:
     template <typename T, XCheck C = default_view_check<L>>
     [[nodiscard]] XResult<XView<T>> view(std::span<const std::byte> wire) const {
         check_view<C>();
-        static_assert(is_v1_wire_admitted_v<T>, "XReceiver::view<T>() requires an admitted fixed-schema wire type.");
+        static_assert(is_wire_admitted_v<T>, "XReceiver::view<T>() requires an admitted fixed-schema wire type.");
         constexpr const char* who = C == XCheck::bounds ? "XReceiver::view<T, bounds>()" : "XReceiver::view<T, admit>()";
         constexpr auto image = detail::view_wire_image<T>();
         constexpr std::size_t head = sizeof(XWireHeaderV2);
@@ -553,7 +529,7 @@ public:
             const auto first = reinterpret_cast<std::uintptr_t>(wire.data()) & ~std::uintptr_t(63);
             const auto last = reinterpret_cast<std::uintptr_t>(wire.data()) + wire.size_bytes() - 1;
             for (auto line = first + 64; line <= last; line += 64)
-                XOFFSET_RECEIVER_PREFETCH(reinterpret_cast<const void*>(line));
+                XOFFSET_DETAIL_PREFETCH_WITH_MSVC(reinterpret_cast<const void*>(line), 0);
         }
         std::memcpy(words.data(), wire.data(), head);
         const auto used = std::uint64_t(std::uint32_t(words[1]));
