@@ -11,7 +11,7 @@
 namespace xo = XOffsetDatastructure;
 namespace xm = slg::xm;
 
-using LoginOps = slg::XOffsetRunnerT<slg::XoTrustedModel, false>::LoginOps;
+using LoginOps = slg::XOffsetRunnerT<slg::XoTrustedModel>::LoginOps;
 
 template <class Order>
 void check_order(const Order& actual, const slg::stdm::March& expected) {
