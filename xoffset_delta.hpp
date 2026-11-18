@@ -3616,13 +3616,13 @@ namespace XOffsetDatastructure {
                     header.root_offset = parsed.header.root_offset;
                     header.hole_count = static_cast<std::uint32_t>(scratch.holes.size());
                     if constexpr (Admit) {
-                        XOFFSET_VTRY(xbuf.template finish_admitted_load<T>(
-                            header, reinterpret_cast<const char*>(scratch.holes.data()), scratch.holes.size(), who,
-                            false));
+                        // In-band, the table is by offset (WireOrder false).
+                        XOFFSET_VTRY(xbuf.template finish_admitted_load<T, !detail::inband_allocator>(
+                            header, reinterpret_cast<const char*>(scratch.holes.data()), scratch.holes.size(), who));
                     } else {
-                        XOFFSET_VTRY(xbuf.template finish_verified_load<T>(
+                        XOFFSET_VTRY(xbuf.template finish_verified_load<T, !detail::inband_allocator>(
                             header, reinterpret_cast<const char*>(scratch.holes.data()), scratch.holes.size(),
-                            default_wire_upstream(), who, &xbuf.retained_reload_scratch(), false));
+                            default_wire_upstream(), who, &xbuf.retained_reload_scratch()));
                     }
                 XOFFSET_ROLLBACK_END(core.reset_arena(0))
                 cursor.stream_ = parsed.header.stream;

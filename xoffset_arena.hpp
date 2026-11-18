@@ -2069,14 +2069,13 @@ namespace XOffsetDatastructure {
         // new_handler): the owner's own table when it is empty, else a new
         // one; the payload's current owner is re-resolved and the table
         // published to it.
-        // `wire_order` (in-band): a wire's table, else a key delta's (by
+        // WireOrder (in-band): a wire's table, else a key delta's (by
         // offset, the link words in the payload); see inband_adopt.
-        XOFFSET_DETAIL_INLINE detail::vstatus load_free_blocks(const void* holes, std::size_t count,
-                                                               bool wire_order = true) {
+        template <bool WireOrder = true>
+        XOFFSET_DETAIL_INLINE detail::vstatus load_free_blocks(const void* holes, std::size_t count) {
             // In-band: a verified load's table (finish_admitted_load adopts
             // its table unchecked).
-            if constexpr (detail::inband_allocator) return inband_adopt(holes, count, true, wire_order);
-            (void)wire_order;
+            if constexpr (detail::inband_allocator) return inband_adopt(holes, count, true, WireOrder);
             // No holes and no entry to remove: the general path would only
             // publish the same empty table (or none). It would publish it to
             // record_owner(owner_record_), the payload's host word, which is
