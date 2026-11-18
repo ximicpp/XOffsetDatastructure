@@ -128,6 +128,7 @@ set(REFLECTION_TESTS
     test_append_grow
     test_staged_insert
     test_assign_sorted
+    test_first_block
     test_subtree_copy
     test_free_table_policy
     test_lower_bound_index
