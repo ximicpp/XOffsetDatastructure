@@ -12,6 +12,12 @@
 //  - retire never lowers used_end; live + free blocks tile [48, used_end);
 //  - the free table follows the storage on move/swap and reloads in
 //    canonical order (identical subsequent allocation decisions).
+// With the in-band allocator (XOFFSET_INBAND_ALLOCATOR) the oracle is that
+// allocator's policy instead (see the second Oracle): one LIFO stack per size,
+// the smallest size with a block serves a request (split at its front), and
+// the free directory is a block of the payload (made in the first retired
+// block of at least 40 bytes, at its end, else at the end of the payload;
+// when full, compacted or moved to a block twice its size).
 #include "xoffsetdatastructure.hpp"
 #include <algorithm>
 #include <cstdint>
@@ -35,6 +41,7 @@ void need(bool value, const char* message) {
 }
 std::uint32_t block_of(std::uint32_t n) { return n == 0 ? 8u : (n + 7u) & ~7u; }
 
+#if !XOFFSET_INBAND_ALLOCATOR
 struct Oracle {
     struct Free { std::uint32_t offset, bytes; std::uint64_t seq; };
     std::vector<Free> free;
@@ -42,7 +49,10 @@ struct Oracle {
     std::uint64_t used_end = kHeader, seq = 0;
     std::size_t reused = 0, bumped = 0, splits = 0;
 
+    std::uint64_t dir_bumped = 0; // bytes the free directory took at the end (none here)
+
     void push(std::uint32_t offset, std::uint32_t bytes) { free.push_back({offset, bytes, seq++}); }
+    std::size_t free_count() const { return free.size(); }
     std::uint64_t free_bytes() const {
         std::uint64_t total = 0;
         for (const auto& f : free) total += f.bytes;
@@ -109,6 +119,112 @@ struct Oracle {
         return out;
     }
 };
+#else
+struct Oracle {
+    // Entries in use, ascending size; a stack's head is its back. An emptied
+    // stack keeps its entry.
+    struct Entry { std::uint32_t size; std::vector<std::uint32_t> stack; };
+    std::vector<Entry> dir;
+    std::uint32_t dir_at = 0, cap = 0;
+    std::map<std::uint32_t, std::uint32_t> live; // offset -> block bytes
+    std::uint64_t used_end = kHeader, dir_bumped = 0;
+    std::size_t reused = 0, bumped = 0, splits = 0;
+
+    static std::uint32_t dir_bytes(std::uint32_t c) { return 8u + 8u * c; }
+    std::size_t free_count() const {
+        std::size_t n = 0;
+        for (const auto& e : dir) n += e.stack.size();
+        return n;
+    }
+    std::uint64_t free_bytes() const {
+        std::uint64_t total = 0;
+        for (const auto& e : dir) total += std::uint64_t(e.size) * e.stack.size();
+        return total;
+    }
+    std::size_t find(std::uint32_t bytes) const { // the first entry of at least `bytes`
+        std::size_t i = 0;
+        while (i < dir.size() && dir[i].size < bytes) ++i;
+        return i;
+    }
+    std::uint32_t bump(std::uint32_t bytes) {
+        const auto at = static_cast<std::uint32_t>(used_end);
+        used_end += bytes;
+        dir_bumped += bytes;
+        return at;
+    }
+    void push(std::uint32_t offset, std::uint32_t bytes) {
+        if (dir_at != 0)
+            if (const auto i = find(bytes); i < dir.size() && dir[i].size == bytes) return dir[i].stack.push_back(offset);
+        if (dir_at == 0) {
+            if (bytes >= dir_bytes(4)) { // the block's end holds the directory
+                cap = std::min<std::uint32_t>((bytes - 8u) / 8u, 8u);
+                bytes -= dir_bytes(cap);
+                dir_at = offset + bytes;
+            } else {
+                cap = 8;
+                dir_at = bump(dir_bytes(cap));
+            }
+            dir.clear();
+            if (bytes == 0) return;
+        }
+        if (dir.size() + 1 == cap) {
+            std::size_t nonempty = 0;
+            for (const auto& e : dir) nonempty += !e.stack.empty();
+            if (nonempty <= dir.size() / 2) {
+                std::erase_if(dir, [](const Entry& e) { return e.stack.empty(); });
+            } else { // twice the entries, in this block's end or at the end; the old block is freed
+                const auto grown = cap * 2u, size = dir_bytes(grown);
+                std::uint32_t at;
+                if (bytes >= size) { bytes -= size; at = offset + bytes; }
+                else at = bump(size);
+                const auto old = dir_at, old_bytes = dir_bytes(cap);
+                dir_at = at;
+                cap = grown;
+                push(old, old_bytes);
+                if (bytes == 0) return;
+            }
+        }
+        const auto i = find(bytes);
+        if (i < dir.size() && dir[i].size == bytes) dir[i].stack.push_back(offset);
+        else dir.insert(dir.begin() + static_cast<std::ptrdiff_t>(i), Entry{bytes, {offset}});
+    }
+    std::uint32_t allocate(std::uint32_t bytes, std::size_t alignment) {
+        if (alignment <= 8 && dir_at != 0) {
+            auto i = find(bytes);
+            while (i < dir.size() && dir[i].stack.empty()) ++i;
+            if (i < dir.size()) {
+                const auto size = dir[i].size, offset = dir[i].stack.back();
+                dir[i].stack.pop_back();
+                if (size > bytes) { push(offset + bytes, size - bytes); ++splits; }
+                live[offset] = bytes;
+                ++reused;
+                return offset;
+            }
+        }
+        const auto a = std::max<std::uint64_t>(alignment, 8);
+        const auto end = used_end, start = (end + a - 1) & ~(a - 1);
+        used_end = start + bytes;
+        if (start != end) push(static_cast<std::uint32_t>(end), static_cast<std::uint32_t>(start - end));
+        live[static_cast<std::uint32_t>(start)] = bytes;
+        ++bumped;
+        return static_cast<std::uint32_t>(start);
+    }
+    void retire(std::uint32_t offset, std::uint32_t bytes) {
+        auto it = live.find(offset);
+        need(it != live.end() && it->second == bytes, "oracle retire of a block that is not live");
+        live.erase(it);
+        push(offset, bytes);
+    }
+    // Emission order: the directory's sizes ascending, each stack from its head.
+    std::vector<Hole> canonical() const {
+        std::vector<Hole> out;
+        for (const auto& e : dir)
+            for (auto it = e.stack.rbegin(); it != e.stack.rend(); ++it) out.push_back({*it, e.size});
+        return out;
+    }
+};
+#endif
+constexpr bool kInband = xo::XBufferCore::free_block_header_bytes != 0;
 
 std::vector<Hole> holes_of(const xo::XBufferCore& core) {
     std::vector<Hole> out;
@@ -126,11 +242,27 @@ struct Arena {
     Oracle oracle;
     Arena() : core(16u * 1024u * 1024u, xo::XBufferCore::maximum_capacity(32u * 1024u * 1024u)) {}
     fd::allocator_ref ref() { return {core.arena()}; }
+    std::uint32_t directory_at() const {
+#if XOFFSET_INBAND_ALLOCATOR
+        return oracle.dir_at;
+#else
+        return 0;
+#endif
+    }
+    // In-band: makes the free directory first (all of a 40-byte block), so
+    // that the next retired blocks stay whole free blocks.
+    void make_directory() {
+        if constexpr (kInband) {
+            retire(alloc(40), 40);
+            need(core.free_directory().bytes == 40 && core.free_block_count() == 0, "free directory fixture differs");
+        }
+    }
     std::uint32_t offset(const void* p) const {
         return static_cast<std::uint32_t>(static_cast<const char*>(p) - core.data());
     }
     void agree(const char* what) const {
-        need(core.free_block_count() == oracle.free.size() && core.free_block_bytes() == oracle.free_bytes(), what);
+        need(core.free_block_count() == oracle.free_count() && core.free_block_bytes() == oracle.free_bytes(), what);
+        need(core.free_directory().offset == directory_at(), what);
         need(core.arena()->used_end == oracle.used_end && core.free_table_complete(), what);
     }
     void* alloc(std::uint32_t n, std::size_t alignment = 1) {
@@ -155,6 +287,7 @@ struct Arena {
         std::vector<std::pair<std::uint64_t, std::uint64_t>> ranges;
         for (auto [o, b] : oracle.live) ranges.emplace_back(o, o + b);
         for (auto h : holes) ranges.emplace_back(h.offset, std::uint64_t(h.offset) + h.bytes);
+        if (const auto d = core.free_directory(); d.bytes != 0) ranges.emplace_back(d.offset, std::uint64_t(d.offset) + d.bytes);
         std::sort(ranges.begin(), ranges.end());
         std::uint64_t at = kHeader;
         for (auto [b, e] : ranges) {
@@ -168,7 +301,7 @@ struct Arena {
 void emit(const char* name, std::size_t n, const Oracle& o) {
     std::cout << "{\"case\":\"" << name << "\",\"n\":" << n << ",\"reused\":" << o.reused
               << ",\"tail_allocations\":" << o.bumped << ",\"splits\":" << o.splits
-              << ",\"free_blocks\":" << o.free.size() << ",\"used_end\":" << o.used_end << "}\n";
+              << ",\"free_blocks\":" << o.free_count() << ",\"used_end\":" << o.used_end << "}\n";
 }
 
 void mixed(std::size_t n, bool same_bucket_retire) {
@@ -200,9 +333,12 @@ void actual_M_prefix() {
     for (std::size_t i = 0; i < 4096; ++i) { (void)a.alloc(384); a.retire(payloads[i], 128); }
     a.check_tiling();
     const auto tail = a.core.arena()->used_end;
+    const auto dir_bumped = a.oracle.dir_bumped;
     for (std::size_t i = 0; i < 4096; ++i) { (void)a.alloc(32); a.retire(values[i], 16); }
-    // Every 32-byte request fits a retired block: no tail growth in stage 5.
-    need(a.core.arena()->used_end == tail, "fixed M stage-5 replay grew the tail despite free blocks");
+    // Every 32-byte request fits a retired block: no tail growth in stage 5
+    // (in-band, but for a free directory placed at the end).
+    need(a.core.arena()->used_end == tail + (a.oracle.dir_bumped - dir_bumped),
+         "fixed M stage-5 replay grew the tail despite free blocks");
     a.check_tiling();
     emit("fixed-M-stages2-through5-size-replay", 4096, a.oracle);
 }
@@ -243,9 +379,12 @@ void inline_and_general_paths_interleaved() {
         if (!live.empty() && (pick < 3 || live.size() > 600)) {
             const auto at = rng() % live.size(); const auto b = live[at];
             a.retire(b.p, b.n);
+            // Past its header (the allocator's), but for a free directory placed in it.
             const auto* bytes = static_cast<const unsigned char*>(b.p);
-            need(std::all_of(bytes, bytes + block_of(b.n), [](unsigned char c) { return c == 0; }),
-                 "retired block was not zeroed");
+            const auto d = a.core.free_directory();
+            const auto* d_at = reinterpret_cast<const unsigned char*>(a.core.data()) + d.offset;
+            for (std::uint32_t k = xo::XBufferCore::free_block_header_bytes; k < block_of(b.n); ++k)
+                need(bytes[k] == 0 || (bytes + k >= d_at && bytes + k < d_at + d.bytes), "retired block was not zeroed");
             live[at] = live.back(); live.pop_back();
         } else {
             const auto n = sizes[rng() % 15];
@@ -268,6 +407,7 @@ void inline_and_general_paths_interleaved() {
 // free block is split, never handed out whole, and the remainder is reused.
 void split_and_remainder_reuse() {
     Arena a;
+    a.make_directory();
     auto* p64 = a.alloc(64);
     (void)a.alloc(8); // barrier: p64 is not the tail
     a.retire(p64, 64);
@@ -288,12 +428,17 @@ void split_and_remainder_reuse() {
     auto* l12000 = a.alloc(12000); (void)a.alloc(8);
     a.retire(l12000, 12000); a.retire(l9000, 9000);
     need(a.alloc(5000) == l9000, "large reuse was not best fit");
-    need(a.alloc(4000) == static_cast<char*>(l9000) + 5000, "large split remainder (small bin) was not reused");
+    // (In-band, a full free directory moves to the end of the remainder.)
+    const auto d = a.core.free_directory();
+    const std::uint32_t rest = 4000 - (d.offset + d.bytes == a.offset(l9000) + 9000 ? d.bytes : 0);
+    need(a.alloc(rest) == static_cast<char*>(l9000) + 5000, "large split remainder (small bin) was not reused");
     a.check_tiling();
 }
 
 void tail_alignment_and_expansion() {
     Arena a;
+    a.make_directory();
+    if constexpr (kInband) (void)a.alloc(24); // the offsets below stay as without it, modulo 64
     auto* t = a.alloc(32);
     const auto end = a.core.arena()->used_end;
     a.retire(t, 32);
@@ -354,12 +499,15 @@ void lifecycle_move_swap_reload() {
     auto* grown = unverified.allocate_block(32, 8);
     need(static_cast<char*>(grown) - unverified.data() == static_cast<std::ptrdiff_t>(tail), "unverified reload reused unknown bytes");
 
-    // Loading the canonical hole table reproduces every later decision.
+    // Loading the canonical hole table reproduces every later decision (its
+    // wire holes: in-band, the free directory first).
     const auto holes = holes_of(destination);
+    std::vector<Hole> wire_holes;
+    destination.for_each_wire_hole([&](Hole h) { wire_holes.push_back(h); });
     xo::XBufferCore reloaded(wire.data(), wire.size(), cap);
-    reloaded.replace_free_blocks(holes);
+    reloaded.replace_free_blocks(wire_holes);
     need(reloaded.free_table_complete() && same_holes(holes_of(reloaded), holes), "reloaded table not canonical");
-    std::string t1(holes.size() * sizeof(Hole), '\0'), t2(holes.size() * sizeof(Hole), '\0');
+    std::string t1(wire_holes.size() * sizeof(Hole), '\0'), t2(wire_holes.size() * sizeof(Hole), '\0');
     destination.write_free_blocks(t1.data()); reloaded.write_free_blocks(t2.data());
     need(t1 == t2, "write-read-write hole table bytes differ");
     for (std::uint32_t n : {24u, 32u, 16u, 32u, 24u, 8u, 64u}) {
@@ -400,7 +548,7 @@ void prefetch_hint_changes_nothing() {
     xo::XBufferCore moved(std::move(a.core));
     a.core.prefetch_for_update();
     moved.prefetch_for_update();
-    need(moved.free_block_count() == a.oracle.free.size(), "prefetch_for_update after move changed the table");
+    need(moved.free_block_count() == a.oracle.free_count(), "prefetch_for_update after move changed the table");
 }
 
 void existing_owner_and_invalid_requests() {

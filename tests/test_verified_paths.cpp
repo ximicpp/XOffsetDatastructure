@@ -202,7 +202,8 @@ xo::XWireHeaderV2 header_of(const std::string& wire) {
 void hole_table_paths() {
     auto source=make();
     source.plain_root().name.reserve(64); // retires the 16-byte "verified paths" block
-    const auto holes=source.free_block_count();const auto hole_bytes=source.free_block_bytes();
+    // Wire holes: the free blocks (in-band, and the free directory).
+    const auto holes=source.wire_hole_count();const auto hole_bytes=source.free_block_bytes();
     need(holes!=0&&hole_bytes!=0,"hole fixture has no free block");
     std::string into;source.save_verified_into(into);
     const auto saved=source.save_verified();
@@ -214,7 +215,7 @@ void hole_table_paths() {
          into.size()==sizeof(h)+h.used_bytes-xo::XWIRE_PAYLOAD_BEGIN+holes*sizeof(xo::XBufferCore::WireHole),
          "dense V2.1 wire layout differs");
     auto loaded=xo::XBuffer::load_verified<PathsRoot>(into);check(loaded.root<PathsRoot>());
-    need(loaded.free_block_count()==holes&&loaded.free_block_bytes()==hole_bytes,"loaded free table differs");
+    need(loaded.wire_hole_count()==holes&&loaded.free_block_bytes()==hole_bytes,"loaded free table differs");
     // An 8 KiB hole and 16 KiB of slack: zero-run elision skips both, the
     // default (free-run) emission skips only the hole, dense emission skips
     // nothing.
@@ -226,7 +227,12 @@ void hole_table_paths() {
     const auto runs=large.save_verified();
     const auto dense_saved=large.save_verified(xo::XSaveOptions{.emission=xo::XWireEmission::dense});
     need(header_of(dense_saved).extent_count==0,"dense emission is not dense");
-    need(header_of(runs).extent_count==2&&runs.size()==dense_saved.size()-8192+16,"default emission did not skip the 8 KiB hole");
+    // The 8 KiB block (in-band, less a free directory at its end and its
+    // header, which is sent).
+    std::uint32_t freed=0;large.for_each_free_block([&](xo::XBufferCore::WireHole h){freed=std::max(freed,h.bytes);});
+    const std::uint32_t skipped=freed-xo::XBufferCore::free_block_header_bytes;
+    need(freed+large.free_directory().bytes>=8192&&header_of(runs).extent_count==2&&runs.size()==dense_saved.size()-skipped+16,
+         "default emission did not skip the 8 KiB hole");
     std::string runs_into;large.save_verified_into(runs_into);
     need(runs_into==runs,"save_verified_into differs from save_verified for the default emission");
     large.save_verified_into(runs_into);need(runs_into==runs,"reused output differs when free runs are skipped");
@@ -240,7 +246,9 @@ void hole_table_paths() {
     need(sh.extent_count!=0&&sparse.size()+8192<dense_saved.size(),"elided save did not skip its zero runs (sparse wire)");
     auto from_dense=xo::XBuffer::load_verified<PathsRoot>(dense_saved);check(from_dense.root<PathsRoot>());
     need(from_dense.root<PathsRoot>().blob.size()==8192,"dense reload differs");
-    // A lost retirement (host OOM in the free table) is recomputed before emission.
+    // A lost retirement (host OOM in the free table) is recomputed before
+    // emission. (The in-band allocator uses no host memory.)
+    if constexpr(xo::detail::inband_allocator) return;
     auto lost=make();
     // A size class whose bin is full: retiring it needs a host allocation.
     lost.plain_root().name=std::string(300,'q');

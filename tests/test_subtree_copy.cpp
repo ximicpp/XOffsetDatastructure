@@ -213,7 +213,8 @@ void hygiene(const T& value, const std::string& where, bool padding) {
 void holes_zero(Buffer& buf, const std::string& where) {
     auto* base = static_cast<const unsigned char*>(buf.get_address());
     buf.for_each_free_block([&](xo::XBufferCore::WireHole hole) {
-        if (!all_zero(base + hole.offset, hole.bytes)) fail(where + ": hole not zero");
+        constexpr std::uint32_t header = xo::XBufferCore::free_block_header_bytes; // the allocator's
+        if (!all_zero(base + hole.offset + header, hole.bytes - header)) fail(where + ": hole not zero");
     });
 }
 

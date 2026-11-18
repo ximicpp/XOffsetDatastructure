@@ -40,6 +40,8 @@ void intervals(XBufferCore& b, const std::array<Live,64>& live, allocator_model:
     });
     require(holes.size()==b.free_block_count() && total==b.free_block_bytes(),"free table count/bytes mismatch");
     require(total+b.get_size()-b.arena()->used_end==b.get_free_memory(),"Core free accounting mismatch");
+    // The in-band allocator's free directory: a hole of its own.
+    if(const auto d=b.free_directory(); d.bytes) ranges.push_back({d.offset,std::uint64_t(d.offset)+d.bytes,holes.size(),1});
     ordered.validate(ranges,b.arena()->used_end);
     allocator_model::require_exact_cover(ranges,b.arena()->used_end);
     // Every previously observed byte stays owned (live, free or header); a
@@ -67,6 +69,12 @@ void trace(std::uint64_t seed,std::size_t operations,bool automatic) {
         current_step=step;
         auto r=allocator_model::random(seed); journal.push_back(r); auto slot=(r>>8)%live.size(); auto& item=live[slot];
         const auto used_before=b.arena()->used_end;
+        // In-band, recording a free block can place the free directory at the
+        // end: used_end then grows by exactly that block, from `at`.
+        auto ends_at=[&](std::uint64_t at) {
+            const auto d=b.free_directory();
+            return b.arena()->used_end==at || (d.offset==at && b.arena()->used_end==at+d.bytes);
+        };
         try {
             if(!item.ptr) {
                 const auto bytes=std::uint32_t(1+(r%4==0?(r>>16)%8192:(r>>16)%256));
@@ -83,18 +91,18 @@ void trace(std::uint64_t seed,std::size_t operations,bool automatic) {
                 if(best) {
                     bool donor=false; for(auto h:holes) donor|=(h.offset==off && h.bytes==best);
                     require(donor,"allocation did not take the best-fit free block");
-                    require(b.arena()->used_end==used_before,"free-table reuse moved used_end");
+                    require(ends_at(used_before),"free-table reuse moved used_end");
                 } else {
                     // The ADDRESS is aligned (the payload base is only page aligned).
                     const auto step_align=std::max<std::uint64_t>(alignment,8);
                     const auto base=std::uint64_t(reinterpret_cast<std::uintptr_t>(b.data()));
                     const auto start=((base+used_before+step_align-1)&~(step_align-1))-base;
-                    require(off==start && b.arena()->used_end==start+need,"tail allocation not placed at used_end");
+                    require(off==start && ends_at(start+need),"tail allocation not placed at used_end");
                 }
                 item={p,bytes,static_cast<unsigned char>((slot+step)%251+1),alignment}; std::memset(p,item.value,bytes);
             } else if((r%5)<3) {
                 b.arena()->deallocate(item.ptr,item.bytes);
-                require(b.arena()->used_end==used_before,"retire returned bytes to used_end");
+                require(ends_at(used_before),"retire returned bytes to used_end");
                 item={};
             } else {
                 auto new_size=item.bytes+std::uint32_t(1+(r>>24)%2048);

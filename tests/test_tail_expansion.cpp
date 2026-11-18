@@ -174,23 +174,27 @@ void interleaved_and_nested_fallback() {
 // V1 kept a reused block's physical (header) size and grew into that slack.
 // V2 never hands out a block larger than requested: reuse splits the free
 // block at its front, the residual stays an exact free block, a non-tail block
-// cannot grow in place, and the allocator writes no metadata into the arena.
+// cannot grow in place, and a reused block holds none of the allocator's words.
 void split_reuse_keeps_exact_extents() {
     XBufferCore buffer(4096, XBufferCore::maximum_capacity(8192));
     auto* large = static_cast<unsigned char*>(buffer.arena()->allocate_aligned(256, 8));
     std::memset(large, 0x6d, 256);
     const auto used = buffer.arena()->used_end;
     buffer.arena()->deallocate(large, 256);
-    assert(buffer.free_block_count() == 1 && has_hole(buffer, large, 256));
+    // In-band, the first retired block's end holds the free directory: the
+    // free block is the rest (dir is 0 off).
+    const std::uint32_t dir = buffer.free_directory().bytes;
+    assert(dir == 0 || buffer.free_directory().offset == offset_of(buffer, large) + 256 - dir);
+    assert(buffer.free_block_count() == 1 && has_hole(buffer, large, 256 - dir));
     auto* reused = static_cast<unsigned char*>(buffer.arena()->allocate_aligned(32, 8));
     assert(reused == large && buffer.arena()->used_end == used);
-    assert(buffer.free_block_count() == 1 && has_hole(buffer, large + 32, 224));
+    assert(buffer.free_block_count() == 1 && has_hole(buffer, large + 32, 224 - dir));
     reject_without_change(buffer, [&] { return buffer.arena()->try_expand(reused, 32, 96); });
-    auto* rest = static_cast<unsigned char*>(buffer.arena()->allocate_aligned(224, 8));
+    auto* rest = static_cast<unsigned char*>(buffer.arena()->allocate_aligned(224 - dir, 8));
     assert(rest == large + 32 && buffer.free_block_count() == 0 && buffer.arena()->used_end == used);
-    // Retire cleared the block (M3) and reuse wrote nothing into it: there are
-    // no in-arena free-list headers.
-    for (std::size_t i = 0; i < 256; ++i) assert(large[i] == 0);
+    // Retire cleared the block (M3) and reuse left nothing in it: no free
+    // block header (in-band, a reused block's link word is cleared).
+    for (std::size_t i = 0; i < 256 - dir; ++i) assert(large[i] == 0);
 
     auto* tail = static_cast<unsigned char*>(buffer.arena()->allocate_aligned(64, 8));
     assert(offset_of(buffer, tail) == used);
@@ -222,14 +226,16 @@ void cached_reuse_and_reload() {
     assert(offset_of(buffer, donor) + 256 == used);
     std::destroy_at(&root.other);
     std::construct_at(&root.other, binding);
-    assert(buffer.free_block_count() == 1 && has_hole(buffer, donor, 256));
+    // In-band, the end of the donor block holds the free directory.
+    const std::uint32_t dir = buffer.free_directory().bytes;
+    assert(buffer.free_block_count() == 1 && has_hole(buffer, donor, 256 - dir));
     root.values.reserve(4);
-    assert(root.values.data() == donor && has_hole(buffer, at(donor, 16), 240));
+    assert(root.values.data() == donor && has_hole(buffer, at(donor, 16), 240 - dir));
     root.values.push_back(89);
     root.values.reserve(32);
     assert(root.values[0] == 89 && root.values.data() == reinterpret_cast<const std::int32_t*>(at(donor, 16)));
     assert(buffer.arena()->used_end == used);
-    assert(has_hole(buffer, donor, 16) && has_hole(buffer, at(donor, 16 + 128), 112));
+    assert(has_hole(buffer, donor, 16) && has_hole(buffer, at(donor, 16 + 128), 112 - dir));
     root.values.reserve(96);
     assert(root.values[0] == 89 && offset_of(buffer, root.values.data()) == used);
     check_allocator_end(buffer, root.values.data(), 384);

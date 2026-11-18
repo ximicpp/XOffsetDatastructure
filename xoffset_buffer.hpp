@@ -558,7 +558,7 @@ namespace XOffsetDatastructure {
                 std::max<std::uint64_t>(this->arena()->used_end, sizeof(arena_header)), this->get_size());
             return detail::make_wire_header<T>(used,
                 reinterpret_cast<std::uintptr_t>(&root) - reinterpret_cast<std::uintptr_t>(this->get_address()),
-                this->free_block_count());
+                this->wire_hole_count());
         }
 
         template <typename T>
@@ -1069,7 +1069,8 @@ namespace XOffsetDatastructure {
             if ((low_bits & 7u) != 0 || reach >= used - XWIRE_PAYLOAD_BEGIN) [[unlikely]] {
                 XOFFSET_VFAIL(XException, XErrc::invalid_payload, std::string(who) + ": hole out of range");
             }
-            XOFFSET_VTRY(this->load_free_blocks(holes, hole_count));
+            if constexpr (detail::inband_allocator) XOFFSET_VTRY(this->inband_adopt(holes, hole_count, false));
+            else XOFFSET_VTRY(this->load_free_blocks(holes, hole_count));
             typed_root_access_allowed_ = true;
             bind_schema<T>();
             this->cache_root(root_ptr);

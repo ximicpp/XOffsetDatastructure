@@ -74,7 +74,7 @@ namespace detail {
         const auto* base = static_cast<const char*>(source.get_address());
         return make_wire_header<T>(source.arena()->used_end,
             reinterpret_cast<std::uintptr_t>(root) - reinterpret_cast<std::uintptr_t>(base),
-            source.free_block_count());
+            source.wire_hole_count());
     }
 
     // The output must not alias the source's storage (or hold it).
@@ -120,7 +120,7 @@ namespace detail {
         T* const root = source.template cached_root<T>();
         if (!arena || !root || !owns_record(source) || !source.free_table_complete()) return false;
         const std::uint64_t used = arena->used_end;
-        const std::size_t holes = source.free_block_count();
+        const std::size_t holes = source.wire_hole_count();
         const std::size_t final_size = sizeof(XWireHeaderV2) + std::size_t(used - XWIRE_PAYLOAD_BEGIN) +
                                        holes * sizeof(XBufferCore::WireHole);
         if (used < XWIRE_PAYLOAD_BEGIN || used >= wire_zero_scan_min_payload || used > source.get_size() ||
@@ -180,7 +180,7 @@ namespace detail {
             arena->used_end >= XWIRE_PAYLOAD_BEGIN &&
             (emission != XWireEmission::free_runs || source.free_block_bytes() < wire_free_run_min_gap) &&
             sizeof(XWireHeaderV2) + std::uint64_t(arena->used_end - XWIRE_PAYLOAD_BEGIN) +
-                std::uint64_t(source.free_block_count()) * sizeof(XBufferCore::WireHole) <= out.capacity()) [[likely]] {
+                std::uint64_t(source.wire_hole_count()) * sizeof(XBufferCore::WireHole) <= out.capacity()) [[likely]] {
             check_alias(source);
             const auto final_header = header_inline<T>(source);
             const auto final_size = wire_dense_size(final_header, "save_verified_into");
@@ -223,12 +223,12 @@ namespace detail {
         const auto* arena = current->arena();
         if (arena && current->free_table_complete() && arena->used_end >= XWIRE_PAYLOAD_BEGIN &&
             sizeof(XWireHeaderV2) + std::uint64_t(arena->used_end - XWIRE_PAYLOAD_BEGIN) +
-                std::uint64_t(current->free_block_count()) * sizeof(XBufferCore::WireHole) <= out.capacity()) {
+                std::uint64_t(current->wire_hole_count()) * sizeof(XBufferCore::WireHole) <= out.capacity()) {
             gaps = gaps_of(*current, arena->used_end);
             current = &owner(token);
             check_alias(*current);
             const auto used = current->arena() ? current->arena()->used_end : 0;
-            const auto holes = current->free_block_count();
+            const auto holes = current->wire_hole_count();
             const auto hole_bytes = current->free_block_bytes();
             final_header = header<T>(*current);
             if (final_header.used_bytes != used || final_header.hole_count != holes ||

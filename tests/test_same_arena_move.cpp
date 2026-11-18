@@ -410,13 +410,19 @@ void retire_metadata_failure() {
     require(buffer.free_table_complete(), "fixture free table already incomplete");
     { new_failure::Arm arm(0); r.a = std::move(r.b); }
     retire_new_attempts += new_failure::attempts; retire_new_hits += new_failure::hits;
-    require(new_failure::hits == 1, "fresh large-retirement host allocation failpoint not reached");
+    // The in-band allocator records the block in the payload: no host allocation.
+    require(new_failure::hits == (detail::inband_allocator ? 0u : 1u),
+            "fresh large-retirement host allocation failpoint not reached");
     require(r.a.data() == source && r.a.size() == 2 && r.a[0] == 500 && r.a[1] == 501,
         "retirement metadata OOM broke ownership commit");
-    require(!buffer.free_table_complete(), "lost retirement was not recorded as an incomplete free table");
+    require(buffer.free_table_complete() == detail::inband_allocator,
+            "lost retirement was not recorded as an incomplete free table");
     require_empty_reusable_binding(r.b, sb); r.b.push_back(999);
     verified_roundtrip(buffer);
-    require(buffer.free_table_complete() && buffer.free_block_bytes() >= 400000,
+    // (In-band nothing was lost: the freed block's end holds the free directory
+    // and r.b's new 32-byte block is its front.)
+    require(buffer.free_table_complete() &&
+            buffer.free_block_bytes() + buffer.free_directory().bytes >= 400000 - (detail::inband_allocator ? 32 : 0),
         "save_verified did not recompute the lost hole");
     // The fresh owner has no earlier core-retired block. This observes an actual
     // hook exception, not an allocation callsite inferred from its request size.
