@@ -5,6 +5,13 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- Shorter small-block allocation and retirement, same placement: an empty vector's first block (from
+  `assign_range`, `reserve` or a first `push_back`) is taken in one call that runs the exact-bin hit or
+  the tail bump inline; a retired block entering a bin with room calls nothing; the tail bump and the
+  retired block's range are one compare each (`used_end` stays within the payload on every load, reset
+  and delta); and a block's offset from its head is stored without the 32-bit reach check (a payload is
+  under 2 GiB). Adding an equipment record with an 8-float array and removing it: 302 -> 220
+  instructions; filling the CppCon 2024 character without its map: 1,992 -> 1,481.
 - Small deltas take a shorter path on both ends; the bytes on the wire are unchanged. A sender with an
   `XDeltaRecord::touches` baseline whose touch log lists at most 8 blocks, with the same hole table,
   used size and root and no digest, writes the touched bytes in one pass; an admitting receiver
