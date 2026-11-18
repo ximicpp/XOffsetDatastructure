@@ -2439,65 +2439,15 @@ namespace XOffsetDatastructure {
             }
         };
 
-        // Host-only identity. A record follows one payload reservation, never a
-        // particular Core object's address, and is never revived after release.
-        // A record is just the identity lease that host-callback revalidation
-        // reads. The canonical fields and the index have no producer left.
-        inline static std::atomic<std::size_t> canonical_active_count_{0};
+        // Host-only identity: the lease that host-callback revalidation reads.
+        // A record follows one payload reservation, never a particular Core
+        // object's address, and is never revived after release.
         struct OwnerRecord {
             const void* const payload;
             std::atomic<XBufferCore*> owner;
-            std::byte* const canonical_origin;
-            const std::size_t canonical_extent;
-            std::atomic<bool> canonical_registered{false};
-            // Written before the record is published, then read only by its owner.
-            bool indexed = false;
-            OwnerRecord(const void* base, XBufferCore* value,
-                    std::byte* origin = nullptr, std::size_t extent = 0) noexcept
-                : payload(base), owner(value), canonical_origin(origin), canonical_extent(extent) {}
+            OwnerRecord(const void* base, XBufferCore* value) noexcept : payload(base), owner(value) {}
         };
-        // Both functions run under the existing registry mutex. No callbacks,
-        // allocations or throws may separate the flag and ledger update.
-        static void mark_canonical_registration(OwnerRecord& record) noexcept {
-            if (record.canonical_origin && !record.canonical_registered.exchange(true, std::memory_order_relaxed))
-                canonical_active_count_.fetch_add(1, std::memory_order_release);
-        }
-        static void retire_canonical_registration(OwnerRecord& record) noexcept {
-            if (record.canonical_registered.exchange(false, std::memory_order_relaxed))
-                canonical_active_count_.fetch_sub(1, std::memory_order_acq_rel);
-        }
         using OwnerRecordPtr = std::shared_ptr<OwnerRecord>;
-        struct NumericPayloadLess {
-            using is_transparent = void;
-            bool operator()(const void* a, const void* b) const noexcept {
-                return reinterpret_cast<std::uintptr_t>(a) < reinterpret_cast<std::uintptr_t>(b);
-            }
-            bool operator()(const void* a, std::uintptr_t b) const noexcept {
-                return reinterpret_cast<std::uintptr_t>(a) < b;
-            }
-            bool operator()(std::uintptr_t a, const void* b) const noexcept {
-                return a < reinterpret_cast<std::uintptr_t>(b);
-            }
-        };
-        using RegistryOwners = std::map<const void*, OwnerRecordPtr, NumericPayloadLess>;
-
-        struct RegistryState {
-            std::mutex mutex;
-            RegistryOwners owners;
-        };
-
-        static RegistryState& registry_state() {
-            // Globals may first register in main and unregister after ordinary
-            // function statics have been destroyed. The index and mutex share
-            // process lifetime; its nodes are erased as owners are destroyed.
-            // Fork policy: no atfork handlers (VmStoragePool follows the same
-            // policy). A child forked while another thread was inside the
-            // library may only exec; forking while no other thread is inside
-            // the library is supported.
-            alignas(RegistryState) static std::byte storage[sizeof(RegistryState)];
-            static auto* state = ::new (static_cast<void*>(storage)) RegistryState;
-            return *state;
-        }
 
         template <typename T>
         static const void* type_identity() noexcept {
@@ -2821,23 +2771,11 @@ namespace XOffsetDatastructure {
             auto record = std::move(owner_record_);
             if (!record) return;
             record->owner.store(nullptr, std::memory_order_release);
-            // An ordinary record never entered the index: no mutex, no node.
-            if (!record->indexed) return;
-            RegistryOwners::node_type retired_node;
-            {
-                auto& state = registry_state();
-                std::lock_guard lock(state.mutex);
-                retire_canonical_registration(*record);
-                const auto found = state.owners.find(record->payload);
-                if (found != state.owners.end() && found->second == record)
-                    retired_node = state.owners.extract(found);
-            }
             // A cache may retain the inert record, never its released mapping.
-            // The node/control block destructor and operator delete are unlocked.
         }
 
         // Owners from init_fresh / init_from_storage, and replace_storage,
-        // which moves only movable slots. A record is never indexed.
+        // which moves only movable slots.
         struct PreparedOwner {
             OwnerRecordPtr record;
         };
@@ -2965,16 +2903,8 @@ namespace XOffsetDatastructure {
             return arena()->root_offset;
         }
 
-        char* payload_byte_address(size_type offset) noexcept {
-            if (auto* bytes = buffer_.canonical_byte_origin())
-                return reinterpret_cast<char*>(bytes + offset);
-            return buffer_.data() + offset;
-        }
-        const char* payload_byte_address(size_type offset) const noexcept {
-            if (auto* bytes = buffer_.canonical_byte_origin())
-                return reinterpret_cast<const char*>(bytes + offset);
-            return buffer_.data() + offset;
-        }
+        char* payload_byte_address(size_type offset) noexcept { return buffer_.data() + offset; }
+        const char* payload_byte_address(size_type offset) const noexcept { return buffer_.data() + offset; }
 
         template <typename T>
         T* object_at_offset(std::uint64_t offset) noexcept {
@@ -3574,7 +3504,7 @@ namespace XOffsetDatastructure {
         const void* root_type_identity_ = nullptr;
         // Three small members in one 8-byte word, so that a move or a swap
         // carries all of them with one load and one store per side (what the
-        // policy byte alone took). It sits before ctl_, whose line a reset
+        // policy byte alone took). It starts the line of ctl_, which a reset
         // and a reload read anyway. No padding bytes: the word is copied as
         // one integer (take_packed, swap).
         struct Packed {
@@ -3588,7 +3518,7 @@ namespace XOffsetDatastructure {
             std::uint32_t reset_dirty_end = 0;
         };
         static_assert(sizeof(Packed) == sizeof(std::uint64_t) && std::has_unique_object_representations_v<Packed>);
-        Packed packed_;
+        alignas(64) Packed packed_;
         // The lineage's control block, and blocks retired inside a pin scope
         // (payload offset << 32 | bytes).
         detail::XCtl* ctl_ = nullptr;
