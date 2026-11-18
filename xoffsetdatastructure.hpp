@@ -2409,14 +2409,7 @@ namespace XOffsetDatastructure {
                 forget_reset_dirt();
                 return detail::vok();
             }));
-            auto* sm = arena();
-            std::memcpy(sm->magic, payload_magic_, sizeof(payload_magic_));
-            sm->header_size = static_cast<std::uint32_t>(sizeof(arena_header));
-            sm->flags = 0;
-            sm->root_offset = 0;
-            sm->used_end = min_payload_size();
-            sm->reserved0 = 0;
-            sm->reserved1 = 0;
+            write_empty_header();
             publish_host_owner();
             return register_registry();
         }
@@ -2497,15 +2490,7 @@ namespace XOffsetDatastructure {
                 return detail::vok();
             }));
             typed_root_access_allowed_ = false;
-            auto* sm = arena();
-            if (std::memcmp(sm->magic, payload_magic_, sizeof(payload_magic_)) != 0 ||
-                sm->header_size != sizeof(arena_header)) {
-                XOFFSET_VFAIL(XException, XErrc::invalid_payload_header, "XBufferCore: payload header mismatch");
-            }
-            if (sm->used_end < min_payload_size() || sm->used_end > buffer_.size()) {
-                XOFFSET_VFAIL(XException, XErrc::invalid_payload_header, "XBufferCore: payload used_end out of range");
-            }
-            zero_past_used_end();
+            XOFFSET_VTRY(check_reinit_payload());
             publish_host_owner();
             return register_registry();
         }
@@ -3527,7 +3512,8 @@ namespace XOffsetDatastructure {
         template <typename T> consteval bool can_relocate_without_allocation();
         template <typename T> void relocate_construct(T* dst, T& src) noexcept;
 
-        // Flat resolution for every storage kind: origin + delta.
+        // Flat resolution for every storage kind: origin + delta (T may be
+        // const).
         template <typename T>
         T* resolve_rel32(const std::int32_t* origin, std::int32_t delta) noexcept {
             if (delta == 0) return nullptr;
@@ -3563,13 +3549,6 @@ namespace XOffsetDatastructure {
                 dst[count >> 1] = middle;
                 dst[count - 1] = last;
             }
-        }
-
-        template <typename T>
-        const T* resolve_rel32_const(const std::int32_t* origin, std::int32_t delta) noexcept {
-            if (delta == 0) return nullptr;
-            auto* base = reinterpret_cast<const char*>(origin);
-            return std::launder(reinterpret_cast<const T*>(base + delta));
         }
 
         [[noreturn]] XOFFSET_DETAIL_COLD inline void throw_rel32_range() {
@@ -4330,7 +4309,7 @@ namespace XOffsetDatastructure {
 
         const char* data() const noexcept {
             if (is_inline()) return inline_bytes();
-            return fixed_detail::resolve_rel32_const<char>(&data_delta, data_delta);
+            return fixed_detail::resolve_rel32<const char>(&data_delta, data_delta);
         }
 
         std::uint32_t size() const noexcept { return is_inline() ? inline_size() : size_; }
@@ -4340,7 +4319,7 @@ namespace XOffsetDatastructure {
         std::string_view view() const noexcept {
             if (is_inline()) return std::string_view(inline_bytes(), inline_size());
             return data_delta ? std::string_view(
-                fixed_detail::resolve_rel32_const<char>(&data_delta, data_delta), size_)
+                fixed_detail::resolve_rel32<const char>(&data_delta, data_delta), size_)
                               : std::string_view{};
         }
 
@@ -4936,7 +4915,7 @@ namespace XOffsetDatastructure {
         }
 
         const T* data() const noexcept {
-            return fixed_detail::resolve_rel32_const<T>(&data_delta, data_delta);
+            return fixed_detail::resolve_rel32<const T>(&data_delta, data_delta);
         }
 
     private:

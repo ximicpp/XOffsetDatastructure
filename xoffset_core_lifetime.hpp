@@ -545,7 +545,7 @@ void subtree_measure_value(const T& value, SubtreeExtent& extent) noexcept {
     if constexpr (is_fixed_string_v<T>) {
         const XFixedString& head = value;
         if ((head.capacity_ & XFixedString::inline_flag) != 0 || head.capacity_ == 0) return;
-        const auto* data = fixed_detail::resolve_rel32_const<char>(&head.data_delta, head.data_delta);
+        const auto* data = fixed_detail::resolve_rel32<const char>(&head.data_delta, head.data_delta);
         if (!data) return;
         extent.add(data, fixed_detail::block_bytes_of(head.capacity_ + 1u));
         if (head.size_ > XFixedString::inline_max) extent.exact += fixed_detail::block_bytes_of(head.size_ + 1u);
