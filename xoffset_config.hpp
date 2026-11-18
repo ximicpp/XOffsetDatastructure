@@ -287,3 +287,14 @@
 #    define XOFFSET_THREAD_CACHES 1
 #  endif
 #endif
+
+// The switches as constants: code tests them with if constexpr, so each
+// switch has one #if (its definition above).
+namespace XOffsetDatastructure::detail {
+inline constexpr bool scrub_popped = XOFFSET_SCRUB_POPPED != 0;
+inline constexpr bool scrub_erased = XOFFSET_SCRUB_ERASED != 0;
+inline constexpr bool scrub_reset = XOFFSET_SCRUB_RESET != 0;
+inline constexpr bool pin_quarantine = XOFFSET_PIN_QUARANTINE != 0;
+inline constexpr bool save_self_check = XOFFSET_SAVE_SELF_CHECK != 0;
+inline constexpr bool check_sorted = XOFFSET_CHECK_SORTED != 0;
+} // namespace XOffsetDatastructure::detail

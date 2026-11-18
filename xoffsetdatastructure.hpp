@@ -1177,11 +1177,10 @@ namespace XOffsetDatastructure {
             // reference the container's own rules invalidated reads garbage).
             if (packed_.growth_policy == XGrowPolicy::Relocating) stress_poison_block(ptr, bytes);
 #endif
-#if XOFFSET_PIN_QUARANTINE
             // Inside a pin scope a retired block is not reused until the
             // scope closes: plain references into it stay harmless.
-            if (packed_.pinned) [[unlikely]] return quarantine_block(ptr, bytes);
-#endif
+            if constexpr (detail::pin_quarantine)
+                if (packed_.pinned) [[unlikely]] return quarantine_block(ptr, bytes);
             // One compare is the block's range test: a ptr below the base
             // gives an offset that wraps past size() unless the block would
             // cross the payload's start, which no block of any payload does
@@ -3191,16 +3190,16 @@ namespace XOffsetDatastructure {
 
         XOFFSET_DETAIL_INLINE void clear_used_payload() noexcept {
             const auto used = used_end_clamped();
-#if XOFFSET_SCRUB_RESET
-            std::memset(buffer_.data() + min_payload_size(), 0, used - min_payload_size());
-#else
-            if (used > packed_.reset_dirty_end) packed_.reset_dirty_end = static_cast<std::uint32_t>(used);
-#  if defined(XOFFSET_STRESS_RELOCATE)
-            // Stress mode: nothing may count on a block from the tail being
-            // zero, so what the reset leaves is made unmistakable.
-            std::memset(buffer_.data() + min_payload_size(), detail::stress_poison_byte, used - min_payload_size());
-#  endif
+            if constexpr (detail::scrub_reset) {
+                std::memset(buffer_.data() + min_payload_size(), 0, used - min_payload_size());
+            } else {
+                if (used > packed_.reset_dirty_end) packed_.reset_dirty_end = static_cast<std::uint32_t>(used);
+#if defined(XOFFSET_STRESS_RELOCATE)
+                // Stress mode: nothing may count on a block from the tail being
+                // zero, so what the reset leaves is made unmistakable.
+                std::memset(buffer_.data() + min_payload_size(), detail::stress_poison_byte, used - min_payload_size());
 #endif
+            }
             write_empty_header();
         }
 
@@ -3208,18 +3207,13 @@ namespace XOffsetDatastructure {
         // or the end of what a reset without XOFFSET_SCRUB_RESET left behind.
         size_type tail_clean_from() const noexcept {
             const auto used = static_cast<size_type>(arena()->used_end);
-#if XOFFSET_SCRUB_RESET
-            return used;
-#else
-            return used > packed_.reset_dirty_end ? used : size_type(packed_.reset_dirty_end);
-#endif
+            if constexpr (detail::scrub_reset) return used;
+            else return used > packed_.reset_dirty_end ? used : size_type(packed_.reset_dirty_end);
         }
         // The storage was replaced, or everything a reset left lies past the
         // logical length (the storage's zero_from covers it from there).
         void forget_reset_dirt() noexcept {
-#if !XOFFSET_SCRUB_RESET
-            packed_.reset_dirty_end = 0;
-#endif
+            if constexpr (!detail::scrub_reset) packed_.reset_dirty_end = 0;
         }
 
         void write_empty_header() noexcept {
@@ -3858,8 +3852,13 @@ namespace XOffsetDatastructure {
         }
 #define XOFFSET_SOFT_PREFLIGHT(head, bytes, ...) \
     do { if (!::XOffsetDatastructure::fixed_detail::soft_preflight((head), (bytes))) return __VA_ARGS__; } while (0)
+// The preflight only when `cond` holds (a full container). Without
+// exceptions only: with them the condition is not evaluated.
+#define XOFFSET_SOFT_PREFLIGHT_IF(cond, head, bytes, ...) \
+    do { if (cond) XOFFSET_SOFT_PREFLIGHT(head, bytes, __VA_ARGS__); } while (0)
 #else
 #define XOFFSET_SOFT_PREFLIGHT(head, bytes, ...) ((void)0)
+#define XOFFSET_SOFT_PREFLIGHT_IF(cond, head, bytes, ...) ((void)0)
 #endif
 
         template <typename T>
@@ -4357,13 +4356,13 @@ namespace XOffsetDatastructure {
                 store_inline(nullptr, 0);
                 return;
             }
-#if XOFFSET_SCRUB_ERASED
-            // M4: old characters never stay behind as spare capacity.
-            if (auto* ptr = data()) std::memset(ptr, 0, std::size_t(size_) + 1u);
-#else
-            // Only the terminator; the old characters stay in the block.
-            if (auto* ptr = data()) ptr[0] = '\0';
-#endif
+            if constexpr (detail::scrub_erased) {
+                // M4: old characters never stay behind as spare capacity.
+                if (auto* ptr = data()) std::memset(ptr, 0, std::size_t(size_) + 1u);
+            } else {
+                // Only the terminator; the old characters stay in the block.
+                if (auto* ptr = data()) ptr[0] = '\0';
+            }
             size_ = 0;
         }
 
@@ -4416,15 +4415,12 @@ namespace XOffsetDatastructure {
                     // implied. rhs may alias the block (memmove).
                     auto* const chars = fixed_detail::resolve_rel32_live<char>(&data_delta, data_delta);
                     const auto new_size = static_cast<std::uint32_t>(rhs.size());
-                    const auto old_size = size_;
+                    [[maybe_unused]] const auto old_size = size_;
                     std::memmove(chars, rhs.data(), new_size);
                     chars[new_size] = '\0';
-#if XOFFSET_SCRUB_ERASED
                     // M4: zero the old characters after the terminator.
-                    if (old_size > new_size) std::memset(chars + new_size + 1, 0, old_size - new_size);
-#else
-                    (void)old_size;
-#endif
+                    if constexpr (detail::scrub_erased)
+                        if (old_size > new_size) std::memset(chars + new_size + 1, 0, old_size - new_size);
                     size_ = new_size;
                     return;
                 }
@@ -4465,15 +4461,14 @@ namespace XOffsetDatastructure {
             }
             auto* old_data = data();
             if (new_size <= capacity_) {
-                const auto old_size = size_;
+                [[maybe_unused]] const auto old_size = size_;
                 std::memmove(old_data, rhs.data(), rhs.size());
-#if XOFFSET_SCRUB_ERASED
-                // M4: zero the terminator and any old characters after it.
-                std::memset(old_data + new_size, 0, std::size_t(old_size > new_size ? old_size - new_size : 0) + 1u);
-#else
-                old_data[new_size] = '\0';
-                (void)old_size;
-#endif
+                if constexpr (detail::scrub_erased) {
+                    // M4: zero the terminator and any old characters after it.
+                    std::memset(old_data + new_size, 0, std::size_t(old_size > new_size ? old_size - new_size : 0) + 1u);
+                } else {
+                    old_data[new_size] = '\0';
+                }
                 size_ = new_size;
                 return;
             }
@@ -4805,15 +4800,12 @@ namespace XOffsetDatastructure {
                 if (this != &other && count != 0 && count <= capacity_ &&
                     detail::subtree_copy_enabled()) [[likely]] {
                     T* items = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta);
-                    const size_type old_size = size_;
+                    [[maybe_unused]] const size_type old_size = size_;
                     std::memmove(static_cast<void*>(items), other.data(), std::size_t(count) * sizeof(T));
                     size_ = count;
-#if XOFFSET_SCRUB_ERASED
-                    if (old_size > count)
-                        std::memset(static_cast<void*>(items + count), 0, std::size_t(old_size - count) * sizeof(T));
-#else
-                    (void)old_size;
-#endif
+                    if constexpr (detail::scrub_erased)
+                        if (old_size > count)
+                            std::memset(static_cast<void*>(items + count), 0, std::size_t(old_size - count) * sizeof(T));
                     for (size_type i = 0; i < count; ++i) detail::scrub_implicit_padding(items + i);
                     XOFFSET_DETAIL_SUBTREE_COUNT(pod_hits, 1);
                     return *this;
@@ -5298,9 +5290,7 @@ namespace XOffsetDatastructure {
             T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + last;
             fixed_detail::destroy_n(slot, 1);
             size_ = last;
-#if XOFFSET_SCRUB_POPPED
-            std::memset(static_cast<void*>(slot), 0, sizeof(T));
-#endif
+            if constexpr (detail::scrub_popped) std::memset(static_cast<void*>(slot), 0, sizeof(T));
         }
 
         T& emplace_back() {
@@ -5317,10 +5307,7 @@ namespace XOffsetDatastructure {
             XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::grow_bytes<T>(capacity_), fixed_detail::soft_sink<T>());
             return emplace_back_general();
 #else
-#if XOFFSET_NO_EXCEPTIONS
-            if (size_ >= capacity_)
-                XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::grow_bytes<T>(capacity_), fixed_detail::soft_sink<T>());
-#endif
+            XOFFSET_SOFT_PREFLIGHT_IF(size_ >= capacity_, this, fixed_detail::grow_bytes<T>(capacity_), fixed_detail::soft_sink<T>());
             return *append_construct([&](T* dst) {
                 fixed_detail::default_construct(dst, default_binding());
             });
@@ -5330,12 +5317,9 @@ namespace XOffsetDatastructure {
         template <typename... Args>
             requires (sizeof...(Args) > 0)
         T& emplace_back(Args&&... args) {
-#if XOFFSET_NO_EXCEPTIONS
-            if (size_ >= capacity_)
-                XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::grow_bytes<T>(capacity_) +
-                                             (std::size_t(0) + ... + fixed_detail::deep_bytes(args)),
-                                       fixed_detail::soft_sink<T>());
-#endif
+            XOFFSET_SOFT_PREFLIGHT_IF(size_ >= capacity_, this, fixed_detail::grow_bytes<T>(capacity_) +
+                                      (std::size_t(0) + ... + fixed_detail::deep_bytes(args)),
+                                      fixed_detail::soft_sink<T>());
             if constexpr (std::is_trivially_copyable_v<T>) {
                 // The append fast path at the caller; a full vector stages
                 // the element (Staged), so no reference to args leaves this
@@ -5735,9 +5719,7 @@ namespace XOffsetDatastructure {
                 // With XOFFSET_SCRUB_ERASED, erase zeroes the slot when
                 // pop_back does not.
                 pop_back();
-#if !XOFFSET_SCRUB_POPPED
-                scrub(size_, size_ + 1);
-#endif
+                if constexpr (!detail::scrub_popped) scrub(size_, size_ + 1);
                 return;
             }
             if constexpr (std::is_trivially_copyable_v<T>) {
@@ -5748,9 +5730,7 @@ namespace XOffsetDatastructure {
                 T* const items = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta);
                 std::memmove(items + index, items + index + 1, std::size_t(n - index - 1) * sizeof(T));
                 size_ = n - 1u;
-#if XOFFSET_SCRUB_ERASED
-                std::memset(static_cast<void*>(items + (n - 1u)), 0, sizeof(T));
-#endif
+                if constexpr (detail::scrub_erased) std::memset(static_cast<void*>(items + (n - 1u)), 0, sizeof(T));
             } else if constexpr (detail::shift_relocate_supported<T>()) {
                 // Ordinary records: same bytes and deltas as the loop below, in one
                 // memmove plus an inline-head restart of the moved run.
@@ -5995,11 +5975,11 @@ namespace XOffsetDatastructure {
         // constructs over them.
         XOFFSET_DETAIL_INLINE void scrub([[maybe_unused]] size_type from,
                                               [[maybe_unused]] size_type to) noexcept {
-#if XOFFSET_SCRUB_ERASED
-            if (to <= from) return;
-            if (auto* items = data())
-                std::memset(static_cast<void*>(items + from), 0, std::size_t(to - from) * sizeof(T));
-#endif
+            if constexpr (detail::scrub_erased) {
+                if (to <= from) return;
+                if (auto* items = data())
+                    std::memset(static_cast<void*>(items + from), 0, std::size_t(to - from) * sizeof(T));
+            }
         }
 
         void copy_from(const XFixedVector& other) {
@@ -6121,10 +6101,9 @@ namespace XOffsetDatastructure {
                 const auto count = static_cast<std::size_t>(last - first);
                 assign_sorted(std::span<const T>(count ? std::to_address(first) : nullptr, count));
             } else {
-#if XOFFSET_CHECK_SORTED
-                if (!fixed_detail::strictly_ascending(first, last, [](const auto& v) -> const auto& { return v; }))
-                    XOFFSET_THROW(XException(XErrc::invalid_argument, "assign_sorted: input not strictly ascending"));
-#endif
+                if constexpr (detail::check_sorted)
+                    if (!fixed_detail::strictly_ascending(first, last, [](const auto& v) -> const auto& { return v; }))
+                        XOFFSET_THROW(XException(XErrc::invalid_argument, "assign_sorted: input not strictly ascending"));
                 const auto count = static_cast<std::size_t>(std::ranges::distance(first, last));
                 const auto alloc = Base::element_binding();
                 Base::fill_construct(first, last, count, [&](T* dst, auto&& value) {
@@ -6141,19 +6120,15 @@ namespace XOffsetDatastructure {
 
         void assign_sorted(std::span<const T> values)
             requires (std::is_trivially_copyable_v<T> && !std::is_const_v<T> && !std::is_volatile_v<T>) {
-#if XOFFSET_CHECK_SORTED
-            if (!fixed_detail::strictly_ascending(values.begin(), values.end(), [](const T& v) -> const T& { return v; }))
-                XOFFSET_THROW(XException(XErrc::invalid_argument, "assign_sorted: input not strictly ascending"));
-#endif
+            if constexpr (detail::check_sorted)
+                if (!fixed_detail::strictly_ascending(values.begin(), values.end(), [](const T& v) -> const T& { return v; }))
+                    XOFFSET_THROW(XException(XErrc::invalid_argument, "assign_sorted: input not strictly ascending"));
             Base::assign_range(values);
         }
 
         XOFFSET_DETAIL_INLINE std::pair<iterator, bool> insert(const T& value) {
-#if XOFFSET_NO_EXCEPTIONS
-            if (Base::size_ >= Base::capacity_)
-                XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::grow_bytes<T>(Base::capacity_) + fixed_detail::deep_bytes(value),
-                                       std::pair<iterator, bool>{Base::end(), false});
-#endif
+            XOFFSET_SOFT_PREFLIGHT_IF(Base::size_ >= Base::capacity_, this, fixed_detail::grow_bytes<T>(Base::capacity_) + fixed_detail::deep_bytes(value),
+                                      std::pair<iterator, bool>{Base::end(), false});
             auto* items = Base::data();
             const std::uint32_t size = Base::size();
             auto construct = [&](T* dst) {
@@ -6170,11 +6145,8 @@ namespace XOffsetDatastructure {
         template <typename Arg>
             requires alloc_aware_convertible<T, Arg>
         XOFFSET_DETAIL_INLINE std::pair<iterator, bool> insert(Arg&& arg) {
-#if XOFFSET_NO_EXCEPTIONS
-            if (Base::size_ >= Base::capacity_)
-                XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::grow_bytes<T>(Base::capacity_) + fixed_detail::deep_bytes(arg),
-                                       std::pair<iterator, bool>{Base::end(), false});
-#endif
+            XOFFSET_SOFT_PREFLIGHT_IF(Base::size_ >= Base::capacity_, this, fixed_detail::grow_bytes<T>(Base::capacity_) + fixed_detail::deep_bytes(arg),
+                                      std::pair<iterator, bool>{Base::end(), false});
             auto* items = Base::data();
             const std::uint32_t size = Base::size();
             auto construct = [&](T* dst) {
@@ -6269,13 +6241,10 @@ namespace XOffsetDatastructure {
 
         template <typename KeyArg, typename... Args>
         XOFFSET_DETAIL_INLINE std::pair<iterator, bool> try_emplace(KeyArg&& key, Args&&... args) {
-#if XOFFSET_NO_EXCEPTIONS
-            if (value_base::size_ >= value_base::capacity_)
-                XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::grow_bytes<value_type>(value_base::capacity_) +
-                                             fixed_detail::deep_bytes(key) +
-                                             (std::size_t(0) + ... + fixed_detail::deep_bytes(args)),
-                                       std::pair<iterator, bool>{value_base::end(), false});
-#endif
+            XOFFSET_SOFT_PREFLIGHT_IF(value_base::size_ >= value_base::capacity_, this, fixed_detail::grow_bytes<value_type>(value_base::capacity_) +
+                                      fixed_detail::deep_bytes(key) +
+                                      (std::size_t(0) + ... + fixed_detail::deep_bytes(args)),
+                                      std::pair<iterator, bool>{value_base::end(), false});
             auto* items = value_base::data();
             const std::uint32_t size = value_base::size();
             auto construct = [&](value_type* dst) {
@@ -6312,10 +6281,9 @@ namespace XOffsetDatastructure {
                 const auto count = static_cast<std::size_t>(last - first);
                 assign_sorted(std::span<const value_type>(count ? std::to_address(first) : nullptr, count));
             } else {
-#if XOFFSET_CHECK_SORTED
-                if (!fixed_detail::strictly_ascending(first, last, [](const auto& e) -> const auto& { return e.first; }))
-                    XOFFSET_THROW(XException(XErrc::invalid_argument, "assign_sorted: keys not strictly ascending"));
-#endif
+                if constexpr (detail::check_sorted)
+                    if (!fixed_detail::strictly_ascending(first, last, [](const auto& e) -> const auto& { return e.first; }))
+                        XOFFSET_THROW(XException(XErrc::invalid_argument, "assign_sorted: keys not strictly ascending"));
                 const auto count = static_cast<std::size_t>(std::ranges::distance(first, last));
                 // Entries without heads never use the binding (no lookup).
                 const auto alloc = value_base::element_binding();
@@ -6334,11 +6302,10 @@ namespace XOffsetDatastructure {
 
         void assign_sorted(std::span<const value_type> values)
             requires (std::is_trivially_copyable_v<value_type>) {
-#if XOFFSET_CHECK_SORTED
-            if (!fixed_detail::strictly_ascending(values.begin(), values.end(),
-                                                  [](const value_type& e) -> const K& { return e.first; }))
-                XOFFSET_THROW(XException(XErrc::invalid_argument, "assign_sorted: keys not strictly ascending"));
-#endif
+            if constexpr (detail::check_sorted)
+                if (!fixed_detail::strictly_ascending(values.begin(), values.end(),
+                                                      [](const value_type& e) -> const K& { return e.first; }))
+                    XOFFSET_THROW(XException(XErrc::invalid_argument, "assign_sorted: keys not strictly ascending"));
             value_base::assign_range(values);
         }
 
@@ -6477,11 +6444,8 @@ namespace XOffsetDatastructure {
 
         template <typename Arg>
         typename Base::iterator insert_value(typename Base::const_iterator pos, Arg&& arg) {
-#if XOFFSET_NO_EXCEPTIONS
-            if (Base::size_ >= Base::capacity_)
-                XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::grow_bytes<T>(Base::capacity_) + fixed_detail::deep_bytes(arg),
-                                       Base::end());
-#endif
+            XOFFSET_SOFT_PREFLIGHT_IF(Base::size_ >= Base::capacity_, this, fixed_detail::grow_bytes<T>(Base::capacity_) + fixed_detail::deep_bytes(arg),
+                                      Base::end());
             auto index = index_from(pos);
             return Base::insert_construct(index, [&](T* dst) {
                 fixed_detail::construct_bound(dst, Base::element_binding(), std::forward<Arg>(arg));
@@ -9733,19 +9697,7 @@ namespace XOffsetDatastructure {
                 if (!pin_enter()) return false;
             }
             PinGuard guard(control());
-#if XOFFSET_NO_EXCEPTIONS
-            detail::SoftFailScope soft;
-            f(*root_ptr);
-            if (soft.failed()) record_error(soft.code());
-#else
-            try {
-                f(*root_ptr);
-            } catch (const XException& e) {
-                record_error(e.code() == XErrc::unspecified ? XErrc::out_of_storage : e.code());
-            } catch (const std::bad_alloc&) {
-                record_error(XErrc::host_allocation_failed);
-            }
-#endif
+            record_error(detail::run_fail_soft([&] { f(*root_ptr); }));
             return ok();
         }
 
@@ -9811,19 +9763,7 @@ namespace XOffsetDatastructure {
                 }
             } close{this, nullptr};
             this->pin_open_lean(&close.ctl);
-#if XOFFSET_NO_EXCEPTIONS
-            detail::SoftFailScope soft;
-            f(fresh);
-            if (soft.failed()) record_error(soft.code());
-#else
-            try {
-                f(fresh);
-            } catch (const XException& e) {
-                record_error(e.code() == XErrc::unspecified ? XErrc::out_of_storage : e.code());
-            } catch (const std::bad_alloc&) {
-                record_error(XErrc::host_allocation_failed);
-            }
-#endif
+            record_error(detail::run_fail_soft([&] { f(fresh); }));
             // A failure made a block (record_error); the block follows the content.
             return !close.ctl || close.ctl->sticky == XErrc::ok;
         }
@@ -10122,17 +10062,8 @@ namespace XOffsetDatastructure {
         static XResult<XBuffer> try_load_verified_with_resource(std::span<const std::byte> data,
                                                                 std::optional<MaximumCapacity> cap,
                                                                 std::pmr::memory_resource* upstream) {
-#if XOFFSET_NO_EXCEPTIONS
             XBuffer xbuf;
-            if (!xbuf.load_verified_v<T>(data, cap, upstream)) return detail::take_pending_error();
-            return XResult<XBuffer>(std::move(xbuf));
-#else
-            try {
-                return XResult<XBuffer>(load_verified_with_resource<T>(data, cap, upstream));
-            } catch (...) {
-                return detail::current_exception_error();
-            }
-#endif
+            return detail::try_v_into(xbuf, [&] { return xbuf.load_verified_v<T>(data, cap, upstream); });
         }
 
         /// Verified load INTO this buffer, reusing its mapping, maximum
@@ -10173,17 +10104,7 @@ namespace XOffsetDatastructure {
         /// a failure).
         template <typename T>
         XStatus try_reload_verified(std::span<const std::byte> data) {
-#if XOFFSET_NO_EXCEPTIONS
-            if (!reload_into<T>(data, nullptr)) return detail::take_pending_error();
-            return {};
-#else
-            try {
-                reload_verified<T>(data);
-                return {};
-            } catch (...) {
-                return detail::current_exception_error();
-            }
-#endif
+            return detail::try_v([&] { return reload_into<T>(data, nullptr); });
         }
 
         template <typename T>
@@ -10195,19 +10116,9 @@ namespace XOffsetDatastructure {
         template <typename T>
         XStatus try_reload_verified_with_resource(std::span<const std::byte> data,
                                                   std::pmr::memory_resource* upstream) {
-#if XOFFSET_NO_EXCEPTIONS
             if (!upstream)
                 return XError{XErrc::invalid_argument, "validation scratch: null upstream"};
-            if (!reload_into<T>(data, upstream)) return detail::take_pending_error();
-            return {};
-#else
-            try {
-                reload_verified_with_resource<T>(data, upstream);
-                return {};
-            } catch (...) {
-                return detail::current_exception_error();
-            }
-#endif
+            return detail::try_v([&] { return reload_into<T>(data, upstream); });
         }
 
         /// Returns the retained reload scratch words to the host allocator.
@@ -10378,20 +10289,14 @@ namespace XOffsetDatastructure {
         XResult<VerifiedReloadToken<T>> try_begin_verified_reload(std::size_t payload_bytes,
                                                                   std::size_t holes = 0,
                                                                   std::size_t extents = 0) {
-#if XOFFSET_NO_EXCEPTIONS
             std::byte* tables = nullptr;
             std::size_t clean_from = 0;
-            if (!begin_verified_reload_v<T>(payload_bytes, holes, extents, tables, clean_from))
-                return detail::take_pending_error();
+            XStatus status = detail::try_v([&] {
+                return begin_verified_reload_v<T>(payload_bytes, holes, extents, tables, clean_from);
+            });
+            if (!status) return std::move(status).error();
             return XResult<VerifiedReloadToken<T>>(
                 VerifiedReloadToken<T>(*this, tables, payload_bytes, holes, extents, clean_from));
-#else
-            try {
-                return XResult<VerifiedReloadToken<T>>(begin_verified_reload<T>(payload_bytes, holes, extents));
-            } catch (...) {
-                return detail::current_exception_error();
-            }
-#endif
         }
 
     private:
@@ -10757,17 +10662,7 @@ namespace XOffsetDatastructure {
         /// finish() without exceptions: ok, or the code and message finish()
         /// would have thrown. Consumes the token either way.
         XStatus try_finish() {
-#if XOFFSET_NO_EXCEPTIONS
-            if (!finish_v()) return detail::take_pending_error();
-            return {};
-#else
-            try {
-                finish();
-                return {};
-            } catch (...) {
-                return detail::current_exception_error();
-            }
-#endif
+            return detail::try_v([&] { return finish_v(); });
         }
 
     private:

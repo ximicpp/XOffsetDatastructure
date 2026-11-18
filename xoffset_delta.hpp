@@ -1367,6 +1367,12 @@ namespace XOffsetDatastructure {
             static thread_local DeltaThreadScratch scratch;
             return &scratch;
         }
+#else
+        struct DeltaThreadScratch {
+            DeltaSendScratch send;
+            DeltaReceiveScratch receive;
+        };
+        constexpr DeltaThreadScratch* delta_thread_scratch() noexcept { return nullptr; }
 #endif
     } // namespace detail
 
@@ -1438,9 +1444,7 @@ namespace XOffsetDatastructure {
             payload_.release();
             std::vector<XBufferCore::WireHole>().swap(holes_);
             own_scratch_.release();
-#if XOFFSET_THREAD_CACHES
             if (detail::DeltaThreadScratch* s = detail::delta_thread_scratch()) s->send.release();
-#endif
         }
 
     private:
@@ -1491,9 +1495,7 @@ namespace XOffsetDatastructure {
         /// the calling thread's cursors share.
         void release_scratch() noexcept {
             own_scratch_.release();
-#if XOFFSET_THREAD_CACHES
             if (detail::DeltaThreadScratch* s = detail::delta_thread_scratch()) s->receive.release();
-#endif
             std::vector<detail::DeltaCheckBits>().swap(checks_);
             std::vector<detail::DeltaCheckNode>().swap(nodes_);
             std::vector<detail::DeltaNodeRange>().swap(ranges_);
@@ -1542,15 +1544,11 @@ namespace XOffsetDatastructure {
         struct DeltaAccess {
             static constexpr std::size_t payload_begin = XWIRE_PAYLOAD_BEGIN;
             static DeltaSendScratch& send_scratch(XDeltaBaseline& b) noexcept {
-#if XOFFSET_THREAD_CACHES
                 if (DeltaThreadScratch* s = delta_thread_scratch()) return s->send;
-#endif
                 return b.own_scratch_;
             }
             static DeltaReceiveScratch& receive_scratch(XDeltaCursor& c) noexcept {
-#if XOFFSET_THREAD_CACHES
                 if (DeltaThreadScratch* s = delta_thread_scratch()) return s->receive;
-#endif
                 return c.own_scratch_;
             }
             // Deltas up to delta_padded_max bytes are read from a copy with
@@ -4044,17 +4042,7 @@ namespace XOffsetDatastructure {
 
     template <typename T>
     XStatus XBuffer::try_apply_delta_verified(std::span<const std::byte> delta, XDeltaCursor& cursor) {
-#if XOFFSET_NO_EXCEPTIONS
-        if (!detail::DeltaAccess::apply<T>(*this, delta, cursor)) return detail::take_pending_error();
-        return {};
-#else
-        try {
-            detail::DeltaAccess::apply<T>(*this, delta, cursor);
-            return {};
-        } catch (...) {
-            return detail::current_exception_error();
-        }
-#endif
+        return detail::try_v([&] { return detail::DeltaAccess::apply<T>(*this, delta, cursor); });
     }
 
     template <typename T>

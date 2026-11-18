@@ -258,17 +258,7 @@ public:
         if constexpr (C == XCheck::full || detail::force_full_check) {
             return dst.template try_reload_verified<T>(wire);
         } else {
-#if XOFFSET_NO_EXCEPTIONS
-            if (!detail::ReceiverAccess::reload_admit<T>(dst, wire)) return detail::take_pending_error();
-            return {};
-#else
-            try {
-                detail::ReceiverAccess::reload_admit<T>(dst, wire);
-                return {};
-            } catch (...) {
-                return detail::current_exception_error();
-            }
-#endif
+            return detail::try_v([&] { return detail::ReceiverAccess::reload_admit<T>(dst, wire); });
         }
     }
 
@@ -296,19 +286,8 @@ public:
         if constexpr (C == XCheck::full || detail::force_full_check) {
             return XBuffer::try_load_verified<T>(wire, cap_);
         } else {
-#if XOFFSET_NO_EXCEPTIONS
             XBuffer out;
-            if (!detail::ReceiverAccess::load_admit<T>(out, wire, cap_)) return detail::take_pending_error();
-            return XResult<XBuffer>(std::move(out));
-#else
-            try {
-                XBuffer out;
-                detail::ReceiverAccess::load_admit<T>(out, wire, cap_);
-                return XResult<XBuffer>(std::move(out));
-            } catch (...) {
-                return detail::current_exception_error();
-            }
-#endif
+            return detail::try_v_into(out, [&] { return detail::ReceiverAccess::load_admit<T>(out, wire, cap_); });
         }
     }
 
@@ -347,17 +326,7 @@ public:
         if constexpr (C == XCheck::full || detail::force_full_check) {
             return dst.template try_apply_delta_verified<T>(delta, cursor);
         } else {
-#if XOFFSET_NO_EXCEPTIONS
-            if (!detail::DeltaAccess::apply<T, true>(dst, delta, cursor)) return detail::take_pending_error();
-            return {};
-#else
-            try {
-                detail::DeltaAccess::apply<T, true>(dst, delta, cursor);
-                return {};
-            } catch (...) {
-                return detail::current_exception_error();
-            }
-#endif
+            return detail::try_v([&] { return detail::DeltaAccess::apply<T, true>(dst, delta, cursor); });
         }
     }
 
@@ -397,21 +366,12 @@ public:
         check_mutable<C>();
         const char* const p = reinterpret_cast<const char*>(msg.data());
         const char* const end = p + msg.size();
-#if XOFFSET_NO_EXCEPTIONS
-        bool ok;
-        if constexpr (C == XCheck::full || detail::force_full_check) ok = bool(xsync::sd_detail::SyncAccess::full(p, end, cursor, target));
-        else ok = bool(xsync::sd_detail::SyncAccess::admit(p, end, cursor, target));
-        if (!ok) return detail::take_pending_error();
-        return {};
-#else
-        try {
-            if constexpr (C == XCheck::full || detail::force_full_check) xsync::sd_detail::SyncAccess::full(p, end, cursor, target);
-            else xsync::sd_detail::SyncAccess::admit(p, end, cursor, target);
-            return {};
-        } catch (...) {
-            return detail::current_exception_error();
-        }
-#endif
+        return detail::try_v([&] {
+            if constexpr (C == XCheck::full || detail::force_full_check)
+                return xsync::sd_detail::SyncAccess::full(p, end, cursor, target);
+            else
+                return xsync::sd_detail::SyncAccess::admit(p, end, cursor, target);
+        });
     }
 
     template <XCheck C = default_mutable_check<L>, class Target>
@@ -494,17 +454,9 @@ private:
 
     template <typename T>
     XError framing_error(std::span<const std::byte> wire, const char* who) const {
-#if XOFFSET_NO_EXCEPTIONS
-        (void)detail::view_framing_error<T>(wire, cap_.value, who);
-        return detail::take_pending_error();
-#else
-        try {
-            detail::view_framing_error<T>(wire, cap_.value, who);
-        } catch (...) {
-            return detail::current_exception_error();
-        }
+        XStatus status = detail::try_v([&] { return detail::view_framing_error<T>(wire, cap_.value, who); });
+        if (!status) return std::move(status).error();
         return XError{XErrc::unspecified, std::string(who) + ": framing"};
-#endif
     }
 
     template <XCheck C>
