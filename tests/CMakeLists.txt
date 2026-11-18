@@ -128,6 +128,7 @@ set(REFLECTION_TESTS
     test_append_grow
     test_staged_insert
     test_assign_sorted
+    test_first_block
     test_subtree_copy
     test_free_table_policy
     test_lower_bound_index
@@ -165,6 +166,7 @@ set(REFLECTION_TESTS
     test_reset_used_range
     test_clone
     test_delta_sync
+    test_delta_small
     test_delta_format
     test_delta_capacity
     test_shared_delta
