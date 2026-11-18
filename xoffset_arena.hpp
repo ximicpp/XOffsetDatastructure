@@ -447,6 +447,12 @@ namespace XOffsetDatastructure {
         ~XBufferCore() {
             retire_ctl();
             unregister_registry();
+            // The storage is released next (back to its slot or pool, or
+            // unmapped). On a settled owner only [0, tail_clean_from()) was
+            // ever dirtied (N2), so the next owner of these bytes clears only
+            // that much instead of the whole logical length.
+            if (const ZeroTail tail = settled_zero_tail(); tail.base)
+                buffer_.note_clean_tail_for_release(tail.used_end);
         }
 
         XBufferCore(const XBufferCore&) = delete;

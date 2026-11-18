@@ -314,22 +314,76 @@ void owners_without_storage() {
     need(refused, "on-demand storage keeps the default maximum");
 }
 
+// Nonzero bytes written the way the library writes them: in blocks below
+// used_end, so every byte past used_end stays zero (N2).
+void dirty_with_block(XBuffer& b, std::size_t bytes) {
+    auto* block = b.arena()->allocate_aligned(bytes, 8);
+    std::memset(block, 0xee, bytes);
+}
+
+void need_zero_past_header(const XBuffer& b, const char* what) {
+    for (std::size_t i = 48; i < b.get_size(); ++i) need(b.data()[i] == 0, what);
+}
+
+// A freed slot's next owner (the thread cache hands back the most recent
+// slot of a class first) reads only zero bytes, now and as it grows: after
+// content that reached the slot's end, after content that used part of it
+// (only that part is cleared), after a reset that left the old content past
+// the new used_end, and after a load that ended below what the slot held.
+// A pooled mapping handed to the pool's next taker reads zero the same way.
 void reused_slots_read_zero() {
-    // Free a dirty slot, then take the same class again (the thread cache
-    // hands back the most recent slot first).
-    const void* dirty = nullptr;
+    const void* slot = nullptr;
+    auto take = [&](const char* what) {
+        XBuffer b(3000);
+        need(b.get_address() == slot, "same slot reused");
+        need_zero_past_header(b, what);
+        need(b.grow(b.accessible_bytes() - b.get_size()), "grow in reused slot");
+        need_zero_past_header(b, what);
+        return b;
+    };
     {
         XBuffer b(3000);
-        std::memset(b.data() + 48, 0xee, b.get_size() - 48);
         need(b.grow(b.accessible_bytes() - b.get_size()), "fill the slot");
-        std::memset(b.data() + 48, 0xee, b.get_size() - 48);
-        dirty = b.get_address();
+        dirty_with_block(b, b.get_size() - 48);
+        slot = b.get_address();
     }
-    XBuffer again(3000);
-    need(again.get_address() == dirty, "same slot reused");
-    for (std::size_t i = 48; i < again.get_size(); ++i) need(again.data()[i] == 0, "reused slot cleared");
-    need(again.grow(again.accessible_bytes() - again.get_size()), "grow in reused slot");
-    for (std::size_t i = 48; i < again.get_size(); ++i) need(again.data()[i] == 0, "grown range cleared");
+    {
+        XBuffer b = take("reused slot cleared");
+        dirty_with_block(b, 1000);
+    }
+    {
+        XBuffer b = take("partly used slot cleared");
+        dirty_with_block(b, 2500);
+        (void)b.reset<SlotRoot>();
+        dirty_with_block(b, 100);
+    }
+    const auto small_wire = XBuffer::create<SlotRoot>(1024).save_verified<SlotRoot>();
+    {
+        XBuffer b = take("slot left with reset content cleared");
+        dirty_with_block(b, 3000);
+        b.reload_verified<SlotRoot>(small_wire);
+    }
+    { XBuffer b = take("slot reloaded with less content cleared"); }
+
+    XBufferPool pool(XBufferPool::Limits{2, 1u << 26, 1u << 26});
+    const auto pooled = XBuffer::maximum_capacity(1024 * 1024).with_pool(pool);
+    {
+        XBuffer b(16384, pooled);
+        dirty_with_block(b, 16384 - 48);
+    }
+    {
+        XBuffer b(4096, pooled);
+        need(pool.stats().hits == 1, "pooled mapping reused");
+        need_zero_past_header(b, "pooled mapping cleared");
+        need(b.grow(16384 - b.get_size()), "grow the pooled mapping");
+        need_zero_past_header(b, "pooled mapping grown range cleared");
+        dirty_with_block(b, 3000);
+    }
+    {
+        XBuffer b(16384, pooled);
+        need(pool.stats().hits == 2, "pooled mapping reused again");
+        need_zero_past_header(b, "partly used pooled mapping cleared");
+    }
 }
 
 void growth_policy_switch_pins() {
