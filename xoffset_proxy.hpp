@@ -1,69 +1,19 @@
 #ifndef X_OFFSET_PROXY_HPP
 #define X_OFFSET_PROXY_HPP
 
-// Growth policy part 2: fast proxies (XRef) and pin scopes (read / edit).
-//
-// A Relocating buffer moves when it outgrows its reservation, so a plain
-// reference into it can dangle. Two ways to reach the data stay safe:
-//
-//   XRef<T>   (buf.ref<Root>(), then .field<&T::m>(), [i], find(k) ...)
-//             A proxy holds the buffer's control block (XCtl), a cached base
-//             and version, and a path (root offset, container + index, map +
-//             key). Every access compares one version word; an allocating
-//             operation that would outgrow the reservation moves the buffer
-//             first (make_room), then runs. Container proxies keep the size
-//             in a register and only compare it with memory, so a push_back
-//             loop runs at the speed of a plain reference.
-//   edit / read (buf.edit<Root>([&](Root& r) { ... }))
-//             Plain references at plain speed. While a scope is open the
-//             buffer does not move (an operation that would need to returns
-//             `borrowed`), and blocks the containers retire wait until the
-//             scope closes, so a reference made inside the scope never points
-//             into reused storage. The callable may not return a pointer,
-//             reference, string_view or span (checked at compile time).
-//
-// Failure is soft: nothing throws or aborts. An allocating operation that
-// cannot be done has no effect, returns false (or an empty proxy) and records
-// the first failure in the buffer (XBuffer::error(): capacity_exceeded,
-// out_of_storage, borrowed, stale, out_of_range), and the buffer refuses to
-// emit a wire until clear_error().
-//
-// An allocating operation first runs in place. With exceptions, an
-// allocation the payload has no room for throws before anything changes; the
-// proxy catches it, makes room (the buffer may move) and runs the operation
-// again out of line, so the common case pays no room check. Without
-// exceptions it checks the room first (and a recorded failure refuses it).
-// Reads through an empty or stale proxy return a value-initialized T.
-//
-// Element proxies hold container + index (map: key + cached index), checked
-// against the size on every access: after the container changed they read
-// another element or nothing, never a retired block.
-
-// Growth policy part 4: batch operations (append, assign, emplace_n, batch
-// insert into maps and sets, XRef::batch scopes).
-#define XOFFSET_PROXY_BATCH_API 1
+// Proxies (XRef) and pin scopes (read / edit) for buffers that move
+// (docs/USER_GUIDE.md section 3.5). A proxy holds the buffer's control block,
+// a cached base and version, and a path (root offset; container + index; map
+// + key); every access compares one version word, and an allocating operation
+// that would outgrow the reservation moves the buffer first. Container proxies
+// keep the size in a register and only compare it with memory. Failure is
+// soft: the operation has no effect, returns false or an empty proxy, and the
+// buffer records the first failure and refuses to emit a wire until
+// clear_error(). With exceptions an allocating operation runs in place first
+// and makes room only when the arena throws; without, it checks the room first.
 
 namespace XOffsetDatastructure {
 
-#if defined(_MSC_VER) && !defined(__clang__)
-#define XOFFSET_PROXY_INLINE __forceinline
-#elif defined(__GNUC__) || defined(__clang__)
-#define XOFFSET_PROXY_INLINE inline __attribute__((always_inline))
-#else
-#define XOFFSET_PROXY_INLINE inline
-#endif
-
-#if defined(_MSC_VER) && !defined(__clang__)
-#define XOFFSET_PROXY_ASSUME(x) __assume(x)
-#elif defined(__clang__)
-#define XOFFSET_PROXY_ASSUME(x) __builtin_assume(x)
-#elif defined(__GNUC__)
-// Not [[assume]]: GCC outlines its expression and passes the address of the
-// enclosing object, which keeps a proxy in memory (dead stores every op).
-#define XOFFSET_PROXY_ASSUME(x) do { if (!(x)) __builtin_unreachable(); } while (0)
-#else
-#define XOFFSET_PROXY_ASSUME(x) ((void)0)
-#endif
 
 namespace proxy_detail {
     // The block of every empty proxy: odd version, never live.
@@ -74,7 +24,7 @@ namespace proxy_detail {
 
     // Byte offset of a data member, folded to a constant by the compiler.
     template <class C, class M>
-    XOFFSET_PROXY_INLINE std::uint32_t member_offset(M C::*mp) noexcept {
+    XOFFSET_DETAIL_INLINE std::uint32_t member_offset(M C::*mp) noexcept {
         constexpr std::uintptr_t probe = 4096u * alignof(C);
         return static_cast<std::uint32_t>(
             reinterpret_cast<std::uintptr_t>(&(reinterpret_cast<C*>(probe)->*mp)) - probe);
@@ -90,7 +40,7 @@ namespace proxy_detail {
     // bound), and the bytes of one more element.
     using fixed_detail::deep_bytes;
     template <class E>
-    XOFFSET_PROXY_INLINE std::size_t grow_bytes(std::uint32_t capacity) noexcept {
+    XOFFSET_DETAIL_INLINE std::size_t grow_bytes(std::uint32_t capacity) noexcept {
         return fixed_detail::grow_bytes<E>(capacity);
     }
 
@@ -102,14 +52,14 @@ namespace proxy_detail {
 
         Anchor() noexcept = default;
         explicit Anchor(detail::XCtl* c) noexcept : ctl(c ? c : dead_ctl()), version(c ? c->version : 0) {}
-        XOFFSET_PROXY_INLINE static Anchor make(detail::XCtl* c, std::uint64_t v) noexcept {
+        XOFFSET_DETAIL_INLINE static Anchor make(detail::XCtl* c, std::uint64_t v) noexcept {
             Anchor a;
             a.ctl = c;
             a.version = v;
             return a;
         }
         // A copy built from the fields (see copy() of the paths).
-        XOFFSET_PROXY_INLINE Anchor copy() const noexcept { return make(ctl, version); }
+        XOFFSET_DETAIL_INLINE Anchor copy() const noexcept { return make(ctl, version); }
 
         // Two words, passed and returned in registers. The out-of-line
         // helpers take the anchor and the path by value and return values,
@@ -121,7 +71,7 @@ namespace proxy_detail {
 
         // The payload base, or null when the lineage is gone or replaced
         // (or the proxy is empty).
-        XOFFSET_PROXY_INLINE char* sync() noexcept {
+        XOFFSET_DETAIL_INLINE char* sync() noexcept {
             if (ctl->version != version) [[unlikely]] {
                 const std::uint64_t now = resync_of(ctl, version);
                 if (now & 1u) return nullptr;
@@ -130,7 +80,7 @@ namespace proxy_detail {
             char* const base = ctl->base;
             // A live lineage always has a payload (resync_of refuses a null
             // base, and a version match means it was seen live).
-            XOFFSET_PROXY_ASSUME(base != nullptr);
+            XOFFSET_DETAIL_ASSUME(base != nullptr);
             return base;
         }
         // The current version, or 1 (odd: stale) when the proxy's lineage
@@ -142,7 +92,7 @@ namespace proxy_detail {
         }
         // The object at `path` now, or null (stale, out of range, missing).
         template <class T, class P>
-        XOFFSET_PROXY_INLINE T* at(const P& path) noexcept {
+        XOFFSET_DETAIL_INLINE T* at(const P& path) noexcept {
             char* const base = sync();
             return base ? reinterpret_cast<T*>(path.resolve(base)) : nullptr;
         }
@@ -159,16 +109,16 @@ namespace proxy_detail {
         static XOFFSET_DETAIL_NOINLINE void miss_at(detail::XCtl* ctl, std::uint64_t version) noexcept {
             if (live_at(ctl, version) && ctl->sticky == XErrc::ok) ctl->sticky = XErrc::out_of_range;
         }
-        XOFFSET_PROXY_INLINE void fail(XErrc code) const noexcept { fail_at(ctl, version, code); }
+        XOFFSET_DETAIL_INLINE void fail(XErrc code) const noexcept { fail_at(ctl, version, code); }
         // An allocation of up to `bytes` can run in place now: no recorded
         // failure, and the committed payload has the room (so the operation
         // can neither fail nor move the payload).
-        XOFFSET_PROXY_INLINE bool room(std::size_t bytes) const noexcept {
+        XOFFSET_DETAIL_INLINE bool room(std::size_t bytes) const noexcept {
             auto* core = ctl->core;
             return ctl->sticky == XErrc::ok && core && bytes <= XBufferCore::MAX_PAYLOAD &&
                    core->has_room(static_cast<XBufferCore::size_type>(bytes));
         }
-        XOFFSET_PROXY_INLINE void miss() const noexcept { miss_at(ctl, version); }
+        XOFFSET_DETAIL_INLINE void miss() const noexcept { miss_at(ctl, version); }
 
         // The allocating slow path: room for `bytes` more (the buffer may
         // move), then `op(base)` with the new base. False (and a recorded
@@ -227,12 +177,12 @@ namespace proxy_detail {
     // A fixed payload offset: the root and the members of fixed objects.
     struct RootPath {
         std::size_t off = 0;
-        XOFFSET_PROXY_INLINE char* resolve(char* base) const noexcept { return base + off; }
+        XOFFSET_DETAIL_INLINE char* resolve(char* base) const noexcept { return base + off; }
         RootPath plus(std::uint32_t bytes) const noexcept { return {off + bytes}; }
         // A copy built from the fields: what the proxies hand to an
         // out-of-line call. (GCC passes a member copied as a whole from the
         // proxy's own storage, and then keeps the whole proxy in memory.)
-        XOFFSET_PROXY_INLINE RootPath copy() const noexcept { return {off}; }
+        XOFFSET_DETAIL_INLINE RootPath copy() const noexcept { return {off}; }
     };
 
     // Element `index` of the vector at `parent` (+ `sub` bytes into it).
@@ -241,7 +191,7 @@ namespace proxy_detail {
         Parent parent;
         std::size_t index = 0;
         std::size_t sub = 0;
-        XOFFSET_PROXY_INLINE char* resolve(char* base) const noexcept {
+        XOFFSET_DETAIL_INLINE char* resolve(char* base) const noexcept {
             char* at = parent.resolve(base);
             if (!at) [[unlikely]] return nullptr;
             auto* vec = reinterpret_cast<Vec*>(at);
@@ -251,7 +201,7 @@ namespace proxy_detail {
                        fixed_detail::resolve_rel32_live<E>(&vec->data_delta, vec->data_delta) + index) + sub;
         }
         IndexPath plus(std::uint32_t bytes) const noexcept { return {parent, index, sub + bytes}; }
-        XOFFSET_PROXY_INLINE IndexPath copy() const noexcept { return {parent.copy(), index, sub}; }
+        XOFFSET_DETAIL_INLINE IndexPath copy() const noexcept { return {parent.copy(), index, sub}; }
     };
 
     // Where a container proxy's container is now. A container at a fixed
@@ -262,7 +212,7 @@ namespace proxy_detail {
     // true: the path names nothing (out of range, missing key).
     template <class T, class Path>
     struct Head {
-        XOFFSET_PROXY_INLINE T* find(Anchor& a, const Path& path, bool& absent) noexcept {
+        XOFFSET_DETAIL_INLINE T* find(Anchor& a, const Path& path, bool& absent) noexcept {
             char* const base = a.sync();
             if (!base) [[unlikely]] {
                 absent = false;
@@ -272,19 +222,19 @@ namespace proxy_detail {
             absent = at == nullptr;
             return at;
         }
-        XOFFSET_PROXY_INLINE Anchor anchor(const Anchor& a) const noexcept { return a.copy(); }
-        XOFFSET_PROXY_INLINE void forget() noexcept {}
+        XOFFSET_DETAIL_INLINE Anchor anchor(const Anchor& a) const noexcept { return a.copy(); }
+        XOFFSET_DETAIL_INLINE void forget() noexcept {}
     };
     template <class T>
     struct Head<T, RootPath> {
         T* at = nullptr;
         std::uint64_t version = 0;   // never a block's version: the first use resolves
 
-        XOFFSET_PROXY_INLINE T* find(Anchor& a, const RootPath& path, bool& absent) noexcept {
+        XOFFSET_DETAIL_INLINE T* find(Anchor& a, const RootPath& path, bool& absent) noexcept {
             absent = false;
             if (a.ctl->version == version) [[likely]] {
                 T* const p = at;
-                XOFFSET_PROXY_ASSUME(p != nullptr);
+                XOFFSET_DETAIL_ASSUME(p != nullptr);
                 return p;
             }
             // Both fields are set on every path (a stale proxy gets version
@@ -297,11 +247,11 @@ namespace proxy_detail {
         // The anchor to hand to an out-of-line path: the newer of the two
         // versions seen live. (find does not update the proxy's own anchor,
         // so a loop on this container carries one version, not two.)
-        XOFFSET_PROXY_INLINE Anchor anchor(const Anchor& a) const noexcept {
+        XOFFSET_DETAIL_INLINE Anchor anchor(const Anchor& a) const noexcept {
             return Anchor::make(a.ctl, version > a.version ? version : a.version);
         }
         // The out-of-line path may have moved the payload: resolve again.
-        XOFFSET_PROXY_INLINE void forget() noexcept {
+        XOFFSET_DETAIL_INLINE void forget() noexcept {
             at = nullptr;
             version = 0;
         }
@@ -333,7 +283,7 @@ namespace proxy_detail {
         mutable std::uint32_t hint = 0;
         std::uint32_t sub = 0;
 
-        XOFFSET_PROXY_INLINE char* resolve(char* base) const noexcept {
+        XOFFSET_DETAIL_INLINE char* resolve(char* base) const noexcept {
             char* at = parent.resolve(base);
             if (!at) [[unlikely]] return nullptr;
             auto* map = reinterpret_cast<Map*>(at);
@@ -406,7 +356,7 @@ namespace proxy_detail {
         Parent parent;
         std::size_t index = 0;
         std::size_t sub = 0;
-        XOFFSET_PROXY_INLINE char* resolve(char* base) const noexcept {
+        XOFFSET_DETAIL_INLINE char* resolve(char* base) const noexcept {
             if (index >= N) [[unlikely]] return nullptr;
             char* at = parent.resolve(base);
             if (!at) [[unlikely]] return nullptr;
@@ -449,7 +399,7 @@ template <class T, class Path = proxy_detail::RootPath,
           proxy_detail::Kind K = proxy_detail::kind_of<std::remove_cv_t<T>>()>
 class XRef;
 
-// Named field accessors (growth policy part 3; declared in
+// Named field accessors (declared in
 // xoffset_schema_describe.hpp): XOFFSET_RECORD and XOFFSET_RECORD_DERIVED
 // specialize XRecordAccess<T, Self, Next> with one accessor per field. A
 // record without a field list (described by reflection only) has none: use
@@ -470,10 +420,10 @@ namespace proxy_detail {
         RefBase(const Anchor& anchor, const Path& p) noexcept : a(anchor), path(p) {}
 
         // The object, or null (stale, out of range, missing key).
-        XOFFSET_PROXY_INLINE T* get_ptr() noexcept {
+        XOFFSET_DETAIL_INLINE T* get_ptr() noexcept {
             return a.template at<T>(path);
         }
-        XOFFSET_PROXY_INLINE const T* get_ptr() const noexcept {
+        XOFFSET_DETAIL_INLINE const T* get_ptr() const noexcept {
             return const_cast<RefBase*>(this)->get_ptr();
         }
 
@@ -488,7 +438,7 @@ namespace proxy_detail {
             return XRef<M, Path>(a, path.plus(offset));
         }
 
-        // Batch scope over this object (growth policy part 4): f(T&) with a
+        // Batch scope over this object: f(T&) with a
         // plain reference, the path resolved once. Room for `expected_growth`
         // bytes is made first (the buffer may move then, while no reference
         // exists); while f runs the payload is pinned as in XBuffer::edit
@@ -575,7 +525,7 @@ namespace proxy_detail {
     // The object of a proxy, through its state (never a field accessor of
     // the same name).
     template <class T, class Path, Kind K>
-    XOFFSET_PROXY_INLINE const T* ptr_of(const XRef<T, Path, K>& ref) noexcept {
+    XOFFSET_DETAIL_INLINE const T* ptr_of(const XRef<T, Path, K>& ref) noexcept {
         return static_cast<const RefBase<T, Path>&>(ref).get_ptr();
     }
 } // namespace proxy_detail
@@ -592,15 +542,15 @@ public:
     XRef(const XRef&) noexcept = default;
 
     // Read: the value, or T{} when the proxy names nothing.
-    XOFFSET_PROXY_INLINE T get() const noexcept {
+    XOFFSET_DETAIL_INLINE T get() const noexcept {
         if (const T* p = Base::get_ptr()) [[likely]] return *p;
         return T{};
     }
-    XOFFSET_PROXY_INLINE operator T() const noexcept { return get(); }
+    XOFFSET_DETAIL_INLINE operator T() const noexcept { return get(); }
 
     // Write: false (and out_of_range / stale recorded) when the proxy
     // names nothing.
-    XOFFSET_PROXY_INLINE bool set(const T& value) noexcept {
+    XOFFSET_DETAIL_INLINE bool set(const T& value) noexcept {
         if (T* p = Base::get_ptr()) [[likely]] {
             *p = value;
             return true;
@@ -608,17 +558,17 @@ public:
         miss();
         return false;
     }
-    XOFFSET_PROXY_INLINE XRef& operator=(const T& value) noexcept {
+    XOFFSET_DETAIL_INLINE XRef& operator=(const T& value) noexcept {
         set(value);
         return *this;
     }
     // Assignment between proxies copies the value (reference semantics).
-    XOFFSET_PROXY_INLINE XRef& operator=(const XRef& other) noexcept {
+    XOFFSET_DETAIL_INLINE XRef& operator=(const XRef& other) noexcept {
         set(other.get());
         return *this;
     }
     template <class F>
-    XOFFSET_PROXY_INLINE bool update(F&& f) noexcept {
+    XOFFSET_DETAIL_INLINE bool update(F&& f) noexcept {
         if (T* p = Base::get_ptr()) [[likely]] {
             f(*p);
             return true;
@@ -628,7 +578,7 @@ public:
     }
 #define XOFFSET_PROXY_COMPOUND(op)                                             \
     template <class U>                                                         \
-    XOFFSET_PROXY_INLINE XRef& operator op(const U& rhs) noexcept {            \
+    XOFFSET_DETAIL_INLINE XRef& operator op(const U& rhs) noexcept {            \
         update([&](T& v) { v op rhs; });                                       \
         return *this;                                                          \
     }
@@ -640,11 +590,11 @@ public:
     XOFFSET_PROXY_COMPOUND(&=)
     XOFFSET_PROXY_COMPOUND(^=)
 #undef XOFFSET_PROXY_COMPOUND
-    XOFFSET_PROXY_INLINE XRef& operator++() noexcept { update([](T& v) { ++v; }); return *this; }
-    XOFFSET_PROXY_INLINE XRef& operator--() noexcept { update([](T& v) { --v; }); return *this; }
+    XOFFSET_DETAIL_INLINE XRef& operator++() noexcept { update([](T& v) { ++v; }); return *this; }
+    XOFFSET_DETAIL_INLINE XRef& operator--() noexcept { update([](T& v) { --v; }); return *this; }
 
 private:
-    XOFFSET_PROXY_INLINE void miss() const noexcept { Base::a.miss(); }
+    XOFFSET_DETAIL_INLINE void miss() const noexcept { Base::a.miss(); }
 };
 
 // ---- records: members by member pointer or by name ------------------------
@@ -667,7 +617,7 @@ public:
 
     // The member `MP` of this record: buf.ref<Unit>().field<&Unit::hp>() = 5.
     template <auto MP>
-    XOFFSET_PROXY_INLINE auto field() const noexcept {
+    XOFFSET_DETAIL_INLINE auto field() const noexcept {
         using Traits = proxy_detail::member_traits<decltype(MP)>;
         static_assert(std::is_base_of_v<typename Traits::class_type, T>, "field<MP>: not a member of this record");
         using M = typename Traits::type;
@@ -676,7 +626,7 @@ public:
     }
     // Member I of the schema (declaration order).
     template <std::size_t I>
-    XOFFSET_PROXY_INLINE auto member() const noexcept {
+    XOFFSET_DETAIL_INLINE auto member() const noexcept {
         using F = schema::member_t<T, I>;
         return Base::template member_at<typename F::type>(static_cast<std::uint32_t>(F::offset));
     }
@@ -731,7 +681,7 @@ public:
 
     // Assign: in place when it fits, else make room (the buffer may move)
     // and assign. False (no effect, error recorded) when it cannot be done.
-    XOFFSET_PROXY_INLINE bool assign(std::string_view value) noexcept {
+    XOFFSET_DETAIL_INLINE bool assign(std::string_view value) noexcept {
         if (T* p = Base::get_ptr()) [[likely]] {
 #if XOFFSET_NO_EXCEPTIONS
             if (fits(*p, value.size()) || Base::a.room(value.size() + 24u)) [[likely]] {
@@ -750,15 +700,15 @@ public:
         Base::a.version = done.version;
         return done.ok;
     }
-    XOFFSET_PROXY_INLINE XRef& operator=(std::string_view value) noexcept {
+    XOFFSET_DETAIL_INLINE XRef& operator=(std::string_view value) noexcept {
         assign(value);
         return *this;
     }
-    XOFFSET_PROXY_INLINE XRef& operator=(const char* value) noexcept {
+    XOFFSET_DETAIL_INLINE XRef& operator=(const char* value) noexcept {
         assign(std::string_view(value));
         return *this;
     }
-    XOFFSET_PROXY_INLINE XRef& operator=(const std::string& value) noexcept {
+    XOFFSET_DETAIL_INLINE XRef& operator=(const std::string& value) noexcept {
         assign(std::string_view(value));
         return *this;
     }
@@ -803,7 +753,7 @@ public:
     }
 
 private:
-    static XOFFSET_PROXY_INLINE bool fits(const T& s, std::size_t n) noexcept {
+    static XOFFSET_DETAIL_INLINE bool fits(const T& s, std::size_t n) noexcept {
         return n <= (s.is_inline() || s.data_delta == 0 ? std::size_t(XFixedString::inline_max)
                                                          : std::size_t(s.capacity()));
     }
@@ -903,7 +853,7 @@ public:
     static constexpr std::uint32_t size() noexcept { return N; }
     // Element i (an empty proxy past the end: reads give E{}, writes fail
     // with out_of_range).
-    XOFFSET_PROXY_INLINE element_ref operator[](std::uint32_t i) const noexcept {
+    XOFFSET_DETAIL_INLINE element_ref operator[](std::uint32_t i) const noexcept {
         return element_ref(Base::a, ElemPath{Base::path, i, 0});
     }
     iterator begin() const noexcept { return iterator(*this, 0); }
@@ -940,7 +890,7 @@ public:
     bool empty() const noexcept { return size() == 0; }
 
     // Element i (an empty proxy past the end).
-    XOFFSET_PROXY_INLINE element_ref operator[](std::uint32_t i) const noexcept {
+    XOFFSET_DETAIL_INLINE element_ref operator[](std::uint32_t i) const noexcept {
         return element_ref(Base::a, ElemPath{Base::path, i, 0});
     }
     element_ref at(std::uint32_t i) const noexcept { return (*this)[i]; }
@@ -950,13 +900,13 @@ public:
         return (*this)[n ? n - 1u : ~0u];
     }
     // A copy of element i of a plain vector (E{} past the end).
-    XOFFSET_PROXY_INLINE E get(std::uint32_t i) const noexcept requires plain {
+    XOFFSET_DETAIL_INLINE E get(std::uint32_t i) const noexcept requires plain {
         const T* v = Base::get_ptr();
         if (v && i < v->size_) [[likely]]
             return fixed_detail::resolve_rel32_live<E>(&v->data_delta, v->data_delta)[i];
         return E{};
     }
-    XOFFSET_PROXY_INLINE bool set(std::uint32_t i, const E& value) noexcept requires plain {
+    XOFFSET_DETAIL_INLINE bool set(std::uint32_t i, const E& value) noexcept requires plain {
         T* v = Base::get_ptr();
         if (v && i < v->size_) [[likely]] {
             fixed_detail::resolve_rel32_live<E>(&v->data_delta, v->data_delta)[i] = value;
@@ -973,7 +923,7 @@ public:
     // only compared (another proxy may have changed it).
     // The value is taken by value and the full case is one out-of-line call
     // (growth is rare), so the caller's value never has its address taken.
-    XOFFSET_PROXY_INLINE bool push_back(E value) noexcept requires plain {
+    XOFFSET_DETAIL_INLINE bool push_back(E value) noexcept requires plain {
         bool absent;
         T* const v = head_.find(Base::a, Base::path, absent);
         if (!v) [[unlikely]] return absent ? missing() : false;
@@ -1019,7 +969,7 @@ public:
     }
     // Appends a value-initialized element and returns its proxy. Inside
     // the capacity this allocates nothing (an empty record owns no blocks).
-    XOFFSET_PROXY_INLINE element_ref emplace_back() noexcept {
+    XOFFSET_DETAIL_INLINE element_ref emplace_back() noexcept {
         bool absent;
         T* const v = head_.find(Base::a, Base::path, absent);
         if (!v) [[unlikely]] {
@@ -1101,11 +1051,11 @@ public:
         }));
     }
 
-    // ---- batch operations (growth policy part 4): one resolve, at most one
+    // ---- batch operations: one resolve, at most one
     // make_room and one regrow per call, then a plain copy.
 
     // Appends `values` (they may live in this buffer, even in this vector).
-    XOFFSET_PROXY_INLINE bool append(std::span<const E> values) noexcept requires plain {
+    XOFFSET_DETAIL_INLINE bool append(std::span<const E> values) noexcept requires plain {
         char* const base = Base::a.sync();
         if (!base) [[unlikely]] return false;
         T* v = reinterpret_cast<T*>(Base::path.resolve(base));
@@ -1197,7 +1147,7 @@ private:
 
     static XOFFSET_DETAIL_NOINLINE char32_t reload_size(const T* v) noexcept { return v->size_; }
 
-    XOFFSET_PROXY_INLINE bool missing() const noexcept {
+    XOFFSET_DETAIL_INLINE bool missing() const noexcept {
         Base::a.miss();
         return false;
     }
@@ -1209,7 +1159,7 @@ private:
     // emplace_back() past the capacity: in place inside the current
     // reservation (with exceptions; a throw changed nothing), else out of
     // line.
-    XOFFSET_PROXY_INLINE bool grow_emplace(T* v) noexcept {
+    XOFFSET_DETAIL_INLINE bool grow_emplace(T* v) noexcept {
 #if !XOFFSET_NO_EXCEPTIONS
         try {
             (void)v->emplace_back();
@@ -1223,7 +1173,7 @@ private:
         return take(append_slow(head_.anchor(Base::a), Base::path.copy(), 0, [](T& w) { (void)w.emplace_back(); }));
     }
 
-    XOFFSET_PROXY_INLINE bool take(const Grow& g) noexcept {
+    XOFFSET_DETAIL_INLINE bool take(const Grow& g) noexcept {
         Base::a.version = g.version;
         head_.forget();
         csize_ = g.csize;
@@ -1342,7 +1292,7 @@ public:
         });
         return inserted;
     }
-    // Batch insert (growth policy part 4): every value not yet present, one
+    // Batch insert: every value not yet present, one
     // resolve and at most one regrow. The number inserted; on failure
     // nothing is inserted (error() tells).
     std::uint32_t insert(std::span<const E> values) noexcept requires plain {
@@ -1380,7 +1330,7 @@ private:
         else if constexpr (std::is_convertible_v<const Arg&, std::string_view>) return std::string(std::string_view(value));
         else return std::cref(value);
     }
-    XOFFSET_PROXY_INLINE bool missing() const noexcept {
+    XOFFSET_DETAIL_INLINE bool missing() const noexcept {
         Base::a.miss();
         return false;
     }
@@ -1426,7 +1376,7 @@ public:
     }
     // A copy of the value of `key` in a plain map (`fallback` when absent).
     template <class Key>
-    XOFFSET_PROXY_INLINE V get(const Key& key, const V& fallback = V{}) const noexcept requires plain {
+    XOFFSET_DETAIL_INLINE V get(const Key& key, const V& fallback = V{}) const noexcept requires plain {
         const T* m = Base::get_ptr();
         if (!m) return fallback;
         auto it = m->find(key);
@@ -1437,7 +1387,7 @@ public:
     // A plain map inside its capacity inserts directly (size kept in a
     // register, as push_back).
     template <class Key, class... Args>
-    XOFFSET_PROXY_INLINE bool try_emplace(const Key& key, Args&&... args) noexcept {
+    XOFFSET_DETAIL_INLINE bool try_emplace(const Key& key, Args&&... args) noexcept {
         if constexpr (plain) {
             bool absent;
             T* const m = head_.find(Base::a, Base::path, absent);
@@ -1503,7 +1453,7 @@ public:
         }
         return inserted;
     }
-    // Batch insert (growth policy part 4): every key -> value pair whose key
+    // Batch insert: every key -> value pair whose key
     // is absent (pairs of any type with .first and .second, e.g. std::pair or
     // this map's entries; any order, ascending is fastest). One resolve and
     // at most one regrow. The number inserted; on failure nothing is
@@ -1584,7 +1534,7 @@ private:
                                              proxy_detail::member_offset(&Entry::second)});
     }
     static XOFFSET_DETAIL_NOINLINE char32_t reload_size(const T* m) noexcept { return m->size_; }
-    XOFFSET_PROXY_INLINE bool missing() const noexcept {
+    XOFFSET_DETAIL_INLINE bool missing() const noexcept {
         Base::a.miss();
         return false;
     }

@@ -36,6 +36,7 @@ class PackageAuditTests(unittest.TestCase):
         (self.source / "xoffset_virtual_memory.hpp").write_text("test header")
         (self.source / "xoffset_slot_storage.hpp").write_text("test slot header")
         (self.source / "xoffset_error.hpp").write_text("test error header")
+        (self.source / "xoffset_config.hpp").write_text("test config header")
         self.version = MODULE.read_version(self.source)
         config = "\n".join("set(" + name + " " + value + ")" for name, value in
                            MODULE.version_config_assertions(self.version).items()) + "\n"
@@ -45,6 +46,7 @@ class PackageAuditTests(unittest.TestCase):
         files = {"include/xoffset_virtual_memory.hpp": "test header",
                  "include/xoffset_slot_storage.hpp": "test slot header",
                  "include/xoffset_error.hpp": "test error header",
+                 "include/xoffset_config.hpp": "test config header",
                  "share/XOffsetDatastructure/licenses/LICENSE": "test license",
                  "share/XOffsetDatastructure/VERSION": (self.source / "XOFFSET_VERSION").read_text(encoding="utf-8"),
                  "share/XOffsetDatastructure/CHANGELOG.md": (self.source / "CHANGELOG.md").read_text(encoding="utf-8"),
@@ -63,7 +65,7 @@ class PackageAuditTests(unittest.TestCase):
 
     def test_complete_storage_package(self):
         audit = self.audit()
-        self.assertEqual(audit["file_count"], 10)
+        self.assertEqual(audit["file_count"], 11)
         self.assertEqual(audit["version"], self.version)
 
     def test_required_release_metadata_is_exact(self):

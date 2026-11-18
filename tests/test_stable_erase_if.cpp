@@ -190,7 +190,7 @@ static_assert(fd::stable_erase_implicit_lifetime<ImplicitRecord>());
 static_assert(!fd::stable_erase_implicit_lifetime<OptedUserDestructor>());
 #endif
 static_assert(XOffsetDatastructure::is_byte_copy_safe_v<ImplicitRecord>);
-static_assert(xo::is_v1_wire_admitted_v<EraseRoot>);
+static_assert(xo::is_wire_admitted_v<EraseRoot>);
 static_assert(Erasable<xo::XVector<ImplicitRecord>>);
 
 namespace {

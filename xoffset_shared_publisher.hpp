@@ -1,54 +1,14 @@
 #ifndef X_OFFSET_SHARED_PUBLISHER_HPP
 #define X_OFFSET_SHARED_PUBLISHER_HPP
 
-// The server side of shared deltas (docs/SHARED_DELTA.md): a publisher, two
-// kinds of tables, per-connection state and the message a server builds for
-// one connection. Clients do not need this header (they apply messages with
-// XReceiver<XLink::from_server>::apply_sync, xoffset_receiver.hpp).
-//
-//   XSyncPublisher        the tick and this tick's body store
-//   XSyncDirtyTable       entities the application marks dirty member by
-//                         member; their images live with the application
-//                         (records with containers: an XBuffer)
-//   XSyncImageTable       plain records compared whole; the image sits in
-//                         the table's entry (dense index, or a ring by id)
-//   XSyncConn             one connection, hot: the message version and the
-//                         client's free slots of each table with enters and
-//                         leaves (a fixed stack per table, cache-line aligned)
-//   XSyncConnCold         one connection, cold: the stream and the free slots
-//                         past the hot stacks
-//   XSyncMessage          one message for one connection
-//
-// Each entity's body is written once per tick into the publisher's store and
-// copied into every message that carries it. A table with enters and leaves
-// sends each client the slot the server gives it for the entity (the client
-// keeps its records by slot and needs no index). Which entity holds which
-// slot on a connection is the application's (it keeps the slot next to its
-// record of what the client holds); which slots are free is the library's,
-// in the connection.
-//
-// Per tick:
-//   pub.begin_tick(tick);
-//   units.publish(pub, changed_units, unit_source);     // before the tick's first message
-// Per connection (each table at most once per kind, sections in this order):
-//   XSyncMessage m(pub, conn, cold, out, root);
-//   units.leaves(m, index, slot);  marches.leaves(m, slot);
-//   units.changes(m, src, index, slot);  marches.changes(m, src, ref, slot);  tiles.changes(m, src, id);
-//   units.enters(m, src, index, [&](std::size_t r, std::uint32_t s) { held[r].slot = s; });
-//   const std::size_t n = m.finish();
-//   XSyncConn<...>::prefetch(&conn + 1);                 // the connection served next
-//
-// Contracts (the first is checked in every build, the others in builds with
-// XOFFSET_SYNC_CHECKS, on by default without NDEBUG; define it the same in
-// every translation unit):
-//   1. A tick's dirty bits are published before its first message.
-//   2. Every connection that holds an entity gets every body the entity has:
-//      skipping a connection is a disconnect (release, then a key message).
-//   3. A disconnect, and a key message, first release every unit the
-//      connection holds (XSyncDirtyTable::release).
-//   4. The slot enters() reports is stored with the application's record and
-//      passed back to changes() and leaves().
-// A publisher and its tables are used from one thread.
+// The server side of shared deltas: XSyncPublisher (the tick and its body
+// store), XSyncDirtyTable and XSyncImageTable, per-connection state
+// (XSyncConn hot, XSyncConnCold cold) and XSyncMessage (one message for one
+// connection). Each entity's body is written once per tick and copied into
+// every message that carries it; a keyed table sends each client the slot the
+// server gave it for the entity. Usage and the four contracts (checked under
+// XOFFSET_SYNC_CHECKS): docs/SHARED_DELTA.md. Clients do not need this
+// header. A publisher and its tables are used from one thread.
 
 #include "xoffset_shared_delta.hpp"
 
@@ -62,27 +22,6 @@
 #include <utility>
 #include <vector>
 
-#if !defined(XOFFSET_SYNC_CHECKS)
-#  if defined(NDEBUG)
-#    define XOFFSET_SYNC_CHECKS 0
-#  else
-#    define XOFFSET_SYNC_CHECKS 1
-#  endif
-#endif
-
-// A loop that usually runs one to three times: no vector code (its prologue
-// and epilogue cost more than the loop).
-#if !defined(XOFFSET_DETAIL_NOVECTOR)
-#  if defined(__clang__)
-#    define XOFFSET_DETAIL_NOVECTOR _Pragma("clang loop vectorize(disable)")
-#  elif defined(__GNUC__) && __GNUC__ >= 14
-#    define XOFFSET_DETAIL_NOVECTOR _Pragma("GCC novector")
-#  elif defined(_MSC_VER)
-#    define XOFFSET_DETAIL_NOVECTOR __pragma(loop(no_vector))
-#  else
-#    define XOFFSET_DETAIL_NOVECTOR
-#  endif
-#endif
 
 namespace XOffsetDatastructure::xsync {
 
@@ -94,10 +33,10 @@ namespace XOffsetDatastructure::xsync {
     template <unsigned K, class T, class Index, bool Keyed, std::size_t Align> class XSyncImageTable;
 
     namespace sd_detail {
-        [[noreturn]] XOFFSET_SYNC_COLD inline void sync_fail(const char* what) {
+        [[noreturn]] XOFFSET_DETAIL_COLD inline void sync_fail(const char* what) {
             XOFFSET_THROW(XException(XErrc::invalid_state, what));
         }
-        [[noreturn]] XOFFSET_SYNC_COLD inline void sync_too_many() {
+        [[noreturn]] XOFFSET_DETAIL_COLD inline void sync_too_many() {
             XOFFSET_THROW(std::length_error("xsync: more than 2^24 - 1 ops in one section"));
         }
         // An entity's two bodies of this tick in the publisher's store: a
@@ -118,7 +57,7 @@ namespace XOffsetDatastructure::xsync {
         // A message's bytes up to q kept and n more writable past them:
         // where q and the end of the room are now.
         struct Room { char* q; char* end; };
-        XOFFSET_SYNC_COLD inline Room grow_message(XSyncOut& out, char* q, std::size_t n) {
+        XOFFSET_DETAIL_COLD inline Room grow_message(XSyncOut& out, char* q, std::size_t n) {
             out.commit(std::size_t(q - out.data()) - out.size());
             char* const r = out.tail(n);
             return {r, out.data() + out.capacity()};
@@ -206,7 +145,7 @@ namespace XOffsetDatastructure::xsync {
         /// Fetches c's lines (writing). Safe for any address, one past the end
         /// of an array of connections included: call it after finish() for the
         /// connection served next.
-        XOFFSET_SYNC_INLINE static void prefetch(const XSyncConn* c) noexcept {
+        XOFFSET_DETAIL_INLINE static void prefetch(const XSyncConn* c) noexcept {
             const char* p = reinterpret_cast<const char*>(c);
             for (std::size_t o = 0; o < sizeof(XSyncConn); o += 64) XOFFSET_DETAIL_PREFETCH(p + o, 1);
         }
@@ -243,7 +182,7 @@ namespace XOffsetDatastructure::xsync {
 
         /// A delta: the connection's next version.
         template <class Root>
-        XOFFSET_SYNC_INLINE XSyncMessage(XSyncPublisher& pub, Conn& conn, cold_type& cold, XSyncOut& out, const Root& root)
+        XOFFSET_DETAIL_INLINE XSyncMessage(XSyncPublisher& pub, Conn& conn, cold_type& cold, XSyncOut& out, const Root& root)
             : pub_(&pub), conn_(&conn), cold_(&cold), out_(&out) {
             Conn::prefetch(&conn);
             start(root, 0, nullptr);
@@ -267,8 +206,8 @@ namespace XOffsetDatastructure::xsync {
 
         /// Ends the message: the slots that left are free from the next
         /// message on, the version goes up and is written. Returns the length.
-        XOFFSET_SYNC_INLINE std::size_t finish() {
-            [&]<std::size_t... J>(std::index_sequence<J...>) XOFFSET_SYNC_LAMBDA_INLINE {
+        XOFFSET_DETAIL_INLINE std::size_t finish() {
+            [&]<std::size_t... J>(std::index_sequence<J...>) XOFFSET_DETAIL_LAMBDA_INLINE {
                 (give<J>(), ...);
             }(std::make_index_sequence<Conn::keyed>{});
             char* const b = out_->data();
@@ -282,7 +221,7 @@ namespace XOffsetDatastructure::xsync {
         template <unsigned, class, class, bool, std::size_t> friend class XSyncImageTable;
 
         template <class Root>
-        XOFFSET_SYNC_INLINE void start(const Root& root, std::uint8_t flags, const std::uint64_t* stream) {
+        XOFFSET_DETAIL_INLINE void start(const Root& root, std::uint8_t flags, const std::uint64_t* stream) {
             static_assert(XRecordBody<Root>::container_count == 0, "xsync: the root record (table 0) has no containers");
             pub_->dispatching_ = true;
             out_->clear();
@@ -298,7 +237,7 @@ namespace XOffsetDatastructure::xsync {
 #endif
         }
         // Room for n more bytes at q_.
-        XOFFSET_SYNC_INLINE void room(std::size_t n) {
+        XOFFSET_DETAIL_INLINE void room(std::size_t n) {
             if (std::size_t(end_ - q_) < n) [[unlikely]] {
                 const sd_detail::Room r = sd_detail::grow_message(*out_, q_, n);
                 q_ = r.q;
@@ -306,7 +245,7 @@ namespace XOffsetDatastructure::xsync {
             }
         }
         // The same inside a section: its cursor q and its head sec move with the bytes.
-        XOFFSET_SYNC_INLINE void room(char*& q, char*& sec, std::size_t n) {
+        XOFFSET_DETAIL_INLINE void room(char*& q, char*& sec, std::size_t n) {
             if (std::size_t(end_ - q) < n) [[unlikely]] {
                 const sd_detail::Room r = sd_detail::grow_message(*out_, q, n);
                 sec = r.q - (q - sec);
@@ -314,10 +253,10 @@ namespace XOffsetDatastructure::xsync {
                 end_ = r.end;
             }
         }
-        XOFFSET_SYNC_INLINE static void count(std::size_t n) {
+        XOFFSET_DETAIL_INLINE static void count(std::size_t n) {
             if (n > kSyncSectionMax) [[unlikely]] sd_detail::sync_too_many();
         }
-        XOFFSET_SYNC_INLINE const char* bodies() const noexcept { return pub_->bodies_.data(); }
+        XOFFSET_DETAIL_INLINE const char* bodies() const noexcept { return pub_->bodies_.data(); }
 
         // Taking slots of stack J: the counters in locals while a section
         // writes (its stores may alias the connection), written back by done().
@@ -325,15 +264,15 @@ namespace XOffsetDatastructure::xsync {
             Conn& c;
             cold_type& k;
             std::uint32_t n, used;
-            XOFFSET_SYNC_INLINE explicit Taker(XSyncMessage& m) : c(*m.conn_), k(*m.cold_), n(m.conn_->n[J]), used(m.conn_->used[J]) {}
-            XOFFSET_SYNC_INLINE std::uint32_t take() {
+            XOFFSET_DETAIL_INLINE explicit Taker(XSyncMessage& m) : c(*m.conn_), k(*m.cold_), n(m.conn_->n[J]), used(m.conn_->used[J]) {}
+            XOFFSET_DETAIL_INLINE std::uint32_t take() {
                 if (n) return c.stack[Conn::at[J] + --n];
                 if (c.spill[J]) [[unlikely]] return unspill<J>(c, k);
                 return used++;
             }
-            XOFFSET_SYNC_INLINE void done() noexcept { c.n[J] = std::uint8_t(n); c.used[J] = used; }
+            XOFFSET_DETAIL_INLINE void done() noexcept { c.n[J] = std::uint8_t(n); c.used[J] = used; }
         };
-        template <std::size_t J> XOFFSET_SYNC_COLD static std::uint32_t unspill(Conn& c, cold_type& k) noexcept {
+        template <std::size_t J> XOFFSET_DETAIL_COLD static std::uint32_t unspill(Conn& c, cold_type& k) noexcept {
             auto& sp = k.spill[J];
             const std::int32_t v = sp.back();
             sp.pop_back();
@@ -342,7 +281,7 @@ namespace XOffsetDatastructure::xsync {
         }
         // Gives back the k slots of stack J at p (u32 each, the leave
         // section's ops), one by one: what does not fit the stack spills.
-        template <std::size_t J> XOFFSET_SYNC_COLD static void give_slow(Conn& c, cold_type& cold, const char* p, std::size_t k) {
+        template <std::size_t J> XOFFSET_DETAIL_COLD static void give_slow(Conn& c, cold_type& cold, const char* p, std::size_t k) {
             std::uint32_t n = c.n[J];
             for (std::size_t i = 0; i < k; ++i) {
                 const std::uint32_t v = sd_detail::load<std::uint32_t>(p + 4 * i);
@@ -351,7 +290,7 @@ namespace XOffsetDatastructure::xsync {
             }
             c.n[J] = std::uint8_t(n);
         }
-        template <std::size_t J> XOFFSET_SYNC_INLINE void give() {
+        template <std::size_t J> XOFFSET_DETAIL_INLINE void give() {
             const std::uint32_t k = ln_[J];
             if (!k) return;
             const char* const p = out_->data() + loff_[J];
@@ -488,7 +427,7 @@ namespace XOffsetDatastructure::xsync {
         /// in (one per index); each entity has one holder fewer. The slots are
         /// free from the next message on.
         template <class Msg>
-        XOFFSET_SYNC_INLINE void leaves(Msg& m, std::span<const std::int32_t> index, std::span<const std::int32_t> slot) {
+        XOFFSET_DETAIL_INLINE void leaves(Msg& m, std::span<const std::int32_t> index, std::span<const std::int32_t> slot) {
             constexpr std::size_t J = Msg::conn_type::template index<K>;
             static_assert(J < Msg::conn_type::keyed, "xsync: the connection has no free slots for this table");
             const std::size_t n = slot.size();
@@ -523,7 +462,7 @@ namespace XOffsetDatastructure::xsync {
         /// A change section: for each index the client holds (at slot), its
         /// change body of this tick, if it has one.
         template <class Msg, class Src>
-        XOFFSET_SYNC_INLINE void changes(Msg& m, Src&& src, std::span<const std::int32_t> index, std::span<const std::int32_t> slot) {
+        XOFFSET_DETAIL_INLINE void changes(Msg& m, Src&& src, std::span<const std::int32_t> index, std::span<const std::int32_t> slot) {
             const std::size_t n = index.size();
             if (!n) return;
             Msg::count(n);
@@ -569,7 +508,7 @@ namespace XOffsetDatastructure::xsync {
         /// with the application's record, contract 4). Each entity has one
         /// holder more.
         template <class Msg, class Src, class Out>
-        XOFFSET_SYNC_INLINE void enters(Msg& m, Src&& src, std::span<const std::int32_t> index, Out&& out) {
+        XOFFSET_DETAIL_INLINE void enters(Msg& m, Src&& src, std::span<const std::int32_t> index, Out&& out) {
             constexpr std::size_t J = Msg::conn_type::template index<K>;
             static_assert(J < Msg::conn_type::keyed, "xsync: the connection has no free slots for this table");
             const std::size_t n = index.size();
@@ -739,7 +678,7 @@ namespace XOffsetDatastructure::xsync {
         }
 
         /// A leave section (keyed tables): the slots that leave.
-        template <class Msg> XOFFSET_SYNC_INLINE void leaves(Msg& m, std::span<const std::int32_t> slot) requires Keyed {
+        template <class Msg> XOFFSET_DETAIL_INLINE void leaves(Msg& m, std::span<const std::int32_t> slot) requires Keyed {
             constexpr std::size_t J = Msg::conn_type::template index<K>;
             static_assert(J < Msg::conn_type::keyed, "xsync: the connection has no free slots for this table");
             const std::size_t n = slot.size();
@@ -764,7 +703,7 @@ namespace XOffsetDatastructure::xsync {
         /// A change section (keyed): for each ref the client holds (at slot),
         /// the members that changed since its image, if any.
         template <class Msg, class Src>
-        XOFFSET_SYNC_INLINE void changes(Msg& m, Src&& src, std::span<const std::int32_t> ref, std::span<const std::int32_t> slot) requires Keyed {
+        XOFFSET_DETAIL_INLINE void changes(Msg& m, Src&& src, std::span<const std::int32_t> ref, std::span<const std::int32_t> slot) requires Keyed {
             const std::size_t n = ref.size();
             if (!n) return;
             Msg::count(n);
@@ -798,7 +737,7 @@ namespace XOffsetDatastructure::xsync {
         /// A change section (fixed tables): for each id, the members that
         /// changed since its image, if any.
         template <class Msg, class Src>
-        XOFFSET_SYNC_INLINE void changes(Msg& m, Src&& src, std::span<const std::int32_t> id) requires (!Keyed) {
+        XOFFSET_DETAIL_INLINE void changes(Msg& m, Src&& src, std::span<const std::int32_t> id) requires (!Keyed) {
             const std::size_t n = id.size();
             if (!n) return;
             Msg::count(n);
@@ -825,7 +764,7 @@ namespace XOffsetDatastructure::xsync {
         /// An enter section (keyed): each ref enters with its whole record at a
         /// free slot; out(r, slot) gets the slot of the r-th (contract 4).
         template <class Msg, class Src, class Out>
-        XOFFSET_SYNC_INLINE void enters(Msg& m, Src&& src, std::span<const std::int32_t> ref, Out&& out) requires Keyed {
+        XOFFSET_DETAIL_INLINE void enters(Msg& m, Src&& src, std::span<const std::int32_t> ref, Out&& out) requires Keyed {
             constexpr std::size_t J = Msg::conn_type::template index<K>;
             static_assert(J < Msg::conn_type::keyed, "xsync: the connection has no free slots for this table");
             const std::size_t n = ref.size();
@@ -860,7 +799,7 @@ namespace XOffsetDatastructure::xsync {
         /// An enter section (fixed tables, key messages): each id with its
         /// whole record.
         template <class Msg, class Src>
-        XOFFSET_SYNC_INLINE void enters(Msg& m, Src&& src, std::span<const std::int32_t> id) requires (!Keyed) {
+        XOFFSET_DETAIL_INLINE void enters(Msg& m, Src&& src, std::span<const std::int32_t> id) requires (!Keyed) {
             const std::size_t n = id.size();
             if (!n) return;
             Msg::count(n);
@@ -896,7 +835,7 @@ namespace XOffsetDatastructure::xsync {
         }
         // The entry of ref, used this tick: the hot test inline, the rest not.
         template <class Src>
-        XOFFSET_SYNC_INLINE Entry* find(Entry*& es, std::size_t& mk, std::uint32_t ref, std::uint32_t tick, XSyncPublisher& pub, Src& src) {
+        XOFFSET_DETAIL_INLINE Entry* find(Entry*& es, std::size_t& mk, std::uint32_t ref, std::uint32_t tick, XSyncPublisher& pub, Src& src) {
             if constexpr (kRing) {
                 const std::uint32_t id = std::uint32_t(src.id(ref));
                 Entry* e = &es[id & mk];

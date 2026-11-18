@@ -1,5 +1,7 @@
 #pragma once
 
+#include "xoffset_config.hpp"
+
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -14,26 +16,7 @@
 #include <vector>
 
 #if defined(_WIN32)
-// The lean <windows.h>, without min/max: no rpcndr.h (`small`, `hyper`), winsock.h or
-// shellapi.h behind a client's back. Both macros are set only for this include; a
-// client that needs more includes those headers itself (or <windows.h> first).
-#  ifndef WIN32_LEAN_AND_MEAN
-#    define WIN32_LEAN_AND_MEAN
-#    define XOFFSET_DETAIL_UNDEF_LEAN_AND_MEAN
-#  endif
-#  ifndef NOMINMAX
-#    define NOMINMAX
-#    define XOFFSET_DETAIL_UNDEF_NOMINMAX
-#  endif
-#  include <windows.h>
-#  ifdef XOFFSET_DETAIL_UNDEF_LEAN_AND_MEAN
-#    undef WIN32_LEAN_AND_MEAN
-#    undef XOFFSET_DETAIL_UNDEF_LEAN_AND_MEAN
-#  endif
-#  ifdef XOFFSET_DETAIL_UNDEF_NOMINMAX
-#    undef NOMINMAX
-#    undef XOFFSET_DETAIL_UNDEF_NOMINMAX
-#  endif
+// <windows.h> comes from xoffset_config.hpp.
 #elif defined(__linux__) || defined(__APPLE__)
 #  include <sys/mman.h>
 #  include <unistd.h>
@@ -163,10 +146,7 @@ private:
 // slot's (SlotHeader); its last pointer-sized word names the current owner
 // (host_owner), and the payload starts right after it, on the same page. The
 // header is never part of the payload, so it is never copied, emitted or
-// exposed by data()/size(). (Before 3.4 it was a page of its own in front of
-// the payload: a page touched only by swap and allocation, the first to be
-// compressed or swapped out under memory pressure, plus a page table of its
-// own in the previous granule.) Accessible means payload page permissions are read/write; it
+// exposed by data()/size(). Accessible means payload page permissions are read/write; it
 // does not measure resident physical memory or promise future fault-free
 // allocation.
 class VirtualMemoryStorage {
@@ -396,7 +376,7 @@ public:
         return vok();
     }
 
-    // Slot owner (R1): an empty owner on a slot of class `cls`. The slot's
+    // Slot owner: an empty owner on a slot of class `cls`. The slot's
     // payload capacity is accessible_bytes(); maximum_capacity may exceed it
     // only for a movable owner, whose growth past the slot is the caller's
     // relocation. A slot has no OS step, so the owner never fails to grow
@@ -530,11 +510,6 @@ public:
     // Nothing is cleared here. Returns the previous zero_from_: bytes at or
     // beyond it are still zero, so a writer that skips ranges (sparse gaps)
     // clears only below it. A failure leaves the old bytes and length.
-    std::size_t expose_for_overwrite(std::size_t length) {
-        std::size_t clean_from = 0;
-        XOFFSET_VREQUIRE(expose_for_overwrite_v(length, clean_from));
-        return clean_from;
-    }
     vstatus expose_for_overwrite_v(std::size_t length, std::size_t& clean_from) {
         if (length > maximum_capacity_) {
             XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument,

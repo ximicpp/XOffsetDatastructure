@@ -68,7 +68,7 @@ consteval bool xsg_typelayout_match(std::string_view expected) {
     return std::string_view(sig.value, sig.size) == expected;
 }
 #define XSG_CHECK(T, PIN, TYPE_PIN) \
-    static_assert(::XOffsetDatastructure::is_v1_wire_admitted_v<T>, "schema not wire admitted"); \
+    static_assert(::XOffsetDatastructure::is_wire_admitted_v<T>, "schema not wire admitted"); \
     static_assert(::boost::typelayout::is_byte_copy_safe_v<T>, "TypeLayout byte-copy safety failed"); \
     static_assert(::XOffsetDatastructure::has_schema_name_v<T>, "root schema name missing"); \
     XOFFSET_PIN_SCHEMA(T, PIN); \

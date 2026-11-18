@@ -129,7 +129,8 @@ function(xoffset_compile_check check_name source_file result_variable output_var
         "${source_file}" "${PROJECT_SOURCE_DIR}/xoffsetdatastructure.hpp"
         "${PROJECT_SOURCE_DIR}/xoffset_virtual_memory.hpp"
         "${PROJECT_SOURCE_DIR}/xoffset_error.hpp"
-        "${PROJECT_SOURCE_DIR}/xoffset_slot_storage.hpp")
+        "${PROJECT_SOURCE_DIR}/xoffset_slot_storage.hpp"
+        "${PROJECT_SOURCE_DIR}/xoffset_config.hpp")
     # A toolchain's STATIC_LIBRARY override would bypass the link check.
     set(CMAKE_TRY_COMPILE_TARGET_TYPE EXECUTABLE)
     # Do not reuse a cached result after the source, dependencies, or flags change.

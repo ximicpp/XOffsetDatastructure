@@ -4,28 +4,7 @@
 #include "xoffsetdatastructure.hpp"
 #include <array>
 #include <tuple>
-#define XOFFSET_VERIFIED_PATHS_API 1
 
-#if defined(_MSC_VER)
-#define XOFFSET_DETAIL_WIRE_INLINE __forceinline
-#elif defined(__clang__) || defined(__GNUC__)
-#define XOFFSET_DETAIL_WIRE_INLINE inline __attribute__((always_inline))
-#else
-#define XOFFSET_DETAIL_WIRE_INLINE inline
-#endif
-#if defined(_MSC_VER)
-#define XOFFSET_DETAIL_WIRE_NOINLINE __declspec(noinline)
-#elif defined(__clang__) || defined(__GNUC__)
-#define XOFFSET_DETAIL_WIRE_NOINLINE __attribute__((noinline))
-#else
-#define XOFFSET_DETAIL_WIRE_NOINLINE
-#endif
-// A lambda's call operator inlined (after its parameter list); GCC and Clang.
-#if (defined(__clang__) || defined(__GNUC__)) && !defined(_MSC_VER)
-#define XOFFSET_DETAIL_LAMBDA_INLINE __attribute__((always_inline))
-#else
-#define XOFFSET_DETAIL_LAMBDA_INLINE
-#endif
 
 namespace XOffsetDatastructure {
 namespace detail {
@@ -50,7 +29,7 @@ namespace detail {
     // Out of line: its hole vector and graph walk stay out of the frames of
     // the paths that inline header_inline.
     template<class T>
-    XOFFSET_DETAIL_WIRE_NOINLINE void VerifiedPathsAccess::rebuild_free_table(T& root, XBufferCore& source) {
+    XOFFSET_DETAIL_NOINLINE void VerifiedPathsAccess::rebuild_free_table(T& root, XBufferCore& source) {
         std::vector<XBufferCore::WireHole> holes;
         XOFFSET_VREQUIRE(verify_structural_wire_graph(root, source, std::pmr::new_delete_resource(),
                                                       nullptr, 0, false, &holes));
@@ -58,8 +37,8 @@ namespace detail {
     }
 
     template<class T>
-    XOFFSET_DETAIL_WIRE_INLINE XWireHeaderV2 VerifiedPathsAccess::header_inline(XBufferCore& source) {
-        static_assert(is_v1_wire_admitted_v<T>);
+    XOFFSET_DETAIL_INLINE XWireHeaderV2 VerifiedPathsAccess::header_inline(XBufferCore& source) {
+        static_assert(is_wire_admitted_v<T>);
 #ifdef XOFFSET_REJECT_IMPLICIT_PADDING
         static_assert(!has_implicit_padding_v<T>,
             "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");
@@ -99,7 +78,7 @@ namespace detail {
     }
 
     // The output must not alias the source's storage (or hold it).
-    XOFFSET_DETAIL_WIRE_INLINE void save_check_alias(const std::string& out, const XBufferCore& candidate) {
+    XOFFSET_DETAIL_INLINE void save_check_alias(const std::string& out, const XBufferCore& candidate) {
         if (out.capacity() == (std::numeric_limits<std::size_t>::max)())
             XOFFSET_THROW(std::length_error("save_verified_into: output capacity overflows alias range"));
         if (verified_paths_intersect(&out, sizeof(out), candidate.get_address(), candidate.segment_size()) ||
@@ -123,10 +102,10 @@ namespace detail {
     // 0), the payload and the holes, as write_wire writes it; two plain
     // copies, written inline. False (nothing done) for anything else.
     template<class T>
-    XOFFSET_DETAIL_WIRE_INLINE bool VerifiedPathsAccess::save_small_into(XBufferCore& source, std::string& out,
+    XOFFSET_DETAIL_INLINE bool VerifiedPathsAccess::save_small_into(XBufferCore& source, std::string& out,
                                                                         XWireEmission emission) {
 #if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
-        static_assert(is_v1_wire_admitted_v<T>);
+        static_assert(is_wire_admitted_v<T>);
 #ifdef XOFFSET_REJECT_IMPLICIT_PADDING
         static_assert(!has_implicit_padding_v<T>,
             "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");
@@ -185,7 +164,7 @@ namespace detail {
     }
 
     template<class T>
-    XOFFSET_DETAIL_WIRE_NOINLINE void VerifiedPathsAccess::save_into_general(XBufferCore& source, std::string& out,
+    XOFFSET_DETAIL_NOINLINE void VerifiedPathsAccess::save_into_general(XBufferCore& source, std::string& out,
                                                                             XSaveOptions options) {
         auto check_alias = [&](XBufferCore& candidate) XOFFSET_DETAIL_LAMBDA_INLINE { save_check_alias(out, candidate); };
         const auto emission = options.emission;
@@ -342,13 +321,13 @@ namespace detail {
     // `at` (data_delta is relative to the head's own address), and the inline
     // form of a string of 1..inline_max bytes (store_inline: bytes 0..10 the
     // characters then zeros, byte 11 = 0x80 | length).
-    XOFFSET_DETAIL_WIRE_INLINE void write_container_head(char* base, std::size_t at, std::int32_t data_delta,
+    XOFFSET_DETAIL_INLINE void write_container_head(char* base, std::size_t at, std::int32_t data_delta,
                                                          std::uint32_t size, std::uint32_t capacity) noexcept {
         const std::int32_t head[3] = {data_delta, static_cast<std::int32_t>(size),
                                       static_cast<std::int32_t>(capacity)};
         std::memcpy(base + at, head, sizeof(head));
     }
-    XOFFSET_DETAIL_WIRE_INLINE void write_inline_string(char* base, std::size_t at, const char* text,
+    XOFFSET_DETAIL_INLINE void write_inline_string(char* base, std::size_t at, const char* text,
                                                         std::uint32_t n) noexcept {
         char head[12] = {};
         for (std::uint32_t i = 0; i < n; ++i) head[i] = text[i];
@@ -358,7 +337,7 @@ namespace detail {
 
     // Capacity given to a vector of n elements (strings stay tight).
     template <class E>
-    XOFFSET_DETAIL_WIRE_INLINE std::uint32_t compact_capacity(std::uint32_t n, std::uint32_t slack_div) noexcept {
+    XOFFSET_DETAIL_INLINE std::uint32_t compact_capacity(std::uint32_t n, std::uint32_t slack_div) noexcept {
         if constexpr (std::is_same_v<std::remove_cv_t<E>, char>) return n;
         if (slack_div == 0 || n < 8u) return n;
         const auto cap = std::uint64_t(n) + n / slack_div + 1u;
@@ -462,12 +441,12 @@ namespace detail {
         std::uint32_t slack_div;
         bool overflow = false;
         template <class E>
-        XOFFSET_DETAIL_WIRE_INLINE std::uint32_t capacity_for(std::uint32_t n) const noexcept {
+        XOFFSET_DETAIL_INLINE std::uint32_t capacity_for(std::uint32_t n) const noexcept {
             if constexpr (Plain) return n;
             else return compact_capacity<E>(n, slack_div);
         }
         // Reserves `padded` bytes (a multiple of 8); false on overflow.
-        XOFFSET_DETAIL_WIRE_INLINE bool take(std::size_t padded, std::size_t& at) noexcept {
+        XOFFSET_DETAIL_INLINE bool take(std::size_t padded, std::size_t& at) noexcept {
             if (padded > limit - cursor) [[unlikely]] { overflow = true; return false; }
             at = cursor;
             cursor += padded;
@@ -478,7 +457,7 @@ namespace detail {
     template <bool P> inline constexpr bool is_direct_writer_v<DirectWriter<P>> = true;
 
     // n is a multiple of 8.
-    XOFFSET_DETAIL_WIRE_INLINE void direct_copy_words(char* dst, const char* src, std::size_t n) noexcept {
+    XOFFSET_DETAIL_INLINE void direct_copy_words(char* dst, const char* src, std::size_t n) noexcept {
         if (n <= 64) {
             for (std::size_t i = 0; i < n; i += 8) {
                 std::uint64_t v;
@@ -502,7 +481,7 @@ namespace detail {
     }
 
     template <bool P>
-    XOFFSET_DETAIL_WIRE_INLINE void direct_string(const XFixedString& src, std::size_t at, DirectWriter<P>& w) noexcept {
+    XOFFSET_DETAIL_INLINE void direct_string(const XFixedString& src, std::size_t at, DirectWriter<P>& w) noexcept {
         const auto text = src.view();
         const auto n = static_cast<std::uint32_t>(text.size());
         if (n == 0) { write_container_head(w.base, at, 0, 0, 0); return; }
@@ -525,7 +504,7 @@ namespace detail {
     }
 
     template <class E, bool P>
-    XOFFSET_DETAIL_WIRE_INLINE void direct_vector(const XFixedVector<E>& src, std::size_t at, DirectWriter<P>& w) noexcept {
+    XOFFSET_DETAIL_INLINE void direct_vector(const XFixedVector<E>& src, std::size_t at, DirectWriter<P>& w) noexcept {
         const auto n = src.size_;
         if (n == 0) { write_container_head(w.base, at, 0, 0, 0); return; }
         const auto cap = w.template capacity_for<E>(n);
@@ -618,7 +597,7 @@ namespace detail {
         template <class C> static consteval bool descend() { return compose_descend<C, M...>(); }
         // The source assigned to the subobject `at` (of type C), or null.
         template <class C>
-        XOFFSET_DETAIL_WIRE_INLINE const C* find(const C* at) const noexcept {
+        XOFFSET_DETAIL_INLINE const C* find(const C* at) const noexcept {
             const C* found = nullptr;
             std::apply([&](const auto&... a) {
                 ([&] {
@@ -631,7 +610,7 @@ namespace detail {
         }
         // Whether a target meets the n bytes at p (else p's subtree is
         // written as is).
-        XOFFSET_DETAIL_WIRE_INLINE bool meets(const void* p, std::size_t n) const noexcept {
+        XOFFSET_DETAIL_INLINE bool meets(const void* p, std::size_t n) const noexcept {
             return std::apply([&](const auto&... a) {
                 return (verified_paths_intersect(p, n, a.target, sizeof(*a.target)) || ...);
             }, items);
@@ -667,7 +646,7 @@ namespace detail {
     }
 
     template <class C>
-    XOFFSET_DETAIL_WIRE_INLINE void zero_padding_bytes(char* at) noexcept {
+    XOFFSET_DETAIL_INLINE void zero_padding_bytes(char* at) noexcept {
         if constexpr (std::is_class_v<C> || std::is_array_v<C>) {
             if constexpr (padding_ranges<C>.size() != 0)
                 for (const auto& r : padding_ranges<C>)
@@ -772,7 +751,7 @@ namespace detail {
     template <class Root, std::size_t Member, class Element, FlatRecordFraming Framing = FlatRecordFraming::retained>
     class FlatRecordWriter {
         using Field = schema::member_t<Root, Member>;
-        static_assert(is_v1_wire_admitted_v<Root> && compact_direct_supported<Root>());
+        static_assert(is_wire_admitted_v<Root> && compact_direct_supported<Root>());
         static_assert(std::is_same_v<typename Field::type, XVector<Element>>);
         static_assert(std::is_trivially_copyable_v<Element> && !compact_has_heads<Element>());
         static_assert(flat_projection_members<Root, Member>(
@@ -820,7 +799,7 @@ namespace detail {
             return {reinterpret_cast<const std::byte*>(data), sizeof(XWireHeaderV2) + used - XWIRE_PAYLOAD_BEGIN};
         }
 
-        XOFFSET_DETAIL_WIRE_NOINLINE static char* open_slot(
+        XOFFSET_DETAIL_NOINLINE static char* open_slot(
                 std::unique_ptr<char, Delete>& slot, std::size_t count) {
             const auto used = XWIRE_PAYLOAD_BEGIN + root_bytes + payload_extent(count);
             std::unique_ptr<char, Delete> data(static_cast<char*>(::operator new(wire_bytes(count), wire_alignment)));
@@ -834,7 +813,7 @@ namespace detail {
             return slot.get();
         }
 
-        XOFFSET_DETAIL_WIRE_NOINLINE void resize_wire(std::size_t count) {
+        XOFFSET_DETAIL_NOINLINE void resize_wire(std::size_t count) {
             if (count > max_bytes / sizeof(Element))
                 XOFFSET_THROW(XException(XErrc::capacity_exceeded, "flat projection exceeds the wire limit"));
             const auto extent = (count * sizeof(Element) + 7u) & ~std::size_t(7u);
@@ -868,7 +847,7 @@ namespace detail {
         template <class Prefix = Root, class Prepare, class Generate>
             requires std::is_invocable_r_v<std::size_t, Prepare&, Prefix&> &&
                      std::is_nothrow_invocable_r_v<Element, Generate&, std::size_t>
-        XOFFSET_DETAIL_WIRE_INLINE std::size_t write(Prepare prepare, Generate generate) {
+        XOFFSET_DETAIL_INLINE std::size_t write(Prepare prepare, Generate generate) {
             // A plain prefix can prepare the scalar fields without constructing
             // the vector whose head is emitted separately below.
             if constexpr (!std::is_same_v<Prefix, Root>) {
@@ -1009,7 +988,7 @@ namespace detail {
     template<class T, class... M>
     void VerifiedPathsAccess::save_composed_into(XBufferCore& source, std::string& out, XCompactOptions options,
                                                  const XAssign<M>&... assigns) {
-        static_assert(is_v1_wire_admitted_v<T>);
+        static_assert(is_wire_admitted_v<T>);
 #ifdef XOFFSET_REJECT_IMPLICIT_PADDING
         static_assert(!has_implicit_padding_v<T>,
             "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");

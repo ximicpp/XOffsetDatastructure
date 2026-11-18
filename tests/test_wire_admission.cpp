@@ -72,22 +72,20 @@ constexpr auto fixed_vector_wire_sig = wire_abi_signature<XFixedVector<uint32_t>
 constexpr auto xmap_wire_sig = wire_abi_signature<XMap<int32_t, XString>>();
 constexpr auto xset_wire_sig = wire_abi_signature<XSet<int32_t>>();
 
-static_assert(is_v1_wire_admitted_v<XBlob>);
-static_assert(std::is_same_v<XFlatSet<int32_t>, XSet<int32_t>>);
-static_assert(std::is_same_v<XFlatMap<int32_t, XString>, XMap<int32_t, XString>>);
-static_assert(is_v1_wire_admitted_v<WireRoot>);
-static_assert(is_v1_wire_admitted_v<WireOther>);
+static_assert(is_wire_admitted_v<XBlob>);
+static_assert(is_wire_admitted_v<WireRoot>);
+static_assert(is_wire_admitted_v<WireOther>);
 // A typedef is the same C++ type as its underlying integer. On LP64 Linux
 // int64_t is long; on macOS it is long long. Preserve the fixed-width whitelist
 // rather than assuming the platform's alias selection or weakening admission.
-static_assert(is_v1_wire_admitted_v<HasLong> ==
+static_assert(is_wire_admitted_v<HasLong> ==
     (std::is_same_v<long, std::int32_t> || std::is_same_v<long, std::int64_t>));
-static_assert(!is_v1_wire_admitted_v<HasWchar>);
-static_assert(!is_v1_wire_admitted_v<HasLongDouble>);
-static_assert(!is_v1_wire_admitted_v<HasPointer>);
-static_assert(!is_v1_wire_admitted_v<DerivedRecord>);
-static_assert(!is_v1_wire_admitted_v<ExtendedString>);
-static_assert(!is_v1_wire_admitted_v<ExtendedMap>);
+static_assert(!is_wire_admitted_v<HasWchar>);
+static_assert(!is_wire_admitted_v<HasLongDouble>);
+static_assert(!is_wire_admitted_v<HasPointer>);
+static_assert(!is_wire_admitted_v<DerivedRecord>);
+static_assert(!is_wire_admitted_v<ExtendedString>);
+static_assert(!is_wire_admitted_v<ExtendedMap>);
 static_assert(std::string_view(xstring_wire_sig) == std::string_view(fixed_string_wire_sig));
 static_assert(std::string_view(xvector_wire_sig) == std::string_view(fixed_vector_wire_sig));
 static_assert(std::string_view(xstring_wire_sig).find("[s:12,a:4]{data:rel32,size:u32,capacity:u32}") != std::string_view::npos);

@@ -39,7 +39,7 @@ template<> struct wire_record_layout<LifetimeRoot> { static constexpr bool ordin
 XOFFSET_REGISTER_SCHEMA_NAME(LifetimeRoot, "receive.complete.core-lifetime.v1")
 static_assert(dt::inplace_lifetime_supported<LifetimeRoot>());
 static_assert(dt::ordinary_outer_lifetime_supported<LifetimeRecord>());
-static_assert(xo::is_v1_wire_admitted_v<LifetimeRoot>);
+static_assert(xo::is_wire_admitted_v<LifetimeRoot>);
 
 namespace {
 void need(bool value, const char* message) { if (!value) throw std::runtime_error(message); }

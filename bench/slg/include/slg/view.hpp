@@ -56,7 +56,7 @@
 //             stages' working set; send + compress = *.send + *Z.send. Own prefix so
 //             per-case totals (pool_v4, the perf gate) are unchanged. Sizes in the
 //             *_zstd byte keys.
-// XOffset native (with XOFFSET_DELTA_SYNC_API), keys N*: the server keeps each
+// XOffset native, keys N*: the server keeps each
 // client's view as an XBuffer, mutates it in place (N*.send) and writes the
 // delta against that client's baseline (N*.diff); the client patches and
 // verifies (N*.recv) and reads in place.
@@ -838,7 +838,7 @@ template <class V, class D> void apply_delta(V& v, HeldIndex& at, const D& d) {
 //   void delta_recv_from(const std::string&)  the same from a stored wire (U*W replay)
 //   const auto& delta()                        that object
 // Optional: std::string_view snap_compact(int b) (XOffset: the compact wire, for bytes only).
-// Optional native delta (XOffset with XOFFSET_DELTA_SYNC_API), keys N*; every
+// Optional native delta (XOffset), keys N*; every
 // client c has its own server-side view and baseline:
 //   void n_view(int c, const MapWorld&, const ViewRect&)   lay out the view's rect and tiles (untimed)
 //   void n_plan(int c, const MapWorld&, const DeltaPlan&)  which slot each change uses (timed in N*.send)

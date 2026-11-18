@@ -1,50 +1,15 @@
 #ifndef X_OFFSET_FIXED_MESSAGE_HPP
 #define X_OFFSET_FIXED_MESSAGE_HPP
 
-// Fixed messages: records with no arena container, sent as their own bytes.
-//
-// A fixed message is an admitted wire type with no XString, XVector, XSet,
-// XMap or XBlob anywhere inside it and no implicit padding: scalars, enums,
-// arrays of them and records of them (a normalized market-data update, an
-// order, an ack). Its object representation holds no offset and no
-// uninitialized byte, so it needs no arena, no root and no wire header:
-//
-//   - The connection binds the type once: list it in the schema handshake
-//     (make_schema_hello<Quote>(...), accept_schema_hello<Quote>(...),
-//     xoffset_handshake.hpp) like any root type; it needs a schema name
-//     (XOFFSET_REGISTER_SCHEMA_NAME). After that a message is sizeof(T) bytes.
-//   - The sender copies the record into the transport buffer
-//     (write_fixed_message) or builds a batch in place (place_fixed_batch).
-//   - The receiver reads it where it lies (view_fixed_message,
-//     view_fixed_batch): no copy, no arena, no XBuffer.
-//
-// A batch is an 8-byte header {count, tag} followed by count records. The
-// tag is 32 bits of the type's wire fingerprint: it catches a batch handed to
-// the reader of another type, and lets one connection carry several fixed
-// types (switch on peek_fixed_batch_tag(bytes), case fixed_message_tag_v<T>).
-// A single message carries no tag: send single messages only on a
-// connection that carries one type.
-//
-// What a view checks: the size (exactly sizeof(T), or the batch's count), the
-// alignment of T, the batch tag, and the byte of every bool (0 or 1), as
-// load_verified does. That is the whole structural validation of a fixed
-// message: it holds no offset that could point outside the buffer. Enum
-// values are not range-checked, as in the wire. For a type without bool the
-// value check compiles away.
-//
-// The same type can also be a member or element of an ordinary XOffset root
-// (XVector<Quote> in a snapshot); the bytes of a record are the same in both.
-//
-// Lifetime: a view reads the record in place, as XBuffer reads its arena
-// (std::launder). The bytes must have been written by an operation that
-// implicitly creates objects in the buffer: memcpy, a socket read into a byte
-// buffer, or the write functions here. A view is valid while those bytes are
-// unchanged.
-//
-// Byte order: like the wire, a fixed message moves only between 64-bit
-// little-endian peers (the library's platform guard).
-//
-// Nothing here throws or allocates.
+// Fixed messages (docs/USER_GUIDE.md section 4.4): admitted records with no
+// arena container and no implicit padding, sent as their own sizeof(T) bytes
+// once the schema handshake has bound the type. A batch is an 8-byte header
+// {count, tag} and count records; the tag is 32 bits of the type's wire
+// fingerprint. A view checks the size, the alignment, the batch tag and every
+// bool byte: with no offsets there is nothing else to bound. It reads in
+// place (std::launder), so the bytes must come from an operation that
+// implicitly creates objects (memcpy, a socket read into a byte buffer, the
+// write functions here). Nothing here throws or allocates.
 
 #include "xoffsetdatastructure.hpp"
 
@@ -90,7 +55,7 @@ namespace XOffsetDatastructure {
         consteval bool is_fixed_message() {
             using C = std::remove_cv_t<T>;
             if constexpr (!std::is_class_v<C> || std::is_union_v<C>) return false;
-            else if constexpr (!v1_wire_admitted<C>()) return false;
+            else if constexpr (!wire_admitted<C>()) return false;
             else if constexpr (!no_arena_container<C>()) return false;
             else return !has_implicit_padding_v<C>;
         }

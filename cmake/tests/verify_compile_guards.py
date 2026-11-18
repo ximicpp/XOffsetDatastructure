@@ -48,7 +48,7 @@ def main():
         fixture = output / case / "source"
         (fixture / "tests").mkdir(parents=True)
         for name in ("xoffsetdatastructure.hpp", "xoffset_virtual_memory.hpp", "xoffset_slot_storage.hpp",
-                     "xoffset_error.hpp"):
+                     "xoffset_error.hpp", "xoffset_config.hpp"):
             shutil.copyfile(source / name, fixture / name)
         for name in ("test_polymorphic_positive.cpp", "test_polymorphic_rejection.cpp"):
             shutil.copyfile(source / "tests" / name, fixture / "tests" / name)
