@@ -289,7 +289,7 @@ namespace XOffsetDatastructure {
 
 // XOFFSET_SCHEMA_DETAIL_REFLECTION_CHECK is defined by the active backend,
 // XOFFSET_CHECK_GLOBAL_NAMESPACE_ and XOFFSET_SCHEMA_DETAIL_ORDINARY (the
-// ordinary-record declaration) by xoffsetdatastructure.hpp.
+// ordinary-record declaration) by xoffset_registration.hpp.
 #define XOFFSET_RECORD(T, ...)                                                 \
     XOFFSET_CHECK_GLOBAL_NAMESPACE_("XOFFSET_RECORD")                          \
     XOFFSET_SCHEMA_DETAIL_DESCRIPTION(T, true, (), __VA_ARGS__)                \
