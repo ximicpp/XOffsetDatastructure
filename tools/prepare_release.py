@@ -51,8 +51,7 @@ DEPENDENCY_LICENSES = ("external/boost/LICENSE_1_0.txt", "external/typelayout/LI
                        "external/typelayout/LICENSE_1_0.txt")
 EXPECTED_REVISIONS = {"boost": "da041154c6bac1a4aa98254a7d6819059e8ac0b0",
                       "typelayout": "fe295929d0a5bfa7809fb737a6eb3db279599346"}
-FULL_OWN_HEADERS = ('xoffsetdatastructure.hpp', 'receive_future.hpp', 'receive_raw.hpp', 'receive_raw_fwd.hpp', 'validation_scratch.hpp', 'xoffset_admission.hpp', 'xoffset_core_lifetime.hpp', 'xoffset_fixed_string.hpp', 'xoffset_schema.hpp', 'xoffset_schema_describe.hpp', 'xoffset_schema_reflect.hpp', 'xoffset_snapshot_index.hpp', 'xoffset_snapshot_index_budget.hpp', 'xoffset_validation_scratch.hpp', 'xoffset_verified_paths.hpp', 'xoffset_verified_receive.hpp', 'xoffset_schema_names.hpp', 'xoffset_handshake.hpp', 'xoffset_evolution.hpp', 'xoffset_schema_freeze.hpp', 'xoffset_fixed_message.hpp', 'xoffset_delta.hpp', 'xoffset_receiver.hpp', 'xoffset_shared_delta.hpp', 'xoffset_shared_publisher.hpp', 'xoffset_proxy.hpp')
-OPTIONAL_RUNTIME_SOURCES = ('validation_scratch.cpp', 'snapshot_index_runtime.cpp')
+FULL_OWN_HEADERS = ('xoffsetdatastructure.hpp', 'xoffset_admission.hpp', 'xoffset_core_lifetime.hpp', 'xoffset_fixed_string.hpp', 'xoffset_schema.hpp', 'xoffset_schema_describe.hpp', 'xoffset_schema_reflect.hpp', 'xoffset_verified_paths.hpp', 'xoffset_schema_names.hpp', 'xoffset_handshake.hpp', 'xoffset_evolution.hpp', 'xoffset_schema_freeze.hpp', 'xoffset_fixed_message.hpp', 'xoffset_delta.hpp', 'xoffset_receiver.hpp', 'xoffset_shared_delta.hpp', 'xoffset_shared_publisher.hpp', 'xoffset_proxy.hpp')
 ROOT_FILES = ("CMakeLists.txt", "README.md", "XOFFSET_VERSION", "CHANGELOG.md", "LICENSE",
               "build.sh", "xoffsetdatastructure.hpp", "xoffset_virtual_memory.hpp", "xoffset_slot_storage.hpp",
               "xoffset_error.hpp", "Dockerfile", "docker-compose.yml", ".dockerignore")
@@ -75,7 +74,7 @@ COPIED_TREES = ("cmake", "tests", "examples", "include", "bench/slg/include")
 # bench/slg/include: the SLG model headers that a test and describe_dump_slg include
 OPTIONAL_TREES = ("include", "bench/slg/include")
 OPTIONAL_FILES = ("toolchains/build_tools.cmake",)
-ROOT_FILES = ROOT_FILES + tuple(h for h in FULL_OWN_HEADERS if h not in ROOT_FILES) + OPTIONAL_RUNTIME_SOURCES
+ROOT_FILES = ROOT_FILES + tuple(h for h in FULL_OWN_HEADERS if h not in ROOT_FILES)
 REQUIRED_FILES = ROOT_FILES + DOC_FILES + TOOLCHAIN_FILES + TOOL_FILES + SIGNATURE_FILES + TOOL_TESTS
 FORBIDDEN_PARTS = {".git", ".svn", "build", "dist", "__pycache__", ".pytest_cache"}
 GENERATED_HEADERS = {"check_compat_baselines.hpp"}

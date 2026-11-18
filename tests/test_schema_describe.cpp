@@ -114,7 +114,7 @@ static_assert(!xo::is_byte_copy_safe_v<sd::Polymorphic>);
 static_assert(!xo::is_byte_copy_safe_v<sdc::DerivedNamed>);
 static_assert(!xo::is_byte_copy_safe_v<sdc::CaseRoot>);
 static_assert(!StableErasable<std::string>);
-static_assert(!xo::detail::receive_raw_supported<std::string>());
+static_assert(!xo::detail::inplace_lifetime_supported<std::string>());
 static_assert(XOFFSET_SCHEMA_REFLECTION || xo::schema::is_undescribable_v<sd::Bits>);
 static_assert(!xo::schema::is_undescribable_v<xo::XVector<std::int32_t>>);
 
@@ -123,8 +123,8 @@ static_assert(!xo::schema::is_undescribable_v<xo::XVector<std::int32_t>>);
 static_assert(!schema::implicit_lifetime_aggregate<sd::UserDestructor>());
 static_assert(schema::implicit_lifetime_aggregate<sd::UserAssignment>());
 static_assert(!schema::only_implicit_special_members<sd::UserAssignment>());
-static_assert(!xo::detail::receive_raw_supported<sd::UserDestructor>());
-static_assert(!xo::detail::receive_raw_supported<sd::UserAssignment>());
+static_assert(!xo::detail::inplace_lifetime_supported<sd::UserDestructor>());
+static_assert(!xo::detail::inplace_lifetime_supported<sd::UserAssignment>());
 
 #if XOFFSET_SCHEMA_REFLECTION
 // The library's own field lists, against reflection.

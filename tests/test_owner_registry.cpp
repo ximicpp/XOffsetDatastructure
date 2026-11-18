@@ -110,8 +110,7 @@ void actual_heap_failure_preserves_owners() {
 }
 
 void ordinary_registration_allocates_only_its_record() {
-    // Ordinary owners are not indexed (only direct-receive owners are, for
-    // canonical_bytes_at): registration is exactly one host allocation, so a
+    // Owners are not indexed: registration is exactly one host allocation, so a
     // failure armed for the second allocation is never reached, however many
     // owners are live.
     std::vector<XBuffer> owners;

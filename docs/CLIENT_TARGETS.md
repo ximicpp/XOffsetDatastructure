@@ -55,7 +55,7 @@ and macOS machines, and an iPhone 15 Pro Max passed CTest and the corpus; eviden
   are still macros. MSVC ignores `[[no_unique_address]]`, so do not use it in shared types: the layout
   differs from GCC/Clang and a pin fails. Sources build with `/utf-8`.
 - **MinGW GCC**: emulated TLS breaks the per-thread caches at thread exit, so they are off
-  (`XOFFSET_THREAD_CACHES=0`) and two cache tests report a skip.
+  (`XOFFSET_THREAD_CACHES=0`).
 - **macOS / iOS**: the system libc++ has `std::pmr` only from macOS 14 / iOS 17, and lower targets would
   fail only at load time, so lower deployment targets are a compile error.
 - **Windows checkouts**: set `core.autocrlf false` and `core.eol lf` before checkout, or the dependency
