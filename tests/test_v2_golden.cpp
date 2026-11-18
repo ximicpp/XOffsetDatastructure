@@ -139,7 +139,9 @@ void check(const std::string& wire, bool expect_sparse, std::size_t pinned_size,
     std::memcpy(&h, wire.data(), sizeof(h));
     if ((h.extent_count != 0) != expect_sparse) fail("unexpected dense/sparse emission");
     if (h.hole_count == 0) fail("expected holes in the golden model");
-    if (wire.size() != pinned_size || fnv1a(wire) != pinned_hash) {
+    // The pinned bytes are wire 2.1's: the in-band allocator's directory and
+    // link words are payload bytes of their own.
+    if (!xo::detail::inband_allocator && (wire.size() != pinned_size || fnv1a(wire) != pinned_hash)) {
         std::cerr << "size=" << wire.size() << " fnv=0x" << std::hex << fnv1a(wire) << std::dec << "\n";
         fail("golden bytes changed");
     }
@@ -203,7 +205,9 @@ int main() {
     check(sparse, true, GOLDEN_ELIDED_SIZE, GOLDEN_ELIDED_FNV, kElide);
     {   // The earlier N10 emission (built here, independently) is the same
         // wire, and every form loads the dense payload.
-        if (n10_wire(large_dense) != large) fail("free-run emission differs from N10 on the golden model");
+        // (In-band, a free run keeps each free block's link word.)
+        if (!xo::detail::inband_allocator && n10_wire(large_dense) != large)
+            fail("free-run emission differs from N10 on the golden model");
         for (const auto* wire : {&large, &sparse}) {
             auto loaded = Buffer(xo::XBuffer::load_verified<golden::Model>(*wire));
             if (loaded.save_verified(kDense) != large_dense) fail("sparse wire does not load the dense payload");

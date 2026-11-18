@@ -45,10 +45,11 @@ void check(bool condition, const std::string& message) {
 }
 
 // Where allocate_block places `bytes` (block size) in a copy of `buffer`
-// with the same hole table, as an offset.
+// with the same hole table (its wire holes: with the in-band allocator, the
+// free directory too), as an offset.
 std::size_t predicted_offset(const xo::XBuffer& buffer, std::uint32_t bytes) {
     std::vector<Hole> holes;
-    buffer.for_each_free_block([&](Hole h) { holes.push_back(h); });
+    buffer.for_each_wire_hole([&](Hole h) { holes.push_back(h); });
     const auto wire = buffer.copy_bytes();
     xo::XBufferCore twin(wire.data(), wire.size(), xo::XBufferCore::maximum_capacity(8u * 1024u * 1024u));
     twin.replace_free_blocks(holes);
@@ -101,8 +102,10 @@ void first_block(xo::XBuffer& buffer, xo::XVector<T>& v, std::mt19937_64& rng, C
 }
 
 // Destroys one list (its block becomes a hole) and appends an empty one.
+// The retired block reads as zero past its header (the allocator's), but
+// for a free directory placed in it.
 template <typename T>
-void release_one(xo::XVector<xo::XVector<T>>& lists, std::mt19937_64& rng) {
+void release_one(const xo::XBuffer& buffer, xo::XVector<xo::XVector<T>>& lists, std::mt19937_64& rng) {
     const auto at = rng() % lists.size();
     const auto& v = lists[std::uint32_t(at)];
     if (v.capacity() == 0) return;
@@ -110,7 +113,10 @@ void release_one(xo::XVector<xo::XVector<T>>& lists, std::mt19937_64& rng) {
     const std::size_t old_bytes = block_of(std::size_t(v.capacity()) * sizeof(T));
     lists.erase(lists.begin() + std::ptrdiff_t(at));
     lists.emplace_back();
-    check(std::all_of(old, old + old_bytes, [](unsigned char c) { return c == 0; }), "retired block not zeroed");
+    const auto dir = buffer.free_directory();
+    const auto* dir_at = reinterpret_cast<const unsigned char*>(buffer.data()) + dir.offset;
+    for (std::size_t i = xo::XBufferCore::free_block_header_bytes; i < old_bytes; ++i)
+        check(old[i] == 0 || (old + i >= dir_at && old + i < dir_at + dir.bytes), "retired block not zeroed");
 }
 
 // Pushes onto a non-empty list; its regrowths relocate the elements (small
@@ -152,9 +158,9 @@ int main() {
             else if (list == 1) first(root->points);
             else first(root->bytes);
         } else if (pick < 8) {
-            if (list == 0) release_one(root->words, rng);
-            else if (list == 1) release_one(root->points, rng);
-            else release_one(root->bytes, rng);
+            if (list == 0) release_one(buffer, root->words, rng);
+            else if (list == 1) release_one(buffer, root->points, rng);
+            else release_one(buffer, root->bytes, rng);
         } else {
             if (list == 0) grow_one(root->words, rng, counts.regrowths);
             else if (list == 1) grow_one(root->points, rng, counts.regrowths);

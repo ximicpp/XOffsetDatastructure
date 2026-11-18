@@ -132,7 +132,10 @@ bool same_binding(fd::allocator_ref a, fd::allocator_ref b) {
 }
 // V2 has no allocator operation counters (FreelistIndex diagnostics are gone).
 // Live bytes = used_end - free bytes, observed through the host free table.
-std::uint64_t live_bytes(const xo::XBufferCore& b) { return b.arena()->used_end - b.free_block_bytes(); }
+// Live: not a free block and not (in-band) the free directory.
+std::uint64_t live_bytes(const xo::XBufferCore& b) {
+    return b.arena()->used_end - b.free_block_bytes() - b.free_directory().bytes;
+}
 void fill(ResizeAttr& a, std::string_view key, std::uint8_t byte) {
     a.key.assign(key); a.value.resize(16);
     std::fill(a.value.begin(), a.value.end(), byte);

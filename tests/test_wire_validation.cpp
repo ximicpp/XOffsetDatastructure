@@ -33,6 +33,11 @@ constexpr const char* kHoleEntry = "wire validation failed: invalid hole table e
 constexpr const char* kLiveFree = "wire validation detected live/free overlap";
 constexpr const char* kLiveLive = "wire validation detected overlapping dynamic ranges";
 constexpr const char* kFreeFree = "wire validation detected overlapping free-list ranges";
+// The in-band allocator (XOFFSET_INBAND_ALLOCATOR): its free directory is a
+// hole of its own (the first in the table), and a full load checks that it
+// holds exactly the table's other holes.
+constexpr bool kInband = XBufferCore::free_block_header_bytes != 0;
+constexpr const char* kDirectory = "wire validation failed: free blocks differ from the free directory";
 constexpr const char* kRelative = "wire validation: relative pointer out of bounds";
 
 std::size_t precise_rejections = 0;
@@ -165,11 +170,13 @@ int main() {
     const auto original = buf.save_verified<CheckedRoot>();
     const auto base = parse(original);
     const auto& h = base.header;
-    need(h.hole_count == 1 && base.holes[0].bytes == 16, "fixture must have one 16-byte hole");
+    // The retired block is the last hole (in-band, after the directory).
+    const std::size_t fi = base.holes.size() - 1;
+    need(h.hole_count == (kInband ? 2u : 1u) && base.holes[fi].bytes == 16, "fixture must have one 16-byte hole");
     need(build(base) == original, "fixture split/rebuild is not byte-identical");
     const std::size_t root = sizeof(h) + h.root_offset - kBegin; // wire offset of the root
     const std::size_t proot = h.root_offset; // root offset inside Parts::payload
-    const Hole hole = base.holes[0];
+    const Hole hole = base.holes[fi];
     auto loaded = XBuffer::load_verified<CheckedRoot>(original);
     assert(loaded.root<CheckedRoot>().id == 42);
     assert(loaded.root<CheckedRoot>().labels[2].view() == "array-two-heap-label");
@@ -273,7 +280,7 @@ int main() {
     {
         const auto* a = loaded.arena();
         need(std::memcmp(a->magic, "XBUFV2\0\0", 8) == 0 && a->header_size == kBegin && a->flags == 0 &&
-             a->root_offset == h.root_offset && a->used_end == h.used_bytes && a->reserved0 == 0 &&
+             a->root_offset == h.root_offset && a->used_end == h.used_bytes && (kInband || a->reserved0 == 0) &&
              a->reserved1 == 0, "the receiver did not write the payload header");
     }
 
@@ -281,18 +288,18 @@ int main() {
     for (auto bad : {uint32_t(1), uint32_t(4), uint32_t(0), uint32_t(40),
                      uint32_t(h.used_bytes), uint32_t(0x7ffffff8), UINT32_MAX}) {
         auto p = base;
-        p.holes[0].offset = bad; // unaligned, inside the payload header, or past used_end
+        p.holes[fi].offset = bad; // unaligned, inside the payload header, or past used_end
         reject(build(p), kHoleEntry);
     }
     for (auto bad : {uint32_t(0), uint32_t(4), uint32_t(12), uint32_t(h.used_bytes), UINT32_MAX - 7}) {
         auto p = base;
-        p.holes[0].bytes = bad; // empty, not a multiple of 8, or past used_end
+        p.holes[fi].bytes = bad; // empty, not a multiple of 8, or past used_end
         reject(build(p), kHoleEntry);
     }
     {   // An entry ending one block past used_end.
         auto p = base;
-        p.holes[0].offset = static_cast<uint32_t>(h.used_bytes - 8);
-        p.holes[0].bytes = 16;
+        p.holes[fi].offset = static_cast<uint32_t>(h.used_bytes - 8);
+        p.holes[fi].bytes = 16;
         reject(build(p), kHoleEntry);
     }
     {   // Duplicate entry and partially overlapping entries.
@@ -300,7 +307,7 @@ int main() {
         p.holes.push_back(hole);
         reject(build(p), kFreeFree);
         p = base;
-        p.holes[0].bytes = 8;
+        p.holes[fi].bytes = 8;
         p.holes.push_back({hole.offset, 16});
         reject(build(p), kFreeFree);
     }
@@ -309,13 +316,17 @@ int main() {
         p.holes.clear();
         reject(build(p), kCoverage);
         p = base;
-        p.holes[0].bytes = 8; // half of the retired block left unaccounted
+        p.holes[fi].bytes = 8; // half of the retired block left unaccounted
         reject(build(p), kCoverage);
     }
-    {   // Splitting the hole into two exact entries (any order) is equivalent.
+    {   // Splitting the hole into two exact entries (any order) is equivalent
+        // (in-band, the directory names the one block).
         auto p = base;
-        p.holes = {{hole.offset + 8, 8}, {hole.offset, 8}};
-        accept(build(p), "split hole table must remain valid");
+        p.holes.resize(fi);
+        p.holes.push_back({hole.offset + 8, 8});
+        p.holes.push_back({hole.offset, 8});
+        if (kInband) reject(build(p), kDirectory);
+        else accept(build(p), "split hole table must remain valid");
     }
     {   // A hole overlapping a live block: the root, a heap string, vector blocks.
         const auto name_block = head_target(base.payload, proot + offsetof(CheckedRoot, name));
@@ -327,7 +338,7 @@ int main() {
             reject(build(p), kLiveFree);
         }
         auto p = base; // moving the only hole onto a live block also uncovers its own bytes
-        p.holes[0].offset = static_cast<uint32_t>(name_block);
+        p.holes[fi].offset = static_cast<uint32_t>(name_block);
         reject(build(p), kLiveFree);
     }
     {   // An extra region past the old used_end: rejected without a hole,
@@ -337,7 +348,15 @@ int main() {
         reject(build(p), kCoverage);
         auto covered = p;
         covered.holes.push_back({static_cast<uint32_t>(h.used_bytes), 16});
+        // In-band, the table's order is the stacks' order: a block after the
+        // last of its size joins that stack (its link is written on load).
         accept(build(covered), "tail region described by a hole must be accepted");
+        if (kInband) {
+            auto other = base; // a size the directory has no stack for
+            other.payload.append(24, '\0');
+            other.holes.push_back({static_cast<uint32_t>(h.used_bytes), 24});
+            reject(build(other), kDirectory);
+        }
         auto partial = p;
         partial.holes.push_back({static_cast<uint32_t>(h.used_bytes), 8});
         reject(build(partial), kCoverage);
@@ -393,8 +412,10 @@ int main() {
         write(p.payload, values_head + offsetof(XVectorCore<int32_t>, capacity_), uint32_t(4));
         std::memcpy(p.payload.data() + hole.offset, base.payload.data() + old_values, 16);
         reject(build(p), kLiveFree);
-        p.holes = {{static_cast<uint32_t>(old_values), 64}};
-        accept(build(p), "exchanging a live block and a hole consistently must be valid");
+        p.holes.resize(fi);
+        p.holes.push_back({static_cast<uint32_t>(old_values), 64});
+        if (kInband) reject(build(p), kDirectory); // the directory still names the old hole
+        else accept(build(p), "exchanging a live block and a hole consistently must be valid");
     }
 
     // ---- Container heads: capacity_ / size_ (derived extents) -------------
@@ -512,10 +533,14 @@ int main() {
         const auto wire = sbuf.save_verified<CheckedRoot>(elide);
         const auto sh = read<XWireHeaderV2>(dense, 0);
         const auto wh = read<XWireHeaderV2>(wire, 0);
-        need(sh.extent_count == 0 && sh.hole_count == 1 && read<Hole>(dense, dense.size() - 8).bytes == 8192,
+        // In-band, the end of the retired block holds the free directory
+        // (the first hole), which a free run leaves out.
+        const std::uint32_t dir_bytes = sbuf.free_directory().bytes, freed = 8192 - dir_bytes;
+        const std::uint32_t holes = kInband ? 2u : 1u, run = freed;
+        need(sh.extent_count == 0 && sh.hole_count == holes && read<Hole>(dense, dense.size() - 8).bytes == freed,
              "dense fixture layout");
-        need(wh.extent_count >= 2 && wh.used_bytes == sh.used_bytes && wh.hole_count == 1 &&
-             read<Hole>(wire, wire.size() - 8).bytes == 8192 && wire.size() + 8192 < dense.size(),
+        need(wh.extent_count >= 2 && wh.used_bytes == sh.used_bytes && wh.hole_count == holes &&
+             read<Hole>(wire, wire.size() - 8).bytes == freed && wire.size() + freed < dense.size(),
              "sparse fixture layout");
         const std::size_t table = sizeof(XWireHeaderV2);
         const std::size_t count = static_cast<std::size_t>(wh.extent_count);
@@ -527,7 +552,7 @@ int main() {
             need(i == 0 ? ext[i].offset == kBegin : ext[i].offset > ext[i - 1].offset + ext[i - 1].bytes,
                  "sparse fixture extents");
         }
-        need(wire.size() == table + count * 8 + stored + sizeof(Hole), "sparse fixture size");
+        need(wire.size() == table + count * 8 + stored + holes * sizeof(Hole), "sparse fixture size");
         // Inflates a sparse wire with a well-formed extent table to the
         // dense wire of the payload it loads (gap bytes zero).
         auto inflate = [&](const std::string& sparse) {
@@ -556,7 +581,7 @@ int main() {
         {   // The default (free-run) emission skips exactly the 8 KiB hole.
             const auto runs = sbuf.save_verified<CheckedRoot>();
             const auto rh = read<XWireHeaderV2>(runs, 0);
-            need(rh.extent_count == 2 && runs.size() == dense.size() - 8192 + 16 && inflate(runs) == dense,
+            need(rh.extent_count == 2 && runs.size() == dense.size() - run + 16 && inflate(runs) == dense,
                  "free-run emission did not skip exactly the 8 KiB hole");
             accept(runs, "free-run wire must load");
         }

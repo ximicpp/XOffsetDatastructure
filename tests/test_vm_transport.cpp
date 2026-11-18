@@ -149,11 +149,16 @@ void check_transport(std::size_t length, const std::filesystem::path& fixture_di
         assert(hole.bytes == 40 && hole.offset % 8 == 0 && hole.offset + hole.bytes <= h.used_bytes);
         auto reloaded = XBuffer::load_verified<TransportRoot>(holed_wire);
         assert(reloaded.save_verified<TransportRoot>() == holed_wire);
-        assert(reloaded.free_block_count() == 1 && reloaded.free_block_bytes() == 40);
-        auto* reused = static_cast<char*>(reloaded.arena()->allocate_aligned(33, 8)); // 40-byte block
-        assert(reloaded.free_block_count() == 0 && reused == reloaded.data() + hole.offset);
-        reloaded.arena()->deallocate(reused, 33);
-        assert(reloaded.free_block_count() == 1 && reloaded.save_verified<TransportRoot>() == holed_wire);
+        if (reloaded.free_directory().bytes != 0) {
+            // In-band, the retired 40-byte block became the free directory.
+            assert(reloaded.free_directory().offset == hole.offset && reloaded.free_block_count() == 0);
+        } else {
+            assert(reloaded.free_block_count() == 1 && reloaded.free_block_bytes() == 40);
+            auto* reused = static_cast<char*>(reloaded.arena()->allocate_aligned(33, 8)); // 40-byte block
+            assert(reloaded.free_block_count() == 0 && reused == reloaded.data() + hole.offset);
+            reloaded.arena()->deallocate(reused, 33);
+            assert(reloaded.free_block_count() == 1 && reloaded.save_verified<TransportRoot>() == holed_wire);
+        }
         // Dropping the hole table leaves dead space that exact coverage rejects.
         std::string no_holes = holed_wire.substr(0, holes_at);
         XWireHeaderV2 stripped = h;

@@ -73,7 +73,10 @@ using Holes = std::vector<std::pair<std::uint32_t, std::uint32_t>>;
 Holes holes(const xo::XBufferCore& b) {
     Holes out; b.for_each_free_block([&](xo::XBufferCore::WireHole h) { out.emplace_back(h.offset, h.bytes); }); return out;
 }
-std::uint64_t live(const xo::XBufferCore& b) { return b.arena()->used_end - b.free_block_bytes(); }
+// Live: not a free block and not (in-band) the free directory.
+std::uint64_t live(const xo::XBufferCore& b) {
+    return b.arena()->used_end - b.free_block_bytes() - b.free_directory().bytes;
+}
 std::uint32_t extent(std::size_t bytes) { return static_cast<std::uint32_t>((bytes + 7u) & ~std::size_t(7)); }
 bool has_hole(const xo::XBufferCore& b, const void* p, std::uint32_t bytes) {
     const auto offset = static_cast<std::uint32_t>(static_cast<const char*>(p) - b.data());

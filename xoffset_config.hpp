@@ -270,6 +270,18 @@
 #  endif
 #endif
 
+// ---- Allocator --------------------------------------------------------------
+//   XOFFSET_INBAND_ALLOCATOR  the allocator's state is payload bytes: free
+//                             blocks of one size are linked through their
+//                             first 4 bytes, and a directory block of the
+//                             payload holds one list head per size (see
+//                             XBufferCore, "In-band allocator"). Off: the
+//                             host-side free table. Being introduced: off by
+//                             default until the wire carries the directory.
+#ifndef XOFFSET_INBAND_ALLOCATOR
+#  define XOFFSET_INBAND_ALLOCATOR 0
+#endif
+
 // ---- Per-thread caches -----------------------------------------------------
 // Per-thread caches (this slab's free lists, the free-table cache and the
 // owner cache in xoffsetdatastructure.hpp). Each keeps a trivial thread_local
@@ -297,4 +309,5 @@ inline constexpr bool scrub_reset = XOFFSET_SCRUB_RESET != 0;
 inline constexpr bool pin_quarantine = XOFFSET_PIN_QUARANTINE != 0;
 inline constexpr bool save_self_check = XOFFSET_SAVE_SELF_CHECK != 0;
 inline constexpr bool check_sorted = XOFFSET_CHECK_SORTED != 0;
+inline constexpr bool inband_allocator = XOFFSET_INBAND_ALLOCATOR != 0;
 } // namespace XOffsetDatastructure::detail

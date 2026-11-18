@@ -1422,6 +1422,9 @@ namespace XOffsetDatastructure {
             payload_.clear();
             holes_.clear();
             holes_gen_ = 0;
+#if XOFFSET_INBAND_ALLOCATOR
+            inband_dir_ = 0;
+#endif
             touch_log_ = 0;
             used_ = 0;
         }
@@ -1459,6 +1462,9 @@ namespace XOffsetDatastructure {
         detail::DeltaCopy payload_;  // [0, used_end) as the receiver holds it ([0, 48) unused)
         std::vector<XBufferCore::WireHole> holes_;        // its hole table, by offset
         std::uint64_t holes_gen_ = 0;                     // the free-block table's generation it was taken at
+#if XOFFSET_INBAND_ALLOCATOR
+        std::uint32_t inband_dir_ = 0;                    // the free directory's offset then (0: none)
+#endif
         // touched_only: the touch log of the buffer the last delta came from
         // (0: none) and the stamp it had then (touches since have a later one).
         std::uint64_t touch_log_ = 0;
@@ -1778,8 +1784,14 @@ namespace XOffsetDatastructure {
                 auto& holes = scratch.holes;
                 holes.clear();
                 if (!holes_same) {
-                    holes.reserve(core.free_block_count());
-                    core.for_each_free_block([&](XBufferCore::WireHole h) { holes.push_back(h); });
+                    if constexpr (detail::inband_allocator) {
+                        // The directory block too (the receiver finds it among them).
+                        holes.reserve(core.wire_hole_count());
+                        core.for_each_wire_hole([&](XBufferCore::WireHole h) { holes.push_back(h); });
+                    } else {
+                        holes.reserve(core.free_block_count());
+                        core.for_each_free_block([&](XBufferCore::WireHole h) { holes.push_back(h); });
+                    }
                     std::sort(holes.begin(), holes.end(), [](const XBufferCore::WireHole& x, const XBufferCore::WireHole& y) {
                         return x.offset < y.offset;
                     });
@@ -1817,8 +1829,9 @@ namespace XOffsetDatastructure {
                 DeltaBlockTotals totals;
                 if (touches) {
                     totals = key ? delta_nonzero_blocks(cur, payload_begin, used, blocks, options.whole_blocks)
-                                 : touched_bytes(b, scratch, *log, cur, holes, holes_changed, base_used, used,
-                                                 options.whole_blocks);
+                                 : touched_bytes(b, scratch, *log, cur, holes,
+                                                 detail::inband_allocator ? !holes_same : holes_changed,
+                                                 base_used, used, options.whole_blocks);
                 } else if (options.touched_only && !key && touches_known(xbuf, b)) {
                     const std::size_t count = (used + delta_block - 1) / delta_block;
                     const std::size_t grown =
@@ -1827,8 +1840,13 @@ namespace XOffsetDatastructure {
                     // list, or by the stamps (none past them was stamped).
                     const std::size_t below =
                         std::min((std::min(base_used, used) + delta_block - 1) / delta_block, grown);
-                    if (holes_changed) {
+                    if (detail::inband_allocator ? !holes_same : holes_changed) {
                         select_touched(b, scratch.want, *log, holes, base_used, used);
+                        if constexpr (detail::inband_allocator)
+                            inband_mark_allocator(b, cur, holes, used, [&](std::size_t from, std::size_t to) {
+                                std::fill(scratch.want.begin() + std::ptrdiff_t(from / delta_block),
+                                          scratch.want.begin() + std::ptrdiff_t((to - 1) / delta_block + 1), 1);
+                            });
                         const std::uint8_t* want = scratch.want.data();
                         totals = delta_scan<true>(
                             cur, base.data(), payload_begin, used, blocks,
@@ -1902,6 +1920,9 @@ namespace XOffsetDatastructure {
                 if (!key && blocks.empty() && !holes_changed && used == base_used && root == b.root_offset_) {
                     if (pair) pair_touch_log(xbuf, b);
                     b.holes_gen_ = holes_gen;
+#if XOFFSET_INBAND_ALLOCATOR
+                    b.inband_dir_ = core.inband_dir();
+#endif
                     drop.b = nullptr;
                     out.clear();
                     stats.empty = true;
@@ -1920,6 +1941,9 @@ namespace XOffsetDatastructure {
                 write_delta(out, header, b.schema_hash_, b.root_type_id_, cur, blocks, totals, holes, hole_section);
                 if (holes_changed) b.holes_.swap(holes);
                 b.holes_gen_ = holes_gen;
+#if XOFFSET_INBAND_ALLOCATOR
+                b.inband_dir_ = core.inband_dir();
+#endif
                 if (used < base.size()) base.resize(used); // shrinking never allocates
                 b.used_ = used;
                 b.version_ = header.version;
@@ -2026,6 +2050,8 @@ namespace XOffsetDatastructure {
                         m[i] |= delta_range_mask(i, from, to);
                 };
                 if (holes_changed) for_each_hole_change(b.holes_, holes, mark);
+                if constexpr (detail::inband_allocator)
+                    if (holes_changed) inband_mark_allocator(b, cur, holes, used, mark);
                 if (used > base_used) {
                     // Past the receiver's used size its bytes are zero: the nonzero ones.
                     (void)delta_nonzero_blocks(cur, std::max(base_used, payload_begin), used, blocks);
@@ -2058,6 +2084,40 @@ namespace XOffsetDatastructure {
                         ++i;
                         ++j;
                     }
+                }
+            }
+
+            // In-band allocator: a change of the free blocks writes bytes no
+            // touch marks: the directory's, the link word of a block that
+            // stayed free while the stack above it changed, and the old
+            // directory's block when the directory moved (it became a free
+            // block, maybe of the same offset and size). fn(from, to) for
+            // each (`holes`: the current ones by offset, the directory among
+            // them; `b`: the baseline's).
+            template <typename Fn>
+            static void inband_mark_allocator(const XDeltaBaseline& b, const char* cur,
+                                              const std::vector<XBufferCore::WireHole>& holes, std::size_t used,
+                                              Fn&& fn) {
+                std::uint32_t dir = 0, cap = 0;
+                std::memcpy(&dir, cur + XBufferCore::inband_dir_at, sizeof(dir));
+#if XOFFSET_INBAND_ALLOCATOR
+                if (const std::uint32_t old = b.inband_dir_; old != 0 && old != dir) {
+                    const auto it = std::lower_bound(b.holes_.begin(), b.holes_.end(), old,
+                        [](const XBufferCore::WireHole& h, std::uint32_t at) { return h.offset < at; });
+                    if (it != b.holes_.end() && it->offset == old && old < used)
+                        fn(std::size_t(old), std::min<std::size_t>(std::size_t(old) + it->bytes, used));
+                }
+#else
+                (void)b;
+#endif
+                if (dir == 0 || std::size_t(dir) + 8u > used) return;
+                std::memcpy(&cap, cur + dir + 4u, sizeof(cap));
+                for (const XBufferCore::WireHole& h : holes) {
+                    if (h.offset == dir)
+                        fn(std::size_t(dir),
+                           std::min<std::size_t>(std::size_t(dir) + XBufferCore::inband_dir_bytes(cap), used));
+                    else if (std::size_t(h.offset) + 4u <= used)
+                        fn(std::size_t(h.offset), std::size_t(h.offset) + 4u);
                 }
             }
 
@@ -2729,11 +2789,18 @@ namespace XOffsetDatastructure {
             // that allocated or freed since, no longer matches, and the next
             // delta is verified in full. (A replica is not changed in place
             // between deltas: docs/DELTA_SYNC.md.)
+            // The free blocks as of the map: their count, or in-band (where
+            // counting walks them) the directory's offset and their bytes.
+            static XOFFSET_DETAIL_INLINE std::size_t checks_free_key(const XBufferCore& core) noexcept {
+                if constexpr (detail::inband_allocator)
+                    return (std::size_t(core.inband_dir()) << 32) | std::size_t(core.inband_free_bytes());
+                return core.free_block_count();
+            }
             static bool checks_match(const XDeltaCursor& c, const XBufferCore& core) noexcept {
                 const XArena* sm = core.arena();
                 return c.checks_valid_ && c.checks_core_ == &core && c.checks_base_ == core.get_address() &&
                        c.checks_epoch_ == core.epoch() && c.checks_used_ == sm->used_end &&
-                       c.checks_root_ == sm->root_offset && c.checks_free_ == core.free_block_count() &&
+                       c.checks_root_ == sm->root_offset && c.checks_free_ == checks_free_key(core) &&
                        c.checks_free_complete_ == core.free_table_complete();
             }
             static void note_checks(XDeltaCursor& c, const XBufferCore& core) noexcept {
@@ -2742,7 +2809,7 @@ namespace XOffsetDatastructure {
                 c.checks_epoch_ = core.epoch();
                 c.checks_used_ = core.arena()->used_end;
                 c.checks_root_ = core.arena()->root_offset;
-                c.checks_free_ = core.free_block_count();
+                c.checks_free_ = checks_free_key(core);
                 c.checks_free_complete_ = core.free_table_complete();
                 c.checks_valid_ = true;
             }
@@ -3196,7 +3263,9 @@ namespace XOffsetDatastructure {
                     free += h.bytes;
                     return true;
                 };
-                if (parsed.holes) {
+                // In-band, `holes` holds the replica's own when the delta
+                // has none (read before the patch).
+                if (parsed.holes || detail::inband_allocator) {
                     for (const XBufferCore::WireHole& h : holes)
                         if (!hole_ok(h)) return false;
                 } else {
@@ -3464,16 +3533,41 @@ namespace XOffsetDatastructure {
                     [](std::size_t) { return true; });
                 if (ranges_changed) rebuild_ranges(c);
             }
+            // A delta's hole table (by offset). In-band the payload bytes
+            // already hold the sender's free blocks and directory: adopted,
+            // and checked against the table unless admitted.
+            static XOFFSET_DETAIL_INLINE vstatus load_holes(XBufferCore& core,
+                                                            const std::vector<XBufferCore::WireHole>& holes,
+                                                            bool check) {
+                if constexpr (detail::inband_allocator) return core.inband_adopt(holes.data(), holes.size(), check, false);
+                (void)check;
+                return core.load_free_blocks(holes.data(), holes.size());
+            }
+
             // The scratch the whole verification needs: the replica's holes,
             // unless the delta carries them, and room for the new map.
             static vstatus prepare_full(XBufferCore& core, const Parsed& parsed, XDeltaCursor& cursor,
                                         std::vector<XBufferCore::WireHole>& holes, const char* who) {
                 XOFFSET_VTRY(size_checks(cursor, parsed.header.used_bytes));
-                if (parsed.holes) return vok();
+                // In-band, apply_incremental read the replica's holes before
+                // the patch (its links may have changed since).
+                if (parsed.holes || detail::inband_allocator) return vok();
+                return replica_holes(core, holes, who);
+            }
+            // The replica's own free blocks (in-band: in write_free_blocks'
+            // order, the directory first).
+            static XOFFSET_DETAIL_INLINE vstatus replica_holes(XBufferCore& core,
+                                                               std::vector<XBufferCore::WireHole>& holes,
+                                                               const char* who) {
                 XOFFSET_TRY {
                     holes.clear();
-                    holes.reserve(core.free_block_count());
-                    core.for_each_free_block([&](XBufferCore::WireHole h) { holes.push_back(h); });
+                    if constexpr (detail::inband_allocator) {
+                        holes.reserve(core.wire_hole_count());
+                        core.for_each_wire_hole([&](XBufferCore::WireHole h) { holes.push_back(h); });
+                    } else {
+                        holes.reserve(core.free_block_count());
+                        core.for_each_free_block([&](XBufferCore::WireHole h) { holes.push_back(h); });
+                    }
                 } XOFFSET_CATCH(const std::bad_alloc&) {
                     XOFFSET_VFAIL_BAD_ALLOC();
                 }
@@ -3522,10 +3616,11 @@ namespace XOffsetDatastructure {
                     header.root_offset = parsed.header.root_offset;
                     header.hole_count = static_cast<std::uint32_t>(scratch.holes.size());
                     if constexpr (Admit) {
-                        XOFFSET_VTRY(xbuf.template finish_admitted_load<T>(
+                        // In-band, the table is by offset (WireOrder false).
+                        XOFFSET_VTRY(xbuf.template finish_admitted_load<T, !detail::inband_allocator>(
                             header, reinterpret_cast<const char*>(scratch.holes.data()), scratch.holes.size(), who));
                     } else {
-                        XOFFSET_VTRY(xbuf.template finish_verified_load<T>(
+                        XOFFSET_VTRY(xbuf.template finish_verified_load<T, !detail::inband_allocator>(
                             header, reinterpret_cast<const char*>(scratch.holes.data()), scratch.holes.size(),
                             default_wire_upstream(), who, &xbuf.retained_reload_scratch()));
                     }
@@ -3600,11 +3695,23 @@ namespace XOffsetDatastructure {
                     if (check == XDeltaCheck::in_place && !collect_nodes(cursor, parsed)) check = XDeltaCheck::full;
                 }
 
+                // In-band, the free blocks' links and the free directory are
+                // payload bytes a delta may write: with free blocks and no hole
+                // table in the delta, the replica's own (read before the patch)
+                // are checked against the patched bytes.
+                bool inband_check = false;
+                if constexpr (detail::inband_allocator) {
+                    if (!parsed.holes) {
+                        XOFFSET_VTRY(replica_holes(core, scratch.holes, who));
+                        inband_check = !scratch.holes.empty();
+                    }
+                }
+
                 // Everything that can fail without verification fails first,
                 // before a byte changes. Nothing can fail after an unchecked
                 // delta without a digest, so it keeps no undo copy.
                 auto& undo = scratch.undo;
-                const bool keep_undo = check != XDeltaCheck::none || parsed.digest_present;
+                const bool keep_undo = check != XDeltaCheck::none || parsed.digest_present || inband_check;
                 if (keep_undo) {
                     const std::size_t undo_bytes = parsed.undo_bytes + (used < old_used ? old_used - used : 0u);
                     XOFFSET_TRY {
@@ -3663,10 +3770,9 @@ namespace XOffsetDatastructure {
                         XOFFSET_VTRY(verify_structural_wire_graph(*root_ptr, core, default_wire_upstream(),
                                                                   scratch.holes.data(), scratch.holes.size(), true,
                                                                   nullptr, &xbuf.retained_reload_scratch()));
-                        if (parsed.holes)
-                            XOFFSET_VTRY(core.load_free_blocks(scratch.holes.data(), scratch.holes.size()));
-                    } else if (parsed.holes) {
-                        XOFFSET_VTRY(core.load_free_blocks(scratch.holes.data(), scratch.holes.size()));
+                        if (parsed.holes || inband_check) XOFFSET_VTRY(load_holes(core, scratch.holes, true));
+                    } else if (parsed.holes || inband_check) {
+                        XOFFSET_VTRY(load_holes(core, scratch.holes, true));
                     }
                 // The map of live blocks may have changed: rebuilt by the next
                 // delta's whole verification.
@@ -3766,8 +3872,7 @@ namespace XOffsetDatastructure {
                 if (keep_undo) {
                     XOFFSET_ROLLBACK_BEGIN
                         XOFFSET_VTRY(check_digest<T>(core, parsed, who));
-                        if (parsed.holes)
-                            XOFFSET_VTRY(core.load_free_blocks(scratch.holes.data(), scratch.holes.size()));
+                        if (parsed.holes) XOFFSET_VTRY(load_holes(core, scratch.holes, false));
                     XOFFSET_ROLLBACK_END(roll_back(core, parsed, undo.data(), old_used, old_root))
                 }
 
