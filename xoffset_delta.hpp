@@ -1605,7 +1605,7 @@ namespace XOffsetDatastructure {
                 // (and a stream), whose last delta checked the extent.
                 if (b.record_ != XDeltaRecord::touches || used != b.used_ ||
                     static_cast<std::uint32_t>(sm->root_offset) != b.root_offset_ || log == nullptr ||
-                    options.digest || options.whole_blocks || used > core.segment_size() ||
+                    options.digest || options.whole_blocks || used > core.get_size() ||
                     b.version_ == UINT32_MAX || b.schema_hash_ != wire_schema_hash<T>() ||
                     b.root_type_id_ != wire_root_type_id<T>())
                     return false;
@@ -1741,7 +1741,7 @@ namespace XOffsetDatastructure {
                 const auto* sm = core.arena();
                 const std::size_t used = static_cast<std::size_t>(sm->used_end);
                 const auto root = static_cast<std::uint32_t>(sm->root_offset);
-                if (used < payload_begin || used > XBufferCore::MAX_PAYLOAD || used > core.segment_size())
+                if (used < payload_begin || used > XBufferCore::MAX_PAYLOAD || used > core.get_size())
                     XOFFSET_THROW(XException(XErrc::invalid_state, "save_delta<T>(): payload extent out of range"));
 
                 if (b.stream_ == 0) b.stream_ = new_delta_stream();
@@ -2108,7 +2108,7 @@ namespace XOffsetDatastructure {
                 sink.base = static_cast<const char*>(core.get_address());
                 const XArena* sm = core.arena();
                 sink.used = sm ? static_cast<std::size_t>(sm->used_end) : 0u;
-                sink.segment = core.segment_size();
+                sink.segment = core.get_size();
                 return true;
             }
             // Room in the stamps for block `last` (and every block below
@@ -3614,7 +3614,7 @@ namespace XOffsetDatastructure {
                     }
                 }
                 if (check == XDeltaCheck::full) XOFFSET_VTRY(prepare_full(core, parsed, cursor, scratch.holes, who));
-                if (used > core.segment_size() && !core.grow(used - core.segment_size()))
+                if (used > core.get_size() && !core.grow(used - core.get_size()))
                     XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, arena_failure_message);
 
                 // Save, then patch. Bytes at or past old_used are zero (zero tail).
@@ -3732,7 +3732,7 @@ namespace XOffsetDatastructure {
                         XOFFSET_VFAIL_BAD_ALLOC();
                     }
                 }
-                if (used > core.segment_size() && !core.grow(used - core.segment_size()))
+                if (used > core.get_size() && !core.grow(used - core.get_size()))
                     XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, arena_failure_message);
 
                 // Bytes at or past old_used are zero (zero tail).
@@ -3824,7 +3824,7 @@ namespace XOffsetDatastructure {
                 const std::size_t used = static_cast<std::size_t>(core.arena()->used_end);
                 const std::uint64_t root = core.arena()->root_offset;
                 using Storage = std::conditional_t<has_wire_allocator_ctor<T>, T, ReflectRoot<T>>;
-                if (used == 0 || used > XBufferCore::MAX_PAYLOAD || used > core.segment_size() || root >= used ||
+                if (used == 0 || used > XBufferCore::MAX_PAYLOAD || used > core.get_size() || root >= used ||
                     sizeof(Storage) > used - root || root % alignof(Storage) != 0)
                     return false;
                 // Blocks (parse): ascending, a mask byte that is present is
@@ -4030,25 +4030,13 @@ namespace XOffsetDatastructure {
     }
 
     template <typename T>
-    void XBuffer::apply_delta_verified(std::span<const std::byte> delta, XDeltaCursor& cursor) {
+    void XBuffer::apply_delta_verified(XByteView delta, XDeltaCursor& cursor) {
         XOFFSET_VREQUIRE(detail::DeltaAccess::apply<T>(*this, delta, cursor));
     }
 
     template <typename T>
-    void XBuffer::apply_delta_verified(const std::string& delta, XDeltaCursor& cursor) {
-        apply_delta_verified<T>(std::span<const std::byte>(reinterpret_cast<const std::byte*>(delta.data()),
-                                                           delta.size()), cursor);
-    }
-
-    template <typename T>
-    XStatus XBuffer::try_apply_delta_verified(std::span<const std::byte> delta, XDeltaCursor& cursor) {
+    XStatus XBuffer::try_apply_delta_verified(XByteView delta, XDeltaCursor& cursor) {
         return detail::try_v([&] { return detail::DeltaAccess::apply<T>(*this, delta, cursor); });
-    }
-
-    template <typename T>
-    XStatus XBuffer::try_apply_delta_verified(const std::string& delta, XDeltaCursor& cursor) {
-        return try_apply_delta_verified<T>(std::span<const std::byte>(
-            reinterpret_cast<const std::byte*>(delta.data()), delta.size()), cursor);
     }
 
 } // namespace XOffsetDatastructure

@@ -42,8 +42,8 @@ strength:
 - Reloading into an existing buffer: `reload_verified` / `try_reload_verified`, `begin_verified_reload`
   (receives directly into an existing buffer's storage), and the same entry points on movable slot
   storage (R1);
-- `load_verified_with_resource<T>` (the validation bitmap comes from a memory resource supplied by the
-  caller; validation itself is the same as `load_verified`);
+- `load_verified<T>` with an `upstream` argument (the validation bitmap comes from a memory resource
+  supplied by the caller; validation itself is the same);
 - Client builds: each of the entry points above is separately compiled code in the C++20 field-list
   build and in the no-exception build (`try_` entry points).
 
@@ -263,7 +263,7 @@ only with no findings. Entry points and harnesses:
 
 | Entry point | Harness (ASan+UBSan) |
 | --- | --- |
-| `load_verified`, `TypedXBuffer<T>::load`, `try_load_verified`, `load_verified_with_resource` | `fuzz_v2_wire`, `fuzz_wire_schemas` (libFuzzer); `test_v2_fuzz` (GCC 16 differential, with an independent oracle) |
+| `load_verified` (with and without `upstream`), `TypedXBuffer<T>::load`, `try_load_verified` | `fuzz_v2_wire`, `fuzz_wire_schemas` (libFuzzer); `test_v2_fuzz` (GCC 16 differential, with an independent oracle) |
 | `reload_verified`, `begin_verified_reload`, movable slot storage | Same as above (the reload, direct and slot columns, compared byte for byte with loading into a new buffer) |
 | Schema evolution: `evolve_load_verified`, the `XPeerSchemas` handshake, `read_schema_ack` | `fuzz_schema_evolution` |
 | Delta apply: `try_apply_delta_verified` / `apply_delta_verified` (3.3) | `fuzz_delta_sync` (both reflection and field-list builds): the fast paths (none, in_place) are compared with full validation on a cloned copy for verdict, error and result; on rejection the copy and cursor are unchanged; accepted results can be validated and loaded again |

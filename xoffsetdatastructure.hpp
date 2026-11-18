@@ -922,7 +922,6 @@ namespace XOffsetDatastructure {
             return buffer_.empty() ? std::string{} : std::string(buffer_.data(), buffer_.size());
         }
         size_type get_size() const { return buffer_.size(); }
-        size_type segment_size() const { return buffer_.size(); }
         size_type reserved_capacity() const { return buffer_.capacity(); }
         size_type reserved_bytes() const noexcept { return buffer_.reserved_bytes(); }
         size_type accessible_bytes() const noexcept { return buffer_.accessible_bytes(); }
@@ -7528,7 +7527,7 @@ namespace XOffsetDatastructure {
             // used_end <= size is an allocator/load invariant: this only turns
             // a corrupted extent into an error instead of an out-of-bounds
             // validation context.
-            if (used > xbuf.segment_size())
+            if (used > xbuf.get_size())
                 return wire_reject("wire validation: payload extent out of bounds");
             const char* validated_end = static_cast<const char*>(xbuf.get_address()) + used;
             // Default-initialized, then assigned: the granule index's inline
@@ -9387,6 +9386,29 @@ namespace XOffsetDatastructure {
 #include "xoffset_proxy.hpp"
 
 namespace XOffsetDatastructure {
+    // The bytes of a wire or delta as the load, reload and apply entries take
+    // them: a std::string, a std::string_view or anything that converts to
+    // std::span<const std::byte>. A view: the bytes must outlive the call.
+    class XByteView {
+    public:
+        template <typename S>
+            requires std::is_convertible_v<const S&, std::string_view>
+        XByteView(const S& text) noexcept : bytes_(bytes_of(text)) {}
+
+        template <typename R>
+            requires std::is_convertible_v<const R&, std::span<const std::byte>>
+        XByteView(const R& bytes) noexcept : bytes_(bytes) {}
+
+        operator std::span<const std::byte>() const noexcept { return bytes_; }
+
+    private:
+        static std::span<const std::byte> bytes_of(std::string_view text) noexcept {
+            return {reinterpret_cast<const std::byte*>(text.data()), text.size()};
+        }
+
+        std::span<const std::byte> bytes_;
+    };
+
     class XBuffer : public XBufferCore {
     public:
         XBuffer() = default;
@@ -9725,11 +9747,6 @@ namespace XOffsetDatastructure {
             return XArenaAllocator<T>(this->arena());
         }
 
-        template<typename T>
-        XArenaAllocator<T> arena_allocator() {
-            return allocator<T>();
-        }
-
         template <typename T>
         bool matches_schema() const {
             if (!schema_bound_) return false;
@@ -9743,7 +9760,7 @@ namespace XOffsetDatastructure {
 
         std::span<const std::byte> bytes() const noexcept {
             auto* base = reinterpret_cast<const std::byte*>(this->get_address());
-            return std::span<const std::byte>(base, this->segment_size());
+            return std::span<const std::byte>(base, this->get_size());
         }
 
         // Serialize with normalized transport semantics: preserve the live object graph,
@@ -9751,7 +9768,7 @@ namespace XOffsetDatastructure {
         std::string save() {
             this->shrink_to_fit();
             const char* base = static_cast<const char*>(this->get_address());
-            std::size_t exact_size = this->segment_size();
+            std::size_t exact_size = this->get_size();
             return exact_size == 0 ? std::string{} : std::string(base, exact_size);
         }
 
@@ -9824,7 +9841,7 @@ namespace XOffsetDatastructure {
             // shrink_to_fit that saves no longer do): used_end, at least the
             // header, at most the logical length.
             const auto used = std::min<std::uint64_t>(
-                std::max<std::uint64_t>(this->arena()->used_end, sizeof(arena_header)), this->segment_size());
+                std::max<std::uint64_t>(this->arena()->used_end, sizeof(arena_header)), this->get_size());
             return detail::make_wire_header<T>(used,
                 reinterpret_cast<std::uintptr_t>(&root) - reinterpret_cast<std::uintptr_t>(this->get_address()),
                 this->free_block_count());
@@ -9870,8 +9887,9 @@ namespace XOffsetDatastructure {
             return out;
         }
 
-        static XBuffer load_unverified(std::span<const std::byte> data,
+        static XBuffer load_unverified(XByteView bytes,
                                        std::optional<MaximumCapacity> cap = std::nullopt) {
+            const std::span<const std::byte> data = bytes;
             XBuffer xbuf = cap
                 ? XBuffer(reinterpret_cast<const char*>(data.data()), data.size_bytes(), *cap)
                 : XBuffer(reinterpret_cast<const char*>(data.data()), data.size_bytes());
@@ -9882,45 +9900,22 @@ namespace XOffsetDatastructure {
             return xbuf;
         }
 
-        static XBuffer load_unverified(const std::string& data,
-                                       std::optional<MaximumCapacity> cap = std::nullopt) {
-            return load_unverified(std::span<const std::byte>(
-                reinterpret_cast<const std::byte*>(data.data()),
-                data.size()), cap);
-        }
-
-        static XBuffer load(const std::string& data, std::optional<MaximumCapacity> cap = std::nullopt) {
-            return load_unverified(data, cap);
-        }
-
-        static XBuffer load(std::span<const std::byte> data, std::optional<MaximumCapacity> cap = std::nullopt) {
+        static XBuffer load(XByteView data, std::optional<MaximumCapacity> cap = std::nullopt) {
             return load_unverified(data, cap);
         }
 
         template <typename T>
-        static XBuffer load(const std::string& data, std::optional<MaximumCapacity> cap = std::nullopt) {
+        static XBuffer load(XByteView data, std::optional<MaximumCapacity> cap = std::nullopt) {
             return load_verified<T>(data, cap);
         }
 
+        // `upstream` gives the validation bitmaps of a payload above 32 KiB
+        // (one block per call; a fresh context and bitmaps every call). It
+        // must be non-null and outlive this synchronous call.
         template <typename T>
-        static XBuffer load(std::span<const std::byte> data, std::optional<MaximumCapacity> cap = std::nullopt) {
-            return load_verified<T>(data, cap);
-        }
-
-        template <typename T>
-        static XBuffer load_verified(std::span<const std::byte> data,
-                                     std::optional<MaximumCapacity> cap = std::nullopt) {
-            return load_verified_with_resource<T>(data, cap, std::pmr::new_delete_resource());
-        }
-
-        // Explicit host-only upstream. A fresh context and fresh membership
-        // bitmaps are prepared for every invocation; payloads above 32 KiB take
-        // one block from the upstream for them. The upstream must outlive this
-        // synchronous call and be non-null.
-        template <typename T>
-        static XBuffer load_verified_with_resource(std::span<const std::byte> data,
-                                                  std::optional<MaximumCapacity> cap,
-                                                  std::pmr::memory_resource* upstream) {
+        static XBuffer load_verified(XByteView data,
+                                     std::optional<MaximumCapacity> cap = std::nullopt,
+                                     std::pmr::memory_resource* upstream = std::pmr::new_delete_resource()) {
             XBuffer xbuf;
             XOFFSET_VREQUIRE(xbuf.load_verified_v<T>(data, cap, upstream));
             return xbuf;
@@ -9931,22 +9926,9 @@ namespace XOffsetDatastructure {
         /// verification are exactly those of load_verified. Also available
         /// in builds without exceptions (-fno-exceptions, /EHs-c-).
         template <typename T>
-        static XResult<XBuffer> try_load_verified(std::span<const std::byte> data,
-                                                  std::optional<MaximumCapacity> cap = std::nullopt) {
-            return try_load_verified_with_resource<T>(data, cap, std::pmr::new_delete_resource());
-        }
-
-        template <typename T>
-        static XResult<XBuffer> try_load_verified(const std::string& data,
-                                                  std::optional<MaximumCapacity> cap = std::nullopt) {
-            return try_load_verified<T>(std::span<const std::byte>(
-                reinterpret_cast<const std::byte*>(data.data()), data.size()), cap);
-        }
-
-        template <typename T>
-        static XResult<XBuffer> try_load_verified_with_resource(std::span<const std::byte> data,
-                                                                std::optional<MaximumCapacity> cap,
-                                                                std::pmr::memory_resource* upstream) {
+        static XResult<XBuffer> try_load_verified(XByteView data,
+                                                  std::optional<MaximumCapacity> cap = std::nullopt,
+                                                  std::pmr::memory_resource* upstream = std::pmr::new_delete_resource()) {
             XBuffer xbuf;
             return detail::try_v_into(xbuf, [&] { return xbuf.load_verified_v<T>(data, cap, upstream); });
         }
@@ -9964,22 +9946,10 @@ namespace XOffsetDatastructure {
         /// Validation scratch for payloads above 32 KiB is retained by this
         /// buffer (released with it or by release_reload_scratch()), so a
         /// reload loop does not allocate host memory per message; smaller
-        /// payloads need none.
+        /// payloads need none. A non-null `upstream` gives that scratch
+        /// instead, one block per call.
         template <typename T>
-        void reload_verified(std::span<const std::byte> data) {
-            XOFFSET_VREQUIRE(reload_into<T>(data, nullptr));
-        }
-
-        template <typename T>
-        void reload_verified(const std::string& data) {
-            reload_verified<T>(std::span<const std::byte>(
-                reinterpret_cast<const std::byte*>(data.data()), data.size()));
-        }
-
-        template <typename T>
-        void reload_verified_with_resource(std::span<const std::byte> data,
-                                           std::pmr::memory_resource* upstream) {
-            if (!upstream) XOFFSET_THROW(std::invalid_argument("validation scratch: null upstream"));
+        void reload_verified(XByteView data, std::pmr::memory_resource* upstream = nullptr) {
             XOFFSET_VREQUIRE(reload_into<T>(data, upstream));
         }
 
@@ -9988,21 +9958,7 @@ namespace XOffsetDatastructure {
         /// reload_verified leaves it (empty, without typed root access, after
         /// a failure).
         template <typename T>
-        XStatus try_reload_verified(std::span<const std::byte> data) {
-            return detail::try_v([&] { return reload_into<T>(data, nullptr); });
-        }
-
-        template <typename T>
-        XStatus try_reload_verified(const std::string& data) {
-            return try_reload_verified<T>(std::span<const std::byte>(
-                reinterpret_cast<const std::byte*>(data.data()), data.size()));
-        }
-
-        template <typename T>
-        XStatus try_reload_verified_with_resource(std::span<const std::byte> data,
-                                                  std::pmr::memory_resource* upstream) {
-            if (!upstream)
-                return XError{XErrc::invalid_argument, "validation scratch: null upstream"};
+        XStatus try_reload_verified(XByteView data, std::pmr::memory_resource* upstream = nullptr) {
             return detail::try_v([&] { return reload_into<T>(data, upstream); });
         }
 
@@ -10129,15 +10085,11 @@ namespace XOffsetDatastructure {
         /// content are invalidated (the root keeps its address while the
         /// root offset and the storage stay; XHandles re-resolve).
         template <typename T>
-        void apply_delta_verified(std::span<const std::byte> delta, XDeltaCursor& cursor);
-        template <typename T>
-        void apply_delta_verified(const std::string& delta, XDeltaCursor& cursor);
+        void apply_delta_verified(XByteView delta, XDeltaCursor& cursor);
         /// apply_delta_verified without exceptions: ok, or the code and
         /// message it would have thrown (same buffer and cursor state).
         template <typename T>
-        XStatus try_apply_delta_verified(std::span<const std::byte> delta, XDeltaCursor& cursor);
-        template <typename T>
-        XStatus try_apply_delta_verified(const std::string& delta, XDeltaCursor& cursor);
+        XStatus try_apply_delta_verified(XByteView delta, XDeltaCursor& cursor);
 
     private:
 
@@ -10258,14 +10210,6 @@ namespace XOffsetDatastructure {
         /// failed reload_verified.
         void clone_into(XBuffer& dst) const {
             dst.clone_state_from(*this);
-        }
-
-        template <typename T>
-        static XBuffer load_verified(const std::string& data,
-                                     std::optional<MaximumCapacity> cap = std::nullopt) {
-            return load_verified<T>(std::span<const std::byte>(
-                reinterpret_cast<const std::byte*>(data.data()),
-                data.size()), cap);
         }
 
         MemoryStats stats() {
@@ -10641,8 +10585,6 @@ namespace XOffsetDatastructure {
         /// field list (XOFFSET_RECORD) its fields have named accessors:
         /// buf.root().units().emplace_back().hp() = 5.
         XRef<T> root() noexcept { return XBuffer::ref<T>(); }
-        /// The same proxy.
-        XRef<T> ref() noexcept { return XBuffer::ref<T>(); }
         /// A plain reference to the root (what root() returned before the
         /// growth policy), with no protection: it dangles when the payload
         /// moves (a Relocating buffer growing past its reservation, grow() of
@@ -10667,25 +10609,18 @@ namespace XOffsetDatastructure {
         XHandle<T> handle() { return XBuffer::handle<T>(); }
 
         /// Load from serialized data and return a typed buffer.
-        static TypedXBuffer load(const std::string& data, std::optional<MaximumCapacity> cap = std::nullopt) {
+        static TypedXBuffer load(XByteView data, std::optional<MaximumCapacity> cap = std::nullopt) {
             return TypedXBuffer(XBuffer::load_verified<T>(data, cap));
         }
 
-        static TypedXBuffer load(std::span<const std::byte> data, std::optional<MaximumCapacity> cap = std::nullopt) {
-            return TypedXBuffer(XBuffer::load_verified<T>(data, cap));
-        }
-
-        static TypedXBuffer load_unverified(const std::string& data, std::optional<MaximumCapacity> cap = std::nullopt) {
-            return TypedXBuffer(XBuffer::load_unverified(data, cap));
-        }
-
-        static TypedXBuffer load_unverified(std::span<const std::byte> data, std::optional<MaximumCapacity> cap = std::nullopt) {
+        static TypedXBuffer load_unverified(XByteView data, std::optional<MaximumCapacity> cap = std::nullopt) {
             return TypedXBuffer(XBuffer::load_unverified(data, cap));
         }
 
         std::string save_verified(XSaveOptions options = {}) { return XBuffer::save_verified<T>(options); }
-        void reload_verified(const std::string& data) { XBuffer::reload_verified<T>(data); }
-        void reload_verified(std::span<const std::byte> data) { XBuffer::reload_verified<T>(data); }
+        void reload_verified(XByteView data, std::pmr::memory_resource* upstream = nullptr) {
+            XBuffer::reload_verified<T>(data, upstream);
+        }
         /// Empties the buffer and makes a new root; a proxy of it (proxies
         /// of the old content become stale).
         XRef<T> reset() {
@@ -10707,30 +10642,23 @@ namespace XOffsetDatastructure {
             XBuffer::save_compact_into<T>(out, options, first, rest...);
         }
 
-        static TypedXBuffer load_verified(const std::string& data, std::optional<MaximumCapacity> cap = std::nullopt) {
-            return TypedXBuffer(XBuffer::load_verified<T>(data, cap));
-        }
-
-        static TypedXBuffer load_verified(std::span<const std::byte> data, std::optional<MaximumCapacity> cap = std::nullopt) {
-            return TypedXBuffer(XBuffer::load_verified<T>(data, cap));
+        static TypedXBuffer load_verified(XByteView data, std::optional<MaximumCapacity> cap = std::nullopt,
+                                          std::pmr::memory_resource* upstream = std::pmr::new_delete_resource()) {
+            return TypedXBuffer(XBuffer::load_verified<T>(data, cap, upstream));
         }
 
         /// load_verified / reload_verified without exceptions (see XBuffer).
-        static XResult<TypedXBuffer> try_load_verified(std::span<const std::byte> data,
-                                                       std::optional<MaximumCapacity> cap = std::nullopt) {
-            auto loaded = XBuffer::try_load_verified<T>(data, cap);
+        static XResult<TypedXBuffer> try_load_verified(XByteView data,
+                                                       std::optional<MaximumCapacity> cap = std::nullopt,
+                                                       std::pmr::memory_resource* upstream = std::pmr::new_delete_resource()) {
+            auto loaded = XBuffer::try_load_verified<T>(data, cap, upstream);
             if (!loaded) return loaded.error();
             return XResult<TypedXBuffer>(TypedXBuffer(std::move(*loaded)));
         }
 
-        static XResult<TypedXBuffer> try_load_verified(const std::string& data,
-                                                       std::optional<MaximumCapacity> cap = std::nullopt) {
-            return try_load_verified(std::span<const std::byte>(
-                reinterpret_cast<const std::byte*>(data.data()), data.size()), cap);
+        XStatus try_reload_verified(XByteView data, std::pmr::memory_resource* upstream = nullptr) {
+            return XBuffer::try_reload_verified<T>(data, upstream);
         }
-
-        XStatus try_reload_verified(std::span<const std::byte> data) { return XBuffer::try_reload_verified<T>(data); }
-        XStatus try_reload_verified(const std::string& data) { return XBuffer::try_reload_verified<T>(data); }
 
         /// Delta sync (see XBuffer::save_delta_into / apply_delta_verified).
         XDeltaStats save_delta_into(std::string& out, XDeltaBaseline& baseline, XDeltaOptions options = {}) {
@@ -10739,16 +10667,10 @@ namespace XOffsetDatastructure {
         std::string save_delta(XDeltaBaseline& baseline, XDeltaOptions options = {}) {
             return XBuffer::save_delta<T>(baseline, options);
         }
-        void apply_delta_verified(std::span<const std::byte> delta, XDeltaCursor& cursor) {
+        void apply_delta_verified(XByteView delta, XDeltaCursor& cursor) {
             XBuffer::apply_delta_verified<T>(delta, cursor);
         }
-        void apply_delta_verified(const std::string& delta, XDeltaCursor& cursor) {
-            XBuffer::apply_delta_verified<T>(delta, cursor);
-        }
-        XStatus try_apply_delta_verified(std::span<const std::byte> delta, XDeltaCursor& cursor) {
-            return XBuffer::try_apply_delta_verified<T>(delta, cursor);
-        }
-        XStatus try_apply_delta_verified(const std::string& delta, XDeltaCursor& cursor) {
+        XStatus try_apply_delta_verified(XByteView delta, XDeltaCursor& cursor) {
             return XBuffer::try_apply_delta_verified<T>(delta, cursor);
         }
 
