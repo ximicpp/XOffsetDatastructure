@@ -142,12 +142,12 @@ ones, the pages the large message used stay committed. To return them, call `rec
 
 Validation uses two bitmaps (one bit per 8 bytes, one for live blocks, one for holes). For payloads up to
 32 KiB the bitmaps are on the stack and no host memory is requested. For larger payloads,
-`reload_verified(wire)` (the form without a resource argument) uses a block of bitmap memory kept by the
+`reload_verified(wire)` (without the `upstream` argument) uses a block of bitmap memory kept by the
 buffer itself, which grows to the largest payload received and is then reused as is, so looping reloads
 no longer request validation memory from the host allocator per message. This memory is only temporary
 host-side memory, not in the payload and not on the wire; it is freed with the buffer, and can be
-returned early with `release_reload_scratch()`. `load_verified_with_resource` and
-`reload_verified_with_resource` request a block from the resource the caller gives. Wires in canonical
+returned early with `release_reload_scratch()`. `load_verified` and `reload_verified` with an
+`upstream` memory resource request a block from it instead. Wires in canonical
 layout (no holes, blocks laid end to end in visiting order, such as the output of
 `XCompactor::compact`) take the cursor path, which records only one offset, does not touch the bitmaps,
 and requests no validation memory at any size.

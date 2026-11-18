@@ -145,7 +145,6 @@ XWireHeaderV2 check_verified_frame(const std::string& frame, const XBufferCore& 
 }
 
 void check_extents(const XBuffer& buffer) {
-    assert(buffer.get_size() == buffer.segment_size());
     assert(buffer.maximum_capacity() == buffer.reserved_capacity());
     assert(buffer.get_size() <= buffer.reserved_capacity());
     assert(buffer.get_size() <= buffer.accessible_bytes());
@@ -395,7 +394,7 @@ void objects_and_relative_references_survive_growth() {
     auto* root = buffer.make<StableRoot>();
     fill_root(*root, 73);
     auto handle = buffer.handle<StableRoot>();
-    auto allocator = buffer.arena_allocator<std::int64_t>();
+    auto allocator = buffer.allocator<std::int64_t>();
     auto* independent = allocator.allocate(8);
     for (std::size_t i = 0; i < 8; ++i) std::construct_at(independent + i, 9000 + i);
     const auto* base = buffer.get_address();
@@ -492,7 +491,7 @@ void shrink_regrow_and_transport() {
         for (const bool verified_path : {false, true}) {
             const auto frame = verified_path ? buffer.save_verified<StableRoot>() : buffer.save();
             if (verified_path) (void)check_verified_frame(frame, buffer);
-            else assert(frame.size() == buffer.segment_size());
+            else assert(frame.size() == buffer.get_size());
             assert(buffer.get_address() == base && &buffer.root<StableRoot>() == root);
             assert(buffer.epoch() == epoch && handle.get() == root);
             grow_preserving_storage(buffer, page * 2 + round + 1);
@@ -518,7 +517,7 @@ void shrink_regrow_and_transport() {
             assert(&loaded.unsafe_root<StableRoot>() == round_root);
             assert(round_handle.get() == round_root);
             if (verified_path) (void)check_verified_frame(repeated_frame, loaded);
-            else assert(repeated_frame.size() == loaded.segment_size());
+            else assert(repeated_frame.size() == loaded.get_size());
 
             auto reloaded = verified_path ? XBuffer::load_verified<StableRoot>(repeated_frame, limit)
                 : XBuffer::load_unverified(repeated_frame, limit);
@@ -536,7 +535,7 @@ void shrink_regrow_and_transport() {
     }
 
     const auto raw = buffer.save();
-    assert(raw.size() == buffer.segment_size());
+    assert(raw.size() == buffer.get_size());
     assert(raw.size() == buffer.arena()->used_end);
     assert(raw.size() < buffer.reserved_capacity());
     assert(buffer.get_address() == base && buffer.epoch() == epoch);
@@ -835,7 +834,7 @@ void independent_buffer_threads() {
                 auto* root = buffer.make<StableScalar>();
                 root->value = worker * 1000 + instance;
                 const auto* base = buffer.get_address();
-                auto alloc = buffer.arena_allocator<std::int64_t>();
+                auto alloc = buffer.allocator<std::int64_t>();
                 for (unsigned round = 0; round < 24; ++round) {
                     assert(buffer.grow(round % 4 == 0 ? page : 1));
                     auto* value = alloc.allocate(1);

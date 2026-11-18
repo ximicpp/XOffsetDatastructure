@@ -133,7 +133,7 @@ void limits_and_schema() {
     must_reject([&] { r.first.assign(1ull << 32, 42); });
     must_reject([&] { r.name.reserve(UINT32_MAX); });
     must_reject([&] { r.name.reserve(1ull << 32); });
-    must_reject([&] { (void)buf.arena_allocator<int64_t>().allocate(SIZE_MAX); });
+    must_reject([&] { (void)buf.allocator<int64_t>().allocate(SIZE_MAX); });
     assert(r.first.capacity() == 0 && r.name.capacity() == 0);
     const auto size = buf.get_size();
     bool grew = buf.grow(SIZE_MAX);

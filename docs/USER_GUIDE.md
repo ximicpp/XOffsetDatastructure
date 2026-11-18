@@ -665,7 +665,8 @@ auto token = buf.try_begin_verified_reload<Profile>(used, holes, extents);
 XStatus done = token ? token->try_finish() : XStatus(token.error());
 ```
 
-There are also `try_load_verified_with_resource`, `try_reload_verified_with_resource` and
+The entries take the wire as a `std::string`, a `std::string_view` or a byte span (`XByteView`),
+and an optional `upstream` memory resource for the validation bitmaps; there are also
 `TypedXBuffer<T>::try_load_verified / try_reload_verified`. `XResult::value()` throws when there is
 no value (in no-exception builds it calls the fatal handler); `*r` / `r->` do not check.
 
