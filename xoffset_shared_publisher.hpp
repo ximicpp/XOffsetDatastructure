@@ -1,54 +1,14 @@
 #ifndef X_OFFSET_SHARED_PUBLISHER_HPP
 #define X_OFFSET_SHARED_PUBLISHER_HPP
 
-// The server side of shared deltas (docs/SHARED_DELTA.md): a publisher, two
-// kinds of tables, per-connection state and the message a server builds for
-// one connection. Clients do not need this header (they apply messages with
-// XReceiver<XLink::from_server>::apply_sync, xoffset_receiver.hpp).
-//
-//   XSyncPublisher        the tick and this tick's body store
-//   XSyncDirtyTable       entities the application marks dirty member by
-//                         member; their images live with the application
-//                         (records with containers: an XBuffer)
-//   XSyncImageTable       plain records compared whole; the image sits in
-//                         the table's entry (dense index, or a ring by id)
-//   XSyncConn             one connection, hot: the message version and the
-//                         client's free slots of each table with enters and
-//                         leaves (a fixed stack per table, cache-line aligned)
-//   XSyncConnCold         one connection, cold: the stream and the free slots
-//                         past the hot stacks
-//   XSyncMessage          one message for one connection
-//
-// Each entity's body is written once per tick into the publisher's store and
-// copied into every message that carries it. A table with enters and leaves
-// sends each client the slot the server gives it for the entity (the client
-// keeps its records by slot and needs no index). Which entity holds which
-// slot on a connection is the application's (it keeps the slot next to its
-// record of what the client holds); which slots are free is the library's,
-// in the connection.
-//
-// Per tick:
-//   pub.begin_tick(tick);
-//   units.publish(pub, changed_units, unit_source);     // before the tick's first message
-// Per connection (each table at most once per kind, sections in this order):
-//   XSyncMessage m(pub, conn, cold, out, root);
-//   units.leaves(m, index, slot);  marches.leaves(m, slot);
-//   units.changes(m, src, index, slot);  marches.changes(m, src, ref, slot);  tiles.changes(m, src, id);
-//   units.enters(m, src, index, [&](std::size_t r, std::uint32_t s) { held[r].slot = s; });
-//   const std::size_t n = m.finish();
-//   XSyncConn<...>::prefetch(&conn + 1);                 // the connection served next
-//
-// Contracts (the first is checked in every build, the others in builds with
-// XOFFSET_SYNC_CHECKS, on by default without NDEBUG; define it the same in
-// every translation unit):
-//   1. A tick's dirty bits are published before its first message.
-//   2. Every connection that holds an entity gets every body the entity has:
-//      skipping a connection is a disconnect (release, then a key message).
-//   3. A disconnect, and a key message, first release every unit the
-//      connection holds (XSyncDirtyTable::release).
-//   4. The slot enters() reports is stored with the application's record and
-//      passed back to changes() and leaves().
-// A publisher and its tables are used from one thread.
+// The server side of shared deltas: XSyncPublisher (the tick and its body
+// store), XSyncDirtyTable and XSyncImageTable, per-connection state
+// (XSyncConn hot, XSyncConnCold cold) and XSyncMessage (one message for one
+// connection). Each entity's body is written once per tick and copied into
+// every message that carries it; a keyed table sends each client the slot the
+// server gave it for the entity. Usage and the four contracts (checked under
+// XOFFSET_SYNC_CHECKS): docs/SHARED_DELTA.md. Clients do not need this
+// header. A publisher and its tables are used from one thread.
 
 #include "xoffset_shared_delta.hpp"
 

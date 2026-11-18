@@ -1,37 +1,14 @@
 #pragma once
 
-// Slot storage (R1): the library slab that holds small XBuffer payloads.
-//
-// A chunk is one 4 MiB mapping aligned to 4 MiB. Each chunk serves a single
-// power-of-two class, from 1 KiB up to XOFFSET_SLOT_MAX_BYTES (256 KiB by
-// default), and is carved on demand, so only touched pages become resident.
-// A slot is aligned to its own size and starts with a 64-byte header whose
-// last pointer-sized word is the owner word: it sits at payload - 8, exactly
-// where a VM owner keeps it in its region's host header, so owner_from_arena and the
-// allocation fast paths do not change. The payload starts at slot + 64.
-//
-// Each thread keeps a bounded free list per class; a global list per class,
-// under one mutex, takes the overflow in batches and serves refills. A slot
-// freed by another thread goes to the freeing thread's cache. Slots are never
-// returned to the OS; free slots above a retention budget have their whole
-// pages after the header page discarded (Linux), and slot_trim() discards all
-// of them at once. Fork policy matches VmStoragePool: no atfork handlers.
-//
-// Zeroing follows the VM rule. The header records dirty_end, the lowest
-// payload offset from which every byte is known zero. A new owner takes it as
-// zero_from_ and clears only what it exposes below it.
-//
-// XOFFSET_SLOT_MAX_BYTES=0 disables slots: every owner is VM.
-//
-// Relocating buffers (XGrowPolicy::Relocating) start in a slot sized from
-// their first content, at most XOFFSET_RELOCATING_RESERVE_BYTES (1 MiB by
-// default): the slab's classes go up to the larger of the two sizes. Only
-// XOFFSET_SLOT_MAX_BYTES decides where the other policies put a buffer
-// (SLOT_MAX). Chunks of the classes above
-// XOFFSET_SLOT_MAX_BYTES are not backed by transparent huge pages (Linux):
-// a small buffer touches a page or two of its 1 MiB slot, and a huge page
-// would make it 2 MiB. The retention budget counts the bytes a free slot
-// has dirtied, not its nominal size.
+// Slot storage: the library slab for small XBuffer payloads (user rules:
+// docs/USER_GUIDE.md section 3.4). A 4 MiB chunk serves one power-of-two class
+// and is carved on demand. A slot is aligned to its size; its 64-byte header
+// ends with the owner word at payload - 8 (as in a VM region) and records
+// dirty_end, the offset from which the payload is known zero. Free slots go
+// to bounded per-thread lists that spill to one global list per class. Slots
+// are never unmapped: free slots above the retention budget have their pages
+// discarded (slot_trim() discards all). Classes above XOFFSET_SLOT_MAX_BYTES
+// avoid transparent huge pages. No atfork handlers.
 
 #include "xoffset_config.hpp"
 

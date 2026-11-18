@@ -1,80 +1,42 @@
 #ifndef X_OFFSET_RECEIVER_HPP
 #define X_OFFSET_RECEIVER_HPP
 
-// Trust tiers by link type (3.4 trust tier design, phases P1 and P2).
-//
-// A receiver is built for one kind of link, and the link decides how much of
-// an incoming wire is checked:
-//
-//   XLink::server_peer   server <-> server        default XCheck::admit
-//   XLink::from_server   a client receiving        default XCheck::admit
-//   XLink::from_client   a server receiving        full for a mutable result,
-//                        from a client             bounds for a view; admit does
-//                                                  not compile (unless the build
-//                                                  sets XOFFSET_CHECK_UPLINK=0)
-//
-//   XCheck::admit  the wire framing only: magic, flags, root type id and
-//                  schema hash, used_bytes within the maximum capacity, the
-//                  extent and hole tables' lengths, the root object inside the
-//                  payload, every hole an aligned 8-byte multiple inside the
-//                  payload. No walk of the object graph: the payload is used
-//                  as the sender wrote it. For links whose sender is our own
-//                  code over a protected transport (TLS or equivalent), with
-//                  the same schema on both sides. The result is mutable.
-//                  For a delta (apply_delta): its framing, stream and
-//                  version, every block and hole inside the used payload and
-//                  the root object inside it; no map of checked bytes is kept.
-//   XCheck::bounds read-only: the framing as admit, then one walk from the
-//                  root over every container head it reaches: each block a
-//                  head names lies inside the used payload (past the payload
-//                  header), aligned; size <= capacity; a heap string ends in
-//                  NUL; an inline string is at most 10 bytes; a bool is 0 or
-//                  1; the element bytes walked add up to at most the payload
-//                  (blocks may overlap, so this caps the work). Not checked:
-//                  overlap and coverage, set and map key order, padding. The
-//                  result is an XView (const access only), read in place.
-//                  Default for view() on from_client; on the other links
-//                  view() defaults to admit (framing and the root only).
-//   XCheck::full   load_verified / reload_verified: every check.
-//
-// Shared deltas (XS 2.0, xoffset_shared_delta.hpp, docs/SHARED_DELTA.md) go
-// through apply_sync on server_peer and from_server receivers only: a server
-// does not read a client's uplink as one, so apply_sync does not compile on
-// from_client. admit there reads the head, the stream and version, every
-// section's table and kind and every op's id against the receiver's records,
-// and trusts the bodies; full also checks every body against its record type
-// and applies nothing of a message it rejects.
-//
-// The input is a V2 wire (save_verified, save_compact, any emission), not an
-// arena image: admit runs the same parse and copy as the full check and only
-// skips the graph walk, so a reload into a buffer whose pages are already
-// touched costs about one copy of the payload plus a fixed amount.
-//
-// Client uplinks: XReceiver<XLink::from_client> checks what a client sends
-// unless the call names another check, and XCheck::admit does not compile on
-// it. Building a client connection's receiver as server_peer is not caught by
-// the types; that is left to review. A deployment whose clients are its own
-// code over a protected transport can build with -DXOFFSET_CHECK_UPLINK=0
-// (2026-11-17): a client link then defaults to XCheck::admit like the trusted
-// links, a crafted message can make the server read or write outside the wire,
-// and only a call that names XCheck::bounds or XCheck::full is checked.
-// Measured: the bounds walk is about 46 instructions of an SLG march order's
-// 482 (UL.recv, 9.6%).
-//
-// Safety net: with XOFFSET_FORCE_FULL_CHECK=1 every admit runs the full check
-// instead (a sender bug is then rejected rather than used). It defaults to 1
-// in builds without NDEBUG and under AddressSanitizer or ThreadSanitizer, else
-// 0; define it to 0 or 1 to choose.
+// XReceiver: receives wires and deltas with the check its link type calls
+// for (docs/USER_GUIDE.md section 8, docs/V2_THREAT_MODEL.md). server_peer
+// and from_server default to XCheck::admit; from_client checks what a client
+// sends (bounds for a view, full for a mutable result) and admit does not
+// compile there, unless the build sets XOFFSET_CHECK_UPLINK=0. Building a
+// client connection's receiver as server_peer is not caught by the types.
+// XOFFSET_FORCE_FULL_CHECK=1 (the default without NDEBUG and under
+// sanitizers) runs the full check wherever admit was chosen. The input is a
+// V2 wire: admit runs the same parse and copy as full and skips only the
+// graph walk.
 
 #include "xoffsetdatastructure.hpp"
 #include "xoffset_shared_delta.hpp"
 
-
-
 namespace XOffsetDatastructure {
 
 enum class XLink : std::uint8_t { server_peer, from_server, from_client };
-enum class XCheck : std::uint8_t { admit, bounds, full };
+enum class XCheck : std::uint8_t {
+    // The wire framing only: magic, flags, root type id and schema hash,
+    // used_bytes within the maximum capacity, the extent and hole tables'
+    // lengths, the root object and every hole (an aligned 8-byte multiple)
+    // inside the payload; no walk of the object graph. A delta: its framing,
+    // stream and version, every block and hole inside the used payload, the
+    // root inside it. For a sender that is our own code over a protected
+    // transport with the same schema. The result is mutable.
+    admit,
+    // Read-only: admit's framing, then one walk from the root over every
+    // container head it reaches: each block inside the used payload past
+    // the header and aligned, size <= capacity, a heap string ends in NUL,
+    // an inline string is at most 10 bytes, a bool is 0 or 1, and the bytes
+    // walked add up to at most the payload (blocks may overlap). Not checked:
+    // overlap, coverage, key order, padding. The result is an XView.
+    bounds,
+    // load_verified / reload_verified: every check.
+    full
+};
 
 /// The check a receiver for link L applies to a mutable result when none is named.
 template <XLink L>
@@ -416,58 +378,17 @@ public:
     }
 
     /// Applies the shared delta `msg` (an XS 2.0 message) to the records
-    /// `target` keeps for the stream `cursor` follows (docs/SHARED_DELTA.md).
-    /// The target names its tables and finds, adds and drops their entries:
-    ///
-    ///   using tables = std::tuple<R0, R1, ...>;      // the record type of table K (1 to 64 tables)
-    ///   template <unsigned K> static constexpr bool keyed = ...;
-    ///                                                 // entries enter and leave (never table 0)
-    ///   template <unsigned K> std::int64_t find(std::uint32_t id);
-    ///                                                 // the entry's handle, < 0 if not held
-    ///   template <unsigned K> R& record(std::int64_t handle);
-    ///   keyed tables:
-    ///   template <unsigned K> std::int64_t enter(std::uint32_t id);
-    ///                                                 // adds the entry: its handle, < 0 if it
-    ///                                                 // cannot be added
-    ///   template <unsigned K> void leave(std::uint32_t id, std::int64_t handle);
-    ///                                                 // drops it; its record is left as it is
-    ///   optional:
-    ///   template <unsigned K> void applied(std::uint32_t id, std::int64_t handle);
-    ///                                                 // after the root, an enter or a change
-    ///                                                 // wrote the record
-    ///
-    /// Table 0 is the stream's root record (R0 has no containers): every
-    /// message carries it whole, into record<0>(find<0>(0)). An id is what
-    /// the sender knows the receiver's entry by: an entity id the target
-    /// looks up (xsync::XSyncSlots), or the slot the server gave this
-    /// receiver for the entity (then find is a bounds check and enter makes
-    /// room for the slot). An enter sets every plain byte and container of
-    /// the record (no clear first): on a keyed table the one enter()
-    /// returns, on a fixed table the one find() returns. A leave does not
-    /// touch the record; a target whose free records must read as empty
-    /// clears it in leave() (xsync::XRecordBody<R>::clear). record() is
-    /// called for each op after that op's enter, and the reference is used
-    /// for that op only (adding an entry or a container operation may move
-    /// the records' storage). A handle stays valid until its own entry
-    /// leaves: leave() must not move other entries. A key message
-    /// (xsync::is_key) enters every entry: empty the keyed tables before
-    /// applying one. Other messages need the next version of the stream the
-    /// cursor holds, else delta_base_mismatch (ask the sender for a key
-    /// message).
+    /// `target` keeps for the stream `cursor` follows. The Target contract
+    /// (tables, keyed, find, record, enter, leave, applied) and the apply
+    /// rules are in docs/SHARED_DELTA.md ("The target", section 3).
     ///
     /// admit (the default) checks the head, the stream and version, every
-    /// section's table and kind, and every op's id against the records
-    /// held; bodies are the sender's. A message it rejects after the head
-    /// may be partly applied: the cursor is then empty. full checks the root
-    /// and every body against its record type, ids held (an enter of a keyed
-    /// table: not held, so find() must answer for every id), and that no
-    /// entry appears twice before anything applies: a message it rejects
-    /// changes nothing. What full accepts writes only plain bytes of the
-    /// record type (bools 0 or 1) and changes containers through library
-    /// operations in the receiver's own arena, so a buffer holding the
-    /// records stays one that load_verified<T> accepts. admit leaves that to
-    /// the sender: bodies that are not the sender's own may be read past
-    /// their end and may write any byte of a record.
+    /// section's table and kind, and every op's id; bodies are the sender's,
+    /// and a message rejected after the head may be partly applied (the
+    /// cursor is then empty). full checks every body against its record type
+    /// and every id before anything applies, so a rejected message changes
+    /// nothing, and what it accepts keeps the records' buffer one that
+    /// load_verified<T> accepts.
     template <XCheck C = default_mutable_check<L>, class Target>
     [[nodiscard]] XStatus apply_sync(std::span<const std::byte> msg, xsync::XSyncCursor& cursor, Target& target) {
         static_assert(L != XLink::from_client,

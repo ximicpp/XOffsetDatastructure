@@ -72,13 +72,29 @@ globally.
   UPPER_SNAKE_CASE constants.
 - Library namespace `XOffsetDatastructure`; TypeLayout APIs live in
   `boost::typelayout`.
-- `XOFFSET_REGISTER_TYPE`, `XOFFSET_REGISTER_CONTAINER` and
-  `XOFFSET_REGISTER_MAP` must be used at global scope; inside a namespace they
-  fail a `static_assert`.
+- `XOFFSET_RECORD`, `XOFFSET_REGISTER_SCHEMA_NAME`, `XOFFSET_ORDINARY_RECORDS`,
+  `XOFFSET_SCHEMA_LINEAGE` and `XOFFSET_SCHEMA_NAME_ALIAS` must be used at
+  global scope; inside a namespace they fail a `static_assert`.
 - English only: documents, comments, strings and tool output. No CJK
   characters in tracked text files (they get garbled under other code pages);
   test data that needs such bytes writes them as escapes. `tools/check_no_cjk.py`
   checks this and runs in the `meta` step of `tools/local_validate.sh`.
+
+### Comments
+
+- Say what the code is and why it has this shape, not what it used to be or
+  which change made it so. No phase codes, dates or names: history lives in
+  git and `CHANGELOG.md`. Labels the docs define stay: the threat model's
+  T, M, P and R entries (`docs/V2_THREAT_MODEL.md`) and K0/K7
+  (`docs/USER_GUIDE.md`).
+- A file header is at most 10 lines: what the header provides and which
+  document in `docs/` has the details. Usage examples live in the docs, not
+  in headers.
+- Keep every comment that explains a performance shape (an inline fast path
+  with an out-of-line slow path, a value staged in registers, a fork per
+  compiler), with its reason and, where there is one, its measurement. It is
+  the only thing that stops a later cleanup from undoing it.
+- State preconditions and invariants in one or two lines.
 
 ## Updating TypeLayout
 

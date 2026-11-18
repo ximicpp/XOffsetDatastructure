@@ -1,37 +1,14 @@
 #ifndef X_OFFSET_HANDSHAKE_HPP
 #define X_OFFSET_HANDSHAKE_HPP
 
-// Schema handshake (both ends; no evolution code).
+// Schema handshake (both ends; no evolution code). Usage, verdicts and
+// release rules: docs/SCHEMA_EVOLUTION.md section 3.
 //
-// When a connection opens, each side sends one XSchemaHello listing, per root
-// type, the schema it works in: root_type_id and schema_hash (the wire
-// fingerprint) plus the field-name digest (xoffset_schema_names.hpp). A server
-// also lists the older versions it still converts (kind = known). The side
-// that knows both versions answers with an XSchemaHelloAck: same, convert,
-// reject_unknown (no such version) or reject_names (the version's layout is
-// known but its field names differ: two builds disagree on what the bytes
-// mean). A client that gets a rejection asks the player to update instead of
-// failing on its first message.
-//
-// Both messages are ordinary wire 2.1 payloads of fixed library types,
-// verified by the same validator as every other message; their schema names
-// ("xoffset.hello", "xoffset.hello.ack") never change. The library does not
-// frame messages: send the hello as the first message of the connection, in
-// whatever framing the application uses (see examples/schema_handshake).
-//
-// Client side, no exceptions escape:
-//   std::string hello = make_schema_hello<Player, Chat>("ios-1.12.0");
-//   XSchemaAckResult r = read_schema_ack<Player, Chat>(ack_bytes);
-//   if (!r) show_update_prompt(r.message);
-//
-// Accepting side: accept_schema_hello<Player, Chat>(hello, ack) accepts the
-// exact versions only; XPeerSchemas::accept (xoffset_evolution.hpp, servers)
-// also accepts the older versions of each root type's lineage and converts.
-//
-// peek_wire_fingerprint(bytes) reads only the header of any wire (magic and
-// version, length, flags) and returns its fingerprint, without throwing. It
-// selects which version's load_verified to run; that load still verifies the
-// whole wire from the start.
+// XSchemaHello and XSchemaHelloAck are ordinary wire 2.1 payloads of fixed
+// library types, checked by the same validator as every message; their schema
+// names ("xoffset.hello", "xoffset.hello.ack") never change. The library does
+// not frame them. accept_schema_hello accepts exact versions only;
+// XPeerSchemas::accept (xoffset_evolution.hpp) also converts older ones.
 
 #include "xoffsetdatastructure.hpp"
 #include "xoffset_schema_names.hpp"
@@ -65,7 +42,9 @@ namespace XOffsetDatastructure {
         explicit operator bool() const noexcept { return status == XPeekStatus::ok; }
     };
 
-    // The checks read_wire_header makes, in the same order, without throwing.
+    // Reads only the wire header (the checks read_wire_header makes, in the same
+    // order, without throwing) to pick which version's load_verified to run;
+    // that load still verifies the whole wire.
     inline XWirePeek peek_wire_fingerprint(const void* data, std::size_t size) noexcept {
         XWirePeek out;
         const auto* b = static_cast<const unsigned char*>(data);

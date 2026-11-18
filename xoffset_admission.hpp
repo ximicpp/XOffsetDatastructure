@@ -1,35 +1,14 @@
 #ifndef X_OFFSET_ADMISSION_HPP
 #define X_OFFSET_ADMISSION_HPP
 
-// K0 admission: may a value of T live in an XBuffer and be moved as bytes?
-//
-// XOffset computes it itself through the schema field interface
-// (xoffset_schema.hpp), with the rules TypeLayout's is_byte_copy_safe_v used
-// before (TypeLayout scanned its layout signature for pointer tokens; this
-// walks the same structure):
-//
-//   has_pointer<T>: a pointer, member pointer or reference; an array of such;
-//   a class with a vtable or a virtual base; a class or union with such a
-//   base or member, at any depth.
-//
-//   byte_copy_safe<T>: trivially copyable without a pointer; or a class or
-//   union without a pointer whose bases and members are byte_copy_safe.
-//   Anything else (an array of non-trivially-copyable elements, a function
-//   type) is not.
-//
-//   Without reflection a union or a non-aggregate class (std::string, a
-//   polymorphic class) has no field list and cannot get one: it is opaque and
-//   counts as holding a pointer, so it is not admitted (specialize
-//   is_byte_copy_safe for direct queries of such a type).
-//
-// is_byte_copy_safe<T> is the customization point: specialize it for a type
-// whose safety the walk cannot see. As with TypeLayout, a specialization
-// answers direct queries for that type (make<T>(), allocator<T>(), ...); the
-// member walk of an enclosing record does not consult it. XOffset's own
-// containers are specialized at the end of xoffsetdatastructure.hpp.
-//
-// Under C++26 the TypeLayout cross test (tests/test_admission_typelayout.cpp)
-// checks that both give the same answer.
+// Admission: may a value of T live in an XBuffer and be moved as bytes?
+// has_pointer<T>: a pointer, member pointer or reference, or a vtable or
+// virtual base, at any depth; without reflection a union or non-aggregate
+// class is opaque and counts as one. byte_copy_safe<T>: trivially copyable
+// without a pointer, or a pointer-free class or union whose bases and members
+// are byte_copy_safe. Specialize is_byte_copy_safe<T> for a type the walk
+// cannot see; it answers direct queries only, not the member walk of an
+// enclosing record. tests/test_admission_typelayout.cpp cross-checks.
 
 #include "xoffset_schema.hpp"
 #include <cstddef>

@@ -158,12 +158,12 @@
 #endif
 
 // ---- Hardening switches (docs/V2_THREAT_MODEL.md, section 4.1) -----------
-// Speed first (2026-11-16). The measures below cost time on the mutate
-// and send paths and guard only against stale bytes on the wire (threat T5)
-// or against a caller's own mistake, so each is OFF unless a build asks for
-// it: -DXOFFSET_<NAME>=1 for one, -DXOFFSET_HARDENED=1 for every one the
-// build does not set itself (the behaviour up to 4.0.0). They change inline
-// functions: define them the same way in every translation unit of a program.
+// The measures below cost time on the mutate and send paths and guard only
+// against stale bytes on the wire (threat T5) or against a caller's own
+// mistake, so each is OFF unless a build asks for it: -DXOFFSET_<NAME>=1 for
+// one, -DXOFFSET_HARDENED=1 for every one the build does not set itself.
+// They change inline functions: define them the same way in every
+// translation unit of a program.
 // save_compact never emits stale bytes, with or without them.
 //   XOFFSET_SCRUB_POPPED     M4: pop_back() zeroes the removed element.
 //   XOFFSET_SCRUB_ERASED     M4: clear(), a shrinking resize(), erase and a
@@ -191,7 +191,7 @@
 //                            when it is not. Off: an unsorted input gives a
 //                            container whose lookups miss.
 //
-// One check is a switch that is ON by default (2026-11-17), because without
+// One check is a switch that is ON by default, because without
 // it any client can make a server read or write outside the wire:
 //   XOFFSET_CHECK_UPLINK     XReceiver<XLink::from_client> checks by default
 //                            (bounds for view(), full for a mutable result)

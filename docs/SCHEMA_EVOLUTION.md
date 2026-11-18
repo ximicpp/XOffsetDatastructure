@@ -141,8 +141,17 @@ version also accepts builds with the old names:
 XOFFSET_SCHEMA_NAME_ALIAS(game::Player, ::XOffsetDatastructure::schema_name_digest_v<game_v12::Player>)
 ```
 
-The text format of the digest is in `xoffset_schema_names.hpp`; it is part of the handshake
-compatibility promise.
+The digest is fnv1a of a name signature that lists, for every record reachable from the root in the
+order `wire_abi_signature()` walks it, each member as `name:offset`. The text is part of the handshake
+compatibility promise: two programs agree on a version only if they compute the same digest for it.
+
+```
+record          {name:offset<field>,name:offset<field>}
+array           [element]   (also std::array)
+vector, set     <element>
+map             <key,value>
+scalar, enum, string: empty
+```
 
 ## 5. The freeze tool and the lock file
 
@@ -166,6 +175,17 @@ int main(int argc, char** argv) {
 - `schema_freeze check <lock>`: put it in CTest so it runs on every build. It fails when the layout
   equals a frozen version but the field names differ (with no alias), and when the layout changed but the
   previous frozen version is not on the version chain.
+
+Paths in the lock file and the `#include` lines of snapshots are written as given on the command line:
+run the tool from the directory the project's include paths start at. The lock file is text, one line
+per item, tab-separated, oldest version first:
+
+```
+version <label> <namespace> <header>
+root    <schema name> <snapshot type> <schema_hash> <name_digest> <wire signature>
+record  <snapshot type> <name> <wire signature> <name signature>
+enum    <snapshot type> <name> <definition>
+```
 
 A complete example in the tests: `tests/schema_freeze/`.
 

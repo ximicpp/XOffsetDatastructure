@@ -1,49 +1,14 @@
 #ifndef X_OFFSET_SCHEMA_FREEZE_HPP
 #define X_OFFSET_SCHEMA_FREEZE_HPP
 
-// Schema freeze tool and schema lock check (server side, schema evolution E4).
-//
-// A project links one small program against its schema:
-//
-//   #include "game_schema.hpp"
-//   #include "xoffset_schema_freeze.hpp"
-//   int main(int argc, char** argv) {
-//       return XOffsetDatastructure::schema_freeze_main<game::Player, game::Chat>(argc, argv);
-//   }
-//
-// and runs it in two ways:
-//
-//   schema_freeze freeze <label> <namespace> <out-header> <lock-file>
-//       At a release: writes the current version of every root type as a
-//       snapshot header (namespace <namespace>, e.g. game_v12) and appends
-//       the version to the lock file. A record or enum that did not change
-//       since the previous snapshot is not copied: the new snapshot refers to
-//       the previous one (using Item = game_v11::Item;), so a lineage never
-//       holds two copies of one type. Each root gets its schema name and an
-//       XOFFSET_PIN_SCHEMA line, so editing a frozen type fails the build.
-//       Each new record also gets its XOFFSET_RECORD line, so a client built
-//       without reflection (C++20 field lists) can include the snapshot.
-//       Then list the snapshot type in XOFFSET_SCHEMA_LINEAGE.
-//
-//   schema_freeze check <lock-file>
-//       In CTest, on every build. For each root type, against the versions
-//       in the lock file:
-//       - the current layout equals a frozen version's but the field names
-//         differ (and no XOFFSET_SCHEMA_NAME_ALIAS accepts them): fail; two
-//         builds would read the same bytes under different names;
-//       - the layout changed since the last frozen version and that version
-//         is not in the root type's XOFFSET_SCHEMA_LINEAGE: fail; peers on
-//         the last release would be rejected.
-//
-// Paths in the lock file and the #include lines of snapshots are written as
-// given on the command line; run the tool from the directory the project's
-// include paths start at.
-//
-// Lock file (text, one line per item, tab-separated, oldest version first):
-//   version <label> <namespace> <header>
-//   root    <schema name> <snapshot type> <schema_hash> <name_digest> <wire signature>
-//   record  <snapshot type> <name> <wire signature> <name signature>
-//   enum    <snapshot type> <name> <definition>
+// Schema freeze tool and lock check (server side; docs/SCHEMA_EVOLUTION.md
+// section 5). A project links one program that calls
+// schema_freeze_main<Roots...>(argc, argv). `freeze` writes the current
+// version of every root as a snapshot header (an unchanged record or enum
+// refers to the previous snapshot, so a lineage never holds two copies of one
+// type) and appends it to the lock file; `check`, run in CTest, fails when a
+// layout equals a frozen one under other field names (without an alias), or
+// changed while the last frozen version is not in the root's lineage.
 
 #include "xoffset_evolution.hpp"
 
