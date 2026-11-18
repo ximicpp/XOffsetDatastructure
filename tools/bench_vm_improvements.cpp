@@ -305,7 +305,7 @@ template<class F> void retry(Measurement& m, XBuffer& buffer, F&& operation) {
         try { operation(); return; }
         catch (const XBadAlloc&) {
             ++m.base.allocation_failures;
-            const auto logical = buffer.segment_size();
+            const auto logical = buffer.get_size();
             require(logical <= buffer.maximum_capacity() / 2, "container workload exhausted budget");
             record_growth(m.base, buffer, logical);
         }

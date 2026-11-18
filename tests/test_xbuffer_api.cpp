@@ -116,19 +116,19 @@ bool test_stats() {
 }
 
 // ============================================================================
-// Test 4: arena_allocator<T>()
+// Test 4: allocator<T>()
 // ============================================================================
 bool test_allocator() {
-    std::cout << "\n[TEST] arena_allocator<T>()\n";
+    std::cout << "\n[TEST] allocator<T>()\n";
     std::cout << std::string(50, '-') << "\n";
 
     XBuffer xbuf(4096);
     auto* obj = xbuf.make<TestData>();
 
-    auto alloc = xbuf.arena_allocator<int32_t>();
+    auto alloc = xbuf.allocator<int32_t>();
     // Allocator should be valid (no crash)
     (void)alloc;
-    std::cout << "  arena_allocator<int32_t>() created ... [OK]\n";
+    std::cout << "  allocator<int32_t>() created ... [OK]\n";
 
     return true;
 }
