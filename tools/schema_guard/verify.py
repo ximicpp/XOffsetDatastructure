@@ -197,6 +197,9 @@ def main():
     version_rc, version = run([args.clang, "--version"], 20) if args.clang else (None, "")
     source_files = ["xoffsetdatastructure.hpp", "xoffset_core_lifetime.hpp",
                     "xoffset_virtual_memory.hpp", "xoffset_slot_storage.hpp", "xoffset_config.hpp",
+                    "xoffset_arena.hpp", "xoffset_containers.hpp", "xoffset_wire.hpp",
+                    "xoffset_schema_hash.hpp", "xoffset_buffer.hpp", "xoffset_compactor.hpp",
+                    "xoffset_registration.hpp",
                     "cmake/XOffsetDependencyLock.cmake"]
     meta = {"source": str(ROOT), "git_head": git.strip() if rc == 0 else None,
             "git_status": dirty if rc2 == 0 else "unavailable",

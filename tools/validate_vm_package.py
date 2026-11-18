@@ -72,7 +72,7 @@ def manifest(root: Path) -> dict[str, str]:
             for p in sorted(root.rglob("*")) if p.is_file()}
 
 
-FULL_OWN_HEADERS = ('xoffsetdatastructure.hpp', 'xoffset_admission.hpp', 'xoffset_core_lifetime.hpp', 'xoffset_fixed_string.hpp', 'xoffset_schema.hpp', 'xoffset_schema_describe.hpp', 'xoffset_schema_reflect.hpp', 'xoffset_verified_paths.hpp', 'xoffset_schema_names.hpp', 'xoffset_handshake.hpp', 'xoffset_evolution.hpp', 'xoffset_schema_freeze.hpp', 'xoffset_fixed_message.hpp', 'xoffset_delta.hpp', 'xoffset_receiver.hpp', 'xoffset_shared_delta.hpp', 'xoffset_shared_publisher.hpp', 'xoffset_proxy.hpp')
+FULL_OWN_HEADERS = ('xoffsetdatastructure.hpp', 'xoffset_arena.hpp', 'xoffset_containers.hpp', 'xoffset_wire.hpp', 'xoffset_schema_hash.hpp', 'xoffset_buffer.hpp', 'xoffset_compactor.hpp', 'xoffset_registration.hpp', 'xoffset_admission.hpp', 'xoffset_core_lifetime.hpp', 'xoffset_fixed_string.hpp', 'xoffset_schema.hpp', 'xoffset_schema_describe.hpp', 'xoffset_schema_reflect.hpp', 'xoffset_verified_paths.hpp', 'xoffset_schema_names.hpp', 'xoffset_handshake.hpp', 'xoffset_evolution.hpp', 'xoffset_schema_freeze.hpp', 'xoffset_fixed_message.hpp', 'xoffset_delta.hpp', 'xoffset_receiver.hpp', 'xoffset_shared_delta.hpp', 'xoffset_shared_publisher.hpp', 'xoffset_proxy.hpp')
 
 
 def audit_install(prefix: Path, source: Path, suite: str, forbidden: list[Path]) -> dict:
