@@ -8,7 +8,11 @@
 //     many candidates and many runs (heap storage) skip exactly the runs a
 //     reference computed from the hole table finds.
 // Every wire loads the dense payload, save_verified_into emits the same
-// bytes, and a beta.1-style check holds: every skipped byte is a hole. (A run
+// bytes, and a beta.1-style check holds: every skipped byte is a hole.
+// With the in-band allocator (XOFFSET_INBAND_ALLOCATOR) a free block's first
+// 8 bytes (its header) are sent and the free directory (the first hole) is
+// never skipped: a run is then one free block, and the cases below say what
+// that changes. (A run
 // at the payload tail is covered by test_wire_hole_zeroing's declared-size
 // claim, which is re-emitted with its tail skipped.)
 #include "xoffsetdatastructure.hpp"
@@ -43,6 +47,8 @@ template<> struct wire_record_layout<fr::Root> { static constexpr bool ordinary_
 namespace {
 using Buffer = xo::TypedXBuffer<fr::Root>;
 struct Hole { std::uint32_t offset, bytes; };
+constexpr std::uint32_t kHeader = xo::XBufferCore::free_block_header_bytes;
+constexpr bool kInband = kHeader != 0;
 
 [[noreturn]] void fail(const std::string& message) {
     std::cerr << "test_free_run_emission FAILED: " << message << "\n";
@@ -140,7 +146,9 @@ std::vector<Hole> emit(Buffer& b, const std::string& where) {
 // 4 KiB kept.
 std::vector<Hole> reference_runs(const std::string& wire) {
     auto holes = parse(wire).holes;
+    if (kInband && !holes.empty()) holes.erase(holes.begin()); // the directory
     std::erase_if(holes, [](Hole h) { return h.bytes < 256; });
+    for (auto& h : holes) h.offset += kHeader, h.bytes -= kHeader;
     std::sort(holes.begin(), holes.end(), [](Hole a, Hole c) { return a.offset < c.offset; });
     std::vector<Hole> runs;
     std::uint64_t start = 0, end = 0;
@@ -193,12 +201,13 @@ int main() {
              offset_of_block(b, 3) == first + 4096, "fixture: blocks are not adjacent");
         release(b, {0, 1, 2, 3});
         const auto gaps = emit(b, "run next to small holes");
-        need(gaps.size() == 1 && gaps[0].offset == first && gaps[0].bytes == 4096,
-             "run next to small holes: expected exactly the two 2 KiB blocks");
+        if (kInband) need(gaps.empty(), "run next to small holes: in-band, each 2 KiB block is below 4 KiB");
+        else need(gaps.size() == 1 && gaps[0].offset == first && gaps[0].bytes == 4096,
+                  "run next to small holes: expected exactly the two 2 KiB blocks");
     }
     {   // 40 adjacent 128 B holes (5 KiB): not skipped.
         auto b = make(std::vector<std::size_t>(40, 128), [] { std::vector<std::size_t> v; for (std::size_t i = 0; i < 40; ++i) v.push_back(i); return v; }());
-        need(b.free_block_bytes() >= 5120, "fixture: small holes missing");
+        need(b.free_block_bytes() + b.free_directory().bytes >= 5120, "fixture: small holes missing");
         const auto gaps = emit(b, "run of small holes");
         need(gaps.empty(), "run of small holes: must stay dense");
     }
@@ -207,15 +216,22 @@ int main() {
         const auto at = offset_of_block(b, 0);
         release(b, {0});
         const auto gaps = emit(b, "large block");
-        need(gaps.size() == 1 && gaps[0].offset == at && gaps[0].bytes == 64 * 1024, "large block: not skipped");
+        // In-band, the block's end holds the directory and its header is sent.
+        const std::uint32_t skipped = 64 * 1024 - b.free_directory().bytes - kHeader;
+        need(gaps.size() == 1 && gaps[0].offset == at + kHeader && gaps[0].bytes == skipped, "large block: not skipped");
     }
     {   // Two runs separated by a live block: three extents.
         auto b = make({4096, 512, 4096}, {});
         const auto a = offset_of_block(b, 0), c = offset_of_block(b, 2);
         release(b, {0, 2});
         const auto gaps = emit(b, "two runs");
-        need(gaps.size() == 2 && gaps[0].offset == a && gaps[1].offset == c, "two runs: expected both 4 KiB blocks");
-        need(parse(b.save_verified()).h.extent_count == 3, "two runs: expected three extents");
+        if (kInband) {
+            // Both blocks less their headers (and one the directory) are below 4 KiB.
+            need(gaps.empty(), "two runs: in-band, no 4 KiB run");
+        } else {
+            need(gaps.size() == 2 && gaps[0].offset == a && gaps[1].offset == c, "two runs: expected both 4 KiB blocks");
+            need(parse(b.save_verified()).h.extent_count == 3, "two runs: expected three extents");
+        }
     }
     {   // Random layouts: up to 64 candidates (local storage), and more
         // candidates with more than 8 runs (heap storage).
@@ -226,7 +242,8 @@ int main() {
             local |= candidates <= 64 && runs >= 1;
             spilled |= candidates > 64 && runs > 8;
         }
-        need(local && spilled, "random layouts: both storage paths must be reached");
+        // (In-band, these blocks, below 4 KiB each, make no run.)
+        need(kInband || (local && spilled), "random layouts: both storage paths must be reached");
     }
     std::cout << "test_free_run_emission: 5 groups passed\n";
     return 0;

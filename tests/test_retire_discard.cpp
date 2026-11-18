@@ -75,12 +75,17 @@ void test_large_hole(std::size_t n, bool expect_discard) {
     std::cout << "large hole, " << n * 8 << " bytes\n";
     XBuffer b = XBuffer::create<DiscardRoot>(1 << 20);
     build_hole(b, n);
-    const auto hs = holes_at_least(b, std::uint32_t(n * 8));
+    // In-band, the free directory is made at the end of this first retired
+    // block, and the free block (the rest) starts with its header: both are
+    // written after the discard, and neither is checked below.
+    const std::uint32_t header = XBufferCore::free_block_header_bytes;
+    const auto hs = holes_at_least(b, std::uint32_t(n * 8) - b.free_directory().bytes);
     need(hs.size() == 1, "the old vector block is one hole");
     if (hs.empty()) return;
-    const char* p = b.data() + hs[0].offset;
+    const char* p = b.data() + hs[0].offset + header;
+    const std::size_t hole_bytes = hs[0].bytes - header;
 #if defined(__linux__)
-    const std::size_t res = resident_pages(p, hs[0].bytes);
+    const std::size_t res = resident_pages(p, hole_bytes);
     if (expect_discard && XOFFSET_RETIRE_DISCARD_BYTES != 0)
         need(res == 0, "the hole's whole pages are no longer resident");
     else
@@ -89,7 +94,7 @@ void test_large_hole(std::size_t n, bool expect_discard) {
     (void)expect_discard;
 #endif
     // Read after mincore: a read maps the shared zero page, which mincore counts.
-    need(all_zero(p, hs[0].bytes), "the hole reads as zero (M3)");
+    need(all_zero(p, hole_bytes), "the hole reads as zero (M3)");
     // The hole is reusable, and a reused block starts from zero.
     auto& r = b.root<DiscardRoot>();
     const auto before = b.free_block_bytes();
@@ -130,7 +135,9 @@ void test_churn() {
         bool ok = true;
         for (std::size_t i = 0; i < r.values.size() && ok; ++i) ok = r.values[i] == i * 3 + 1;
         need(ok, "values after a round");
-        for (auto h : holes_at_least(b, 8)) need(all_zero(b.data() + h.offset, h.bytes), "every hole is zero");
+        constexpr std::uint32_t header = XBufferCore::free_block_header_bytes;
+        for (auto h : holes_at_least(b, 8))
+            need(all_zero(b.data() + h.offset + header, h.bytes - header), "every hole is zero");
         if (failures) return;
     }
     const auto wire = b.save_verified<DiscardRoot>();

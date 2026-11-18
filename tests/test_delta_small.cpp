@@ -38,6 +38,10 @@ std::string payload_of(const xo::XBuffer& b) {
 
 std::vector<std::pair<std::uint32_t, std::uint32_t>> holes_of(const xo::XBuffer& b) {
     std::vector<std::pair<std::uint32_t, std::uint32_t>> out;
+    // In-band, the free blocks are payload bytes (payload_of compares them),
+    // and a corrupted delta this trusted link accepts can leave a directory
+    // that names bytes outside the payload: not walked.
+    if constexpr (xo::detail::inband_allocator) return out;
     b.for_each_free_block([&](xo::XBufferCore::WireHole h) { out.emplace_back(h.offset, h.bytes); });
     std::sort(out.begin(), out.end());
     return out;

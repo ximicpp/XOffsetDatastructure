@@ -86,7 +86,10 @@ template<class V, class T> void assign(V& v, const std::vector<T>& a) { v.assign
 // Allocator operations are observed through the host free table instead:
 // live bytes = used_end - free bytes, and a retired block is an exact hole.
 struct Ledger { std::uint64_t used, free; std::size_t holes; };
-Ledger ledger(const xo::XBufferCore& b) { return {b.arena()->used_end, b.free_block_bytes(), b.free_block_count()}; }
+// Free bytes: the free blocks and (in-band) the free directory.
+Ledger ledger(const xo::XBufferCore& b) {
+    return {b.arena()->used_end, b.free_block_bytes() + b.free_directory().bytes, b.free_block_count()};
+}
 std::uint64_t live(const Ledger& l) { return l.used - l.free; }
 std::uint32_t extent(std::size_t bytes) { return static_cast<std::uint32_t>((bytes + 7u) & ~std::size_t(7)); }
 bool has_hole(const xo::XBufferCore& b, const void* p, std::uint32_t bytes) {

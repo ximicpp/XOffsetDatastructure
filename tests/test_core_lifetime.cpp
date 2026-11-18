@@ -140,6 +140,12 @@ void string_growth_reacquires_self_view_including_terminator() {
 
 void free_header_reuse_changes_real_element_array_type() {
     auto buffer=make(); auto alloc=buffer.root<LifetimeRoot>().words.binding();
+    if constexpr (xo::detail::inband_allocator) {
+        // The first retirement makes the free directory (here all of a 40-byte
+        // block), so the 64-byte block below stays a whole free block.
+        fd::retire_dynamic_bytes(alloc,fd::allocate_dynamic_bytes(alloc,40,8),40);
+        need(buffer.free_directory().bytes==40 && buffer.free_block_count()==0, "free directory fixture differs");
+    }
     auto* raw=fd::allocate_dynamic_bytes(alloc,64,8);
     auto* integers=dt::begin_dynamic_array<std::uint64_t>(raw,8);
     for(unsigned i=0;i<8;++i)std::construct_at(integers+i, std::uint64_t(100+i));

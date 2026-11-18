@@ -55,12 +55,17 @@ using Holes = std::vector<std::pair<std::uint32_t, std::uint32_t>>;
 Holes holes(const xo::XBufferCore& b) {
     Holes out; b.for_each_free_block([&](xo::XBufferCore::WireHole h) { out.emplace_back(h.offset, h.bytes); }); return out;
 }
-std::uint64_t live(const xo::XBufferCore& b) { return b.arena()->used_end - b.free_block_bytes(); }
+// Live: not a free block and not (in-band) the free directory.
+std::uint64_t live(const xo::XBufferCore& b) {
+    return b.arena()->used_end - b.free_block_bytes() - b.free_directory().bytes;
+}
 std::uint32_t extent(std::size_t bytes) { return static_cast<std::uint32_t>((bytes + 7u) & ~std::size_t(7)); }
+// A free block at p, or (in-band) the free directory that a retirement made
+// of the block.
 bool has_hole(const xo::XBufferCore& b, const void* p, std::uint32_t bytes) {
     const auto offset = static_cast<std::uint32_t>(static_cast<const char*>(p) - b.data());
     for (auto [o, n] : holes(b)) if (o == offset && n == bytes) return true;
-    return false;
+    return b.free_directory().offset == offset && b.free_directory().bytes == bytes;
 }
 void check(const xo::XString& value, std::string_view expected) {
     need(value.view() == expected && value.size() == expected.size(), "string value mismatch");
@@ -233,9 +238,11 @@ void repeated_full_replacement_operation_gate() {
 #endif
     for (auto& word : root.words) word.assign(desired);
     // One exact 129 -> 136-byte allocation per word and one retire per heap
-    // word; every retired block (at most 72 bytes) stays a distinct hole.
+    // word; every retired block (at most 72 bytes) stays a distinct hole (in-band,
+    // the free directory is made of or next to them: the live bytes say it all).
     need(live(buffer) == live_before + std::uint64_t(n) * extent(129) - old_extents &&
-         buffer.free_block_count() == heap_words && buffer.free_block_bytes() == old_extents,
+         (xo::detail::inband_allocator ||
+          (buffer.free_block_count() == heap_words && buffer.free_block_bytes() == old_extents)),
          "full replacement operation gate changed allocation count");
 #ifdef XOFFSET_STRING_REPLACE_COPY_AUDIT
     need(fd::string_replace_audit_stats.fresh_replacements == n &&

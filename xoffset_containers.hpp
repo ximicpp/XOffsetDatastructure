@@ -340,9 +340,17 @@ namespace XOffsetDatastructure {
             auto* const segment = reinterpret_cast<XArena*>(detail::OwnerMap::payload_of(&data_delta));
             auto* const owner = segment ? XBufferCore::owner_from_arena_noexcept(segment) : nullptr;
             void* block;
-            if (!owner || bytes > XBufferCore::small_block_max ||
-                !(block = owner->try_allocate_small(block_bytes_of(bytes)))) [[unlikely]]
+            if constexpr (detail::inband_allocator) {
+                // bytes - 1 < small_block_max is both request checks (bytes is
+                // nonzero, so its block is (bytes + 7) & ~7), and the owner,
+                // found from its payload, has one.
+                if (!owner || bytes - 1u >= XBufferCore::small_block_max ||
+                    !(block = owner->inband_allocate_in_payload((bytes + 7u) & ~7u))) [[unlikely]]
+                    return publish_first_block_general(data_delta, bytes);
+            } else if (!owner || bytes > XBufferCore::small_block_max ||
+                       !(block = owner->try_allocate_small(block_bytes_of(bytes)))) [[unlikely]] {
                 return publish_first_block_general(data_delta, bytes);
+            }
             set_rel32_in_payload(data_delta, &data_delta, block);
             return block;
         }

@@ -298,7 +298,9 @@ void callback_during_allocation_bookkeeping() {
     // actual payload owner, or fail closed once that payload is released.
     // A bin records its first free_table_inline_entries holes without host
     // storage, so the fixture first fills the remainder's bin (16 bytes): the
-    // remainder is the hole that needs bin storage.
+    // remainder is the hole that needs bin storage. (The in-band allocator
+    // makes no host allocation: no callback point.)
+    if constexpr (xo::detail::inband_allocator) return;
     constexpr std::size_t fillers = xo::XBufferCore::free_table_inline_entries;
     for (Action which : {Action::move, Action::swap, Action::release, Action::reenter}) {
         auto from = make_buffer(), to = make_buffer(), unrelated = make_buffer();
@@ -339,6 +341,8 @@ void callback_during_allocation_bookkeeping() {
 void callback_during_free_table_retirement() {
     // V1 Core reclamation reserved a host vector; V2 retirement creates/grows
     // the host free table. That new_handler may transfer, release or reenter.
+    // (The in-band allocator makes no host allocation: no callback point.)
+    if constexpr (xo::detail::inband_allocator) return;
     for (Action which : {Action::move, Action::swap, Action::release, Action::reclaim_reenter}) {
         auto from = make_buffer(), to = make_buffer(); auto ref = binding(from);
         auto* p = ref.segment->allocate_aligned(32, 8);
@@ -376,6 +380,8 @@ void callback_during_free_table_retirement() {
 void free_table_host_oom_is_recorded_and_recomputed() {
     // V2 replacement of V1's best-effort Core cache under host OOM: a lost
     // retirement marks the host table incomplete and saving recomputes holes.
+    // (The in-band allocator makes no host allocation.)
+    if constexpr (xo::detail::inband_allocator) return;
     auto b = make_buffer(); auto ref = binding(b);
     auto* p = fd::allocate_dynamic_bytes(ref, 24, 8);
     xo::XBufferCore::trim_free_table_cache(); // the table is the failing host allocation
@@ -407,7 +413,8 @@ void registry_new_handler_reentry_is_unlocked() {
 void delete_callbacks_observe_complete_move() {
     // Target's actual free-table allocation is captured, not a guessed size or
     // the earlier registry-node delete. Its delete fires in the move gap.
-    {
+    // (The in-band allocator has no host table.)
+    if constexpr (!xo::detail::inband_allocator) {
         auto from = make_buffer();
         auto to = xo::XBuffer::create<OtherOwnerRoot>(4096, policy());
         from.root<OwnerRoot>().numbers.resize(3, 313u);

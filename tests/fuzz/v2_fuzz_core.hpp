@@ -1219,10 +1219,19 @@ enum class Outcome { Accepted, HeaderReject, PayloadReject };
 // One input through the oracle and all library acceptors. They must agree;
 // an accepted input is then read, mutated and re-saved (see exercise()).
 Outcome check_case(const std::string& w, std::mt19937_64& rng, const std::string& id) {
-    const auto o = oracle(w);
+    auto o = oracle(w);
     std::string terr;
     auto typed = typed_load(w, &terr);
     outcome_add("T", bool(typed), terr);
+#if XOFFSET_INBAND_ALLOCATOR
+    // The in-band allocator's full check is stricter than the oracle's
+    // tiling: the free directory must name exactly the table's other holes.
+    if (!typed && o.ok && terr == "wire validation failed: free blocks differ from the free directory") {
+        o.ok = false;
+        o.stage = Oracle::Stage::Payload;
+        o.why = terr;
+    }
+#endif
     if (bool(typed) != o.ok)
         fail("case " + id + ": typed=" + (typed ? "accept" : "reject(" + terr + ")") +
              " oracle=" + (o.ok ? "accept" : "reject(" + o.why + ")"));

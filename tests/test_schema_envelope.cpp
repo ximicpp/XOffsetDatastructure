@@ -158,10 +158,11 @@ bool test_hole_envelope_rejection() {
     const std::string data = envelope_with_hole();
     XWireHeaderV2 header{};
     std::memcpy(&header, data.data(), sizeof(header));
-    assert(header.hole_count == 1);
+    // One free block (in-band, the free directory is a hole too).
+    const auto loaded = XBuffer::load_verified<EnvelopeData>(data);
+    assert(loaded.free_block_count() == 1 && header.hole_count == loaded.wire_hole_count());
     assert(data.size() == sizeof(header) + header.used_bytes - XWIRE_PAYLOAD_BEGIN +
                               header.hole_count * sizeof(XBufferCore::WireHole));
-    (void)XBuffer::load_verified<EnvelopeData>(data);
 
     auto mutate = [&](auto&& edit) {
         auto copy = data;
@@ -176,7 +177,7 @@ bool test_hole_envelope_rejection() {
     assert(rejects_with(mutate([](XWireHeaderV2& h) { h.used_bytes += 8; }), "used size mismatch"));
     // Dropping the table entry together with its envelope leaves the retired
     // block unaccounted for: exact coverage fails.
-    auto dropped = mutate([](XWireHeaderV2& h) { h.hole_count = 0; });
+    auto dropped = mutate([](XWireHeaderV2& h) { h.hole_count -= 1; });
     dropped.resize(dropped.size() - sizeof(XBufferCore::WireHole));
     assert(rejects_with(dropped, "payload is not exactly covered by live blocks and holes"));
     std::cout << "  [OK]\n";

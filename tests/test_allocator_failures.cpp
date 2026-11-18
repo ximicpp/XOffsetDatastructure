@@ -369,7 +369,33 @@ void reloads_keep_their_tables() {
         require(b.root<AllocatorFailureRoot>().values[0]==std::uint32_t(i),"reload changed the root");
     }
 }
+// The in-band allocator (XOFFSET_INBAND_ALLOCATOR) keeps its state in the
+// payload: no allocation, retirement (of any size, the free directory's growth
+// included), save or verified load of the holes makes a host allocation, so
+// there is no failure point to arm, and every entry is kept.
+void inband_makes_no_host_allocation() {
+    auto b=XBuffer::create<AllocatorFailureRoot>(4*1024*1024,XBuffer::maximum_capacity(4*1024*1024));
+    std::vector<void*> blocks; blocks.reserve(4096);
+    attempts=hits=0;fail_after=0;watch=true;
+    for(unsigned i=0;i<4096;++i) blocks.push_back(b.arena()->allocate_aligned(8+8*(i%61)+(i%97==0?8192:0),8));
+    for(unsigned i=0;i<4096;i+=2) b.arena()->deallocate(blocks[i],8+8*(i%61)+(i%97==0?8192:0));
+    for(unsigned i=0;i<2048;++i) blocks[2*i]=b.arena()->allocate_aligned(8+8*(i%37),8);
+    for(unsigned i=0;i<4096;++i) b.arena()->deallocate(blocks[i],i%2 ? 8+8*(i%61)+(i%97==0?8192:0) : 8+8*((i/2)%37));
+    watch=false;fail_after=-1;
+    require(attempts==0 && hits==0,"an in-band allocator operation made a host allocation");
+    require(b.free_table_complete() && b.free_block_count()!=0,"in-band retirements lost an entry");
+    const auto frame=b.save_verified<AllocatorFailureRoot>();
+    auto loaded=XBuffer::load_verified<AllocatorFailureRoot>(frame);
+    require(same(holes_of(loaded),holes_of(b)) && loaded.save_verified<AllocatorFailureRoot>()==frame,
+            "in-band free blocks did not travel with the payload");
+}
+
 int main() {try {
+#if XOFFSET_INBAND_ALLOCATOR
+    inband_makes_no_host_allocation();
+    std::cout<<"{\"status\":\"passed\",\"in_band\":true}\n";
+    return 0;
+#endif
     std::size_t points=0,max_lost=0;
     reload_keeps_small_bin_storage();
     reloads_keep_their_tables();

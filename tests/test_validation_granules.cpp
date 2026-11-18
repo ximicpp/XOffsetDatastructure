@@ -484,8 +484,12 @@ void typed_head_checks() {
         const auto valid = retired.save_verified<PairRoot>();
         const auto header = read_at<xo::XWireHeaderV2>(valid, 0);
         const auto at = sizeof(header) - xo::XWIRE_PAYLOAD_BEGIN; // + payload offset: file position
-        const auto hole = read_at<xo::XBufferCore::WireHole>(valid, at + header.used_bytes);
-        need(header.hole_count == 1 && hole.bytes == 16, "fixture must hold one retired block");
+        // The retired block is the last hole (in-band, the free directory is
+        // the first).
+        const std::uint32_t holes = xo::XBufferCore::free_block_header_bytes != 0 ? 2u : 1u;
+        const auto hole = read_at<xo::XBufferCore::WireHole>(
+            valid, at + header.used_bytes + (holes - 1u) * sizeof(xo::XBufferCore::WireHole));
+        need(header.hole_count == holes && hole.bytes == 16, "fixture must hold one retired block");
         auto bad = valid;
         const auto origin = at + header.root_offset + offsetof(PairRoot, right) +
                             offsetof(xo::XVectorCore<std::uint8_t>, data_delta);
