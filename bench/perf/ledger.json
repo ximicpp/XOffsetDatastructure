@@ -1,4 +1,15 @@
 {
   "schema": "xoffset-perf-ledger-v1",
-  "entries": []
+  "entries": [
+    {
+      "id": "pr313-slg-c-bench-tu-inlining",
+      "pr": 313,
+      "metric": "slg.C",
+      "compiler": "gcc16",
+      "max_ratio": 1.025,
+      "reason": "The bench translation unit lost the removed direct-receive column, and GCC 16 now inlines XFixedFlatMap<int, int>::operator[] into the SLG shard_ticks loop (+90,491 Ir). Against the anchor built with the same bench sources the base is already 1.0226; head/base is 0.9997. No library code on that path changed.",
+      "evidence": "PR #313 local_validate --tier pr: slg.C head/base 0.9997, head/anchor 1.0223; function diff: operator[] inlined into shard_ticks only in head, +90,491 Ir.",
+      "approved_by": "susu (2026-11-18 08:11Z, card cmsg_01W8h2niLCspyDhp6DxMomYuGsyJL4ehkci7KyZEj4bNhM in the simplification thread)"
+    }
+  ]
 }
