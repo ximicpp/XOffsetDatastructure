@@ -1,12 +1,8 @@
 #pragma once
-// Error codes, the exception switch and the non-throwing result types shared
-// by every XOffset header. C++17, no other XOffset header.
-//
-// Exceptions on (the default when the compiler has them): every failure
-// throws, exactly as before; the try_* receive entries catch and return the
-// same code and message. Exceptions off (-fno-exceptions, MSVC /EHs-c-, or
-// -DXOFFSET_NO_EXCEPTIONS=1): the receive path returns its first failure up
-// to the try_* entry, and any other failure calls the fatal handler.
+// Error codes and the non-throwing result types shared by every XOffset
+// header (the exception switch is in xoffset_config.hpp). C++17.
+#include "xoffset_config.hpp"
+
 #include <atomic>
 #include <cstdint>
 #include <cstdlib>
@@ -15,17 +11,6 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
-
-#if !defined(XOFFSET_NO_EXCEPTIONS)
-#  if defined(__cpp_exceptions) || defined(__EXCEPTIONS) || defined(_CPPUNWIND)
-#    define XOFFSET_NO_EXCEPTIONS 0
-#  else
-#    define XOFFSET_NO_EXCEPTIONS 1
-#  endif
-#endif
-#if !XOFFSET_NO_EXCEPTIONS && !(defined(__cpp_exceptions) || defined(__EXCEPTIONS) || defined(_CPPUNWIND))
-#  error "XOFFSET_NO_EXCEPTIONS=0 requires a build with exceptions enabled"
-#endif
 
 namespace XOffsetDatastructure {
 
@@ -167,7 +152,7 @@ template <class E>
 } // namespace detail
 
 namespace detail {
-// Fail-soft region (growth policy part 2: proxies and pin scopes in builds
+// Fail-soft region (proxies and pin scopes in builds
 // without exceptions). While one is open on this thread, an arena
 // allocation that fails records its code here and returns null instead of
 // calling the fatal handler; the container operation that asked for it then
@@ -335,11 +320,6 @@ inline XError take_pending_error() noexcept {
 }
 } // namespace detail
 
-#if defined(__cplusplus) && __cplusplus >= 202002L
-#  define XOFFSET_DETAIL_UNLIKELY [[unlikely]]
-#else
-#  define XOFFSET_DETAIL_UNLIKELY
-#endif
 
 #if XOFFSET_NO_EXCEPTIONS
 // A failure outside the receive path: there is nobody to return it to.

@@ -111,8 +111,7 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
     lists and deltas with a single kind of march change.
   M: 10,000 units, 1,500 clients, 1,000 marches, 4 ticks per cycle. Bytes
   include zstd-3 and, for XOffset, the save_compact pull.
-- native delta (XOffset only, built when the library has
-  `XOFFSET_DELTA_SYNC_API` with `XDeltaBaseline::key_delta_into`), keys N*
+- native delta (XOffset only, `XDeltaBaseline::key_delta_into`), keys N*
   beside U*: the server keeps each static client's view in an XBuffer in
   stable slots (a record that leaves zeroes its slot, the lowest free slot is
   reused, tiles stay in place), mutates it in place (N*.send) and writes one
@@ -186,7 +185,7 @@ XOffset's A adapter (both case sets) calls `prefetch_for_update()` on the two
 players' buffers when the battle result starts arriving, inside the timed
 A.res_decode: a public cache hint that changes nothing, so A.apply does not
 pay the cold allocator lines one after another. The other formats have no
-equivalent; libraries without `XOFFSET_PREFETCH_FOR_UPDATE_API` skip it.
+equivalent.
 
 There is no C or D in this set, and `MANIFEST` lists the change. With
 `SLG_CASES` unset nothing changes: same stage keys, digests and report sums.
@@ -309,8 +308,7 @@ D3 shared deltas (2026-11-04, thread "shared-delta prototype design", doc X5MZPW
 `xoffset_shared_delta.hpp`, XS 1.0 in 3.5-3.6, XS 2.0 since 4.0, docs/SHARED_DELTA.md). XOffset and (since
 4.0 W1, below) zpp_bits, class 3 only;
 `SLG_D3=1` runs D3 alone (no N*), `SLG_D3=2` both, unset none (keys and stage
-ranges as before); `SLG_NATIVE_OFF` turns D3 off too. Needs no
-`XOFFSET_DELTA_SYNC_API`. The server keeps one image of every entity as its
+ranges as before); `SLG_NATIVE_OFF` turns D3 off too. The server keeps one image of every entity as its
 holders have it, shared by all connections. Once per tick (`D*.pub`) it notes
 the world's dirty flags and encodes every changed unit some view holds, its
 change body straight from the dirty members (`put_change_op`, no compare); a

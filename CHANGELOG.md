@@ -5,6 +5,13 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- `xoffset_config.hpp` holds the compiler and platform detection, the attribute macros (24 per-file
+  macros are 11 shared ones) and the build switches with their defaults; the storage headers include it
+  too. Removed: the `XOFFSET_*_API` feature macros (every feature they announced is always present),
+  `XOFFSET_REGISTER_TYPE` / `_CONTAINER` / `_MAP` and the `XOFFSET_REGISTER_MIGRATION_*` macros,
+  `XFlatSet` / `XFlatMap` (the same types as `XSet` / `XMap`), `XFixedBlob`,
+  `schema_snapshot_body` and unused internal helpers. `is_v1_wire_admitted_v` is now
+  `is_wire_admitted_v`.
 - Removed the experimental direct receive (`begin_verified_receive`, `finish_verified`, the second
   validator `receive_raw::validate`, the custom lifetime hooks `wire_activation` and
   `wire_future_lifetime`, `canonical_bytes_at`, `freeze_verified` / `VerifiedSnapshot` and

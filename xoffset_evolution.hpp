@@ -1,52 +1,14 @@
 #ifndef X_OFFSET_EVOLUTION_HPP
 #define X_OFFSET_EVOLUTION_HPP
 
-// Schema evolution, conversion core (server side).
-//
-// Converts a verified object of one version of a schema into another version
-// of it, built in a buffer of the library. Fields correspond by name; offsets
-// and declaration order do not matter. Nested records, array elements and
-// container elements follow the same rules, level by level:
-//
-//   change                         To has it, From not / From has it, To not
-//   added field                    keeps the value make<To>() gives it
-//   removed field                  dropped
-//   reordered, inserted in between matched by name
-//   renamed                        a removal plus an addition (write a hook)
-//   same name, other type          compile error unless a hook handles it;
-//                                  int32 -> int64 included
-//   enum value                     copied when it is an enumerator of the
-//                                  target enum, else the conversion fails
-//   container element type         element by element
-//   set / map key                  same key type, or enum keys checked by
-//                                  value; a duplicate key after conversion
-//                                  fails
-//   container kind, array extent,
-//   string <-> other               compile error unless a hook handles it
-//
-// A hook for one adjacent step Old -> New is a specialization, at global
-// scope, of XOffsetDatastructure::xevolve<Old, New>:
-//
-//   template <> struct XOffsetDatastructure::xevolve<v12::Player, Player> {
-//       static constexpr std::string_view handles[] = {"gold"};
-//       static void upgrade(const v12::Player& from, Player& to, XEvolveContext& ctx) {
-//           to.gold = from.gold;
-//       }
-//       static void downgrade(const Player& from, v12::Player& to, XEvolveContext& ctx) {
-//           to.gold = ctx.checked_narrow<std::int32_t>(from.gold, "gold");
-//       }
-//   };
-//
-// The default copy runs first and leaves the fields named in `handles` alone;
-// then the hook runs. A name in `handles` that neither version has is a
-// compile error. Converting From -> To uses xevolve<From, To>::upgrade, or
-// xevolve<To, From>::downgrade.
-//
-// Every failure (an enum value the target does not have, checked_narrow out of
-// range, a duplicate key, the target buffer's maximum capacity, a hook's
-// ctx.fail) throws XException naming the field path; there is no partial
-// result. The conversion reads the source through typed const references
-// only: run it on objects that passed load_verified.
+// Schema evolution, conversion core (server side): converts a verified object
+// of one version of a schema into another, built in a library buffer. Fields
+// correspond by name, level by level; an adjacent step's hook is a global
+// specialization of xevolve<Old, New> (upgrade, downgrade, and `handles`, the
+// fields the default copy leaves to it). Rules and examples:
+// docs/SCHEMA_EVOLUTION.md. Every failure throws XException naming the field
+// path, with no partial result. The source is read through typed const
+// references only: run it on objects that passed load_verified.
 
 #include "xoffsetdatastructure.hpp"
 #include "xoffset_schema_names.hpp"
@@ -947,10 +909,6 @@ namespace XOffsetDatastructure {
                 auto middle = ::XOffsetDatastructure::evolve<version_t<W, Next>>(source, step);
                 return chain<W, Next, To>(middle, options);
             }
-        }
-
-        inline std::size_t capacity_of(std::optional<XBuffer::MaximumCapacity> cap, std::size_t fallback) noexcept {
-            return cap ? cap->value : fallback;
         }
 
         // Loads a wire of any version of W's lineage and upgrades it to W. A

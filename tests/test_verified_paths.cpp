@@ -109,7 +109,6 @@ template<class F> void rejects(F&& operation) {
     need(caught,"expected rejection missing");
 }
 
-#if defined(XOFFSET_VERIFIED_PATHS_API)
 xo::XBufferCore *from{}, *to{};
 xo::TypedXBuffer<PathsRoot>* typed{};
 void move_owner() { *to=std::move(*from); }
@@ -262,7 +261,6 @@ void hole_table_paths() {
     need(reloaded.root<PathsRoot>().name.view()==std::string(300,'q'),"recomputed wire lost content");
 }
 
-#endif
 }
 
 int main(int argc,char** argv) {try {
@@ -276,12 +274,8 @@ int main(int argc,char** argv) {try {
         need(bool(f)||f.eof(),"wire read failed");auto source=xo::XBuffer::load_verified<PathsRoot>(wire);
         check(source.root<PathsRoot>());return 0;
     }
-#if defined(XOFFSET_VERIFIED_PATHS_API)
     into_exact_hot_and_oom();into_owner_callbacks();into_alias_and_unverified();
     hole_table_paths();
     std::cout<<"verified paths: four groups, exact/hot/OOM/owner callbacks/alias/V2 hole table passed\n";
-#else
-    throw std::runtime_error("full tests require the new APIs; baseline supports compatibility CLI only");
-#endif
     return 0;
 }catch(const std::exception& e){host::remaining=-1;host::callback=nullptr;std::cerr<<e.what()<<'\n';return 1;}}

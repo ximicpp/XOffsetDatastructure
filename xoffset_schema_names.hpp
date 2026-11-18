@@ -1,23 +1,11 @@
 #ifndef X_OFFSET_SCHEMA_NAMES_HPP
 #define X_OFFSET_SCHEMA_NAMES_HPP
 
-// Field-name fingerprint of a wire type (schema evolution, handshake).
-//
-// schema_hash covers offsets, sizes and scalar kinds but no member names, so
-// two versions of a record that only swap or rename same-typed fields share
-// it. The name signature lists, for every record reachable from T in the order
-// wire_abi_signature() walks it, each member as "name:offset"; the name digest
-// is fnv1a of that text. It travels in the schema handshake only, never in a
-// wire header, so the wire format and schema_hash are unchanged.
-//
-//   record          {name:offset<field>,name:offset<field>}
-//   array           [element]   (also std::array)
-//   vector, set     <element>
-//   map             <key,value>
-//   scalar, enum, string: empty
-//
-// The text is part of the handshake compatibility promise: two programs agree
-// on a version only if they compute the same digest for it.
+// Field-name fingerprint of a wire type (schema evolution, handshake):
+// schema_hash covers no member names, so this digest tells apart versions that
+// only swap or rename same-typed fields. It travels in the handshake only,
+// never in a wire header. The signature text (docs/SCHEMA_EVOLUTION.md
+// section 4) is part of the handshake compatibility promise.
 
 #include "xoffsetdatastructure.hpp"
 

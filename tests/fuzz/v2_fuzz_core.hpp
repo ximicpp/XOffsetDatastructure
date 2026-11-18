@@ -429,7 +429,6 @@ Oracle oracle(const std::string& wire, bool collect_heads = false) {
 template <class Root = fz::Root>
 std::optional<xo::TypedXBuffer<Root>> load_entry(const std::string& wire, xo::XBuffer::MaximumCapacity cap,
                                                  std::string* error) {
-#if defined(XOFFSET_TRY_ENTRIES_API)
     auto loaded = xo::TypedXBuffer<Root>::try_load_verified(wire, cap);
 #if !XOFFSET_NO_EXCEPTIONS
     // The throwing entry must agree exactly: outcome, code and message.
@@ -454,14 +453,6 @@ std::optional<xo::TypedXBuffer<Root>> load_entry(const std::string& wire, xo::XB
         return std::nullopt;
     }
     return std::move(*loaded);
-#else
-    try {
-        return xo::TypedXBuffer<Root>(xo::XBuffer::load_verified<Root>(wire, cap));
-    } catch (const xo::XException& e) {
-        if (error) *error = e.what();
-        return std::nullopt;
-    }
-#endif
 }
 
 template <class Root = fz::Root>
@@ -491,18 +482,9 @@ Buffer& reloader() {
 }
 
 bool reload_accepts(Buffer& target, const std::string& wire, std::string* error) {
-#if defined(XOFFSET_TRY_ENTRIES_API)
     const auto status = target.try_reload_verified(wire);
     if (status) return true;
     if (error) *error = status.error().message;
-#else
-    try {
-        target.reload_verified(wire);
-        return true;
-    } catch (const xo::XException& e) {
-        if (error) *error = e.what();
-    }
-#endif
     require_no_root(target, "reload_verified");
     return false;
 }
@@ -543,7 +525,6 @@ void check_admit(const std::string& w, const Oracle& o, Buffer* typed, const std
     if (!st) require_no_root(target, "XReceiver admit");
 }
 
-#if defined(XOFFSET_RECEIVER_VIEW_API)
 std::string dump(const fz::Root& r);
 // Acceptor 9: the bounds-checked view of a client uplink.
 void check_view(const std::string& w, const Oracle& o, Buffer* typed, const std::string& id) {
@@ -566,9 +547,7 @@ void check_view(const std::string& w, const Oracle& o, Buffer* typed, const std:
         fail(id + ": bounds view accepted a wire the oracle rejects at the header (" + o.why + ")");
     if (v) (void)dump(v->root());  // every const access stays in the wire
 }
-#endif
 
-#if defined(XOFFSET_VERIFIED_RELOAD_API)
 // Acceptor 6: direct reload (XBuffer::begin_verified_reload) into ONE
 // long-lived buffer, delivered the way a transport would: the section lengths
 // come from the wire header, each extent lands at the offset its (not yet
@@ -590,32 +569,15 @@ Buffer& direct_slot() {
 using DirectToken = xo::VerifiedReloadToken<fz::Root>;
 std::optional<DirectToken> direct_begin(Buffer& target, std::size_t used, std::size_t holes, std::size_t extents,
                                         std::string* error) {
-#if defined(XOFFSET_TRY_ENTRIES_API)
     auto begun = target.try_begin_verified_reload<fz::Root>(used, holes, extents);
     if (begun) return std::optional<DirectToken>(std::move(*begun));
     if (error) *error = begun.error().message;
-#else
-    try {
-        return std::optional<DirectToken>(target.begin_verified_reload<fz::Root>(used, holes, extents));
-    } catch (const xo::XException& e) {
-        if (error) *error = e.what();
-    }
-#endif
     return std::nullopt;
 }
 bool direct_finish(DirectToken& token, std::string* error) {
-#if defined(XOFFSET_TRY_ENTRIES_API)
     const auto finished = token.try_finish();
     if (finished) return true;
     if (error) *error = finished.error().message;
-#else
-    try {
-        token.finish();
-        return true;
-    } catch (const xo::XException& e) {
-        if (error) *error = e.what();
-    }
-#endif
     return false;
 }
 
@@ -708,9 +670,7 @@ void check_direct(const std::string& w, bool accepted, Buffer* fresh, const std:
              " typed=" + (accepted ? "accept" : "reject"));
     if (fresh) compare_reload(*fresh, direct_slot(), "direct reload");
 }
-#endif
 
-#if defined(XOFFSET_SLOT_STORAGE_API)
 // Acceptor 7 (R1). Movable slots: Explicit growth, maximum kLimit, starting
 // in the smallest class, so reloads keep moving the owner to larger slots
 // (and to VM above SLOT_MAX). Each accepted payload must equal `fresh` (a VM
@@ -741,16 +701,12 @@ void check_slots(const std::string& w, bool accepted, Buffer* fresh, const std::
     if (reload_accepts(slot_reloader(), w, &error) != accepted)
         fail(where + ": slot reload=" + (accepted ? "reject(" + error + ")" : "accept"));
     if (accepted) compare_reload(*fresh, slot_reloader(), "slot reload");
-#if defined(XOFFSET_VERIFIED_RELOAD_API)
     if (direct_accepts(slot_direct(), w, nullptr, DirectMode::Mismatch))
         fail(where + ": interrupted direct reload on a slot accepted");
     if (direct_accepts(slot_direct(), w, &error) != accepted)
         fail(where + ": slot direct=" + (accepted ? "reject(" + error + ")" : "accept"));
     if (accepted) compare_reload(*fresh, slot_direct(), "slot direct reload");
-#endif
 }
-
-#endif
 
 // Header-valid wire -> {aligned payload (receiver-written payload header,
 // gaps zeroed), gaps, hole pointer}.
@@ -1171,7 +1127,6 @@ void check_clone(B& buf, const std::string& saved, const std::mt19937_64& rng) {
 // also builds against older libraries for validation_outcomes).
 void check_composed([[maybe_unused]] Buffer& buf, [[maybe_unused]] const std::string& saved,
                     [[maybe_unused]] const std::mt19937_64& rng) {
-#if defined(XOFFSET_SAVE_COMPOSED_API)
     auto r = rng;
     auto src = typed_load(build_wire(r));
     if (!src) fail("composed: generated source wire rejected");
@@ -1207,7 +1162,6 @@ void check_composed([[maybe_unused]] Buffer& buf, [[maybe_unused]] const std::st
     if (!loaded) fail("composed wire rejected by load_verified");
     if (dump(plain_root_of(*loaded)) != dump(plain_root_of(*clone))) fail("composed wire loads different values");
     ++composed_comparisons;
-#endif
 }
 
 std::string exercise(Buffer& buf, std::mt19937_64& rng) {
@@ -1230,7 +1184,6 @@ std::string exercise(Buffer& buf, std::mt19937_64& rng) {
     return saved;
 }
 
-#if defined(XOFFSET_SLOT_STORAGE_API)
 // The mutations `exercise` applies to a VM buffer, applied with the same rng
 // to a pinned slot: the re-saved wire must be the same bytes.
 void check_slot_mutation(const std::string& w, std::mt19937_64 rng, const std::string& saved_vm,
@@ -1241,7 +1194,6 @@ void check_slot_mutation(const std::string& w, std::mt19937_64 rng, const std::s
     mutate_valid(plain_root_of(slot), rng);
     if (slot.save_verified() != saved_vm) fail(where + ": mutation on a pinned slot re-saves a different wire");
 }
-#endif
 
 // A sparse wire must have exactly the outcome (and error) of the dense wire
 // of the payload it loads, and an accepted one must load that payload.
@@ -1281,15 +1233,10 @@ Outcome check_case(const std::string& w, std::mt19937_64& rng, const std::string
         fail("case " + id + ": reload=" + (typed ? "reject(" + lerr + ")" : "accept") +
              " typed=" + (typed ? "accept" : "reject(" + terr + ")"));
     if (typed) compare_reload(*typed);
-#if defined(XOFFSET_VERIFIED_RELOAD_API)
     check_direct(w, bool(typed), typed ? &*typed : nullptr, "case " + id);
-#endif
     check_admit(w, o, typed ? &*typed : nullptr, "case " + id);
-#if defined(XOFFSET_RECEIVER_VIEW_API)
     check_view(w, o, typed ? &*typed : nullptr, "case " + id);
-#endif
     compare_inflated(w, typed, terr, o, "case " + id);
-#if defined(XOFFSET_TRY_ENTRIES_API)
     {
         // load_verified_with_resource: the validation bitmaps come from another upstream (a monotonic
         // resource over a small stack buffer, so large payloads spill), with
@@ -1306,8 +1253,6 @@ Outcome check_case(const std::string& w, std::mt19937_64& rng, const std::string
         if (typed && xo::TypedXBuffer<fz::Root>(std::move(*viar)).save_verified() != typed->save_verified())
             fail("case " + id + ": load_verified_with_resource loaded a different payload");
     }
-#endif
-#if defined(XOFFSET_SLOT_STORAGE_API)
     check_slots(w, bool(typed), typed ? &*typed : nullptr, "case " + id);
     if (o.ok) {
         const auto before = rng;
@@ -1316,9 +1261,6 @@ Outcome check_case(const std::string& w, std::mt19937_64& rng, const std::string
         if (fits) check_slot_mutation(w, before, saved, "case " + id);
         return Outcome::Accepted;
     }
-#else
-    if (o.ok) { exercise(*typed, rng); return Outcome::Accepted; }
-#endif
     return o.stage == Oracle::Stage::Header ? Outcome::HeaderReject : Outcome::PayloadReject;
 }
 
@@ -1331,12 +1273,8 @@ void check_golden(const std::string& w, const std::string& where) {
     if (!loaded) fail(where + ": typed load rejects a library-generated wire");
     if (!reload_accepts(w, nullptr)) fail(where + ": reload_verified rejects a library-generated wire");
     compare_reload(*loaded);
-#if defined(XOFFSET_VERIFIED_RELOAD_API)
     check_direct(w, true, &*loaded, where);
-#endif
-#if defined(XOFFSET_SLOT_STORAGE_API)
     check_slots(w, true, &*loaded, where);
-#endif
     // w may be any of the three forms; the default re-save carries the same
     // payload and holes and is itself byte stable.
     const auto again = loaded->save_verified();

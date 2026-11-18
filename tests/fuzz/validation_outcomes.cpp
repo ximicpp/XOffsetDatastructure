@@ -64,14 +64,12 @@ int main(int argc, char** argv) {
         std::string line = std::to_string(c) + " " + std::to_string(mutated_fnv) + (dense ? " I" : "") +
                            " T:" + outcome(typed, terr) +
                            " L:" + outcome(reload, lerr);
-#if defined(XOFFSET_VERIFIED_RELOAD_API)
         // Direct reload must agree with load_verified and reject every
         // interrupted delivery; the line only changes (and so differs from a
         // library without it) when it does not.
         for (auto mode : {DirectMode::Abort, DirectMode::Mismatch, DirectMode::Short})
             if (direct_accepts(w, nullptr, mode)) line += " D:interrupted-accepted";
         if (direct_accepts(w, nullptr) != typed) line += " D:disagrees";
-#endif
         ++histogram[outcome(typed, terr)];
         block = fnv(line, block);
         if (c >= from && c < to) std::cout << line << "\n";

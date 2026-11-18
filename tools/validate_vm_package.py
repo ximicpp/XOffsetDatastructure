@@ -81,6 +81,7 @@ def audit_install(prefix: Path, source: Path, suite: str, forbidden: list[Path])
     expected = {"include/xoffset_virtual_memory.hpp": digest(source / "xoffset_virtual_memory.hpp"),
                 "include/xoffset_slot_storage.hpp": digest(source / "xoffset_slot_storage.hpp"),
                 "include/xoffset_error.hpp": digest(source / "xoffset_error.hpp"),
+                "include/xoffset_config.hpp": digest(source / "xoffset_config.hpp"),
                 "share/XOffsetDatastructure/licenses/LICENSE": digest(source / "LICENSE")}
     for path, installed in RELEASE_FILES.items():
         expected["share/XOffsetDatastructure/" + installed] = digest(source / path)
