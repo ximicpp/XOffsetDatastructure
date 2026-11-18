@@ -6271,6 +6271,16 @@ namespace XOffsetDatastructure {
                 detail::shift_rebase_moved(fresh, size_, static_cast<std::int32_t>(
                     reinterpret_cast<const char*>(old) - reinterpret_cast<const char*>(fresh)));
                 for (size_type i = 0; i < size_; ++i) detail::empty_vacated_slot(old + i);
+            } else if constexpr (std::is_trivially_copyable_v<T> && !std::is_array_v<T> &&
+                                 !detail::future_custom_lifetime_supported<T>() && sizeof(T) <= 16) {
+                // Small plain elements (a float, an id, a 12-byte point): one
+                // block copy, the bytes relocate_construct copies one element
+                // at a time. The loop below reloads size_ on every iteration
+                // (a store through `fresh` may alias the head) and takes 5
+                // instructions per 4-byte element. Larger elements keep the
+                // loop: no measured cell gained from lifting the limit.
+                std::memcpy(static_cast<void*>(fresh), static_cast<const void*>(old),
+                            std::size_t(size_) * sizeof(T));
             } else {
                 for (size_type i = 0; i < size_; ++i) {
                     fixed_detail::relocate_construct(fresh + i, old[i]);
