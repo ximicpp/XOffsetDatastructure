@@ -12,6 +12,9 @@ of this file and in the pull requests.
   `XFlatSet` / `XFlatMap` (the same types as `XSet` / `XMap`), `XFixedBlob`,
   `schema_snapshot_body` and unused internal helpers. `is_v1_wire_admitted_v` is now
   `is_wire_admitted_v`.
+- `XString`, `XSet` and `XMap` are one class each: `XFixedString`, `XFixedFlatSet` and
+  `XFixedFlatMap` are gone, and `XFixedVector` is `XVectorCore`, the base of `XVector`, `XSet` and
+  `XMap` (no longer a field type). Behavior, layout and wire bytes are unchanged.
 - Removed the experimental direct receive (`begin_verified_receive`, `finish_verified`, the second
   validator `receive_raw::validate`, the custom lifetime hooks `wire_activation` and
   `wire_future_lifetime`, `canonical_bytes_at`, `freeze_verified` / `VerifiedSnapshot` and

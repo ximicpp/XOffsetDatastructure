@@ -30,7 +30,7 @@ void operator delete[](void* p,std::size_t) noexcept { ::operator delete(p); }
 struct BulkAttr { xo::XString key; xo::XVector<std::uint8_t> value; };
 struct BulkRoot {
     xo::XVector<std::uint32_t> numbers, donor;
-    xo::XFixedVector<std::uint8_t> fixed_bytes;
+    xo::XVector<std::uint8_t> fixed_bytes;
     xo::XVector<std::uint8_t> bytes;
     xo::XString blocker;
     xo::XVector<BulkAttr> attrs;
@@ -61,12 +61,12 @@ struct AssignmentOnly {
 static_assert(std::is_trivially_copyable_v<AssignmentOnly> && std::is_trivially_destructible_v<AssignmentOnly>);
 static_assert(!std::is_trivially_copy_constructible_v<AssignmentOnly>);
 template<class V> concept HasBulk = requires(V& v, std::span<const typename V::value_type> s) { v.assign_range(s); };
-static_assert(HasBulk<xo::XFixedVector<std::uint32_t>> && HasBulk<xo::XVector<std::uint32_t>>);
+static_assert(HasBulk<xo::XVector<std::uint32_t>>);
 static_assert(HasBulk<xo::XVector<WithDefaultCallback>>);
 static_assert(!HasBulk<xo::XVector<AssignmentOnly>>);
 static_assert(!HasBulk<xo::XVector<xo::XString>> && !HasBulk<xo::XVector<BulkAttr>>);
 static_assert(!HasBulk<xo::XVector<const std::uint32_t>> && !HasBulk<xo::XVector<volatile std::uint32_t>>);
-static_assert(sizeof(xo::XFixedVector<std::uint8_t>) == 12 && sizeof(xo::XVector<std::uint32_t>) == 12);
+static_assert(sizeof(xo::XVector<std::uint8_t>) == 12 && sizeof(xo::XVector<std::uint32_t>) == 12);
 namespace {
 void need(bool value, const char* what) { if (!value) throw std::runtime_error(what); }
 auto policy(std::size_t maximum = 32u << 20) {

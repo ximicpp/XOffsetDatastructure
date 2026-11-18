@@ -301,7 +301,7 @@ bool test_main_containers_assoc_rejects_corrupt_map() {
         const auto& value = root->by_id.begin()[0].second;
         assert(value.is_inline() && dense_wire(inline_data));
         inline_data[sizeof(XWireHeaderV2) + payload_offset(xbuf, &value) - XWIRE_PAYLOAD_BEGIN + 11] =
-            static_cast<char>(0x80 | (XFixedString::inline_max + 1));
+            static_cast<char>(0x80 | (XString::inline_max + 1));
         bool inline_threw = false;
         try {
             (void)TypedXBuffer<BridgeAssocRoot>::load_verified(inline_data);

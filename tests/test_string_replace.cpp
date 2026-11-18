@@ -195,10 +195,10 @@ void failed_growth_preserves_descriptor_and_source() {
 }
 
 void rejection_order_and_layout() {
-    static_assert(sizeof(xo::XFixedString) == 12 && sizeof(xo::XString) == 12);
+    static_assert(sizeof(xo::XString) == 12);
     // V2.1: a head outside every payload takes empty and inline values; only
     // a value that needs a block is rejected, and it leaves the head as it was.
-    xo::XFixedString unbound; const auto initial = descriptor(unbound); bool caught = false;
+    xo::XString unbound; const auto initial = descriptor(unbound); bool caught = false;
     unbound.assign({});
     need(descriptor(unbound) == initial, "unbound empty assignment changed the head");
     try { unbound.assign(std::string(40, 'u')); } catch (const xo::XException&) { caught = true; }

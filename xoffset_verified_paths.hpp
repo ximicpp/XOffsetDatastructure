@@ -359,22 +359,22 @@ namespace detail {
             return true;
         }
     };
-    static_assert(offsetof(XFixedString, data_delta) == 0 && offsetof(XFixedString, size_) == 4 &&
-                  offsetof(XFixedString, capacity_) == 8 && sizeof(XFixedString) == 12);
-    static_assert(offsetof(XFixedVector<int>, data_delta) == 0 && offsetof(XFixedVector<int>, size_) == 4 &&
-                  offsetof(XFixedVector<int>, capacity_) == 8 && sizeof(XFixedVector<int>) == 12);
+    static_assert(offsetof(XString, data_delta) == 0 && offsetof(XString, size_) == 4 &&
+                  offsetof(XString, capacity_) == 8 && sizeof(XString) == 12);
+    static_assert(offsetof(XVectorCore<int>, data_delta) == 0 && offsetof(XVectorCore<int>, size_) == 4 &&
+                  offsetof(XVectorCore<int>, capacity_) == 8 && sizeof(XVectorCore<int>) == 12);
 
     // Measures the subtree of the source value `src`.
     template <class U>
     void compact_value(const U& src, CompactMeasure& w) noexcept;
 
-    inline void compact_string(const XFixedString& src, CompactMeasure& w) noexcept {
+    inline void compact_string(const XString& src, CompactMeasure& w) noexcept {
         const auto n = src.size();
-        if (n > XFixedString::inline_max) w.block(std::size_t(n) + 1u);
+        if (n > XString::inline_max) w.block(std::size_t(n) + 1u);
     }
 
     template <class E>
-    void compact_vector(const XFixedVector<E>& src, CompactMeasure& w) noexcept {
+    void compact_vector(const XVectorCore<E>& src, CompactMeasure& w) noexcept {
         const auto n = src.size_;
         if (n == 0) return;
         if (!w.block(std::size_t(compact_capacity<E>(n, w.slack_div)) * sizeof(E))) return;
@@ -398,9 +398,9 @@ namespace detail {
         if constexpr (!compact_has_heads<C>()) {
             return;
         } else if constexpr (is_fixed_string_v<C>) {
-            compact_string(static_cast<const XFixedString&>(src), w);
+            compact_string(static_cast<const XString&>(src), w);
         } else if constexpr (is_fixed_vector_v<C>) {
-            compact_vector(static_cast<const XFixedVector<typename C::value_type>&>(src), w);
+            compact_vector(static_cast<const XVectorCore<typename C::value_type>&>(src), w);
         } else if constexpr (std::is_array_v<C>) {
             for (std::size_t i = 0; i < std::extent_v<C>; ++i) compact_value(src[i], w);
         } else {
@@ -481,11 +481,11 @@ namespace detail {
     }
 
     template <bool P>
-    XOFFSET_DETAIL_INLINE void direct_string(const XFixedString& src, std::size_t at, DirectWriter<P>& w) noexcept {
+    XOFFSET_DETAIL_INLINE void direct_string(const XString& src, std::size_t at, DirectWriter<P>& w) noexcept {
         const auto text = src.view();
         const auto n = static_cast<std::uint32_t>(text.size());
         if (n == 0) { write_container_head(w.base, at, 0, 0, 0); return; }
-        if (n <= XFixedString::inline_max) { write_inline_string(w.base, at, text.data(), n); return; }
+        if (n <= XString::inline_max) { write_inline_string(w.base, at, text.data(), n); return; }
         // Block of n + 1 bytes padded to 8. The source block holds at least
         // that many bytes (capacity + 1 padded to 8, see block_bytes_of), so
         // it is copied in words and the bytes from n on are cleared
@@ -504,7 +504,7 @@ namespace detail {
     }
 
     template <class E, bool P>
-    XOFFSET_DETAIL_INLINE void direct_vector(const XFixedVector<E>& src, std::size_t at, DirectWriter<P>& w) noexcept {
+    XOFFSET_DETAIL_INLINE void direct_vector(const XVectorCore<E>& src, std::size_t at, DirectWriter<P>& w) noexcept {
         const auto n = src.size_;
         if (n == 0) { write_container_head(w.base, at, 0, 0, 0); return; }
         const auto cap = w.template capacity_for<E>(n);
@@ -533,9 +533,9 @@ namespace detail {
         if constexpr (!compact_has_heads<C>()) {
             return;
         } else if constexpr (is_fixed_string_v<C>) {
-            direct_string(static_cast<const XFixedString&>(src), at, w);
+            direct_string(static_cast<const XString&>(src), at, w);
         } else if constexpr (is_fixed_vector_v<C>) {
-            direct_vector(static_cast<const XFixedVector<typename C::value_type>&>(src), at, w);
+            direct_vector(static_cast<const XVectorCore<typename C::value_type>&>(src), at, w);
         } else if constexpr (std::is_array_v<C>) {
             using Elem = std::remove_extent_t<C>;
             for (std::size_t i = 0; i < std::extent_v<C>; ++i) direct_value(src[i], at + i * sizeof(Elem), w);
