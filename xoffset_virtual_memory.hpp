@@ -564,7 +564,6 @@ public:
         return *this;
     }
 
-    std::byte* canonical_byte_origin() const noexcept { return canonical_byte_origin_; }
     // Host-only owner slot in the page preceding the payload (null if none).
     void* host_owner() const noexcept {
         return base_ ? *reinterpret_cast<void* const*>(base_ - sizeof(void*)) : nullptr;
@@ -690,7 +689,6 @@ private:
     void swap_storage(VirtualMemoryStorage& other) noexcept {
         using std::swap;
         swap(base_, other.base_);
-        swap(canonical_byte_origin_, other.canonical_byte_origin_);
         swap(reserved_bytes_, other.reserved_bytes_);
         swap(mapped_bytes_, other.mapped_bytes_);
         swap(maximum_capacity_, other.maximum_capacity_);
@@ -776,7 +774,6 @@ private:
 #endif
         }
         base_ = nullptr;
-        canonical_byte_origin_ = nullptr;
         reserved_bytes_ = mapped_bytes_ = maximum_capacity_ = accessible_bytes_ = logical_bytes_ = 0;
         zero_from_ = 0;
         page_size_ = reservation_granularity_ = 0;
@@ -786,7 +783,6 @@ private:
     // owner that embeds this storage keeps its own hot fields next to them.
     char* base_{nullptr};
     std::size_t logical_bytes_{0};
-    std::byte* canonical_byte_origin_{nullptr};
     std::size_t reserved_bytes_{0};
     // Mapped payload span: reserved_bytes_ rounded up to whole owner-map
     // granules (4 MiB). 0 for a slot owner.
