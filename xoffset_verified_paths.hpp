@@ -127,16 +127,16 @@ namespace detail {
             (emission == XWireEmission::free_runs && source.free_block_bytes() >= wire_free_run_min_gap) ||
             final_size > out.capacity())
             return false;
-#if XOFFSET_SAVE_SELF_CHECK
         // The sender's own state, checked again per message: the arena
         // header is intact and `out` is not this buffer's storage. Off by
         // default (save_into_general, the path of every larger save, keeps
         // both checks).
-        if (std::memcmp(arena->magic, XBufferCore::payload_magic_, 8) != 0 ||
-            arena->header_size != sizeof(XBufferCore::arena_header))
-            XOFFSET_THROW(XException(XErrc::invalid_payload_header, "verified paths: payload header mismatch"));
-        save_check_alias(out, source);
-#endif
+        if constexpr (detail::save_self_check) {
+            if (std::memcmp(arena->magic, XBufferCore::payload_magic_, 8) != 0 ||
+                arena->header_size != sizeof(XBufferCore::arena_header))
+                XOFFSET_THROW(XException(XErrc::invalid_payload_header, "verified paths: payload header mismatch"));
+            save_check_alias(out, source);
+        }
         const auto* base = static_cast<const char*>(source.get_address());
         const auto final_header = make_wire_header<T>(
             used, reinterpret_cast<std::uintptr_t>(root) - reinterpret_cast<std::uintptr_t>(base), holes);
