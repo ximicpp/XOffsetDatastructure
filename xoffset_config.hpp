@@ -4,7 +4,7 @@
 // C++17; includes no other XOffset header.
 
 // ---- Platform ---------------------------------------------------------------
-// 64-bit little-endian only (the main header refuses anything else).
+// 64-bit little-endian only (xoffset_arena.hpp refuses anything else).
 #if defined(__LP64__) || defined(_WIN64) || (defined(__SIZEOF_POINTER__) && __SIZEOF_POINTER__ == 8)
     #define XOFFSET_ARCH_64BIT 1
 #else

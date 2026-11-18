@@ -20,6 +20,10 @@ def cmake_path(path):
     return "[==[" + value + "]==]"
 
 
+# The main header's parts (it includes them in this order).
+PARTS = ("xoffset_arena.hpp", "xoffset_containers.hpp", "xoffset_wire.hpp", "xoffset_schema_hash.hpp",
+         "xoffset_buffer.hpp", "xoffset_compactor.hpp", "xoffset_registration.hpp")
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, default=Path(__file__).resolve().parents[2])
@@ -48,7 +52,7 @@ def main():
         fixture = output / case / "source"
         (fixture / "tests").mkdir(parents=True)
         for name in ("xoffsetdatastructure.hpp", "xoffset_virtual_memory.hpp", "xoffset_slot_storage.hpp",
-                     "xoffset_error.hpp", "xoffset_config.hpp"):
+                     "xoffset_error.hpp", "xoffset_config.hpp", *PARTS):
             shutil.copyfile(source / name, fixture / name)
         for name in ("test_polymorphic_positive.cpp", "test_polymorphic_rejection.cpp"):
             shutil.copyfile(source / "tests" / name, fixture / "tests" / name)
@@ -61,12 +65,12 @@ def main():
             (typelayout / "boost/typelayout.hpp").write_text(
                 '#include "xoffset_intentionally_missing_dependency.hpp"\n')
         elif case == "disabled_guard":
-            header = (fixture / "xoffsetdatastructure.hpp").read_text()
+            header = (fixture / "xoffset_buffer.hpp").read_text()
             guard = 'T* make() {\n            static_assert(is_byte_copy_safe_v<T>,'
             if header.count(guard) != 1:
                 raise RuntimeError("Expected exactly one XBuffer::make safety guard")
             header = header.replace(guard, 'T* make() {\n            static_assert(true,', 1)
-            (fixture / "xoffsetdatastructure.hpp").write_text(header)
+            (fixture / "xoffset_buffer.hpp").write_text(header)
         elif case == "wrong_diagnostic":
             (fixture / "tests/test_polymorphic_rejection.cpp").write_text(
                 '#error "unrelated failure must not satisfy the rejection check"\n')

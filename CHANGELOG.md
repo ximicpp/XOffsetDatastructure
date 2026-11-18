@@ -5,6 +5,9 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- `xoffsetdatastructure.hpp` includes seven parts in its former order: `xoffset_arena.hpp`,
+  `xoffset_containers.hpp`, `xoffset_wire.hpp`, `xoffset_schema_hash.hpp`, `xoffset_buffer.hpp`,
+  `xoffset_compactor.hpp` and `xoffset_registration.hpp`. Includes do not change; the code is the same.
 - `xoffset_config.hpp` holds the compiler and platform detection, the attribute macros (24 per-file
   macros are 11 shared ones) and the build switches with their defaults; the storage headers include it
   too. Removed: the `XOFFSET_*_API` feature macros (every feature they announced is always present),

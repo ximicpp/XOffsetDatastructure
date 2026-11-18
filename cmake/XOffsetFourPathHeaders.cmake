@@ -1,5 +1,12 @@
 set(XOFFSET_FULL_OWN_HEADERS
     xoffsetdatastructure.hpp
+    xoffset_arena.hpp
+    xoffset_containers.hpp
+    xoffset_wire.hpp
+    xoffset_schema_hash.hpp
+    xoffset_buffer.hpp
+    xoffset_compactor.hpp
+    xoffset_registration.hpp
     xoffset_admission.hpp
     xoffset_core_lifetime.hpp
     xoffset_fixed_string.hpp
