@@ -54,6 +54,10 @@ case "$TARGET" in
     host) ;;
     *) echo "unknown target: $TARGET" >&2; exit 2 ;;
 esac
+# Ubuntu 24.04's wine 9.0 aborts at startup ("free(): invalid pointer") whenever TMPDIR
+# is set, even to /tmp (cloud containers set TMPDIR=/tmp; first seen 2026-11-18). Every wine
+# run below (the MSVC tools, CTest's emulator) inherits this shell's environment.
+case "$TARGET" in mingw-x64|msvc-x64|clang-cl-x64) unset TMPDIR ;; esac
 mkdir -p "$BUILD"
 BUILD=$(cd "$BUILD" && pwd)
 LOG=$BUILD/native-logs
