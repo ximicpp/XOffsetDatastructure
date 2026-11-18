@@ -5,6 +5,8 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- Fixed: a client that includes `<windows.h>` before the library compiles again (a variable in
+  `save_delta_into` was named `small`, which `rpcndr.h` defines as a macro).
 - `xoffsetdatastructure.hpp` includes seven parts in its former order: `xoffset_arena.hpp`,
   `xoffset_containers.hpp`, `xoffset_wire.hpp`, `xoffset_schema_hash.hpp`, `xoffset_buffer.hpp`,
   `xoffset_compactor.hpp` and `xoffset_registration.hpp`. Includes do not change; the code is the same.
