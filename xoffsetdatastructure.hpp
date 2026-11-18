@@ -5543,10 +5543,7 @@ namespace XOffsetDatastructure {
                 return;
             }
             XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::grow_bytes<T>(capacity_) + fixed_detail::deep_bytes(value), );
-            const Grown grown = [&] {
-                if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) return push_back_general<T>(value);
-                else return push_back_general<const T&>(value);
-            }();
+            const Grown grown = push_back_full(value);
             // The general path appended exactly one element. Restating the
             // head here makes it known on both paths, so a caller's push_back
             // loop keeps size_ and capacity_ in registers instead of
@@ -5672,9 +5669,27 @@ namespace XOffsetDatastructure {
                                              (std::size_t(0) + ... + fixed_detail::deep_bytes(args)),
                                        fixed_detail::soft_sink<T>());
 #endif
-            return *append_construct([&](T* dst) {
-                fixed_detail::construct_bound(dst, element_binding(), std::forward<Args>(args)...);
-            });
+            if constexpr (std::is_trivially_copyable_v<T>) {
+                // The append fast path at the caller; a full vector stages
+                // the element (Staged), so no reference to args leaves this
+                // function.
+                const size_type n = size_;
+                if (n < capacity_) [[likely]] {
+                    T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + n;
+                    fixed_detail::construct_bound(slot, element_binding(), std::forward<Args>(args)...);
+                    size_ = n + 1u;
+                    return *slot;
+                }
+                XOFFSET_INDETERMINATE Staged staged;
+                fixed_detail::construct_bound(staged.get(), element_binding(), std::forward<Args>(args)...);
+                T* const slot = grow_back_slot();
+                std::memcpy(static_cast<void*>(slot), staged.bytes, sizeof(T));
+                return *slot;
+            } else {
+                return *append_construct([&](T* dst) {
+                    fixed_detail::construct_bound(dst, element_binding(), std::forward<Args>(args)...);
+                });
+            }
         }
 
     protected:
@@ -5696,9 +5711,25 @@ namespace XOffsetDatastructure {
         // and needs no extra call level on each growth. Declared with its
         // return type so that walking the members of a recursive element
         // type does not instantiate the body.
+        // A larger trivially copyable value is staged here, before the
+        // growth (it may lie in the block the growth retires), and copied
+        // into the new slot after it: with a reference to it passed out of
+        // line, a temporary the caller built would have to live in memory
+        // on the in-capacity path too (Staged).
         Grown push_back_full(const T& value) {
-            if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) return push_back_general<T>(value);
-            else return push_back_general<const T&>(value);
+            if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) {
+                return push_back_general<T>(value);
+            } else if constexpr (std::is_trivially_copyable_v<T> && !std::is_array_v<T> &&
+                                 !detail::future_custom_lifetime_supported<T>()) {
+                XOFFSET_INDETERMINATE Staged staged;
+                std::memcpy(staged.bytes, static_cast<const void*>(std::addressof(value)), sizeof(T));
+                T* const slot = grow_back_slot();
+                std::memcpy(static_cast<void*>(slot), staged.bytes, sizeof(T));
+                detail::scrub_implicit_padding(slot);
+                return {data_delta, capacity_};
+            } else {
+                return push_back_general<const T&>(value);
+            }
         }
 
     protected:
@@ -5843,6 +5874,48 @@ namespace XOffsetDatastructure {
 #endif
         }
 
+        // A trivially copyable element staged at the caller. The single-
+        // element inserts build it inline, call out of line only to grow
+        // (grow_back_slot, grow_gap_slot: no element argument), then copy it
+        // into the slot the growth returns. No reference to the caller's
+        // arguments reaches a function that is not inlined, so a temporary
+        // the caller passed (an Item{...} built field by field) stays in
+        // registers, on the in-capacity path and across the growth call.
+        // Taken by reference, it had to live in memory on every call, and
+        // the element copy then waited on the narrower stores that built it
+        // (store-to-load forwarding); passed by value above 16 bytes, it is
+        // stored to the argument area and reloaded the same way. Staging
+        // before the growth keeps an argument that aliases an old element
+        // valid: the growth retires (and zeroes) the old block.
+        struct Staged {
+            alignas(T) std::byte bytes[sizeof(T)];
+            T* get() noexcept { return reinterpret_cast<T*>(bytes); }
+        };
+
+        // One more element at size_ in a full (or unbound) vector: grows,
+        // counts the new element and returns its slot for the caller to fill
+        // without a throw in between. An empty vector takes its first block
+        // through reserve's first-storage path.
+        XOFFSET_DETAIL_NOINLINE T* grow_back_slot() {
+            const size_type n = size_;
+            if (n >= capacity_) [[likely]] reserve_first_or_grow(grown_capacity());
+            T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + n;
+            size_ = n + 1u;
+            return slot;
+        }
+
+        // One more element at index < size_ in a full vector: grows, moves
+        // the tail up one slot, counts the new element and returns the gap.
+        XOFFSET_DETAIL_NOINLINE T* grow_gap_slot(size_type index) {
+            reserve_grow(grown_capacity());
+            const size_type n = size_;
+            T* const items = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta);
+            size_ = n + 1u;
+            std::memmove(static_cast<void*>(items + index + 1), static_cast<const void*>(items + index),
+                         std::size_t(n - index) * sizeof(T));
+            return items + index;
+        }
+
         // insert_construct at size_ (a sorted insert after the last element),
         // all compilers. Only the spare-capacity path is inline: with more
         // here GCC stops inlining XMap::operator[] or zero_implicit_padding.
@@ -5855,26 +5928,21 @@ namespace XOffsetDatastructure {
                 size_ = n + 1u;
                 return slot;
             }
-            return append_full_construct(construct);
-        }
-
-        // append_after_last_construct into a full vector. Trivially copyable
-        // elements: stage, grow (reserve inline: one call per growth), copy.
-        template <typename Construct>
-        XOFFSET_DETAIL_NOINLINE iterator append_full_construct(Construct& construct) {
             if constexpr (std::is_trivially_copyable_v<T>) {
-                alignas(T) std::byte storage[sizeof(T)];
-                auto* staged = reinterpret_cast<T*>(storage);
-                construct(staged);
-                reserve_grow(grown_capacity());
-                const size_type n = size_;
-                T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + n;
-                std::memcpy(slot, staged, sizeof(T));
-                size_ = n + 1u;
+                XOFFSET_INDETERMINATE Staged staged;
+                construct(staged.get());
+                T* const slot = grow_back_slot();
+                std::memcpy(static_cast<void*>(slot), staged.bytes, sizeof(T));
                 return slot;
             } else {
-                return insert_body<false>(size_, construct);
+                return append_full_construct(construct);
             }
+        }
+
+        // append_after_last_construct into a full vector, elements with heads.
+        template <typename Construct>
+        XOFFSET_DETAIL_NOINLINE iterator append_full_construct(Construct& construct) {
+            return insert_body<false>(size_, construct);
         }
 
         // insert_construct for an index below size_, without its append
@@ -5884,17 +5952,19 @@ namespace XOffsetDatastructure {
         iterator insert_before_end_construct(size_type index, Construct&& construct) {
             if constexpr (std::is_trivially_copyable_v<T>) {
                 const size_type n = size_;
+                XOFFSET_INDETERMINATE Staged staged;
+                construct(staged.get());
                 if (n < capacity_) [[likely]] {
-                    alignas(T) std::byte storage[sizeof(T)];
-                    auto* staged = reinterpret_cast<T*>(storage);
-                    construct(staged);
                     T* const items = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta);
                     size_ = n + 1u;
-                    std::memmove(items + index + 1, items + index, std::size_t(n - index) * sizeof(T));
-                    std::memcpy(items + index, staged, sizeof(T));
+                    std::memmove(static_cast<void*>(items + index + 1), static_cast<const void*>(items + index),
+                                 std::size_t(n - index) * sizeof(T));
+                    std::memcpy(static_cast<void*>(items + index), staged.bytes, sizeof(T));
                     return items + index;
                 }
-                return insert_general<GrowOutOfLine>(index, construct);
+                T* const slot = grow_gap_slot(index);
+                std::memcpy(static_cast<void*>(slot), staged.bytes, sizeof(T));
+                return slot;
             } else {
 #if defined(__clang__)
                 return insert_general<GrowOutOfLine>(index, construct);
