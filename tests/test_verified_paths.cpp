@@ -227,11 +227,10 @@ void hole_table_paths() {
     const auto runs=large.save_verified();
     const auto dense_saved=large.save_verified(xo::XSaveOptions{.emission=xo::XWireEmission::dense});
     need(header_of(dense_saved).extent_count==0,"dense emission is not dense");
-    // The 8 KiB block (in-band, less a free directory at its end and its
-    // header, which is sent).
+    // The 8 KiB block (in-band, less a free directory at its end, which is
+    // sent).
     std::uint32_t freed=0;large.for_each_free_block([&](xo::XBufferCore::WireHole h){freed=std::max(freed,h.bytes);});
-    const std::uint32_t skipped=freed-xo::XBufferCore::free_block_header_bytes;
-    need(freed+large.free_directory().bytes>=8192&&header_of(runs).extent_count==2&&runs.size()==dense_saved.size()-skipped+16,
+    need(freed+large.free_directory().bytes>=8192&&header_of(runs).extent_count==2&&runs.size()==dense_saved.size()-freed+16,
          "default emission did not skip the 8 KiB hole");
     std::string runs_into;large.save_verified_into(runs_into);
     need(runs_into==runs,"save_verified_into differs from save_verified for the default emission");

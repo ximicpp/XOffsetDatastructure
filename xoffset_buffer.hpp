@@ -85,6 +85,8 @@ namespace XOffsetDatastructure {
             // header<T>'s body, inlined into save_into's fast path.
             template<class T> XOFFSET_DETAIL_INLINE static XWireHeaderV2 header_inline(XBufferCore&);
             template<class T> static void save_into(XBufferCore&, std::string&, XSaveOptions);
+            // In-band: save_small_into's hole table gathered on its frame.
+            static constexpr std::size_t small_wire_holes = 16;
             template<class T> static bool save_small_into(XBufferCore&, std::string&, XWireEmission);
             template<class T> static void save_into_general(XBufferCore&, std::string&, XSaveOptions);
             template<class T> static void rebuild_free_table(T&, XBufferCore&);
@@ -998,9 +1000,10 @@ namespace XOffsetDatastructure {
         }
 
         template <typename T>
+        // `wire_order`: false for a key delta's table (see load_free_blocks).
         detail::vstatus finish_verified_load(const XWireHeaderV2& header, const char* holes, std::size_t hole_count,
                                              std::pmr::memory_resource* upstream, const char* who,
-                                             detail::WireValidationScratch* retained) {
+                                             detail::WireValidationScratch* retained, bool wire_order = true) {
             if (this->arena()->used_end != header.used_bytes) {
                 XOFFSET_VFAIL(XException, XErrc::root_mismatch, std::string(who) + ": non-normalized payload extent");
             }
@@ -1018,7 +1021,7 @@ namespace XOffsetDatastructure {
             }
             XOFFSET_VTRY(detail::verify_structural_wire_graph(*root_ptr, *this, upstream, holes, hole_count,
                                                               true, nullptr, retained));
-            XOFFSET_VTRY(this->load_free_blocks(holes, hole_count));
+            XOFFSET_VTRY(this->load_free_blocks(holes, hole_count, wire_order));
             typed_root_access_allowed_ = true;
             bind_schema<T>();
             this->cache_root(root_ptr);
@@ -1036,7 +1039,7 @@ namespace XOffsetDatastructure {
         // the sender's promise: only for trusted links.
         template <typename T>
         detail::vstatus finish_admitted_load(const XWireHeaderV2& header, const char* holes, std::size_t hole_count,
-                                             const char* who) {
+                                             const char* who, bool wire_order = true) {
             const std::uint64_t used = header.used_bytes;
             if (this->arena()->used_end != used) {
                 XOFFSET_VFAIL(XException, XErrc::root_mismatch, std::string(who) + ": non-normalized payload extent");
@@ -1069,8 +1072,8 @@ namespace XOffsetDatastructure {
             if ((low_bits & 7u) != 0 || reach >= used - XWIRE_PAYLOAD_BEGIN) [[unlikely]] {
                 XOFFSET_VFAIL(XException, XErrc::invalid_payload, std::string(who) + ": hole out of range");
             }
-            if constexpr (detail::inband_allocator) XOFFSET_VTRY(this->inband_adopt(holes, hole_count, false));
-            else XOFFSET_VTRY(this->load_free_blocks(holes, hole_count));
+            if constexpr (detail::inband_allocator) XOFFSET_VTRY(this->inband_adopt(holes, hole_count, false, wire_order));
+            else XOFFSET_VTRY(this->load_free_blocks(holes, hole_count, wire_order));
             typed_root_access_allowed_ = true;
             bind_schema<T>();
             this->cache_root(root_ptr);

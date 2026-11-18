@@ -1284,6 +1284,11 @@ namespace XOffsetDatastructure {
         static constexpr std::uint32_t inband_hosted_cap_min = 4;   // one inside a retired block
         static constexpr std::uint32_t inband_hosted_cap_max = 8;
         static constexpr std::uint32_t inband_dir_bytes(std::uint32_t cap) noexcept { return 8u + 8u * cap; }
+        // A loaded directory's cap matches its block (no 32-bit wrap: the
+        // entries the check reads lie inside the block).
+        static constexpr bool inband_dir_spans(std::uint32_t cap, std::uint32_t bytes) noexcept {
+            return 8u + 8u * std::uint64_t(cap) == bytes;
+        }
 
         static XOFFSET_DETAIL_INLINE std::uint32_t inband_word(const char* at) noexcept {
             std::uint32_t value;
@@ -1295,19 +1300,25 @@ namespace XOffsetDatastructure {
         }
 
         // The first entry of directory d whose size is at least `bytes` (an
-        // unused entry, when no used one is): entries in order, after a
-        // binary search narrows more than 8 used ones.
+        // unused entry, when no used one is): entries in order, four to a
+        // step (a compare and a branch each; the unused entry after the
+        // used ones ends the scan), after a binary search narrows more than
+        // 16 used ones.
         static XOFFSET_DETAIL_INLINE std::uint32_t* inband_find(std::uint32_t* d, std::uint32_t bytes) noexcept {
             std::uint32_t* e = d + 2;
-            if (std::uint32_t n = d[0]; n > 8u) [[unlikely]] {
+            if (std::uint32_t n = d[0]; n > 16u) [[unlikely]] {
                 do {
                     const std::uint32_t half = n / 2u;
                     if (e[2u * (half - 1u)] < bytes) e += 2u * half;
                     n -= half;
-                } while (n > 8u);
+                } while (n > 16u);
             }
-            while (e[0] < bytes) e += 2;
-            return e;
+            for (;; e += 8) {
+                if (e[0] >= bytes) return e;
+                if (e[2] >= bytes) return e + 2;
+                if (e[4] >= bytes) return e + 4;
+                if (e[6] >= bytes) return e + 6;
+            }
         }
 
         // A directory of `cap` entries at `at`, n of them (already there) in
@@ -1362,8 +1373,13 @@ namespace XOffsetDatastructure {
             inband_set(base + offset, 0);
             inband_set(base + inband_bytes_at, inband_word(base + inband_bytes_at) - found);
             inband_stale();
-            // The tail was inside a free block: zero.
-            if (found > bytes) inband_push_zeroed(offset + bytes, found - bytes);
+            // The tail becomes a free block of its own: its header is
+            // cleared first (a wire load writes only each block's own
+            // header, so an accepted input may leave other bytes there).
+            if (found > bytes) {
+                std::memset(base + offset + bytes, 0, 8);
+                inband_push_zeroed(offset + bytes, found - bytes);
+            }
             return base + offset;
         }
 
@@ -1565,19 +1581,22 @@ namespace XOffsetDatastructure {
             return count;
         }
 
-        // A loaded table of free blocks (a wire's, in write_free_blocks'
-        // order, or a delta's, by offset; `holes` need not be aligned): the
-        // payload bytes, link words and directory included, are already the
-        // sender's (a free-run emission keeps each free block's first 8
-        // bytes). The directory is the entry whose second word is not zero
-        // (a free block's is zero; a directory's is its capacity); a table
-        // without one is recorded anew (inband_rebuild). `check` (a verified
-        // load: the graph walk or the delta's map checked that the entries
-        // tile the payload with the live blocks): one directory at most, and
-        // it holds exactly the other entries, in stack order.
-        detail::vstatus inband_adopt(const void* holes, std::size_t count, bool check) {
+        // A loaded table of free blocks (`holes` need not be aligned).
+        // `wire_order`: a wire's, in write_free_blocks' order (the directory
+        // first, then each stack from its head); the payload holds the
+        // sender's directory, while a free-run emission may skip the free
+        // blocks whole, so each block's link word comes from that order.
+        // Else a delta's, by offset, whose payload bytes (link words
+        // included) are already the sender's. The directory is the entry
+        // whose second word is not zero (a free block's is zero; a
+        // directory's is its capacity); a table without one is recorded
+        // anew (inband_rebuild). `check` (a verified load: the graph walk or
+        // the delta's map checked that the entries tile the payload with the
+        // live blocks): one directory at most, and it holds exactly the
+        // other entries, in stack order.
+        detail::vstatus inband_adopt(const void* holes, std::size_t count, bool check, bool wire_order) {
             if (!arena()) XOFFSET_VFAIL(XException, XErrc::invalid_state, "XBufferCore: buffer has no payload");
-            if (inband_adopt_table(holes, count, check) == inband_adopted::rejected) [[unlikely]]
+            if (inband_adopt_table(holes, count, check, wire_order) == inband_adopted::rejected) [[unlikely]]
                 XOFFSET_VFAIL(XException, XErrc::invalid_payload,
                               "wire validation failed: free blocks differ from the free directory");
             return detail::vok();
@@ -1586,7 +1605,8 @@ namespace XOffsetDatastructure {
         // (a table without a directory), or rejected by `check` (nothing
         // changed).
         enum class inband_adopted { kept, rebuilt, rejected };
-        inband_adopted inband_adopt_table(const void* holes, std::size_t count, bool check) noexcept {
+        inband_adopted inband_adopt_table(const void* holes, std::size_t count, bool check,
+                                          bool wire_order = false) noexcept {
             char* const base = buffer_.data();
             const auto* in = static_cast<const char*>(holes);
             const auto entry = [&](std::size_t i) noexcept {
@@ -1600,6 +1620,7 @@ namespace XOffsetDatastructure {
                 free_table_lost_ = false;
                 return inband_adopted::kept;
             }
+            if (wire_order) return inband_adopt_wire(holes, count, check);
             std::size_t dir = count;
             std::uint64_t total = 0;
             bool by_offset = true;
@@ -1628,7 +1649,7 @@ namespace XOffsetDatastructure {
             if (check) {
                 const auto* const d = reinterpret_cast<const std::uint32_t*>(base + directory.offset);
                 const std::uint32_t n = d[0], cap = d[1];
-                if (n >= cap || inband_dir_bytes(cap) != directory.bytes) return fail();
+                if (n >= cap || !inband_dir_spans(cap, directory.bytes)) return fail();
                 std::uint32_t last = 0;
                 for (std::uint32_t k = 0; k < n; ++k) {
                     const std::uint32_t size = d[2u + 2u * k];
@@ -1664,6 +1685,83 @@ namespace XOffsetDatastructure {
                     }
                 }
                 if (budget != 0) return fail();
+            }
+            inband_set(base + inband_dir_at, directory.offset);
+            inband_set(base + inband_bytes_at, static_cast<std::uint32_t>(total));
+            inband_stale();
+            free_table_lost_ = false;
+            return inband_adopted::kept;
+        }
+
+        // inband_adopt_table for a wire's table (count > 0): the directory is
+        // its first entry, unless the table has none (a sender without the
+        // in-band allocator). Each block gets {link, 0}: the next entry when
+        // it has the same size (the same stack), else 0. `check`: the
+        // directory is well formed and its stacks are the other entries, in
+        // its order, each from its head. A rejected table may leave link
+        // words written: the wire load that adopts it fails and resets the
+        // payload.
+        inband_adopted inband_adopt_wire(const void* holes, std::size_t count, bool check) noexcept {
+            char* const base = buffer_.data();
+            const auto* in = static_cast<const char*>(holes);
+            const auto entry = [&](std::size_t i) noexcept {
+                WireHole hole;
+                std::memcpy(&hole, in + i * sizeof(hole), sizeof(hole));
+                return hole;
+            };
+            const WireHole directory = entry(0);
+            if (directory.bytes < 16u || inband_word(base + directory.offset + 4u) == 0) {
+                (void)inband_rebuild(holes, count);
+                return inband_adopted::rebuilt;
+            }
+            // Entries [first, last) are one stack of `size`: linked in order.
+            std::uint64_t total = 0;
+            const auto link = [&](std::size_t first, std::size_t last, std::uint32_t size) noexcept {
+                for (std::size_t i = first; i < last; ++i) {
+                    const std::uint64_t next = i + 1u < last ? entry(i + 1u).offset : 0u;
+                    std::memcpy(base + entry(i).offset, &next, sizeof(next));  // {link, 0}
+                }
+                total += std::uint64_t(size) * (last - first);
+            };
+            if (check) {
+                const auto* const d = reinterpret_cast<const std::uint32_t*>(base + directory.offset);
+                const std::uint32_t n = d[0], cap = d[1];
+                if (n >= cap || !inband_dir_spans(cap, directory.bytes)) return inband_adopted::rejected;
+                // One pass over the directory: sizes ascending, multiples of
+                // 8; each entry with a head names the next table entry, and
+                // the entries after it of the same size are its stack.
+                std::size_t i = 1;
+                std::uint32_t last = 0;
+                for (std::uint32_t k = 0; k < n; ++k) {
+                    const std::uint32_t size = d[2u + 2u * k], head = d[3u + 2u * k];
+                    if (size <= last || (size & 7u) != 0) return inband_adopted::rejected;
+                    last = size;
+                    if (head == 0) continue;
+                    if (i == count) return inband_adopted::rejected;
+                    if (const WireHole hole = entry(i); hole.bytes != size || hole.offset != head)
+                        return inband_adopted::rejected;
+                    std::size_t end = i + 1u;
+                    while (end < count && entry(end).bytes == size) ++end;
+                    link(i, end, size);
+                    i = end;
+                }
+                if (i != count) return inband_adopted::rejected;
+                constexpr std::uint64_t unused = inband_end;  // {inband_end, 0}, little-endian
+                std::uint64_t stray = 0;
+                for (std::uint32_t k = n; k < cap; ++k) {
+                    std::uint64_t word;
+                    std::memcpy(&word, d + 2u + 2u * k, sizeof(word));
+                    stray |= word ^ unused;
+                }
+                if (stray != 0) return inband_adopted::rejected;
+            } else {
+                for (std::size_t i = 1; i < count;) {
+                    const std::uint32_t size = entry(i).bytes;
+                    std::size_t end = i + 1u;
+                    while (end < count && entry(end).bytes == size) ++end;
+                    link(i, end, size);
+                    i = end;
+                }
             }
             inband_set(base + inband_dir_at, directory.offset);
             inband_set(base + inband_bytes_at, static_cast<std::uint32_t>(total));
@@ -1793,6 +1891,25 @@ namespace XOffsetDatastructure {
                 return;
             }
             for_each_free_block(fn);
+        }
+        // In-band: the wire hole table in one walk. Writes its first `room`
+        // entries (for_each_wire_hole's order) to `out` and returns its
+        // length (wire_hole_count()).
+        std::size_t inband_gather(WireHole* out, std::size_t room) const noexcept {
+            const char* const base = buffer_.data();
+            const std::uint32_t dir = buffer_.size() < sizeof(arena_header) ? 0u : inband_word(base + inband_dir_at);
+            if (dir == 0) return 0;
+            const auto* const d = reinterpret_cast<const std::uint32_t*>(base + dir);
+            std::size_t count = 1;
+            out[0] = WireHole{dir, inband_dir_bytes(d[1])};
+            for (std::uint32_t i = 0, n = d[0]; i < n; ++i) {
+                const std::uint32_t bytes = d[2u + 2u * i];
+                for (std::uint32_t at = d[3u + 2u * i]; at != 0; at = inband_word(base + at)) {
+                    if (count < room) out[count] = WireHole{at, bytes};
+                    ++count;
+                }
+            }
+            return count;
         }
         // The in-band allocator's free directory, a block of its own and the
         // first wire hole: {0, 0} when there is none (always, off).
@@ -1952,10 +2069,14 @@ namespace XOffsetDatastructure {
         // new_handler): the owner's own table when it is empty, else a new
         // one; the payload's current owner is re-resolved and the table
         // published to it.
-        XOFFSET_DETAIL_INLINE detail::vstatus load_free_blocks(const void* holes, std::size_t count) {
+        // `wire_order` (in-band): a wire's table, else a key delta's (by
+        // offset, the link words in the payload); see inband_adopt.
+        XOFFSET_DETAIL_INLINE detail::vstatus load_free_blocks(const void* holes, std::size_t count,
+                                                               bool wire_order = true) {
             // In-band: a verified load's table (finish_admitted_load adopts
             // its table unchecked).
-            if constexpr (detail::inband_allocator) return inband_adopt(holes, count, true);
+            if constexpr (detail::inband_allocator) return inband_adopt(holes, count, true, wire_order);
+            (void)wire_order;
             // No holes and no entry to remove: the general path would only
             // publish the same empty table (or none). It would publish it to
             // record_owner(owner_record_), the payload's host word, which is
