@@ -453,19 +453,7 @@ namespace proxy_detail {
             T* p = batch_enter(expected_growth);
             if (!p) [[unlikely]] return false;
             BatchExit exit{a.ctl};
-#if XOFFSET_NO_EXCEPTIONS
-            detail::SoftFailScope soft;
-            f(*p);
-            if (soft.failed()) [[unlikely]] a.fail(soft.code());
-#else
-            try {
-                f(*p);
-            } catch (const XException& e) {
-                a.fail(e.code() == XErrc::unspecified ? XErrc::out_of_storage : e.code());
-            } catch (const std::bad_alloc&) {
-                a.fail(XErrc::host_allocation_failed);
-            }
-#endif
+            if (const XErrc e = detail::run_fail_soft([&] { f(*p); }); e != XErrc::ok) [[unlikely]] a.fail(e);
             return a.ctl->sticky == XErrc::ok;
         }
 

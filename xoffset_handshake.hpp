@@ -184,14 +184,13 @@ namespace XOffsetDatastructure {
         }
 
         // Loads a handshake message; false (and `error`) when it is not one.
-        // Never throws: the loaders that throw are wrapped here.
+        // Never throws.
         template <typename Message>
         bool load(const void* data, std::size_t size, TypedXBuffer<Message>& out, std::string& error) noexcept {
             if (size > XSCHEMA_HELLO_MAX_BYTES) {
                 error = "handshake message larger than XSCHEMA_HELLO_MAX_BYTES";
                 return false;
             }
-#if XOFFSET_NO_EXCEPTIONS
             auto loaded = TypedXBuffer<Message>::try_load_verified(
                 std::span<const std::byte>(static_cast<const std::byte*>(data), size), receive_limit());
             if (!loaded) {
@@ -199,17 +198,6 @@ namespace XOffsetDatastructure {
                 return false;
             }
             out = std::move(*loaded);
-#else
-            try {
-                out = TypedXBuffer<Message>::load_verified(
-                    std::span<const std::byte>(static_cast<const std::byte*>(data), size), receive_limit());
-            } catch (const std::exception& e) {
-                try { error = e.what(); } catch (...) {}
-                return false;
-            } catch (...) {
-                return false;
-            }
-#endif
             const Message& m = out.plain_root();
             if (m.wire_format != XSCHEMA_HELLO_WIRE_FORMAT) {
                 error = "handshake from another wire format";
