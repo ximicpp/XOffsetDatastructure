@@ -5,6 +5,17 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- `XSet` / `XMap` `assign_sorted(range)` (also an iterator pair): fills from input already sorted by
+  key in one exact block, without lookups; a contiguous range of the element type is one copy. 64
+  entries of `XMap<std::uint64_t, 24-byte record>`: 39 ns from a same-layout vector, 58 ns converted
+  entry by entry; the CppCon 2024 build with it 152-162 ns (289 ns with 64 `try_emplace` calls). New
+  switch `XOFFSET_CHECK_SORTED` checks the order (1 without `NDEBUG` or with `XOFFSET_HARDENED=1`,
+  else 0).
+- Single-element inserts of trivially copyable elements that grow the container (`push_back` of
+  elements above 16 bytes, `emplace_back`, `XMap::try_emplace` / `XSet::insert` at the end or in the
+  middle) copy the element into a local first and grow out of line without it, which removes a
+  store-forwarding stall per growth: 64 ascending `try_emplace` calls 520 -> 167 ns, the CppCon 2024
+  build 623 -> 293 ns.
 - `bench/premises`: where the send + receive lead holds, by message size (68 bytes to 729 KB), receiver
   checks and churn of the sender's buffer, against zpp::bits, cista, FlatBuffers, Protocol Buffers and
   cereal. `docs/PERFORMANCE.md` section 2 has the results; its reading notes no longer say the lead

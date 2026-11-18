@@ -241,6 +241,13 @@ child data of other containers never move.
   like small-string optimization in `std::vector<std::string>`; do not rely on it.
 - `XSet`/`XMap` lookups are O(log n) and inserts and erases O(n); compare them with
   `std::flat_set`/`std::flat_map`, not the node-based `std::set`/`std::map`.
+- To build an `XSet`/`XMap` from input that is already sorted by key with no duplicates (a
+  `std::map`, a sorted `std::vector`, a range or iterator pair), call `assign_sorted(range)`: it
+  replaces the content with one exact-size block and no lookups, and a contiguous range of the
+  container's own element type is copied in one go. Input out of order is checked only when
+  `XOFFSET_CHECK_SORTED` is 1 (the default in builds without `NDEBUG` and with `XOFFSET_HARDENED=1`),
+  which throws `XErrc::invalid_argument` and leaves the container unchanged; otherwise lookups on
+  the result miss.
 
 **Buffer operations affect the whole region.** The epoch is a counter on the buffer object;
 `XHandle` re-resolves the root when it sees the epoch change.

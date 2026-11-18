@@ -330,6 +330,14 @@ namespace XOffsetDatastructure {
 // Not a switch, because deltas rely on it (a hole's bytes are zero on both
 // sides): a retired block is always zeroed (M3).
 //
+// A precondition check, off by default for the same reason, on in builds
+// without NDEBUG as well:
+//   XOFFSET_CHECK_SORTED     XMap / XSet assign_sorted() check that their
+//                            input is strictly ascending and throw
+//                            XErrc::invalid_argument, the container unchanged,
+//                            when it is not. Off: an unsorted input gives a
+//                            container whose lookups miss.
+//
 // One check is a switch that is ON by default (2026-11-17), because without
 // it any client can make a server read or write outside the wire:
 //   XOFFSET_CHECK_UPLINK     XReceiver<XLink::from_client> checks by default
@@ -363,6 +371,13 @@ namespace XOffsetDatastructure {
 #endif
 #ifndef XOFFSET_CHECK_UPLINK
 #  define XOFFSET_CHECK_UPLINK 1
+#endif
+#ifndef XOFFSET_CHECK_SORTED
+#  if XOFFSET_HARDENED || !defined(NDEBUG)
+#    define XOFFSET_CHECK_SORTED 1
+#  else
+#    define XOFFSET_CHECK_SORTED 0
+#  endif
 #endif
 
     namespace fixed_detail {
@@ -4470,6 +4485,18 @@ namespace XOffsetDatastructure {
             }
         }
 
+        // Is every key of [first, last) below the next one (the
+        // XOFFSET_CHECK_SORTED check of assign_sorted)? key(*it) may refer
+        // into a temporary *it: both are used within one full-expression.
+        template <typename It, typename S, typename KeyFn>
+        bool strictly_ascending(It first, S last, KeyFn key) {
+            if (first == last) return true;
+            for (It prev = first; ++first != last; prev = first) {
+                if (!ordered_less(key(*prev), key(*first))) return false;
+            }
+            return true;
+        }
+
         template <typename Elem, typename KeyLike, typename KeyFn>
         std::uint32_t lower_bound_index(const Elem* data, std::uint32_t size,
                                         const KeyLike& key, KeyFn&& key_fn) {
@@ -5543,10 +5570,7 @@ namespace XOffsetDatastructure {
                 return;
             }
             XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::grow_bytes<T>(capacity_) + fixed_detail::deep_bytes(value), );
-            const Grown grown = [&] {
-                if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) return push_back_general<T>(value);
-                else return push_back_general<const T&>(value);
-            }();
+            const Grown grown = push_back_full(value);
             // The general path appended exactly one element. Restating the
             // head here makes it known on both paths, so a caller's push_back
             // loop keeps size_ and capacity_ in registers instead of
@@ -5672,9 +5696,27 @@ namespace XOffsetDatastructure {
                                              (std::size_t(0) + ... + fixed_detail::deep_bytes(args)),
                                        fixed_detail::soft_sink<T>());
 #endif
-            return *append_construct([&](T* dst) {
-                fixed_detail::construct_bound(dst, element_binding(), std::forward<Args>(args)...);
-            });
+            if constexpr (std::is_trivially_copyable_v<T>) {
+                // The append fast path at the caller; a full vector stages
+                // the element (Staged), so no reference to args leaves this
+                // function.
+                const size_type n = size_;
+                if (n < capacity_) [[likely]] {
+                    T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + n;
+                    fixed_detail::construct_bound(slot, element_binding(), std::forward<Args>(args)...);
+                    size_ = n + 1u;
+                    return *slot;
+                }
+                XOFFSET_INDETERMINATE Staged staged;
+                fixed_detail::construct_bound(staged.get(), element_binding(), std::forward<Args>(args)...);
+                T* const slot = grow_back_slot();
+                std::memcpy(static_cast<void*>(slot), staged.bytes, sizeof(T));
+                return *slot;
+            } else {
+                return *append_construct([&](T* dst) {
+                    fixed_detail::construct_bound(dst, element_binding(), std::forward<Args>(args)...);
+                });
+            }
         }
 
     protected:
@@ -5696,9 +5738,25 @@ namespace XOffsetDatastructure {
         // and needs no extra call level on each growth. Declared with its
         // return type so that walking the members of a recursive element
         // type does not instantiate the body.
+        // A larger trivially copyable value is staged here, before the
+        // growth (it may lie in the block the growth retires), and copied
+        // into the new slot after it: with a reference to it passed out of
+        // line, a temporary the caller built would have to live in memory
+        // on the in-capacity path too (Staged).
         Grown push_back_full(const T& value) {
-            if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) return push_back_general<T>(value);
-            else return push_back_general<const T&>(value);
+            if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) <= 16) {
+                return push_back_general<T>(value);
+            } else if constexpr (std::is_trivially_copyable_v<T> && !std::is_array_v<T> &&
+                                 !detail::future_custom_lifetime_supported<T>()) {
+                XOFFSET_INDETERMINATE Staged staged;
+                std::memcpy(staged.bytes, static_cast<const void*>(std::addressof(value)), sizeof(T));
+                T* const slot = grow_back_slot();
+                std::memcpy(static_cast<void*>(slot), staged.bytes, sizeof(T));
+                detail::scrub_implicit_padding(slot);
+                return {data_delta, capacity_};
+            } else {
+                return push_back_general<const T&>(value);
+            }
         }
 
     protected:
@@ -5780,6 +5838,36 @@ namespace XOffsetDatastructure {
             fixed_detail::retire_dynamic_bytes(alloc, old, static_cast<std::uint32_t>(old_cap * sizeof(T)));
         }
 
+        // Replaces all elements with count elements built in order by
+        // construct(dst, *it) from [first, last): the sorted bulk fills of
+        // XFixedFlatSet and XFixedFlatMap (one exact block, no lookup). An
+        // empty vector builds in place, growing first if needed; otherwise a
+        // fresh exact block is built before the old one is released, so the
+        // source may alias this container, as for assign().
+        template <typename It, typename S, typename Construct>
+        void fill_construct(It first, S last, std::size_t count, Construct&& construct) {
+            XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::array_bytes<T>(count), );
+            const auto n = checked_count(count);
+            if (n == 0) { clear(); return; }
+            if (size_ != 0) {
+                rebuild(n, n, [&](T* dst, size_type) {
+                    construct(dst, *first);
+                    ++first;
+                });
+                return;
+            }
+            reserve(n);
+            T* const items = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta);
+            size_type built = 0;
+            XOFFSET_TRY {
+                for (; built < n; ++built, ++first) construct(items + built, *first);
+            } XOFFSET_CATCH(...) {
+                fixed_detail::destroy_n(items, built);
+                XOFFSET_RETHROW;
+            }
+            size_ = n;
+        }
+
         // Appends (emplace_back, push_back_general) keep the general path in
         // the same function: under Clang a call to it there costs more than
         // it saves (slg.A). GCC and MSVC take insert_construct as before,
@@ -5843,6 +5931,48 @@ namespace XOffsetDatastructure {
 #endif
         }
 
+        // A trivially copyable element staged at the caller. The single-
+        // element inserts build it inline, call out of line only to grow
+        // (grow_back_slot, grow_gap_slot: no element argument), then copy it
+        // into the slot the growth returns. No reference to the caller's
+        // arguments reaches a function that is not inlined, so a temporary
+        // the caller passed (an Item{...} built field by field) stays in
+        // registers, on the in-capacity path and across the growth call.
+        // Taken by reference, it had to live in memory on every call, and
+        // the element copy then waited on the narrower stores that built it
+        // (store-to-load forwarding); passed by value above 16 bytes, it is
+        // stored to the argument area and reloaded the same way. Staging
+        // before the growth keeps an argument that aliases an old element
+        // valid: the growth retires (and zeroes) the old block.
+        struct Staged {
+            alignas(T) std::byte bytes[sizeof(T)];
+            T* get() noexcept { return reinterpret_cast<T*>(bytes); }
+        };
+
+        // One more element at size_ in a full (or unbound) vector: grows,
+        // counts the new element and returns its slot for the caller to fill
+        // without a throw in between. An empty vector takes its first block
+        // through reserve's first-storage path.
+        XOFFSET_DETAIL_NOINLINE T* grow_back_slot() {
+            const size_type n = size_;
+            if (n >= capacity_) [[likely]] reserve_first_or_grow(grown_capacity());
+            T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + n;
+            size_ = n + 1u;
+            return slot;
+        }
+
+        // One more element at index < size_ in a full vector: grows, moves
+        // the tail up one slot, counts the new element and returns the gap.
+        XOFFSET_DETAIL_NOINLINE T* grow_gap_slot(size_type index) {
+            reserve_grow(grown_capacity());
+            const size_type n = size_;
+            T* const items = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta);
+            size_ = n + 1u;
+            std::memmove(static_cast<void*>(items + index + 1), static_cast<const void*>(items + index),
+                         std::size_t(n - index) * sizeof(T));
+            return items + index;
+        }
+
         // insert_construct at size_ (a sorted insert after the last element),
         // all compilers. Only the spare-capacity path is inline: with more
         // here GCC stops inlining XMap::operator[] or zero_implicit_padding.
@@ -5855,26 +5985,21 @@ namespace XOffsetDatastructure {
                 size_ = n + 1u;
                 return slot;
             }
-            return append_full_construct(construct);
-        }
-
-        // append_after_last_construct into a full vector. Trivially copyable
-        // elements: stage, grow (reserve inline: one call per growth), copy.
-        template <typename Construct>
-        XOFFSET_DETAIL_NOINLINE iterator append_full_construct(Construct& construct) {
             if constexpr (std::is_trivially_copyable_v<T>) {
-                alignas(T) std::byte storage[sizeof(T)];
-                auto* staged = reinterpret_cast<T*>(storage);
-                construct(staged);
-                reserve_grow(grown_capacity());
-                const size_type n = size_;
-                T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + n;
-                std::memcpy(slot, staged, sizeof(T));
-                size_ = n + 1u;
+                XOFFSET_INDETERMINATE Staged staged;
+                construct(staged.get());
+                T* const slot = grow_back_slot();
+                std::memcpy(static_cast<void*>(slot), staged.bytes, sizeof(T));
                 return slot;
             } else {
-                return insert_body<false>(size_, construct);
+                return append_full_construct(construct);
             }
+        }
+
+        // append_after_last_construct into a full vector, elements with heads.
+        template <typename Construct>
+        XOFFSET_DETAIL_NOINLINE iterator append_full_construct(Construct& construct) {
+            return insert_body<false>(size_, construct);
         }
 
         // insert_construct for an index below size_, without its append
@@ -5884,17 +6009,19 @@ namespace XOffsetDatastructure {
         iterator insert_before_end_construct(size_type index, Construct&& construct) {
             if constexpr (std::is_trivially_copyable_v<T>) {
                 const size_type n = size_;
+                XOFFSET_INDETERMINATE Staged staged;
+                construct(staged.get());
                 if (n < capacity_) [[likely]] {
-                    alignas(T) std::byte storage[sizeof(T)];
-                    auto* staged = reinterpret_cast<T*>(storage);
-                    construct(staged);
                     T* const items = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta);
                     size_ = n + 1u;
-                    std::memmove(items + index + 1, items + index, std::size_t(n - index) * sizeof(T));
-                    std::memcpy(items + index, staged, sizeof(T));
+                    std::memmove(static_cast<void*>(items + index + 1), static_cast<const void*>(items + index),
+                                 std::size_t(n - index) * sizeof(T));
+                    std::memcpy(static_cast<void*>(items + index), staged.bytes, sizeof(T));
                     return items + index;
                 }
-                return insert_general<GrowOutOfLine>(index, construct);
+                T* const slot = grow_gap_slot(index);
+                std::memcpy(static_cast<void*>(slot), staged.bytes, sizeof(T));
+                return slot;
             } else {
 #if defined(__clang__)
                 return insert_general<GrowOutOfLine>(index, construct);
@@ -6330,6 +6457,49 @@ namespace XOffsetDatastructure {
             return find(key) != Base::end();
         }
 
+        // Sorted bulk fill: replaces the contents with the values of
+        // [first, last), which must be strictly ascending (the contract of
+        // std::sorted_unique). One exact block and no lookup: each value is
+        // built in place, in order; a contiguous range of trivially copyable
+        // T is one copy. The order is checked only under
+        // XOFFSET_CHECK_SORTED: an input that is not strictly ascending then
+        // throws XErrc::invalid_argument and leaves the set unchanged.
+        template <std::forward_iterator It, std::sentinel_for<It> S>
+            requires requires(T* dst, It it, allocator_type alloc) { fixed_detail::construct_bound(dst, alloc, *it); }
+        void assign_sorted(It first, S last) {
+            if constexpr (std::contiguous_iterator<It> && std::sized_sentinel_for<S, It> &&
+                          std::is_same_v<std::remove_cv_t<std::iter_value_t<It>>, T> &&
+                          std::is_trivially_copyable_v<T>) {
+                const auto count = static_cast<std::size_t>(last - first);
+                assign_sorted(std::span<const T>(count ? std::to_address(first) : nullptr, count));
+            } else {
+#if XOFFSET_CHECK_SORTED
+                if (!fixed_detail::strictly_ascending(first, last, [](const auto& v) -> const auto& { return v; }))
+                    XOFFSET_THROW(XException(XErrc::invalid_argument, "assign_sorted: input not strictly ascending"));
+#endif
+                const auto count = static_cast<std::size_t>(std::ranges::distance(first, last));
+                const auto alloc = Base::element_binding();
+                Base::fill_construct(first, last, count, [&](T* dst, auto&& value) {
+                    fixed_detail::construct_bound(dst, alloc, std::forward<decltype(value)>(value));
+                });
+            }
+        }
+
+        template <std::ranges::forward_range R>
+            requires requires(R& range) { std::declval<XFixedFlatSet&>().assign_sorted(std::ranges::begin(range), std::ranges::end(range)); }
+        void assign_sorted(R&& range) {
+            assign_sorted(std::ranges::begin(range), std::ranges::end(range));
+        }
+
+        void assign_sorted(std::span<const T> values)
+            requires (std::is_trivially_copyable_v<T> && !std::is_const_v<T> && !std::is_volatile_v<T>) {
+#if XOFFSET_CHECK_SORTED
+            if (!fixed_detail::strictly_ascending(values.begin(), values.end(), [](const T& v) -> const T& { return v; }))
+                XOFFSET_THROW(XException(XErrc::invalid_argument, "assign_sorted: input not strictly ascending"));
+#endif
+            Base::assign_range(values);
+        }
+
         XOFFSET_DETAIL_MOVE_INLINE std::pair<iterator, bool> insert(const T& value) {
 #if XOFFSET_NO_EXCEPTIONS
             if (Base::size_ >= Base::capacity_)
@@ -6476,6 +6646,54 @@ namespace XOffsetDatastructure {
             return try_emplace(std::forward<KeyArg>(key), std::forward<ValueArg>(value));
         }
 
+        // Sorted bulk fill: replaces the contents with the entries of
+        // [first, last), each a pair-like element (e.first the key, e.second
+        // the value: std::pair, XKeyValue, the elements of a std::map), whose
+        // keys must be strictly ascending (the contract of std::sorted_unique).
+        // One exact block and no lookup: each entry is built in place, in
+        // order; a contiguous range of trivially copyable value_type is one
+        // copy. The order is checked only under XOFFSET_CHECK_SORTED: an
+        // input that is not strictly ascending then throws
+        // XErrc::invalid_argument and leaves the map unchanged.
+        template <std::forward_iterator It, std::sentinel_for<It> S>
+            requires requires(It it) { (*it).first; (*it).second; }
+        void assign_sorted(It first, S last) {
+            if constexpr (std::contiguous_iterator<It> && std::sized_sentinel_for<S, It> &&
+                          std::is_same_v<std::remove_cv_t<std::iter_value_t<It>>, value_type> &&
+                          std::is_trivially_copyable_v<value_type>) {
+                const auto count = static_cast<std::size_t>(last - first);
+                assign_sorted(std::span<const value_type>(count ? std::to_address(first) : nullptr, count));
+            } else {
+#if XOFFSET_CHECK_SORTED
+                if (!fixed_detail::strictly_ascending(first, last, [](const auto& e) -> const auto& { return e.first; }))
+                    XOFFSET_THROW(XException(XErrc::invalid_argument, "assign_sorted: keys not strictly ascending"));
+#endif
+                const auto count = static_cast<std::size_t>(std::ranges::distance(first, last));
+                // Entries without heads never use the binding (no lookup).
+                const auto alloc = value_base::element_binding();
+                value_base::fill_construct(first, last, count, [&](value_type* dst, auto&& entry) {
+                    construct_entry_in(alloc, dst, std::forward<decltype(entry)>(entry).first,
+                                       std::forward<decltype(entry)>(entry).second);
+                });
+            }
+        }
+
+        template <std::ranges::forward_range R>
+            requires requires(R& range) { std::declval<XFixedFlatMap&>().assign_sorted(std::ranges::begin(range), std::ranges::end(range)); }
+        void assign_sorted(R&& range) {
+            assign_sorted(std::ranges::begin(range), std::ranges::end(range));
+        }
+
+        void assign_sorted(std::span<const value_type> values)
+            requires (std::is_trivially_copyable_v<value_type>) {
+#if XOFFSET_CHECK_SORTED
+            if (!fixed_detail::strictly_ascending(values.begin(), values.end(),
+                                                  [](const value_type& e) -> const K& { return e.first; }))
+                XOFFSET_THROW(XException(XErrc::invalid_argument, "assign_sorted: keys not strictly ascending"));
+#endif
+            value_base::assign_range(values);
+        }
+
         template <typename KeyArg, typename ValueArg>
         std::pair<iterator, bool> insert_or_assign(KeyArg&& key, ValueArg&& value) {
             auto it = find(key);
@@ -6526,7 +6744,11 @@ namespace XOffsetDatastructure {
     private:
         template <typename KeyArg, typename... Args>
         void construct_entry(value_type* dst, KeyArg&& key, Args&&... args) {
-            auto alloc = value_base::binding();
+            construct_entry_in(value_base::binding(), dst, std::forward<KeyArg>(key), std::forward<Args>(args)...);
+        }
+
+        template <typename KeyArg, typename... Args>
+        void construct_entry_in(const allocator_type& alloc, value_type* dst, KeyArg&& key, Args&&... args) {
             fixed_detail::construct_bound(&dst->first, alloc, std::forward<KeyArg>(key));
             XOFFSET_TRY {
                 fixed_detail::construct_bound(&dst->second, alloc, std::forward<Args>(args)...);
@@ -6781,6 +7003,7 @@ namespace XOffsetDatastructure {
         using Base::erase;
         using Base::emplace;
         using Base::insert;
+        using Base::assign_sorted;
 
         XSet() = default;
 
@@ -6839,6 +7062,7 @@ namespace XOffsetDatastructure {
         using Base::try_emplace;
         using Base::emplace;
         using Base::insert_or_assign;
+        using Base::assign_sorted;
 
         XMap() = default;
 
