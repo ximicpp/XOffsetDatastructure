@@ -5,6 +5,13 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- Removed the experimental direct receive (`begin_verified_receive`, `finish_verified`, the second
+  validator `receive_raw::validate`, the custom lifetime hooks `wire_activation` and
+  `wire_future_lifetime`, `canonical_bytes_at`, `freeze_verified` / `VerifiedSnapshot` and
+  `VirtualMemoryStorage::for_receive`), the optional shared validation scratch pool
+  (`XOFFSET_BUILD_VALIDATION_SCRATCH_RUNTIME`, `XOffset::ValidationScratch`) and the snapshot index
+  (`XOFFSET_BUILD_SNAPSHOT_INDEX_RUNTIME`). Receiving goes through `load_verified`, `reload_verified`,
+  `begin_verified_reload` and `XReceiver` as before; the machine code of the library is unchanged.
 - Shorter small-block allocation and retirement, same placement: an empty vector's first block (from
   `assign_range`, `reserve` or a first `push_back`) is taken in one call that runs the exact-bin hit or
   the tail bump inline; a retired block entering a bin with room calls nothing; the tail bump and the

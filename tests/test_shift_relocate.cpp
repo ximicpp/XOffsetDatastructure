@@ -82,8 +82,8 @@ template<> struct wire_record_layout<shift::Rec> { static constexpr bool ordinar
 
 // Each SHIFT precondition separately, so a failure names the missing one.
 static_assert(xo::fixed_detail::can_relocate_without_allocation<shift::Rec>());
-static_assert(xo::detail::receive_raw::future_supported<shift::Rec>());
-static_assert(xo::detail::raw_needs_activation<shift::Rec>());
+static_assert(xo::detail::inplace_lifetime_supported<shift::Rec>());
+static_assert(xo::detail::contains_owning_head<shift::Rec>());
 static_assert(xo::detail::ordinary_outer_lifetime_supported<shift::Rec>());
 static_assert(xo::detail::shift_rebase_domain<shift::Rec>());
 static_assert(xo::detail::shift_relocate_supported<shift::Rec>(), "Rec must take the SHIFT path");

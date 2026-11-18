@@ -350,17 +350,6 @@ namespace XOffsetDatastructure::schema {
     template <class T, std::size_t I>
     inline constexpr bool base_is_virtual_v = false;
 
-    template <class E>
-    consteval auto enum_range() {
-        static_assert(std::is_enum_v<E>);
-        static_assert(describe_detail::fixed_underlying_type<E>(),
-            "XOffset: without reflection the enumerators of an enum without a fixed "
-            "underlying type are unknown. Give it one: enum E : std::uint8_t { ... } "
-            "(or enum class E { ... }), with the width the values need.");
-        using U = std::underlying_type_t<E>;
-        return enum_bounds<U>{};
-    }
-
     namespace describe_detail {
         // Is every base and member of T trivial for Trait? Then T's implicit
         // special member would be trivial too, and a nontrivial one is

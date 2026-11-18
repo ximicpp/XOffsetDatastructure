@@ -37,7 +37,7 @@ template<> struct wire_record_layout<LifetimeRecord> { static constexpr bool ord
 template<> struct wire_record_layout<LifetimeRoot> { static constexpr bool ordinary_members = true; };
 }
 XOFFSET_REGISTER_SCHEMA_NAME(LifetimeRoot, "receive.complete.core-lifetime.v1")
-static_assert(dt::receive_raw::future_supported<LifetimeRoot>());
+static_assert(dt::inplace_lifetime_supported<LifetimeRoot>());
 static_assert(dt::ordinary_outer_lifetime_supported<LifetimeRecord>());
 static_assert(xo::is_v1_wire_admitted_v<LifetimeRoot>);
 

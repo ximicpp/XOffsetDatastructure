@@ -63,9 +63,6 @@ int main() {
     }
     {
         VirtualMemoryStorage owner;
-        need(refused(VirtualMemoryStorage::for_receive_v(owner, 4096, 1024), XErrc::invalid_argument,
-                     "VM receive length exceeds maximum capacity"),
-             "for_receive_v over the maximum");
         need(refused(VirtualMemoryStorage::for_slot_v(owner, SlotGeometry::classes, 64, true),
                      XErrc::invalid_argument, "slot class out of range"),
              "for_slot_v of a bad class");

@@ -71,19 +71,6 @@ namespace XOffsetDatastructure::schema {
     template <class T>
     inline constexpr bool is_undescribable_v = false;
 
-    template <class E>
-    consteval auto enum_range() {
-        static_assert(std::is_enum_v<E>);
-        using U = std::underlying_type_t<E>;
-        U minimum = 0, maximum = 0;
-        for (const auto enumerator : std::meta::enumerators_of(^^E)) {
-            const U value = static_cast<U>(std::meta::extract<E>(enumerator));
-            if (value < minimum) minimum = value;
-            if (value > maximum) maximum = value;
-        }
-        return enum_bounds<U>{minimum, maximum};
-    }
-
     template <class T>
     consteval bool implicit_lifetime_aggregate() {
         if constexpr (!std::is_aggregate_v<T>) return false;

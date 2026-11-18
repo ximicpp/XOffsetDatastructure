@@ -26,8 +26,6 @@
 //                                          (a union or a non-aggregate class) and it has
 //                                          none; never true under reflection. Walks treat
 //                                          such a T as opaque: not admitted, no walk.
-//   enum_range<E>()                        {min, max}: the smallest range holding 0 and
-//                                          every enumerator of E
 //   implicit_lifetime_aggregate<T>()       aggregate without a user-provided destructor
 //   only_implicit_special_members<T>()     no user-declared special member function
 //
@@ -41,10 +39,6 @@
 #else
 #define XOFFSET_SCHEMA_INLINE inline __attribute__((always_inline))
 #endif
-
-namespace XOffsetDatastructure::schema {
-    template <class U> struct enum_bounds { U min, max; };
-} // namespace XOffsetDatastructure::schema
 
 // GCC 16 defines __cpp_impl_reflection; the P2996 Clang fork answers
 // __has_feature(reflection). (GCC before 14 has no __has_feature.)
