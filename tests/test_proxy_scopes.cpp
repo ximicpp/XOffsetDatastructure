@@ -246,17 +246,17 @@ bool test_xbuffer_moves_and_lifetime() {
     CHECK(ints.error() == XErrc::stale);
     // Replaced content (reset, reload): proxies of the old content are stale.
     auto t = TypedXBuffer<Root>::create(256, XBuffer::relocating());
-    auto old = t.ref().field<&Root::counter>();
+    auto old = t.root().field<&Root::counter>();
     old = 5;
     const std::string wire = t.save_verified();
     t.reset();
     CHECK(!old.valid() && old.get() == 0);
     CHECK(t.ok());
-    auto fresh = t.ref().field<&Root::counter>();
+    auto fresh = t.root().field<&Root::counter>();
     fresh = 9;
     t.reload_verified(wire);
     CHECK(!fresh.valid());
-    CHECK(t.ref().field<&Root::counter>().get() == 5);
+    CHECK(t.root().field<&Root::counter>().get() == 5);
     return true;
 }
 

@@ -62,7 +62,7 @@ namespace detail {
             arena->header_size != sizeof(XBufferCore::arena_header))
             XOFFSET_THROW(XException(XErrc::invalid_payload_header, "verified paths: payload header mismatch"));
         if (arena->used_end < XBufferCore::min_payload_size() ||
-            arena->used_end > source.segment_size() || arena->used_end > XBufferCore::MAX_PAYLOAD)
+            arena->used_end > source.get_size() || arena->used_end > XBufferCore::MAX_PAYLOAD)
             XOFFSET_THROW(XException(XErrc::invalid_payload_header, "verified paths: payload used_end out of range"));
         if (!root) {
             root = find_root<T>(source);
@@ -81,8 +81,8 @@ namespace detail {
     XOFFSET_DETAIL_INLINE void save_check_alias(const std::string& out, const XBufferCore& candidate) {
         if (out.capacity() == (std::numeric_limits<std::size_t>::max)())
             XOFFSET_THROW(std::length_error("save_verified_into: output capacity overflows alias range"));
-        if (verified_paths_intersect(&out, sizeof(out), candidate.get_address(), candidate.segment_size()) ||
-            verified_paths_intersect(out.data(), out.capacity() + 1, candidate.get_address(), candidate.segment_size()))
+        if (verified_paths_intersect(&out, sizeof(out), candidate.get_address(), candidate.get_size()) ||
+            verified_paths_intersect(out.data(), out.capacity() + 1, candidate.get_address(), candidate.get_size()))
             XOFFSET_THROW(XException(XErrc::invalid_state, "save_verified_into: output aliases source storage"));
     }
 
@@ -123,7 +123,7 @@ namespace detail {
         const std::size_t holes = source.free_block_count();
         const std::size_t final_size = sizeof(XWireHeaderV2) + std::size_t(used - XWIRE_PAYLOAD_BEGIN) +
                                        holes * sizeof(XBufferCore::WireHole);
-        if (used < XWIRE_PAYLOAD_BEGIN || used >= wire_zero_scan_min_payload || used > source.segment_size() ||
+        if (used < XWIRE_PAYLOAD_BEGIN || used >= wire_zero_scan_min_payload || used > source.get_size() ||
             (emission == XWireEmission::free_runs && source.free_block_bytes() >= wire_free_run_min_gap) ||
             final_size > out.capacity())
             return false;
@@ -923,8 +923,8 @@ namespace detail {
         auto check_alias = [&](XBufferCore& candidate) {
             if (out.capacity() == (std::numeric_limits<std::size_t>::max)())
                 XOFFSET_THROW(std::length_error("save_compact_into: output capacity overflows alias range"));
-            if (verified_paths_intersect(&out, sizeof(out), candidate.get_address(), candidate.segment_size()) ||
-                verified_paths_intersect(out.data(), out.capacity() + 1, candidate.get_address(), candidate.segment_size()))
+            if (verified_paths_intersect(&out, sizeof(out), candidate.get_address(), candidate.get_size()) ||
+                verified_paths_intersect(out.data(), out.capacity() + 1, candidate.get_address(), candidate.get_size()))
                 XOFFSET_THROW(XException(XErrc::invalid_state, "save_compact_into: output aliases source storage"));
         };
         check_alias(*current);
@@ -1002,8 +1002,8 @@ namespace detail {
         auto check_alias = [&](XBufferCore& candidate) {
             if (out.capacity() == (std::numeric_limits<std::size_t>::max)())
                 XOFFSET_THROW(std::length_error("save_compact_into: output capacity overflows alias range"));
-            if (verified_paths_intersect(&out, sizeof(out), candidate.get_address(), candidate.segment_size()) ||
-                verified_paths_intersect(out.data(), out.capacity() + 1, candidate.get_address(), candidate.segment_size())) {
+            if (verified_paths_intersect(&out, sizeof(out), candidate.get_address(), candidate.get_size()) ||
+                verified_paths_intersect(out.data(), out.capacity() + 1, candidate.get_address(), candidate.get_size())) {
                 out_aliases = true;
                 XOFFSET_THROW(XException(XErrc::invalid_state, "save_compact_into: output aliases source storage"));
             }
@@ -1016,7 +1016,7 @@ namespace detail {
                 arena->header_size != sizeof(XBufferCore::arena_header))
                 XOFFSET_THROW(XException(XErrc::invalid_payload_header, "verified paths: payload header mismatch"));
             if (arena->used_end < XBufferCore::min_payload_size() ||
-                arena->used_end > source.segment_size() || arena->used_end > XBufferCore::MAX_PAYLOAD)
+                arena->used_end > source.get_size() || arena->used_end > XBufferCore::MAX_PAYLOAD)
                 XOFFSET_THROW(XException(XErrc::invalid_payload_header, "verified paths: payload used_end out of range"));
             const T* root = find_root<T>(source);
             {

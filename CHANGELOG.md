@@ -15,6 +15,12 @@ of this file and in the pull requests.
 - `XString`, `XSet` and `XMap` are one class each: `XFixedString`, `XFixedFlatSet` and
   `XFixedFlatMap` are gone, and `XFixedVector` is `XVectorCore`, the base of `XVector`, `XSet` and
   `XMap` (no longer a field type). Behavior, layout and wire bytes are unchanged.
+- The `XBuffer` and `TypedXBuffer` load, reload and delta-apply entries take the bytes as one
+  `XByteView` (a `std::string`, `std::string_view` or byte span) instead of a string and a span
+  overload, and the validation memory resource as a defaulted `upstream` argument: the
+  `*_with_resource` entries are gone (`reload_verified` with a null `upstream` uses the buffer's own
+  scratch). Removed aliases: `segment_size()` (use `get_size()`), `arena_allocator<T>()` (use
+  `allocator<T>()`) and `TypedXBuffer::ref()` (use `root()`).
 - Removed the experimental direct receive (`begin_verified_receive`, `finish_verified`, the second
   validator `receive_raw::validate`, the custom lifetime hooks `wire_activation` and
   `wire_future_lifetime`, `canonical_bytes_at`, `freeze_verified` / `VerifiedSnapshot` and

@@ -2,7 +2,7 @@
 // Diagnostic only: splits the per-message cost of XOffset V2 into VM setup,
 // owner registry, validation scratch, validation proper and teardown, using
 // the prototype's real BattleMsg / Report wires. Full validation is kept in
-// every load variant (load_verified / load_verified_with_resource).
+// every load variant (load_verified with the default and with a local upstream).
 //
 //   small_msg_probe [--iters 20000] [--rounds 15]
 //   small_msg_probe --a-loop SECONDS   (pooled scenario-A pipeline in a loop, for `sample`)
@@ -72,7 +72,7 @@ template <class T>
 XBuffer load_mono(const std::string& w, std::optional<XBuffer::MaximumCapacity> cap) {
     std::pmr::monotonic_buffer_resource mono(g_scratch.data(), g_scratch.size(),
                                              std::pmr::new_delete_resource());
-    return XBuffer::load_verified_with_resource<T>(
+    return XBuffer::load_verified<T>(
         std::span<const std::byte>(reinterpret_cast<const std::byte*>(w.data()), w.size()), cap, &mono);
 }
 

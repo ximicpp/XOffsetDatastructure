@@ -298,7 +298,7 @@ int main(int argc, char** argv) {
     }
     // A null upstream is an argument error, not a payload error.
     {
-        auto loaded = XBuffer::try_load_verified_with_resource<NoExcRoot>(
+        auto loaded = XBuffer::try_load_verified<NoExcRoot>(
             std::span<const std::byte>(reinterpret_cast<const std::byte*>(good.data()), good.size()), cap(),
             nullptr);
         need(!loaded && loaded.code() == XErrc::invalid_argument &&

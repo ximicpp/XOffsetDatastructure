@@ -226,7 +226,7 @@ std::size_t accessible_extent(const XBuffer& buffer) {
 }
 
 void capture_buffer(Result& r, const XBuffer& buffer) {
-    r.final_logical_bytes = buffer.segment_size();
+    r.final_logical_bytes = buffer.get_size();
     r.final_reserved_bytes = buffer.reserved_capacity();
     r.final_accessible_bytes = accessible_extent(buffer);
 #if XOFFSET_BENCH_VM
@@ -246,7 +246,7 @@ void capture_memory_after(Result& r) {
 
 void record_growth(Result& r, XBuffer& buffer, std::size_t extra) {
     const auto old_address = reinterpret_cast<std::uintptr_t>(buffer.get_address());
-    const auto old_size = buffer.segment_size();
+    const auto old_size = buffer.get_size();
     const auto old_accessible = accessible_extent(buffer);
     const auto from = Clock::now();
     const bool ok = buffer.grow(extra);
@@ -290,8 +290,8 @@ Result grow_workload(const Args& args) {
                 0x5a, initial_small - tail_start);
     r.setup_pretouched_bytes = initial_small;
     const auto from = Clock::now();
-    while (buffer.segment_size() < args.size) {
-        const auto extra = std::min<std::size_t>(4 * MiB, args.size - buffer.segment_size());
+    while (buffer.get_size() < args.size) {
+        const auto extra = std::min<std::size_t>(4 * MiB, args.size - buffer.get_size());
         record_growth(r, buffer, extra);
     }
     r.elapsed_ms = milliseconds(from, Clock::now());
@@ -347,7 +347,7 @@ Result append_workload(const Args& args) {
                     ++r.allocation_failures;
                     require(!preallocated, "preallocated append unexpectedly required arena growth");
                     // Identical explicit retry algorithm. Reacquire root after every grow.
-                    const auto logical = buffer.segment_size();
+                    const auto logical = buffer.get_size();
                     require(logical <= XBufferCore::MAX_PAYLOAD / 2,
                             "append doubling would exceed MAX_PAYLOAD");
                     record_growth(r, buffer, logical);
@@ -477,7 +477,7 @@ Result save_workload(const Args& args) {
     r.operation_samples_ms.push_back(r.elapsed_ms);
     r.save_base_changed = old_address != reinterpret_cast<std::uintptr_t>(buffer.get_address());
     r.address_changes = r.save_base_changed ? 1 : 0;
-    if (r.save_base_changed) r.relocation_copy_bytes_est = buffer.segment_size();
+    if (r.save_base_changed) r.relocation_copy_bytes_est = buffer.get_size();
     capture_buffer(r, buffer);
     capture_memory_after(r);
     r.wire_size = wire.size();
@@ -608,9 +608,9 @@ Result cycle_workload(const Args& args) {
         if (reinterpret_cast<std::uintptr_t>(buffer.get_address()) != old_address) {
             ++r.address_changes;
             r.save_base_changed = true;
-            r.relocation_copy_bytes_est += buffer.segment_size();
+            r.relocation_copy_bytes_est += buffer.get_size();
         }
-        record_growth(r, buffer, r.initial_logical_bytes - buffer.segment_size());
+        record_growth(r, buffer, r.initial_logical_bytes - buffer.get_size());
         const double cycle_ms = save_ms + r.growth_samples_ms.back();
         r.operation_samples_ms.push_back(cycle_ms);
         elapsed += cycle_ms;

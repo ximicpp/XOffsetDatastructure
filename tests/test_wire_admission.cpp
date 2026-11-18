@@ -107,7 +107,7 @@ bool test_v1_admission_round_trip() {
     root->names.emplace(2, "two");
 
     assert(xbuf.matches_schema());
-    assert(xbuf.bytes().size() == xbuf.segment_size());
+    assert(xbuf.bytes().size() == xbuf.get_size());
 
     std::string data = xbuf.save_verified();
     // The admission trait keeps its historical "v1" name; the verified wire it
