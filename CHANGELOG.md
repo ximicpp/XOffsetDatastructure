@@ -103,9 +103,17 @@ of this file and in the pull requests.
   wire (12,392 -> 992 bytes at k = 1/4, 717,680 -> 53,184 at k = 16); k = 1/4 g4 likewise
   (0.71 -> 0.47); the other 442 cells send the same bytes with at most 3 more instructions per
   message (30 of them 13 to 62 fewer). Instructions (ops cells, GCC 16): push
-  and pop +1, append 8 and resize back +2, insert and erase in the middle of a vector +4, map
+  and pop +1, append 8 and resize back +2, insert and erase in the middle of a vector +3, map
   insert and erase +6; the clean send unchanged (the flag shares the free state's 16-bit word: one
-  load and compare); checked receive -12 (`reload_into`'s small path is inline).
+  load and compare); checked receive -12 (`reload_into`'s small path is inline); building a
+  Character element by element +65 (1.7%; no hook runs there: GCC inlines differently inside that
+  build function). Perf gate (GCC 16 / P2996): map and set erase +2.0 to 2.5% / +2.4 to 3.0% (the
+  quarter test runs on every erase from a container with at least 1 KiB of capacity), slg
+  `A.apply` +1.9% / +2.8%; every scenario total within 0.3%. The hooks keep the callers' code as
+  on main: `clear()` tests the old size (a capacity load there was kept by the refill loop that
+  followed), an assignment in place tests the capacity after the copy and reads the old size out of
+  line, `erase` has one hook after its branches, the flat map and set `erase(key)` are inline at
+  the caller under Clang, and a move assignment between payloads copies out of line.
 - Fixed: a client that includes `<windows.h>` before the library compiles again (a variable in
   `save_delta_into` was named `small`, which `rpcndr.h` defines as a macro).
 - `xoffsetdatastructure.hpp` includes seven parts in its former order: `xoffset_arena.hpp`,
