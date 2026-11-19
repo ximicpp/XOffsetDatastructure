@@ -19,6 +19,7 @@
 #include "fuzz/v2_fuzz_core.hpp"
 
 #include <functional>
+#include <set>
 #include <thread>
 
 namespace dz {
@@ -647,10 +648,11 @@ void block_section_case() {
         {"a missing mask byte", make(1, std::string("\x01\x03\x01", 3)), xo::XErrc::size_mismatch},
         {"a block count past the section", make(100, std::string("\x01\x01\x01", 3) + "a"), xo::XErrc::size_mismatch},
         {"trailing bytes", make(1, std::string("\x01\x01\x01", 3) + "ab"), xo::XErrc::size_mismatch},
-        // Block 0 starts in the image header [0, 40), which no delta writes.
+        // Block 0 starts in the image header, whose first 32 bytes no delta
+        // writes.
         {"block 0 whole", make(1, std::string(2, '\0') + std::string(64, 'w')), xo::XErrc::invalid_extent_table},
         {"a mask bit in the header", make(1, std::string("\0\x01\x01", 3) + "a"), xo::XErrc::invalid_extent_table},
-        {"a mask bit just below 40", make(1, std::string("\0\x30\x80\x01", 4) + "ab"),
+        {"a mask bit just below 32", make(1, std::string("\0\x18\x80\x01", 4) + "ab"),
          xo::XErrc::invalid_extent_table},
     };
     // Header cases.
@@ -664,7 +666,7 @@ void block_section_case() {
     cases.push_back({"a header cut before its varints", good.substr(0, 12), xo::XErrc::truncated});
     cases.push_back({"a header cut in a varint", good.substr(0, 12) + char(0x81), xo::XErrc::truncated});
     cases.push_back({"a key delta without extent",
-                     delta_header(cur.stream(), cur.version() + 1, 1, xo::XDELTA_FLAG_KEY | xo::XDELTA_FLAG_HOLES) +
+                     delta_header(cur.stream(), cur.version() + 1, 1, xo::XDELTA_FLAG_KEY) +
                          std::string(16, '\0') + body,
                      xo::XErrc::unsupported_flags});
     cases.push_back({"a stream of 0", delta_header(0, cur.version() + 1, 1) + body, xo::XErrc::delta_base_mismatch});
@@ -833,7 +835,7 @@ void check_path_case() {
             poke_delta(rep, cur, off(rep.plain_root().title.data() + rep.plain_root().title.size()), std::string(1, 'x')),
             "missing terminator");
     {
-        // Moved blocks are checked against the live blocks and holes.
+        // Moved blocks are checked against the live and free blocks.
         const std::size_t head = off(&rep.plain_root().items[0].vals);
         const auto head_bytes = [&](std::int64_t data_at, std::uint32_t size, std::uint32_t capacity) {
             const auto delta = std::int32_t(data_at - std::int64_t(head));
@@ -857,9 +859,11 @@ void check_path_case() {
         std::vector<std::pair<std::uint32_t, std::uint32_t>> holes;
         rep.for_each_free_block([&](xo::XBufferCore::WireHole h) { holes.emplace_back(h.offset, h.bytes); });
         need(!holes.empty(), "check path: no hole to move into");
-        rejects("a vector block into a hole the table keeps",
+        // (The free regions are registered after the live blocks: the free
+        // block now overlaps one.)
+        rejects("a vector block into a free block the directory keeps",
                 poke_delta(rep, cur, head, head_bytes(holes[0].first, 1, holes[0].second / 2)),
-                "wire validation");
+                "invalid free blocks");
         {
             // A record brought back past the size is verified on its own:
             // first a bool of 2 in the slot past the size (a free byte then),
@@ -1191,8 +1195,8 @@ void touches_stream(std::uint64_t seed, int steps) {
 }
 
 // Touches deltas: touched bytes go even unchanged, untouched changes do not;
-// more touched blocks than the list holds go whole; growth and shrinking;
-// the copy is never kept and key_delta_into is not offered.
+// more touched runs than the list holds go as whole blocks; growth and
+// shrinking; the copy is never kept and key_delta_into is not offered.
 void touches_fixed_case() {
     std::mt19937_64 rng(23);
     const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
@@ -1251,28 +1255,40 @@ void touches_fixed_case() {
     need(!st.empty, "touches: no delta for growth");
     need(bool(apply_entry(rep, d, cur)), "touches: growth delta");
     same_state(src.plain_root(), src, rep, "touches: growth");
-    // More touched blocks than the list holds: each still goes by the bytes
-    // touched in it (one baseline keeps them past the list).
+    // More touched runs than the list holds, a block or more apart (closer
+    // ones are joined): the period's touched 64-byte blocks go whole,
+    // adjacent ones as one run (one baseline keeps them past the list), and
+    // the next period sends its own blocks only.
     const auto used = std::size_t(src.arena()->used_end);
-    need(used / 64 > xo::detail::DeltaTouchLog::list_capacity + 4, "touches: payload too small for the list");
-    for (std::size_t i = 0; i < vals.size(); i += 32) vals[i] = std::uint16_t(vals[i] + 1);
-    for (std::size_t i = 0; i < vals.size(); i += 32) src.touch(vals[i]);
+    need(used / 64 > xo::detail::DeltaTouchLog::run_capacity + 4, "touches: payload too small for the list");
+    const auto base = static_cast<const char*>(src.get_address());
+    // The runs and bytes of whole blocks holding the given elements.
+    const auto whole_runs = [&](std::size_t from, std::size_t step) {
+        std::set<std::size_t> blocks;
+        for (std::size_t i = from; i < vals.size(); i += step)
+            blocks.insert(std::size_t(reinterpret_cast<const char*>(&vals[i]) - base) / 64);
+        std::size_t runs = 0, last = SIZE_MAX;
+        for (const std::size_t b : blocks) runs += b != last + 1, last = b;
+        return std::pair<std::size_t, std::size_t>(runs, blocks.size() * 64);
+    };
+    for (std::size_t i = 0; i < vals.size(); i += 40) vals[i] = std::uint16_t(vals[i] + 1);
+    for (std::size_t i = 0; i < vals.size(); i += 40) src.touch(vals[i]);
     vals[0] = std::uint16_t(vals[0] + 1);
     src.touch(vals[0]);  // a block touched twice in the overflowed period
     st = src.save_delta_into(d, xb);
-    const std::size_t touched_blocks = (vals.size() + 31) / 32;
-    need(touched_blocks > xo::detail::DeltaTouchLog::list_capacity && st.blocks == touched_blocks &&
-             st.changed_bytes == touched_blocks * sizeof(vals[0]),
-         "touches: an overflowed list did not send the touched bytes");
+    const auto first = whole_runs(0, 40);
+    need((vals.size() + 39) / 40 > xo::detail::DeltaTouchLog::run_capacity && st.blocks == first.first &&
+             st.changed_bytes == first.second,
+         "touches: an overflowed list did not send the touched blocks");
     need(bool(apply_entry(rep, d, cur)), "touches: overflow delta");
     same_state(src.plain_root(), src, rep, "touches: overflow");
-    // The next period overflows again: its own bytes, not the last period's.
-    for (std::size_t i = 16; i < vals.size(); i += 32) vals[i] = std::uint16_t(vals[i] + 1);
-    for (std::size_t i = 16; i < vals.size(); i += 32) src.touch(vals[i]);
+    // The next period overflows again: its own blocks, not the last period's.
+    for (std::size_t i = 16; i < vals.size(); i += 64) vals[i] = std::uint16_t(vals[i] + 1);
+    for (std::size_t i = 16; i < vals.size(); i += 64) src.touch(vals[i]);
     st = src.save_delta_into(d, xb);
-    const std::size_t second = (vals.size() + 15) / 32;
-    need(st.blocks == second && st.changed_bytes == second * sizeof(vals[0]),
-         "touches: a second overflowed period sent other bytes");
+    const auto second = whole_runs(16, 64);
+    need(st.blocks == second.first && st.changed_bytes == second.second,
+         "touches: a second overflowed period sent other blocks");
     need(bool(apply_entry(rep, d, cur)), "touches: second overflow delta");
     same_state(src.plain_root(), src, rep, "touches: second overflow");
     // Back within the list: only the touched bytes again.
@@ -1281,11 +1297,21 @@ void touches_fixed_case() {
     st = src.save_delta_into(d, xb);
     need(st.blocks == 1 && st.changed_bytes == sizeof(std::uint16_t), "touches: the list was not used again");
     need(bool(apply_entry(rep, d, cur)), "touches: delta after overflow");
-    // An item erased: its blocks become holes (they go with the hole change).
+    // More runs than the list holds, each less than a block past the one
+    // touched before: the full list is joined (the first 25 runs become one,
+    // with the bytes between) and the period stays listed: 1 + 15 runs.
+    for (std::size_t i = 100; i < 100 + 4 * 40; i += 4) vals[i] = std::uint16_t(vals[i] + 1);
+    for (std::size_t i = 100; i < 100 + 4 * 40; i += 4) src.touch(vals[i]);
+    st = src.save_delta_into(d, xb);
+    need(st.blocks == 16 && st.changed_bytes == 8 * 24 + 2 + 15 * 2, "touches: close runs were not joined");
+    need(bool(apply_entry(rep, d, cur)), "touches: joined delta");
+    same_state(src.plain_root(), src, rep, "touches: joined");
+    // An item erased: its blocks become free (the allocator's writes are
+    // touches: the free blocks' links and the directory go with it).
     src.plain_root().items.erase(src.plain_root().items.begin() + 1);
     src.touch(src.plain_root().items);
     st = src.save_delta_into(d, xb);
-    need(st.holes, "touches: erasing an item changed no hole");
+    need(!st.empty, "touches: erasing an item sent nothing");
     need(bool(apply_entry(rep, d, cur)), "touches: erase delta");
     same_state(src.plain_root(), src, rep, "touches: erase");
 }
@@ -1302,17 +1328,17 @@ void touched_fixed_case() {
     Buffer rep(4096, xo::XBuffer::maximum_capacity(kLimit));
     xo::XDeltaCursor cur;
     need(bool(apply_entry(rep, delta_of(src, base, touched), cur)), "touched: key delta");
-    const std::size_t whole = payload_of(src).size() - xo::XWIRE_PAYLOAD_BEGIN;
+    const std::size_t whole = payload_of(src).size() - xo::XDELTA_IMAGE_BEGIN;
     std::string d;
     // The first touched delta of a baseline compares everything (the key
     // delta paired it); a touched change then compares its block only.
     src.plain_root().epoch += 1;
     src.touch(src.plain_root().epoch);
     auto st = src.save_delta_into(d, base, touched);
-    // Its block: 64 bytes, or the 16 past the arena header for block 0.
+    // Its block: 64 bytes, or the 32 a delta writes of block 0.
     const auto epoch_at = std::size_t(reinterpret_cast<const char*>(&src.plain_root().epoch) -
                                       static_cast<const char*>(static_cast<const xo::XBufferCore&>(src).get_address()));
-    const std::size_t epoch_block = epoch_at < 64 ? 64 - xo::XWIRE_PAYLOAD_BEGIN : 64;
+    const std::size_t epoch_block = epoch_at < 64 ? 64 - xo::XDELTA_IMAGE_BEGIN : 64;
     need(epoch_at % 64 + sizeof(src.plain_root().epoch) <= 64, "touched: the scalar crosses a block");
     need(!st.empty && st.compared_bytes == epoch_block, "touched: one touched scalar did not compare one block");
     need(bool(apply_entry(rep, d, cur)), "touched: scalar delta");
@@ -1376,7 +1402,7 @@ void touched_fixed_case() {
     src.plain_root().epoch += 1;
     src.touch(src.plain_root().epoch);
     st = src.save_delta_into(d, base, touched);
-    need(!st.empty && st.compared_bytes == payload_of(src).size() - xo::XWIRE_PAYLOAD_BEGIN,
+    need(!st.empty && st.compared_bytes == payload_of(src).size() - xo::XDELTA_IMAGE_BEGIN,
          "touched: a reloaded buffer did not compare everything");
     need(bool(apply_entry(rep, d, cur)), "touched: delta after reload");
     same_state(src.plain_root(), src, rep, "touched: reload");
@@ -1386,7 +1412,7 @@ void touched_fixed_case() {
     for (int i = 0; i < 40; ++i) vals.push_back(std::uint16_t(i));
     src.touch(vals);
     st = src.save_delta_into(d, base, touched);
-    need(!st.empty && st.compared_bytes < payload_of(src).size() - xo::XWIRE_PAYLOAD_BEGIN,
+    need(!st.empty && st.compared_bytes < payload_of(src).size() - xo::XDELTA_IMAGE_BEGIN,
          "touched: a moved container compared everything");
     need(bool(apply_entry(rep, d, cur)), "touched: moved container");
     same_state(src.plain_root(), src, rep, "touched: moved container");

@@ -3,7 +3,9 @@
 // and order, no state change on rejection, sparse gaps, recomputed holes,
 // storage (inline, upstream block, retained reload words), real global new
 // failures in typed load, and typed hostile wires through the single-check
-// head path. No timer.
+// head path. No timer. A live registration is checked against the live
+// blocks only: the validator registers the free regions after every live
+// block, each checked against both.
 #include "validation_global_new_failure.hpp"
 #include <xoffsetdatastructure.hpp>
 #include <algorithm>
@@ -104,7 +106,6 @@ void reg(bool free, const char* p, std::size_t bytes, wd::WireValidationContext&
     else wd::register_owned_range(p, bytes, ctx, "granule test: bounds");
 }
 constexpr const char* live_live = "wire validation detected overlapping dynamic ranges";
-constexpr const char* live_free = "wire validation detected live/free overlap";
 constexpr const char* free_live = "wire validation detected free-list overlap with live ranges";
 constexpr const char* free_free = "wire validation detected overlapping free-list ranges";
 
@@ -138,7 +139,7 @@ void pairwise_oracle() {
                     if (b > extent || n > extent - b) expected = "granule test: bounds";
                     else if ((b | n) & 7) expected = "granule test: bounds";
                     else if (hits(owned, b, b + n)) expected = f ? free_live : live_live;
-                    else if (hits(free, b, b + n)) expected = f ? free_free : live_free;
+                    else if (f && hits(free, b, b + n)) expected = free_free;
                 }
                 const auto before = save(ctx);
                 bool rejected = false;
@@ -226,7 +227,7 @@ void derived_extent_error_order() {
     };
     for (bool incoming_free : {false, true}) {
         const char* live_hit = incoming_free ? free_live : live_live;
-        const char* free_hit = incoming_free ? free_free : live_free;
+        const char* free_hit = incoming_free ? free_free : "";  // a live block meets live blocks only
         for (std::size_t request : {std::size_t{1}, std::size_t{7}, std::size_t{8}, std::size_t{13}, std::size_t{16}, std::size_t{4095 - 127}})
             one(base + 128, request, 8, incoming_free, "");
         one(base + 128, 16, 1, incoming_free, "");
@@ -396,10 +397,13 @@ void reject(const std::string& wire, std::string_view expected) {
     catch (const xo::XException& e) { what = e.what(); caught = what == expected; }
     if (!caught) std::cerr << "expected '" << expected << "', got '" << what << "'\n";
     need(caught && wire == before, "typed rejection or its first error differs");
+    // An error that names its entry point names reload_verified there.
+    const std::string reload_expected =
+        expected.starts_with("load_verified") ? "re" + std::string(expected) : std::string(expected);
     auto reloader = xo::XBuffer::create<Root>(4096);
     caught = false;
     try { reloader.template reload_verified<Root>(wire); }
-    catch (const xo::XException& e) { caught = std::string_view(e.what()) == expected; }
+    catch (const xo::XException& e) { caught = e.what() == reload_expected; }
     need(caught, "typed reload rejection or its first error differs");
     ++typed_rejections;
 }
@@ -476,7 +480,8 @@ void typed_head_checks() {
         write_at(order, data + sizeof(Pair) + offsetof(Pair, first), std::uint32_t{1});
         reject<GranuleRoot>(order, "wire validation: map keys not strictly ordered");
     }
-    {   // Live block onto a hole.
+    {   // Live block onto a hole: the free regions are checked after the
+        // live walk, so the free block's registration reports it.
         auto retired = xo::XBuffer::create<PairRoot>(32768);
         auto& r = retired.root<PairRoot>();
         r.left.resize(16); r.right.resize(16);
@@ -493,7 +498,7 @@ void typed_head_checks() {
         const auto origin = xo::XWIRE_PAYLOAD_BEGIN + offsetof(PairRoot, right) +
                             offsetof(xo::XVectorCore<std::uint8_t>, data_delta);
         write_at(bad, origin, std::int32_t(std::int64_t(hole) - std::int64_t(origin)));
-        reject<PairRoot>(bad, live_free);
+        reject<PairRoot>(bad, "load_verified<T>(): invalid free blocks");
         (void)xo::XBuffer::load_verified<PairRoot>(valid);
     }
 }

@@ -30,7 +30,6 @@ namespace {
 using Hole = XBufferCore::WireHole;
 constexpr const char* kCoverage =
     "wire validation failed: payload is not exactly covered by live blocks and holes";
-constexpr const char* kLiveFree = "wire validation detected live/free overlap";
 constexpr const char* kLiveLive = "wire validation detected overlapping dynamic ranges";
 // The full check walks the free directory and its stacks first.
 constexpr const char* kFree = "load_verified<T>(): invalid free blocks";
@@ -316,11 +315,12 @@ int main() {
         p.header.free_bytes = 0;
         reject(build(p), kCoverage);
     }
-    {   // A free block over a live one (the root, a heap string, vector blocks).
+    {   // A free block over a live one (the root, a heap string, vector blocks):
+        // the free blocks are registered after the live walk, which finds it.
         const auto values_block = head_target(base.image, proot + offsetof(CheckedRoot, values));
         auto p = base; // the values block's zero slack named as the free block
         write(p.image, head, std::uint32_t(values_block + 8));
-        reject(build(p), kLiveFree);
+        reject(build(p), kFree);
         p = base; // a second 16-byte block on the stack, at the root
         write(p.image, hole.offset, std::uint32_t(proot));
         p.header.free_bytes = 32;
@@ -388,9 +388,11 @@ int main() {
         write(p.image, name_head + offsetof(XString, capacity_), uint32_t(20));
         write(p.image, name_head + offsetof(XString, size_), uint32_t(20));
         reject(build(p), kLiveLive);
-        p = base; // values moved onto the free block (derived extent: 16 * 4 bytes)
+        p = base; // values moved onto the free block (derived extent: 16 * 4 bytes,
+                  // past the 16-byte block onto the live block after it: the
+                  // live walk finds that before the free blocks are registered)
         set_head_target(p.image, values_head, hole.offset);
-        reject(build(p), kLiveFree);
+        reject(build(p), kLiveLive);
         p = base; // values moved by one block inside its own extent
         set_head_target(p.image, values_head, head_target(base.image, values_head) + 8);
         reject(build(p));
