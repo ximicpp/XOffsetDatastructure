@@ -37,16 +37,16 @@ namespace detail {
         static_assert(!has_implicit_padding_v<T>,
             "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");
 #endif
-        // A root cache hit is what root<T>() returns: make<T>(), a verified
-        // load of T or root<T>()'s checked path admitted it at the current
-        // epoch, so typed access and the schema binding are as the checks
-        // below find them. A miss runs those checks and the lookup.
-        T* root = source.template cached_root<T>();
+        // A root key of T is what root<T>() reads: make<T>() or a verified
+        // load of T admitted it, so typed access and the schema binding are
+        // as the checks below find them and the root is at root_at. Any
+        // other key runs those checks and the lookup.
+        T* root = source.template root_is<T>() ? image_root<T>(source) : nullptr;
         if (!root) {
             if (!source.typed_root_access_allowed_)
                 XOFFSET_THROW(XException(XErrc::no_root, "verified paths: typed source required"));
             const auto* image = source.arena();
-            if (source.schema_bound_ && image &&
+            if (source.root_named() && image &&
                 (image->root_type_id != wire_root_type_id<T>() || image->schema_hash != wire_schema_hash<T>()))
                 XOFFSET_THROW(XException(XErrc::schema_mismatch, "verified paths: schema mismatch"));
         }
@@ -104,12 +104,12 @@ namespace detail {
         static_assert(!has_implicit_padding_v<T>,
             "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");
 #endif
-        // header's checks for the state this path admits: a root cache
-        // hit (typed access and schema binding as make<T>() or a verified
-        // load of T left them, and T's fingerprint in the image header), a
-        // complete free state, and a used end below save_small_max. A miss
-        // or anything else takes save_into_general, which runs them all.
-        if (!source.template root_cached_as<T>() || !source.free_table_complete()) return false;
+        // header's checks for the state this path admits: a root key of T
+        // (typed access and schema binding as make<T>() or a verified load
+        // of T left them, and T's fingerprint in the image header), a
+        // complete free state, and a used end below save_small_max. Anything
+        // else takes save_into_general, which runs them all.
+        if (!source.template root_is<T>() || !source.free_table_complete()) return false;
         const auto* image = static_cast<const char*>(source.get_address());
         const auto* arena = std::launder(reinterpret_cast<const XBufferCore::arena_header*>(image));
         const std::size_t used = arena->used_end;

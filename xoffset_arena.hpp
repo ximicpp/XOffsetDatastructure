@@ -135,6 +135,24 @@ namespace XOffsetDatastructure {
         inline void fail_next_registry_registration() noexcept { pending_registry_failure = true; }
         inline void clear_registry_failures() noexcept { pending_registry_failure = false; }
 
+        // std::malloc as an allocator (the owner record, see owner_identity):
+        // it never runs a new_handler.
+        template <typename T>
+        struct MallocAllocator {
+            using value_type = T;
+            MallocAllocator() = default;
+            template <typename U>
+            MallocAllocator(const MallocAllocator<U>&) noexcept {}
+            T* allocate(std::size_t n) {
+                if (n > std::size_t(-1) / sizeof(T)) XOFFSET_THROW(std::bad_alloc());
+                if (void* p = std::malloc(n * sizeof(T))) return static_cast<T*>(p);
+                XOFFSET_THROW(std::bad_alloc());
+            }
+            void deallocate(T* p, std::size_t) noexcept { std::free(p); }
+            template <typename U>
+            bool operator==(const MallocAllocator<U>&) const noexcept { return true; }
+        };
+
         // Logical host-identity diagnostics; disabled in ordinary production.
         struct OwnerLookupStats {
             std::uint64_t entries = 0, cache_hits = 0, cold_lookups = 0;
@@ -943,18 +961,37 @@ namespace XOffsetDatastructure {
             packed_.pinned = true;
             return true;
         }
-        // pin_enter when nothing has to happen first: a live lineage with no
-        // failure and no open scope, whose payload stays put (address-stable,
-        // or a reservation at most half used). False: take the full entry.
-        bool pin_quiet() noexcept {
-            detail::XCtl* const live = ctl_;
-            if (!live || live->sticky != XErrc::ok || packed_.pinned) return false;
-            if (!address_stable()) {
-                const auto* sm = arena();
-                if (!sm || static_cast<size_type>(sm->used_end) > buffer_.reservation_limit() / 2) return false;
-            }
-            ++live->borrow;
-            packed_.pinned = true;
+        // Bare pin scopes (XBuffer::edit, build and read while the lineage
+        // has no block): the pin flag is the whole scope. A block made while
+        // one is open (a recorded failure, a nested scope, a move of the
+        // content) counts it and is noted in handoff_; the close then exits
+        // that block (pin_close_bare_slow).
+        //
+        // A bare scope may open: no scope is open, the lineage has no block
+        // (so no recorded failure) and no handoff, and no block waits in the
+        // quarantine. Packed's bytes 1 to 3 are zero.
+        XOFFSET_DETAIL_INLINE bool pin_bare_free() const noexcept { return packed_low_word() < 0x100u; }
+        // edit's fast entry: a bare scope may open, the growth policy is not
+        // Relocating (whose reservation edit may move first), and the
+        // payload stays put while the scope is open: address-stable storage,
+        // or a movable slot at most half used (buffer_.stay_end()). One
+        // compare on Packed's low word (policy byte 0 or 1, bytes 1 to 3
+        // zero) and one on used_end. Only for an owner with an arena (one
+        // whose root key is set).
+        XOFFSET_DETAIL_INLINE bool edit_quiet() const noexcept {
+            static_assert(static_cast<int>(XGrowPolicy::Explicit) < 2 &&
+                          static_cast<int>(XGrowPolicy::Automatic) < 2 &&
+                          static_cast<int>(XGrowPolicy::Relocating) == 2);
+            return packed_low_word() < 2u && arena_unchecked()->used_end <= buffer_.stay_end();
+        }
+        void pin_open_bare() noexcept { packed_.pinned = true; }
+        // Closes a bare scope. False: a failure was recorded inside it.
+        XOFFSET_DETAIL_INLINE bool pin_close_bare() noexcept {
+            if (scope_marks() != 0) [[unlikely]] return pin_close_bare_slow();
+            packed_.pinned = false;
+#if defined(XOFFSET_STRESS_RELOCATE)
+            stress_relocate();
+#endif
             return true;
         }
         // Closes a scope opened by pin_enter on this lineage. `ctl` is the
@@ -972,28 +1009,25 @@ namespace XOffsetDatastructure {
             }
         }
 
-        // XBuffer::build's scope: counted on this lineage's block, or, when
-        // there is none (no proxy was ever made), bare: only the pin flag, and no
-        // block to renew per message. `*slot` is the block the scope counts
-        // on; a block made while a bare scope is open goes there (make_ctl).
-        // Close with pin_exit(*slot), or pin_close_bare() while it is null.
-        void pin_open_lean(detail::XCtl** slot) noexcept {
-            detail::XCtl* const ctl = ctl_;
-            *slot = ctl;
-            if (ctl) ++ctl->borrow;
-            else bare_slot_ = slot;
-            packed_.pinned = true;
-        }
-        void pin_close_bare() noexcept {
-            bare_slot_ = nullptr;
+    private:
+        // A bare scope's close with something to do: a block took the scope
+        // over (handoff_: it counts the scope, wherever the content went),
+        // or blocks wait in the quarantine.
+        XOFFSET_DETAIL_NOINLINE bool pin_close_bare_slow() noexcept {
+            if (detail::XCtl* const taken = handoff_) {
+                handoff_ = nullptr;
+                sync_blocked();
+                const bool ok = taken->sticky == XErrc::ok;
+                pin_exit(taken);
+                return ok;
+            }
             packed_.pinned = false;
             release_quarantine();
 #if defined(XOFFSET_STRESS_RELOCATE)
             stress_relocate();
 #endif
+            return true;
         }
-
-    private:
         void make_ctl() noexcept {
             XOFFSET_TRY {
                 ctl_ = detail::XCtlPool::acquire();
@@ -1004,15 +1038,15 @@ namespace XOffsetDatastructure {
                 ctl_->core = this;
                 ctl_->base = buffer_.data();
                 if (packed_.pinned) [[unlikely]] {
-                    // Made inside a bare scope (a nested scope, a recorded
-                    // failure, a move): the block counts that scope, which
-                    // now closes on it.
+                    // Pinned without a block: a bare scope is open on this
+                    // owner. The block counts it, and the scope closes on it.
                     ctl_->borrow = 1;
-                    if (bare_slot_) *bare_slot_ = ctl_;
-                    bare_slot_ = nullptr;
+                    handoff_ = ctl_;
                 }
             }
+            sync_blocked();
         }
+        void sync_blocked() noexcept { packed_.blocked = ctl_ != nullptr || handoff_ != nullptr; }
         // packed_ as one integer (see Packed). 0 is the default word.
         std::uint64_t packed_bits() const noexcept {
             std::uint64_t bits;
@@ -1020,6 +1054,18 @@ namespace XOffsetDatastructure {
             return bits;
         }
         void set_packed_bits(std::uint64_t bits) noexcept { std::memcpy(&packed_, &bits, sizeof(bits)); }
+        // Packed's first four bytes (policy, pinned, blocked, quarantined)
+        // as one little-endian word, and its blocked and quarantined bytes.
+        std::uint32_t packed_low_word() const noexcept {
+            std::uint32_t word;
+            std::memcpy(&word, &packed_, sizeof(word));
+            return word;
+        }
+        std::uint16_t scope_marks() const noexcept {
+            std::uint16_t marks;
+            std::memcpy(&marks, reinterpret_cast<const unsigned char*>(&packed_) + offsetof(Packed, blocked), sizeof(marks));
+            return marks;
+        }
         // A bare scope that the content may leave (move, swap) gets its
         // block first, so the scope follows the content as a counted one.
         void promote_bare_pin() noexcept {
@@ -1032,6 +1078,7 @@ namespace XOffsetDatastructure {
                 ctl_->base = buffer_.data();
             }
             packed_.pinned = ctl_ && ctl_->borrow != 0;
+            sync_blocked();
         }
         void retire_ctl() noexcept {
             if (!ctl_) return;
@@ -1039,12 +1086,15 @@ namespace XOffsetDatastructure {
             ctl_ = nullptr;
             packed_.pinned = false;
             quarantine_.clear();
+            packed_.quarantined = 0;
+            sync_blocked();
         }
         // The content is replaced (reload, reset, clone_into): proxies of the
         // old content become stale. An open pin scope keeps its block (the
         // scope closes on it), which starts a new lineage in place.
         XOFFSET_DETAIL_NOINLINE void end_lineage() noexcept {
             quarantine_.clear();
+            packed_.quarantined = 0;
             ctl_->version += 2;
             ctl_->birth = ctl_->version;
             ctl_->sticky = XErrc::ok;
@@ -1057,6 +1107,7 @@ namespace XOffsetDatastructure {
             if (!ptr || bytes == 0 || address < base || address - base >= buffer_.size()) return;
             XOFFSET_TRY {
                 quarantine_.push_back((std::uint64_t(address - base) << 32) | bytes);
+                packed_.quarantined = 1;
             } XOFFSET_CATCH(...) {
             }
         }
@@ -1066,6 +1117,7 @@ namespace XOffsetDatastructure {
         XOFFSET_DETAIL_NOINLINE void release_quarantine_slow() noexcept {
             auto blocks = std::move(quarantine_);
             quarantine_.clear();
+            packed_.quarantined = 0;
             for (const auto entry : blocks) {
                 const auto offset = static_cast<std::uint32_t>(entry >> 32);
                 const auto bytes = static_cast<std::uint32_t>(entry);
@@ -1156,9 +1208,8 @@ namespace XOffsetDatastructure {
             std::swap(free_table_lost_, other.free_table_lost_);
             publish_host_owner();
             other.publish_host_owner();
-            std::swap(root_type_identity_, other.root_type_identity_);
+            std::swap(root_key_, other.root_key_);
             std::swap(typed_root_access_allowed_, other.typed_root_access_allowed_);
-            std::swap(schema_bound_, other.schema_bound_);
             advance_epoch();
             other.advance_epoch();
             // No record is written: a record follows its payload, so after the
@@ -1189,6 +1240,14 @@ namespace XOffsetDatastructure {
             return std::launder(reinterpret_cast<const arena_header*>(buffer_.data()));
         }
 
+        // The header of an owner known to hold an arena (its root key is set).
+        const arena_header* arena_unchecked() const noexcept {
+            return std::launder(reinterpret_cast<const arena_header*>(buffer_.data()));
+        }
+        arena_header* arena_unchecked() noexcept {
+            return std::launder(reinterpret_cast<arena_header*>(buffer_.data()));
+        }
+
         // The root object is the image's first block, at root_at: there is
         // one when the image holds a block of T's size past the header.
         template <typename T>
@@ -1211,22 +1270,40 @@ namespace XOffsetDatastructure {
             return sm && sm->used_end >= root_at + sizeof(T) ? object_at_offset_const<T>(root_at) : nullptr;
         }
 
-        // BindType false: the caller keeps the root type identity, which
-        // already names the root (XBuffer::reset<T>()'s same-type path).
+        // BindType false: the caller keeps the root key, which already
+        // names the root (XBuffer::reset<T>()'s same-type path).
         template <typename T, bool BindType = true, typename... Args>
         XOFFSET_DETAIL_INLINE T* construct_root_storage(Args&&... args) {
             T* result = construct_root_object<T>(std::forward<Args>(args)...);
-            if constexpr (BindType) bind_root_type<T>();
+            if constexpr (BindType) bind_root<T>();
             return result;
         }
 
+        // A root type's key: one static per type, so its address names the
+        // type (writable, so that no linker folds two of them into one).
+        // `named`: the type has a schema name, so the image header holds its
+        // fingerprint.
+        struct RootKey {
+            bool named;
+        };
         template <typename T>
-        void bind_root_type() noexcept { root_type_identity_ = type_identity<std::remove_cv_t<T>>(); }
-
+        static const RootKey* root_key_of() noexcept {
+            return root_key_for<std::remove_cv_t<T>>();
+        }
         template <typename T>
-        bool root_type_matches() const noexcept { return root_type_identity_ == type_identity<std::remove_cv_t<T>>(); }
+        static const RootKey* root_key_for() noexcept {
+            static RootKey key{has_schema_name_v<T>};
+            return &key;
+        }
 
-        bool root_type_known() const noexcept { return root_type_identity_ != nullptr; }
+        // root_key_ (see there) is T's.
+        template <typename T>
+        bool root_is() const noexcept { return root_key_ == root_key_of<T>(); }
+        bool root_bound() const noexcept { return root_key_ != nullptr; }
+        // The bound root type has a schema name.
+        bool root_named() const noexcept { return root_key_ && root_key_->named; }
+        template <typename T>
+        void bind_root() noexcept { root_key_ = root_key_of<T>(); }
 
     public:
         // A free range of the image: a free block, the free directory, or an
@@ -1315,7 +1392,6 @@ namespace XOffsetDatastructure {
             if (table && table->count != 0) {
                 const auto bin = bytes / 8u - 1u;
                 if (!table->bin_empty(bin)) [[likely]] {
-                    check_owner_resolves();
                     const auto offset = table->bin_pop(bin);
                     table->bytes -= bytes;
                     --table->count;
@@ -1336,7 +1412,6 @@ namespace XOffsetDatastructure {
                 const std::uint64_t start = sm->used_end;
                 if (((reinterpret_cast<std::uintptr_t>(buffer_.data()) + start) & 7u) == 0 &&
                     start + bytes <= buffer_.size()) [[likely]] {
-                    check_owner_resolves();
                     sm->used_end = start + bytes;
                     return payload_byte_address(static_cast<size_type>(start));
                 }
@@ -1367,12 +1442,27 @@ namespace XOffsetDatastructure {
             // In-band: no free block (the free bytes are zero).
             if constexpr (detail::inband_allocator)
                 if (inband_word(data + inband_bytes_at) != 0) return nullptr;
+            // used_end is 8-aligned (every image's is: see
+            // check_reinit_payload), and so is the payload base.
             const std::uint64_t start = sm->used_end;
-            if (start + bytes > buffer_.size() ||
-                ((reinterpret_cast<std::uintptr_t>(data) + start) & 7u) != 0) [[unlikely]] return nullptr;
-            check_owner_resolves();
+            if (start + bytes > buffer_.size()) [[unlikely]] return nullptr;
             sm->used_end = start + bytes;
             return payload_byte_address(static_cast<size_type>(start));
+        }
+        // publish_first_block's bump: try_bump_first<false> from the payload
+        // base the caller's owner lookup returned (`data`, the arena header),
+        // so the owner's buffer pointer is not read again.
+        XOFFSET_DETAIL_INLINE void* try_bump_first_at(char* data, std::uint32_t bytes) noexcept {
+            auto* const sm = std::launder(reinterpret_cast<arena_header*>(data));
+            if constexpr (detail::inband_allocator) {
+                if (inband_word(data + inband_bytes_at) != 0) return nullptr;
+            } else {
+                if (const FreeTable* table = free_table_.get(); table && table->count != 0) return nullptr;
+            }
+            const std::uint64_t start = sm->used_end;
+            if (start + bytes > buffer_.size()) [[unlikely]] return nullptr;
+            sm->used_end = static_cast<std::uint32_t>(start + bytes);
+            return data + start;
         }
 
         bool try_expand_block(void* ptr, std::uint32_t old_bytes, std::uint32_t new_bytes) {
@@ -1425,7 +1515,6 @@ namespace XOffsetDatastructure {
                 FreeTable* const table = free_table_.get();
                 const auto offset = static_cast<std::uint32_t>(at);
                 if (table && table->bin_try_push(bytes / 8u - 1u, offset)) [[likely]] {
-                    check_owner_resolves();
                     // M3, as in retire_block_general.
                     zero_retired(ptr, bytes);
                     table->bytes += bytes;
@@ -1447,7 +1536,6 @@ namespace XOffsetDatastructure {
             const auto bin = bytes / 8u - 1u;
             if (table->bin_try_push(bin, offset) ||
                 (table->make_room(bin, 1) && table->bin_try_push(bin, offset))) [[likely]] {
-                check_owner_resolves();
                 // M3, as in retire_block_general.
                 zero_retired(ptr, bytes);
                 table->bytes += bytes;
@@ -1547,7 +1635,6 @@ namespace XOffsetDatastructure {
             if (const std::uint32_t dir = inband_word(base + inband_dir_at); dir != 0) {
                 std::uint32_t* const e = inband_find(reinterpret_cast<std::uint32_t*>(base + dir), bytes);
                 if (const std::uint32_t offset = e[1]; e[0] == bytes && offset != 0) [[likely]] {
-                    check_owner_resolves();
                     e[1] = inband_word(base + offset);
                     inband_set(base + offset, 0);
                     inband_set(base + inband_bytes_at, inband_word(base + inband_bytes_at) - bytes);
@@ -1564,7 +1651,6 @@ namespace XOffsetDatastructure {
             const std::uint64_t start = sm->used_end;
             if (((reinterpret_cast<std::uintptr_t>(base) + start) & 7u) == 0 &&
                 start + bytes <= buffer_.size()) [[likely]] {
-                check_owner_resolves();
                 sm->used_end = start + bytes;
                 return base + start;
             }
@@ -1574,7 +1660,6 @@ namespace XOffsetDatastructure {
         // The head of entry e (a size of at least `bytes` whose stack holds
         // a block): taken, its tail beyond `bytes` freed again.
         XOFFSET_DETAIL_NOINLINE void* inband_split(std::uint32_t* e, std::uint32_t bytes) noexcept {
-            check_owner_resolves();
             char* const base = buffer_.data();
             const std::uint32_t offset = e[1], found = e[0];
             e[1] = inband_word(base + offset);
@@ -1606,7 +1691,6 @@ namespace XOffsetDatastructure {
         // bytes: cleared (M3), then pushed on its size's stack; a size the
         // directory does not hold yet takes inband_add_class.
         XOFFSET_DETAIL_INLINE void inband_retire_small(void* ptr, std::uint32_t bytes, std::uint32_t offset) noexcept {
-            check_owner_resolves();
             zero_retired(ptr, bytes);
             inband_push_zeroed(offset, bytes, bytes);
         }
@@ -2685,13 +2769,6 @@ namespace XOffsetDatastructure {
             std::memset(bytes, 0, n);
         }
 
-        // The inline paths run no host callback, so a registered Core is
-        // still its record's owner (the general paths re-resolve instead).
-        XOFFSET_DETAIL_INLINE void check_owner_resolves() const noexcept {
-#if !defined(NDEBUG)
-            if (owner_record_ && record_owner(owner_record_) != this) std::abort();
-#endif
-        }
 
         // Records one free block. Host allocation (table, bin growth, map
         // node) may run new_handler, which may move, swap or release this
@@ -2715,7 +2792,6 @@ namespace XOffsetDatastructure {
             const auto bin = bytes / 8u - 1u;
             if (!table->bin_try_push(bin, offset) &&
                 !(table->make_room(bin, 1) && table->bin_try_push(bin, offset))) return false;
-            check_owner_resolves();
             table->bytes += bytes;
             ++table->count;
             table->bump_gen();
@@ -2801,7 +2877,6 @@ namespace XOffsetDatastructure {
         void finish_free_split(FreeSplit& split) {
             if (split.node) {
                 if (split.bytes > FreeTable::small_max) {
-                    check_owner_resolves();
                     auto& table = *free_table_;
                     split.node.key() = split.bytes;
                     split.node.mapped() = split.offset;
@@ -2907,12 +2982,6 @@ namespace XOffsetDatastructure {
             OwnerRecord(const void* base, XBufferCore* value) noexcept : payload(base), owner(value) {}
         };
         using OwnerRecordPtr = std::shared_ptr<OwnerRecord>;
-
-        template <typename T>
-        static const void* type_identity() noexcept {
-            static char token;
-            return &token;
-        }
 
         static size_type align_up(size_type value, size_type alignment) noexcept {
             return (value + alignment - 1u) & ~(alignment - 1u);
@@ -3054,7 +3123,7 @@ namespace XOffsetDatastructure {
             }));
             write_empty_header();
             publish_host_owner();
-            return register_registry();
+            return detail::vok();
         }
 
         detail::vstatus init_from_bytes(const char* data, size_type size, size_type max_reserved,
@@ -3139,7 +3208,7 @@ namespace XOffsetDatastructure {
             typed_root_access_allowed_ = false;
             XOFFSET_VTRY(check_reinit_payload());
             publish_host_owner();
-            return register_registry();
+            return detail::vok();
         }
 
         // Out of line: inlining the short path into every move site changes
@@ -3157,27 +3226,29 @@ namespace XOffsetDatastructure {
                 free_table_lost_ = std::exchange(other.free_table_lost_, false);
                 touch_log_.swap(other.touch_log_);
                 publish_host_owner();
-                if (ctl_ || other.ctl_ || packed_.pinned || other.packed_.pinned) [[unlikely]] {
+                if (ctl_ || other.ctl_ || packed_.pinned || other.packed_.pinned || handoff_ || other.handoff_)
+                    [[unlikely]] {
                     promote_bare_pin();
                     other.promote_bare_pin();
                     retire_ctl();
                     ctl_ = std::exchange(other.ctl_, nullptr);
                     quarantine_.swap(other.quarantine_);
+                    packed_.quarantined = std::exchange(other.packed_.quarantined, std::uint8_t{0});
                     adopt_ctl();
                     other.adopt_ctl();
                     // adopt_ctl set each pin flag: the rest moves by member.
                     packed_.growth_policy = std::exchange(other.packed_.growth_policy, XGrowPolicy::Explicit);
                     packed_.reset_dirty_end = std::exchange(other.packed_.reset_dirty_end, 0u);
                 } else {
-                    // Neither side is pinned: policy and reset mark move as
-                    // one word and other gets the default one.
+                    // Neither side is pinned or has a block or a handoff:
+                    // policy and reset mark move as one word and other gets
+                    // the default one.
                     const auto theirs = other.packed_bits();
                     other.set_packed_bits(0);
                     set_packed_bits(theirs);
                 }
-                root_type_identity_ = std::exchange(other.root_type_identity_, nullptr);
+                root_key_ = std::exchange(other.root_key_, nullptr);
                 typed_root_access_allowed_ = std::exchange(other.typed_root_access_allowed_, true);
-                schema_bound_ = std::exchange(other.schema_bound_, false);
                 advance_epoch();
                 other.advance_epoch();
                 update_registry_owner();
@@ -3195,8 +3266,6 @@ namespace XOffsetDatastructure {
             // Preserve the existing one-invalidation-per-Core epoch contract.
             m_epoch = target_epoch + 1u;
             other.m_epoch = source_epoch + 1u;
-            root_cache_type_ = nullptr;
-            other.root_cache_type_ = nullptr;
             // Only now destroy retired target resources. Any delete reentry
             // sees the fully published incoming payload, schema and free cache.
         }
@@ -3221,38 +3290,33 @@ namespace XOffsetDatastructure {
             // A cache may retain the inert record, never its released mapping.
         }
 
-        // Owners from init_fresh / init_from_storage, and replace_storage,
-        // which moves only movable slots.
-        struct PreparedOwner {
-            OwnerRecordPtr record;
-        };
-
-        // The only allocation, including any new_handler reentry, precedes
-        // publication of the record.
-        detail::vstatus prepare_owner(const detail::VirtualMemoryStorage& storage, PreparedOwner& prepared) {
-            if (std::exchange(detail::pending_registry_failure, false))
-                XOFFSET_VFAIL(XBadAlloc, XErrc::out_of_storage, detail::arena_failure_message);
-            XOFFSET_TRY {
-                prepared.record = std::make_shared<OwnerRecord>(storage.data(), this);
-            } XOFFSET_CATCH(const std::bad_alloc&) {
-                XOFFSET_THROW(XBadAlloc());
+    public:
+        // This owner's record (OwnerRecord), made on first use: the identity
+        // that the paths running a host callback (a host allocation, a
+        // predicate) re-resolve after it: stable_erase_if, save_into_general,
+        // save_compact_into. Creation, loads, transfers and destruction make
+        // none. The one allocation, including any new_handler reentry,
+        // precedes publication of the record. Throws XBadAlloc.
+        OwnerRecordPtr owner_identity() {
+            if (!owner_record_) [[unlikely]] {
+                if (std::exchange(detail::pending_registry_failure, false)) XOFFSET_THROW(XBadAlloc());
+                OwnerRecordPtr record;
+                XOFFSET_TRY {
+                    // From malloc: no new_handler runs, so nothing can move or
+                    // release this owner while its record is made.
+                    record = std::allocate_shared<OwnerRecord>(detail::MallocAllocator<OwnerRecord>{},
+                                                               buffer_.data(), this);
+                } XOFFSET_CATCH(const std::bad_alloc&) {
+                    XOFFSET_THROW(XBadAlloc());
+                }
+                owner_record_ = std::move(record);
+                detail::owner_lookup_count(&detail::OwnerLookupStats::registrations);
+                detail::owner_lookup_count(&detail::OwnerLookupStats::record_object_bytes, sizeof(OwnerRecord));
             }
-            return detail::vok();
+            return owner_record_;
         }
 
-        // Publishes a prepared record as this owner's.
-        void insert_owner(PreparedOwner& prepared) noexcept {
-            owner_record_ = std::move(prepared.record);
-            detail::owner_lookup_count(&detail::OwnerLookupStats::registrations);
-            detail::owner_lookup_count(&detail::OwnerLookupStats::record_object_bytes, sizeof(OwnerRecord));
-        }
-
-        detail::vstatus register_registry() {
-            PreparedOwner prepared;
-            XOFFSET_VTRY(prepare_owner(buffer_, prepared));
-            insert_owner(prepared);
-            return detail::vok();
-        }
+    private:
 
         // Moves this owner to new storage of at least `logical` bytes: a
         // larger slot, or a VM reservation (pinned from then on) above
@@ -3267,7 +3331,6 @@ namespace XOffsetDatastructure {
             // A pin scope holds plain references into the payload.
             if (packed_.pinned) return false;
             detail::VirtualMemoryStorage next;
-            PreparedOwner prepared;
             XOFFSET_TRY {
                 const auto cls = pin ? detail::SlotGeometry::classes : detail::SlotGeometry::class_for(logical);
                 if (packed_.growth_policy == XGrowPolicy::Relocating && !pin) {
@@ -3283,11 +3346,12 @@ namespace XOffsetDatastructure {
                     XOFFSET_VTRY_OR(false, detail::VirtualMemoryStorage::create_v(next, 0, maximum));
                 }
                 if (copy && !next.grow_to(logical)) return false;
-                XOFFSET_VTRY_OR(false, prepare_owner(next, prepared));
             } XOFFSET_CATCH(...) {
                 return false;
             }
-            insert_owner_keeping(prepared);
+            // The record names the old storage: it reads as released, and a
+            // new one is made on its next use (owner_identity).
+            unregister_registry();
             buffer_.swap(next);
             forget_reset_dirt();  // the new storage holds the used bytes and zeros
             publish_host_owner();
@@ -3303,17 +3367,6 @@ namespace XOffsetDatastructure {
 #endif
             return true;
             // `next` (the old storage) is released here.
-        }
-
-        // insert_owner for an owner that already has a record: the old one
-        // is retired after the new one is published.
-        void insert_owner_keeping(PreparedOwner& prepared) noexcept {
-            auto old = std::move(owner_record_);
-            insert_owner(prepared);
-            auto fresh = std::move(owner_record_);
-            owner_record_ = std::move(old);
-            unregister_registry();
-            owner_record_ = std::move(fresh);
         }
 
         // An owner without storage (default-constructed or moved-from) gets
@@ -3536,8 +3589,7 @@ namespace XOffsetDatastructure {
             empty_free_table(reset);
             free_table_lost_ = false;
             typed_root_access_allowed_ = false;
-            schema_bound_ = false;
-            root_type_identity_ = nullptr;
+            root_key_ = nullptr;
         }
 
         XOFFSET_DETAIL_INLINE void empty_free_table(bool reset) noexcept {
@@ -3557,19 +3609,45 @@ namespace XOffsetDatastructure {
             }
         }
 
-        // XBuffer::reset<T>() of an owner whose root cache holds T. The cache
-        // is set only with a root of T that make<T>(), a verified load of T or
-        // a delta of T bound, and every epoch change clears it; so typed root
-        // access is open and the root type identity is T's. With the schema
-        // binding the make<T>() that follows would leave (checked by the
-        // caller), only the epoch, the free table, the payload and the root
-        // change: reset_arena(size()) without the binding stores. Typed
-        // access stays closed until the caller has the new root, as there.
-        XOFFSET_DETAIL_INLINE void reset_arena_keeping_binding() noexcept {
-            if (ctl_) [[unlikely]] end_lineage();
+        // XBuffer::reset<T>() of an owner whose root key is T's: the image
+        // becomes its header and T's root block at root_at (`root_block`
+        // bytes, block-sized), which the caller constructs empty. The old
+        // content held that root, so the logical length holds the block
+        // (used_end >= root_at + root_block); the root key, typed access and
+        // the fingerprint words stay. What the old content left past the
+        // root block is remembered as clear_used_payload remembers it.
+        // Returns the root block. On a failed construction the caller calls
+        // forget_root().
+        template <bool MayHaveBlock = true>
+        XOFFSET_DETAIL_INLINE char* reset_keeping_root(std::uint32_t root_block) noexcept {
+            if constexpr (MayHaveBlock) {
+                if (ctl_) [[unlikely]] end_lineage();
+            }
             advance_epoch();
             empty_free_table(true);
             free_table_lost_ = false;
+            char* const base = buffer_.data();
+            arena_header* const sm = arena_unchecked();
+            const std::uint32_t used = sm->used_end;
+            if constexpr (detail::scrub_reset) {
+                std::memset(base + root_at, 0, used - root_at);
+            } else {
+                if (used > packed_.reset_dirty_end) packed_.reset_dirty_end = used;
+#if defined(XOFFSET_STRESS_RELOCATE)
+                std::memset(base + root_at, detail::stress_poison_byte, used - root_at);
+#endif
+            }
+            // The magic word stays: the old content is an image.
+            sm->used_end = static_cast<std::uint32_t>(root_at) + root_block;
+            sm->extent_count = 0;
+            sm->free_dir = 0;
+            sm->free_bytes = 0;
+            return base + root_at;
+        }
+        // reset_keeping_root's root did not construct: the image is empty
+        // and has no root.
+        void forget_root() noexcept {
+            root_key_ = nullptr;
             typed_root_access_allowed_ = false;
             clear_used_payload();
         }
@@ -3665,6 +3743,11 @@ namespace XOffsetDatastructure {
             if (sm->used_end < min_payload_size() || sm->used_end > buffer_.size()) {
                 XOFFSET_VFAIL(XException, XErrc::invalid_payload_header, "XBufferCore: payload used_end out of range");
             }
+            // Every image's used_end is 8-aligned (blocks are multiples of 8),
+            // so a bump needs no alignment test (try_bump_first).
+            if ((sm->used_end & 7u) != 0) {
+                XOFFSET_VFAIL(XException, XErrc::invalid_payload_header, "XBufferCore: payload used_end not 8-aligned");
+            }
             // In-band: the free blocks of loaded bytes are unknown until a
             // verified load (or a clone's source) supplies them: no directory.
             if constexpr (detail::inband_allocator)
@@ -3717,7 +3800,7 @@ namespace XOffsetDatastructure {
         // admission check of admit_reinit holds, and check_reinit_payload()
         // by construction (nothing lies past used_end to zero), so only the
         // epoch and the image change. The free state is the image's. Typed
-        // access, the binding and the root cache are left as they are: the
+        // access and the root key are left as they are: the
         // caller publishes the new root (at root_at, where a root of the same
         // type already was) or, on any failure, resets the arena, which
         // clears them. False: an injected storage failure, nothing copied.
@@ -3772,14 +3855,51 @@ namespace XOffsetDatastructure {
                 free_table_lost_ = false;
             }
             typed_root_access_allowed_ = src.typed_root_access_allowed_;
-            schema_bound_ = src.schema_bound_;
-            root_type_identity_ = src.root_type_identity_;
+            root_key_ = src.root_key_;
         }
 
         // clone_into(): src's used payload replaces this owner's content in
         // place, like reload_verified (same mapping, address and registration;
         // epoch advances). On any failure this owner is left an empty arena.
-        void clone_state_from(const XBufferCore& src) {
+        XOFFSET_DETAIL_INLINE void clone_state_from(const XBufferCore& src) {
+            if (clone_in_place(src)) [[likely]] return;
+            clone_state_general(src);
+        }
+
+    private:
+        // The common clone_into: this owner's logical length is already src's
+        // (two buffers made alike) and src's free state is exact. One copy of
+        // src's image, whose header carries the free state; src's typed state
+        // and root key come along, and what the old content left past the
+        // image is cleared. False: anything else (clone_state_general).
+        XOFFSET_DETAIL_INLINE bool clone_in_place(const XBufferCore& src) {
+            const size_type logical = buffer_.size();
+            if (this == &src || src.buffer_.size() != logical || src.free_table_lost_ || logical < min_payload_size())
+                return false;
+            // src.size() >= 40: its header is there, and used_end <= size().
+            const size_type used = src.arena()->used_end;
+            const size_type dirty = tail_clean_from();
+            if (ctl_) [[unlikely]] end_lineage();
+            advance_epoch();
+            if (!buffer_.overwrite_in_place(src.buffer_.data(), used)) [[unlikely]] {
+                reset_arena(0);
+                XOFFSET_THROW(XBadAlloc());
+            }
+            // A clone is src byte for byte, past used_end too (its later
+            // blocks take zero bytes there, as src's do): what the old
+            // content left past the image is cleared.
+            if (dirty > used) [[unlikely]] {
+                std::memset(buffer_.data() + used, 0, dirty - used);
+                forget_reset_dirt();
+            }
+            // A touch log describes the epoch it was made in: the new epoch
+            // starts it over at its next use.
+            free_table_lost_ = false;
+            typed_root_access_allowed_ = src.typed_root_access_allowed_;
+            root_key_ = src.root_key_;
+            return true;
+        }
+        XOFFSET_DETAIL_NOINLINE void clone_state_general(const XBufferCore& src) {
             if (this == &src) XOFFSET_THROW(XException(XErrc::invalid_state, "clone_into(): source and destination are the same buffer"));
             XOFFSET_TRY {
                 const auto* sm = src.arena();
@@ -3793,6 +3913,7 @@ namespace XOffsetDatastructure {
             }
         }
 
+    protected:
         // clone(): a new owner with src's maximum capacity, growth policy,
         // pool and kind of storage: a movable slot onto a movable slot, a VM
         // owner onto VM, a pinned slot onto a pinned slot (Auto picks one,
@@ -3882,55 +4003,20 @@ namespace XOffsetDatastructure {
             if (used < buffer_.size()) std::memset(buffer_.data() + used, 0, buffer_.size() - used);
         }
 
-        // The root that make<T>() or a verified load of T admitted, valid
-        // until the epoch advances. Typed access, the schema binding and the
-        // root offset change only with the epoch (reinit, reset, move, swap,
-        // storage move) or on a fresh owner, so a hit in root<T>() returns
-        // what its checked path would. Set by those calls and by root<T>()'s
-        // checked path, which runs the same checks (root<T>() is non-const:
-        // concurrent calls on one buffer need the caller's lock, as for every
-        // other non-const member; a const accessor must not fill it). Not
-        // transferred: every epoch change (advance_epoch, the retiring move)
-        // clears it.
-        template <typename T>
-        T* cached_root() const noexcept {
-            return root_cached_as<T>() ? static_cast<T*>(root_cache_) : nullptr;
-        }
-
-        // The type test of cached_root<T>() alone: a hit has a root, since
-        // cache_root() is only given one. root<T>() tests just this and then
-        // reads the root, one branch instead of two.
-        template <typename T>
-        bool root_cached_as() const noexcept { return root_cache_type_ == type_identity<T>(); }
-        template <typename T>
-        T* cached_root_hit() const noexcept { return static_cast<T*>(root_cache_); }
-
-        // root is not null (every caller has found or built it). T may be
-        // const (root<const T>()), cached under its own identity.
-        template <typename T>
-        void cache_root(T* root) noexcept {
-            root_cache_type_ = type_identity<T>();
-            root_cache_ = const_cast<std::remove_cv_t<T>*>(root);
-        }
-
-        void advance_epoch() noexcept {
-            ++m_epoch;
-            root_cache_type_ = nullptr;
-        }
+        void advance_epoch() noexcept { ++m_epoch; }
 
     private:
         friend struct detail::VerifiedPathsAccess;
         friend struct detail::DeltaAccess;
         friend struct fixed_detail::StableEraseOwnerWitness;
         // The owner is 64-byte aligned and its first line holds everything
-        // the per-message paths touch: the flags, the epoch, the root cache
+        // the per-message paths touch: the flags, the epoch, the root key
         // (root<T>()'s fast path), the free table pointer and the storage's
         // payload base and size (VirtualMemoryStorage's first two fields, at
-        // 40 and 48). root<T>() and the update that follows it, reset<T>()
-        // and the allocations of a fresh message find all of it there; a
-        // save adds only the owner record's line. Growth (maximum capacity,
-        // zero watermark), the owner record and the schema binding follow.
-        // Fields of different access keep this declaration order.
+        // 32 and 40). root<T>() and the update that follows it, reset<T>()
+        // and the allocations of a fresh message find all of it there.
+        // Growth (maximum capacity, zero watermark) and the owner record
+        // follow. Fields of different access keep this declaration order.
         alignas(64) bool free_table_lost_ = false;
 
     protected:
@@ -3941,21 +4027,25 @@ namespace XOffsetDatastructure {
         // Storage-associated access/schema state belongs to the owner so even
         // transfers through XBufferCore cannot leave derived flags behind.
         bool typed_root_access_allowed_ = true;
-        bool schema_bound_ = false;
 
     private:
         // Next growth step below zero_from() (ensure_allocation_extent).
         std::uint32_t dirty_step_ = first_dirty_step;
         std::uint64_t m_epoch = 0;
-        const void* root_cache_type_ = nullptr;
-        void* root_cache_ = nullptr;
+        // The root type whose typed access the content admits (root<T>()
+        // compares it and reads the root at root_at): set by make<T>(), a
+        // verified load, reload or delta of T, reset<T>() and a clone (the
+        // source's); null for an empty or unverified content. Set only with
+        // typed_root_access_allowed_, a root of the type at root_at and, for
+        // a type with a schema name, its fingerprint in the image header.
+        // Kept across the epochs that keep the type (reload, reset, clone).
+        const RootKey* root_key_ = nullptr;
         FreeTablePtr free_table_;
         detail::VirtualMemoryStorage buffer_;
         OwnerRecordPtr owner_record_;
 
     private:
         uint64_t dirty_epoch_ = 0;  // m_epoch when dirty_step_ was last reset
-        const void* root_type_identity_ = nullptr;
         // A delta sender's touch marks (detail::DeltaTouchLog), made by the
         // first delta from this buffer that pairs with a baseline; the
         // in-band allocator records its writes in it. It follows the
@@ -3968,9 +4058,13 @@ namespace XOffsetDatastructure {
         // one integer (take_packed, swap).
         struct Packed {
             XGrowPolicy growth_policy = XGrowPolicy::Explicit;
-            // An open pin scope (mirrors ctl_->borrow).
+            // An open pin scope (mirrors ctl_->borrow, or a bare scope).
             bool pinned = false;
-            std::uint16_t reserved = 0;
+            // ctl_ or handoff_ is set: edit's fast entry and a bare scope's
+            // close read it with the pin flag (sync_blocked keeps it).
+            std::uint8_t blocked = 0;
+            // The quarantine holds blocks: a bare scope's close releases them.
+            std::uint8_t quarantined = 0;
             // Bytes in [used_end, reset_dirty_end) may be nonzero: the content
             // a reset discarded without clearing (always 0 with
             // XOFFSET_SCRUB_RESET).
@@ -3984,9 +4078,11 @@ namespace XOffsetDatastructure {
         std::vector<std::uint64_t> quarantine_;
         // Largest quarantine list (entries) kept between pin scopes: 8 KiB.
         static constexpr std::size_t quarantine_keep_max = 1024;
-        // An open bare pin scope (pin_open_lean without a block): where the
-        // block goes if one is made before it closes.
-        detail::XCtl** bare_slot_ = nullptr;
+        // The block that took over a bare scope open on this owner (made
+        // inside it: a recorded failure, a nested scope, a move of the
+        // content). The scope closes on it (pin_close_bare_slow). It stays
+        // with this object, not with the content.
+        detail::XCtl* handoff_ = nullptr;
     };
 } // namespace XOffsetDatastructure
 

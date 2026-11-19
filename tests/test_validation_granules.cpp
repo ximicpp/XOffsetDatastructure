@@ -520,7 +520,7 @@ std::string big_wire(Big kind) {
 }
 
 // Every global new failpoint of typed load (above 32 KiB: the upstream block
-// is one of them): std::bad_alloc or XBadAlloc, nothing leaked, wire intact,
+// is one of them; the owner itself allocates none): std::bad_alloc or XBadAlloc, nothing leaked, wire intact,
 // next load recovers. A reload loop over a hole-free large wire allocates
 // nothing after its first reload.
 void typed_new_failures() {
@@ -530,7 +530,9 @@ void typed_new_failures() {
         const auto outside = fail_new::live();
         { fail_new::Arm arm(-1); auto loaded = xo::XBuffer::load_verified<BigRoot>(wire); }
         const auto points = fail_new::attempts;
-        need(points > 0 && !fail_new::overflow, "typed load allocation inventory empty");
+        // The owner allocates no host memory: what is counted is the
+        // checks' (the bitmap words; none on the cursor path).
+        need(!fail_new::overflow, "typed load allocation inventory overflowed");
         for (std::size_t p = 0; p < points; ++p) {
             const auto before = fail_new::live();
             bool caught = false;

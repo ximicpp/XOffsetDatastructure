@@ -255,9 +255,11 @@ void pooled_verified_lifecycle() {
         const auto n = clean.get_size();
         for (auto i = offset; i < n; ++i) assert(clean.data()[i] == 0);
     }
-    // Registration and graph failures must not leave cached addresses registered.
+    // A load makes no owner record (one is made on its first use), and a
+    // graph failure must not leave cached addresses registered.
     detail::fail_next_registry_registration();
-    bad_alloc([&] { (void)TypedXBuffer<PolicyRoot>::load(wire, options); });
+    { auto loaded = TypedXBuffer<PolicyRoot>::load(wire, options); }
+    assert(detail::pending_registry_failure);
     assert(pool.stats().cached_blocks == 1);
     detail::clear_registry_failures();
     auto malformed = wire;

@@ -626,7 +626,10 @@ void block_section_case() {
     xo::XDeltaCursor cur;
     need(bool(apply_entry(rep, delta_of(src, base), cur)), "block section: key delta rejected");
     src.plain_root().epoch += 1;
-    const std::string good = delta_of(src, base);
+    // Whole blocks: a scan delta of few changed blocks is a run frame otherwise.
+    xo::XDeltaOptions whole;
+    whole.whole_blocks = true;
+    const std::string good = delta_of(src, base, whole);
     const std::size_t used = std::size_t(rep.arena()->used_end);
     const std::size_t last = (used - 1) / 64; // index of the last block (block k: bytes [64k, 64k + 64))
     const auto make = [&](std::uint32_t count, std::string section) {

@@ -328,6 +328,15 @@ namespace XOffsetDatastructure {
             raw = static_cast<void*>(begin_fresh_ordinary_outer<T>(raw));
             reflect_init_all_impl<T>(raw, alloc);
         }
+        // reflect_init_all inlined: a root's construction (make<T>(), and
+        // reset<T>() once per message), where the call costs as much as
+        // the stores of a small root.
+        template <typename T, typename Alloc>
+        XOFFSET_DETAIL_INLINE void reflect_init_root(void* raw, Alloc alloc) {
+            std::memset(raw, 0, sizeof(T));
+            raw = static_cast<void*>(begin_fresh_ordinary_outer<T>(raw));
+            reflect_init_all_impl<T>(raw, alloc);
+        }
 
         // -- Reflection Transfer (move/copy with allocator injection) --
 
@@ -389,8 +398,8 @@ namespace XOffsetDatastructure {
             alignas(T) unsigned char storage[sizeof(T)];
 
             template <typename Alloc>
-            ReflectRoot(Alloc alloc) {
-                reflect_init_all<T>(storage, alloc);
+            XOFFSET_DETAIL_INLINE ReflectRoot(Alloc alloc) {
+                reflect_init_root<T>(storage, alloc);
             }
 
             T& ref() noexcept {
@@ -409,6 +418,18 @@ namespace XOffsetDatastructure {
             } else {
                 auto* wrapper = xbuf.template construct_root_storage<ReflectRoot<T>, BindType>(alloc);
                 return &wrapper->ref();
+            }
+        }
+
+        // T's root constructed empty in `raw`, its block at root_at (see
+        // XBufferCore::reset_keeping_root).
+        template <typename T>
+        XOFFSET_DETAIL_INLINE T* construct_root_at(XBufferCore& xbuf, char* raw) {
+            const fixed_detail::allocator_ref alloc{xbuf.arena_unchecked()};
+            if constexpr (has_wire_allocator_ctor<T>) {
+                return std::construct_at(reinterpret_cast<T*>(raw), alloc);
+            } else {
+                return &std::construct_at(reinterpret_cast<ReflectRoot<T>*>(raw), alloc)->ref();
             }
         }
 

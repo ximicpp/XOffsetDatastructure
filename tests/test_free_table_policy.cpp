@@ -557,7 +557,8 @@ void existing_owner_and_invalid_requests() {
         // V2 allocation/retirement never touch the registry (host prefix page).
         need(a.alloc(32) == p, "free-table hit while registration failure is armed");
         a.retire(p, 32);
-        bool bad = false; try { xo::XBufferCore b(1024); } catch (const xo::XBadAlloc&) { bad = true; }
+        // A record is made on an owner's first identity request.
+        bool bad = false; try { xo::XBufferCore b(1024); (void)b.owner_identity(); } catch (const xo::XBadAlloc&) { bad = true; }
         need(bad, "existing-owner lookup consumed registry injection");
     } catch (...) { xo::detail::clear_registry_failures(); throw; }
     xo::detail::clear_registry_failures();

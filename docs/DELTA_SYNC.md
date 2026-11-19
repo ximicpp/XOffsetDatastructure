@@ -141,6 +141,15 @@ returns the delta's size (0: nothing changed); a delta larger than `out` is
 not written, its size is returned, and the baseline keeps it for its next
 `save_delta_into`, which writes it before anything else.
 
+### One changed field
+
+A delta found by comparing with a copy (not a key delta, no `digest`, no
+`whole_blocks`, the same used size) whose changed bytes are one run inside
+one block (a field set, or a few side by side) is a run frame: the receiver
+copies the run instead of applying a masked block. Its bytes are the same as
+a touches baseline's for the same change; a one-byte change is 19 bytes (18
+as a block frame). Anything more stays a block frame.
+
 ### Statistics and options
 
 `save_delta_into` returns `XDeltaStats`: `key`, `empty`, `blocks` (64-byte
@@ -174,7 +183,8 @@ blocks are image bytes like the rest (each block's link word, the free
 directory), so a delta carries them as it carries any other bytes; offsets 0
 to 31 never change, and the root is always at 40. There are two frames: a
 block frame (key deltas, and deltas found by comparing with a copy) and a
-run frame (`RUNS`: the deltas of an `XDeltaRecord::touches` baseline). A
+run frame (`RUNS`: the deltas of an `XDeltaRecord::touches` baseline, and a
+compared delta of one changed field, section 1). A
 delta is exactly its header, the optional fields its flags announce and its
 block or run section; nothing may follow.
 
@@ -190,8 +200,10 @@ known to read it.
 `tests/test_delta_format.cpp` pins the bytes of two small delta streams
 (block frames: a key delta, a scalar delta, a digest delta; run frames: the
 same changes touched) both ways, written out field by field after the tables
-below: the sender must write them and the receiver must apply them, with the
-full check and with admit, so a framing change fails on every compiler. What
+below: the sender must write them (the compared scalar change as its run
+frame, the same bytes as the touched one) and the receiver must apply them,
+with the full check and with admit, so a framing change fails on every
+compiler. What
 is not frozen is where the library places data inside the payload (the same
 release on both ends gives the same payload; a delta always carries image
 bytes at image offsets of the sender's own buffer).
