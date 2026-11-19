@@ -23,7 +23,7 @@
     },
     {
       "id": "pr7-slg-a-p2996-receiver-layout",
-      "pr": 0,
+      "pr": 330,
       "metric": "slg.A",
       "compiler": "p2996",
       "max_ratio": 1.01,
