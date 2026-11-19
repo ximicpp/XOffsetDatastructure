@@ -2710,8 +2710,12 @@ namespace XOffsetDatastructure {
         // capacity, so the crossing follows a real shrink. Inline, each hook
         // is one compare (the capacity, or the old size) and a branch; the
         // rest is one more compare (one element removed) or out of line.
-        static constexpr size_type spare_watch_min_capacity = static_cast<size_type>(
-            (XBufferCore::spare_watch_min_bytes + sizeof(T) - 1u) / sizeof(T));
+        // A function, not a data member: MSVC evaluates a static data
+        // member's initializer when the class is instantiated, where T may
+        // still be incomplete (a node holding an XVector of itself).
+        static constexpr size_type spare_watch_min_capacity() noexcept {
+            return static_cast<size_type>((XBufferCore::spare_watch_min_bytes + sizeof(T) - 1u) / sizeof(T));
+        }
         // pop_back without the watch, for erase_index (one hook after its
         // branches): size_ > 0, which names a live block (no null test).
         size_type pop_last() {
@@ -2729,7 +2733,7 @@ namespace XOffsetDatastructure {
         // compares memory directly instead of loading a register for both
         // (one instruction fewer on every pop of a small container).
         XOFFSET_DETAIL_INLINE void note_popped(size_type new_size) const noexcept {
-            if (capacity_ >= spare_watch_min_capacity) [[unlikely]] {
+            if (capacity_ >= spare_watch_min_capacity()) [[unlikely]] {
                 std::atomic_signal_fence(std::memory_order_seq_cst);
                 if (new_size == (static_cast<size_type>(capacity_) >> 2)) [[unlikely]]
                     XBufferCore::note_spare_head(this, static_cast<std::uint32_t>(sizeof(T)));
@@ -2738,7 +2742,7 @@ namespace XOffsetDatastructure {
         // Several removed (truncate, resize, remove): the capacity test
         // inline, the crossing test out of line.
         XOFFSET_DETAIL_INLINE void note_shrunk(size_type old_size, size_type new_size) const noexcept {
-            if (capacity_ >= spare_watch_min_capacity) [[unlikely]] note_shrunk_cold(old_size, new_size);
+            if (capacity_ >= spare_watch_min_capacity()) [[unlikely]] note_shrunk_cold(old_size, new_size);
         }
         // All removed (clear): a crossing needs the old size, which is in a
         // register, above a quarter of the minimum capacity, so the inline
@@ -2746,10 +2750,10 @@ namespace XOffsetDatastructure {
         // after the clear may keep, which cost reloc's push_back loop an
         // instruction per element).
         XOFFSET_DETAIL_INLINE void note_cleared(size_type old_size) const noexcept {
-            if (old_size > spare_watch_min_capacity / 4u) [[unlikely]] note_shrunk_cold(old_size, 0);
+            if (old_size > spare_watch_min_capacity() / 4u) [[unlikely]] note_shrunk_cold(old_size, 0);
         }
         XOFFSET_DETAIL_COLD void note_shrunk_cold(size_type old_size, size_type new_size) const noexcept {
-            if (capacity_ < spare_watch_min_capacity) return;
+            if (capacity_ < spare_watch_min_capacity()) return;
             const size_type quarter = static_cast<size_type>(capacity_) >> 2;
             if (new_size <= quarter && old_size > quarter)
                 XBufferCore::note_spare_head(this, static_cast<std::uint32_t>(sizeof(T)));
@@ -2760,7 +2764,7 @@ namespace XOffsetDatastructure {
         // no register holds it across the copy. The out-of-line part stores
         // the new size itself before it registers (the caller stores the same).
         XOFFSET_DETAIL_INLINE void note_shrinking(size_type new_size) noexcept {
-            if (capacity_ >= spare_watch_min_capacity) [[unlikely]] note_shrinking_cold(new_size);
+            if (capacity_ >= spare_watch_min_capacity()) [[unlikely]] note_shrinking_cold(new_size);
         }
         XOFFSET_DETAIL_COLD void note_shrinking_cold(size_type new_size) noexcept {
             const size_type quarter = static_cast<size_type>(capacity_) >> 2;
