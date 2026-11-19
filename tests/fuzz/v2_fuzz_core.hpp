@@ -1272,6 +1272,11 @@ Outcome check_case(const std::string& w, std::mt19937_64& rng, const std::string
     return o.stage == Oracle::Stage::Header ? Outcome::HeaderReject : Outcome::PayloadReject;
 }
 
+// Whether the library has XWireEmission::automatic (the base library of a
+// differential run may not).
+template <class E>
+constexpr bool has_automatic_emission() { return requires { E::automatic; }; }
+
 // A library-generated valid wire must pass the oracle and be golden
 // (load -> save byte-identical).
 void check_golden(const std::string& w, const std::string& where) {
@@ -1292,10 +1297,13 @@ void check_golden(const std::string& w, const std::string& where) {
     if (!reloaded || reloaded->save_verified(runs) != again) fail(where + ": golden write-read-write not byte stable");
     // The default (automatic) emission: the compact wire once the free
     // blocks are at least 512 bytes and an eighth of the image, the
-    // free-run wire below that.
-    {
+    // free-run wire below that. The rule is spelled out here, not taken from
+    // the library, and the check is skipped for a library without
+    // `automatic`: tools/validation_differential.sh builds this header
+    // against the base library too.
+    if constexpr (has_automatic_emission<xo::XWireEmission>()) {
         xo::XWireHeader dh; std::memcpy(&dh, w.data(), kHeader);
-        const bool compact = xo::detail::wire_prefers_compact(dh.used_bytes, dh.free_bytes);
+        const bool compact = dh.free_bytes >= 512 && dh.free_bytes * 8 >= dh.used_bytes;
         if (loaded->save_verified() != (compact ? loaded->save_compact() : again))
             fail(where + ": the default emission does not follow its rule");
     }
