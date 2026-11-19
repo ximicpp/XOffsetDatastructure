@@ -127,7 +127,7 @@ namespace XOffsetDatastructure {
                                     const void* address, std::size_t bytes)
                 : head(address), head_bytes(bytes) {
                 auto& owner = XBufferCore::owner_from_arena(alloc.segment);
-                record = owner.owner_record_; // shared_ptr copy does not allocate
+                record = owner.owner_identity(); // made on first use
                 const auto base = reinterpret_cast<std::uintptr_t>(record->payload);
                 const auto at = reinterpret_cast<std::uintptr_t>(address);
                 if (at >= base && at - base < owner.buffer_.size()) {
@@ -355,7 +355,7 @@ namespace XOffsetDatastructure {
                 // here without a frame; any other takes allocate_block.
                 if (!owner || bytes - 1u >= XBufferCore::small_block_max) [[unlikely]]
                     return publish_first_block_general(data_delta, bytes);
-                if (!(block = owner->try_bump_first<false>((bytes + 7u) & ~7u))) [[unlikely]]
+                if (!(block = owner->try_bump_first_at(reinterpret_cast<char*>(segment), (bytes + 7u) & ~7u))) [[unlikely]]
                     return publish_first_block_owned(*owner, data_delta, bytes);
             } else if (!owner || bytes > XBufferCore::small_block_max ||
                        !(block = owner->try_allocate_small(block_bytes_of(bytes)))) [[unlikely]] {

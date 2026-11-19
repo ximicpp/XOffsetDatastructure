@@ -1,7 +1,8 @@
-// Exact-base owner lookup, construction rollback, and allocation-free transfers.
-// V2: allocation resolves its owner from the host page before the payload; the
-// registry remains the identity behind save_verified_into/canonical lookup, so
-// these checks exercise both after every transfer.
+// Exact-base owner lookup, the owner record, and allocation-free transfers.
+// Allocation resolves its owner from the host page before the payload; the
+// owner record (made on an owner's first identity request, never by creation,
+// loads or transfers) is the identity behind save_verified_into's general path
+// and stable_erase_if, so these checks exercise both after every transfer.
 #include <atomic>
 #include <cassert>
 #include <cstdlib>
@@ -45,7 +46,7 @@ XBuffer make_buffer(std::int64_t value) {
     return buffer;
 }
 
-// The registry record (identity used by save_verified_into) follows the owner.
+// The owner record (identity used by save_verified_into) follows the owner.
 void check_registry_identity(XBuffer& owner, std::int64_t value) {
     std::string out;
     owner.save_verified_into<RegistryRoot>(out);
@@ -67,8 +68,18 @@ void registration_failure_preserves_owners() {
     const auto* base = existing.get_address();
     const auto frame = existing.save_verified<RegistryRoot>();
     const auto before = existing.copy_bytes();
-    reject_registration([&] { (void)make_buffer(7); });
-    reject_registration([&] { existing = XBuffer::load_verified<RegistryRoot>(frame); });
+    // Creation and loads make no record: an armed failure waits for the
+    // first identity request.
+    detail::fail_next_registry_registration();
+    { auto made = make_buffer(7); auto loaded = XBuffer::load_verified<RegistryRoot>(frame); }
+    assert(detail::pending_registry_failure);
+    detail::clear_registry_failures();
+    reject_registration([&] { auto made = make_buffer(7); (void)made.owner_identity(); });
+    reject_registration([&] {
+        auto loaded = XBuffer::load_verified<RegistryRoot>(frame);
+        (void)loaded.owner_identity();
+        existing = std::move(loaded);
+    });
     assert(existing.get_address() == base && existing.copy_bytes() == before);
     assert(checked->value == 42);
     assert(existing.grow(4096));
@@ -86,12 +97,12 @@ void actual_heap_failure_preserves_owners() {
     std::vector<XBuffer> owners;
     owners.reserve(128);
     owners.push_back(make_buffer(0));
-    // The record is the first host allocation of a new ordinary owner.
-    fail_host_allocation_after = 0;
+    // The record is made on the first identity request, from malloc (no
+    // operator new, so no new_handler); its failure is the injected one.
+    detail::fail_next_registry_registration();
     bool observed_failure = false;
-    try { (void)make_buffer(1); } catch (const XBadAlloc&) { observed_failure = true; }
-    assert(observed_failure && fail_host_allocation_after == -1);
-    fail_host_allocation_after = -1;
+    try { auto made = make_buffer(1); (void)made.owner_identity(); } catch (const XBadAlloc&) { observed_failure = true; }
+    assert(observed_failure && !detail::pending_registry_failure);
     assert(owners[0].root<RegistryRoot>().value == 0);
     auto seed_alloc = owners[0].allocator<std::int64_t>();
     auto* seed_value = seed_alloc.allocate(1);
@@ -110,17 +121,18 @@ void actual_heap_failure_preserves_owners() {
 }
 
 void ordinary_registration_allocates_only_its_record() {
-    // Owners are not indexed: registration is exactly one host allocation, so a
-    // failure armed for the second allocation is never reached, however many
-    // owners are live.
+    // Owners are not indexed and make no record until asked for their
+    // identity: creating one is no host allocation at all, however many
+    // owners are live, and its record is not an operator new allocation.
     std::vector<XBuffer> owners;
     owners.reserve(128);
     // The thread's first owner registers its thread_local caches; bionic's
     // __cxa_thread_atexit_impl allocates that node with operator new.
     { auto warm = make_buffer(-1); }
     for (unsigned i = 0; i < 128; ++i) {
-        fail_host_allocation_after = 1;
+        fail_host_allocation_after = 0;
         owners.push_back(make_buffer(i));
+        if (i % 2 == 0) (void)owners.back().owner_identity();
         assert(fail_host_allocation_after == 0);
         fail_host_allocation_after = -1;
     }
@@ -133,18 +145,21 @@ void ordinary_registration_allocates_only_its_record() {
         alloc.deallocate(value, 1);
         if (i % 32 == 0) check_registry_identity(owners[i], static_cast<std::int64_t>(i));
     }
-    // A movable slot that outgrows its slot moves (replace_storage) and is
-    // registered again at the new address: still only its new record, not
-    // an index node (#59 with #82's slot storage).
+    // A movable slot that outgrows its slot moves (replace_storage): its old
+    // record reads as released and no new one is made until it is asked
+    // for: no host allocation, no index node (#59 with #82's slot storage).
     auto moving = XBuffer::create<RegistryRoot>(1024);
     moving.root<RegistryRoot>().value = 512;
     assert(moving.storage_kind() == XStorageKind::MovableSlot);
     const auto* before = moving.get_address();
     { XBuffer warm(moving.accessible_bytes() * 2); } // the larger class's chunk exists
-    fail_host_allocation_after = 1;
+    const auto old_record = moving.owner_identity();
+    fail_host_allocation_after = 0;
     assert(moving.grow(moving.accessible_bytes()));
     assert(fail_host_allocation_after == 0);
     fail_host_allocation_after = -1;
+    assert(old_record->owner.load() == nullptr);
+    assert(moving.owner_identity()->owner.load() == &moving);
     assert(moving.get_address() != before && moving.storage_kind() == XStorageKind::MovableSlot);
     auto moved_alloc = moving.allocator<std::int64_t>();
     auto* moved_value = moved_alloc.allocate(1);
@@ -177,7 +192,7 @@ void transfer_matrix() {
     assert(host_allocations.load(std::memory_order_relaxed) == before);
     // The registration failure must remain pending across move/swap/destruction.
     bool rejected = false;
-    try { (void)make_buffer(99); } catch (const XBadAlloc&) { rejected = true; }
+    try { auto made = make_buffer(99); (void)made.owner_identity(); } catch (const XBadAlloc&) { rejected = true; }
     assert(rejected);
     detail::clear_registry_failures();
     auto* p = allocator.allocate(1);
@@ -285,7 +300,7 @@ void independent_threads() {
     std::vector<std::thread> threads;
     for (unsigned id = 0; id < 8; ++id) {
         threads.emplace_back([id] {
-            reject_registration([] { (void)make_buffer(-1); });
+            reject_registration([] { auto made = make_buffer(-1); (void)made.owner_identity(); });
             for (unsigned i = 0; i < 80; ++i) {
                 auto a = make_buffer(id * 1000 + i);
                 auto b = make_buffer(-1);

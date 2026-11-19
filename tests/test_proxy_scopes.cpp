@@ -638,6 +638,62 @@ bool test_build() {
     CHECK(f.build<Root>([](Root& m) { m.counter = 6; }) && f.root<Root>().counter == 6);
     return true;
 }
+
+// edit's bare scope: no proxy (so no control block) and a policy that is not
+// Relocating. Nested scopes, a failure recorded inside, the buffer moved or
+// swapped inside it, and the blocks it retires reused by the scopes after it.
+bool test_bare_edit_scopes() {
+    const auto cap = XBuffer::maximum_capacity(1u << 20).with_growth(XGrowPolicy::Automatic);
+    auto d = XBuffer::create<Root>(16384, cap);
+    CHECK(d.edit<Root>([&](Root& m) {
+        m.counter = 1;
+        CHECK_SCOPE(d.pinned());
+        CHECK_SCOPE(d.read<Root>([](const Root& r) { return r.counter; }) == 1);   // nested scopes
+        CHECK_SCOPE(d.edit<Root>([](Root& r) { r.counter = 2; }));
+        CHECK_SCOPE(d.pinned());
+        m.counter += 1;
+    }));
+    CHECK(!d.pinned() && d.root<Root>().counter == 3);
+    CHECK(!d.edit<Root>([&](Root&) { d.record_error(XErrc::out_of_storage); }));   // a failure inside
+    CHECK(d.error() == XErrc::out_of_storage && !d.pinned());
+    d.clear_error();
+    CHECK(d.edit<Root>([](Root& m) { m.counter = 4; }) && d.ok() && !d.pinned());
+    XBuffer moved;
+    CHECK(d.edit<Root>([&](Root& m) {                 // the buffer moves away inside its scope
+        m.counter = 5;
+        moved = std::move(d);
+        CHECK_SCOPE(moved.pinned());
+    }));
+    CHECK(!moved.pinned() && moved.root<Root>().counter == 5);
+    CHECK(moved.edit<Root>([](Root& m) { m.counter = 6; }) && !moved.pinned());
+    auto e = XBuffer::create<Root>(16384, cap);
+    auto f = XBuffer::create<Root>(16384, cap);
+    CHECK(e.edit<Root>([&](Root& m) {                 // and swaps with another
+        m.counter = 7;
+        e.swap(f);
+        CHECK_SCOPE(f.pinned() && !e.pinned());
+    }));
+    CHECK(!e.pinned() && !f.pinned() && f.root<Root>().counter == 7);
+    CHECK(e.edit<Root>([](Root& m) { m.counter = 8; }) && f.edit<Root>([](Root& m) { m.counter = 9; }));
+    CHECK(e.root<Root>().counter == 8 && f.root<Root>().counter == 9 && !e.pinned() && !f.pinned());
+    // Blocks retired inside bare scopes (quarantined with
+    // XOFFSET_PIN_QUARANTINE) are reused by the scopes after them.
+    auto churn = XBuffer::create<Root>(16384, cap);
+    auto churn_scope = [&] {
+        return churn.edit<Root>([](Root& root) {
+            for (int i = 0; i < 4; ++i) {
+                Player& p = root.players.emplace_back();
+                for (int k = 0; k < 8; ++k) p.items.push_back(k);   // regrows: retires blocks
+                root.players.pop_back();
+            }
+        });
+    };
+    for (int i = 0; i < 8; ++i) CHECK(churn_scope());
+    const auto wire = churn.save_verified<Root>().size();
+    for (int i = 0; i < 2000; ++i) CHECK(churn_scope());
+    CHECK(churn.save_verified<Root>().size() == wire && !churn.pinned());
+    return true;
+}
 } // namespace
 
 int main() {
@@ -654,6 +710,7 @@ int main() {
     ok = test_failed_buffer_refuses_to_emit() && ok;
     ok = test_batch_operations() && ok;
     ok = test_build() && ok;
+    ok = test_bare_edit_scopes() && ok;
     ok = g_scope_ok && ok;
     std::cout << (ok ? "test_proxy_scopes: all passed" : "test_proxy_scopes: FAILED") << std::endl;
     return ok ? 0 : 1;

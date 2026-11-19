@@ -412,6 +412,10 @@ public:
         owner.page_size_ = owner.reservation_granularity_ = SlotSlab::page_size();
         owner.slot_class_ = static_cast<std::uint8_t>(cls);
         owner.movable_ = movable;
+        if (movable) {
+            const std::size_t reach = owner.reservation_limit();
+            owner.stay_end_ = static_cast<std::uint32_t>(reach / 2);
+        }
         owner.set_host_owner(nullptr);
         return true;
     }
@@ -422,6 +426,10 @@ public:
         const std::size_t limit = is_slot() ? accessible_bytes_ : reserved_bytes_;
         return limit < maximum_capacity_ ? limit : maximum_capacity_;
     }
+    // The used length up to which a pin scope may open without moving
+    // first: half of a movable slot's reach (reservation_limit), and no
+    // bound for storage whose address stays put. Set when a slot is taken.
+    std::uint32_t stay_end() const noexcept { return stay_end_; }
     // A relocating buffer's VM owner: its maximum becomes `maximum`, above
     // its reservation. Growth stops at the reservation (reservation_limit);
     // past it the buffer moves. Only for an owner without a pool.
@@ -472,6 +480,14 @@ public:
         std::memcpy(base_ + at, bytes, length - at);
         logical_bytes_ = length;
         if (zero_from_ < length) zero_from_ = length;
+        return true;
+    }
+
+    // assign_in_place of the first `length` bytes (length <= size()), the
+    // logical length kept (a clone into a buffer of the same size).
+    bool overwrite_in_place(const char* bytes, std::size_t length) noexcept {
+        if (consume_vm_failure(VmOperation::Prepare)) return false;
+        std::memcpy(base_, bytes, length);
         return true;
     }
 
@@ -687,6 +703,7 @@ private:
         swap(reservation_granularity_, other.reservation_granularity_);
         swap(slot_class_, other.slot_class_);
         swap(movable_, other.movable_);
+        swap(stay_end_, other.stay_end_);
     }
 
     bool acquire_from_pool() noexcept;
@@ -747,6 +764,7 @@ private:
         page_size_ = reservation_granularity_ = 0;
         slot_class_ = no_slot;
         movable_ = false;
+        stay_end_ = no_stay_bound;
     }
 
     void release_mapping() noexcept {
@@ -786,6 +804,8 @@ private:
     static constexpr std::uint8_t no_slot = 0xff;
     std::uint8_t slot_class_{no_slot};
     bool movable_{false};
+    static constexpr std::uint32_t no_stay_bound = 0xFFFFFFFFu;
+    std::uint32_t stay_end_{no_stay_bound};  // see stay_end()
     VmStoragePool pool_;
 };
 
