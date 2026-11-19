@@ -1540,7 +1540,7 @@ namespace XOffsetDatastructure {
     struct XDeltaStats {
         bool key = false;                 // a key delta: the receiver starts from an empty payload
         bool empty = false;               // nothing changed: no delta written, version not advanced
-        std::uint32_t blocks = 0;         // 64-byte payload blocks sent (those with a changed byte)
+        std::uint32_t blocks = 0;         // 64-byte payload blocks sent (those with a changed byte), or a run frame's runs
         std::uint64_t changed_bytes = 0;  // payload bytes carried in them
         std::uint64_t compared_bytes = 0; // payload bytes compared against the baseline
         std::size_t delta_bytes = 0;      // size of the delta written (0 when empty)

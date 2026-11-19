@@ -71,8 +71,10 @@ std::string key_delta() {
     return d;
 }
 
-// Version 2: b = 8. No flags (used_end and root stay): 14-byte header, one
-// block, selector 0x40 (word 6), mask 0x01 (its first byte), the byte.
+// Version 2: b = 8 as a block frame (receivers take it; the sender writes so
+// few changed bytes as a run frame). No flags (used_end and root stay):
+// 14-byte header, one block, selector 0x40 (word 6), mask 0x01 (its first
+// byte), the byte.
 std::string scalar_delta() {
     std::string d = {'X', 'D', char(0x20), char(0)};
     d += le(kStream);
@@ -136,10 +138,11 @@ void sender_writes_frozen_bytes() {
     need(d == key_delta(), "sender: key delta bytes changed");
     r.b = 8;
     src.save_delta_into<FrozenRoot>(d, base);
-    if (d != scalar_delta()) std::fprintf(stderr, "delta written: %s\n       frozen: %s\n", hex(d).c_str(),
-                                          hex(scalar_delta()).c_str());
-    need(d == scalar_delta(), "sender: delta bytes changed");
-    need(d.size() == 18, "sender: a scalar delta is a 14-byte header and a 4-byte block");
+    // A scan delta of few changed blocks goes as a run frame: the same bytes
+    // as the touches baseline's below (b's one changed byte).
+    if (d != run_delta()) std::fprintf(stderr, "delta written: %s\n       frozen: %s\n", hex(d).c_str(),
+                                       hex(run_delta()).c_str());
+    need(d == run_delta(), "sender: delta bytes changed");
     r.a = 0x11223344a0b0c0d0ull;
     XDeltaOptions digest;
     digest.digest = true;

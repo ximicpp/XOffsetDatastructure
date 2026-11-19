@@ -210,12 +210,12 @@ void grow_failures_are_atomic() {
     need(!b.grow(b.accessible_bytes()), "slot acquisition failure");
     detail::clear_vm_failures();
     need(b.get_address() == address && b.epoch() == epoch && b.copy_bytes() == bytes, "unchanged");
+    // A move to a larger slot makes no owner record (one is made on its
+    // first use): an armed registration failure is not reached.
     detail::fail_next_registry_registration();
-    need(!b.grow(b.accessible_bytes()), "registration failure");
-    detail::clear_registry_failures();
-    need(b.get_address() == address && b.epoch() == epoch && b.copy_bytes() == bytes, "unchanged");
-    check(b, 5, 10);
     need(b.grow(b.accessible_bytes()), "grow after failures");
+    need(detail::pending_registry_failure, "a grow made an owner record");
+    detail::clear_registry_failures();
     check(b, 5, 10);
 }
 

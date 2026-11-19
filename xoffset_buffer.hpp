@@ -56,7 +56,7 @@ namespace XOffsetDatastructure {
             if (!buffer_) return nullptr;
             const uint64_t current_epoch = buffer_->epoch();
             cached_ptr_ = resolver_ ? resolver_(*buffer_)
-                : (buffer_->root_type_known() && !buffer_->template root_type_matches<T>()
+                : (buffer_->root_bound() && !buffer_->template root_is<T>()
                     ? nullptr : detail::find_root<T>(*buffer_));
             cached_epoch_ = current_epoch;
             return cached_ptr_;
@@ -74,7 +74,7 @@ namespace XOffsetDatastructure {
         // Internal friend bridge; no Core/container/wire field is added.
         struct VerifiedPathsAccess {
             using Identity = XBufferCore::OwnerRecordPtr;
-            static Identity identity(XBufferCore& source) noexcept { return source.owner_record_; }
+            static Identity identity(XBufferCore& source) { return source.owner_identity(); }
             static XBufferCore& owner(const Identity& value) { return XBufferCore::require_record_owner(value); }
             template<class T> static XWireHeader header(XBufferCore&);
             template<class T> static void save_into(XBufferCore&, std::string&, XSaveOptions);
@@ -198,24 +198,43 @@ namespace XOffsetDatastructure {
             }
             auto* result = detail::construct_root<T>(*this);
             typed_root_access_allowed_ = true;
-            this->template bind_root_type<T>();
-            bind_schema_if_available<T>();
-            this->cache_root(result);
+            this->template bind_root<T>();
+            if constexpr (has_schema_name_v<T>) write_fingerprint<T>();
             return result;
         }
 
     private:
-        // An open pin scope (nests); closes on the block, which follows the
-        // content if this XBuffer is moved meanwhile.
-        struct PinGuard {
-            detail::XCtl* ctl = nullptr;
-            explicit PinGuard(XBuffer& buffer) noexcept {
-                if (buffer.pin_enter()) ctl = buffer.control();
+        // An open pin scope of edit, build or read. Bare (the pin flag, see
+        // XBufferCore::pin_bare_free): a block made while it is open takes
+        // it over and the close exits that block. Counted: entered on the
+        // lineage's block (ctl; null when the entry failed and nothing is
+        // to exit), which follows the content if this XBuffer is moved
+        // meanwhile. edit and read inline f once, after whichever entry;
+        // build once more in its retry (build_again).
+        struct PinScope {
+            XBufferCore* core;
+            detail::XCtl* ctl;
+            bool bare;
+            bool open = true;
+            XOFFSET_DETAIL_INLINE PinScope(XBufferCore& owner, detail::XCtl* entered, bool is_bare) noexcept
+                : core(&owner), ctl(entered), bare(is_bare) {}
+            XOFFSET_DETAIL_INLINE ~PinScope() {
+                if (open) (void)close();
             }
-            explicit PinGuard(detail::XCtl* entered) noexcept : ctl(entered) {}
-            ~PinGuard() { XBufferCore::pin_exit(ctl); }
-            PinGuard(const PinGuard&) = delete;
-            PinGuard& operator=(const PinGuard&) = delete;
+            PinScope(const PinScope&) = delete;
+            PinScope& operator=(const PinScope&) = delete;
+            // Closes the scope. False: a failure was recorded inside it (a
+            // counted scope: the buffer's state as the scope ends).
+            XOFFSET_DETAIL_INLINE bool close() noexcept {
+                open = false;
+                if (bare) [[likely]] return core->pin_close_bare();
+                return close_counted(core, ctl);
+            }
+            XOFFSET_DETAIL_NOINLINE static bool close_counted(XBufferCore* core, detail::XCtl* ctl) noexcept {
+                const bool ok = core->ok();
+                XBufferCore::pin_exit(ctl);
+                return ok;
+            }
         };
         // The root for a pin scope, after the entry move (see edit).
         template<typename T>
@@ -237,15 +256,20 @@ namespace XOffsetDatastructure {
         }
 
     public:
+        // The root: when the root key is T's (make<T>(), a verified load of
+        // T, reset<T>(), a clone of such a buffer) it is at root_at, read
+        // with one compare. Anything else takes the checked path.
         template<typename T>
         T& root() {
-            if (this->template root_cached_as<T>()) [[likely]] return *this->template cached_root_hit<T>();
+            if (this->template root_is<T>()) [[likely]] return *detail::image_root<std::remove_cv_t<T>>(*this);
             return root_checked<T>();
         }
 
     private:
-        // root<T>()'s checked path, out of line so the cache hit above stays
-        // a compare and a load where it is inlined.
+        // root<T>()'s checked path, out of line so the compare above stays
+        // a compare and a load where it is inlined: a root read through
+        // another type (one of the same fingerprint, or any type when the
+        // bound root type has no schema name), or a failure.
         template<typename T>
         XOFFSET_DETAIL_NOINLINE T& root_checked() {
             require_typed_root_access(
@@ -257,12 +281,6 @@ namespace XOffsetDatastructure {
                 XOFFSET_THROW(XException(XErrc::no_root, "root<T>(): no root object in buffer. "
                     "Call make<T>() first or check with has_root<T>()."));
             }
-            // Passed the checks make<T>() and a verified load pass, so the
-            // next call takes the fast path (a buffer moved into a container
-            // pays this path once, not on every call). Only an image with T's
-            // fingerprint is cached as T (a root of T without a schema name
-            // read through another type stays on this path).
-            if (holds_fingerprint<T>()) this->cache_root(ptr);
             return *ptr;
         }
 
@@ -297,24 +315,48 @@ namespace XOffsetDatastructure {
         // effect, and with exceptions the rest of f is skipped.
         // f may not return a pointer, reference, string_view or span.
         template<typename T, typename F>
-        bool edit(F&& f, size_type expected_growth = 0) {
+        XOFFSET_DETAIL_INLINE bool edit(F&& f, size_type expected_growth = 0) {
             using R = std::invoke_result_t<F&, T&>;
             static_assert(std::is_void_v<R>,
                 "edit(f): f must return void (a value made inside may point into the payload; "
                 "use read(f) to compute a value)");
-            T* root_ptr = nullptr;
-            // Fast entry (no growth asked, the root cached, see pin_quiet).
-            if (expected_growth == 0 && (root_ptr = this->template cached_root<T>()) && pin_quiet()) [[likely]] {
+            // Fast entry: no growth asked, the root key is T's (the root is
+            // at root_at) and nothing has to happen first (edit_quiet: no
+            // block, no open scope, a payload that stays put). The scope is
+            // bare: the pin flag.
+            ScopeEntry<T> entry;
+            if (expected_growth == 0 && this->template root_is<T>() && this->edit_quiet()) [[likely]] {
+                entry = {detail::image_root<std::remove_cv_t<T>>(*this), nullptr};
+                this->pin_open_bare();
             } else {
-                if (!ok()) return false;
-                root_ptr = pin_root<T>(expected_growth);
-                if (!root_ptr) return false;
-                if (!pin_enter()) return false;
+                entry = edit_enter<T>(expected_growth);
+                if (!entry.root) return false;
             }
-            PinGuard guard(control());
-            record_error(detail::run_fail_soft([&] { f(*root_ptr); }));
-            return ok();
+            PinScope scope(*this, entry.ctl, entry.ctl == nullptr);
+            record_error(detail::run_fail_soft([&] { f(*entry.root); }));
+            return scope.close();
         }
+
+    private:
+        // An entered scope of edit or build: the root, and the block the
+        // scope counts on (null: a bare scope). A null root: nothing entered.
+        template<typename T>
+        struct ScopeEntry {
+            T* root;
+            detail::XCtl* ctl;
+        };
+        // edit's entry when something has to happen first: a failed buffer
+        // refuses, a payload that may move moves (pin_root), a nested scope
+        // counts on the lineage's block.
+        template<typename T>
+        XOFFSET_DETAIL_NOINLINE ScopeEntry<T> edit_enter(size_type expected_growth) {
+            if (!ok()) return {nullptr, nullptr};
+            T* root_ptr = pin_root<T>(expected_growth);
+            if (!root_ptr || !pin_enter()) return {nullptr, nullptr};
+            return {root_ptr, control()};
+        }
+
+    public:
 
         // A message in one step, for senders that fill a new one each time:
         // reset<T>(), then f(T& root) in a pin scope entered with the fresh
@@ -332,11 +374,45 @@ namespace XOffsetDatastructure {
         // stays with the buffer, so a reused buffer pays this once.
         template<typename T, typename F>
         XOFFSET_DETAIL_INLINE bool build(F&& f, size_type expected_growth = 0) {
-            if (build_once<T>(f, expected_growth)) [[likely]] return true;
+            using R = std::invoke_result_t<F&, T&>;
+            static_assert(std::is_void_v<R>,
+                "build(f): f must return void (a value made inside may point into the payload; "
+                "use read(f) to compute a value)");
+            // Each message of a stream: the root key is T's and a bare scope
+            // may open (no block, so no end of lineage either).
+            ScopeEntry<T> entry;
+            if (expected_growth == 0 && this->pin_bare_free() && this->template root_is<T>()) [[likely]] {
+                entry = {&reset_same_root<T, false>(), nullptr};
+                this->pin_open_bare();
+            } else {
+                entry = build_enter<T>(expected_growth);
+                if (!entry.root) return build_again<T>(f);
+            }
+            PinScope scope(*this, entry.ctl, entry.ctl == nullptr);
+            record_error(detail::run_fail_soft([&] { f(*entry.root); }));
+            if (scope.close()) [[likely]] return true;
             return build_again<T>(f);
         }
 
     private:
+        // A reset<T>() for the cold paths below, out of line.
+        template<typename T>
+        XOFFSET_DETAIL_NOINLINE T& reset_cold() {
+            return reset<T>();
+        }
+        // build's entry after reset<T>(): a bare scope when one may open and
+        // no growth is asked, otherwise edit's (a lineage with a block or an
+        // open scope counts the scope on it). The fresh root, or null with
+        // nothing entered.
+        template<typename T>
+        XOFFSET_DETAIL_NOINLINE ScopeEntry<T> build_enter(size_type expected_growth) {
+            T* fresh = &reset_cold<T>();
+            if (expected_growth == 0 && this->pin_bare_free()) {
+                this->pin_open_bare();
+                return {fresh, nullptr};
+            }
+            return edit_enter<T>(expected_growth);
+        }
         // A failure a larger reservation can cure: the scope could not move
         // the payload, and the buffer can still grow.
         bool build_outgrew() const noexcept {
@@ -344,43 +420,28 @@ namespace XOffsetDatastructure {
             if (e != XErrc::out_of_storage && e != XErrc::borrowed) return false;
             return !this->pinned() && !this->address_stable() && reservation_limit() < maximum_capacity();
         }
+        // build's later attempts (at most 16) while a larger reservation can
+        // cure the failure: a reservation of at least twice the size
+        // reached, then build's entry and f again (its one other copy).
         template<typename T, typename F>
         XOFFSET_DETAIL_NOINLINE bool build_again(F& f) {
             for (int attempt = 0; attempt < 16 && build_outgrew(); ++attempt) {
                 const size_type limit = reservation_limit();
                 const size_type reached = arena() ? static_cast<size_type>(arena()->used_end) : 0;
-                (void)reset<T>();
+                (void)reset_cold<T>();
                 const size_type target = std::min<size_type>(std::max(limit, reached) * 2u, maximum_capacity());
                 const size_type used = arena() ? static_cast<size_type>(arena()->used_end) : 0;
                 if (target <= used || make_room(target - used) != XErrc::ok || reservation_limit() <= limit) {
                     record_error(XErrc::out_of_storage);
                     return false;
                 }
-                if (build_once<T>(f, 0)) return true;
+                const ScopeEntry<T> entry = build_enter<T>(0);
+                if (!entry.root) continue;
+                PinScope scope(*this, entry.ctl, entry.ctl == nullptr);
+                record_error(detail::run_fail_soft([&] { f(*entry.root); }));
+                if (scope.close()) return true;
             }
             return false;
-        }
-        template<typename T, typename F>
-        XOFFSET_DETAIL_INLINE bool build_once(F& f, size_type expected_growth) {
-            using R = std::invoke_result_t<F&, T&>;
-            static_assert(std::is_void_v<R>,
-                "build(f): f must return void (a value made inside may point into the payload; "
-                "use read(f) to compute a value)");
-            T& fresh = reset<T>();
-            if (expected_growth != 0 || this->pinned()) [[unlikely]] return edit<T>(f, expected_growth);
-            // Lean scope: bare while this lineage has no control block.
-            struct Close {
-                XBufferCore* core;
-                detail::XCtl* ctl;
-                ~Close() {
-                    if (!ctl) core->pin_close_bare();
-                    else XBufferCore::pin_exit(ctl);
-                }
-            } close{this, nullptr};
-            this->pin_open_lean(&close.ctl);
-            record_error(detail::run_fail_soft([&] { f(fresh); }));
-            // A failure made a block (record_error); the block follows the content.
-            return !close.ctl || close.ctl->sticky == XErrc::ok;
         }
 
     public:
@@ -394,7 +455,11 @@ namespace XOffsetDatastructure {
                 "read(f): f may not return a pointer, reference, string_view or span "
                 "(it would point into the payload after the scope)");
             const T& root_ref = root<T>();
-            PinGuard guard(*this);
+            const bool bare = this->pin_bare_free();
+            detail::XCtl* entered = nullptr;
+            if (bare) [[likely]] this->pin_open_bare();
+            else entered = read_enter();
+            PinScope scope(*this, entered, bare);
             if constexpr (std::is_void_v<R>) {
                 f(root_ref);
             } else {
@@ -402,9 +467,18 @@ namespace XOffsetDatastructure {
             }
         }
 
+    private:
+        // read's scope on a lineage with a block, or nested in another
+        // scope: counted on the block (null: not entered).
+        XOFFSET_DETAIL_NOINLINE detail::XCtl* read_enter() noexcept {
+            return pin_enter() ? control() : nullptr;
+        }
+
+    public:
+
         template<typename T>
         bool has_root() {
-            if (schema_bound_ && !matches_schema<T>()) return false;
+            if (this->root_named() && !matches_schema<T>()) return false;
             return detail::find_root<T>(*this) != nullptr;
         }
 
@@ -436,9 +510,8 @@ namespace XOffsetDatastructure {
             require_schema_match<T>("handle<T>(): schema mismatch for requested root type");
             return XHandle<T>(*this, [](XBufferCore& core) -> T* {
                 auto& buffer = static_cast<XBuffer&>(core);
-                if (!buffer.typed_root_access_allowed_ || !buffer.template root_type_matches<T>())
-                    return nullptr;
-                if (buffer.schema_bound_ && !buffer.template matches_schema<T>()) return nullptr;
+                if (!buffer.typed_root_access_allowed_ || !buffer.template root_is<T>()) return nullptr;
+                if (buffer.root_named() && !buffer.template matches_schema<T>()) return nullptr;
                 return detail::find_root<T>(buffer);
             });
         }
@@ -455,11 +528,11 @@ namespace XOffsetDatastructure {
             return XArenaAllocator<T>(this->arena());
         }
 
-        // The binding is T's: a root of T was made or loaded, and the image
-        // header holds T's fingerprint.
+        // The binding is T's: a root of a type with a schema name was made or
+        // loaded, and the image header holds T's fingerprint.
         template <typename T>
         bool matches_schema() const {
-            if (!schema_bound_) return false;
+            if (!this->root_named()) return false;
             if constexpr (!has_schema_name_v<T>) {
                 return false;
             } else {
@@ -603,7 +676,6 @@ namespace XOffsetDatastructure {
                 ? XBuffer(reinterpret_cast<const char*>(data.data()), data.size_bytes(), *cap)
                 : XBuffer(reinterpret_cast<const char*>(data.data()), data.size_bytes());
             xbuf.typed_root_access_allowed_ = false;
-            xbuf.schema_bound_ = false;
             return xbuf;
         }
 
@@ -763,6 +835,11 @@ namespace XOffsetDatastructure {
         std::size_t save_delta_into(std::span<char> out, XDeltaBaseline& baseline, XDeltaOptions options = {});
         template <typename T>
         std::string save_delta(XDeltaBaseline& baseline, XDeltaOptions options = {});
+    private:
+        // save_delta_into(std::string&) past its short path.
+        template <typename T>
+        XDeltaStats save_delta_into_general(std::string& out, XDeltaBaseline& baseline, XDeltaOptions options);
+    public:
         /// For deltas with XDeltaOptions::touched_only: records that `value`
         /// (an object in this buffer's payload) may have changed, with
         /// everything it reaches (the blocks of its strings and containers,
@@ -873,18 +950,42 @@ namespace XOffsetDatastructure {
         template <typename T>
         XOFFSET_DETAIL_INLINE T& reset() {
             // The same root type again (each message of a stream): the root
-            // type and schema binding already are what make<T>() would bind.
-            if (this->template cached_root<T>() && schema_bound_ == has_schema_name_v<T>) [[likely]] {
-                this->reset_arena_keeping_binding();
-                T* result = detail::construct_root<T, false>(*this);
-                typed_root_access_allowed_ = true;
-                this->cache_root(result);
+            // key and the fingerprint already are what make<T>() would write.
+            if (this->template root_is<T>()) [[likely]] return reset_same_root<T, true>();
+            return reset_general<T>();
+        }
+
+    private:
+        // reset<T>() of a buffer whose root key is T's: an empty root in
+        // place of the old one (XBufferCore::reset_keeping_root). Without
+        // MayHaveBlock the caller knows the lineage has no block.
+        template<typename T, bool MayHaveBlock>
+        XOFFSET_DETAIL_INLINE T& reset_same_root() {
+            using U = std::remove_cv_t<T>;
+            using S = detail::root_storage_t<U>;
+            char* const raw = this->template reset_keeping_root<MayHaveBlock>(
+                arena_header::block_size(static_cast<std::uint32_t>(sizeof(S))));
+            if constexpr (std::is_nothrow_constructible_v<S, fixed_detail::allocator_ref>) {
+                return *detail::construct_root_at<U>(*this, raw);
+            } else {
+                U* result = nullptr;
+                XOFFSET_TRY {
+                    result = detail::construct_root_at<U>(*this, raw);
+                } XOFFSET_CATCH(...) {
+                    this->forget_root();
+                    XOFFSET_RETHROW;
+                }
                 return *result;
             }
+        }
+        template<typename T>
+        XOFFSET_DETAIL_NOINLINE T& reset_general() {
             reset_arena(this->get_size());
             if (!this->arena()) XOFFSET_THROW(XException(XErrc::invalid_state, "reset<T>(): buffer has no arena"));
             return *this->template make_inline<T>();
         }
+
+    public:
 
         /// An independent copy of this buffer in the same process: one copy of
         /// the used payload into a new owner with this buffer's size, maximum
@@ -981,12 +1082,11 @@ namespace XOffsetDatastructure {
             return detail::find_root<T>(*this);
         }
 
-        // Typed access to the root of T that a load admitted.
+        // Typed access to the root of T that a load admitted (at root_at).
         template <typename T>
-        XOFFSET_DETAIL_INLINE void publish_loaded_root(T* root) noexcept {
+        XOFFSET_DETAIL_INLINE void publish_loaded_root(T*) noexcept {
             typed_root_access_allowed_ = true;
-            bind_schema<T>();
-            this->cache_root(root);
+            this->template bind_root<T>();
         }
 
         // Post-copy verification shared by load_verified and reload_verified:
@@ -1075,20 +1175,10 @@ namespace XOffsetDatastructure {
             }
         }
 
-        // make<T>(): the binding, and T's fingerprint in the image header
-        // (a load's image already holds the sender's).
-        template <typename T>
-        void bind_schema_if_available() noexcept {
-            if constexpr (has_schema_name_v<T>) {
-                bind_schema<T>();
-                write_fingerprint<T>();
-            }
-        }
-
         // T's fingerprint in the image header (only a type with a schema name
-        // has one, and only such a type is sent). A buffer whose root is
-        // cached as such a T holds it (make<T>(), a load or delta of T, a
-        // clone), so a save copies the image as it is.
+        // has one, and only such a type is sent). make<T>() writes it; a
+        // buffer whose root key is such a T holds it (make<T>(), a load or
+        // delta of T, a clone), so a save copies the image as it is.
         template <typename T>
         void write_fingerprint() noexcept {
             auto* sm = this->arena();
@@ -1108,15 +1198,8 @@ namespace XOffsetDatastructure {
         }
 
         template <typename T>
-        void bind_schema() noexcept {
-            this->template bind_root_type<T>();
-            // The fingerprint itself is the image header's.
-            if constexpr (has_schema_name_v<T>) schema_bound_ = true;
-        }
-
-        template <typename T>
         void require_schema_match(const char* message) const {
-            if (schema_bound_ && !matches_schema<T>()) {
+            if (this->root_named() && !matches_schema<T>()) {
                 XOFFSET_THROW(XException(XErrc::schema_mismatch, message));
             }
         }
@@ -1332,7 +1415,8 @@ namespace XOffsetDatastructure {
         }
 
         /// Delta sync (see XBuffer::save_delta_into / apply_delta_verified).
-        XDeltaStats save_delta_into(std::string& out, XDeltaBaseline& baseline, XDeltaOptions options = {}) {
+        XOFFSET_DETAIL_INLINE XDeltaStats save_delta_into(std::string& out, XDeltaBaseline& baseline,
+                                                          XDeltaOptions options = {}) {
             return XBuffer::save_delta_into<T>(out, baseline, options);
         }
         XOFFSET_DETAIL_INLINE std::size_t save_delta_into(std::span<char> out, XDeltaBaseline& baseline,
