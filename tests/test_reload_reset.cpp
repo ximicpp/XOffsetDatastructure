@@ -29,6 +29,9 @@ namespace {
 void need(bool ok, const char* what) { if (!ok) throw std::runtime_error(what); }
 constexpr std::size_t kMax = 1u << 22;
 auto cap() { return XBuffer::maximum_capacity(kMax).with_growth(XGrowPolicy::Automatic); }
+// Every save here is of the image: a reload must re-save byte for byte, which
+// the automatic default does not promise for an image with large free runs.
+constexpr XSaveOptions kImage{.emission = XWireEmission::free_runs};
 
 std::string make_wire(std::uint64_t id, std::size_t n, std::size_t holes = 0) {
     auto b = XBuffer::create<ReloadRoot>(4096, cap());
@@ -42,7 +45,7 @@ std::string make_wire(std::uint64_t id, std::size_t n, std::size_t holes = 0) {
         std::memset(p, 0xab, bytes);
         b.arena()->deallocate(p, bytes);
     }
-    return b.save_verified<ReloadRoot>();
+    return b.save_verified<ReloadRoot>(kImage);
 }
 
 bool payload_equal(const XBuffer& a, const XBuffer& b) {
@@ -69,14 +72,14 @@ void reload_reuses_owner() {
     auto fresh = XBuffer::load_verified<ReloadRoot>(small, cap());
     need(payload_equal(in, fresh), "small reload after big reload leaked old bytes");
     need(in.root<ReloadRoot>().values.size() == 3 && in.root<ReloadRoot>().id == 2, "reload content");
-    need(in.save_verified<ReloadRoot>() == small, "reload re-save not byte stable");
+    need(in.save_verified<ReloadRoot>(kImage) == small, "reload re-save not byte stable");
     // Every newly exposed byte reads as zero, though the big content was there.
     const auto size = in.get_size();
     need(in.grow(1u << 20), "grow after reload");
     for (std::size_t i = size; i < in.get_size(); ++i) need(in.data()[i] == 0, "stale byte after growth");
     // Mutation after reload works like after load.
     in.root<ReloadRoot>().values.push_back(7);
-    auto out = XBuffer::load_verified<ReloadRoot>(in.save_verified<ReloadRoot>(), cap());
+    auto out = XBuffer::load_verified<ReloadRoot>(in.save_verified<ReloadRoot>(kImage), cap());
     need(out.root<ReloadRoot>().values.back() == 7, "mutate after reload");
     // Trimming is explicit (saves leave the logical length): shrink, then
     // return the pages beyond it.
@@ -102,11 +105,11 @@ void failed_reload_is_rootless_then_recovers() {
         need(root_refused(in), "root<T>() allowed after a failed reload");
         need(!in.has_root<ReloadRoot>(), "has_root after a failed reload");
         bool save_refused = false;
-        try { (void)in.save_verified<ReloadRoot>(); } catch (const XException&) { save_refused = true; }
+        try { (void)in.save_verified<ReloadRoot>(kImage); } catch (const XException&) { save_refused = true; }
         need(save_refused, "save_verified allowed after a failed reload");
         in.reload_verified<ReloadRoot>(good);
         auto fresh = XBuffer::load_verified<ReloadRoot>(good, cap());
-        need(payload_equal(in, fresh) && in.save_verified<ReloadRoot>() == good, "recovery reload");
+        need(payload_equal(in, fresh) && in.save_verified<ReloadRoot>(kImage) == good, "recovery reload");
     }
     // Over the buffer's maximum: rejected like load_verified with that maximum.
     auto tiny = XBuffer::create<ReloadRoot>(
@@ -130,12 +133,12 @@ void reset_equals_create() {
         need(r.id == 0 && r.name.size() == 0 && r.values.size() == 0, "reset root not default");
         need(b.free_block_count() == 0, "reset kept free blocks");
         auto fresh = XBuffer::create<ReloadRoot>(4096, cap());
-        need(b.save_verified<ReloadRoot>() == fresh.save_verified<ReloadRoot>(), "reset wire differs from create");
+        need(b.save_verified<ReloadRoot>(kImage) == fresh.save_verified<ReloadRoot>(kImage), "reset wire differs from create");
         auto& again = b.reset<ReloadRoot>();
         again.id = std::uint64_t(round + 10);
         for (int i = 0; i < 2000; ++i) again.values.push_back(std::uint32_t(i));
         again.name = std::string(100, char('a' + round));
-        const auto wire = b.save_verified<ReloadRoot>();
+        const auto wire = b.save_verified<ReloadRoot>(kImage);
         auto in = XBuffer::load_verified<ReloadRoot>(wire, cap());
         need(in.root<ReloadRoot>().values.size() == 2000 && in.root<ReloadRoot>().id == std::uint64_t(round + 10),
              "reset buffer content");
@@ -169,15 +172,15 @@ void reload_scratch_survives_release_and_swap() {
     for (int i = 0; i < 3; ++i) in.reload_verified<ReloadRoot>(i % 2 ? other : good);
     auto fresh = XBuffer::load_verified<ReloadRoot>(other, cap());
     in.reload_verified<ReloadRoot>(other);
-    need(payload_equal(in, fresh) && in.save_verified<ReloadRoot>() == other, "reload with reused scratch");
+    need(payload_equal(in, fresh) && in.save_verified<ReloadRoot>(kImage) == other, "reload with reused scratch");
     in.release_reload_scratch();
     in.reload_verified<ReloadRoot>(good);
-    need(in.save_verified<ReloadRoot>() == good, "reload after releasing scratch");
+    need(in.save_verified<ReloadRoot>(kImage) == good, "reload after releasing scratch");
     auto peer = XBuffer::create<ReloadRoot>(4096, cap());
     swap(in, peer);
     peer.reload_verified<ReloadRoot>(other);
     in.reload_verified<ReloadRoot>(good);
-    need(peer.save_verified<ReloadRoot>() == other && in.save_verified<ReloadRoot>() == good, "reload after swap");
+    need(peer.save_verified<ReloadRoot>(kImage) == other && in.save_verified<ReloadRoot>(kImage) == good, "reload after swap");
 }
 // root<T>() serves the root that make<T>() or a verified load admitted until
 // the epoch advances. After every operation that changes typed access, the
@@ -301,7 +304,7 @@ SmallReloadOutcome small_reload(XBuffer& in, const std::string& w, bool fast) {
         in.reload_verified<ReloadRoot>(w);
         need(in.epoch() != epoch, "reload did not advance the epoch");
         o.payload.assign(reinterpret_cast<const char*>(in.data()), in.get_size());
-        o.save = in.save_verified<ReloadRoot>();
+        o.save = in.save_verified<ReloadRoot>(kImage);
         o.free_count = in.free_block_count();
         o.free_bytes = in.free_block_bytes();
     } catch (const XBadAlloc& e) {
@@ -342,7 +345,7 @@ void small_reload_matches_general_path() {
                 need(same(a, b), "small reload differs from the general path");
                 if (a.error.empty()) {
                     auto fresh = XBuffer::load_verified<ReloadRoot>(*prior, cap());
-                    need(a.save == fresh.save_verified<ReloadRoot>(), "small reload re-save differs from load");
+                    need(a.save == fresh.save_verified<ReloadRoot>(kImage), "small reload re-save differs from load");
                 }
             }
         }
@@ -426,7 +429,7 @@ void direct_reload(XBuffer& in, const std::string& w) {
     t.finish();
 }
 
-// A wire with one large hole: emitted sparse when the library skips gaps.
+// A wire with one large hole: emitted sparse (free-run emission skips it).
 std::string gap_wire(std::uint64_t id) {
     auto b = XBuffer::create<ReloadRoot>(4096, cap());
     auto& r = b.root<ReloadRoot>();
@@ -435,7 +438,7 @@ std::string gap_wire(std::uint64_t id) {
     std::memset(p, 0xcd, 1u << 16);
     for (std::uint32_t i = 0; i < 200; ++i) r.values.push_back(i);
     b.arena()->deallocate(p, 1u << 16);
-    return b.save_verified<ReloadRoot>();
+    return b.save_verified<ReloadRoot>(kImage);
 }
 
 void direct_reload_equals_reload() {
@@ -450,7 +453,7 @@ void direct_reload_equals_reload() {
         auto fresh = XBuffer::load_verified<ReloadRoot>(*w, cap());
         need(payload_equal(in, fresh), "direct reload payload differs from load_verified (stale bytes?)");
         need(in.free_block_count() == fresh.free_block_count(), "direct reload free table");
-        need(in.save_verified<ReloadRoot>() == *w, "direct reload re-save not byte stable");
+        need(in.save_verified<ReloadRoot>(kImage) == *w, "direct reload re-save not byte stable");
     }
     // Sparse gaps were dirty from the big content and still read as zero.
     need(header_of(gaps).extent_count != 0, "gap wire has no gap");
@@ -458,7 +461,7 @@ void direct_reload_equals_reload() {
     need(in.grow(1u << 20), "grow after direct reload");
     for (std::size_t i = size; i < in.get_size(); ++i) need(in.data()[i] == 0, "stale byte after growth");
     in.root<ReloadRoot>().values.push_back(7);
-    auto out = XBuffer::load_verified<ReloadRoot>(in.save_verified<ReloadRoot>(), cap());
+    auto out = XBuffer::load_verified<ReloadRoot>(in.save_verified<ReloadRoot>(kImage), cap());
     need(out.root<ReloadRoot>().values.back() == 7, "mutate after direct reload");
     TypedXBuffer<ReloadRoot> typed = TypedXBuffer<ReloadRoot>::create(4096, cap());
     direct_reload(typed, small);
@@ -489,7 +492,7 @@ void direct_reload_keeps_n2() {
             need(in.data()[i] == 0, "reset after direct reload left stale bytes");
 #endif
         auto fresh = XBuffer::create<ReloadRoot>(4096, cap());
-        need(in.save_verified<ReloadRoot>() == fresh.save_verified<ReloadRoot>(),
+        need(in.save_verified<ReloadRoot>(kImage) == fresh.save_verified<ReloadRoot>(kImage),
              "reset after direct reload differs from create");
     }
 }
@@ -504,7 +507,7 @@ void direct_reload_rejects_interrupted_input() {
         need(threw, what);
         need(root_refused(in) && !in.has_root<ReloadRoot>(), "root after a rejected direct reload");
         direct_reload(in, good);
-        need(in.save_verified<ReloadRoot>() == good, "direct reload after a reject");
+        need(in.save_verified<ReloadRoot>(kImage) == good, "direct reload after a reject");
     };
     // Dropped half-way: the token's destructor leaves the buffer rootless.
     rejects([&] {
@@ -555,7 +558,7 @@ void direct_reload_rejects_interrupted_input() {
         need(!t, "token still open after finish");
         bool again = false;
         try { t.finish(); } catch (const XException&) { again = true; }
-        need(again && in.save_verified<ReloadRoot>() == good, "finish on a consumed token");
+        need(again && in.save_verified<ReloadRoot>(kImage) == good, "finish on a consumed token");
     }
     // Over the buffer's maximum: XBadAlloc at begin, like reload_verified.
     auto tiny = XBuffer::create<ReloadRoot>(

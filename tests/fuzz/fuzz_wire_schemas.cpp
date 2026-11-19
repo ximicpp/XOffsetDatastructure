@@ -139,7 +139,10 @@ void check(const std::string& w, std::mt19937_64& rng) {
         return;
     }
     if (!typed) return;
-    if (typed->save_verified() != w) fail("accepted wire does not re-save byte-identically");
+    // The image form re-saves byte for byte; the default (automatic) may
+    // send a churned image compact instead.
+    if (typed->save_verified(xo::XSaveOptions{xo::XWireEmission::free_runs}) != w)
+        fail("accepted wire does not re-save byte-identically");
     edit(typed->plain_root(), rng);
     const auto saved = typed->save_verified();
     auto again = typed_load<Root>(saved);

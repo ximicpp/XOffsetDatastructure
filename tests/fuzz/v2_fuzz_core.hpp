@@ -796,12 +796,12 @@ std::string build_wire(std::mt19937_64& rng) {
         after.name = random_text(rng, 40);
         r.items.erase(r.items.begin() + std::ptrdiff_t(r.items.size() - 2));
     }
-    // Three wire forms of the same payload: the library's default emission,
-    // dense, and zero-run elision. The last two are byte operations, so the
-    // core also builds against libraries without XSaveOptions
-    // (validation_outcomes); test_v2_fuzz checks them against the library's
-    // own dense and zero_runs emissions.
-    const auto w = buf.save_verified();
+    // Three wire forms of the same payload: the image as free-run emission
+    // sends it (sparse after a large freed block; the default would send
+    // such a buffer compact), dense, and zero-run elision. The last two are
+    // byte operations; test_v2_fuzz checks them against the library's own
+    // dense and zero_runs emissions.
+    const auto w = buf.save_verified(xo::XSaveOptions{xo::XWireEmission::free_runs});
     const auto form = rng() % 3;
     if (g_dense_pool || form == 1) return dense_of(w);
     return form == 2 ? elide_zero_runs(dense_of(w)) : w;
@@ -1272,6 +1272,11 @@ Outcome check_case(const std::string& w, std::mt19937_64& rng, const std::string
     return o.stage == Oracle::Stage::Header ? Outcome::HeaderReject : Outcome::PayloadReject;
 }
 
+// Whether the library has XWireEmission::automatic (the base library of a
+// differential run may not).
+template <class E>
+constexpr bool has_automatic_emission() { return requires { E::automatic; }; }
+
 // A library-generated valid wire must pass the oracle and be golden
 // (load -> save byte-identical).
 void check_golden(const std::string& w, const std::string& where) {
@@ -1283,19 +1288,31 @@ void check_golden(const std::string& w, const std::string& where) {
     compare_reload(*loaded);
     check_direct(w, true, &*loaded, where);
     check_slots(w, true, &*loaded, where);
-    // w may be any of the three forms; the default re-save carries the same
+    // w may be any of the three forms; the free-run re-save carries the same
     // image and is itself byte stable.
-    const auto again = loaded->save_verified();
+    const xo::XSaveOptions runs{xo::XWireEmission::free_runs};
+    const auto again = loaded->save_verified(runs);
     if (dense_of(again) != dense_of(w)) fail(where + ": golden write-read-write changed the payload");
     auto reloaded = typed_load(again);
-    if (!reloaded || reloaded->save_verified() != again) fail(where + ": golden write-read-write not byte stable");
-    // The default emission (docs/WIRE_FORMAT.md section 3, free_runs): dense
-    // below 4 KiB of free blocks; else the free blocks of at least 1 KiB,
-    // sorted, merge where adjacent, and in every merged run of at least
-    // 4 KiB each block's body (all but its link word) is skipped. Nothing
-    // else is.
+    if (!reloaded || reloaded->save_verified(runs) != again) fail(where + ": golden write-read-write not byte stable");
+    // The default (automatic) emission: the compact wire once the free
+    // blocks are at least 512 bytes and an eighth of the image, the
+    // free-run wire below that. The rule is spelled out here, not taken from
+    // the library, and the check is skipped for a library without
+    // `automatic`: tools/validation_differential.sh builds this header
+    // against the base library too.
+    if constexpr (has_automatic_emission<xo::XWireEmission>()) {
+        xo::XWireHeader dh; std::memcpy(&dh, w.data(), kHeader);
+        const bool compact = dh.free_bytes >= 512 && dh.free_bytes * 8 >= dh.used_bytes;
+        if (loaded->save_verified() != (compact ? loaded->save_compact() : again))
+            fail(where + ": the default emission does not follow its rule");
+    }
+    // Free-run emission (docs/WIRE_FORMAT.md section 3): dense below 4 KiB
+    // of free blocks; else the free blocks of at least 1 KiB, sorted, merge
+    // where adjacent, and in every merged run of at least 4 KiB each
+    // block's body (all but its link word) is skipped. Nothing else is.
     const auto ext = extents_of(again);
-    if (!ext) fail(where + ": default emission has a malformed extent table");
+    if (!ext) fail(where + ": free-run emission has a malformed extent table");
     const auto image = dense_of(again);
     xo::XWireHeader h; std::memcpy(&h, image.data(), kHeader);
     OracleRun run;
@@ -1328,7 +1345,7 @@ void check_golden(const std::string& w, const std::string& where) {
     }
     if (prev < h.used_bytes) skipped.push_back({prev, h.used_bytes});
     if (skipped != expected)
-        fail(where + ": default emission skipped " + std::to_string(skipped.size()) + " ranges, expected " +
+        fail(where + ": free-run emission skipped " + std::to_string(skipped.size()) + " ranges, expected " +
              std::to_string(expected.size()) + " free block bodies");
 }
 

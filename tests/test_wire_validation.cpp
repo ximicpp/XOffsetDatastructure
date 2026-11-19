@@ -574,9 +574,9 @@ int main() {
             catch (const XException& e) { return e.what(); }
         };
         need(inflate(wire) == dense, "sparse wire does not load the dense image");
-        {   // The default (free-run) emission skips the free block's body: all
-            // of it but its link word.
-            const auto runs = sbuf.save_verified<CheckedRoot>();
+        {   // Free-run emission skips the free block's body: all of it but its
+            // link word.
+            const auto runs = sbuf.save_verified<CheckedRoot>(XSaveOptions{.emission = XWireEmission::free_runs});
             const auto rh = read<XWireHeader>(runs, 0);
             need(rh.extent_count == 2 && runs.size() == dense.size() - (freed - 8) + 16 && inflate(runs) == dense,
                  "free-run emission did not skip exactly the free block's body");

@@ -52,7 +52,16 @@ std::size_t check_library_emissions(const std::vector<std::string>& pool) {
         auto b = typed_load(pool[i]);
         if (!b) fail("pool wire " + std::to_string(i) + " rejected");
         const auto dense = b->save_verified(xo::XSaveOptions{.emission = xo::XWireEmission::dense});
-        if (dense != dense_of(b->save_verified())) fail("pool wire " + std::to_string(i) + ": dense emission differs");
+        if (dense != dense_of(b->save_verified(xo::XSaveOptions{.emission = xo::XWireEmission::free_runs})))
+            fail("pool wire " + std::to_string(i) + ": dense emission differs");
+        // The default (automatic) emission: the compact wire past the rule,
+        // the free-run wire below it.
+        xo::XWireHeader h; std::memcpy(&h, dense.data(), kHeader);
+        const auto automatic = b->save_verified();
+        if (automatic != (xo::detail::wire_prefers_compact(h.used_bytes, h.free_bytes)
+                              ? b->save_compact()
+                              : b->save_verified(xo::XSaveOptions{.emission = xo::XWireEmission::free_runs})))
+            fail("pool wire " + std::to_string(i) + ": automatic emission differs from its rule");
         const auto zero = b->save_verified(xo::XSaveOptions{.emission = xo::XWireEmission::zero_runs});
         if (zero != elide_zero_runs(dense)) fail("pool wire " + std::to_string(i) + ": zero_runs emission differs");
         elided += zero != dense;
