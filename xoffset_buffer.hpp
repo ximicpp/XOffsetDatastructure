@@ -81,6 +81,7 @@ namespace XOffsetDatastructure {
             template<class T> static bool save_small_into(XBufferCore&, std::string&, XWireEmission);
             template<class T> static void save_into_general(XBufferCore&, std::string&, XSaveOptions);
             template<class T> static void rebuild_free_table(T&, XBufferCore&);
+            template<class T> static bool try_save_compact_into(XBufferCore&, std::string&, std::uint32_t);
             template<class T> static void save_compact_into(XBufferCore&, std::string&, XCompactOptions);
             template<class T, class... M> static void save_composed_into(XBufferCore&, std::string&, XCompactOptions,
                                                                          const XAssign<M>&...);
@@ -569,6 +570,8 @@ namespace XOffsetDatastructure {
         template <typename T>
         void save_compact_into(std::string& out, XCompactOptions options = {}) {
             if (refuse_failed_emit(out)) return;
+            if (detail::VerifiedPathsAccess::try_save_compact_into<T>(*this, out, options.slack_div)) [[likely]]
+                return;
             require_typed_root_access("save_compact<T>(): unverified payload cannot be relabeled as verified");
             require_schema_match<T>("save_compact<T>(): schema mismatch for requested root type");
             if (!detail::find_root<T>(*this))

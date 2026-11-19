@@ -869,6 +869,36 @@ namespace XOffsetDatastructure {
                 return lower_bound_index(data, size - 1, key, key_fn);
             }
         }
+
+        // The inline head of `count` (0..10) bytes at `src` as its two words
+        // (little-endian): bytes 0..7, then bytes 8..10 with the length byte
+        // 0x80 | count. Reads exactly `count` bytes. Built in registers: a
+        // byte-filled stack buffer reloaded as words stalls store forwarding.
+        XOFFSET_DETAIL_INLINE void inline_string_words(const char* src, std::uint32_t count, std::uint64_t& lo,
+                                                       std::uint32_t& hi) noexcept {
+            lo = 0;
+            hi = 0;
+            if (count >= 8) {
+                std::memcpy(&lo, src, 8);
+                if (count == 10) {
+                    std::uint16_t tail;
+                    std::memcpy(&tail, src + 8, 2);
+                    hi = tail;
+                } else if (count == 9) {
+                    hi = static_cast<unsigned char>(src[8]);
+                }
+            } else if (count >= 4) {
+                std::uint32_t head, tail;
+                std::memcpy(&head, src, 4);
+                std::memcpy(&tail, src + count - 4, 4);
+                lo = head | (std::uint64_t(tail) << ((count - 4) * 8));
+            } else if (count != 0) {
+                lo = std::uint64_t(static_cast<unsigned char>(src[0])) |
+                     (std::uint64_t(static_cast<unsigned char>(src[count >> 1])) << ((count >> 1) * 8)) |
+                     (std::uint64_t(static_cast<unsigned char>(src[count - 1])) << ((count - 1) * 8));
+            }
+            hi |= (0x80u | count) << 24;
+        }
     } // namespace fixed_detail
 
     template <typename K, typename V>
@@ -1298,28 +1328,9 @@ namespace XOffsetDatastructure {
         // it is assign()'s short-value copy, and GCC called it out of line at
         // some callers once assign() was inlined there.
         XOFFSET_DETAIL_INLINE void store_inline(const char* src, std::uint32_t count) noexcept {
-            std::uint64_t lo = 0;
-            std::uint32_t hi = 0;
-            if (count >= 8) {
-                std::memcpy(&lo, src, 8);
-                if (count == 10) {
-                    std::uint16_t tail;
-                    std::memcpy(&tail, src + 8, 2);
-                    hi = tail;
-                } else if (count == 9) {
-                    hi = static_cast<unsigned char>(src[8]);
-                }
-            } else if (count >= 4) {
-                std::uint32_t head, tail;
-                std::memcpy(&head, src, 4);
-                std::memcpy(&tail, src + count - 4, 4);
-                lo = head | (std::uint64_t(tail) << ((count - 4) * 8));
-            } else if (count != 0) {
-                lo = std::uint64_t(static_cast<unsigned char>(src[0])) |
-                     (std::uint64_t(static_cast<unsigned char>(src[count >> 1])) << ((count >> 1) * 8)) |
-                     (std::uint64_t(static_cast<unsigned char>(src[count - 1])) << ((count - 1) * 8));
-            }
-            hi |= (0x80u | count) << 24;
+            std::uint64_t lo;
+            std::uint32_t hi;
+            fixed_detail::inline_string_words(src, count, lo, hi);
             std::memcpy(inline_bytes(), &lo, 8);
             std::memcpy(inline_bytes() + 8, &hi, 4);
         }

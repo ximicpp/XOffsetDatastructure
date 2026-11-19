@@ -10,6 +10,8 @@
 //   - with the default slack (XCompactOptions{}), the same holds except that
 //     vectors of at least 8 elements keep size / 8 + 1 zeroed spare elements
 //     (checked against the tight wire's sizes), which is the only difference.
+// The second save_compact_into into the same string takes the reused-output
+// path (one walk into the existing capacity); the others start over.
 #include "fuzz/v2_fuzz_core.hpp"
 
 namespace {
@@ -130,6 +132,22 @@ void fixed_cases() {
         r.keys.insert(1);
         r.attrs.insert_or_assign(std::string_view("k"), std::uint64_t(9));
         check(b, "boundaries");
+    }
+    {   // Every block size the writer copies in moves (vectors of 0..70
+        // two-byte elements: last word partly live or not, spare words with
+        // slack), every inline length reached from a heap block, and heap
+        // strings around the move sizes.
+        auto b = Buffer::create(4096, xo::XBuffer::maximum_capacity(1u << 20).with_growth(xo::XGrowPolicy::Automatic));
+        auto& r = b.plain_root();
+        for (std::uint16_t n = 0; n <= 70; ++n) {
+            auto& it = r.items.emplace_back();
+            for (std::uint16_t i = 0; i < n; ++i) it.vals.push_back(std::uint16_t(n * 131u + i));
+            it.name = std::string(40, 'h');
+            it.name = std::string(n % 11u, char('a' + n % 26u)); // keeps the heap block
+        }
+        for (std::size_t n = 0; n <= 72; ++n)
+            r.tags.emplace_back(std::string(n, char('A' + n % 26u)), r.tags.get_stored_allocator());
+        check(b, "block sizes");
     }
 }
 } // namespace

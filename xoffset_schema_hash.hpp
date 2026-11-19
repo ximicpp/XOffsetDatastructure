@@ -460,8 +460,8 @@ namespace XOffsetDatastructure {
         // the given free state; the writer sets extent_count. Sizes fit:
         // used_bytes <= MAX_PAYLOAD < 2 GiB.
         template <typename T>
-        XWireHeader make_wire_header(std::uint64_t used, std::uint32_t free_dir = 0,
-                                     std::uint32_t free_bytes = 0) noexcept {
+        constexpr XWireHeader make_wire_header(std::uint64_t used, std::uint32_t free_dir = 0,
+                                               std::uint32_t free_bytes = 0) noexcept {
             XWireHeader header{};
             header.magic = XWIRE_MAGIC;
             header.header_bytes = static_cast<std::uint32_t>(sizeof(XWireHeader));

@@ -280,19 +280,23 @@ namespace detail {
     // head layout is written: a 12-byte container head at payload offset
     // `at` (data_delta is relative to the head's own address), and the inline
     // form of a string of 1..inline_max bytes (store_inline: bytes 0..10 the
-    // characters then zeros, byte 11 = 0x80 | length).
+    // characters then zeros, byte 11 = 0x80 | length). Both write two words
+    // built in registers (little-endian): a head assembled in a stack array
+    // and copied out is read back across smaller stores, a store-forwarding
+    // stall per head.
     XOFFSET_DETAIL_INLINE void write_container_head(char* base, std::size_t at, std::int32_t data_delta,
                                                          std::uint32_t size, std::uint32_t capacity) noexcept {
-        const std::int32_t head[3] = {data_delta, static_cast<std::int32_t>(size),
-                                      static_cast<std::int32_t>(capacity)};
-        std::memcpy(base + at, head, sizeof(head));
+        const std::uint64_t low = std::uint64_t(static_cast<std::uint32_t>(data_delta)) | (std::uint64_t(size) << 32);
+        std::memcpy(base + at, &low, 8);
+        std::memcpy(base + at + 8, &capacity, 4);
     }
     XOFFSET_DETAIL_INLINE void write_inline_string(char* base, std::size_t at, const char* text,
                                                         std::uint32_t n) noexcept {
-        char head[12] = {};
-        for (std::uint32_t i = 0; i < n; ++i) head[i] = text[i];
-        head[11] = static_cast<char>(0x80u | n);
-        std::memcpy(base + at, head, sizeof(head));
+        std::uint64_t low;
+        std::uint32_t high;
+        fixed_detail::inline_string_words(text, n, low, high);
+        std::memcpy(base + at, &low, 8);
+        std::memcpy(base + at + 8, &high, 4);
     }
 
     // Capacity given to a vector of n elements (strings stay tight).
@@ -416,16 +420,56 @@ namespace detail {
     template <class W> inline constexpr bool is_direct_writer_v = false;
     template <bool P> inline constexpr bool is_direct_writer_v<DirectWriter<P>> = true;
 
-    // n is a multiple of 8.
+    // Copies n bytes (a multiple of 8, at least 8): up to 64 bytes as two
+    // to four moves of 8 or 16 bytes from each end (they may overlap), so a
+    // block's copy is a few moves without a call; memcpy above.
+    struct DirectPair {
+        std::uint64_t a, b;
+    };
     XOFFSET_DETAIL_INLINE void direct_copy_words(char* dst, const char* src, std::size_t n) noexcept {
-        if (n <= 64) {
-            for (std::size_t i = 0; i < n; i += 8) {
-                std::uint64_t v;
-                std::memcpy(&v, src + i, 8);
-                std::memcpy(dst + i, &v, 8);
-            }
+        if (n <= 16) {
+            std::uint64_t x, y;
+            std::memcpy(&x, src, 8);
+            std::memcpy(&y, src + n - 8, 8);
+            std::memcpy(dst, &x, 8);
+            std::memcpy(dst + n - 8, &y, 8);
+        } else if (n <= 32) {
+            DirectPair x, y;
+            std::memcpy(&x, src, 16);
+            std::memcpy(&y, src + n - 16, 16);
+            std::memcpy(dst, &x, 16);
+            std::memcpy(dst + n - 16, &y, 16);
+        } else if (n <= 64) {
+            DirectPair x0, x1, y0, y1;
+            std::memcpy(&x0, src, 16);
+            std::memcpy(&x1, src + 16, 16);
+            std::memcpy(&y0, src + n - 32, 16);
+            std::memcpy(&y1, src + n - 16, 16);
+            std::memcpy(dst, &x0, 16);
+            std::memcpy(dst + 16, &x1, 16);
+            std::memcpy(dst + n - 32, &y0, 16);
+            std::memcpy(dst + n - 16, &y1, 16);
         } else {
             std::memcpy(dst, src, n);
+        }
+    }
+    // Zeroes n bytes (a multiple of 8, 0 included) the same way.
+    XOFFSET_DETAIL_INLINE void direct_zero_words(char* dst, std::size_t n) noexcept {
+        const DirectPair zero{};
+        if (n == 0) return;
+        if (n <= 16) {
+            std::memcpy(dst, &zero.a, 8);
+            std::memcpy(dst + n - 8, &zero.a, 8);
+        } else if (n <= 32) {
+            std::memcpy(dst, &zero, 16);
+            std::memcpy(dst + n - 16, &zero, 16);
+        } else if (n <= 64) {
+            std::memcpy(dst, &zero, 16);
+            std::memcpy(dst + 16, &zero, 16);
+            std::memcpy(dst + n - 32, &zero, 16);
+            std::memcpy(dst + n - 16, &zero, 16);
+        } else {
+            std::memset(dst, 0, n);
         }
     }
 
@@ -450,15 +494,18 @@ namespace detail {
         // that many bytes (capacity + 1 padded to 8, see block_bytes_of), so
         // it is copied in words and the bytes from n on are cleared
         // (little-endian, as store_inline).
+        // The last word is taken from the source and stored after the copy
+        // (not read back from the output just written).
         const std::size_t padded = (std::size_t(n) + 8u) & ~std::size_t(7u);
         std::size_t data;
         if (!w.take(padded, data)) return;
         char* dst = w.base + data;
-        direct_copy_words(dst, text.data(), padded);
+        const char* from = text.data();
         const auto keep = n - (padded - 8u); // 0..7 bytes of the last word
         std::uint64_t last;
-        std::memcpy(&last, dst + padded - 8u, 8);
+        std::memcpy(&last, from + padded - 8u, 8);
         last &= keep == 0 ? 0 : (~std::uint64_t(0) >> (64u - 8u * keep));
+        direct_copy_words(dst, from, padded);
         std::memcpy(dst + padded - 8u, &last, 8);
         write_container_head(w.base, at, static_cast<std::int32_t>(data - at), n, n);
     }
@@ -475,12 +522,21 @@ namespace detail {
         char* dst = w.base + data;
         const E* elements = src.data();
         const auto* from = reinterpret_cast<const char*>(elements);
-        if (sizeof(E) % 8u == 0 && (P || cap == n)) {
-            direct_copy_words(dst, from, live); // live == padded
-        } else {
-            std::memcpy(dst, from, live);
-            std::memset(dst + live, 0, padded - live);
+        // The live bytes padded to 8 are in the source block (its capacity is
+        // at least n; blocks are padded to 8): copied in words, the bytes
+        // past `live` in the last word cleared (that word is taken from the
+        // source), then spare capacity zeroed.
+        const std::size_t words = (live + 7u) & ~std::size_t(7u);
+        direct_copy_words(dst, from, words);
+        if constexpr (sizeof(E) % 8u != 0) {
+            if (const auto keep = live & 7u) { // live bytes of the last word
+                std::uint64_t last;
+                std::memcpy(&last, from + words - 8u, 8);
+                last &= ~std::uint64_t(0) >> (64u - 8u * keep);
+                std::memcpy(dst + words - 8u, &last, 8);
+            }
         }
+        if constexpr (!P) direct_zero_words(dst + words, padded - words);
         write_container_head(w.base, at, static_cast<std::int32_t>(data - at), n, cap);
         if constexpr (compact_has_heads<E>()) {
             for (std::uint32_t i = 0; i < n; ++i) direct_value(elements[i], data + std::size_t(i) * sizeof(E), w);
@@ -511,6 +567,15 @@ namespace detail {
     template <class T>
     XWireHeader compact_wire_header(std::size_t used) noexcept {
         return make_wire_header<T>(used);
+    }
+    // The same header written at `out`: a constant copied, then used_bytes
+    // (a header built on the stack would be read back across smaller stores).
+    template <class T>
+    XOFFSET_DETAIL_INLINE void write_compact_wire_header(char* out, std::size_t used) noexcept {
+        static constexpr XWireHeader proto = make_wire_header<T>(0);
+        std::memcpy(out, &proto, sizeof(proto));
+        const auto bytes = static_cast<std::uint32_t>(used);
+        std::memcpy(out + offsetof(XWireHeader, used_bytes), &bytes, sizeof(bytes));
     }
 }
 
@@ -687,8 +752,7 @@ namespace detail {
         if (root_bytes != sizeof(T)) std::memset(payload + sizeof(T), 0, root_bytes - sizeof(T));
         compose_value(root, 0, w, set);
         if (w.overflow) return 0;
-        const auto header = compact_wire_header<T>(XWIRE_PAYLOAD_BEGIN + w.cursor);
-        std::memcpy(out, &header, sizeof(header));
+        write_compact_wire_header<T>(out, XWIRE_PAYLOAD_BEGIN + w.cursor);
         return sizeof(XWireHeader) + w.cursor;
     }
 
@@ -874,19 +938,70 @@ namespace detail {
         }
     };
 
+    // save_compact_into's path for a reused output (each message of a
+    // stream): a root key of T (so the checks of the general path hold, as
+    // in save_small_into) and an output whose storage holds the wire. Plain:
+    // the wire is never longer than the source's used bytes, so those bound
+    // it; with slack the write stops at the output's capacity. One walk of
+    // the source writes the wire into the output: no host allocation, no
+    // owner identity. False for anything else (out is then rewritten by the
+    // general path).
+    // The output must not alias the source's storage (or hold it).
+    XOFFSET_DETAIL_INLINE void compact_check_alias(const std::string& out, const XBufferCore& candidate) {
+        if (out.capacity() == (std::numeric_limits<std::size_t>::max)())
+            XOFFSET_THROW(std::length_error("save_compact_into: output capacity overflows alias range"));
+        if (verified_paths_intersect(&out, sizeof(out), candidate.get_address(), candidate.get_size()) ||
+            verified_paths_intersect(out.data(), out.capacity() + 1, candidate.get_address(), candidate.get_size()))
+            XOFFSET_THROW(XException(XErrc::invalid_state, "save_compact_into: output aliases source storage"));
+    }
+
     template<class T>
-    void VerifiedPathsAccess::save_compact_into(XBufferCore& source, std::string& out, XCompactOptions options) {
+    XOFFSET_DETAIL_INLINE bool VerifiedPathsAccess::try_save_compact_into(XBufferCore& source, std::string& out,
+                                                                          std::uint32_t slack_div) {
+        static_assert(compact_direct_supported<T>(),
+            "save_compact<T>(): every stored type must be at most 8-byte aligned");
+        static_assert(sizeof(XWireHeader) == XWIRE_PAYLOAD_BEGIN);
+        if (!source.template root_is<T>()) return false;
+        const auto* image = static_cast<const char*>(source.get_address());
+        const auto* arena = std::launder(reinterpret_cast<const XBufferCore::arena_header*>(image));
+        const std::size_t room = out.capacity();
+        if (slack_div == 0 && arena->used_end > room) return false;
+        if constexpr (detail::save_self_check) {
+            if (arena->magic != XBufferCore::image_magic || arena->used_end < XBufferCore::root_at ||
+                arena->used_end > source.get_size())
+                XOFFSET_THROW(XException(XErrc::invalid_payload_header, "verified paths: payload header mismatch"));
+            compact_check_alias(out, source);
+        }
+        const auto limit = compact_wire_limit(room);
+        if (limit == 0) return false;
+        const T& root = *image_root<T>(source);
+        const ComposeSet<> none{};
+        std::size_t written = 0;
+        auto emit = [&](char* destination) noexcept {
+            return slack_div == 0 ? write_compact_wire<true>(destination, limit, root, 0, none)
+                                  : write_compact_wire<false>(destination, limit, root, slack_div, none);
+        };
+#if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
+        out.resize_and_overwrite(room, [&](char* destination, std::size_t) noexcept {
+            written = emit(destination);
+            return written;
+        });
+#else
+        out.resize(room);
+        written = emit(out.data());
+        out.resize(written);
+#endif
+        return written != 0;
+    }
+
+    template<class T>
+    XOFFSET_DETAIL_NOINLINE void VerifiedPathsAccess::save_compact_into(XBufferCore& source, std::string& out,
+                                                                            XCompactOptions options) {
         static_assert(compact_direct_supported<T>(),
             "save_compact<T>(): every stored type must be at most 8-byte aligned");
         const auto token = identity(source);
         auto* current = &owner(token);
-        auto check_alias = [&](XBufferCore& candidate) {
-            if (out.capacity() == (std::numeric_limits<std::size_t>::max)())
-                XOFFSET_THROW(std::length_error("save_compact_into: output capacity overflows alias range"));
-            if (verified_paths_intersect(&out, sizeof(out), candidate.get_address(), candidate.get_size()) ||
-                verified_paths_intersect(out.data(), out.capacity() + 1, candidate.get_address(), candidate.get_size()))
-                XOFFSET_THROW(XException(XErrc::invalid_state, "save_compact_into: output aliases source storage"));
-        };
+        auto check_alias = [&](XBufferCore& candidate) { compact_check_alias(out, candidate); };
         check_alias(*current);
         auto h = header<T>(*current);
         current = &owner(token); // header may have recomputed the free table
