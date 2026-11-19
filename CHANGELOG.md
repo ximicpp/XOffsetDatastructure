@@ -46,6 +46,14 @@ of this file and in the pull requests.
   run in one block is a run frame ([DELTA_SYNC.md](docs/DELTA_SYNC.md), "One changed field").
   GCC 16, Character fixture, one scalar: touches publish 182 -> 126, publish and apply 327 -> 269;
   compared publish 1,907 -> 1,863, publish and apply 2,243 -> 2,034.
+- The host-side free table is gone: `FreeTable`, its per-thread cache and recycler, and the paths
+  that inserted into it and took from it (`xoffset_arena.hpp` 4,089 -> 3,199 lines). The in-band
+  allocator is the only one and no longer sits behind `XOFFSET_INBAND_ALLOCATOR` (the macro is now
+  ignored). Removed: `XBufferCore::trim_free_table_cache()` and `free_table_inline_entries`.
+  `prefetch_for_update()` prefetches the owner map entry, the owner word and the arena header.
+  `free_table_complete()` stays: a free block the directory has no room for is still lost until
+  `save_verified` recomputes the free blocks. Instructions unchanged (SLG and formal totals 0.9995
+  to 1.0000, GCC 16 and P2996).
 - Fixed: a client that includes `<windows.h>` before the library compiles again (a variable in
   `save_delta_into` was named `small`, which `rpcndr.h` defines as a macro).
 - `xoffsetdatastructure.hpp` includes seven parts in its former order: `xoffset_arena.hpp`,
