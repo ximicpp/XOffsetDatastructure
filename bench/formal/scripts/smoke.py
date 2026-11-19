@@ -21,8 +21,10 @@ from pathlib import Path
 # The formal M input wire. R3/W9a (Mac FREEZE.json, wire format 2.0):
 # 2bf0c0717767f3776a47532e90f39aee6ae9ac0056e94e06731a2f9eaa25c2a4.
 # 2026-10-27, wire format 2.1 (12-byte heads, 40-byte header, no payload header
-# on the wire): 8,649,368 bytes.
-M_INPUT_WIRE = "89fd02d2d36fce705cc519d1a6a6298ff23e595c01fb01211e360d6249d2edcc"
+# on the wire): 8,649,368 bytes, 89fd02d2d36fce705cc519d1a6a6298ff23e595c01fb01211e360d6249d2edcc.
+# 2026-11-19, wire format 3.0 (the wire is the image: 40-byte header, root at
+# 40): 8,649,368 bytes.
+M_INPUT_WIRE = "8ee8ff53ad48274fe10932e549f016bfd8399faa2f0ab4e1a3f975a62c529084"
 
 
 def sha256(path):
