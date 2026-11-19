@@ -97,11 +97,11 @@ void check_entries(Buffer& b, const std::string& expected, const std::string& wh
     need(fresh == expected, where + ": save_verified_into (empty output)");
     b.save_verified_into(fresh); // reused output that holds the wire
     need(fresh == expected, where + ": save_verified_into (reused output)");
-    std::string small = "previous";
-    small.reserve(expected.size() - 1);
-    small.assign(small.capacity(), char(0x5a));
-    b.save_verified_into(small);
-    need(small == expected, where + ": save_verified_into (output one byte short)");
+    std::string short_out = "previous";
+    short_out.reserve(expected.size() - 1);
+    short_out.assign(short_out.capacity(), char(0x5a));
+    b.save_verified_into(short_out);
+    need(short_out == expected, where + ": save_verified_into (output one byte short)");
     std::string exact(expected.size(), char(0x5a));
     exact.shrink_to_fit();
     b.save_verified_into(exact);
@@ -179,7 +179,7 @@ int main() {
     }
     {   // Random layouts on both sides of the threshold.
         std::mt19937_64 rng(0x5eedae01);
-        int images = 0, compacts = 0, near = 0;
+        int images = 0, compacts = 0, boundary = 0;
         for (int round = 0; round < 300; ++round) {
             const std::size_t n = 1 + rng() % 24;
             std::vector<std::size_t> sizes, freed;
@@ -188,7 +188,7 @@ int main() {
                 if (rng() % 3 == 0) freed.push_back(i);
             auto b = make(sizes, freed);
             const auto h = header_of(b.save_verified(kDense));
-            near += h.free_bytes >= 384 && h.free_bytes < 1024;
+            boundary += h.free_bytes >= 384 && h.free_bytes < 1024;
             const auto where = "random layout " + std::to_string(round);
             if (wire_prefers_compact(h.used_bytes, h.free_bytes)) {
                 ++compacts;
@@ -198,7 +198,7 @@ int main() {
                 expect_image(b, where);
             }
         }
-        need(images > 30 && compacts > 30 && near > 10, "random layouts did not cover both sides of the threshold");
+        need(images > 30 && compacts > 30 && boundary > 10, "random layouts did not cover both sides of the threshold");
     }
     std::cout << "{\"status\":\"passed\",\"automatic_emission\":true}\n";
     return 0;
