@@ -1589,8 +1589,17 @@ namespace XOffsetDatastructure {
                     }
                 }
             }
-            return (*this = static_cast<const XVectorCore&>(other));
+            return copy_assign_out_of_line(other);
         }
+
+    private:
+        // A move between payloads copies, out of line, so the move above
+        // (a relocation within one payload) stays small enough to inline.
+        XOFFSET_DETAIL_NOINLINE XVectorCore& copy_assign_out_of_line(const XVectorCore& other) {
+            return *this = other;
+        }
+
+    public:
 
         // Bound = the head lies in a registered payload. Each call is one
         // owner-table read: callers look the binding up only to allocate,
