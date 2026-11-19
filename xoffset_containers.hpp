@@ -1600,7 +1600,6 @@ namespace XOffsetDatastructure {
         }
 
     public:
-
         // Bound = the head lies in a registered payload. Each call is one
         // owner-table read: callers look the binding up only to allocate,
         // grow or retire a block, once per operation (WIRE_FORMAT, owner by address).
@@ -1683,7 +1682,16 @@ namespace XOffsetDatastructure {
         T& back() noexcept { return live_data()[size_ - 1]; }
         const T& back() const noexcept { return live_data()[size_ - 1]; }
 
-        void clear() noexcept { truncate(0); }
+        // truncate(0), with the old-size hook (note_cleared).
+        void clear() noexcept {
+            const auto old_size = size_;
+            if (old_size == 0) return;
+            if constexpr (!std::is_trivially_destructible_v<T>)
+                fixed_detail::destroy_n_in(binding(), data(), old_size);
+            size_ = 0;
+            note_cleared(old_size);
+            scrub(0, old_size);
+        }
 
         // Destroys the elements from count on with one binding lookup (rule 5).
         void truncate(size_type count) noexcept {
@@ -1692,7 +1700,7 @@ namespace XOffsetDatastructure {
             if constexpr (!std::is_trivially_destructible_v<T>)
                 fixed_detail::destroy_n_in(binding(), data() + count, old_size - count);
             size_ = count;
-            note_truncated(old_size, count);
+            note_shrunk(old_size, count);
             scrub(count, old_size);
         }
 
@@ -1993,7 +2001,7 @@ namespace XOffsetDatastructure {
                 }
             }
             size_ = write; // publication follows the complete no-throw commit
-            note_truncated(original_size, write);
+            note_shrunk(original_size, write);
             scrub(write, original_size);
             return removed;
         }
@@ -2006,7 +2014,14 @@ namespace XOffsetDatastructure {
         // save_compact also rewrites spare capacity as zero).
         void pop_back() {
             if (size_ == 0) return;
-            note_popped(pop_last());
+            // size_ > 0 names a live block: no null test.
+            const size_type last = size_ - 1u;
+            T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + last;
+            fixed_detail::destroy_n(slot, 1);
+            size_ = last;
+            note_popped(last);
+            if constexpr (detail::scrub_popped) std::memset(static_cast<void*>(slot), 0, sizeof(T));
+            else if constexpr (detail::settles_vacated_heads<T>()) detail::empty_vacated_slot(slot);
         }
 
         T& emplace_back() {
@@ -2601,7 +2616,7 @@ namespace XOffsetDatastructure {
             if (count <= size_) {
                 const auto old_size = size_;
                 size_ = count;
-                note_truncated(old_size, count);
+                note_shrunk(old_size, count);
                 scrub(count, old_size);
                 return;
             }
@@ -2697,10 +2712,9 @@ namespace XOffsetDatastructure {
         // rest is one more compare (one element removed) or out of line.
         static constexpr size_type spare_watch_min_capacity = static_cast<size_type>(
             (XBufferCore::spare_watch_min_bytes + sizeof(T) - 1u) / sizeof(T));
-        // pop_back without the watch (erase_index calls it with its own
-        // hook): size_ > 0, which names a live block (no null test).
-        // Returns the new size.
-        XOFFSET_DETAIL_INLINE size_type pop_last() {
+        // pop_back without the watch, for erase_index (one hook after its
+        // branches): size_ > 0, which names a live block (no null test).
+        size_type pop_last() {
             const size_type last = size_ - 1u;
             T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + last;
             fixed_detail::destroy_n(slot, 1);
@@ -2721,13 +2735,18 @@ namespace XOffsetDatastructure {
                     XBufferCore::note_spare_head(this, static_cast<std::uint32_t>(sizeof(T)));
             }
         }
-        // Several removed (truncate, clear, resize, remove): the old size is
-        // in a register, and a crossing needs it above a quarter of the
-        // minimum capacity, so the inline test reads no memory (a capacity
-        // load there is one the caller's next append may reuse, which can
-        // cost its loop an instruction). The rest is out of line.
-        XOFFSET_DETAIL_INLINE void note_truncated(size_type old_size, size_type new_size) const noexcept {
-            if (old_size > spare_watch_min_capacity / 4u) [[unlikely]] note_shrunk_cold(old_size, new_size);
+        // Several removed (truncate, resize, remove): the capacity test
+        // inline, the crossing test out of line.
+        XOFFSET_DETAIL_INLINE void note_shrunk(size_type old_size, size_type new_size) const noexcept {
+            if (capacity_ >= spare_watch_min_capacity) [[unlikely]] note_shrunk_cold(old_size, new_size);
+        }
+        // All removed (clear): a crossing needs the old size, which is in a
+        // register, above a quarter of the minimum capacity, so the inline
+        // test reads no memory (a capacity load there is one a refill loop
+        // after the clear may keep, which cost reloc's push_back loop an
+        // instruction per element).
+        XOFFSET_DETAIL_INLINE void note_cleared(size_type old_size) const noexcept {
+            if (old_size > spare_watch_min_capacity / 4u) [[unlikely]] note_shrunk_cold(old_size, 0);
         }
         XOFFSET_DETAIL_COLD void note_shrunk_cold(size_type old_size, size_type new_size) const noexcept {
             if (capacity_ < spare_watch_min_capacity) return;
@@ -2996,10 +3015,10 @@ namespace XOffsetDatastructure {
             }
         }
 
-        // Inline at the caller: find plus one erase_index, as compilers
+        // Clang: inline at the caller (find plus one erase_index), as it
         // chose before the spare watch's hook made erase_index larger.
         template <typename KeyLike>
-        XOFFSET_DETAIL_INLINE std::uint32_t erase(const KeyLike& key) {
+        XOFFSET_DETAIL_INLINE_CLANG std::uint32_t erase(const KeyLike& key) {
             auto it = find(key);
             if (it == Base::end()) return 0;
             auto index = static_cast<std::uint32_t>(it - Base::begin());
@@ -3191,9 +3210,9 @@ namespace XOffsetDatastructure {
             return value_base::data() + index;
         }
 
-        // Inline at the caller, as XSet::erase.
+        // Clang: inline at the caller, as XSet::erase.
         template <typename KeyLike>
-        XOFFSET_DETAIL_INLINE std::uint32_t erase(const KeyLike& key) {
+        XOFFSET_DETAIL_INLINE_CLANG std::uint32_t erase(const KeyLike& key) {
             auto it = find(key);
             if (it == value_base::end()) return 0;
             erase_at(it);
