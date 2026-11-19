@@ -12,6 +12,8 @@
 #   2bf0c0717767f3776a47532e90f39aee6ae9ac0056e94e06731a2f9eaa25c2a4
 # Since wire format 2.1 (2026-10-27; scripts/smoke.py M_INPUT_WIRE, 8,649,368 bytes):
 #   89fd02d2d36fce705cc519d1a6a6298ff23e595c01fb01211e360d6249d2edcc
+# Since wire format 3.0 (2026-11-19; scripts/smoke.py M_INPUT_WIRE, 8,649,368 bytes):
+#   8ee8ff53ad48274fe10932e549f016bfd8399faa2f0ab4e1a3f975a62c529084
 # Field lists (2026-10-26, remove-C++26 p5): adapters/xoffset/adapter.hpp describes Attr,
 #   Record and Snapshot with XOFFSET_RECORD_DERIVED when the library has it (guarded).
 #   Same machine code under GCC 16 and P2996 (asm_equal).
@@ -29,7 +31,7 @@ b0b4feade79ad88b1ae7b867503d4138b053655163c01db83c2f0bac785cd727  include/sha256
 6ac02a13cdc6c509da007c3a9ec6c54506d2a8b978f2ac5ace0722973ad4b2ef  model/SPEC.md
 2ce49fc651773833865588b389ee5352fc9161c8f14b9cfb34c27f5f1376394f  model/reference.py
 ef5f7a89747eb1ba979095209b8a31e50bd11f287dd56671809083b43a174bb4  scripts/make_fixtures.py
-a927fc55db1d816f256c9a306710469381c28c324b61ce04aeb71efdb9e8e171  scripts/smoke.py
+4c45b2f3ece6c507f46fab305384e189bcf0f1c2734973fbd86fcbfdb65749ec  scripts/smoke.py
 5a242ea3a56b05dcf139a0e26c4f8fc0c5d6fb58031e0662375e9ae02d18624a  tests/contracts/adapter_contract.cpp
 ed3ed0e125678e8a7af7db2aa3d775b323817709f9b96c8ad9aac6ca286e00a9  tests/contracts/model_contract.cpp
 e7767f440550aad451c1cf7b1f2ad402bec4f771592d4807c7432b1850496908  tests/contracts/resource_failure.cpp
