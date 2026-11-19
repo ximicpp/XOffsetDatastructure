@@ -162,7 +162,7 @@ template <class Root> std::vector<std::string> run() {
 // (one memmove against per-element moves), so the wires' compact forms, which
 // hold the live content only.
 template <class Root> std::string comparable(const std::string& wire) {
-    constexpr std::size_t header = sizeof(xo::XWireHeaderV2);
+    constexpr std::size_t header = sizeof(xo::XWireHeader);
 #if XOFFSET_SCRUB_ERASED && XOFFSET_SCRUB_POPPED
     return wire.substr(header);
 #else

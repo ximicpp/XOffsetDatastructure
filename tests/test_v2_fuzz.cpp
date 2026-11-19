@@ -1,4 +1,4 @@
-// V2 validator differential + mutation fuzz (seeded, runs in CTest). The
+// Wire validator differential + mutation fuzz (seeded, runs in CTest). The
 // oracle, acceptors and mutators live in fuzz/v2_fuzz_core.hpp, shared with the
 // libFuzzer target fuzz_v2_wire.
 // Golden check: for every generated wire, load -> save is byte-identical.
@@ -100,7 +100,7 @@ void compare_small_reload_off(const std::string& w, const std::string& id) {
     xo::detail::small_reload_fast_path = true;
     if (on != off) fail("case " + id + ": small reload path on and off differ");
     std::uint32_t used = 0, extents = 0;
-    if (w.size() >= 40) { std::memcpy(&used, w.data() + 8, 4); std::memcpy(&extents, w.data() + 20, 4); }
+    if (w.size() >= 40) { std::memcpy(&used, w.data() + 24, 4); std::memcpy(&extents, w.data() + 28, 4); }
     small_reload_eligible += w.size() >= 40 && used <= 32768 && extents == 0;
     ++small_reload_compared;
 }
@@ -163,7 +163,7 @@ int main(int argc, char** argv) {
     const auto in = make_inputs(seed);
     std::size_t sparse = 0;
     for (const auto& w : in.pool) {
-        xo::XWireHeaderV2 h; std::memcpy(&h, w.data(), kHeader);
+        xo::XWireHeader h; std::memcpy(&h, w.data(), kHeader);
         sparse += h.extent_count != 0;
     }
     // V1 input is rejected explicitly.

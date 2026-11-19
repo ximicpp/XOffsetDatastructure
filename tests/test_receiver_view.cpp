@@ -156,13 +156,13 @@ struct Exact {
     std::span<const std::byte> span() const { return {bytes.get(), size}; }
 };
 
-XWireHeaderV2 header_of(const std::string& w) {
-    XWireHeaderV2 h;
+XWireHeader header_of(const std::string& w) {
+    XWireHeader h;
     std::memcpy(&h, w.data(), sizeof(h));
     return h;
 }
-// Wire position of payload offset `off` (dense wire).
-std::size_t at(std::uint64_t off) { return sizeof(XWireHeaderV2) + std::size_t(off - XWIRE_PAYLOAD_BEGIN); }
+// Wire position of image offset `off` (a dense wire is the image).
+std::size_t at(std::uint64_t off) { return std::size_t(off); }
 template <class V> void put(std::string& w, std::size_t pos, V v) { std::memcpy(w.data() + pos, &v, sizeof(v)); }
 template <class V> V get(const std::string& w, std::size_t pos) {
     V v;
@@ -225,17 +225,17 @@ void rejects_framing() {
     bad[3] = char(bad[3] + 1);
     rejects(bad, XErrc::unsupported_version, "other version");
     bad = wire;
-    put<std::uint32_t>(bad, 4, 1);
-    rejects(bad, XErrc::unsupported_flags, "flags");
+    put<std::uint32_t>(bad, offsetof(XWireHeader, header_bytes), 48);
+    rejects(bad, XErrc::unsupported_flags, "header size");
     bad = wire;
-    put<std::uint64_t>(bad, 24, get<std::uint64_t>(wire, 24) ^ 1);
+    put<std::uint64_t>(bad, offsetof(XWireHeader, schema_hash), get<std::uint64_t>(wire, 8) ^ 1);
     rejects(bad, XErrc::schema_mismatch, "schema hash");
     bad = wire;
-    put<std::uint64_t>(bad, 32, get<std::uint64_t>(wire, 32) ^ 1);
+    put<std::uint64_t>(bad, offsetof(XWireHeader, root_type_id), get<std::uint64_t>(wire, 16) ^ 1);
     rejects(bad, XErrc::root_type_mismatch, "root type");
-    bad = wire;
-    put<std::uint32_t>(bad, 12, header_of(wire).used_bytes);
-    rejects(bad, XErrc::root_offset_out_of_bounds, "root offset at used");
+    bad = wire.substr(0, XWIRE_PAYLOAD_BEGIN);
+    put<std::uint32_t>(bad, offsetof(XWireHeader, used_bytes), XWIRE_PAYLOAD_BEGIN);
+    rejects(bad, XErrc::root_offset_out_of_bounds, "no root");
     bad = wire;
     bad.pop_back();
     rejects(bad, XErrc::size_mismatch, "short body");
@@ -391,10 +391,10 @@ void mutations_read_in_bounds() {
         Rng rng{seed * 977};
         for (int m = 0; m < 60; ++m) {
             std::string w = wire;
-            const auto body = w.size() - sizeof(XWireHeaderV2);
+            const auto body = w.size() - sizeof(XWireHeader);
             const int edits = 1 + int(rng.below(3));
             for (int e = 0; e < edits; ++e) {
-                const auto pos = sizeof(XWireHeaderV2) + (body ? rng.below(std::uint32_t(body)) : 0);
+                const auto pos = sizeof(XWireHeader) + (body ? rng.below(std::uint32_t(body)) : 0);
                 switch (rng.below(4)) {
                 case 0: w[pos] = char(rng.next()); break;
                 case 1: if (pos + 4 <= w.size()) put<std::uint32_t>(w, pos & ~std::size_t(3), std::uint32_t(rng.next())); break;

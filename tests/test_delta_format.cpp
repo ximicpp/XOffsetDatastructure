@@ -1,4 +1,4 @@
-// Delta format 1.0 is frozen (docs/DELTA_SYNC.md section 2, "Stability").
+// Delta format 2.0 is frozen (docs/DELTA_SYNC.md section 2, "Stability").
 //
 // A root of plain fields has one layout on every 64-bit little-endian target
 // and no allocation placement to depend on, so its deltas are pinned byte for
@@ -53,40 +53,40 @@ std::string le(V v) {
 
 constexpr std::uint64_t kStream = 0x0123456789abcdefull;
 
-// The payload: arena header [0, 48), the root at 48 (16 bytes), used_end 64.
-// Key delta, version 1: KEY | HOLES | EXTENT, used (64 - 48) / 8 = 2, root
-// 48 - 48 = 0, one block; the fingerprint; block 0 (skip 0) with mask bytes
-// for words 6 and 7 (selector 0xc0): a's eight bytes (0xff), and of word 7
+// The image: header [0, 40), the root at 40 (16 bytes), used_end 56.
+// Key delta, version 1: KEY | HOLES | EXTENT, used (56 - 40) / 8 = 2, root
+// 40 - 40 = 0, one block; the fingerprint; block 0 (skip 0) with mask bytes
+// for words 5 and 6 (selector 0x60): a's eight bytes (0xff), and of word 6
 // only the nonzero bytes, b's first and c's first (0x11), since a key delta
 // applies to zeros; then those ten bytes; no holes.
 std::string key_delta() {
-    std::string d = {'X', 'D', char(0x10), char(0x0b)};
+    std::string d = {'X', 'D', char(0x20), char(0x0b)};
     d += le(kStream);
     d += char(1) + std::string(1, char(2)) + char(0) + char(1);
     d += le(detail::wire_schema_hash<FrozenRoot>()) + le(detail::wire_root_type_id<FrozenRoot>());
-    d += std::string{char(0), char(0xc0), char(0xff), char(0x11)};
+    d += std::string{char(0), char(0x60), char(0xff), char(0x11)};
     d += le(std::uint64_t(0x1122334455667788ull)) + char(7) + char(9);
     d += char(0);  // hole count
     return d;
 }
 
 // Version 2: b = 8. No flags (used_end and root stay): 14-byte header, one
-// block, selector 0x80 (word 7), mask 0x01 (its first byte), the byte.
+// block, selector 0x40 (word 6), mask 0x01 (its first byte), the byte.
 std::string scalar_delta() {
-    std::string d = {'X', 'D', char(0x10), char(0)};
+    std::string d = {'X', 'D', char(0x20), char(0)};
     d += le(kStream);
     d += char(2) + std::string(1, char(1));
-    d += std::string{char(0), char(0x80), char(0x01), char(8)};
+    d += std::string{char(0), char(0x40), char(0x01), char(8)};
     return d;
 }
 
-// Version 3: a's low four bytes, with DIGEST: xxHash64 of [48, 64) after it.
+// Version 3: a's low four bytes, with DIGEST: xxHash64 of [40, 56) after it.
 std::string digest_delta(std::uint64_t digest) {
-    std::string d = {'X', 'D', char(0x10), char(0x04)};
+    std::string d = {'X', 'D', char(0x20), char(0x04)};
     d += le(kStream);
     d += char(3) + std::string(1, char(1));
     d += le(digest);
-    d += std::string{char(0), char(0x40), char(0x0f)};
+    d += std::string{char(0), char(0x20), char(0x0f)};
     d += le(std::uint32_t(0xa0b0c0d0u));
     return d;
 }
@@ -99,7 +99,7 @@ std::uint64_t digest_after() {
 void sender_writes_frozen_bytes() {
     auto src = XBuffer::create<FrozenRoot>(4096, XBuffer::maximum_capacity(1 << 20));
     auto& r = src.root<FrozenRoot>();
-    need(reinterpret_cast<const char*>(&r) - src.data() == 48, "root not at offset 48");
+    need(reinterpret_cast<const char*>(&r) - src.data() == 40, "root not at offset 40");
     r.a = 0x1122334455667788ull;
     r.b = 7;
     r.c = 9;
@@ -137,9 +137,11 @@ void receiver_applies_frozen_bytes(Apply apply, const char* who) {
     need(cur.version() == 3, (what + "cursor after the stream").c_str());
     // Another format byte is refused, whatever follows it.
     std::string other = key_delta();
-    other[2] = char(0x11);
+    other[2] = char(0x21);
     XDeltaCursor fresh;
-    need(!apply(dst, other, fresh), (what + "format 1.1 accepted").c_str());
+    need(!apply(dst, other, fresh), (what + "format 2.1 accepted").c_str());
+    other[2] = char(0x10);
+    need(!apply(dst, other, fresh), (what + "format 1.0 accepted").c_str());
 }
 } // namespace
 

@@ -9,7 +9,7 @@
 // INPUT: a file (one message), a directory (every regular file in it, by
 // name, one message each), or records:FILE (records of [u64 little-endian
 // length][bytes], as slg_bench's SLG_DUMP_DIR hook writes them).
-// --binding auto (default): every sample must be an XOffset 2.1 wire of one
+// --binding auto (default): every sample must be an XOffset 3.0 wire of one
 // schema, and the dictionary is bound to it. none: bound to nothing.
 // Exit 0 on success, 1 when a round trip differs, 2 on usage or input errors.
 #include "xoffset_zstd_dict.hpp"
@@ -149,7 +149,7 @@ int cmd_train(int argc, char** argv) {
     if (!load_inputs(inputs, samples)) return 2;
     if (binding == "auto") {
         if (!zd::wire_binding(samples[0], opt.binding)) {
-            std::fputs("error: sample 0 is not an XOffset 2.1 wire (use --binding none or HEX32)\n", stderr);
+            std::fputs("error: sample 0 is not an XOffset 3.0 wire (use --binding none or HEX32)\n", stderr);
             return 2;
         }
         for (std::size_t i = 1; i < samples.size(); ++i) {

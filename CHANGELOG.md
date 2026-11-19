@@ -5,6 +5,15 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- **Breaking:** wire format 3.0 ([WIRE_FORMAT.md](docs/WIRE_FORMAT.md) section 6). A buffer's
+  memory and its wire are the same bytes: one 40-byte header (magic and version, fingerprint,
+  `used_bytes`, extent count, free directory, free bytes), the root at offset 40, and the free
+  blocks and their directory inside the image. No hole table on the wire. A 3.0 reader rejects
+  2.1 wires and a 2.1 reader rejects 3.0 wires. Send, receive, clone and reset are one copy and a
+  few checks; the full check walks the free directory. `begin_verified_reload<T>(used_bytes,
+  extent_count)` takes the image size; root types are aligned to at most 8 bytes. Whole-state
+  deltas move to format 2.0 (the same framing, image offsets with the root at 40); a 2.0
+  receiver rejects 1.0 deltas.
 - Fixed: a client that includes `<windows.h>` before the library compiles again (a variable in
   `save_delta_into` was named `small`, which `rpcndr.h` defines as a macro).
 - `xoffsetdatastructure.hpp` includes seven parts in its former order: `xoffset_arena.hpp`,
@@ -212,8 +221,8 @@ Includes 3.2.0-rc.1 and rc.2.
 
 ## 3.1.0: wire format 2.1
 
-- **Breaking:** wire format 2.1 (40-byte header, 12-byte container heads;
-  [V2_FORMAT.md](docs/V2_FORMAT.md) section 6). A 2.1 reader rejects 2.0 wires.
+- **Breaking:** wire format 2.1 (40-byte header, 12-byte container heads). A 2.1 reader rejects
+  2.0 wires.
 - Faster dense small-message reloads and `XVector` inserts.
 - Nightly libFuzzer without GitHub Actions.
 

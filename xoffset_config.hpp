@@ -79,6 +79,14 @@
 #define XOFFSET_DETAIL_COLD
 #define XOFFSET_DETAIL_LAMBDA_INLINE
 #endif
+// A value the optimizer must take as it is, in one register: a pointer that
+// several loads use stays one address instead of being selected again for
+// each (LLVM folds an offset into a select of a string's two buffers).
+#if defined(__GNUC__) || defined(__clang__)
+#define XOFFSET_DETAIL_OPAQUE(value) __asm__("" : "+r"(value))
+#else
+#define XOFFSET_DETAIL_OPAQUE(value) ((void)0)
+#endif
 
 // Inlining that GCC 16 does on its own in C++26 mode but not in C++23 (it
 // keeps these out of line in push_back: +7% instructions on reloc.hero
@@ -271,16 +279,16 @@
 #endif
 
 // ---- Allocator --------------------------------------------------------------
-//   XOFFSET_INBAND_ALLOCATOR  the allocator's state is payload bytes: free
-//                             blocks of one size are linked through their
-//                             first 4 bytes, and a directory block of the
-//                             payload holds one list head per size (see
-//                             XBufferCore, "In-band allocator"). Off: the
-//                             host-side free table. Being introduced: off by
-//                             default until the wire carries the directory.
-#ifndef XOFFSET_INBAND_ALLOCATOR
-#  define XOFFSET_INBAND_ALLOCATOR 0
+// The allocator's state is payload bytes (wire 3.0 carries it): free blocks
+// of one size are linked through their first 4 bytes, and a directory block
+// of the payload holds one list head per size (see XBufferCore, "In-band
+// allocator"). XOFFSET_INBAND_ALLOCATOR remains only until the host-side free
+// table is deleted; 0 is no longer supported.
+#if defined(XOFFSET_INBAND_ALLOCATOR) && !XOFFSET_INBAND_ALLOCATOR
+#  error "XOFFSET_INBAND_ALLOCATOR=0 is not supported: wire 3.0 carries the in-band allocator"
 #endif
+#undef XOFFSET_INBAND_ALLOCATOR
+#define XOFFSET_INBAND_ALLOCATOR 1
 
 // ---- Per-thread caches -----------------------------------------------------
 // Per-thread caches (this slab's free lists, the free-table cache and the

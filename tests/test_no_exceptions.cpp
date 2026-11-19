@@ -55,12 +55,12 @@ std::string make_wire(std::uint64_t id, std::size_t n) {
     return b.save_verified<NoExcRoot>();
 }
 
-XWireHeaderV2 header_of(const std::string& w) {
-    XWireHeaderV2 h{};
+XWireHeader header_of(const std::string& w) {
+    XWireHeader h{};
     std::memcpy(&h, w.data(), sizeof(h));
     return h;
 }
-std::string with_header(std::string w, const XWireHeaderV2& h) {
+std::string with_header(std::string w, const XWireHeader& h) {
     std::memcpy(w.data(), &h, sizeof(h));
     return w;
 }
@@ -144,20 +144,17 @@ void reload_rejections(const std::vector<Rejection>& cases, const std::string& g
          "TypedXBuffer::try_reload_verified refusal");
 }
 
-// Direct reload delivered from a whole wire (dense: no extent table).
+// Direct reload delivered from a whole wire (dense: the image, no extent
+// table).
 XStatus direct(XBuffer& target, const std::string& w, bool complete_all = true) {
     const auto h = header_of(w);
-    auto begun = target.try_begin_verified_reload<NoExcRoot>(h.used_bytes, h.hole_count, h.extent_count);
+    auto begun = target.try_begin_verified_reload<NoExcRoot>(h.used_bytes, h.extent_count);
     if (!begun) return begun.error();
     auto& token = *begun;
-    std::memcpy(token.header_bytes().data(), w.data(), sizeof(XWireHeaderV2));
-    const auto payload = token.payload_bytes();
-    const auto holes = token.hole_bytes();
-    if (sizeof(XWireHeaderV2) + payload.size() + holes.size() != w.size())
-        return XError{XErrc::size_mismatch, "test: wire length"};
-    std::memcpy(payload.data(), w.data() + sizeof(XWireHeaderV2), payload.size());
-    if (!holes.empty()) std::memcpy(holes.data(), w.data() + sizeof(XWireHeaderV2) + payload.size(), holes.size());
-    token.complete(sizeof(XWireHeaderV2), complete_all ? payload.size() : payload.size() - 8, holes.size(), 0);
+    const auto image = token.image_bytes();
+    if (image.size() != w.size()) return XError{XErrc::size_mismatch, "test: wire length"};
+    std::memcpy(image.data(), w.data(), image.size());
+    token.complete(complete_all ? image.size() : image.size() - 8, 0);
     return token.try_finish();
 }
 
@@ -174,10 +171,10 @@ void direct_reload(const std::string& good, const std::string& corrupt) {
          "direct reload with a short delivery: " + describe(incomplete.error()));
     need(bool(direct(target, good)) && holds(target, 7, 300), "direct reload after refusals");
     // Counts that cannot fit the payload are refused by begin.
-    auto begun = target.try_begin_verified_reload<NoExcRoot>(64, 9, 0);
+    auto begun = target.try_begin_verified_reload<NoExcRoot>(64, 9);
     need(!begun && begun.code() == XErrc::size_mismatch &&
              begun.error().message == "reload_verified<T>(): used size mismatch",
-         "try_begin_verified_reload with too many holes");
+         "try_begin_verified_reload with too many extents");
     {
         auto open = target.try_begin_verified_reload<NoExcRoot>(64);
         need(bool(open), "try_begin_verified_reload");
@@ -236,15 +233,15 @@ int main(int argc, char** argv) {
     std::string corrupt = good;
     {
         // The name's heap block offset (after id, at the root) pointed
-        // outside the payload.
-        const auto at = sizeof(XWireHeaderV2) + (h.root_offset - XWIRE_PAYLOAD_BEGIN) + 8;
+        // outside the image (a dense wire is the image).
+        const auto at = XWIRE_PAYLOAD_BEGIN + 8;
         std::memset(corrupt.data() + at, 0x7f, 16);
     }
     auto magic = good; magic[0] = 'Q';
     auto v1 = good; std::memcpy(v1.data(), "XOFFV1\0\0", 8);
-    auto flags = h; flags.flags = 0x10;
+    auto size = h; size.header_bytes = 48;
     auto used = h; used.used_bytes += 4;
-    auto root = h; root.root_offset = used.used_bytes + 64;
+    auto root = h; root.used_bytes = XWIRE_PAYLOAD_BEGIN;
     auto schema = h; schema.schema_hash ^= 1;
     auto type = h; type.root_type_id ^= 1;
 
@@ -252,11 +249,11 @@ int main(int argc, char** argv) {
         {"truncated", good.substr(0, 20), XErrc::truncated, "load_verified<T>(): truncated wire header"},
         {"bad magic", magic, XErrc::bad_magic, "load_verified<T>(): not an XOffset wire (bad magic)"},
         {"format 1", v1, XErrc::unsupported_version,
-         "load_verified<T>(): wire format 1 is not supported; this build reads 2.1"},
-        {"flags", with_header(good, flags), XErrc::unsupported_flags,
-         "load_verified<T>(): unsupported wire flags 0x00000010"},
+         "load_verified<T>(): wire format 1 is not supported; this build reads 3.0"},
+        {"header size", with_header(good, size), XErrc::unsupported_flags,
+         "load_verified<T>(): unsupported header size 0x00000030"},
         {"used size", with_header(good, used), XErrc::size_mismatch, "load_verified<T>(): used size mismatch"},
-        {"root offset", with_header(good, root), XErrc::root_offset_out_of_bounds,
+        {"no root", with_header(good.substr(0, XWIRE_PAYLOAD_BEGIN), root), XErrc::root_offset_out_of_bounds,
          "load_verified<T>(): root offset out of bounds"},
         {"schema", with_header(good, schema), XErrc::schema_mismatch, nullptr},
         {"root type", with_header(good, type), XErrc::root_type_mismatch, nullptr},

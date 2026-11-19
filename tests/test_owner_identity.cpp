@@ -486,7 +486,7 @@ void alias_roundtrip_and_thread_exit() {
     for (unsigned i=0;i!=512;++i) { auto x=make_buffer(); (void)xo::XBufferCore::owner_from_arena(binding(x).segment); }
     need(host::live.load() <= baseline, "dead host records accumulated across owner lifetimes");
     static_assert(sizeof(xo::XString)==12 && sizeof(xo::XVectorCore<std::uint32_t>)==12);
-    static_assert(sizeof(xo::XBufferCore::arena_header)==48);
+    static_assert(sizeof(xo::XBufferCore::arena_header)==40);
 }
 
 xo::XBuffer late_owner;

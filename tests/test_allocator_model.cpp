@@ -12,7 +12,7 @@ namespace {
 // V2 blocks carry no header: a block's extent is derived from its owner as
 // round8(requested bytes). The oracle computes this itself.
 std::uint64_t extent(std::uint32_t bytes) { return (std::uint64_t(bytes)+7u)&~std::uint64_t(7); }
-constexpr std::uint64_t payload_header_bytes=48;
+constexpr std::uint64_t payload_header_bytes=sizeof(XBufferCore::arena_header);
 struct Live { void* ptr{}; std::uint32_t bytes{}; unsigned char value{}; std::size_t alignment{}; };
 using Holes=std::vector<XBufferCore::WireHole>;
 // Full ownership after every operation: header + live blocks + the host-side
@@ -114,7 +114,7 @@ void trace(std::uint64_t seed,std::size_t operations,bool automatic) {
                 if(!tail) require(!expanded,"non-tail block expanded in place");
                 else if(fits) require(expanded,"tail block within capacity failed to expand");
                 if(expanded) {
-                    require(b.arena()->used_end==std::max(used_before,off+extent(new_size)),"expand did not move used_end to the new extent");
+                    require(b.arena()->used_end==std::max<std::uint64_t>(used_before,off+extent(new_size)),"expand did not move used_end to the new extent");
                     std::memset(static_cast<char*>(item.ptr)+item.bytes,item.value,new_size-item.bytes); item.bytes=new_size;
                 } else require(b.arena()->used_end==used_before,"failed expand changed used_end");
             }
