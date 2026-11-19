@@ -422,28 +422,32 @@ namespace XOffsetDatastructure {
             }
         }
 
+        // The storage type of T's root object (T itself, or its reflected wrapper).
         template <typename T>
-        T* find_root_at(XBufferCore& xbuf, std::uint64_t root_offset) {
-            if constexpr (has_wire_allocator_ctor<T>) {
-                return xbuf.template find_root_storage_at<T>(root_offset);
-            } else {
-                auto* wrapper = xbuf.template find_root_storage_at<ReflectRoot<T>>(root_offset);
-                return wrapper ? &wrapper->ref() : nullptr;
-            }
+        using root_storage_t = std::conditional_t<has_wire_allocator_ctor<T>, T, ReflectRoot<T>>;
+
+        // find_root for an image known to hold T's root (used_end >= 40 +
+        // sizeof(root_storage_t<T>), checked by the caller).
+        template <typename T>
+        XOFFSET_DETAIL_INLINE T* image_root(XBufferCore& xbuf) noexcept {
+            auto* storage = xbuf.template root_storage_unchecked<root_storage_t<T>>();
+            if constexpr (has_wire_allocator_ctor<T>) return storage;
+            else return &storage->ref();
         }
 
-        // Wire header of a payload of `used` bytes with the root at
-        // `root_offset` and `holes` hole table entries; the writer sets
-        // extent_count. Sizes fit: used_bytes <= MAX_PAYLOAD < 2 GiB.
+        // Wire header of an image of `used` bytes with T's fingerprint and
+        // the given free state; the writer sets extent_count. Sizes fit:
+        // used_bytes <= MAX_PAYLOAD < 2 GiB.
         template <typename T>
-        XWireHeaderV2 make_wire_header(std::uint64_t used, std::uint64_t root_offset,
-                                       std::uint64_t holes) noexcept {
-            XWireHeaderV2 header{};
+        XWireHeader make_wire_header(std::uint64_t used, std::uint32_t free_dir = 0,
+                                     std::uint32_t free_bytes = 0) noexcept {
+            XWireHeader header{};
             header.magic = XWIRE_MAGIC;
-            header.flags = XWIRE_FLAGS;
+            header.header_bytes = static_cast<std::uint32_t>(sizeof(XWireHeader));
             header.used_bytes = static_cast<std::uint32_t>(used);
-            header.root_offset = static_cast<std::uint32_t>(root_offset);
-            header.hole_count = static_cast<std::uint32_t>(holes);
+            header.extent_count = 0;
+            header.free_dir = free_dir;
+            header.free_bytes = free_bytes;
             header.schema_hash = wire_schema_hash<T>();
             header.root_type_id = wire_root_type_id<T>();
             return header;

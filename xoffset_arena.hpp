@@ -404,17 +404,20 @@ namespace XOffsetDatastructure {
     public:
         using size_type = std::size_t;
 
-        // V2 payload header. Blocks carry no headers: every block is 8-byte
-        // aligned with a length that is a multiple of 8, and its extent is
-        // derived from the owning head (see XBufferCore::allocate_block).
+        // The image header (wire 3.0): the first 40 bytes of the payload,
+        // the same in memory and on the wire (docs/WIRE_FORMAT.md). The root
+        // object follows at offset 40. Blocks carry no headers: every block
+        // is 8-byte aligned with a length that is a multiple of 8, and its
+        // extent is derived from the owning head (see
+        // XBufferCore::allocate_block).
         struct alignas(8) arena_header {
-            char magic[8];
-            std::uint32_t header_size = 0;
-            std::uint32_t flags = 0;
-            std::uint64_t root_offset = 0;
-            std::uint64_t used_end = 0;
-            std::uint64_t reserved0 = 0;
-            std::uint64_t reserved1 = 0;
+            std::uint64_t magic = 0;          // image_magic: 'X' 'O' major minor, then the header size (40)
+            std::uint64_t schema_hash = 0;    // fingerprint of the root type (0 while none is bound)
+            std::uint64_t root_type_id = 0;
+            std::uint32_t used_end = 0;       // bytes of the image, this header included
+            std::uint32_t extent_count = 0;   // 0: an image is dense (a sparse wire's extent count)
+            std::uint32_t free_dir = 0;       // in-band allocator: the directory's offset (0: no free block)
+            std::uint32_t free_bytes = 0;     // bytes of the free blocks, the directory not counted
 
             void* allocate_aligned(std::uint32_t bytes, std::size_t alignment) {
                 return owner().allocate_block(block_size(bytes), alignment);
@@ -622,11 +625,12 @@ namespace XOffsetDatastructure {
             XOFFSET_VREQUIRE(init_from_bytes(data, size, cap.value, cap.pool, cap.storage, cap.reserve));
         }
 
-        // The payload of an admitted wire (see XWireHeaderV2): the payload
-        // bytes from offset 48, dense (extent_count 0) or as extents. The
-        // payload header is written from root_offset and the size.
+        // The image of an admitted wire: dense (extent_count 0), `stored`
+        // is the image itself, header included; sparse, `stored` is the
+        // 40-byte header, `extents` the extent table, and the extents' bytes
+        // follow the table (the gaps load as zero). The copied header's
+        // extent count is cleared (an image is dense).
         struct WirePayload {
-            std::uint64_t root_offset;
             const char* stored;
             const void* extents;
             std::size_t extent_count;
@@ -964,8 +968,6 @@ namespace XOffsetDatastructure {
             std::swap(root_type_identity_, other.root_type_identity_);
             std::swap(typed_root_access_allowed_, other.typed_root_access_allowed_);
             std::swap(schema_bound_, other.schema_bound_);
-            std::swap(bound_root_type_id_, other.bound_root_type_id_);
-            std::swap(bound_schema_hash_, other.bound_schema_hash_);
             advance_epoch();
             other.advance_epoch();
             // No record is written: a record follows its payload, so after the
@@ -996,28 +998,33 @@ namespace XOffsetDatastructure {
             return std::launder(reinterpret_cast<const arena_header*>(buffer_.data()));
         }
 
+        // The root object is the image's first block, at root_at: there is
+        // one when the image holds a block of T's size past the header.
         template <typename T>
         T* find_root_storage() noexcept {
-            return arena() ? object_at_offset<T>(root_offset_value()) : nullptr;
+            const auto* sm = arena();
+            return sm && sm->used_end >= root_at + sizeof(T) ? object_at_offset<T>(root_at) : nullptr;
+        }
+
+        // The root object of an image known to hold one (used_end >= root_at
+        // + sizeof(T), checked by the caller): at root_at.
+        template <typename T>
+        XOFFSET_DETAIL_INLINE T* root_storage_unchecked() noexcept {
+            static_assert(alignof(T) <= 8);
+            return std::launder(reinterpret_cast<T*>(buffer_.data() + root_at));
         }
 
         template <typename T>
         const T* find_root_storage() const noexcept {
-            return arena() ? object_at_offset_const<T>(root_offset_value()) : nullptr;
-        }
-
-        // find_root_storage for a root offset the caller already holds (it
-        // wrote root_offset_value() from it).
-        template <typename T>
-        T* find_root_storage_at(std::uint64_t root_offset) noexcept {
-            return object_at_offset<T>(root_offset);
+            const auto* sm = arena();
+            return sm && sm->used_end >= root_at + sizeof(T) ? object_at_offset_const<T>(root_at) : nullptr;
         }
 
         // BindType false: the caller keeps the root type identity, which
         // already names the root (XBuffer::reset<T>()'s same-type path).
         template <typename T, bool BindType = true, typename... Args>
         XOFFSET_DETAIL_INLINE T* construct_root_storage(Args&&... args) {
-            T* result = construct_object_at_slot<T>(root_offset_slot(), std::forward<Args>(args)...);
+            T* result = construct_root_object<T>(std::forward<Args>(args)...);
             if constexpr (BindType) bind_root_type<T>();
             return result;
         }
@@ -1038,21 +1045,30 @@ namespace XOffsetDatastructure {
         };
         static_assert(sizeof(WireHole) == 8);
 
-        // The payload header of a received wire, which does not carry it:
-        // six 8-byte stores (magic, header_size with flags 0, root_offset,
-        // used_end, the two reserved words).
-        static void write_payload_header(char* base, std::uint64_t root_offset, std::uint64_t used_end) noexcept {
-            static_assert(offsetof(arena_header, header_size) == 8 && offsetof(arena_header, flags) == 12 &&
-                          offsetof(arena_header, root_offset) == 16 && offsetof(arena_header, used_end) == 24 &&
-                          offsetof(arena_header, reserved0) == 32 && sizeof(arena_header) == 48);
-            const std::uint64_t size_and_flags = sizeof(arena_header); // little-endian: flags (high half) 0
-            const std::uint64_t zero = 0;
-            std::memcpy(base, payload_magic_, 8);
-            std::memcpy(base + 8, &size_and_flags, 8);
-            std::memcpy(base + 16, &root_offset, 8);
-            std::memcpy(base + 24, &used_end, 8);
-            std::memcpy(base + 32, &zero, 8);
-            std::memcpy(base + 40, &zero, 8);
+        // The image header's layout (docs/WIRE_FORMAT.md). image_magic is
+        // 'X' 'O' 3 0 (the format version) followed by the header size.
+        static_assert(sizeof(arena_header) == 40 && offsetof(arena_header, schema_hash) == 8 &&
+                      offsetof(arena_header, root_type_id) == 16 && offsetof(arena_header, used_end) == 24 &&
+                      offsetof(arena_header, extent_count) == 28 && offsetof(arena_header, free_dir) == 32 &&
+                      offsetof(arena_header, free_bytes) == 36);
+        static constexpr std::uint8_t image_format_major = 3;
+        static constexpr std::uint8_t image_format_minor = 0;
+        static constexpr std::uint64_t image_magic = 0x4F58u | (std::uint64_t(image_format_major) << 16) |
+                                                     (std::uint64_t(image_format_minor) << 24) |
+                                                     (std::uint64_t(sizeof(arena_header)) << 32);
+        // The root object's offset: right past the header.
+        static constexpr std::uint32_t root_at = sizeof(arena_header);
+
+        // The header of an image of `used` bytes whose payload is written in
+        // place (a key delta): no free block until the caller records them.
+        static void write_image_header(char* base, std::uint64_t used, std::uint64_t schema_hash,
+                                       std::uint64_t root_type_id) noexcept {
+            arena_header header{};
+            header.magic = image_magic;
+            header.schema_hash = schema_hash;
+            header.root_type_id = root_type_id;
+            header.used_end = static_cast<std::uint32_t>(used);
+            std::memcpy(base, &header, sizeof(header));
         }
 
         // Host owner of a payload base (the arena header address). V2 keeps it
@@ -1264,7 +1280,7 @@ namespace XOffsetDatastructure {
         // Entries [0, n) are in use; every other one is {inband_end, 0}, and
         // n < cap, so a scan for the first entry of at least a size needs no
         // bound. A size whose stack emptied keeps its entry (head 0). The
-        // payload header's reserved0 holds the directory's offset (at 32; 0:
+        // image header holds the directory's offset (free_dir, at 32; 0:
         // no directory, so no free block) and the bytes of all free blocks
         // (at 36, the directory not counted). The first retirement makes the
         // directory: inside the retired block when that is large enough (up
@@ -1579,6 +1595,48 @@ namespace XOffsetDatastructure {
             std::size_t count = 0;
             inband_for_each([&](WireHole) noexcept { ++count; });
             return count;
+        }
+
+        // The full check of a loaded image's free state: the directory and
+        // every stack hold what the allocator relies on (blocks inside the
+        // image, aligned, each stack of one size, the sizes ascending, the
+        // unused entries unused, a second word of zero in every free block,
+        // the free bytes the header names), and the stacks end (at most one
+        // block per word of the image). Appends the directory block, then
+        // each free block, to `out`: the graph walk checks that they tile the
+        // image with the live blocks, so no two overlap. False: malformed.
+        template <typename Push>
+        bool inband_collect(Push&& out) const {
+            const auto* sm = arena();
+            if (!sm) return false;
+            const char* const base = reinterpret_cast<const char*>(sm);
+            const std::uint64_t used = sm->used_end;
+            const std::uint32_t dir = sm->free_dir;
+            if (dir == 0) return sm->free_bytes == 0;
+            if ((dir & 7u) != 0 || dir < root_at || std::uint64_t(dir) + 8u > used) return false;
+            const std::uint32_t n = inband_word(base + dir), cap = inband_word(base + dir + 4u);
+            if (n >= cap || std::uint64_t(dir) + 8u + 8u * std::uint64_t(cap) > used) return false;
+            out(WireHole{dir, inband_dir_bytes(cap)});
+            std::uint64_t total = 0, blocks = 0;
+            std::uint32_t previous = 0;
+            for (std::uint32_t i = 0; i < cap; ++i) {
+                const std::uint32_t bytes = inband_word(base + dir + 8u + 8u * i);
+                const std::uint32_t head = inband_word(base + dir + 12u + 8u * i);
+                if (i >= n) {
+                    if (bytes != inband_end || head != 0) return false;
+                    continue;
+                }
+                if (bytes <= previous || (bytes & 7u) != 0 || bytes == inband_end) return false;
+                previous = bytes;
+                for (std::uint32_t at = head; at != 0; at = inband_word(base + at)) {
+                    if ((at & 7u) != 0 || at < root_at || std::uint64_t(at) + bytes > used ||
+                        inband_word(base + at + 4u) != 0 || ++blocks > used / 8u)
+                        return false;
+                    out(WireHole{at, bytes});
+                    total += bytes;
+                }
+            }
+            return total == sm->free_bytes;
         }
 
         // A loaded table of free blocks (`holes` need not be aligned).
@@ -2969,7 +3027,6 @@ namespace XOffsetDatastructure {
 
         void publish_host_owner() noexcept { buffer_.set_host_owner(this); }
 
-        static constexpr char payload_magic_[8] = {'X', 'B', 'U', 'F', 'V', '2', '\0', '\0'};
 
         // Host-only identity: the lease that host-callback revalidation reads.
         // A record follows one payload reservation, never a particular Core
@@ -3014,7 +3071,7 @@ namespace XOffsetDatastructure {
         }
 
         static size_type min_payload_size() noexcept {
-            return sizeof(arena_header); // 48: a multiple of 8 on every platform
+            return sizeof(arena_header); // 40: a multiple of 8 on every platform
         }
 
         // Storage rule. VM: a pool, Pinned, Automatic growth with a
@@ -3157,30 +3214,34 @@ namespace XOffsetDatastructure {
             XOFFSET_VTRY(plan_storage(size, max_reserved, packed_.growth_policy, pool.enabled(), request, plan));
             return init_from_storage(wire.stored, size, max_reserved,
                                      [&](detail::VirtualMemoryStorage& owner) -> detail::vstatus {
+                const char* extents = static_cast<const char*>(wire.extents) + wire.extent_count * 8u;
                 if (packed_.growth_policy == XGrowPolicy::Relocating && size <= max_reserved) {
                     if (!relocating_owner(owner, size, max_reserved, std::max(size, reserve_or_default(reserve, size))))
                         XOFFSET_VFAIL_BAD_ALLOC();
                     if (wire.extent_count == 0)
-                        XOFFSET_VTRY(owner.assign_bytes_v(wire.stored, size, sizeof(arena_header)));
+                        XOFFSET_VTRY(owner.assign_bytes_v(wire.stored, size));
                     else
-                        XOFFSET_VTRY(owner.assign_extents_v(wire.stored, wire.extents, wire.extent_count, size));
+                        XOFFSET_VTRY(owner.assign_extents_v(extents, wire.extents, wire.extent_count, size));
                 } else if (!plans_slot(plan) || size > max_reserved) {
                     if (wire.extent_count == 0)
                         XOFFSET_VTRY(detail::VirtualMemoryStorage::from_bytes_v(owner, wire.stored, size, max_reserved,
-                                                                                pool, sizeof(arena_header)));
+                                                                                pool));
                     else
-                        XOFFSET_VTRY(detail::VirtualMemoryStorage::from_extents_v(owner, wire.stored, wire.extents,
+                        XOFFSET_VTRY(detail::VirtualMemoryStorage::from_extents_v(owner, extents, wire.extents,
                                                                                   wire.extent_count, size,
                                                                                   max_reserved, pool));
                 } else {
                     XOFFSET_VTRY(detail::VirtualMemoryStorage::for_slot_v(owner, plan.slot_class, max_reserved,
                                                                           plan.movable));
                     if (wire.extent_count == 0)
-                        XOFFSET_VTRY(owner.assign_bytes_v(wire.stored, size, sizeof(arena_header)));
+                        XOFFSET_VTRY(owner.assign_bytes_v(wire.stored, size));
                     else
-                        XOFFSET_VTRY(owner.assign_extents_v(wire.stored, wire.extents, wire.extent_count, size));
+                        XOFFSET_VTRY(owner.assign_extents_v(extents, wire.extents, wire.extent_count, size));
                 }
-                write_payload_header(owner.data(), wire.root_offset, size);
+                if (wire.extent_count != 0) copy_wire_header(owner.data(), wire.stored);
+                // The image carries its free blocks: the caller's check takes
+                // them (or rejects the load).
+                free_table_lost_ = false;
                 return detail::vok();
             });
         }
@@ -3247,8 +3308,6 @@ namespace XOffsetDatastructure {
                 root_type_identity_ = std::exchange(other.root_type_identity_, nullptr);
                 typed_root_access_allowed_ = std::exchange(other.typed_root_access_allowed_, true);
                 schema_bound_ = std::exchange(other.schema_bound_, false);
-                bound_root_type_id_ = std::exchange(other.bound_root_type_id_, 0);
-                bound_schema_hash_ = std::exchange(other.bound_schema_hash_, 0);
                 advance_epoch();
                 other.advance_epoch();
                 update_registry_owner();
@@ -3413,14 +3472,6 @@ namespace XOffsetDatastructure {
             return used;
         }
 
-        std::uint64_t& root_offset_slot() noexcept {
-            return arena()->root_offset;
-        }
-
-        const std::uint64_t& root_offset_value() const noexcept {
-            return arena()->root_offset;
-        }
-
         char* payload_byte_address(size_type offset) noexcept { return buffer_.data() + offset; }
         const char* payload_byte_address(size_type offset) const noexcept { return buffer_.data() + offset; }
 
@@ -3447,23 +3498,27 @@ namespace XOffsetDatastructure {
         }
 
         // Inlined into make<T>() (its one caller, through construct_root).
+        // The root is the first block of an empty image, so it lands at
+        // root_at: an empty image has no free block and bumps there.
         template <typename T, typename... Args>
-        XOFFSET_DETAIL_INLINE T* construct_object_at_slot(std::uint64_t& slot, Args&&... args) {
+        XOFFSET_DETAIL_INLINE T* construct_root_object(Args&&... args) {
+            static_assert(alignof(T) <= 8, "the root object is at offset 40: its alignment is at most 8");
             if constexpr (sizeof(T) > MAX_PAYLOAD) XOFFSET_THROW(XBadAlloc());
-            if (slot != 0) {
+            if (arena()->used_end != root_at) {
                 XOFFSET_THROW(XException(XErrc::invalid_state, "XBufferCore: object slot already populated"));
             }
             const auto block = arena_header::block_size(static_cast<std::uint32_t>(sizeof(T)));
             void* raw = allocate_block(block, alignof(T));
+            (void)block;
             T* obj;
             XOFFSET_TRY {
                 obj = std::construct_at(reinterpret_cast<T*>(raw), std::forward<Args>(args)...);
             } XOFFSET_CATCH(...) {
-                retire_block(raw, block);
+                // The image is empty again (what the constructor allocated
+                // goes with it), so the next root lands at root_at too.
+                clear_used_payload();
                 XOFFSET_RETHROW;
             }
-            slot = static_cast<std::uint64_t>(
-                reinterpret_cast<std::uintptr_t>(obj) - reinterpret_cast<std::uintptr_t>(buffer_.data()));
             return obj;
         }
 
@@ -3612,12 +3667,15 @@ namespace XOffsetDatastructure {
             free_table_lost_ = false;
             typed_root_access_allowed_ = false;
             schema_bound_ = false;
-            bound_root_type_id_ = 0;
-            bound_schema_hash_ = 0;
             root_type_identity_ = nullptr;
         }
 
         XOFFSET_DETAIL_INLINE void empty_free_table(bool reset) noexcept {
+            // The in-band allocator keeps no host table (PR5 removes it).
+            if constexpr (detail::inband_allocator) {
+                (void)reset;
+                return;
+            }
             // An empty table whose bins are within the keep limits (not
             // grown since the last empty) is already what a reload keeps.
             if (const FreeTable* table = free_table_.get(); table && (table->count != 0 || table->grown)) {
@@ -3731,8 +3789,7 @@ namespace XOffsetDatastructure {
 
         XOFFSET_DETAIL_INLINE detail::vstatus check_reinit_payload() {
             auto* sm = arena();
-            if (std::memcmp(sm->magic, payload_magic_, sizeof(payload_magic_)) != 0 ||
-                sm->header_size != sizeof(arena_header)) {
+            if (sm->magic != image_magic) {
                 XOFFSET_VFAIL(XException, XErrc::invalid_payload_header, "XBufferCore: payload header mismatch");
             }
             if (sm->used_end < min_payload_size() || sm->used_end > buffer_.size()) {
@@ -3741,7 +3798,7 @@ namespace XOffsetDatastructure {
             // In-band: the free blocks of loaded bytes are unknown until a
             // verified load (or a clone's source) supplies them: no directory.
             if constexpr (detail::inband_allocator)
-                if (free_table_lost_) sm->reserved0 = 0;
+                if (free_table_lost_) { sm->free_dir = 0; sm->free_bytes = 0; }
             zero_past_used_end();
             return detail::vok();
         }
@@ -3750,48 +3807,55 @@ namespace XOffsetDatastructure {
             return reinit_from_storage(data, size, [&] { return buffer_.assign_bytes_v(data, size); });
         }
 
+        // A wire written into the storage in place (a direct reload) carries
+        // its free blocks: the caller's check takes them.
+        void take_loaded_free_state() noexcept { free_table_lost_ = false; }
+
+        // The header of a sparse wire (its extent count names the form; an
+        // image is dense).
+        static void copy_wire_header(char* base, const char* header) noexcept {
+            std::memcpy(base, header, sizeof(arena_header));
+            std::launder(reinterpret_cast<arena_header*>(base))->extent_count = 0;
+        }
+
         detail::vstatus reinit_from_wire(const WirePayload& wire, size_type size) {
             return reinit_from_storage(wire.stored, size, [&]() -> detail::vstatus {
-                if (wire.extent_count == 0) XOFFSET_VTRY(buffer_.assign_bytes_v(wire.stored, size, sizeof(arena_header)));
-                else XOFFSET_VTRY(buffer_.assign_extents_v(wire.stored, wire.extents, wire.extent_count, size));
-                write_payload_header(buffer_.data(), wire.root_offset, size);
+                if (wire.extent_count == 0) {
+                    XOFFSET_VTRY(buffer_.assign_bytes_v(wire.stored, size));
+                } else {
+                    XOFFSET_VTRY(buffer_.assign_extents_v(static_cast<const char*>(wire.extents) + wire.extent_count * 8u,
+                                                          wire.extents, wire.extent_count, size));
+                    copy_wire_header(buffer_.data(), wire.stored);
+                }
+                // The image carries its free blocks: the caller's check takes
+                // them (or rejects the load).
+                free_table_lost_ = false;
                 return detail::vok();
             });
         }
 
-        // reinit_from_wire for a dense wire when the storage already holds
-        // `size` bytes in place (a reload into a buffer of sufficient size):
-        // every admission check of admit_reinit holds, so only its state
-        // changes remain.
-        XOFFSET_DETAIL_INLINE detail::vstatus reinit_from_dense_wire_in_place(const char* stored,
-                                                                                   std::uint64_t root_offset,
-                                                                                   size_type size) {
-            if (size < sizeof(arena_header) || !buffer_.can_assign_in_place(size)) [[unlikely]] {
-                return reinit_from_wire({root_offset, stored, nullptr, 0}, size);
-            }
-            if (shrinks_by_page(size)) [[unlikely]] return reinit_dense_shrinking_in_place(stored, root_offset, size);
-            begin_reinit();
-            free_table_lost_ = true;
-            if (!buffer_.assign_in_place(stored, size, sizeof(arena_header)))
-                XOFFSET_VFAIL(XBadAlloc, XErrc::out_of_storage, detail::arena_failure_message);
-            // check_reinit_payload() holds by construction: the header was
-            // just written with used_end == size == the logical size, so its
-            // checks pass and nothing lies past used_end to zero.
-            write_payload_header(buffer_.data(), root_offset, size);
-            return detail::vok();
+        // A reload of a dense image of `size` bytes (its header checked by
+        // the caller: used_end == size) in place, the case of each message of
+        // a stream: the storage's accessible prefix holds it and it shrinks
+        // the logical length by less than a page. Anything else takes
+        // reinit_from_wire.
+        XOFFSET_DETAIL_INLINE bool can_reload_image_in_place(size_type size) const noexcept {
+            // size >= sizeof(arena_header) (the caller's header check).
+            return buffer_.holds_in_place(size) && !shrinks_by_page(size);
         }
-
-        XOFFSET_DETAIL_NOINLINE detail::vstatus reinit_dense_shrinking_in_place(const char* stored,
-                                                                               std::uint64_t root_offset,
-                                                                               size_type size) {
-            const ZeroTail tail = settled_zero_tail();
-            begin_reinit();
-            free_table_lost_ = true;
-            if (!buffer_.assign_in_place(stored, size, sizeof(arena_header)))
-                XOFFSET_VFAIL(XBadAlloc, XErrc::out_of_storage, detail::arena_failure_message);
-            note_reinit_zero_tail(tail, size);
-            write_payload_header(buffer_.data(), root_offset, size);
-            return detail::vok();
+        // The copy of such a reload (can_reload_image_in_place held): every
+        // admission check of admit_reinit holds, and check_reinit_payload()
+        // by construction (nothing lies past used_end to zero), so only the
+        // epoch and the image change. The free state is the image's. Typed
+        // access, the binding and the root cache are left as they are: the
+        // caller publishes the new root (at root_at, where a root of the same
+        // type already was) or, on any failure, resets the arena, which
+        // clears them. False: an injected storage failure, nothing copied.
+        XOFFSET_DETAIL_INLINE bool reload_image_in_place(const char* image, size_type size) noexcept {
+            if (ctl_) [[unlikely]] end_lineage();
+            ++m_epoch;
+            free_table_lost_ = false;
+            return buffer_.assign_in_place(image, size, 0);
         }
 
         // In-place direct receive (XBuffer::begin_verified_reload): the
@@ -3820,7 +3884,8 @@ namespace XOffsetDatastructure {
                 // The payload copy holds src's free blocks; its header word
                 // (cleared by the load) is src's again.
                 if (!src.free_table_lost_) {
-                    arena()->reserved0 = src.arena()->reserved0;
+                    arena()->free_dir = src.arena()->free_dir;
+                    arena()->free_bytes = src.arena()->free_bytes;
                     inband_stale();
                     free_table_lost_ = false;
                 }
@@ -3838,8 +3903,6 @@ namespace XOffsetDatastructure {
             }
             typed_root_access_allowed_ = src.typed_root_access_allowed_;
             schema_bound_ = src.schema_bound_;
-            bound_root_type_id_ = src.bound_root_type_id_;
-            bound_schema_hash_ = src.bound_schema_hash_;
             root_type_identity_ = src.root_type_identity_;
         }
 
@@ -3930,15 +3993,15 @@ namespace XOffsetDatastructure {
             if constexpr (!detail::scrub_reset) packed_.reset_dirty_end = 0;
         }
 
+        // An empty image: no root, no free block. The fingerprint words
+        // are left as they are (a make<T>() writes them).
         void write_empty_header() noexcept {
             auto* sm = arena();
-            std::memcpy(sm->magic, payload_magic_, sizeof(payload_magic_));
-            sm->header_size = static_cast<std::uint32_t>(sizeof(arena_header));
-            sm->flags = 0;
-            sm->root_offset = 0;
-            sm->used_end = min_payload_size();
-            sm->reserved0 = 0;
-            sm->reserved1 = 0;
+            sm->magic = image_magic;
+            sm->used_end = root_at;
+            sm->extent_count = 0;
+            sm->free_dir = 0;
+            sm->free_bytes = 0;
         }
 
         // The bytes past a loaded payload's used_end are zeroed, so the
@@ -4019,10 +4082,6 @@ namespace XOffsetDatastructure {
         FreeTablePtr free_table_;
         detail::VirtualMemoryStorage buffer_;
         OwnerRecordPtr owner_record_;
-
-    protected:
-        std::uint64_t bound_root_type_id_ = 0;
-        std::uint64_t bound_schema_hash_ = 0;
 
     private:
         uint64_t dirty_epoch_ = 0;  // m_epoch when dirty_step_ was last reset
