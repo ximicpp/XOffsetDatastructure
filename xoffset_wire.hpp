@@ -3,7 +3,7 @@
 
 // The wire: its header and extent table, the emission forms, the save and
 // delta options, and validation of a received wire against its type. Part
-// of xoffsetdatastructure.hpp; include that header. Format: docs/V2_FORMAT.md;
+// of xoffsetdatastructure.hpp; include that header. Format: docs/WIRE_FORMAT.md;
 // what validation guarantees: docs/V2_THREAT_MODEL.md.
 
 #include "xoffset_containers.hpp"
@@ -155,7 +155,7 @@ namespace XOffsetDatastructure {
                 }
                 return words_;
             }
-            // Header, extent table and hole table of a direct reload.
+            // The extent table of a direct reload.
             std::byte* tables(std::size_t bytes) {
                 if (bytes > tables_.size()) tables_.resize(bytes);
                 return tables_.data();
@@ -172,7 +172,7 @@ namespace XOffsetDatastructure {
             std::vector<std::byte> tables_;
         };
 
-        // V2 validation index: one bit per 8-byte granule of the payload, one
+        // Validation index: one bit per 8-byte granule of the payload, one
         // bitmap for live blocks and one for holes. Every range the validator
         // registers is granule aligned: a block is 8-byte aligned with its
         // length rounded up to 8 (register_allocation), and the arena header
@@ -348,7 +348,7 @@ namespace XOffsetDatastructure {
             const char* base{};
             const char* end{};
             XArena* segment{};
-            // V2 exact coverage: bytes registered as live and as holes. Ranges
+            // Exact coverage: bytes registered as live and as holes. Ranges
             // never overlap (rejected on insert), so equality with used_end
             // proves the payload is tiled exactly.
             std::uint64_t owned_bytes = 0;
@@ -547,7 +547,7 @@ namespace XOffsetDatastructure {
             return vok();
         }
 
-        // V2: a block has no header. Its extent is derived from its owner:
+        // A block has no header. Its extent is derived from its owner:
         // 8-byte aligned, length rounded up to a multiple of 8.
         inline vstatus register_allocation(const void* ptr, std::size_t bytes,
                                            std::size_t alignment, WireValidationContext& ctx,
@@ -559,7 +559,8 @@ namespace XOffsetDatastructure {
             else return register_owned_range(ptr, block, ctx, "wire validation: invalid live block");
         }
 
-        // V2 wire hole table: each entry is a free block of the payload.
+        // Free regions (the free directory, then the free blocks; or a delta's
+        // hole table): each entry is a free range of the image.
         inline vstatus register_wire_holes(const void* holes, std::size_t count,
                                            WireValidationContext& ctx) {
             // A valid entry is a nonempty range on 8-byte granules inside the
@@ -852,8 +853,8 @@ namespace XOffsetDatastructure {
             return vok();
         }
 
-        // V2: holes == nullptr && check_coverage == false walks the graph
-        // without the hole table (used to recompute holes from the live set).
+        // holes == nullptr && check_coverage == false walks the graph without
+        // free regions (used to recompute them from the live set).
         template <typename T>
         vstatus verify_structural_wire_graph(const T& root, XBufferCore& xbuf,
                                              std::pmr::memory_resource* upstream,
@@ -940,8 +941,8 @@ namespace XOffsetDatastructure {
             if (complete) {
                 if constexpr (detail::inband_allocator) {
                     // The directory block too: the entries tile the payload with the live blocks.
-                    holes.reserve(xbuf.wire_hole_count());
-                    xbuf.for_each_wire_hole([&](XBufferCore::WireHole hole) { holes.push_back(hole); });
+                    holes.reserve(xbuf.free_region_count());
+                    xbuf.for_each_free_region([&](XBufferCore::WireHole hole) { holes.push_back(hole); });
                 } else {
                     holes.reserve(xbuf.free_block_count());
                     xbuf.for_each_free_block([&](XBufferCore::WireHole hole) { holes.push_back(hole); });
@@ -1334,8 +1335,8 @@ namespace XOffsetDatastructure {
     enum class XWireEmission : std::uint8_t {
         // Default. Skips each run of at least 4 KiB of adjacent free blocks
         // of at least 256 B (one large deletion, for example); everything
-        // else is copied. Skipped bytes are all holes, so every V2 receiver
-        // accepts it.
+        // else is copied (the link word of each skipped block too). Skipped
+        // bytes are zero free-block bodies, so every receiver accepts it.
         free_runs,
         // One copy of the whole payload.
         dense,

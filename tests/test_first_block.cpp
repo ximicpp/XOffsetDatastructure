@@ -49,7 +49,7 @@ void check(bool condition, const std::string& message) {
 // free directory too), as an offset.
 std::size_t predicted_offset(const xo::XBuffer& buffer, std::uint32_t bytes) {
     std::vector<Hole> holes;
-    buffer.for_each_wire_hole([&](Hole h) { holes.push_back(h); });
+    buffer.for_each_free_region([&](Hole h) { holes.push_back(h); });
     const auto wire = buffer.copy_bytes();
     xo::XBufferCore twin(wire.data(), wire.size(), xo::XBufferCore::maximum_capacity(8u * 1024u * 1024u));
     twin.replace_free_blocks(holes);

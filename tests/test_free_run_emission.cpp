@@ -1,19 +1,17 @@
-// Default (free-run) emission: skips each run of at least 4 KiB of adjacent
-// free blocks of at least 256 B, nothing else.
-//   - a run next to small holes skips only its large blocks;
-//   - a run made only of small holes is not skipped (dense wire);
-//   - a single large free block (the large table) is skipped;
-//   - two runs give three extents;
+// Default (free-run) emission: in each run of at least 4 KiB of adjacent free
+// blocks of at least 256 B, skips every block's body (all of it but its first
+// word, the link to the next block of its size), nothing else.
+//   - a run next to small free blocks skips only its large blocks' bodies;
+//   - a run made only of small blocks is not skipped (dense wire);
+//   - a single large free block is skipped;
+//   - a block that hosts the free directory at its end is shorter by it;
 //   - random layouts with few candidates (sorted in local storage) and with
-//     many candidates and many runs (heap storage) skip exactly the runs a
-//     reference computed from the hole table finds.
-// Every wire loads the dense payload, save_verified_into emits the same
-// bytes, and a beta.1-style check holds: every skipped byte is a hole.
-// With the in-band allocator (XOFFSET_INBAND_ALLOCATOR) the free blocks are
-// skipped whole (the receiver writes their link words from the hole table's
-// order) and the free directory (the first hole) is never skipped. (A run
-// at the payload tail is covered by test_wire_hole_zeroing's declared-size
-// claim, which is re-emitted with its tail skipped.)
+//     many candidates and many runs (heap storage) skip exactly the bodies a
+//     reference computed from the image's free directory finds.
+// Every wire loads the dense image, save_verified_into emits the same bytes,
+// and every skipped byte is a free block's body. (A run at the image tail is
+// covered by test_wire_hole_zeroing's declared-size claim, which is
+// re-emitted with its tail skipped.)
 #include "xoffsetdatastructure.hpp"
 
 #include <algorithm>
@@ -46,7 +44,6 @@ template<> struct wire_record_layout<fr::Root> { static constexpr bool ordinary_
 namespace {
 using Buffer = xo::TypedXBuffer<fr::Root>;
 struct Hole { std::uint32_t offset, bytes; };
-constexpr bool kInband = xo::XBufferCore::free_block_header_bytes != 0;
 
 [[noreturn]] void fail(const std::string& message) {
     std::cerr << "test_free_run_emission FAILED: " << message << "\n";
@@ -80,8 +77,8 @@ Buffer make(const std::vector<std::size_t>& sizes, const std::vector<std::size_t
 }
 
 struct Parsed {
-    xo::XWireHeaderV2 h{};
-    std::vector<Hole> extents, gaps, holes;
+    xo::XWireHeader h{};
+    std::vector<Hole> extents, gaps;
 };
 
 Parsed parse(const std::string& w) {
@@ -93,8 +90,7 @@ Parsed parse(const std::string& w) {
         p.extents.push_back(e);
         stored += e.bytes;
     }
-    // The wire carries payload bytes from offset 48 (the payload header is the
-    // receiver's); a dense wire is one implicit extent.
+    // A dense wire is the image: one implicit extent after the header.
     if (p.extents.empty()) {
         p.extents.push_back({std::uint32_t(xo::XWIRE_PAYLOAD_BEGIN), std::uint32_t(p.h.used_bytes - xo::XWIRE_PAYLOAD_BEGIN)});
         stored = p.h.used_bytes - xo::XWIRE_PAYLOAD_BEGIN;
@@ -106,15 +102,52 @@ Parsed parse(const std::string& w) {
     }
     if (prev < p.h.used_bytes) p.gaps.push_back({std::uint32_t(prev), std::uint32_t(p.h.used_bytes - prev)});
     at += stored;
-    for (std::uint64_t i = 0; i < p.h.hole_count; ++i, at += 8) {
-        Hole h; std::memcpy(&h, w.data() + at, 8);
-        p.holes.push_back(h);
-    }
     need(at == w.size(), "wire framing does not add up");
     return p;
 }
 
-// Checks the common properties and returns the skipped runs.
+std::uint32_t word_at(const std::string& image, std::size_t at) {
+    std::uint32_t v;
+    std::memcpy(&v, image.data() + at, sizeof(v));
+    return v;
+}
+// The free blocks of a dense wire (the image): its directory's stacks.
+std::vector<Hole> free_blocks(const std::string& image) {
+    xo::XWireHeader h;
+    std::memcpy(&h, image.data(), sizeof(h));
+    std::vector<Hole> out;
+    if (h.free_dir == 0) return out;
+    for (std::uint32_t k = 0, n = word_at(image, h.free_dir); k < n; ++k) {
+        const std::uint32_t size = word_at(image, h.free_dir + 8 + 8 * k);
+        for (std::uint32_t at = word_at(image, h.free_dir + 12 + 8 * k); at != 0; at = word_at(image, at))
+            out.push_back({at, size});
+    }
+    return out;
+}
+
+// The bodies the emission must skip, from the image's free directory: free
+// blocks of at least 256 B sorted by offset, adjacent ones merged, and in
+// every merged run of at least 4 KiB each block's body; nothing when the free
+// blocks hold less than 4 KiB.
+std::vector<Hole> reference_gaps(const std::string& dense) {
+    auto blocks = free_blocks(dense);
+    std::uint64_t total = 0;
+    for (auto h : blocks) total += h.bytes;
+    std::erase_if(blocks, [](Hole h) { return h.bytes < 256; });
+    std::sort(blocks.begin(), blocks.end(), [](Hole a, Hole c) { return a.offset < c.offset; });
+    std::vector<Hole> gaps;
+    if (total < 4096) return gaps;
+    for (std::size_t first = 0; first < blocks.size();) {
+        std::size_t last = first + 1;
+        while (last < blocks.size() && blocks[last].offset == blocks[last - 1].offset + blocks[last - 1].bytes) ++last;
+        if (std::uint64_t(blocks[last - 1].offset) + blocks[last - 1].bytes - blocks[first].offset >= 4096)
+            for (std::size_t k = first; k < last; ++k) gaps.push_back({blocks[k].offset + 8, blocks[k].bytes - 8});
+        first = last;
+    }
+    return gaps;
+}
+
+// Checks the common properties and returns the skipped ranges.
 std::vector<Hole> emit(Buffer& b, const std::string& where) {
     const auto dense = b.save_verified(kDense);
     const auto wire = b.save_verified();
@@ -122,42 +155,17 @@ std::vector<Hole> emit(Buffer& b, const std::string& where) {
     b.save_verified_into(into);
     need(into == wire, where + ": save_verified_into differs");
     const auto p = parse(wire);
-    auto holes = p.holes;
-    std::sort(holes.begin(), holes.end(), [](Hole a, Hole c) { return a.offset < c.offset; });
-    for (auto g : p.gaps) {
-        need(g.bytes >= 4096, where + ": skipped a run below 4 KiB");
-        std::uint64_t covered = g.offset;
-        for (auto h : holes)
-            if (h.offset <= covered && std::uint64_t(h.offset) + h.bytes > covered) covered = std::uint64_t(h.offset) + h.bytes;
-        need(covered >= std::uint64_t(g.offset) + g.bytes, where + ": skipped bytes outside holes");
-    }
+    const auto expected = reference_gaps(dense);
+    need(p.gaps.size() == expected.size(), where + ": skipped range count differs from the reference");
+    for (std::size_t i = 0; i < p.gaps.size(); ++i)
+        need(p.gaps[i].offset == expected[i].offset && p.gaps[i].bytes == expected[i].bytes,
+             where + ": a skipped range is not a free block's body");
     auto loaded = Buffer::load(wire);
-    need(loaded.save_verified(kDense) == dense, where + ": wire does not load the dense payload");
+    need(loaded.save_verified(kDense) == dense, where + ": wire does not load the dense image");
     need(wire.size() == dense.size() - [&] { std::size_t s = 0; for (auto g : p.gaps) s += g.bytes; return s; }() +
                             (p.gaps.empty() ? 0 : p.extents.size() * 8),
          where + ": wire size does not match its runs");
     return p.gaps;
-}
-
-// The runs the emission must skip, from the wire's own hole table: holes of
-// at least 256 B sorted by offset, adjacent ones merged, runs of at least
-// 4 KiB kept.
-std::vector<Hole> reference_runs(const std::string& wire) {
-    auto holes = parse(wire).holes;
-    if (kInband && !holes.empty()) holes.erase(holes.begin()); // the directory
-    std::erase_if(holes, [](Hole h) { return h.bytes < 256; });
-    std::sort(holes.begin(), holes.end(), [](Hole a, Hole c) { return a.offset < c.offset; });
-    std::vector<Hole> runs;
-    std::uint64_t start = 0, end = 0;
-    auto close = [&] { if (end - start >= 4096) runs.push_back({std::uint32_t(start), std::uint32_t(end - start)}); };
-    for (auto h : holes) {
-        if (h.offset == end && end != 0) { end += h.bytes; continue; }
-        close();
-        start = h.offset;
-        end = std::uint64_t(h.offset) + h.bytes;
-    }
-    close();
-    return runs;
 }
 
 // Blocks of random sizes (some below 256 B), a random subset freed.
@@ -171,16 +179,13 @@ void random_layout(std::uint64_t seed, std::size_t blocks, unsigned free_percent
         if (next() % 100 < free_percent) freed.push_back(i);
     }
     auto b = make(sizes, freed);
-    const auto wire = b.save_verified();
     const auto gaps = emit(b, "random layout");
-    const auto expected = reference_runs(wire);
-    need(gaps.size() == expected.size(), "random layout: run count differs from the reference");
-    for (std::size_t i = 0; i < gaps.size() && i < expected.size(); ++i)
-        need(gaps[i].offset == expected[i].offset && gaps[i].bytes == expected[i].bytes,
-             "random layout: a run differs from the reference");
     candidates = 0;
-    for (auto h : parse(wire).holes) candidates += h.bytes >= 256 ? 1 : 0;
-    runs = gaps.size();
+    for (auto h : free_blocks(b.save_verified(kDense))) candidates += h.bytes >= 256 ? 1 : 0;
+    // Runs: skipped bodies that do not continue a block right before them.
+    runs = 0;
+    for (std::size_t i = 0; i < gaps.size(); ++i)
+        runs += i == 0 || std::uint64_t(gaps[i - 1].offset) + gaps[i - 1].bytes + 8 != gaps[i].offset;
 }
 
 std::uint32_t offset_of_block(Buffer& b, std::size_t i) {
@@ -191,47 +196,44 @@ std::uint32_t offset_of_block(Buffer& b, std::size_t i) {
 
 int main() {
     {   // 64 B | 2 KiB | 2 KiB | 64 B, all freed: only the two 2 KiB blocks
-        // (at least 256 B each) form the run; the small neighbours are sent.
+        // (at least 256 B each) form the run; the small neighbours are sent
+        // (the last, freed first, holds the free directory).
         auto b = make({64, 2048, 2048, 64}, {});
         const auto first = offset_of_block(b, 1);
         need(offset_of_block(b, 2) == first + 2048 && offset_of_block(b, 0) + 64 == first &&
              offset_of_block(b, 3) == first + 4096, "fixture: blocks are not adjacent");
         release(b, {0, 1, 2, 3});
-        const auto gaps = emit(b, "run next to small holes");
-        need(gaps.size() == 1 && gaps[0].offset == first && gaps[0].bytes == 4096,
-             "run next to small holes: expected exactly the two 2 KiB blocks");
+        const auto gaps = emit(b, "run next to small blocks");
+        need(gaps.size() == 2 && gaps[0].offset == first + 8 && gaps[0].bytes == 2040 &&
+             gaps[1].offset == first + 2048 + 8 && gaps[1].bytes == 2040,
+             "run next to small blocks: expected exactly the two 2 KiB blocks' bodies");
     }
-    {   // 40 adjacent 128 B holes (5 KiB): not skipped.
+    {   // 40 adjacent 128 B free blocks (5 KiB): not skipped.
         auto b = make(std::vector<std::size_t>(40, 128), [] { std::vector<std::size_t> v; for (std::size_t i = 0; i < 40; ++i) v.push_back(i); return v; }());
-        need(b.free_block_bytes() + b.free_directory().bytes >= 5120, "fixture: small holes missing");
-        const auto gaps = emit(b, "run of small holes");
-        need(gaps.empty(), "run of small holes: must stay dense");
+        need(b.free_block_bytes() + b.free_directory().bytes >= 5120, "fixture: small blocks missing");
+        const auto gaps = emit(b, "run of small blocks");
+        need(gaps.empty(), "run of small blocks: must stay dense");
     }
-    {   // One 64 KiB free block (large table).
+    {   // One 64 KiB free block; its end holds the directory, which is sent.
         auto b = make({64 * 1024}, {});
         const auto at = offset_of_block(b, 0);
         release(b, {0});
         const auto gaps = emit(b, "large block");
-        // In-band, the block's end holds the directory, which is sent.
-        const std::uint32_t skipped = 64 * 1024 - b.free_directory().bytes;
-        need(gaps.size() == 1 && gaps[0].offset == at && gaps[0].bytes == skipped, "large block: not skipped");
+        const std::uint32_t skipped = 64 * 1024 - b.free_directory().bytes - 8;
+        need(gaps.size() == 1 && gaps[0].offset == at + 8 && gaps[0].bytes == skipped, "large block: not skipped");
     }
-    {   // Two runs separated by a live block: three extents.
+    {   // Two 4 KiB blocks separated by a live block. The directory went into
+        // the end of the block freed first (the second), which is then too
+        // short for a run: only the first block's body is skipped (two
+        // extents).
         auto b = make({4096, 512, 4096}, {});
         const auto a = offset_of_block(b, 0), c = offset_of_block(b, 2);
         release(b, {0, 2});
         const auto gaps = emit(b, "two runs");
-        if (kInband) {
-            // The directory went into the end of the block freed first (the
-            // second): only the first is a 4 KiB run (two extents).
-            const auto dir = b.free_directory();
-            need(dir.offset + dir.bytes == c + 4096, "two runs: the directory is not at the second block's end");
-            need(gaps.size() == 1 && gaps[0].offset == a && gaps[0].bytes == 4096, "two runs: expected the first block");
-            need(parse(b.save_verified()).h.extent_count == 2, "two runs: expected two extents");
-        } else {
-            need(gaps.size() == 2 && gaps[0].offset == a && gaps[1].offset == c, "two runs: expected both 4 KiB blocks");
-            need(parse(b.save_verified()).h.extent_count == 3, "two runs: expected three extents");
-        }
+        const auto dir = b.free_directory();
+        need(dir.offset + dir.bytes == c + 4096, "two runs: the directory is not at the second block's end");
+        need(gaps.size() == 1 && gaps[0].offset == a + 8 && gaps[0].bytes == 4088, "two runs: expected the first block");
+        need(parse(b.save_verified()).h.extent_count == 2, "two runs: expected two extents");
     }
     {   // Random layouts: up to 64 candidates (local storage), and more
         // candidates with more than 8 runs (heap storage).

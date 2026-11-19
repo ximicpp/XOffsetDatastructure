@@ -213,24 +213,33 @@ void admit_rejects_framing() {
     other.root<RxOther>().x = 5;
     rejects(other.save_verified<RxOther>(), XErrc::root_type_mismatch, "other root type");
 
-    XWireHeaderV2 header;
+    XWireHeader header;
     std::memcpy(&header, wire.data(), sizeof(header));
-    auto with_header = [&](auto patch) {
-        XWireHeaderV2 h = header;
-        patch(h);
-        std::string out = wire;
+    // The wire's first `used` bytes with the header's used_bytes set to it.
+    auto with_used = [&](std::uint32_t used_bytes) {
+        XWireHeader h = header;
+        h.used_bytes = used_bytes;
+        std::string out = wire.substr(0, used_bytes);
         std::memcpy(out.data(), &h, sizeof(h));
         return out;
     };
-    rejects(with_header([](XWireHeaderV2& h) { h.schema_hash ^= 1; }), XErrc::schema_mismatch, "schema hash");
     {
-        auto st = rx.reload<RxRoot>(dst, with_header([&](XWireHeaderV2& h) { h.root_offset = h.used_bytes + 64; }));
-        need(!st, "root offset past used");
-        need(!dst.has_root<RxRoot>(), "rejected root offset left a root");
+        XWireHeader h = header;
+        h.schema_hash ^= 1;
+        std::string out = wire;
+        std::memcpy(out.data(), &h, sizeof(h));
+        rejects(out, XErrc::schema_mismatch, "schema hash");
     }
     {
-        // The root object must lie inside the used payload.
-        auto st = rx.reload<RxRoot>(dst, with_header([&](XWireHeaderV2& h) { h.root_offset = h.used_bytes - 8; }));
+        // The header alone: an image without a root.
+        auto st = rx.reload<RxRoot>(dst, with_used(XWIRE_PAYLOAD_BEGIN));
+        need(!st, "image without a root");
+        need(!dst.has_root<RxRoot>(), "rejected rootless image left a root");
+    }
+    {
+        // The root object must lie inside the image.
+        static_assert(sizeof(RxRoot) > 8);
+        auto st = rx.reload<RxRoot>(dst, with_used(XWIRE_PAYLOAD_BEGIN + 8));
         need(!st, "root object past used");
         need(!dst.has_root<RxRoot>(), "rejected root object left a root");
     }
@@ -245,9 +254,10 @@ void admit_rejects_framing() {
     need(!st2, "reload over the destination's maximum capacity");
 }
 
-// Holes go into the free table and allocations write into them, so admit
-// checks each hole lies inside the payload.
-void admit_rejects_bad_holes() {
+// The free directory and its blocks are image bytes. Admit takes them as the
+// sender's promise (a trusted link); the full check rejects any that are
+// malformed or do not tile the image with the live blocks.
+void full_rejects_bad_free_blocks() {
     XReceiver<XLink::server_peer> rx(cap());
     auto src = make_source(11, 300);
     for (std::uint32_t bytes : {64u, 136u, 6000u}) {
@@ -255,33 +265,50 @@ void admit_rejects_bad_holes() {
         src.arena()->deallocate(p, bytes);
     }
     const auto wire = src.save_verified<RxRoot>(XSaveOptions{XWireEmission::dense});
-    XWireHeaderV2 header;
+    XWireHeader header;
     std::memcpy(&header, wire.data(), sizeof(header));
-    need(header.hole_count > 0, "source has holes");
-    const std::size_t last = wire.size() - 8;
-    auto with_hole = [&](std::uint32_t offset, std::uint32_t bytes) {
+    need(header.free_dir != 0 && header.free_bytes > 0, "source has free blocks");
+    auto word = [&](std::size_t at) {
+        std::uint32_t v;
+        std::memcpy(&v, wire.data() + at, sizeof(v));
+        return v;
+    };
+    auto patched = [&](std::size_t at, std::uint32_t value) {
         std::string out = wire;
-        XBufferCore::WireHole h{offset, bytes};
-        std::memcpy(out.data() + last, &h, sizeof(h));
+        std::memcpy(out.data() + at, &value, sizeof(value));
         return out;
     };
-    auto dst = XBuffer::create<RxRoot>(4096, cap());
-    const std::uint32_t used_bytes = header.used_bytes;
-    const struct { std::uint32_t offset, bytes; const char* what; } bad[] = {
-        {used_bytes, 8, "hole at used"},
-        {used_bytes - 8, 16, "hole crossing used"},
-        {0, 8, "hole in the payload header"},
-        {64, 0, "empty hole"},
-        {68, 8, "unaligned hole offset"},
-        {64, 12, "unaligned hole size"},
-        {0xfffffff8u, 16, "hole offset overflow"},
+    const std::uint32_t dir = header.free_dir, used_bytes = header.used_bytes;
+    const std::uint32_t n = word(dir), dir_cap = word(dir + 4);
+    std::uint32_t entry = 0;
+    while (entry < n && word(dir + 12 + 8 * entry) == 0) ++entry;
+    need(entry < n, "a size with a free block");
+    const std::uint32_t size_at = dir + 8 + 8 * entry, head_at = size_at + 4, block = word(head_at);
+    const struct { std::size_t at; std::uint32_t value; const char* what; } bad[] = {
+        {offsetof(XWireHeader, free_dir), used_bytes, "directory at used"},
+        {offsetof(XWireHeader, free_dir), 8, "directory in the header"},
+        {offsetof(XWireHeader, free_dir), dir + 4, "unaligned directory"},
+        {offsetof(XWireHeader, free_bytes), header.free_bytes + 8, "free bytes off by 8"},
+        {dir, dir_cap, "directory without an unused entry"},
+        {dir + 8 + 8 * n, 64, "unused entry with a size"},
+        {size_at, word(size_at) + 4, "unaligned size"},
+        {head_at, used_bytes, "block at used"},
+        {head_at, block + 4, "unaligned block"},
+        {head_at, 8, "block in the header"},
+        {block, block, "block linked to itself"},
+        {block + 4, 1, "block's second word not zero"},
+        {head_at, XWIRE_PAYLOAD_BEGIN, "block over the root"},
     };
+    auto dst = XBuffer::create<RxRoot>(4096, cap());
     for (const auto& b : bad) {
-        auto st = rx.reload<RxRoot>(dst, with_hole(b.offset, b.bytes));
+        auto st = rx.reload<RxRoot, XCheck::full>(dst, patched(b.at, b.value));
         need(!st && st.code() == XErrc::invalid_payload, b.what);
-        need(!dst.has_root<RxRoot>(), "rejected hole left a root");
+        need(!dst.has_root<RxRoot>(), "rejected free blocks left a root");
     }
-    need(rx.reload<RxRoot>(dst, wire).has_value(), "admit after hole rejections");
+    // Admit does not read them.
+    need(rx.reload<RxRoot>(dst, patched(offsetof(XWireHeader, free_bytes), header.free_bytes + 8)).has_value(),
+         "admit read the free directory");
+    need(rx.reload<RxRoot>(dst, wire).has_value(), "admit after free block rejections");
 }
 
 // What admit does not check: the object graph. A container head pointing
@@ -293,11 +320,10 @@ void admit_skips_graph() {
     for (std::uint32_t i = 0; i < 40; ++i) r.values.push_back(i);
     const auto head = std::size_t(reinterpret_cast<const char*>(&r.values) - reinterpret_cast<const char*>(&r));
     const auto wire = src.save_verified<RxRoot>(XSaveOptions{XWireEmission::dense});
-    XWireHeaderV2 header;
-    std::memcpy(&header, wire.data(), sizeof(header));
     std::string bad = wire;
-    // The vector head's rel32 to its block: point it far outside the payload.
-    const std::size_t at = sizeof(XWireHeaderV2) + (header.root_offset - XWIRE_PAYLOAD_BEGIN) + head;
+    // The vector head's rel32 to its block: point it far outside the image
+    // (a dense wire is the image; the root is at XWIRE_PAYLOAD_BEGIN).
+    const std::size_t at = XWIRE_PAYLOAD_BEGIN + head;
     const std::int32_t outside = 0x40000000;  // not "far": a macro on Windows
     std::memcpy(bad.data() + at, &outside, sizeof(outside));
 
@@ -366,7 +392,7 @@ std::string varint(std::uint32_t v) {
 
 // The payload past the arena header (what a delta carries) and its extent.
 bool payload_equal(const XBufferCore& a, const XBufferCore& b) {
-    return used(a) == used(b) && a.arena()->root_offset == b.arena()->root_offset &&
+    return used(a) == used(b) &&
            std::memcmp(a.data() + XWIRE_PAYLOAD_BEGIN, b.data() + XWIRE_PAYLOAD_BEGIN,
                        used(a) - XWIRE_PAYLOAD_BEGIN) == 0;
 }
@@ -519,7 +545,7 @@ void delta_admit_rejects() {
     // Hand-made deltas on the replica's stream and version: a block past the
     // used payload, and a root object that would end past it.
     const auto header = [&](std::uint32_t flags) {
-        std::string h = {'X', 'D', char(0x10), char(flags)};
+        std::string h = {'X', 'D', char(0x20), char(flags)};
         const std::uint64_t stream = cur.stream();
         h.append(reinterpret_cast<const char*>(&stream), 8);
         return h + varint(cur.version() + 1);
@@ -528,8 +554,13 @@ void delta_admit_rejects() {
                                          std::string(1, '\0') + std::string(64, 'x'), cur);
     need(!st && st.code() == XErrc::invalid_extent_table, "block past used");
     unchanged("a block past used changed the replica");
+    // The root is at 40: any other root offset is out of bounds, and an
+    // image of 48 bytes cannot hold the root object.
     const auto words = std::uint32_t((used(dst) - XWIRE_PAYLOAD_BEGIN) / 8);
-    st = rx.apply_delta<RxRoot>(dst, header(8) + varint(words) + varint(words * 8 - 8) + varint(0), cur);
+    st = rx.apply_delta<RxRoot>(dst, header(8) + varint(words) + varint(8) + varint(0), cur);
+    need(!st && st.code() == XErrc::root_offset_out_of_bounds, "root offset other than 40");
+    unchanged("a moved root changed the replica");
+    st = rx.apply_delta<RxRoot>(dst, header(8) + varint(1) + varint(0) + varint(0), cur);
     need(!st && st.code() == XErrc::root_mismatch, "root object past used");
     unchanged("a root past used changed the replica");
 
@@ -569,7 +600,7 @@ void delta_admit_skips_graph() {
     const auto head = std::size_t(reinterpret_cast<const char*>(&src.root<RxRoot>().values) - src.data());
     const std::size_t block = head / 64, at = head % 64;
     std::uint64_t mask = std::uint64_t(0xF) << at;
-    std::string d = {'X', 'D', char(0x10), char(0)};
+    std::string d = {'X', 'D', char(0x20), char(0)};
     const std::uint64_t stream = cur.stream();
     d.append(reinterpret_cast<const char*>(&stream), 8);
     d += varint(cur.version() + 1) + varint(1) + varint(std::uint32_t(block));
@@ -587,7 +618,7 @@ void delta_admit_skips_graph() {
     need(cur.last_check() == XDeltaCheck::admit && cur.version() == 2, "bad delta admitted");
     // The next delta of the stream writes nothing; checked in full it verifies
     // the whole payload, which no longer verifies.
-    std::string next = {'X', 'D', char(0x10), char(0)};
+    std::string next = {'X', 'D', char(0x20), char(0)};
     next.append(reinterpret_cast<const char*>(&stream), 8);
     next += varint(cur.version() + 1) + varint(0);
     XReceiver<XLink::from_client> client(cap());
@@ -602,7 +633,7 @@ void delta_admit_skips_graph() {
 int main() {
     admit_matches_full();
     admit_rejects_framing();
-    admit_rejects_bad_holes();
+    full_rejects_bad_free_blocks();
     admit_skips_graph();
     typed_and_links();
     reload_reuses_buffer();

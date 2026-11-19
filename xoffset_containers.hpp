@@ -558,7 +558,7 @@ namespace XOffsetDatastructure {
             }
         }
 
-        // Owner lookup rule 5 (V2_FORMAT): a container that destroys its
+        // Owner lookup rule 5 (WIRE_FORMAT section 2): a container that destroys its
         // elements passes its own binding down, so the element heads, and the
         // heads nested in aggregate elements, retire their blocks without a
         // lookup each. The destructors that run afterwards see empty heads.
@@ -990,7 +990,7 @@ namespace XOffsetDatastructure {
 
         // Bound = the head lies in a registered payload. Each call is one
         // owner-table read: callers look the binding up only to allocate,
-        // grow or retire a block, once per operation (V2_FORMAT, Owner lookup).
+        // grow or retire a block, once per operation (WIRE_FORMAT, owner by address).
         bool is_bound() const noexcept { return arena() != nullptr; }
 
         allocator_type binding() const noexcept {
@@ -1587,7 +1587,7 @@ namespace XOffsetDatastructure {
 
         // Bound = the head lies in a registered payload. Each call is one
         // owner-table read: callers look the binding up only to allocate,
-        // grow or retire a block, once per operation (V2_FORMAT, Owner lookup).
+        // grow or retire a block, once per operation (WIRE_FORMAT, owner by address).
         bool is_bound() const noexcept { return arena() != nullptr; }
 
         allocator_type binding() const noexcept {
@@ -3129,9 +3129,9 @@ namespace XOffsetDatastructure {
     };
 
     static_assert(sizeof(XString) == 12 && alignof(XString) == 4,
-        "XString ABI must stay frozen at 12 bytes, 4-aligned (wire V2.1)");
+        "XString ABI must stay frozen at 12 bytes, 4-aligned (wire 3.0)");
     static_assert(sizeof(XVectorCore<int>) == 12 && alignof(XVectorCore<int>) == 4,
-        "XVectorCore ABI must stay frozen at 12 bytes, 4-aligned (wire V2.1)");
+        "XVectorCore ABI must stay frozen at 12 bytes, 4-aligned (wire 3.0)");
     static_assert(sizeof(XSet<int>) == sizeof(XVectorCore<int>),
         "XSet ABI must stay frozen at 12 bytes");
     static_assert(sizeof(XMap<int, int>) == sizeof(XVectorCore<XKeyValue<int, int>>),

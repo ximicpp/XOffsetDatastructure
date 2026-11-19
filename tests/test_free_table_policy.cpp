@@ -34,7 +34,7 @@ namespace fd = xo::fixed_detail;
 namespace {
 using Hole = xo::XBufferCore::WireHole;
 constexpr std::uint32_t kSmallMax = 4096;
-constexpr std::uint32_t kHeader = 48;
+constexpr std::uint32_t kHeader = 40; // the image header; the first block (the root, when there is one) follows
 
 void need(bool value, const char* message) {
     if (!value) throw std::runtime_error(message);
@@ -279,7 +279,7 @@ struct Arena {
         fd::retire_dynamic_bytes(ref(), p, n);
         agree("free table / used_end after retirement differs");
     }
-    // Live blocks plus free blocks tile [48, used_end) exactly, and the table
+    // Live blocks plus free blocks tile [40, used_end) exactly, and the table
     // is emitted in canonical order.
     void check_tiling() const {
         const auto holes = holes_of(core);
@@ -452,13 +452,13 @@ void tail_alignment_and_expansion() {
     need(a.core.free_block_count() == before + 1, "alignment padding is not an exact free block");
     a.check_tiling();
     // In-place expansion only for the tail block, never past it.
-    auto* tail = a.alloc(48); // larger than the 40-byte padding: a tail block
-    need(a.offset(tail) + 48u == a.core.arena()->used_end, "fixture block is not the tail");
-    need(fd::try_expand_dynamic_bytes(a.ref(), tail, 48, 96, 1), "tail block did not expand in place");
-    a.oracle.live[a.offset(tail)] = 96; a.oracle.used_end += 48;
+    auto* tail = a.alloc(64); // larger than any alignment padding (below 64): a tail block
+    need(a.offset(tail) + 64u == a.core.arena()->used_end, "fixture block is not the tail");
+    need(fd::try_expand_dynamic_bytes(a.ref(), tail, 64, 112, 1), "tail block did not expand in place");
+    a.oracle.live[a.offset(tail)] = 112; a.oracle.used_end += 48;
     a.agree("in-place expansion accounting differs");
     need(!fd::try_expand_dynamic_bytes(a.ref(), aligned, 16, 64, 1), "non-tail block expanded");
-    need(fd::try_expand_dynamic_bytes(a.ref(), tail, 96, 64, 1), "shrinking request on the tail must succeed");
+    need(fd::try_expand_dynamic_bytes(a.ref(), tail, 112, 64, 1), "shrinking request on the tail must succeed");
     a.agree("no-op expansion changed accounting");
     a.check_tiling();
 }
@@ -499,24 +499,23 @@ void lifecycle_move_swap_reload() {
     auto* grown = unverified.allocate_block(32, 8);
     need(static_cast<char*>(grown) - unverified.data() == static_cast<std::ptrdiff_t>(tail), "unverified reload reused unknown bytes");
 
-    // Loading the canonical hole table reproduces every later decision (its
-    // wire holes: in-band, the free directory first).
+    // Adopting the buffer's own free regions (the free directory first) on a
+    // copy of its bytes reproduces the same image and every later decision.
     const auto holes = holes_of(destination);
-    std::vector<Hole> wire_holes;
-    destination.for_each_wire_hole([&](Hole h) { wire_holes.push_back(h); });
+    std::vector<Hole> regions;
+    destination.for_each_free_region([&](Hole h) { regions.push_back(h); });
     xo::XBufferCore reloaded(wire.data(), wire.size(), cap);
-    reloaded.replace_free_blocks(wire_holes);
+    reloaded.replace_free_blocks(regions);
     need(reloaded.free_table_complete() && same_holes(holes_of(reloaded), holes), "reloaded table not canonical");
-    std::string t1(wire_holes.size() * sizeof(Hole), '\0'), t2(wire_holes.size() * sizeof(Hole), '\0');
-    destination.write_free_blocks(t1.data()); reloaded.write_free_blocks(t2.data());
-    need(t1 == t2, "write-read-write hole table bytes differ");
+    need(std::memcmp(reloaded.data(), destination.data(), destination.arena()->used_end) == 0,
+         "write-read-write image bytes differ");
     for (std::uint32_t n : {24u, 32u, 16u, 32u, 24u, 8u, 64u}) {
         auto* x = destination.allocate_block(n, 8);
         auto* y = reloaded.allocate_block(n, 8);
         need(static_cast<char*>(x) - destination.data() == static_cast<char*>(y) - reloaded.data(),
              "reloaded free table makes a different allocation decision");
     }
-    need(sizeof(xo::XBufferCore::arena_header) == 48 && sizeof(Hole) == 8, "V2 layout changed");
+    need(sizeof(xo::XBufferCore::arena_header) == 40 && sizeof(Hole) == 8, "image header layout changed");
 }
 
 // prefetch_for_update() is a hint: no payload byte, hole, counter or later

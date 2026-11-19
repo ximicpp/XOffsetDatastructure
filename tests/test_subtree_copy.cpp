@@ -591,7 +591,7 @@ void run_case(std::size_t index, Rng& rng, Coverage& cov) {
 void run_explicit_case(std::size_t index, Rng& rng, Coverage& cov) {
     const auto where = "explicit case " + std::to_string(index);
     const auto wire = build_wire(rng);
-    xo::XWireHeaderV2 header{};
+    xo::XWireHeader header{};
     std::memcpy(&header, wire.data(), sizeof(header));
     const auto room = std::size_t(header.used_bytes) + 8u * (rng() % 64);
     auto cap = xo::XBuffer::maximum_capacity(room);

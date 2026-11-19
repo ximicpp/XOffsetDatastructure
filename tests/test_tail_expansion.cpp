@@ -384,11 +384,11 @@ void transport_and_graph_admission() {
     auto valid = XBuffer::load_verified<TailExpansionRoot>(wire);
     // V1 corrupted the block header's user_bytes. V2 derives the extent from
     // the head: shrinking or growing capacity_ must break exact coverage.
-    XWireHeaderV2 header{};
+    XWireHeader header{};
     std::memcpy(&header, wire.data(), sizeof(header));
-    assert(header.extent_count == 0 && header.hole_count == 0); // dense: payload [48, used) = bytes [40, used - 8)
+    assert(header.extent_count == 0 && header.free_dir == 0); // dense: the wire is the image
     auto& live = valid.root<TailExpansionRoot>();
-    const auto head = sizeof(XWireHeaderV2) + offset_of(valid, &live.values) - XWIRE_PAYLOAD_BEGIN;
+    const auto head = offset_of(valid, &live.values);
     const auto size_at = head + offsetof(XVectorCore<std::int32_t>, size_);
     const auto capacity_at = head + offsetof(XVectorCore<std::int32_t>, capacity_);
     std::uint32_t capacity = 0;

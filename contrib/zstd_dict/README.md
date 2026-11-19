@@ -44,7 +44,7 @@ about 1.2 to 1.5 us per message and decoding 0.5 to 0.7 us.
   (`dict_id_mismatch`). A protocol that negotiates should also compare ids
   up front (the demo's Subscribe does). A new dictionary gets a new id.
 - **Binding.** `--binding auto` binds a dictionary to the schema fingerprint
-  in its sample wires' header (bytes 24..39: schema hash and root type id).
+  in its sample wires' header (bytes 8..23: schema hash and root type id).
   The encoder then refuses wires of any other schema, and leaves out the 24
   header bytes the binding fixes; the decoder puts them back. A schema change
   means a new dictionary.

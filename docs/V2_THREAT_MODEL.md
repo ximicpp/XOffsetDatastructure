@@ -2,7 +2,7 @@
 
 This document describes what XOffset V2 protects against when receiving an **untrusted wire**, what it
 does not, and what callers must add outside the library. Format details are in
-[V2_FORMAT.md](V2_FORMAT.md) and integration requirements in [DEPLOYMENT.md](DEPLOYMENT.md). All
+[WIRE_FORMAT.md](WIRE_FORMAT.md) and integration requirements in [DEPLOYMENT.md](DEPLOYMENT.md). All
 measurements here can be reproduced with the method of section 6.
 
 ## 1. Assets and attackers
@@ -76,7 +76,7 @@ in section 5.
 
 | ID | Threat | Status | Basis / gap |
 | --- | --- | --- | --- |
-| T1 | A crafted wire makes the receiver read or write out of bounds | **Protected** (a server built with `XOFFSET_CHECK_UPLINK=0` is not protected against client uplink, see 4.1) | Full validation (V2_FORMAT section 5); ASan+UBSan CI with Clang and GCC 16; libFuzzer on every PR (multiple schemas, section 5); pre-release GCC 16 ASan+UBSan differential fuzzing of 4.8 million cases with no disagreement. Gap: daily long fuzz runs are not yet running (section 5, F4) |
+| T1 | A crafted wire makes the receiver read or write out of bounds | **Protected** (a server built with `XOFFSET_CHECK_UPLINK=0` is not protected against client uplink, see 4.1) | Full validation (WIRE_FORMAT section 5); ASan+UBSan CI with Clang and GCC 16; libFuzzer on every PR (multiple schemas, section 5); pre-release GCC 16 ASan+UBSan differential fuzzing of 4.8 million cases with no disagreement. Gap: daily long fuzz runs are not yet running (section 5, F4) |
 | T2 | Tampering with field values (A3) | **Not protected** | A wire that only changes scalar values passes validation; the wire header has no checksum (format 2.1 removed the always-zero `crc32c`) and no MAC. TLS or message signatures must be used outside the library |
 | T3 | Forging schema identity | No privilege gained | The schema fingerprint (64-bit FNV-1a) is a consistency check, not authentication: an attacker copying the fingerprint can only make the receiver fully validate against **the receiver's own type** |
 | T4 | Resource exhaustion | **Bounded by default** (M1: 64 MiB default when no limit is passed) | See 3.1; servers receiving client data should still set a smaller limit (DEPLOYMENT section 5) |
@@ -105,8 +105,9 @@ Without a limit, `load_verified` reserves the size the wire declares. Consequenc
   process.
 - **Checking the wire length is not enough**: 184 bytes is far below any length limit.
 
-**R2 hole table amplification.** Each hole table entry is 8 bytes; on load every entry goes into the
-host-side free table, and validation also registers it in the byte index:
+**R2 free block amplification.** Measured with wire format 2.x, whose wire ended with a hole table
+(8 bytes per free block): on load every entry went into the host-side free table, and validation also
+registered it in the byte index:
 
 | Declared used_bytes | Hole size | Wire | Load time | Free blocks | Peak RSS |
 | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -116,6 +117,10 @@ host-side free table, and validation also registers it in the byte index:
 
 Host memory and time grow linearly with `used_bytes` and the number of holes, never superlinearly. With
 `maximum_capacity` set, both are bounded by the limit (peak about 5 MiB with a 1 MiB limit).
+Since wire format 3.0 the free blocks and their directory are inside the image: a sparse wire can still
+declare many small free blocks, the full check walks every stack (at most `used_bytes / 8` blocks) and
+registers each one in the byte index, and no host-side table is built. The bound is the same: linear in
+`used_bytes`, capped by the limit.
 
 **R3 other.** Concurrent buffer count, queue length, decompressed length and per-request time are
 outside the library and limited by the caller (DEPLOYMENT sections 5 and 6).

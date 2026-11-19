@@ -41,7 +41,7 @@ int main() {
     // The pin is exactly the layout that the wire schema hash covers.
     auto buffer = xo::TypedXBuffer<pin::Root>::create(4096);
     const auto wire = buffer.save_verified();
-    xo::XWireHeaderV2 header{};
+    xo::XWireHeader header{};
     std::memcpy(&header, wire.data(), sizeof(header));
     if (header.schema_hash != xo::wire_schema_hash_v<pin::Root>())
         fail("wire header does not carry wire_schema_hash_v");

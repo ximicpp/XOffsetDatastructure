@@ -73,29 +73,30 @@ void fill_explicit(XBuffer& b, std::uint64_t id, std::size_t n) {
     }
 }
 
-// The transport side of begin_verified_reload: header, extent table,
-// payload bytes (dense, or each extent at its payload offset - 48), hole table.
+// The transport side of begin_verified_reload: the header into the image's
+// first bytes, the extent table, then the rest of a dense image or each
+// extent at its image offset.
 void direct_reload(XBuffer& b, const std::string& w) {
-    XWireHeaderV2 h{};
+    XWireHeader h{};
     std::memcpy(&h, w.data(), sizeof(h));
-    auto t = b.begin_verified_reload<SlotRoot>(h.used_bytes, h.hole_count, h.extent_count);
+    auto t = b.begin_verified_reload<SlotRoot>(h.used_bytes, h.extent_count);
     std::size_t at = 0;
     auto take = [&](std::byte* to, std::size_t n) { std::memcpy(to, w.data() + at, n); at += n; };
-    take(t.header_bytes().data(), t.header_bytes().size());
+    const auto image = t.image_bytes();
+    take(image.data(), sizeof(XWireHeader));
     const auto table = t.extent_bytes();
     if (!table.empty()) take(table.data(), table.size());
     if (table.empty()) {
-        take(t.payload_bytes().data(), t.payload_bytes().size());
+        take(image.data() + sizeof(XWireHeader), image.size() - sizeof(XWireHeader));
     } else {
         for (std::size_t i = 0; i < table.size() / 8; ++i) {
             std::uint32_t e[2];
             std::memcpy(e, table.data() + i * 8, 8);
-            take(t.payload_bytes().data() + e[0] - XWIRE_PAYLOAD_BEGIN, e[1]);
+            take(image.data() + e[0], e[1]);
         }
     }
-    if (!t.hole_bytes().empty()) take(t.hole_bytes().data(), t.hole_bytes().size());
     need(at == w.size(), "test transport framing");
-    t.complete(t.header_bytes().size(), t.payload_bytes().size(), t.hole_bytes().size(), table.size());
+    t.complete(image.size(), table.size());
     t.finish();
 }
 

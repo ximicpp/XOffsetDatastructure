@@ -6,7 +6,7 @@ whole buffer again when the sender changes a few fields. Delta sync sends only
 the payload bytes that changed and patches the receiver's copy in place.
 Nothing is encoded per field: a delta carries raw payload bytes at payload
 offsets, which mean the same thing on every 64-bit little-endian target (the
-wire rule of [V2_FORMAT.md](V2_FORMAT.md)). After a delta applies, the
+wire rule of [WIRE_FORMAT.md](WIRE_FORMAT.md)). After a delta applies, the
 receiver's payload is the sender's payload byte for byte.
 
 Header: `xoffset_delta.hpp` (included by `xoffsetdatastructure.hpp`). Both schema backends (C++26 reflection,
@@ -149,18 +149,20 @@ section 3).
 `examples/delta_sync.cpp` runs a server and a client through key delta,
 small deltas, a lost delta and the key delta that recovers from it.
 
-## 2. Format 1.0
+## 2. Format 2.0
 
 Little-endian. A delta is exactly the header, the optional fields its flags
 announce, the block section and the optional hole section; nothing may follow.
 
-**Stability.** Format 1.0 is frozen from 3.4.0 for every 3.x release: a 3.x
-sender writes 1.0 and a 3.x receiver reads it, on every 64-bit little-endian
-target, compiler and schema backend. Nothing in this section changes within
-1.0: not the fields, not their order or meaning, not what a receiver accepts
-or rejects. An addition gets a new format byte; a 1.0 receiver rejects any
-format byte but `0x10` with `unsupported_version` before reading further, and
-a sender writes a newer format only to a receiver known to read it.
+**Stability.** Format 2.0 goes with wire format 3.0 (format 1.0, from 3.4.0
+to 4.1.0, addressed the 2.x image, whose root was at 48). A sender writes 2.0
+and a receiver reads it, on every 64-bit little-endian target, compiler and
+schema backend. Once released, nothing in this section changes within 2.0:
+not the fields, not their order or meaning, not what a receiver accepts or
+rejects. An addition gets a new format byte; a 2.0 receiver rejects any
+format byte but `0x20` (1.0's `0x10` included) with `unsupported_version`
+before reading further, and a sender writes a newer format only to a receiver
+known to read it.
 `tests/test_delta_format.cpp` pins the bytes of a small delta stream (a key
 delta, a scalar delta, a digest delta) both ways, written out field by field
 after the table below: the sender must write them and the receiver must apply
@@ -172,12 +174,12 @@ carries payload bytes at payload offsets of the sender's own buffer).
 | offset | field | type | value |
 | ---: | --- | --- | --- |
 | 0 | magic | 2 bytes | `'X' 'D'` |
-| 2 | format | u8 | `major << 4 \| minor`: `0x10` (1.0) |
+| 2 | format | u8 | `major << 4 \| minor`: `0x20` (2.0) |
 | 3 | flags | u8 | bit 0 KEY, bit 1 HOLES, bit 2 DIGEST, bit 3 EXTENT; other bits 0 |
 | 4 | stream | u64 | the sender's stream id, nonzero |
 | 12 | version | varint | version after this delta, at least 1 |
-| | used | varint | EXTENT only: (payload `used_end` after this delta − 48) / 8 |
-| | root | varint | EXTENT only: root offset after this delta − 48, below `used_end` |
+| | used | varint | EXTENT only: (payload `used_end` after this delta − 40) / 8 |
+| | root | varint | EXTENT only: root offset after this delta − 40: always 0 (the root is at 40) |
 | | block count | varint | entries of the block section |
 
 Without EXTENT, `used_end` and the root offset stay as the replica holds
@@ -188,13 +190,13 @@ Then, in this order:
 
 - KEY: `schema_hash` (u64), `root_type_id` (u64): the wire fingerprint of the
   root type. A key delta always has HOLES and EXTENT.
-- DIGEST: xxHash64 (seed 0) of payload bytes `[48, used_end)` after this
+- DIGEST: xxHash64 (seed 0) of payload bytes `[40, used_end)` after this
   delta.
 - Block section: `block count` × { varint `skip`, u8 `selector`, mask bytes,
   data bytes }. The payload is cut into 64-byte blocks from its start (block
   `i` holds offsets `64 i` to `64 i + 63`; a payload starts 64-aligned in
-  memory, so a block is one cache line). Block 0 holds the arena header in
-  offsets 0 to 47, which no delta writes: block 0 never goes whole and its
+  memory, so a block is one cache line). Block 0 holds the image header in
+  offsets 0 to 39, which no delta writes: block 0 never goes whole and its
   mask bits for those bytes are 0. An entry's block index is
   the previous entry's index + 1 + `skip` (the first: `skip`), so blocks are
   ascending. `selector` 0: the whole block follows (64 bytes; it ends at or
@@ -205,7 +207,7 @@ Then, in this order:
   replace the payload bytes; the other bytes of the block stay.
 - HOLES: varint `count`, then `count` × { varint `gap / 8`, varint
   `bytes / 8` }: the whole new hole table in offset order, each hole starting
-  `gap` bytes after the end of the previous one (the first: after offset 48).
+  `gap` bytes after the end of the previous one (the first: after offset 40).
   Without HOLES the hole table does not change.
 
 A varint is unsigned LEB128 of at most 5 bytes holding a value below 2^32. The
@@ -293,7 +295,7 @@ verification, like a store receiving saves, does not rebuild it each time).
 `XReceiver<XLink::from_server>` apply deltas with `XCheck::admit` by default
 (`apply_delta`; `last_check()` is `admit`). Everything the parse checks stays:
 the format, the stream and version against the cursor, the root type and
-schema fingerprint of a key delta, every block and hole inside `[48,
+schema fingerprint of a key delta, every block and hole inside `[40,
 used_end)`, nothing after the last section. Besides that only the root object
 has to lie inside the used payload; what the bytes mean is the sender's, as
 for a whole wire taken with admit. No map of checked bytes is built or kept,
@@ -407,7 +409,7 @@ about 270 bytes per tick in 39 blocks, against 5946 bytes for `save_compact`
 and 7225 bytes for `save_verified` of the same view; the key delta is 3214
 bytes.
 
-## 7. Not in format 1.0
+## 7. Not in format 2.0
 
 - Moved data is not detected (an erase from the middle sends the shifted
   tail).

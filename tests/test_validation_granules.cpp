@@ -415,11 +415,11 @@ void typed_head_checks() {
     for (std::uint32_t i = 0; i < 5; ++i) root.words.push_back(i);
     root.no_checks[15].a = 123;
     const auto original = buffer.save_verified<GranuleRoot>();
-    const auto h = read_at<xo::XWireHeaderV2>(original, 0);
-    need(h.extent_count == 0 && h.hole_count == 0, "fixture wire must be dense without holes");
-    // Dense V2.1: payload offset p is file position payload_at + p.
-    const std::int64_t payload_at = std::int64_t(sizeof(h)) - std::int64_t(xo::XWIRE_PAYLOAD_BEGIN);
-    const std::size_t rp = std::size_t(payload_at + h.root_offset);
+    const auto h = read_at<xo::XWireHeader>(original, 0);
+    need(h.extent_count == 0 && h.free_dir == 0, "fixture wire must be dense without free blocks");
+    // A dense wire is the image: image offset p is file position payload_at + p.
+    constexpr std::int64_t payload_at = 0;
+    const std::size_t rp = xo::XWIRE_PAYLOAD_BEGIN;
     const std::size_t used = h.used_bytes;
     (void)xo::XBuffer::load_verified<GranuleRoot>(original);
     auto field = [&](std::size_t member, std::size_t head_field) { return rp + member + head_field; };
@@ -429,7 +429,7 @@ void typed_head_checks() {
         const auto origin = field(member, offsetof(xo::XVectorCore<std::uint32_t>, data_delta));
         return std::size_t(std::int64_t(origin) + read_at<std::int32_t>(w, origin));
     };
-    // Points a head's data_delta at payload offset `to` (file position payload_at + to).
+    // Points a head's data_delta at image offset `to` (file position payload_at + to).
     auto point = [&](std::string& w, std::size_t member, std::int64_t to) {
         const auto origin = field(member, offsetof(xo::XVectorCore<std::uint32_t>, data_delta));
         write_at(w, origin, std::int32_t(payload_at + to - std::int64_t(origin)));
@@ -482,18 +482,17 @@ void typed_head_checks() {
         r.left.resize(16); r.right.resize(16);
         r.left.reserve(32);
         const auto valid = retired.save_verified<PairRoot>();
-        const auto header = read_at<xo::XWireHeaderV2>(valid, 0);
-        const auto at = sizeof(header) - xo::XWIRE_PAYLOAD_BEGIN; // + payload offset: file position
-        // The retired block is the last hole (in-band, the free directory is
-        // the first).
-        const std::uint32_t holes = xo::XBufferCore::free_block_header_bytes != 0 ? 2u : 1u;
-        const auto hole = read_at<xo::XBufferCore::WireHole>(
-            valid, at + header.used_bytes + (holes - 1u) * sizeof(xo::XBufferCore::WireHole));
-        need(header.hole_count == holes && hole.bytes == 16, "fixture must hold one retired block");
+        const auto header = read_at<xo::XWireHeader>(valid, 0);
+        // The retired block is the free directory's one block, of 16 bytes
+        // (a dense wire is the image: image offset p is file position p).
+        const auto size = read_at<std::uint32_t>(valid, header.free_dir + 8);
+        const auto hole = read_at<std::uint32_t>(valid, header.free_dir + 12);
+        need(header.free_dir != 0 && header.free_bytes == 16 && size == 16 && hole != 0,
+             "fixture must hold one retired block");
         auto bad = valid;
-        const auto origin = at + header.root_offset + offsetof(PairRoot, right) +
+        const auto origin = xo::XWIRE_PAYLOAD_BEGIN + offsetof(PairRoot, right) +
                             offsetof(xo::XVectorCore<std::uint8_t>, data_delta);
-        write_at(bad, origin, std::int32_t(std::int64_t(at + hole.offset) - std::int64_t(origin)));
+        write_at(bad, origin, std::int32_t(std::int64_t(hole) - std::int64_t(origin)));
         reject<PairRoot>(bad, live_free);
         (void)xo::XBuffer::load_verified<PairRoot>(valid);
     }
@@ -522,7 +521,7 @@ std::string big_wire(Big kind) {
 void typed_new_failures() {
     for (Big kind : {Big::preorder, Big::holes, Big::reversed}) {
         const auto wire = big_wire(kind), copy = wire;
-        need((read_at<xo::XWireHeaderV2>(wire, 0).hole_count != 0) == (kind == Big::holes), "big fixture hole table");
+        need((read_at<xo::XWireHeader>(wire, 0).free_bytes != 0) == (kind == Big::holes), "big fixture free blocks");
         const auto outside = fail_new::live();
         { fail_new::Arm arm(-1); auto loaded = xo::XBuffer::load_verified<BigRoot>(wire); }
         const auto points = fail_new::attempts;

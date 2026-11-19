@@ -65,42 +65,35 @@ template<> struct wire_record_layout<ms::Deep> { static constexpr bool ordinary_
 }
 
 namespace {
-// Header and framing rules of the V2.1 format, independent of the schema: the
+// Header and framing rules of format 3.0, independent of the schema: the
 // same checks as the oracle's header stage in v2_fuzz_core.hpp.
 template <class Root>
 bool framing_valid(const std::string& wire) {
     constexpr std::uint64_t begin = xo::XWIRE_PAYLOAD_BEGIN;
     if (wire.size() < kHeader) return false;
-    xo::XWireHeaderV2 h;
+    xo::XWireHeader h;
     std::memcpy(&h, wire.data(), kHeader);
-    if (h.magic != xo::XWIRE_MAGIC || h.flags != 0) return false;
+    if (h.magic != xo::XWIRE_MAGIC || h.header_bytes != kHeader) return false;
     if (h.root_type_id != xo::detail::wire_root_type_id<Root>() ||
         h.schema_hash != xo::detail::wire_schema_hash<Root>())
         return false;
-    if (h.used_bytes < begin || h.used_bytes > kMaxPayload || h.used_bytes % 8) return false;
-    if (h.root_offset < begin || h.root_offset >= h.used_bytes) return false;
+    if (h.used_bytes <= begin || h.used_bytes > kMaxPayload || h.used_bytes % 8) return false;
     const std::uint64_t body = wire.size() - kHeader;
     if (h.extent_count > body / 8) return false;
     if (h.used_bytes > kLimit) return false;
+    if (h.extent_count == 0) return wire.size() == h.used_bytes;
     const auto* table = reinterpret_cast<const unsigned char*>(wire.data()) + kHeader;
-    std::uint64_t stored = h.used_bytes - begin, end = 0;
-    if (h.extent_count) {
-        stored = 0;
-        bool gap = false;
-        for (std::uint64_t i = 0; i < h.extent_count; ++i) {
-            std::uint32_t off, b; std::memcpy(&off, table + i * 8, 4); std::memcpy(&b, table + i * 8 + 4, 4);
-            if (b == 0 || off % 8 || b % 8 || (i == 0 ? off != begin : off <= end) || std::uint64_t(off) + b > h.used_bytes)
-                return false;
-            gap |= i != 0;
-            end = std::uint64_t(off) + b; stored += b;
-        }
-        if (end < h.used_bytes) gap = true;
-        if (!gap) return false;
+    std::uint64_t stored = 0, end = 0;
+    bool gap = false;
+    for (std::uint64_t i = 0; i < h.extent_count; ++i) {
+        std::uint32_t off, b; std::memcpy(&off, table + i * 8, 4); std::memcpy(&b, table + i * 8 + 4, 4);
+        if (b == 0 || off % 8 || b % 8 || (i == 0 ? off != begin : off <= end) || std::uint64_t(off) + b > h.used_bytes)
+            return false;
+        gap |= i != 0;
+        end = std::uint64_t(off) + b; stored += b;
     }
-    const std::uint64_t tbytes = std::uint64_t(h.extent_count) * 8;
-    if (stored > body - tbytes) return false;
-    const auto rest = body - tbytes - stored;
-    return h.hole_count <= rest / 8 && std::uint64_t(h.hole_count) * 8 == rest;
+    if (end < h.used_bytes) gap = true;
+    return gap && stored == body - std::uint64_t(h.extent_count) * 8;
 }
 
 std::string text(std::mt19937_64& rng) { return random_text(rng, 40); }

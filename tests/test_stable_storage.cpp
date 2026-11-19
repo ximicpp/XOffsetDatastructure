@@ -35,24 +35,8 @@ struct StableScalar {
     std::int64_t value{};
 };
 
-// MSVC-ABI compilers (MSVC, clang-cl) cap alignas at 8192, the COFF section limit.
-#if defined(_MSC_VER)
-inline constexpr std::size_t kOveralignA = 4096, kOveralignB = 8192;
-#else
-inline constexpr std::size_t kOveralignA = 65536, kOveralignB = 131072;
-#endif
-
-template <std::size_t Alignment>
-struct alignas(Alignment) StableOveralignedRoot {
-    std::int64_t value{};
-};
 XOFFSET_RECORD_DERIVED(StableItem, (), code, label)
 XOFFSET_RECORD_DERIVED(StableScalar, (), value)
-XOFFSET_RECORD_DERIVED(StableOveralignedRoot<kOveralignB>, (), value)
-XOFFSET_RECORD_DERIVED(StableOveralignedRoot<kOveralignA>, (), value)
-
-static_assert(is_byte_copy_safe_v<StableOveralignedRoot<kOveralignA>>);
-static_assert(is_byte_copy_safe_v<StableOveralignedRoot<kOveralignB>>);
 
 struct OtherStableRoot {
     std::int32_t id{};
@@ -130,17 +114,15 @@ bool has_hole(const XBufferCore& buffer, const void* ptr, std::uint32_t bytes) {
     buffer.for_each_free_block([&](XBufferCore::WireHole hole) { found |= hole.offset == offset && hole.bytes == bytes; });
     return found;
 }
-// V2.1 verified frame: header + payload bytes [48, used) + hole table (dense
-// unless a free run of at least 4 KiB makes it sparse; these fixtures never
-// have one).
-XWireHeaderV2 check_verified_frame(const std::string& frame, const XBufferCore& buffer) {
-    XWireHeaderV2 header{};
+// Verified frame (wire format 3.0): the image [0, used) (dense unless a free
+// run of at least 4 KiB makes it sparse; these fixtures never have one).
+XWireHeader check_verified_frame(const std::string& frame, const XBufferCore& buffer) {
+    XWireHeader header{};
     std::memcpy(&header, frame.data(), sizeof(header));
     assert(header.extent_count == 0);
     assert(header.used_bytes == buffer.arena()->used_end); // saves keep the logical length
-    assert(header.hole_count == buffer.wire_hole_count());
-    assert(frame.size() == sizeof(header) + header.used_bytes - XWIRE_PAYLOAD_BEGIN +
-                               header.hole_count * sizeof(XBufferCore::WireHole));
+    assert(header.free_dir == buffer.arena()->free_dir && header.free_bytes == buffer.arena()->free_bytes);
+    assert(frame.size() == header.used_bytes);
     return header;
 }
 
@@ -269,32 +251,6 @@ void page_boundaries_and_capacity() {
                                    : hinted.epoch() != hinted_epoch);
 }
 
-template <std::size_t Alignment>
-void check_overaligned_root(XBuffer& buffer, std::int64_t value) {
-    using Root = StableOveralignedRoot<Alignment>;
-    auto* root = buffer.make<Root>();
-    assert(reinterpret_cast<std::uintptr_t>(root) % Alignment == 0);
-    root->value = value;
-    auto handle = buffer.handle<Root>();
-    assert(handle.get() == root);
-    assert(&buffer.root<Root>() == root);
-    const auto& core = static_cast<const XBufferCore&>(buffer);
-    assert(core.find_root_storage<Root>() == root);
-    const auto root_offset = buffer.arena()->root_offset;
-    buffer.arena()->root_offset += 8;
-    assert(buffer.find_root_storage<Root>() == nullptr);
-    assert(core.find_root_storage<Root>() == nullptr);
-    buffer.arena()->root_offset = root_offset;
-    const auto* base = buffer.get_address();
-    const auto epoch = buffer.epoch();
-    assert(buffer.grow(system_page_size() + 1));
-    assert(buffer.get_address() == base && buffer.epoch() == epoch);
-    assert(handle.get() == root && &buffer.root<Root>() == root);
-    assert(core.find_root_storage<Root>() == root && root->value == value);
-    // Local byte-copy-safe roots require no schema name. The verified wire ABI
-    // deliberately has a stricter alignment limit and is not exercised here.
-}
-
 void actual_addresses_honor_large_alignment() {
     constexpr std::array<std::size_t, 2> alignments{65536, 131072};
     const auto page = system_page_size();
@@ -346,8 +302,6 @@ void actual_addresses_honor_large_alignment() {
             assert(buffer.arena()->used_end == used_before && !has_hole(buffer, reused, 32));
             buffer.arena()->deallocate(reused, 32);
         }
-        if (instance % 2 == 0) check_overaligned_root<kOveralignA>(buffer, 1234 + instance);
-        else check_overaligned_root<kOveralignB>(buffer, 1234 + instance);
     }
     // OS placement is not a portable guarantee. Check every pointer regardless,
     // and record whether this run also covered a non-aligned reservation base.
@@ -384,7 +338,7 @@ void actual_addresses_honor_large_alignment() {
     struct OversizedRoot { char bytes[std::size_t{1} << 32]; };
     require_rejection([&] { limited.construct_root_storage<OversizedRoot>(); });
     assert(std::memcmp(limited.arena(), &before, sizeof(before)) == 0);
-    assert(limited.arena()->root_offset == 0);
+    assert(limited.arena()->used_end == XBufferCore::root_at);
 #endif
 }
 
@@ -592,8 +546,9 @@ void shrink_regrow_and_transport() {
             stable_capacity(static_cast<std::size_t>(header.used_bytes) - 1));
     });
 
-    // V1 frames carried a historic reservation hint (reserved_bytes). V2.1 has
-    // no such field: V1 input is rejected outright and flag bits must be 0.
+    // V1 frames carried a historic reservation hint (reserved_bytes). Format
+    // 3.0 has no such field: V1 input is rejected outright and the header
+    // size must be 40.
     auto v1_frame = verified;
     std::memcpy(v1_frame.data(), "XOFFV1\0\0", 8);
     bool v1_rejected = false;
@@ -604,7 +559,7 @@ void shrink_regrow_and_transport() {
     assert(v1_rejected);
     auto reserved_frame = verified;
     auto reserved_header = header;
-    reserved_header.flags = static_cast<std::uint32_t>(page * 32);
+    reserved_header.header_bytes = static_cast<std::uint32_t>(page * 32);
     std::memcpy(reserved_frame.data(), &reserved_header, sizeof(reserved_header));
     require_rejection([&] { (void)XBuffer::load_verified<StableRoot>(reserved_frame); });
     auto plain_frame = XBuffer::load_verified<StableRoot>(verified);
