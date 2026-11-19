@@ -19,7 +19,7 @@
       "max_ratio": 1.02,
       "reason": "GCC 16 reaches its inline-unit-growth limit in the SLG bench translation unit in both trees. Head's unit is smaller (IPA size 88,211 vs 101,842), so its growth budget is smaller and the XString validator is no longer inlined into the Hero validator. P2996 builds the same sources at 0.9998.",
       "evidence": "PR #327 Ir (GCC 16, SLG S scale, cycles 5-8): slg.A head/base 1.0150 (2,903,839 -> 2,947,485); function diff: outlined XString validator +109,978 Ir, Hero validator -87,474 Ir. Attempted change: forcing the validators inline (always_inline) moved the excess to slg.B (1.0102), so it was dropped. P2996 slg.A 0.9998, slg.B 0.9987.",
-      "approved_by": "requested from the performance thread (2026-11-19)"
+      "approved_by": "performance thread (ops-vs-floor review), 2026-11-19 08:28Z: GCC 16 bench-TU inline budget, P2996 0.9998, no product-path change"
     }
   ]
 }
