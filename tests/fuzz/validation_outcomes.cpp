@@ -52,7 +52,7 @@ int main(int argc, char** argv) {
         const auto heads = oracle(base, true).heads;
         auto w = base;
         for (int k = 1 + int(rng() % 3); k > 0; --k) mutate_wire(w, rng, heads);
-        xo::XWireHeaderV2 h{};
+        xo::XWireHeader h{};
         std::memcpy(&h, w.data(), std::min(w.size(), kHeader));
         const auto dense = w.size() >= kHeader && h.extent_count != 0 ? inflate(w) : std::nullopt;
         const auto mutated_fnv = fnv(w);

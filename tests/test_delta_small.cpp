@@ -420,7 +420,7 @@ void crafted_cases() {
     std::size_t cases = 0;
     const auto header = [&](std::string& d, std::uint32_t count) {
         d.assign("XD", 2);
-        d.push_back(char(0x10));
+        d.push_back(char(0x20));
         d.push_back(char(0));
         const std::uint64_t stream = cur.stream();
         d.append(reinterpret_cast<const char*>(&stream), 8);

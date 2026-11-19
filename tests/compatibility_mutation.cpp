@@ -65,7 +65,7 @@ int main(int argc,char** argv) {
         } else if(std::string(argv[1])=="--expect-v1-rejection") {
             std::ifstream in(argv[2],std::ios::binary);if(!in)throw std::runtime_error("read failed");
             std::string wire((std::istreambuf_iterator<char>(in)),{});
-            if(wire.size()<sizeof(xo::XWireHeaderV2))throw std::runtime_error("wire too small");
+            if(wire.size()<sizeof(xo::XWireHeader))throw std::runtime_error("wire too small");
             // Relabel the stored wire as format 1 (the V1 magic).
             std::memcpy(wire.data(),"XOFFV1\0\0",8);
             bool rejected=false;

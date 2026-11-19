@@ -33,7 +33,7 @@ enum class XErrc : std::uint16_t {
     // Payload verification.
     invalid_payload = 32,          // the structural graph check rejected the payload
     root_mismatch = 33,            // no root at the declared offset, or a non-normalized extent
-    invalid_payload_header = 34,   // the 48-byte payload header is malformed
+    invalid_payload_header = 34,   // the 40-byte image header is malformed
     digest_mismatch = 35,          // a delta's result differs from the sender's digest
     // Limits and resources.
     capacity_exceeded = 64,        // more than the maximum capacity (or the format limit)

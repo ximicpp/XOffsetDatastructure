@@ -76,11 +76,10 @@ static std::size_t payload_offset(const XBuffer& xbuf, const Member* member) {
     return static_cast<std::size_t>(ptr - base);
 }
 
-// Payload offsets below index a dense V2.1 wire (extent_count == 0): header
-// followed by payload bytes [48, used_bytes), so payload offset p is wire
-// byte sizeof(XWireHeaderV2) + p - XWIRE_PAYLOAD_BEGIN.
+// Image offsets below index a dense wire (extent_count == 0), which is the
+// image [0, used_bytes) itself: image offset p is wire byte p.
 static bool dense_wire(const std::string& data) {
-    XWireHeaderV2 header{};
+    XWireHeader header{};
     std::memcpy(&header, data.data(), sizeof(header));
     return header.extent_count == 0;
 }
@@ -281,7 +280,7 @@ bool test_main_containers_assoc_rejects_corrupt_map() {
     assert(!root->by_id.begin()[1].second.is_inline());
     auto* bad_size = &root->by_id.begin()[1].second.size_;
     const std::size_t size_offset =
-        sizeof(XWireHeaderV2) + payload_offset(xbuf, bad_size) - XWIRE_PAYLOAD_BEGIN;
+        payload_offset(xbuf, bad_size);
     assert(dense_wire(data));
     std::uint32_t corrupted = root->by_id.begin()[1].second.capacity_ + 9;
     std::memcpy(data.data() + size_offset, &corrupted, sizeof(corrupted));
@@ -300,7 +299,7 @@ bool test_main_containers_assoc_rejects_corrupt_map() {
         auto inline_data = xbuf.save_verified<BridgeAssocRoot>();
         const auto& value = root->by_id.begin()[0].second;
         assert(value.is_inline() && dense_wire(inline_data));
-        inline_data[sizeof(XWireHeaderV2) + payload_offset(xbuf, &value) - XWIRE_PAYLOAD_BEGIN + 11] =
+        inline_data[payload_offset(xbuf, &value) + 11] =
             static_cast<char>(0x80 | (XString::inline_max + 1));
         bool inline_threw = false;
         try {

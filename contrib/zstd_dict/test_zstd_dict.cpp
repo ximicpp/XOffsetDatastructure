@@ -1,6 +1,6 @@
 // xoffset_zstd_dict unit test: dictionary file, lean frames, batches and
 // every refusal. Synthetic samples shaped like small XOffset wires (40-byte
-// 2.1 header, a record, a name), so it needs no XOffset build.
+// 3.0 header, a record, a name), so it needs no XOffset build.
 #include "xoffset_zstd_dict.hpp"
 
 #include <cstdio>
@@ -40,10 +40,11 @@ const zd::Binding kSchemaB = zd::make_binding(0x1111222233334444ull, 0xaaaabbbbc
 
 std::string sample(std::uint32_t i, const zd::Binding& binding = kSchemaA) {
     std::string w(40, '\0');
-    w[0] = 'X'; w[1] = 'O'; w[2] = 2; w[3] = 1;
-    const std::uint32_t used = 120 + (i % 7) * 8;
-    std::memcpy(&w[8], &used, 4);
-    std::memcpy(&w[24], binding.data(), 16);
+    w[0] = 'X'; w[1] = 'O'; w[2] = 3; w[3] = 0;
+    const std::uint32_t header = 40, used = 120 + (i % 7) * 8;
+    std::memcpy(&w[4], &header, 4);
+    std::memcpy(&w[8], binding.data(), 16);
+    std::memcpy(&w[24], &used, 4);
     char rec[96];
     const int n = std::snprintf(rec, sizeof rec, "unit=%05u hp=%03u behavior=%u name=U%05u-route-marker-%02u tick=%06u",
                                 i * 100, 50 + rnd() % 51, rnd() % 3, i * 100, i % 100, (i / 7) * 20);
@@ -95,7 +96,7 @@ int main() {
         expect(p.check_binding(zd::kUnbound), zd::Errc::binding_mismatch, "unbound refused");
         zd::Binding b{};
         check(zd::wire_binding(test_set[0], b) && b == kSchemaA, "wire_binding");
-        check(!zd::wire_binding("XO\x02\x02" + test_set[0].substr(4), b), "wire_binding refuses another wire version");
+        check(!zd::wire_binding("XO\x02\x01" + test_set[0].substr(4), b), "wire_binding refuses another wire version");
     }
     {
         // Every corruption of the file is refused.

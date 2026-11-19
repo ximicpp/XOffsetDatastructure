@@ -54,12 +54,12 @@ void peek() {
     CHECK(peek_wire_fingerprint(std::string_view("XOFFV2 old wire")).status == XPeekStatus::unsupported_version);
     CHECK(peek_wire_fingerprint(std::string_view(wire.data(), 39)).status == XPeekStatus::truncated);
     std::string flagged = wire;
-    flagged[7] = char(0x80);  // flags bit 31: reserved
+    flagged[7] = char(0x80);  // header size 0x80000028: not 40
     CHECK(peek_wire_fingerprint(flagged).status == XPeekStatus::unsupported_flags);
     // A wire whose payload is garbage still peeks: the peek only selects the
     // version, load_verified decides.
     std::string body = wire;
-    for (std::size_t i = sizeof(XWireHeaderV2); i < body.size(); ++i) body[i] = char(0xEE);
+    for (std::size_t i = sizeof(XWireHeader); i < body.size(); ++i) body[i] = char(0xEE);
     CHECK(peek_wire_fingerprint(body));
 }
 
@@ -68,7 +68,7 @@ void hello_round_trip() {
     CHECK(peek_wire_fingerprint(hello).fingerprint == wire_fingerprint_v<XSchemaHello>);
     auto h = TypedXBuffer<XSchemaHello>::load_verified(hello, XBuffer::maximum_capacity(XSCHEMA_HELLO_MAX_BYTES));
     const auto& m = h.plain_root();
-    CHECK(m.wire_format == 0x0201 && m.role == 0 && m.label.view() == "ios-1.12.0");
+    CHECK(m.wire_format == 0x0300 && m.role == 0 && m.label.view() == "ios-1.12.0");
     CHECK(m.entries.size() == 2);
     CHECK(m.entries[0].root_type_id == wire_root_type_id_v<game::Player>());
     CHECK(m.entries[0].schema_hash == wire_schema_hash_v<game::Player>());
@@ -130,7 +130,7 @@ void ack_outcomes() {
     // Malformed: never throws.
     r = read_schema_ack<game::Player>(std::string_view("garbage"));
     CHECK(r.status == S::malformed && !r.message.empty());
-    r = read_schema_ack<game::Player>(make_ack({{player, XSchemaVerdict::same}}, 0x0300));
+    r = read_schema_ack<game::Player>(make_ack({{player, XSchemaVerdict::same}}, 0x0201));
     CHECK(r.status == S::malformed);
     r = read_schema_ack<game::Player>(make_ack({{player, XSchemaVerdict::same}}, XSCHEMA_HELLO_WIRE_FORMAT,
                                                XSCHEMA_HELLO_MAX_ENTRIES));

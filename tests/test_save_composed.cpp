@@ -206,7 +206,7 @@ void padded_targets() {
                  l.other.ids.size() == src.plain_root().list[3].ids.size(),
              "padded targets: loaded values differ");
         // The padding of every target in the wire is zero.
-        const char* root = out.data() + sizeof(xo::XWireHeaderV2); // the root is the first payload byte on the wire
+        const char* root = out.data() + xo::XWIRE_PAYLOAD_BEGIN; // the root is at 40, after the header
         auto zero_padding = [&](std::size_t at, const auto& ranges) {
             for (const auto& r : ranges)
                 for (std::size_t k = 0; k < r.count; ++k)

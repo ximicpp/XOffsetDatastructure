@@ -1038,7 +1038,8 @@ namespace XOffsetDatastructure {
         bool root_type_known() const noexcept { return root_type_identity_ != nullptr; }
 
     public:
-        // One entry of the V2 wire hole table: a free block of the payload.
+        // A free range of the image: a free block, the free directory, or an
+        // entry of a delta's hole table.
         struct WireHole {
             std::uint32_t offset = 0;
             std::uint32_t bytes = 0;
@@ -1071,7 +1072,7 @@ namespace XOffsetDatastructure {
             std::memcpy(base, &header, sizeof(header));
         }
 
-        // Host owner of a payload base (the arena header address). V2 keeps it
+        // Host owner of a payload base (the arena header address), kept
         // in the host header just before the payload (a slot's, or a VM
         // region's first 64 bytes, on the payload's first page); no registry
         // or TLS lookup.
@@ -1086,7 +1087,7 @@ namespace XOffsetDatastructure {
                 static_cast<const char*>(arena) - sizeof(void*));
         }
 
-        // ---- V2 allocator (host-side free table) ------------------------
+        // ---- Allocator (in-band; the host-side free table when off) -----
         // `bytes` is a block size: a nonzero multiple of 8. Exact-size bins up
         // to free_small_max serve reuse in O(1); a larger free block is split
         // (best fit) before the tail grows. A block is never handed out larger
@@ -1639,22 +1640,17 @@ namespace XOffsetDatastructure {
             return total == sm->free_bytes;
         }
 
-        // A loaded table of free blocks (`holes` need not be aligned).
-        // `wire_order`: a wire's, in write_free_blocks' order (the directory
-        // first, then each stack from its head); the payload holds the
-        // sender's directory, while a free-run emission may skip the free
-        // blocks whole, so each block's link word comes from that order.
-        // Else a delta's, by offset, whose payload bytes (link words
-        // included) are already the sender's. The directory is the entry
-        // whose second word is not zero (a free block's is zero; a
-        // directory's is its capacity); a table without one is recorded
-        // anew (inband_rebuild). `check` (a verified load: the graph walk or
-        // the delta's map checked that the entries tile the payload with the
-        // live blocks): one directory at most, and it holds exactly the
-        // other entries, in stack order.
-        detail::vstatus inband_adopt(const void* holes, std::size_t count, bool check, bool wire_order) {
+        // A loaded table of free blocks (`holes` need not be aligned): a key
+        // delta's, by offset, whose payload bytes (link words included) are
+        // already the sender's. The directory is the entry whose second word
+        // is not zero (a free block's is zero; a directory's is its
+        // capacity); a table without one is recorded anew (inband_rebuild).
+        // `check` (the delta's map checked that the entries tile the payload
+        // with the live blocks): one directory at most, and it holds exactly
+        // the other entries, in stack order.
+        detail::vstatus inband_adopt(const void* holes, std::size_t count, bool check) {
             if (!arena()) XOFFSET_VFAIL(XException, XErrc::invalid_state, "XBufferCore: buffer has no payload");
-            if (inband_adopt_table(holes, count, check, wire_order) == inband_adopted::rejected) [[unlikely]]
+            if (inband_adopt_table(holes, count, check) == inband_adopted::rejected) [[unlikely]]
                 XOFFSET_VFAIL(XException, XErrc::invalid_payload,
                               "wire validation failed: free blocks differ from the free directory");
             return detail::vok();
@@ -1663,8 +1659,7 @@ namespace XOffsetDatastructure {
         // (a table without a directory), or rejected by `check` (nothing
         // changed).
         enum class inband_adopted { kept, rebuilt, rejected };
-        inband_adopted inband_adopt_table(const void* holes, std::size_t count, bool check,
-                                          bool wire_order = false) noexcept {
+        inband_adopted inband_adopt_table(const void* holes, std::size_t count, bool check) noexcept {
             char* const base = buffer_.data();
             const auto* in = static_cast<const char*>(holes);
             const auto entry = [&](std::size_t i) noexcept {
@@ -1678,7 +1673,6 @@ namespace XOffsetDatastructure {
                 free_table_lost_ = false;
                 return inband_adopted::kept;
             }
-            if (wire_order) return inband_adopt_wire(holes, count, check);
             std::size_t dir = count;
             std::uint64_t total = 0;
             bool by_offset = true;
@@ -1686,7 +1680,15 @@ namespace XOffsetDatastructure {
                 const WireHole hole = entry(i);
                 total += hole.bytes;
                 if (i != 0 && hole.offset <= entry(i - 1u).offset) by_offset = false;
-                if (hole.bytes < 16u || inband_word(base + hole.offset + 4u) == 0) continue;
+                if (inband_word(base + hole.offset + 4u) == 0) continue;
+                // A free block's second word is 0; only the directory (at
+                // least 16 bytes) has another, its capacity. Checked, an
+                // 8-byte block with one is rejected, as the full check of a
+                // load rejects it.
+                if (hole.bytes < 16u) {
+                    if (check) dir = count + 1u;
+                    continue;
+                }
                 if (dir == count) dir = i;
                 else if (check) dir = count + 1u;
             }
@@ -1717,7 +1719,8 @@ namespace XOffsetDatastructure {
                 for (std::uint32_t k = n; k < cap; ++k)
                     if (d[2u + 2u * k] != inband_end || d[3u + 2u * k] != 0) return fail();
                 // Each stack's blocks are entries of the table: by offset, a
-                // binary search; else (a wire's) the next entries in order,
+                // binary search; else (the replica's own regions,
+                // for_each_free_region's order) the next entries in order,
                 // after the directory. Every other entry is visited once.
                 std::size_t next = 1, budget = count - 1u;
                 if (!by_offset && dir != 0) return fail();
@@ -1743,83 +1746,6 @@ namespace XOffsetDatastructure {
                     }
                 }
                 if (budget != 0) return fail();
-            }
-            inband_set(base + inband_dir_at, directory.offset);
-            inband_set(base + inband_bytes_at, static_cast<std::uint32_t>(total));
-            inband_stale();
-            free_table_lost_ = false;
-            return inband_adopted::kept;
-        }
-
-        // inband_adopt_table for a wire's table (count > 0): the directory is
-        // its first entry, unless the table has none (a sender without the
-        // in-band allocator). Each block gets {link, 0}: the next entry when
-        // it has the same size (the same stack), else 0. `check`: the
-        // directory is well formed and its stacks are the other entries, in
-        // its order, each from its head. A rejected table may leave link
-        // words written: the wire load that adopts it fails and resets the
-        // payload.
-        inband_adopted inband_adopt_wire(const void* holes, std::size_t count, bool check) noexcept {
-            char* const base = buffer_.data();
-            const auto* in = static_cast<const char*>(holes);
-            const auto entry = [&](std::size_t i) noexcept {
-                WireHole hole;
-                std::memcpy(&hole, in + i * sizeof(hole), sizeof(hole));
-                return hole;
-            };
-            const WireHole directory = entry(0);
-            if (directory.bytes < 16u || inband_word(base + directory.offset + 4u) == 0) {
-                (void)inband_rebuild(holes, count);
-                return inband_adopted::rebuilt;
-            }
-            // Entries [first, last) are one stack of `size`: linked in order.
-            std::uint64_t total = 0;
-            const auto link = [&](std::size_t first, std::size_t last, std::uint32_t size) noexcept {
-                for (std::size_t i = first; i < last; ++i) {
-                    const std::uint64_t next = i + 1u < last ? entry(i + 1u).offset : 0u;
-                    std::memcpy(base + entry(i).offset, &next, sizeof(next));  // {link, 0}
-                }
-                total += std::uint64_t(size) * (last - first);
-            };
-            if (check) {
-                const auto* const d = reinterpret_cast<const std::uint32_t*>(base + directory.offset);
-                const std::uint32_t n = d[0], cap = d[1];
-                if (n >= cap || !inband_dir_spans(cap, directory.bytes)) return inband_adopted::rejected;
-                // One pass over the directory: sizes ascending, multiples of
-                // 8; each entry with a head names the next table entry, and
-                // the entries after it of the same size are its stack.
-                std::size_t i = 1;
-                std::uint32_t last = 0;
-                for (std::uint32_t k = 0; k < n; ++k) {
-                    const std::uint32_t size = d[2u + 2u * k], head = d[3u + 2u * k];
-                    if (size <= last || (size & 7u) != 0) return inband_adopted::rejected;
-                    last = size;
-                    if (head == 0) continue;
-                    if (i == count) return inband_adopted::rejected;
-                    if (const WireHole hole = entry(i); hole.bytes != size || hole.offset != head)
-                        return inband_adopted::rejected;
-                    std::size_t end = i + 1u;
-                    while (end < count && entry(end).bytes == size) ++end;
-                    link(i, end, size);
-                    i = end;
-                }
-                if (i != count) return inband_adopted::rejected;
-                constexpr std::uint64_t unused = inband_end;  // {inband_end, 0}, little-endian
-                std::uint64_t stray = 0;
-                for (std::uint32_t k = n; k < cap; ++k) {
-                    std::uint64_t word;
-                    std::memcpy(&word, d + 2u + 2u * k, sizeof(word));
-                    stray |= word ^ unused;
-                }
-                if (stray != 0) return inband_adopted::rejected;
-            } else {
-                for (std::size_t i = 1; i < count;) {
-                    const std::uint32_t size = entry(i).bytes;
-                    std::size_t end = i + 1u;
-                    while (end < count && entry(end).bytes == size) ++end;
-                    link(i, end, size);
-                    i = end;
-                }
             }
             inband_set(base + inband_dir_at, directory.offset);
             inband_set(base + inband_bytes_at, static_cast<std::uint32_t>(total));
@@ -1890,17 +1816,6 @@ namespace XOffsetDatastructure {
         }
 
         bool free_table_complete() const noexcept { return !free_table_lost_; }
-#if defined(XOFFSET_TEST_EAGER_HOLE_TABLE)
-        // Test hook (tests/test_hole_table_differential.cpp only): while set,
-        // a hole table load on this thread builds the bin index at once,
-        // the way every load did before the lazy hole table, so a test can
-        // run the same operations on an eagerly and a lazily loaded buffer
-        // and compare every allocation, hole table and saved byte.
-        static bool& test_eager_hole_table() noexcept {
-            static thread_local bool eager = false;
-            return eager;
-        }
-#endif
         // Small holes of one size a free table with no other small holes
         // records without host storage (its inline word pool, shared by all
         // sizes); the next one of that size allocates a pool.
@@ -1932,15 +1847,15 @@ namespace XOffsetDatastructure {
             return free_table_ ? free_table_->current_gen() : 0;
         }
 
-        // The wire hole table: the free blocks and, in-band, the directory
-        // block first (write_free_blocks' order). Off: free_block_count()
-        // and for_each_free_block.
-        std::size_t wire_hole_count() const noexcept {
+        // The image's free regions: in-band, the directory block first, then
+        // each size's stack from its head (what the full check tiles with
+        // the live blocks). Off: free_block_count() and for_each_free_block.
+        std::size_t free_region_count() const noexcept {
             if constexpr (detail::inband_allocator) return inband_dir() != 0 ? 1u + inband_count() : 0u;
             return free_block_count();
         }
         template <typename Fn>
-        void for_each_wire_hole(Fn&& fn) const {
+        void for_each_free_region(Fn&& fn) const {
             if constexpr (detail::inband_allocator) {
                 if (const WireHole dir = free_directory(); dir.bytes != 0) {
                     fn(dir);
@@ -1949,25 +1864,6 @@ namespace XOffsetDatastructure {
                 return;
             }
             for_each_free_block(fn);
-        }
-        // In-band: the wire hole table in one walk. Writes its first `room`
-        // entries (for_each_wire_hole's order) to `out` and returns its
-        // length (wire_hole_count()).
-        std::size_t inband_gather(WireHole* out, std::size_t room) const noexcept {
-            const char* const base = buffer_.data();
-            const std::uint32_t dir = buffer_.size() < sizeof(arena_header) ? 0u : inband_word(base + inband_dir_at);
-            if (dir == 0) return 0;
-            const auto* const d = reinterpret_cast<const std::uint32_t*>(base + dir);
-            std::size_t count = 1;
-            out[0] = WireHole{dir, inband_dir_bytes(d[1])};
-            for (std::uint32_t i = 0, n = d[0]; i < n; ++i) {
-                const std::uint32_t bytes = d[2u + 2u * i];
-                for (std::uint32_t at = d[3u + 2u * i]; at != 0; at = inband_word(base + at)) {
-                    if (count < room) out[count] = WireHole{at, bytes};
-                    ++count;
-                }
-            }
-            return count;
         }
         // The in-band allocator's free directory, a block of its own and the
         // first wire hole: {0, 0} when there is none (always, off).
@@ -2074,170 +1970,6 @@ namespace XOffsetDatastructure {
             for (const auto& [bytes, offset] : table.large) fn(WireHole{offset, bytes});
         }
 
-        // Writes wire_hole_count() little-endian entries.
-        void write_free_blocks(char* out) const noexcept {
-            if constexpr (detail::inband_allocator) {
-                for_each_wire_hole([&](WireHole hole) noexcept {
-                    std::memcpy(out, &hole, sizeof(hole));
-                    out += sizeof(hole);
-                });
-                return;
-            }
-            // A reload keeps its emptied table (begin_reinit), so a save of a
-            // buffer with no holes often finds an empty table: only its count
-            // is read, not its index words, map or bins (lines nothing has
-            // touched since the reload).
-            if (!free_table_ || free_table_->count == 0) return;
-            const auto& table = *free_table_;
-            // for_each_free_block's order. A hole is {offset, bytes}, so one
-            // little-endian word per entry with the bin's size in the high
-            // half; the loop over a bin's offsets vectorizes.
-            for (auto words = table.nonempty_words; words != 0; words &= words - 1u) {
-                const auto word = static_cast<std::uint32_t>(std::countr_zero(words));
-                for (auto bits = table.nonempty[word]; bits != 0; bits &= bits - 1u) {
-                    const auto bin = word * 64u + static_cast<std::uint32_t>(std::countr_zero(bits));
-                    const std::uint64_t bytes = std::uint64_t((bin + 1u) * 8u) << 32;
-                    const std::uint32_t h = table.head[bin];
-                    if (FreeTable::is_single(h)) {
-                        const std::uint64_t hole = bytes | (h - 1u);
-                        std::memcpy(out, &hole, sizeof(hole));
-                        out += sizeof(WireHole);
-                        continue;
-                    }
-                    const std::uint32_t* const seg = table.seg_of(h);
-                    const std::uint32_t* const offsets = seg + FreeTable::seg_header;
-                    const std::uint32_t n = seg[0];
-                    for (std::uint32_t i = 0; i < n; ++i) {
-                        const std::uint64_t hole = bytes | offsets[i];
-                        std::memcpy(out + std::size_t(i) * sizeof(WireHole), &hole, sizeof(hole));
-                    }
-                    out += std::size_t(n) * sizeof(WireHole);
-                }
-            }
-            for (const auto& [bytes, offset] : table.large) {
-                const WireHole hole{offset, bytes};
-                std::memcpy(out, &hole, sizeof(hole));
-                out += sizeof(hole);
-            }
-        }
-
-        // Replaces the free table's entries with validated holes (wire order).
-        // `holes` need not be aligned (it may point into wire bytes). The
-        // table is filled off to the side (host allocation may run
-        // new_handler): the owner's own table when it is empty, else a new
-        // one; the payload's current owner is re-resolved and the table
-        // published to it.
-        // WireOrder (in-band): a wire's table, else a key delta's (by
-        // offset, the link words in the payload); see inband_adopt.
-        template <bool WireOrder = true>
-        XOFFSET_DETAIL_INLINE detail::vstatus load_free_blocks(const void* holes, std::size_t count) {
-            // In-band: a verified load's table (finish_admitted_load adopts
-            // its table unchecked).
-            if constexpr (detail::inband_allocator) return inband_adopt(holes, count, true, WireOrder);
-            // No holes and no entry to remove: the general path would only
-            // publish the same empty table (or none). It would publish it to
-            // record_owner(owner_record_), the payload's host word, which is
-            // this owner while it holds the payload; neither the word nor
-            // the record (a cold heap object) needs to be read here.
-            if (count == 0 && (!free_table_ || free_table_->count == 0)) [[likely]] {
-                free_table_lost_ = false;
-                return detail::vok();
-            }
-            return load_free_blocks_general(holes, count);
-        }
-
-        XOFFSET_DETAIL_NOINLINE detail::vstatus load_free_blocks_general(const void* holes, std::size_t count) {
-            const auto identity = owner_record_;
-            // An owner's table with no entries (a reload or reset emptied it)
-            // is refilled off to the side. A table with entries (an exact
-            // recomputation) is replaced only once the new one is complete,
-            // so a host allocation failure leaves it as it was. With no table
-            // and no holes, an absent table is an exact, empty one.
-            FreeTablePtr table;
-            if (free_table_ && free_table_->count == 0) table = std::move(free_table_);
-            XOFFSET_TRY {
-                if (count != 0 && !table) table = make_free_table();
-                // The table records nothing (new, cached or emptied): its
-                // pool starts over.
-                if (count != 0) table->reset_pool_entries();
-                const auto* in = static_cast<const char*>(holes);
-                for (std::size_t i = 0; i < count;) {
-                    WireHole hole;
-                    std::memcpy(&hole, in + i * sizeof(hole), sizeof(hole));
-                    if (hole.bytes <= FreeTable::small_max) {
-                        // The canonical order groups holes by size: a run of
-                        // one size fills its bin in one step, in wire order.
-                        std::size_t run = 1;
-                        for (std::uint32_t next = 0; i + run < count; ++run) {
-                            std::memcpy(&next, in + (i + run) * sizeof(hole) + offsetof(WireHole, bytes), sizeof(next));
-                            if (next != hole.bytes) break;
-                        }
-                        const auto bin = hole.bytes / 8u - 1u;
-                        if (run == 1 && table->head[bin] == 0) {
-                            // A bin's only entry is held in its head.
-                            table->head[bin] = hole.offset | 1u;
-                            table->mark_nonempty(bin);
-                            table->bytes += hole.bytes;
-                            ++table->count;
-                            ++i;
-                            continue;
-                        }
-                        // A new segment at the end of the pool, of
-                        // make_room's capacity (the run rounded up to a power
-                        // of two, at least 4); make_room otherwise.
-                        const std::uint32_t cap = run <= 4 ? 4u : static_cast<std::uint32_t>(std::bit_ceil(run));
-                        if (table->head[bin] == 0 && run <= (std::size_t(1) << 29)) {
-                            // Nothing to compact in a table being filled:
-                            // a pool too small grows (doubling) right away.
-                            const std::uint64_t need = std::uint64_t(table->pool_used) + FreeTable::seg_header + cap;
-                            if (need > table->pool_words) {
-                                const std::uint64_t words = (std::max)(std::uint64_t(table->pool_words) * 2u, need);
-                                if (words >= (std::uint64_t(1) << 30)) XOFFSET_THROW(std::bad_alloc());
-                                const auto w = static_cast<std::uint32_t>(words);
-                                delete[] table->adopt_pool(new std::uint32_t[w], w);
-                            }
-                            const std::uint32_t at = table->pool_used;
-                            table->pool[at] = 0;
-                            table->pool[at + 1u] = cap;
-                            table->pool[at + 2u] = bin;
-                            table->head[bin] = FreeTable::seg_head(at);
-                            table->pool_used = at + FreeTable::seg_header + cap;
-                        } else {
-                            table->reserve_in_bin(bin, run);
-                        }
-                        std::uint32_t* const seg = table->seg_of(table->head[bin]);
-                        std::uint32_t* const entries = seg + FreeTable::seg_header + seg[0];
-                        for (std::size_t k = 0; k < run; ++k)
-                            std::memcpy(&entries[k], in + (i + k) * sizeof(hole) + offsetof(WireHole, offset), sizeof(std::uint32_t));
-                        seg[0] += static_cast<std::uint32_t>(run);
-                        table->head[bin] |= FreeTable::seg_nonempty;
-                        table->mark_nonempty(bin);
-                        table->bytes += std::uint64_t(hole.bytes) * run;
-                        table->count += run;
-                        i += run;
-                    } else {
-                        table->large.emplace(hole.bytes, hole.offset);
-                        table->bytes += hole.bytes;
-                        ++table->count;
-                        ++i;
-                    }
-                }
-                // A table from make_free_table() is new or came from the
-                // cache through recycle(), so it is already stale. Marked
-                // anyway: a table this path fills that had its generation
-                // read since its last change (an owner's kept, emptied
-                // table) must not keep that value with new holes in it.
-                if (count != 0) table->bump_gen();
-            } XOFFSET_CATCH(const std::bad_alloc&) {
-                XOFFSET_THROW(XBadAlloc());
-            }
-            auto* owner = identity ? record_owner(identity) : this;
-            if (!owner) XOFFSET_VFAIL(XException, XErrc::invalid_state, "arena owner lookup failed");
-            owner->free_table_.swap(table);
-            owner->free_table_lost_ = false;
-            return detail::vok();
-        }
-
         // Replaces the free table with an exact recomputation (used after an
         // unverified load or when a host allocation failure lost an entry).
         void replace_free_blocks(const std::vector<WireHole>& holes) {
@@ -2259,9 +1991,7 @@ namespace XOffsetDatastructure {
                 if (!arena() || free_table_lost_) [[unlikely]]
                     XOFFSET_THROW(XException(XErrc::capacity_exceeded,
                                              "XBufferCore: no room for the free directory"));
-                return;
             }
-            XOFFSET_VREQUIRE(load_free_blocks(holes.data(), holes.size()));
         }
 
     private:
@@ -2294,8 +2024,8 @@ namespace XOffsetDatastructure {
             std::uint32_t nonempty_words = 0;
             // RL: false means the pool has not moved to host storage since
             // the last full recycle (or construction), so a keep-recycle
-            // only empties the bins. Every pool growth (load_free_blocks,
-            // insert_free_block, copy_free_table) sets it.
+            // only empties the bins. Every pool growth (insert_free_block,
+            // copy_free_table) sets it.
             bool grown = false;
             // The generation, read through current_gen(): it differs from
             // every value read before if an entry came or went in between, in
@@ -3258,7 +2988,7 @@ namespace XOffsetDatastructure {
             XOFFSET_VTRY(as_arena_failure([&]() -> detail::vstatus {
                 free_table_.reset();
                 // Holes of an unverified payload are unknown until a verified
-                // load supplies its hole table (or a typed walk recomputes it).
+                // load checks its free directory (or a typed walk recomputes it).
                 free_table_lost_ = true;
                 detail::VirtualMemoryStorage owner;
                 XOFFSET_VTRY(make(owner));
@@ -3656,7 +3386,7 @@ namespace XOffsetDatastructure {
         // caller finishes verification.
         //
         // The free table stays with the owner, emptied: the holes of the new
-        // content (load_free_blocks) or the first retires after it refill it,
+        // content or the first retires after it refill it,
         // so neither needs a fresh 12 KiB table, whatever else this thread
         // reloaded in between. A reset keeps all its bin storage; a reload
         // keeps it within FreeTableRecycler's keep limits.
@@ -3782,7 +3512,7 @@ namespace XOffsetDatastructure {
                                    : packed_.growth_policy == XGrowPolicy::Relocating && size > buffer_.reservation_limit()) &&
                 !replace_storage(size, false))
                 XOFFSET_VFAIL(XBadAlloc, XErrc::out_of_storage, detail::arena_failure_message);
-            // Holes are unknown until verification supplies the hole table.
+            // Holes are unknown until verification checks the free directory.
             free_table_lost_ = true;
             return detail::vok();
         }

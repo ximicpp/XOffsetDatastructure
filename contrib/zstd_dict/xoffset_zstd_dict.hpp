@@ -16,7 +16,7 @@
 //     8  u32 dictionary id: the version both ends compare, 1 .. 2^31-1;
 //            equal to the zstd dictionary's own id
 //    12  u32 dictionary bytes
-//    16  16  binding: bytes 24..39 of the XOffset wire header of every
+//    16  16  binding: bytes 8..23 of the XOffset wire header of every
 //            message the dictionary is for (schema hash, root type id), or
 //            all zero for a dictionary bound to nothing
 //    32  u64 FNV-1a 64 of bytes 0..31 followed by the dictionary bytes
@@ -35,8 +35,8 @@
 //   the receiver verifies every decoded XOffset wire in full anyway.
 //
 // * Header elision (bound dictionaries only): every message must be an
-//   XOffset 2.1 wire of the bound schema, and its 24 bytes that the binding
-//   fixes ('X' 'O' 2 1, flags 0, the 16 fingerprint bytes 24..39) are left
+//   XOffset 3.0 wire of the bound schema, and its 24 bytes that the binding
+//   fixes ('X' 'O' 3 0, header bytes 40, the 16 fingerprint bytes 8..23) are left
 //   out of the frame and put back by the decoder. The encoder refuses any
 //   other message (binding_mismatch), so the decoder returns exactly the
 //   bytes the sender passed in; what it returns is still an unverified
@@ -80,12 +80,12 @@ struct [[nodiscard]] Status {
 
 const char* errc_name(Errc e) noexcept;   // "ok", "dict_id_mismatch", ...
 
-// Bytes 24..39 of an XOffset wire header (XWireHeaderV2: schema_hash, then
+// Bytes 8..23 of an XOffset wire header (XWireHeader: schema_hash, then
 // root_type_id, little endian), or all zero for "bound to nothing".
 using Binding = std::array<std::uint8_t, 16>;
 inline constexpr Binding kUnbound{};
 
-// The binding of an XOffset 2.1 wire ('X' 'O' 2 1 and at least 40 bytes),
+// The binding of an XOffset 3.0 wire ('X' 'O' 3 0 and at least 40 bytes),
 // false otherwise.
 bool wire_binding(std::string_view wire, Binding& out) noexcept;
 // From the two fingerprint words (XWireFingerprint: root_type_id, schema_hash).
@@ -205,7 +205,7 @@ private:
 inline constexpr std::size_t kElidedBytes = 24;
 // `wire` without the 24 header bytes `binding` fixes (what a bound
 // dictionary compresses, and what it is trained on); binding_mismatch for
-// anything but an XOffset 2.1 wire of that schema.
+// anything but an XOffset 3.0 wire of that schema.
 Status elide_wire(std::string_view wire, const Binding& binding, std::string& out);
 
 // Batch content without compression or elision (the layout inside a batch frame).

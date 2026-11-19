@@ -70,8 +70,8 @@ const char* errc_name(Errc e) noexcept {
 
 bool wire_binding(std::string_view wire, Binding& out) noexcept {
     const unsigned char* p = bytes(wire);
-    if (wire.size() < 40 || p[0] != 'X' || p[1] != 'O' || p[2] != 2 || p[3] != 1) return false;
-    std::memcpy(out.data(), p + 24, out.size());
+    if (wire.size() < 40 || p[0] != 'X' || p[1] != 'O' || p[2] != 3 || p[3] != 0) return false;
+    std::memcpy(out.data(), p + 8, out.size());
     return true;
 }
 
@@ -307,22 +307,22 @@ Status Encoder::set_dictionary(const Dictionary& dict, int level) {
 }
 
 namespace {
-// The fixed start of every XOffset 2.1 wire header: 'X' 'O' 2 1, flags 0.
-constexpr unsigned char kWirePrefix[8] = {'X', 'O', 2, 1, 0, 0, 0, 0};
+// The fixed start of every XOffset 3.0 wire header: 'X' 'O' 3 0, header
+// bytes 40.
+constexpr unsigned char kWirePrefix[8] = {'X', 'O', 3, 0, 40, 0, 0, 0};
 }   // namespace
 
 Status elide_wire(std::string_view wire, const Binding& binding, std::string& out) {
     out.clear();
     if (wire.size() < 40 || std::memcmp(wire.data(), kWirePrefix, sizeof kWirePrefix) != 0)
-        return fail(Errc::binding_mismatch, "the dictionary is bound to a schema; the message is not an XOffset 2.1 wire");
-    if (std::memcmp(wire.data() + 24, binding.data(), binding.size()) != 0) {
+        return fail(Errc::binding_mismatch, "the dictionary is bound to a schema; the message is not an XOffset 3.0 wire");
+    if (std::memcmp(wire.data() + 8, binding.data(), binding.size()) != 0) {
         Binding b{};
-        std::memcpy(b.data(), wire.data() + 24, b.size());
+        std::memcpy(b.data(), wire.data() + 8, b.size());
         return fail(Errc::binding_mismatch, "the dictionary is bound to " + binding_hex(binding) + ", the message is " +
                                                 binding_hex(b));
     }
-    out.assign(wire.data() + 8, 16);
-    out.append(wire.data() + 40, wire.size() - 40);
+    out.assign(wire.data() + kElidedBytes, wire.size() - kElidedBytes);
     return {};
 }
 
@@ -423,12 +423,12 @@ Status Decoder::inflate(std::string_view frame, std::size_t cap, std::string& ou
 }
 
 namespace {
-// Puts the elided header bytes back: prefix, 16 kept bytes, binding, rest.
+// Puts the elided header bytes back: prefix, binding, then the rest (the
+// header's 16 kept bytes first).
 void restore(std::string_view elided, const Binding& binding, std::string& out) {
     out.append(reinterpret_cast<const char*>(kWirePrefix), sizeof kWirePrefix);
-    out.append(elided.data(), 16);
     out.append(reinterpret_cast<const char*>(binding.data()), binding.size());
-    out.append(elided.data() + 16, elided.size() - 16);
+    out.append(elided.data(), elided.size());
 }
 constexpr std::size_t kKeptHeaderBytes = 16;
 }   // namespace

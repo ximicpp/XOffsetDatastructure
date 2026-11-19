@@ -27,12 +27,10 @@ int main() {
     for (std::uint32_t i = 0; i < 40; ++i) r.values.push_back(i);
     const auto head = std::size_t(reinterpret_cast<const char*>(&r.values) - reinterpret_cast<const char*>(&r));
     const auto wire = src.save_verified<ForcedRoot>(XSaveOptions{XWireEmission::dense});
-    XWireHeaderV2 header;
-    std::memcpy(&header, wire.data(), sizeof(header));
     std::string bad = wire;
     const std::int32_t outside = 0x40000000;  // not "far": a macro on Windows
-    std::memcpy(bad.data() + sizeof(XWireHeaderV2) + (header.root_offset - XWIRE_PAYLOAD_BEGIN) + head, &outside,
-                sizeof(outside));
+    // A dense wire is the image; the root is at XWIRE_PAYLOAD_BEGIN.
+    std::memcpy(bad.data() + XWIRE_PAYLOAD_BEGIN + head, &outside, sizeof(outside));
 
     int failures = 0;
     XReceiver<XLink::server_peer> rx(cap);

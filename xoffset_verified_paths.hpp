@@ -21,13 +21,7 @@ namespace detail {
         return x - y + (an - 1) < span;
     }
 
-    template<class T>
-    XWireHeader VerifiedPathsAccess::header(XBufferCore& source) {
-        return header_inline<T>(source);
-    }
-
-    // Out of line: its hole vector and graph walk stay out of the frames of
-    // the paths that inline header_inline.
+    // Out of line: its hole vector and graph walk stay out of header's frame.
     template<class T>
     XOFFSET_DETAIL_NOINLINE void VerifiedPathsAccess::rebuild_free_table(T& root, XBufferCore& source) {
         std::vector<XBufferCore::WireHole> holes;
@@ -37,7 +31,7 @@ namespace detail {
     }
 
     template<class T>
-    XOFFSET_DETAIL_INLINE XWireHeader VerifiedPathsAccess::header_inline(XBufferCore& source) {
+    XWireHeader VerifiedPathsAccess::header(XBufferCore& source) {
         static_assert(is_wire_admitted_v<T>);
 #ifdef XOFFSET_REJECT_IMPLICIT_PADDING
         static_assert(!has_implicit_padding_v<T>,
@@ -110,7 +104,7 @@ namespace detail {
         static_assert(!has_implicit_padding_v<T>,
             "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");
 #endif
-        // header_inline's checks for the state this path admits: a root cache
+        // header's checks for the state this path admits: a root cache
         // hit (typed access and schema binding as make<T>() or a verified
         // load of T left them, and T's fingerprint in the image header), a
         // complete free state, and a used end below save_small_max. A miss
@@ -168,32 +162,6 @@ namespace detail {
                                                                             XSaveOptions options) {
         auto check_alias = [&](XBufferCore& candidate) XOFFSET_DETAIL_LAMBDA_INLINE { save_check_alias(out, candidate); };
         const auto emission = options.emission;
-        // Fast path: no host allocation can run before the wire is written,
-        // so no callback can move or change the source; it is examined once,
-        // in place. That holds when the reused output already holds the
-        // image (which bounds every emission: no reserve) and no free-run
-        // list is built (zero_runs, or free bytes below one run:
-        // wire_free_runs would return no runs). The output is the same as
-        // the general path's: free_runs with no runs is the dense wire.
-        if (const auto* arena = source.arena();
-            arena && owns_record(source) && source.free_table_complete() &&
-            arena->used_end >= XWIRE_PAYLOAD_BEGIN &&
-            (emission != XWireEmission::free_runs || arena->free_bytes < wire_free_run_min_gap) &&
-            arena->used_end <= out.capacity()) [[likely]] {
-            check_alias(source);
-            const auto final_header = header_inline<T>(source);
-            const auto* base = static_cast<const char*>(source.get_address());
-            const WireGaps none{};
-#if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
-            out.resize_and_overwrite(final_header.used_bytes, [&](char* destination, std::size_t) noexcept {
-                return write_wire(destination, final_header, base, emission, none);
-            });
-#else
-            out.resize(final_header.used_bytes);
-            out.resize(write_wire(out.data(), final_header, base, emission, none));
-#endif
-            return;
-        }
         // A shared record is an identity, not a mapping pin. Resolve it after
         // reserve/new_handler; a moved owner may even be a plain XBufferCore.
         const auto token = identity(source);

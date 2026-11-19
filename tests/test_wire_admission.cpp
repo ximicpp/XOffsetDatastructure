@@ -111,13 +111,12 @@ bool test_v1_admission_round_trip() {
 
     std::string data = xbuf.save_verified();
     // The admission trait keeps its historical "v1" name; the verified wire it
-    // gates is format 2.1 ('X' 'O' 2 1 header + payload bytes + hole table).
-    XWireHeaderV2 wire_header{};
+    // gates is format 3.0 (the image: 'X' 'O' 3 0 header, then the root).
+    XWireHeader wire_header{};
     std::memcpy(&wire_header, data.data(), sizeof(wire_header));
-    assert(wire_header.magic == XWIRE_MAGIC && std::memcmp(data.data(), "XO\x02\x01", 4) == 0);
-    assert(wire_header.extent_count == 0); // small buffer without a >= 4 KiB hole: dense
-    assert(data.size() == sizeof(wire_header) + wire_header.used_bytes - XWIRE_PAYLOAD_BEGIN +
-                          wire_header.hole_count * sizeof(XBufferCore::WireHole));
+    assert(wire_header.magic == XWIRE_MAGIC && std::memcmp(data.data(), "XO\x03\x00", 4) == 0);
+    assert(wire_header.extent_count == 0); // small buffer without a >= 4 KiB free run: dense
+    assert(data.size() == wire_header.used_bytes);
     XBuffer loaded = XBuffer::load_verified<WireRoot>(data);
 
     assert(loaded.matches_schema<WireRoot>());

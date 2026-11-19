@@ -76,14 +76,7 @@ namespace XOffsetDatastructure {
             using Identity = XBufferCore::OwnerRecordPtr;
             static Identity identity(XBufferCore& source) noexcept { return source.owner_record_; }
             static XBufferCore& owner(const Identity& value) { return XBufferCore::require_record_owner(value); }
-            // The source is its record's owner (what owner(identity(source))
-            // resolves to on entry), without copying the record.
-            static bool owns_record(const XBufferCore& source) noexcept {
-                return XBufferCore::record_owner(source.owner_record_) == &source;
-            }
             template<class T> static XWireHeader header(XBufferCore&);
-            // header<T>'s body, inlined into save_into's fast path.
-            template<class T> XOFFSET_DETAIL_INLINE static XWireHeader header_inline(XBufferCore&);
             template<class T> static void save_into(XBufferCore&, std::string&, XSaveOptions);
             template<class T> static bool save_small_into(XBufferCore&, std::string&, XWireEmission);
             template<class T> static void save_into_general(XBufferCore&, std::string&, XSaveOptions);
@@ -499,7 +492,7 @@ namespace XOffsetDatastructure {
         // of at most 10 bytes inline, no holes, and capacity == size except
         // for the bounded slack of XCompactOptions (slack_div = 0: the
         // canonical wire of XCompactor, the smallest one). Same checks as
-        // save_verified; the source is not changed. A valid V2 wire: every
+        // save_verified; the source is not changed. A valid wire: every
         // receiver accepts it.
         template <typename T>
         void save_compact_into(std::string& out, XCompactOptions options = {}) {
@@ -689,7 +682,8 @@ namespace XOffsetDatastructure {
         detail::vstatus reload_into(std::span<const std::byte> data, std::pmr::memory_resource* upstream) {
             constexpr const char* who = "reload_verified<T>()";
             const std::size_t size = data.size_bytes();
-            if (admit_image<T>(data) && size <= small_reload_max && this->can_reload_image_in_place(size)) [[likely]] {
+            if (admit_image<T>(data) && size <= small_reload_max && detail::small_reload_fast_path &&
+                this->can_reload_image_in_place(size)) [[likely]] {
                 // An image <= small_reload_max: the inline bitmaps suffice, so
                 // neither upstream nor the retained scratch is touched.
                 if (!this->reload_image_in_place(reinterpret_cast<const char*>(data.data()), size)) [[unlikely]]
@@ -1096,12 +1090,15 @@ namespace XOffsetDatastructure {
         // (a load's image already holds the sender's).
         template <typename T>
         void bind_schema_if_available() noexcept {
-            if constexpr (has_schema_name_v<T>) bind_schema<T>();
-            if constexpr (is_wire_admitted_v<T>) write_fingerprint<T>();
+            if constexpr (has_schema_name_v<T>) {
+                bind_schema<T>();
+                write_fingerprint<T>();
+            }
         }
 
-        // T's fingerprint in the image header. A buffer whose root is cached
-        // as a wire type T holds it (make<T>(), a load or delta of T, a
+        // T's fingerprint in the image header (only a type with a schema name
+        // has one, and only such a type is sent). A buffer whose root is
+        // cached as such a T holds it (make<T>(), a load or delta of T, a
         // clone), so a save copies the image as it is.
         template <typename T>
         void write_fingerprint() noexcept {
@@ -1112,7 +1109,7 @@ namespace XOffsetDatastructure {
         template <typename T>
         bool holds_fingerprint() const noexcept {
             using U = std::remove_cv_t<T>;
-            if constexpr (is_wire_admitted_v<U>) {
+            if constexpr (has_schema_name_v<U>) {
                 const auto* sm = this->arena();
                 return sm && sm->schema_hash == detail::wire_schema_hash<U>() &&
                        sm->root_type_id == detail::wire_root_type_id<U>();

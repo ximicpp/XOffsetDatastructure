@@ -112,34 +112,35 @@ server to client (`server_to_client.cpp`), deltas (`delta_sync.cpp`,
 ```
  one arena (payload), any address
  ┌────────┬───────────────────────┬──────────┬────────┬──────────────────┐
- │ header │ root WorldView        │ Unit[]   │ hole   │ "Archer Captain" │
- │ 48 B   │ tick │ units{Δ,n,cap} │ Unit ... │ (free) │                  │
+ │ header │ root WorldView        │ Unit[]   │ free   │ "Archer Captain" │
+ │ 40 B   │ tick │ units{Δ,n,cap} │ Unit ... │ block  │                  │
  └────────┴───────────────┬───────┴─▲────────┴────────┴─▲────────────────┘
                           └─────────┘                   │
                      rel32 Δ from head to block         │
                           Unit.name{Δ,n,cap} ───────────┘
 
- wire = 40 B header + used arena bytes + hole table
+ wire = the used arena bytes [0, used), header included
 ```
 
 1. **Relative offsets instead of pointers.** Every container head is 12 bytes:
    a signed 32-bit offset from the head to its data block, a size and a
    capacity. Short strings (up to 10 bytes) sit inside the head. The root is
-   found by its offset from the start of the arena. Nothing in the payload is
+   the first block, at offset 40. Nothing in the payload is
    an absolute address, so the bytes mean the same thing at any address, in
    any process, on any 64-bit little-endian machine.
 2. **An allocator inside the arena.** Containers allocate 8-byte aligned blocks
-   from the arena itself. A freed block becomes a hole; the buffer keeps the
-   holes in a free table (exact-size bins for small blocks, best fit for large
-   ones) and reuses them. That is what makes in-place, variable-length
+   from the arena itself. A freed block becomes a free block; free blocks of
+   one size are linked through their first word, and a directory block in the
+   arena holds one list head per size, so the allocator's whole state is in
+   the arena bytes. That is what makes in-place, variable-length
    mutation possible: a vector that outgrows its block moves to a new one and
    the old block is reused by the next allocation.
-3. **The wire is the arena.** `save_verified` writes a 40-byte wire header
-   (format version, used size, root offset, schema fingerprint, root type),
-   the used part of the arena, and the hole table. Large free runs or zero
-   runs can be skipped on the wire. The receiver copies the bytes into its own
-   buffer, loads the hole table back into its free table and carries on: one
-   copy on each end, no encode or decode, and the free space survives the hop.
+3. **The wire is the arena.** The arena starts with a 40-byte header (format
+   version, schema fingerprint, root type, used size, free directory), and
+   `save_verified` writes the used part of the arena as it is. Large free runs
+   or zero runs can be skipped on the wire. The receiver copies the bytes into
+   its own buffer and carries on: one copy on each end, no encode or decode,
+   and the free space survives the hop.
 4. **The schema is the C++ type.** Each record's field list (written once with
    `XOFFSET_RECORD`, or derived by C++26 reflection) gives a layout signature
    and a 64-bit fingerprint. The wire carries the fingerprint, and the receiver
@@ -163,7 +164,7 @@ server to client (`server_to_client.cpp`), deltas (`delta_sync.cpp`,
    build where a receiver must not see them
    ([threat model 4.1](docs/V2_THREAT_MODEL.md)).
 
-The format is specified in [V2_FORMAT.md](docs/V2_FORMAT.md) (wire format 2.1).
+The format is specified in [WIRE_FORMAT.md](docs/WIRE_FORMAT.md) (wire format 3.0).
 
 ## Performance
 
@@ -252,7 +253,7 @@ storage and ownership rules are in
 | [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Limits, links and checklists for production |
 | [DELTA_SYNC.md](docs/DELTA_SYNC.md), [SHARED_DELTA.md](docs/SHARED_DELTA.md) | Per-client deltas and shared viewport deltas |
 | [SCHEMA_EVOLUTION.md](docs/SCHEMA_EVOLUTION.md), [SCHEMA_PINS.md](docs/SCHEMA_PINS.md) | Different schema versions on the two ends; pinned layouts |
-| [V2_FORMAT.md](docs/V2_FORMAT.md), [V2_THREAT_MODEL.md](docs/V2_THREAT_MODEL.md) | Wire format; what the checks do and do not cover |
+| [WIRE_FORMAT.md](docs/WIRE_FORMAT.md), [V2_THREAT_MODEL.md](docs/V2_THREAT_MODEL.md) | Wire format; what the checks do and do not cover |
 | [ALPHA_COMPATIBILITY.md](docs/ALPHA_COMPATIBILITY.md) | Compatibility and input contract |
 | [CLIENT_TARGETS.md](docs/CLIENT_TARGETS.md), [DEVICE_TESTING.md](docs/DEVICE_TESTING.md) | Client toolchains and real-device records |
 | [PERFORMANCE.md](docs/PERFORMANCE.md), [bench/cppcon2024](bench/cppcon2024/README.md) | Performance numbers and methods |

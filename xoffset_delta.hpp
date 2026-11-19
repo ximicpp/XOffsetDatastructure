@@ -48,13 +48,14 @@
 
 namespace XOffsetDatastructure {
 
-    // Delta format 1.0 (docs/DELTA_SYNC.md). Little-endian. The header:
+    // Delta format 2.0 (docs/DELTA_SYNC.md; 1.0 addressed the 2.x image, its
+    // root at 48). Little-endian. The header:
     // 'X' 'D', the format byte (major << 4 | minor), the flags byte, the
-    // stream (u64), then varints: the version, with EXTENT (used_end - 48) / 8
-    // and root_offset - 48, and the block count. Block k of the block
-    // section is payload bytes [64k, 64k + 64); no delta writes the arena
-    // header [0, 48).
-    inline constexpr std::uint32_t XDELTA_FORMAT_MAJOR = 1;
+    // stream (u64), then varints: the version, with EXTENT (used_end - 40) / 8
+    // and root_offset - 40 (always 0: the root is at 40), and the block
+    // count. Block k of the block section is image bytes [64k, 64k + 64); no
+    // delta writes the image header [0, 40).
+    inline constexpr std::uint32_t XDELTA_FORMAT_MAJOR = 2;
     inline constexpr std::uint32_t XDELTA_FORMAT_MINOR = 0;
     inline constexpr std::uint32_t XDELTA_FLAG_KEY = 1u;    // apply to an all-zero payload; carries the fingerprint
     inline constexpr std::uint32_t XDELTA_FLAG_HOLES = 2u;  // carries the whole new hole table
@@ -1459,7 +1460,7 @@ namespace XOffsetDatastructure {
         std::uint64_t root_type_id_ = 0;
         std::size_t used_ = 0;                            // the receiver's used_end (0: nothing recorded)
         XDeltaRecord record_ = XDeltaRecord::copy;
-        detail::DeltaCopy payload_;  // [0, used_end) as the receiver holds it ([0, 48) unused)
+        detail::DeltaCopy payload_;  // [0, used_end) as the receiver holds it ([0, 40) unused)
         std::vector<XBufferCore::WireHole> holes_;        // its hole table, by offset
         std::uint64_t holes_gen_ = 0;                     // the free-block table's generation it was taken at
 #if XOFFSET_INBAND_ALLOCATOR
@@ -1786,8 +1787,8 @@ namespace XOffsetDatastructure {
                 if (!holes_same) {
                     if constexpr (detail::inband_allocator) {
                         // The directory block too (the receiver finds it among them).
-                        holes.reserve(core.wire_hole_count());
-                        core.for_each_wire_hole([&](XBufferCore::WireHole h) { holes.push_back(h); });
+                        holes.reserve(core.free_region_count());
+                        core.for_each_free_region([&](XBufferCore::WireHole h) { holes.push_back(h); });
                     } else {
                         holes.reserve(core.free_block_count());
                         core.for_each_free_block([&](XBufferCore::WireHole h) { holes.push_back(h); });
@@ -2594,7 +2595,7 @@ namespace XOffsetDatastructure {
                 if ((p[2] >> 4) != XDELTA_FORMAT_MAJOR || (p[2] & 15u) != XDELTA_FORMAT_MINOR)
                     XOFFSET_VFAIL(XException, XErrc::unsupported_version,
                                   std::string(who) + ": delta format " + std::to_string(unsigned(p[2] >> 4)) + "." +
-                                      std::to_string(unsigned(p[2] & 15u)) + " is not supported; this build reads 1.0");
+                                      std::to_string(unsigned(p[2] & 15u)) + " is not supported; this build reads 2.0");
                 if (n < XDELTA_HEADER_FIXED)
                     XOFFSET_VFAIL(XException, XErrc::truncated, msg(who, "delta shorter than its header"));
                 auto& h = out.header;
@@ -2662,7 +2663,7 @@ namespace XOffsetDatastructure {
                 h.root_offset = static_cast<std::uint32_t>(root);
 
                 // Blocks: ascending; a mask byte that is present is nonzero; every
-                // byte written lies inside [48, used). Each takes at least 3 bytes.
+                // byte written lies inside [40, used). Each takes at least 3 bytes.
                 if (h.block_count > std::size_t(end - q) / 3u)
                     XOFFSET_VFAIL(XException, XErrc::size_mismatch, msg(who, "delta block table truncated"));
                 XOFFSET_TRY {
@@ -3540,9 +3541,7 @@ namespace XOffsetDatastructure {
             static XOFFSET_DETAIL_INLINE vstatus load_holes(XBufferCore& core,
                                                             const std::vector<XBufferCore::WireHole>& holes,
                                                             bool check) {
-                if constexpr (detail::inband_allocator) return core.inband_adopt(holes.data(), holes.size(), check, false);
-                (void)check;
-                return core.load_free_blocks(holes.data(), holes.size());
+                return core.inband_adopt(holes.data(), holes.size(), check);
             }
 
             // The scratch the whole verification needs: the replica's holes,
@@ -3555,16 +3554,15 @@ namespace XOffsetDatastructure {
                 if (parsed.holes || detail::inband_allocator) return vok();
                 return replica_holes(core, holes, who);
             }
-            // The replica's own free blocks (in-band: in write_free_blocks'
-            // order, the directory first).
+            // The replica's own free regions (the directory first).
             static XOFFSET_DETAIL_INLINE vstatus replica_holes(XBufferCore& core,
                                                                std::vector<XBufferCore::WireHole>& holes,
                                                                const char* who) {
                 XOFFSET_TRY {
                     holes.clear();
                     if constexpr (detail::inband_allocator) {
-                        holes.reserve(core.wire_hole_count());
-                        core.for_each_wire_hole([&](XBufferCore::WireHole h) { holes.push_back(h); });
+                        holes.reserve(core.free_region_count());
+                        core.for_each_free_region([&](XBufferCore::WireHole h) { holes.push_back(h); });
                     } else {
                         holes.reserve(core.free_block_count());
                         core.for_each_free_block([&](XBufferCore::WireHole h) { holes.push_back(h); });
@@ -3614,7 +3612,7 @@ namespace XOffsetDatastructure {
                     XOFFSET_VTRY(check_digest<T>(core, parsed, who));
                     // The hole table is by offset: the payload holds the
                     // sender's directory and link words.
-                    XOFFSET_VTRY(core.inband_adopt(scratch.holes.data(), scratch.holes.size(), !Admit, false));
+                    XOFFSET_VTRY(core.inband_adopt(scratch.holes.data(), scratch.holes.size(), !Admit));
                     if constexpr (Admit) {
                         XOFFSET_VTRY(xbuf.template finish_admitted_load<T>(used, who));
                     } else {
@@ -3802,7 +3800,7 @@ namespace XOffsetDatastructure {
             // Trust tier admit of a non-key delta (XReceiver<L>::apply_delta<T,
             // admit>). What the parse checks stays (format,
             // stream and version, root type and fingerprint, every block and hole
-            // inside [48, used), the root below used) and the root object must lie
+            // inside [40, used), the root below used) and the root object must lie
             // inside the used payload, aligned; the payload itself is the sender's
             // promise. No map of checked bytes is kept: the cursor's map no longer
             // matches, so a later verified delta on this cursor verifies the whole

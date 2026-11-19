@@ -33,37 +33,40 @@ names.
 buffer. The transport layer can skip this copy and write received bytes straight into the buffer:
 
 ```cpp
-XWireHeaderV2 h = read_header(conn);         // receive the wire header first, which has the three lengths
-auto t = in.begin_verified_reload<Msg>(h.used_bytes, h.hole_count, h.extent_count);
-std::memcpy(t.header_bytes().data(), &h, sizeof h);
-recv_exact(conn, t.extent_bytes());          // extent table of a sparse wire
-recv_exact(conn, t.payload_bytes());         // payload [48, used): dense in one piece; sparse extent o goes to o - 48
-recv_exact(conn, t.hole_bytes());            // hole table
-t.complete(t.header_bytes().size(), t.payload_bytes().size(),
-           t.hole_bytes().size(), t.extent_bytes().size());
+XWireHeader h = read_header(conn);           // receive the 40-byte wire header first: used size, extent count
+auto t = in.begin_verified_reload<Msg>(h.used_bytes, h.extent_count);
+auto image = t.image_bytes();                // the image [0, used_bytes), header first
+std::memcpy(image.data(), &h, sizeof h);
+if (h.extent_count == 0) {
+    recv_exact(conn, image.subspan(sizeof h));   // dense: the rest of the image in one piece
+} else {
+    recv_exact(conn, t.extent_bytes());          // sparse: the extent table, then each extent at its offset
+    for_each_extent(t.extent_bytes(), [&](std::uint32_t o, std::uint32_t n) { recv_exact(conn, image.subspan(o, n)); });
+}
+t.complete(image.size(), t.extent_bytes().size());
 t.finish();                                  // the same validator as reload_verified
 handle(in.root<Msg>());
 ```
 
 - Acceptance, validation, the rejection set and the result are exactly the same as calling
   `reload_verified<T>()` on the same wire.
-- `payload_bytes()` is `[48, used_bytes)` of the payload: the 48-byte payload header is not on the wire;
-  the library writes it at `finish()`. Offsets in the extent table are payload offsets; the extent at
-  offset `o` goes to `o - 48` of `payload_bytes()`.
-- `complete()` reports the bytes actually written; for a sparse wire the payload count includes the gaps,
-  that is, the logical length after all extents have landed (`used_bytes - 48`). A message shorter or
-  longer than its header declares, not calling `complete()`, mismatched counts, or declared lengths that
-  disagree with the header are all rejected.
+- `image_bytes()` is the image `[0, used_bytes)`, the wire header included: a dense wire goes there whole.
+  Offsets in a sparse wire's extent table are image offsets; the extent at offset `o` goes to `o` of
+  `image_bytes()`.
+- `complete()` reports the bytes actually written; for a sparse wire the image count includes the gaps,
+  that is, the image's length after all extents have landed (`used_bytes`). A message shorter or longer
+  than its header declares, not calling `complete()`, mismatched counts, or declared lengths that disagree
+  with the header are all rejected.
 - Destroying the token before `finish()` (for example when the connection drops midway) equals a failed
   reload: the buffer becomes empty, with no usable root.
 - From begin until `finish()` succeeds, the buffer has no usable root; during that time the buffer must
   not be used, moved or destroyed, and a buffer can have only one token at a time.
-- begin does not zero: a dense payload is overwritten in full by the transport layer; for a sparse wire,
+- begin does not zero: a dense image is overwritten in full by the transport layer; for a sparse wire,
   finish clears only the parts of the gaps dirtied by old content (pages never exposed are zero anyway).
-- The header, extent table and hole table go into scratch kept by the buffer (returned together with the
-  validation bitmaps by `release_reload_scratch()`), so dense wires request no host memory per message.
+- The extent table goes into scratch kept by the buffer (returned together with the validation bitmaps by
+  `release_reload_scratch()`), so dense wires request no host memory per message.
 - A transport layer writing according to the unvalidated extent table must check itself that each extent
-  falls inside `payload_bytes()`; an out-of-range table is always rejected at finish.
+  falls inside `image_bytes()`; an out-of-range table is always rejected at finish.
 
 ## Semantics
 

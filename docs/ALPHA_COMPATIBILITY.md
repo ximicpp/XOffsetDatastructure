@@ -4,8 +4,8 @@
 compiler, dependencies and schemas and do their own acceptance testing. The core implementation is
 usable, but source API and ABI stability between pre-releases is not promised (the only stability
 promises are K0–K9, see `docs/STABILITY_TESTS.md`), nor is long-term wire compatibility across arbitrary
-combinations of compilers, standard libraries, schema evolution and layouts. This version uses the V2
-storage and wire format (`docs/V2_FORMAT.md`) and does not read V1 wires.
+combinations of compilers, standard libraries, schema evolution and layouts. This version uses wire format
+3.0 (`docs/WIRE_FORMAT.md`) and does not read older wires.
 
 ## Version and toolchain
 
@@ -38,15 +38,16 @@ translation units. The validated multi-translation-unit install and source consu
 ABI guarantees for shared libraries, dynamic plugins, crossing CRTs, mixed standard libraries or mixed
 header versions.
 
-## Admission and compatibility of V2 wires
+## Admission and compatibility of wires
 
-V2 is the current fixed format, wire format version 2.1 (magic bytes `'X' 'O' 2 1`, 40-byte wire header).
-V1 wires are always rejected with `wire format 1 is not supported`, and 2.0 wires (3.0.0 and earlier) with
-`wire format 2.0 is not supported; this build reads 2.1 (sender and receiver must upgrade together)`; the
-library has no read or migration path for V1 or 2.0, and both ends must upgrade together. No schema
+The current fixed format is wire format 3.0 (magic bytes `'X' 'O' 3 0`, 40-byte header). V1 wires are
+always rejected with `wire format 1 is not supported`, 2.0 wires (3.0.0 and earlier) with `wire format
+2.0 is not supported; this build reads 3.0`, and 2.1 wires (4.1.0 and earlier) with `wire format 2.1 is
+not supported; this build reads 3.0 (sender and receiver must upgrade together)`; the library has no read
+or migration path for older formats, and both ends must upgrade together. No schema
 evolution in this path, general schema migration or arbitrary ABI conversion is offered: loading requires
-matching root/schema/type/layout identities and a valid object graph (the live block and hole tables tile
-the used region exactly); registering the same schema name does not make different layouts compatible.
+matching root/schema/type/layout identities and a valid object graph (the live blocks, the free
+directory and the free blocks tile the used region exactly); registering the same schema name does not make different layouts compatible.
 When persisted data must be read across versions, keep a toolchain, schema and conversion program that
 can read the original format, and validate the migration result separately.
 
@@ -80,7 +81,7 @@ scan or authentication of malicious input. `load_unverified()` is only for raw p
 already trusts.
 
 The signature, FNV and file SHA-256 lists in the format are for identity/integrity checks; they provide no
-sender authentication, confidentiality, MAC or digital signature. The format 2.1 wire header has no
+sender authentication, confidentiality, MAC or digital signature. The format 3.0 wire header has no
 checksum field (the `crc32c` field fixed at 0 in the 2.0 header was removed), and no CRC check is done.
 When the application needs source authenticity or protection against modification, authenticate in an
 outer protocol and protect the corresponding version/schema/length information there; the library's
