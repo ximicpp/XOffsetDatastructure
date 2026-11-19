@@ -467,11 +467,18 @@ void empty_vacated_slot(T* slot) noexcept {
 // between builds of one program (test_cross_compiler_wire,
 // tools/no_exceptions_differential.sh). XVectorCore empties them again with
 // empty_vacated_slot once the lifetime has ended (pop_back, scrub): heads
-// empty, every other byte as the element left it.
+// empty, every other byte as the element left it. (Decided without
+// inplace_lifetime_supported, whose wire admission of a record that holds a
+// vector of itself is still open when that vector's members are
+// instantiated.)
 template<class T>
 consteval bool settles_vacated_heads() {
-    if constexpr (std::is_trivially_destructible_v<T> || !inplace_lifetime_supported<T>()) return false;
-    else return contains_owning_head<T>();
+    if constexpr (std::is_trivially_destructible_v<T>) return false;
+    else if constexpr (fixed_detail::is_owning_head<T>::value) return true;
+    else if constexpr (std::is_array_v<T>) return settles_vacated_heads<std::remove_extent_t<T>>();
+    else if constexpr (std::is_class_v<T> && std::is_aggregate_v<T> && std::is_standard_layout_v<T>)
+        return contains_owning_head<T>();
+    else return false;
 }
 
 
