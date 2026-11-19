@@ -21,6 +21,9 @@ namespace detail {
         return x - y + (an - 1) < span;
     }
 
+    // save_compact's admission (below): every stored type at most 8-aligned.
+    template <class U> consteval bool compact_direct_supported();
+
     // Out of line: its hole vector and graph walk stay out of header's frame.
     template<class T>
     XOFFSET_DETAIL_NOINLINE void VerifiedPathsAccess::rebuild_free_table(T& root, XBufferCore& source) {
@@ -82,7 +85,7 @@ namespace detail {
     // reserve path) a message written here does not touch.
     template<class T>
     void VerifiedPathsAccess::save_into(XBufferCore& source, std::string& out, XSaveOptions options) {
-        if (save_small_into<T>(source, out, options.emission)) [[likely]] return;
+        if (save_small_into<T, false>(source, out, options.emission)) [[likely]] return;
         save_into_general<T>(source, out, options);
     }
 
@@ -91,12 +94,15 @@ namespace detail {
     inline constexpr std::size_t save_small_max = std::size_t(1) << 20;
 
     // save_into_general's fast path for an image that goes as it is: no
-    // emission skips a byte of it (free_runs: free bytes below one run, read
-    // from the header; zero_runs: below wire_zero_scan_min_payload), it is
-    // below save_small_max and the reused output holds it. The wire is the
-    // image, fingerprint included: one copy, written inline. False (nothing
-    // done) for anything else.
-    template<class T>
+    // emission skips a byte of it or sends it compact, it is below
+    // save_small_max and the reused output holds it. The wire is the image,
+    // fingerprint included: one copy, written inline. False (nothing done)
+    // for anything else. From the header: zero_runs below
+    // wire_zero_scan_min_payload; automatic and free_runs below 512 free
+    // bytes (one compare), and with `Band` (save_into_general's first step)
+    // also with more, as long as automatic is below the compact share and
+    // free_runs below one run.
+    template<class T, bool Band>
     XOFFSET_DETAIL_INLINE bool VerifiedPathsAccess::save_small_into(XBufferCore& source, std::string& out,
                                                                         XWireEmission emission) {
         static_assert(is_wire_admitted_v<T>);
@@ -113,11 +119,20 @@ namespace detail {
         const auto* image = static_cast<const char*>(source.get_address());
         const auto* arena = std::launder(reinterpret_cast<const XBufferCore::arena_header*>(image));
         const std::size_t used = arena->used_end;
-        if (used >= save_small_max ||
-            (emission == XWireEmission::free_runs ? arena->free_bytes >= wire_free_run_min_gap
-                                                  : emission == XWireEmission::zero_runs &&
-                                                        used >= wire_zero_scan_min_payload))
+        if (used >= save_small_max) return false;
+        static_assert(wire_auto_compact_min_free <= wire_free_run_min_gap);
+        if (emission == XWireEmission::automatic || emission == XWireEmission::free_runs) {
+            if constexpr (Band) {
+                const std::size_t free_bytes = arena->free_bytes;
+                if (free_bytes >= wire_free_run_min_gap ||
+                    (emission == XWireEmission::automatic && wire_prefers_compact(used, free_bytes)))
+                    return false;
+            } else if (arena->free_bytes >= wire_auto_compact_min_free) {
+                return false;
+            }
+        } else if (emission == XWireEmission::zero_runs && used >= wire_zero_scan_min_payload) {
             return false;
+        }
         // A message no longer than the previous one (a stream of similar
         // messages) is copied over the output's bytes; the output then
         // ends at `used`. Otherwise its storage must already hold it.
@@ -160,6 +175,27 @@ namespace detail {
     template<class T>
     XOFFSET_DETAIL_NOINLINE void VerifiedPathsAccess::save_into_general(XBufferCore& source, std::string& out,
                                                                             XSaveOptions options) {
+        // 512 or more free bytes that still go as the image (below the
+        // compact share, below one run): the small path's copy.
+        if ((options.emission == XWireEmission::automatic || options.emission == XWireEmission::free_runs) &&
+            save_small_into<T, true>(source, out, options.emission))
+            return;
+        // automatic: a churned image goes compact, decided from the header's
+        // free bytes (an incomplete free state is recomputed first, as
+        // save_verified does); anything else as with free_runs.
+        if (options.emission == XWireEmission::automatic) {
+            if constexpr (compact_direct_supported<T>()) {
+                if (!source.free_table_complete()) [[unlikely]] (void)header<T>(source);
+                const auto* arena = source.arena();
+                if (arena && wire_prefers_compact(arena->used_end, arena->free_bytes)) {
+                    constexpr auto slack_div = XCompactOptions{}.slack_div;
+                    if (try_save_compact_into<T>(source, out, slack_div)) return;
+                    save_compact_into<T>(source, out, XCompactOptions{});
+                    return;
+                }
+            }
+            options.emission = XWireEmission::free_runs;
+        }
         auto check_alias = [&](XBufferCore& candidate) XOFFSET_DETAIL_LAMBDA_INLINE { save_check_alias(out, candidate); };
         const auto emission = options.emission;
         // A shared record is an identity, not a mapping pin. Resolve it after

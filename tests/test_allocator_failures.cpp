@@ -46,9 +46,12 @@ void inband_makes_no_host_allocation() {
     watch=false;fail_after=-1;
     require(attempts==0 && hits==0,"an in-band allocator operation made a host allocation");
     require(b.free_table_complete() && b.free_block_count()!=0,"in-band retirements lost an entry");
-    const auto frame=b.save_verified<AllocatorFailureRoot>();
+    // Free-run emission carries the image itself; the automatic default would
+    // send this churned buffer as compact wire, which has no free blocks.
+    const XSaveOptions image{.emission=XWireEmission::free_runs};
+    const auto frame=b.save_verified<AllocatorFailureRoot>(image);
     auto loaded=XBuffer::load_verified<AllocatorFailureRoot>(frame);
-    require(same(holes_of(loaded),holes_of(b)) && loaded.save_verified<AllocatorFailureRoot>()==frame,
+    require(same(holes_of(loaded),holes_of(b)) && loaded.save_verified<AllocatorFailureRoot>(image)==frame,
             "in-band free blocks did not travel with the payload");
 }
 

@@ -75,6 +75,9 @@ XOFFSET_REGISTER_SCHEMA_NAME(golden::Model, "golden.v2.model")
 // after the payload); free runs skip each free block's body but not its link
 // word. Dense 1560 -> 1632, large dense 9752 -> 9824, zero-run elided
 // 1432 -> 1504, free runs 1568 -> 1648.
+// 2026-11-19: the default emission is automatic (compact wire once the free
+// blocks reach 1/8 of the image and 512 bytes); the pins name free_runs
+// explicitly and are unchanged.
 #define GOLDEN_DENSE_SIZE 1632u
 #define GOLDEN_DENSE_FNV 0xe82fdc351fa701d3ull
 #define GOLDEN_LARGE_DENSE_SIZE 9824u
@@ -105,7 +108,7 @@ std::string text(std::uint32_t seed, std::size_t n) {
 }
 
 // Deterministic content; `large` frees a >= 4 KiB block before saving.
-std::string build(bool large, xo::XSaveOptions options = {}) {
+Buffer make(bool large) {
     auto buf = Buffer::create(4096, xo::XBuffer::maximum_capacity(1u << 20).with_growth(xo::XGrowPolicy::Automatic));
     auto& m = buf.plain_root();
     m.version = 7;
@@ -132,9 +135,12 @@ std::string build(bool large, xo::XSaveOptions options = {}) {
         tail.label = text(6, 30);
         m.entries.erase(m.entries.begin() + std::ptrdiff_t(m.entries.size() - 2));
     }
-    return buf.save_verified(options);
+    return buf;
 }
 
+std::string build(bool large, xo::XSaveOptions options) { return make(large).save_verified(options); }
+
+constexpr xo::XSaveOptions kRuns{.emission = xo::XWireEmission::free_runs};
 constexpr xo::XSaveOptions kElide{.emission = xo::XWireEmission::zero_runs};
 constexpr xo::XSaveOptions kDense{.emission = xo::XWireEmission::dense};
 
@@ -205,17 +211,21 @@ std::string free_run_wire(const std::string& dense) {
 } // namespace
 
 int main() {
-    const auto dense = build(false);
-    const auto large = build(true);              // default: free runs
+    const auto dense = build(false, kRuns);
+    const auto large = build(true, kRuns);
     const auto large_dense = build(true, kDense);
     const auto sparse = build(true, kElide);
-    if (build(false) != dense || build(true) != large || build(true, kDense) != large_dense ||
+    if (build(false, kRuns) != dense || build(true, kRuns) != large || build(true, kDense) != large_dense ||
         build(true, kElide) != sparse)
         fail("emission is not deterministic");
     if (build(false, kElide) != dense || build(false, kDense) != dense)
         fail("a payload without a free run, or below 4 KiB, must stay dense");
-    check(dense, false, GOLDEN_DENSE_SIZE, GOLDEN_DENSE_FNV, {});
-    check(large, true, GOLDEN_N10_SIZE, GOLDEN_N10_FNV, {});
+    // The default (automatic) emission sends the image while the free blocks
+    // are a small share of it, and the compact wire once they are not.
+    if (build(false, {}) != dense) fail("automatic emission of the small model is not its image");
+    if (build(true, {}) != make(true).save_compact()) fail("automatic emission of the large model is not compact");
+    check(dense, false, GOLDEN_DENSE_SIZE, GOLDEN_DENSE_FNV, kRuns);
+    check(large, true, GOLDEN_N10_SIZE, GOLDEN_N10_FNV, kRuns);
     check(large_dense, false, GOLDEN_LARGE_DENSE_SIZE, GOLDEN_LARGE_DENSE_FNV, kDense);
     check(sparse, true, GOLDEN_ELIDED_SIZE, GOLDEN_ELIDED_FNV, kElide);
     {   // The free-run emission (built here, independently) is the same

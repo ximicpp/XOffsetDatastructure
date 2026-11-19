@@ -71,6 +71,9 @@ namespace XOffsetDatastructure {
     // XBuffer -- Single root object per buffer (make/root/has_root).
     // ========================================================================
     namespace detail {
+        // save_compact's admission (xoffset_verified_paths.hpp).
+        template <class U> consteval bool compact_direct_supported();
+
         // Internal friend bridge; no Core/container/wire field is added.
         struct VerifiedPathsAccess {
             using Identity = XBufferCore::OwnerRecordPtr;
@@ -78,7 +81,7 @@ namespace XOffsetDatastructure {
             static XBufferCore& owner(const Identity& value) { return XBufferCore::require_record_owner(value); }
             template<class T> static XWireHeader header(XBufferCore&);
             template<class T> static void save_into(XBufferCore&, std::string&, XSaveOptions);
-            template<class T> static bool save_small_into(XBufferCore&, std::string&, XWireEmission);
+            template<class T, bool Band> static bool save_small_into(XBufferCore&, std::string&, XWireEmission);
             template<class T> static void save_into_general(XBufferCore&, std::string&, XSaveOptions);
             template<class T> static void rebuild_free_table(T&, XBufferCore&);
             template<class T> static bool try_save_compact_into(XBufferCore&, std::string&, std::uint32_t);
@@ -568,15 +571,11 @@ namespace XOffsetDatastructure {
         // save_verified; the source is not changed. A valid wire: every
         // receiver accepts it.
         template <typename T>
-        void save_compact_into(std::string& out, XCompactOptions options = {}) {
+        XOFFSET_DETAIL_INLINE void save_compact_into(std::string& out, XCompactOptions options = {}) {
             if (refuse_failed_emit(out)) return;
             if (detail::VerifiedPathsAccess::try_save_compact_into<T>(*this, out, options.slack_div)) [[likely]]
                 return;
-            require_typed_root_access("save_compact<T>(): unverified payload cannot be relabeled as verified");
-            require_schema_match<T>("save_compact<T>(): schema mismatch for requested root type");
-            if (!detail::find_root<T>(*this))
-                XOFFSET_THROW(XException(XErrc::no_root, "save_compact<T>(): no root object of requested type"));
-            detail::VerifiedPathsAccess::save_compact_into<T>(*this, out, options);
+            save_compact_into_checked<T>(out, options);
         }
 
         // Composes a wire from parts: writes the wire save_compact_into would
@@ -653,6 +652,11 @@ namespace XOffsetDatastructure {
             ensure_hole_table(*root_ptr);
             const char* base = static_cast<const char*>(this->get_address());
             const auto header = image_wire_header<T>();
+            if (options.emission == XWireEmission::automatic) {
+                if constexpr (detail::compact_direct_supported<T>())
+                    if (detail::wire_prefers_compact(header.used_bytes, header.free_bytes)) return save_compact<T>();
+                options.emission = XWireEmission::free_runs;
+            }
             detail::WireGaps gaps;
             if (options.emission == XWireEmission::free_runs) gaps = detail::wire_free_runs(*this, header.used_bytes);
             const auto output_size = options.emission == XWireEmission::zero_runs
@@ -751,6 +755,17 @@ namespace XOffsetDatastructure {
         }
 
     private:
+        // save_compact_into past its reused-output path: the full checks,
+        // then the general writer (measure, reserve, write).
+        template <typename T>
+        XOFFSET_DETAIL_NOINLINE void save_compact_into_checked(std::string& out, XCompactOptions options) {
+            require_typed_root_access("save_compact<T>(): unverified payload cannot be relabeled as verified");
+            require_schema_match<T>("save_compact<T>(): schema mismatch for requested root type");
+            if (!detail::find_root<T>(*this))
+                XOFFSET_THROW(XException(XErrc::no_root, "save_compact<T>(): no root object of requested type"));
+            detail::VerifiedPathsAccess::save_compact_into<T>(*this, out, options);
+        }
+
         // upstream == nullptr: this buffer's own reload scratch.
         template <typename T>
         detail::vstatus reload_into(std::span<const std::byte> data, std::pmr::memory_resource* upstream) {

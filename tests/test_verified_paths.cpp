@@ -215,14 +215,16 @@ void hole_table_paths() {
     auto loaded=xo::XBuffer::load_verified<PathsRoot>(into);check(loaded.root<PathsRoot>());
     need(loaded.free_block_count()==blocks&&loaded.free_block_bytes()==hole_bytes,"loaded free blocks differ");
     // An 8 KiB free block and 16 KiB of slack: zero-run elision skips both,
-    // the default (free-run) emission skips only the free block's body, dense
-    // emission skips nothing.
+    // free-run emission skips only the free block's body, dense emission
+    // skips nothing, and the default (automatic) emission sends the compact
+    // wire.
     auto large=make();large.plain_root().blob.resize(8192);
     for(std::size_t i=0;i<80;++i)large.plain_root().blob[i]=std::uint8_t(i+1);
     large.plain_root().labels.reserve(8); // keeps the blob block off the arena tail
     large.plain_root().blob.reserve(16384); // relocates: the old 8 KiB block is retired
     const xo::XSaveOptions elide{.emission=xo::XWireEmission::zero_runs};
-    const auto runs=large.save_verified();
+    const xo::XSaveOptions free_runs{.emission=xo::XWireEmission::free_runs};
+    const auto runs=large.save_verified(free_runs);
     const auto dense_saved=large.save_verified(xo::XSaveOptions{.emission=xo::XWireEmission::dense});
     need(header_of(dense_saved).extent_count==0,"dense emission is not dense");
     // The 8 KiB block, less the free directory at its end; the emission
@@ -230,10 +232,15 @@ void hole_table_paths() {
     std::uint32_t freed=0;large.for_each_free_block([&](xo::XBufferCore::WireHole h){freed=std::max(freed,h.bytes);});
     need(freed+large.free_directory().bytes>=8192&&header_of(runs).extent_count==2&&
          runs.size()==dense_saved.size()-(freed-8)+16,
-         "default emission did not skip the 8 KiB free block's body");
-    std::string runs_into;large.save_verified_into(runs_into);
-    need(runs_into==runs,"save_verified_into differs from save_verified for the default emission");
-    large.save_verified_into(runs_into);need(runs_into==runs,"reused output differs when free runs are skipped");
+         "free-run emission did not skip the 8 KiB free block's body");
+    std::string runs_into;large.save_verified_into(runs_into,free_runs);
+    need(runs_into==runs,"save_verified_into differs from save_verified for free-run emission");
+    large.save_verified_into(runs_into,free_runs);need(runs_into==runs,"reused output differs when free runs are skipped");
+    const auto compact=large.save_compact();
+    need(large.save_verified()==compact,"the default emission of a churned image is not its compact wire");
+    std::string auto_into;large.save_verified_into(auto_into);
+    need(auto_into==compact,"save_verified_into differs from save_verified for the default emission");
+    large.save_verified_into(auto_into);need(auto_into==compact,"reused output differs for the default emission");
     const auto sparse=large.save_verified(elide);const auto sh=header_of(sparse);
     std::string sparse_into;large.save_verified_into(sparse_into,elide);
     need(sparse_into==sparse,"save_verified_into differs from save_verified for a sparse wire");
