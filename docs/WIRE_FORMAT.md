@@ -127,6 +127,16 @@ size`. Errors are prefixed with the calling API's name.
   image that stays in L1 costs about as much as the compact walk. Clean
   images are faster as the image (compact 1.3 to 2.1 times slower). A root
   type that `save_compact` does not admit always goes as `free_runs`.
+  Spare capacity is not in the header: a vector grown in place and shrunk
+  back leaves no free block. The sender keeps a host-side list of up to 8
+  container heads (never on the wire) whose size fell from above a quarter of
+  their capacity to a quarter or below, with at least 1 KiB of capacity.
+  When the free bytes alone keep the image, it reads those heads from the
+  image and applies the same rule to the free bytes plus their spare; a head
+  whose size is back above half of its capacity, or that no longer reads as
+  a head inside `used_bytes`, leaves the list. The list follows the content
+  (move, swap, clone) and is dropped by a reload or reset. It only chooses
+  between the two forms, each of which carries the same contents.
 - `free_runs`: dense unless `free_bytes` is at least 4 KiB (one
   header read). Otherwise free blocks of at least 1 KiB are sorted by offset,
   adjacent ones merge, and in every merged run of at least 4 KiB each block's

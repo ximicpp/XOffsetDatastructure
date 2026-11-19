@@ -60,6 +60,61 @@
       "reason": "Untimed game logic (scene edits) on a player that arrived compact: small vectors without spare capacity regrow on the first edits. Same cause as pr7-slg-a-apply-receiver-layout.",
       "evidence": "Ir vs PR6 (SLG S scale, cycles 5-8): slg.B.season_edits GCC 16 3,575,415 -> 3,757,260 (1.051), P2996 3,685,268 -> 3,768,315 (1.023). Untimed stage; time (GCC 16, M scale, 7 batches) 1.000. The function diff's \"suspected inlining change\" flag is a behaviour change (the regrow inside season_edits; P2996 relocate_live_run), so the noinline step of PERF_GATE section 4 does not apply; tables in the PR #330 gate JSONs (rows slg.B.season_edits).",
       "approved_by": "performance thread (ops vs floor), 2026-11-19 12:20Z"
+    },
+    {
+      "id": "spare-watch-ops-push-pop",
+      "pr": 331,
+      "metric": "ops.grow.push_pop/*",
+      "compiler": "gcc16",
+      "max_ratio": 1.074,
+      "record_only": true,
+      "reason": "Designed hook cost of the spare watch (a shrink in place registers a container head whose size crosses a quarter of its capacity): one compare inline, the rest out of line; equal to or below the prototype (spare-watch design doc). perf_gate does not measure ops cells: a record only.",
+      "evidence": "grow.push_pop/xo 24 -> 25, /xo_edit 41 -> 44 (the hook is cmpl mem + ja; +1 more on xo_edit is register allocation in the bench loop). ops_bench Ir per operation (callgrind, GCC 16, N=2000) vs 848741a; tables in /mnt/project-files/spare-watch-20261119/impl/ops_ir_diff.txt. No floor verdict changes (performance thread check).",
+      "approved_by": "ops-floor performance thread (Claude), 2026-11-19"
+    },
+    {
+      "id": "spare-watch-ops-append8",
+      "pr": 331,
+      "metric": "ops.grow.append8/xo",
+      "compiler": "gcc16",
+      "max_ratio": 1.034,
+      "record_only": true,
+      "reason": "Designed hook cost of the spare watch (a shrink in place registers a container head whose size crosses a quarter of its capacity): one compare inline, the rest out of line; equal to or below the prototype (spare-watch design doc). perf_gate does not measure ops cells: a record only.",
+      "evidence": "grow.append8/xo 59 -> 61 (resize back: one capacity compare). ops_bench Ir per operation (callgrind, GCC 16, N=2000) vs 848741a; tables in /mnt/project-files/spare-watch-20261119/impl/ops_ir_diff.txt. No floor verdict changes (performance thread check).",
+      "approved_by": "ops-floor performance thread (Claude), 2026-11-19"
+    },
+    {
+      "id": "spare-watch-ops-append8-direct",
+      "pr": 331,
+      "metric": "ops.grow.append8_direct/xo",
+      "compiler": "gcc16",
+      "max_ratio": 1.019,
+      "record_only": true,
+      "reason": "Designed hook cost of the spare watch (a shrink in place registers a container head whose size crosses a quarter of its capacity): one compare inline, the rest out of line; equal to or below the prototype (spare-watch design doc). perf_gate does not measure ops cells: a record only.",
+      "evidence": "grow.append8_direct/xo 110 -> 112 (resize back: one capacity compare). ops_bench Ir per operation (callgrind, GCC 16, N=2000) vs 848741a; tables in /mnt/project-files/spare-watch-20261119/impl/ops_ir_diff.txt. No floor verdict changes (performance thread check).",
+      "approved_by": "ops-floor performance thread (Claude), 2026-11-19"
+    },
+    {
+      "id": "spare-watch-ops-vec-mid",
+      "pr": 331,
+      "metric": "ops.grow.vec_mid/xo",
+      "compiler": "gcc16",
+      "max_ratio": 1.028,
+      "record_only": true,
+      "reason": "Designed hook cost of the spare watch (a shrink in place registers a container head whose size crosses a quarter of its capacity): one compare inline, the rest out of line; equal to or below the prototype (spare-watch design doc). perf_gate does not measure ops cells: a record only.",
+      "evidence": "grow.vec_mid/xo 143 -> 147 (erase of a vector with at least 1 KiB of capacity: capacity and quarter compares). ops_bench Ir per operation (callgrind, GCC 16, N=2000) vs 848741a; tables in /mnt/project-files/spare-watch-20261119/impl/ops_ir_diff.txt. No floor verdict changes (performance thread check).",
+      "approved_by": "ops-floor performance thread (Claude), 2026-11-19"
+    },
+    {
+      "id": "spare-watch-ops-map-insert-erase",
+      "pr": 331,
+      "metric": "ops.grow.map_insert_erase/*",
+      "compiler": "gcc16",
+      "max_ratio": 1.016,
+      "record_only": true,
+      "reason": "Designed hook cost of the spare watch (a shrink in place registers a container head whose size crosses a quarter of its capacity): one compare inline, the rest out of line; equal to or below the prototype (spare-watch design doc). perf_gate does not measure ops cells: a record only.",
+      "evidence": "grow.map_insert_erase/xo 412.2 -> 418.2, /xo_edit 436.2 -> 443.2 (map erase: capacity and quarter compares). ops_bench Ir per operation (callgrind, GCC 16, N=2000) vs 848741a; tables in /mnt/project-files/spare-watch-20261119/impl/ops_ir_diff.txt. No floor verdict changes (performance thread check).",
+      "approved_by": "ops-floor performance thread (Claude), 2026-11-19"
     }
   ]
 }

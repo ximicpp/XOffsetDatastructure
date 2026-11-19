@@ -98,6 +98,14 @@
 #define XOFFSET_DETAIL_INLINE_GCC_BELOW_26
 #endif
 
+// Forced inlining for Clang only, where its inline cost model stops at a
+// function that GCC still inlines (the flat map and set erase).
+#if defined(__clang__)
+#define XOFFSET_DETAIL_INLINE_CLANG XOFFSET_DETAIL_INLINE
+#else
+#define XOFFSET_DETAIL_INLINE_CLANG inline
+#endif
+
 // Forced inlining only without exceptions (the inline-string check of the
 // wire validation; see validate_wire_element).
 #if XOFFSET_NO_EXCEPTIONS

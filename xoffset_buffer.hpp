@@ -83,6 +83,7 @@ namespace XOffsetDatastructure {
             template<class T> static void save_into(XBufferCore&, std::string&, XSaveOptions);
             template<class T, bool Band> static bool save_small_into(XBufferCore&, std::string&, XWireEmission);
             template<class T> static void save_into_general(XBufferCore&, std::string&, XSaveOptions);
+            template<class T> static bool save_watched_into(XBufferCore&, std::string&);
             template<class T> static void rebuild_free_table(T&, XBufferCore&);
             template<class T> static bool try_save_compact_into(XBufferCore&, std::string&, std::uint32_t);
             template<class T> static void save_compact_into(XBufferCore&, std::string&, XCompactOptions);
@@ -654,7 +655,10 @@ namespace XOffsetDatastructure {
             const auto header = image_wire_header<T>();
             if (options.emission == XWireEmission::automatic) {
                 if constexpr (detail::compact_direct_supported<T>())
-                    if (detail::wire_prefers_compact(header.used_bytes, header.free_bytes)) return save_compact<T>();
+                    if (detail::wire_prefers_compact(header.used_bytes, header.free_bytes) ||
+                        (spare_watched() &&
+                         detail::wire_prefers_compact(header.used_bytes, header.free_bytes + watched_spare_bytes())))
+                        return save_compact<T>();
                 options.emission = XWireEmission::free_runs;
             }
             detail::WireGaps gaps;
@@ -766,9 +770,12 @@ namespace XOffsetDatastructure {
             detail::VerifiedPathsAccess::save_compact_into<T>(*this, out, options);
         }
 
-        // upstream == nullptr: this buffer's own reload scratch.
+        // upstream == nullptr: this buffer's own reload scratch. The small
+        // image's in-place path is always inline at the caller (a receive
+        // loop); any other wire takes reload_into_general.
         template <typename T>
-        detail::vstatus reload_into(std::span<const std::byte> data, std::pmr::memory_resource* upstream) {
+        XOFFSET_DETAIL_INLINE detail::vstatus reload_into(std::span<const std::byte> data,
+                                                          std::pmr::memory_resource* upstream) {
             constexpr const char* who = "reload_verified<T>()";
             const std::size_t size = data.size_bytes();
             if (admit_image<T>(data) && size <= small_reload_max && detail::small_reload_fast_path &&
@@ -783,6 +790,12 @@ namespace XOffsetDatastructure {
                 XOFFSET_ROLLBACK_END(reset_arena(0))
                 return detail::vok();
             }
+            return reload_into_general<T>(data, upstream);
+        }
+        template <typename T>
+        XOFFSET_DETAIL_NOINLINE detail::vstatus reload_into_general(std::span<const std::byte> data,
+                                                                    std::pmr::memory_resource* upstream) {
+            constexpr const char* who = "reload_verified<T>()";
             XOFFSET_ROLLBACK_BEGIN
                 detail::WireValidationScratch* retained = nullptr;
                 if (!upstream) {
