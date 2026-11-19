@@ -460,6 +460,20 @@ void empty_vacated_slot(T* slot) noexcept {
     }
 }
 
+// A destroyed element's container heads release their blocks and empty
+// themselves, but those stores precede the end of the element's lifetime, so
+// the optimizer may drop them (GCC's lifetime dead store elimination does,
+// depending on inlining) and the spare bytes a save emits would differ
+// between builds of one program (test_cross_compiler_wire,
+// tools/no_exceptions_differential.sh). XVectorCore empties them again with
+// empty_vacated_slot once the lifetime has ended (pop_back, scrub): heads
+// empty, every other byte as the element left it.
+template<class T>
+consteval bool settles_vacated_heads() {
+    if constexpr (std::is_trivially_destructible_v<T> || !inplace_lifetime_supported<T>()) return false;
+    else return contains_owning_head<T>();
+}
+
 
 // Subtree copy: copy assignment of a container copies its source subtree
 // (its block plus every block reachable from its live elements) into one

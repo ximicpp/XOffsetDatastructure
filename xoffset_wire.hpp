@@ -275,6 +275,22 @@ namespace XOffsetDatastructure {
                 bits[w1] |= last;
             }
 
+            // Marks [g0, g1) free unless one of its granules is free already
+            // (false, nothing marked). For free regions registered before
+            // every live block but the arena header, which they lie past.
+            XOFFSET_DETAIL_INLINE bool mark_free_disjoint(std::size_t g0, std::size_t g1) noexcept {
+                const auto w0 = g0 / 64u, w1 = (g1 - 1u) / 64u;
+                if (w0 == w1) [[likely]] {
+                    const auto m = (~std::uint64_t(0) << (g0 % 64u)) & (~std::uint64_t(0) >> (63u - (g1 - 1u) % 64u));
+                    if (free_[w0] & m) [[unlikely]] return false;
+                    free_[w0] |= m;
+                    return true;
+                }
+                if (overlap_words(g0, g1) != 0) return false;
+                mark_words(free_, g0, g1);
+                return true;
+            }
+
             bool member(bool free, std::size_t granule) const noexcept {
                 // The pointer is chosen first: GCC 13 at -O0 with UBSan
                 // miscompiles the conditional used directly as the array.
@@ -559,8 +575,24 @@ namespace XOffsetDatastructure {
             else return register_owned_range(ptr, block, ctx, "wire validation: invalid live block");
         }
 
-        // Free regions (the free directory, then the free blocks; or a delta's
-        // hole table): each entry is a free range of the image.
+        // One free region whose range is known valid (a nonempty run of
+        // 8-byte granules inside the payload) into the bitmaps of
+        // ctx.general().
+        XOFFSET_DETAIL_INLINE vstatus register_wire_hole(XBufferCore::WireHole hole, WireGranuleIndex& index,
+                                                         WireValidationContext& ctx) {
+            const auto g0 = std::size_t(hole.offset) / 8u, g1 = (std::size_t(hole.offset) + hole.bytes) / 8u;
+            const auto overlap = index.overlap(g0, g1);
+            if (overlap == 1) [[unlikely]]
+                return wire_reject("wire validation detected free-list overlap with live ranges");
+            if (overlap == 2) [[unlikely]]
+                return wire_reject("wire validation detected overlapping free-list ranges");
+            index.mark(true, g0, g1);
+            ctx.free_bytes += hole.bytes;
+            return vok();
+        }
+
+        // Free regions (a delta's hole table): each entry is a free range of
+        // the image.
         inline vstatus register_wire_holes(const void* holes, std::size_t count,
                                            WireValidationContext& ctx) {
             // A valid entry is a nonempty range on 8-byte granules inside the
@@ -580,15 +612,67 @@ namespace XOffsetDatastructure {
             auto& index = ctx.general();
             for (std::size_t i = 0; i < count; ++i) {
                 if (!entry(i, hole)) [[unlikely]] return wire_reject("wire validation failed: invalid hole table entry");
-                const auto g0 = std::size_t(hole.offset) / 8u, g1 = (std::size_t(hole.offset) + hole.bytes) / 8u;
-                const auto overlap = index.overlap(g0, g1);
-                if (overlap == 1) [[unlikely]]
-                    return wire_reject("wire validation detected free-list overlap with live ranges");
-                if (overlap == 2) [[unlikely]]
-                    return wire_reject("wire validation detected overlapping free-list ranges");
-                index.mark(true, g0, g1);
-                ctx.free_bytes += hole.bytes;
+                XOFFSET_VTRY(register_wire_hole(hole, index, ctx));
             }
+            return vok();
+        }
+
+        XOFFSET_VNORETURN XOFFSET_DETAIL_COLD inline vstatus reject_free_blocks(const char* who) {
+            XOFFSET_VFAIL(XException, XErrc::invalid_payload, std::string(who) + ": invalid free blocks");
+        }
+
+        // The full check of a loaded image's free state, each region
+        // registered in ctx's bitmaps as the walk reaches it: the directory
+        // and every stack hold what the allocator relies on (blocks inside
+        // the image, aligned, each stack of one size, the sizes ascending,
+        // the unused entries unused, a second word of zero in every free
+        // block, the free bytes the header names), and no region overlaps
+        // another (a stack that loops comes back to a marked block, so every
+        // walk ends). The graph walk then checks that they tile the image
+        // with the live blocks.
+        inline vstatus register_inband_free_regions(const XBufferCore& xbuf, WireValidationContext& ctx,
+                                                    const char* who) {
+            const auto* const sm = xbuf.arena();
+            const std::uint32_t dir = sm->free_dir;
+            if (dir == 0) {
+                if (sm->free_bytes != 0) [[unlikely]] return reject_free_blocks(who);
+                return vok();
+            }
+            const char* const base = reinterpret_cast<const char*>(sm);
+            const auto word = [&](std::uint64_t at) noexcept { return XBufferCore::inband_word(base + at); };
+            const std::uint64_t used = sm->used_end;
+            if ((dir & 7u) != 0 || dir < XBufferCore::root_at || std::uint64_t(dir) + 8u > used) [[unlikely]]
+                return reject_free_blocks(who);
+            const std::uint32_t n = word(dir), cap = word(dir + 4u);
+            const std::uint64_t dir_bytes = XBufferCore::inband_dir_bytes(cap);
+            if (n >= cap || dir + dir_bytes > used) [[unlikely]] return reject_free_blocks(who);
+            auto& index = ctx.general();
+            index.mark(true, dir / 8u, (dir + dir_bytes) / 8u);
+            std::uint64_t total = 0;
+            std::uint32_t previous = 0;
+            for (std::uint32_t i = 0; i < cap; ++i) {
+                const std::uint32_t bytes = word(dir + 8u + 8u * i);
+                const std::uint32_t head = word(dir + 12u + 8u * i);
+                if (i >= n) {
+                    if (bytes != XBufferCore::inband_end || head != 0) [[unlikely]] return reject_free_blocks(who);
+                    continue;
+                }
+                if (bytes <= previous || (bytes & 7u) != 0 || bytes == XBufferCore::inband_end) [[unlikely]]
+                    return reject_free_blocks(who);
+                previous = bytes;
+                // The highest offset a block of this size may have (none: 0,
+                // below every block; an empty stack of any size is valid).
+                const std::uint64_t last = bytes <= used ? used - bytes : 0u;
+                const std::size_t granules = bytes / 8u;
+                for (std::uint64_t at = head; at != 0; at = word(at)) {
+                    if ((at & 7u) != 0 || at < XBufferCore::root_at || at > last || word(at + 4u) != 0 ||
+                        !index.mark_free_disjoint(at / 8u, at / 8u + granules)) [[unlikely]]
+                        return reject_free_blocks(who);
+                    total += bytes;
+                }
+            }
+            if (total != sm->free_bytes) [[unlikely]] return reject_free_blocks(who);
+            ctx.free_bytes += dir_bytes + total;
             return vok();
         }
 
@@ -855,6 +939,14 @@ namespace XOffsetDatastructure {
 
         // holes == nullptr && check_coverage == false walks the graph without
         // free regions (used to recompute them from the live set).
+        template <typename T, typename RegisterFree>
+        vstatus verify_structural_wire_graph_with(const T& root, XBufferCore& xbuf,
+                                                  std::pmr::memory_resource* upstream,
+                                                  RegisterFree&& register_free,
+                                                  bool check_coverage,
+                                                  std::vector<XBufferCore::WireHole>* recomputed,
+                                                  WireValidationScratch* retained);
+
         template <typename T>
         vstatus verify_structural_wire_graph(const T& root, XBufferCore& xbuf,
                                              std::pmr::memory_resource* upstream,
@@ -863,6 +955,33 @@ namespace XOffsetDatastructure {
                                              bool check_coverage = true,
                                              std::vector<XBufferCore::WireHole>* recomputed = nullptr,
                                              WireValidationScratch* retained = nullptr) {
+            return verify_structural_wire_graph_with(root, xbuf, upstream,
+                [&](WireValidationContext& ctx) -> vstatus {
+                    if (holes && hole_count != 0) return register_wire_holes(holes, hole_count, ctx);
+                    return vok();
+                }, check_coverage, recomputed, retained);
+        }
+
+        // The graph walk of an image loaded with its in-band free state: the
+        // directory and its stacks are checked and tile the image with the
+        // live blocks (load_verified, reload_verified, a direct reload).
+        template <typename T>
+        vstatus verify_loaded_image(const T& root, XBufferCore& xbuf, std::pmr::memory_resource* upstream,
+                                    WireValidationScratch* retained, const char* who) {
+            return verify_structural_wire_graph_with(root, xbuf, upstream,
+                [&](WireValidationContext& ctx) -> vstatus { return register_inband_free_regions(xbuf, ctx, who); },
+                true, nullptr, retained);
+        }
+
+        // register_free(ctx) registers the free regions (before the live
+        // blocks, so each block is checked against them as it is reached).
+        template <typename T, typename RegisterFree>
+        vstatus verify_structural_wire_graph_with(const T& root, XBufferCore& xbuf,
+                                                  std::pmr::memory_resource* upstream,
+                                                  RegisterFree&& register_free,
+                                                  bool check_coverage,
+                                                  std::vector<XBufferCore::WireHole>* recomputed,
+                                                  WireValidationScratch* retained) {
             if (!upstream)
                 XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument, "validation scratch: null upstream");
             const auto used = xbuf.arena()->used_end;
@@ -900,7 +1019,7 @@ namespace XOffsetDatastructure {
                 return wire_reject("wire validation: unsupported arena header flags");
             }
             XOFFSET_VTRY(register_owned_range(ctx.base, sizeof(XArena), ctx, "wire validation: invalid arena header"));
-            if (holes && hole_count != 0) XOFFSET_VTRY(register_wire_holes(holes, hole_count, ctx));
+            XOFFSET_VTRY(register_free(ctx));
             XOFFSET_VTRY(register_allocation(&root, sizeof(T), alignof(T), ctx));
             XOFFSET_VTRY(validate_wire_value(root, ctx));
             if (check_coverage) XOFFSET_VTRY(require_exact_coverage(ctx));
@@ -1334,7 +1453,7 @@ namespace XOffsetDatastructure {
     // accept every form; the loaded payload is byte-identical.
     enum class XWireEmission : std::uint8_t {
         // Default. Skips each run of at least 4 KiB of adjacent free blocks
-        // of at least 256 B (one large deletion, for example); everything
+        // of at least 1 KiB (one large deletion, for example); everything
         // else is copied (the link word of each skipped block too). Skipped
         // bytes are zero free-block bodies, so every receiver accepts it.
         free_runs,
@@ -1682,7 +1801,11 @@ namespace XOffsetDatastructure {
         // wire_free_run_local_runs gaps stay in local storage, so such a save
         // allocates nothing for them; more go to the heap, and the
         // candidates are then sorted with one counting pass.
-        inline constexpr std::uint32_t wire_free_run_min_block = 256;
+        // A skipped body costs an extent (its table entry, a copy split in
+        // two on both sides); below 1 KiB that costs more than the copy it
+        // saves, and a free block keeps its link word, so smaller blocks in
+        // a run would each add one.
+        inline constexpr std::uint32_t wire_free_run_min_block = 1024;
         inline constexpr std::uint32_t wire_free_run_min_gap = 4096;
         inline constexpr std::size_t wire_free_run_local = 64;
         inline constexpr std::size_t wire_free_run_local_runs = 8;

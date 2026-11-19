@@ -165,7 +165,7 @@ std::uint32_t word_at(const std::string& image, std::size_t at) {
 }
 
 // The free-run emission, built independently of the library from a dense
-// wire (the image): free blocks of at least 256 B (from the image's free
+// wire (the image): free blocks of at least 1 KiB (from the image's free
 // directory) sorted by offset, adjacent ones merged; in every merged run of
 // at least 4 KiB each block's body (all but its link word) is skipped
 // through the extent table.
@@ -177,7 +177,7 @@ std::string free_run_wire(const std::string& dense) {
     for (std::uint32_t k = 0, n = h.free_dir ? word_at(dense, h.free_dir) : 0; k < n; ++k) {
         const std::uint32_t size = word_at(dense, h.free_dir + 8 + 8 * k);
         for (std::uint32_t at = word_at(dense, h.free_dir + 12 + 8 * k); at != 0; at = word_at(dense, at))
-            if (size >= 256) blocks.push_back({at, size});
+            if (size >= 1024) blocks.push_back({at, size});
     }
     std::sort(blocks.begin(), blocks.end(), [](Hole a, Hole b) { return a.offset < b.offset; });
     std::vector<Hole> gaps;

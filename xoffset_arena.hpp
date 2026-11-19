@@ -97,6 +97,7 @@ namespace XOffsetDatastructure {
         template<class T> consteval bool shift_relocate_supported();
         template<class T> void shift_rebase_moved(T*, std::size_t, std::int32_t) noexcept;
         template<class T> void empty_vacated_slot(T*) noexcept;
+        template<class T> consteval bool settles_vacated_heads();
         template<class T> void zero_implicit_padding(T*) noexcept;
         template<class T> void scrub_implicit_padding(T*) noexcept;
         template<class T> consteval bool subtree_copy_supported();
@@ -1596,48 +1597,6 @@ namespace XOffsetDatastructure {
             std::size_t count = 0;
             inband_for_each([&](WireHole) noexcept { ++count; });
             return count;
-        }
-
-        // The full check of a loaded image's free state: the directory and
-        // every stack hold what the allocator relies on (blocks inside the
-        // image, aligned, each stack of one size, the sizes ascending, the
-        // unused entries unused, a second word of zero in every free block,
-        // the free bytes the header names), and the stacks end (at most one
-        // block per word of the image). Appends the directory block, then
-        // each free block, to `out`: the graph walk checks that they tile the
-        // image with the live blocks, so no two overlap. False: malformed.
-        template <typename Push>
-        bool inband_collect(Push&& out) const {
-            const auto* sm = arena();
-            if (!sm) return false;
-            const char* const base = reinterpret_cast<const char*>(sm);
-            const std::uint64_t used = sm->used_end;
-            const std::uint32_t dir = sm->free_dir;
-            if (dir == 0) return sm->free_bytes == 0;
-            if ((dir & 7u) != 0 || dir < root_at || std::uint64_t(dir) + 8u > used) return false;
-            const std::uint32_t n = inband_word(base + dir), cap = inband_word(base + dir + 4u);
-            if (n >= cap || std::uint64_t(dir) + 8u + 8u * std::uint64_t(cap) > used) return false;
-            out(WireHole{dir, inband_dir_bytes(cap)});
-            std::uint64_t total = 0, blocks = 0;
-            std::uint32_t previous = 0;
-            for (std::uint32_t i = 0; i < cap; ++i) {
-                const std::uint32_t bytes = inband_word(base + dir + 8u + 8u * i);
-                const std::uint32_t head = inband_word(base + dir + 12u + 8u * i);
-                if (i >= n) {
-                    if (bytes != inband_end || head != 0) return false;
-                    continue;
-                }
-                if (bytes <= previous || (bytes & 7u) != 0 || bytes == inband_end) return false;
-                previous = bytes;
-                for (std::uint32_t at = head; at != 0; at = inband_word(base + at)) {
-                    if ((at & 7u) != 0 || at < root_at || std::uint64_t(at) + bytes > used ||
-                        inband_word(base + at + 4u) != 0 || ++blocks > used / 8u)
-                        return false;
-                    out(WireHole{at, bytes});
-                    total += bytes;
-                }
-            }
-            return total == sm->free_bytes;
         }
 
         // A loaded table of free blocks (`holes` need not be aligned): a key

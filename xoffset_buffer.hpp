@@ -985,9 +985,8 @@ namespace XOffsetDatastructure {
 
         // Post-copy verification shared by load_verified and reload_verified:
         // the graph walk, with the image's free blocks (the directory and
-        // its stacks, walked and checked here) tiling the image with the live
-        // blocks. Up to local_free_blocks of them stay on the frame.
-        static constexpr std::size_t local_free_blocks = 32;
+        // its stacks, walked and checked as they are registered) tiling the
+        // image with the live blocks.
         template <typename T>
         detail::vstatus finish_verified_load(std::size_t used, std::pmr::memory_resource* upstream, const char* who,
                                              detail::WireValidationScratch* retained = nullptr) {
@@ -995,23 +994,7 @@ namespace XOffsetDatastructure {
             if (!root_ptr) {
                 XOFFSET_VFAIL(XException, XErrc::root_mismatch, std::string(who) + ": root not found");
             }
-            std::array<WireHole, local_free_blocks> local;
-            std::vector<WireHole> more;
-            std::size_t count = 0;
-            const bool formed = this->inband_collect([&](WireHole hole) {
-                if (count < local.size()) local[count] = hole;
-                else {
-                    if (more.empty()) more.assign(local.begin(), local.end());
-                    more.push_back(hole);
-                }
-                ++count;
-            });
-            if (!formed) {
-                XOFFSET_VFAIL(XException, XErrc::invalid_payload, std::string(who) + ": invalid free blocks");
-            }
-            XOFFSET_VTRY(detail::verify_structural_wire_graph(*root_ptr, *this, upstream,
-                                                              count <= local.size() ? local.data() : more.data(),
-                                                              count, true, nullptr, retained));
+            XOFFSET_VTRY(detail::verify_loaded_image(*root_ptr, *this, upstream, retained, who));
             publish_loaded_root<T>(root_ptr);
             return detail::vok();
         }

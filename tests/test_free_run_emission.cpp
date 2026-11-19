@@ -1,6 +1,6 @@
 // Default (free-run) emission: in each run of at least 4 KiB of adjacent free
-// blocks of at least 256 B, skips every block's body (all of it but its first
-// word, the link to the next block of its size), nothing else.
+// blocks of at least 1 KiB (kMinBlock), skips every block's body (all of it
+// but its first word, the link to the next block of its size), nothing else.
 //   - a run next to small free blocks skips only its large blocks' bodies;
 //   - a run made only of small blocks is not skipped (dense wire);
 //   - a single large free block is skipped;
@@ -23,6 +23,10 @@
 #include <vector>
 
 namespace xo = XOffsetDatastructure;
+
+// The smallest free block whose body the default emission skips.
+constexpr std::uint32_t kMinBlock = xo::detail::wire_free_run_min_block;
+static_assert(kMinBlock == 1024);
 
 namespace fr {
 struct Blob {
@@ -126,14 +130,14 @@ std::vector<Hole> free_blocks(const std::string& image) {
 }
 
 // The bodies the emission must skip, from the image's free directory: free
-// blocks of at least 256 B sorted by offset, adjacent ones merged, and in
+// blocks of at least kMinBlock sorted by offset, adjacent ones merged, and in
 // every merged run of at least 4 KiB each block's body; nothing when the free
 // blocks hold less than 4 KiB.
 std::vector<Hole> reference_gaps(const std::string& dense) {
     auto blocks = free_blocks(dense);
     std::uint64_t total = 0;
     for (auto h : blocks) total += h.bytes;
-    std::erase_if(blocks, [](Hole h) { return h.bytes < 256; });
+    std::erase_if(blocks, [](Hole h) { return h.bytes < kMinBlock; });
     std::sort(blocks.begin(), blocks.end(), [](Hole a, Hole c) { return a.offset < c.offset; });
     std::vector<Hole> gaps;
     if (total < 4096) return gaps;
@@ -168,7 +172,7 @@ std::vector<Hole> emit(Buffer& b, const std::string& where) {
     return p.gaps;
 }
 
-// Blocks of random sizes (some below 256 B), a random subset freed.
+// Blocks of random sizes (some below kMinBlock), a random subset freed.
 void random_layout(std::uint64_t seed, std::size_t blocks, unsigned free_percent, std::size_t& candidates,
                    std::size_t& runs) {
     std::uint64_t s = seed;
@@ -181,7 +185,7 @@ void random_layout(std::uint64_t seed, std::size_t blocks, unsigned free_percent
     auto b = make(sizes, freed);
     const auto gaps = emit(b, "random layout");
     candidates = 0;
-    for (auto h : free_blocks(b.save_verified(kDense))) candidates += h.bytes >= 256 ? 1 : 0;
+    for (auto h : free_blocks(b.save_verified(kDense))) candidates += h.bytes >= kMinBlock ? 1 : 0;
     // Runs: skipped bodies that do not continue a block right before them.
     runs = 0;
     for (std::size_t i = 0; i < gaps.size(); ++i)
@@ -196,7 +200,7 @@ std::uint32_t offset_of_block(Buffer& b, std::size_t i) {
 
 int main() {
     {   // 64 B | 2 KiB | 2 KiB | 64 B, all freed: only the two 2 KiB blocks
-        // (at least 256 B each) form the run; the small neighbours are sent
+        // (at least kMinBlock each) form the run; the small neighbours are sent
         // (the last, freed first, holds the free directory).
         auto b = make({64, 2048, 2048, 64}, {});
         const auto first = offset_of_block(b, 1);

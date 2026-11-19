@@ -1975,10 +1975,10 @@ namespace XOffsetDatastructure {
             return removed;
         }
 
-        // pop_back() leaves the removed element's bytes in spare capacity
-        // (a send copies them as they are; the next append there constructs
-        // over them). Its owned blocks are still retired and
-        // zeroed (M3). XOFFSET_SCRUB_POPPED=1 zeroes the slot too (M4, for
+        // pop_back() leaves the removed element's bytes in spare capacity,
+        // its container heads empty (a send copies them as they are; the
+        // next append there constructs over them). Its owned blocks are
+        // still retired and zeroed (M3). XOFFSET_SCRUB_POPPED=1 zeroes the slot too (M4, for
         // buffers sent to readers that must not see removed elements;
         // save_compact also rewrites spare capacity as zero).
         void pop_back() {
@@ -1989,6 +1989,7 @@ namespace XOffsetDatastructure {
             fixed_detail::destroy_n(slot, 1);
             size_ = last;
             if constexpr (detail::scrub_popped) std::memset(static_cast<void*>(slot), 0, sizeof(T));
+            else if constexpr (detail::settles_vacated_heads<T>()) detail::empty_vacated_slot(slot);
         }
 
         T& emplace_back() {
@@ -2417,7 +2418,7 @@ namespace XOffsetDatastructure {
                 // With XOFFSET_SCRUB_ERASED, erase zeroes the slot when
                 // pop_back does not.
                 pop_back();
-                if constexpr (!detail::scrub_popped) scrub(size_, size_ + 1);
+                if constexpr (detail::scrub_erased && !detail::scrub_popped) scrub(size_, size_ + 1);
                 return;
             }
             if constexpr (std::is_trivially_copyable_v<T>) {
@@ -2670,13 +2671,17 @@ namespace XOffsetDatastructure {
         // M4 (threat model T5/P2, XOFFSET_SCRUB_ERASED): storage of destroyed
         // elements is zeroed, so a later save does not emit the old values as
         // spare capacity. Without it the bytes stay until an append
-        // constructs over them.
+        // constructs over them, with their container heads empty (settle).
         XOFFSET_DETAIL_INLINE void scrub([[maybe_unused]] size_type from,
                                               [[maybe_unused]] size_type to) noexcept {
             if constexpr (detail::scrub_erased) {
                 if (to <= from) return;
                 if (auto* items = data())
                     std::memset(static_cast<void*>(items + from), 0, std::size_t(to - from) * sizeof(T));
+            } else if constexpr (detail::settles_vacated_heads<T>()) {
+                if (to <= from) return;
+                T* const items = data();
+                for (size_type i = from; i < to; ++i) detail::empty_vacated_slot(items + i);
             }
         }
 

@@ -405,7 +405,7 @@ in.read([](const Profile& r) { print(r.name.view()); });   // read plain members
 - A wire is the buffer's image: a 40-byte header, then the payload with its free blocks (a sparse
   wire has an extent table after the header; see [WIRE_FORMAT.md](WIRE_FORMAT.md) section 3). By
   default only the bodies of free blocks in runs that are "at least 4 KiB long and made of free
-  blocks of at least 256 B" are skipped (for example the hole left by deleting many records at
+  blocks of at least 1 KiB" are skipped (for example the hole left by deleting many records at
   once); the rest of the image is copied in one go.
   `XSaveOptions{.emission = XWireEmission::dense}` forces a full copy.
 - When sending across machines you can turn on zero-run omission:
