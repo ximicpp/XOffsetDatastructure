@@ -153,4 +153,5 @@ returned early with `release_reload_scratch()`. `load_verified` and `reload_veri
 `upstream` memory resource request a block from it instead. Wires in canonical
 layout (no holes, blocks laid end to end in visiting order, such as the output of
 `XCompactor::compact`) take the cursor path, which records only one offset, does not touch the bitmaps,
-and requests no validation memory at any size.
+and requests no validation memory at any size. Other wires take it up to their first gap: the free
+blocks are checked after the live blocks, each against both bitmaps.

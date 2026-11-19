@@ -85,16 +85,21 @@ buf.save_delta_into<Player>(d, base, o); // compares the touched blocks only
 `touch(value)` marks the object's bytes and everything it reaches (the blocks
 of its strings and containers, nested); `touch(p, bytes)` marks raw payload
 bytes. A delta with `touched_only` compares the 64-byte blocks touched since
-the baseline's previous delta from this buffer, the bytes past the baseline's
-used size, and the holes that came or went (a container that moved left its
-old block as a hole, cleared; the delta finds it without a touch). Touches go
-to a log in the buffer, so one buffer can feed any number of baselines (a
-client, the storage process, a relay). While one baseline pairs with the
-buffer, the log is a short list of the blocks touched since its last delta
-(up to 24; the baseline's lines of them are fetched into cache as they are
-touched); with a second baseline, or more blocks than the list holds, it also
-stamps each touched block with the delta it belongs to (four bytes per
-64-byte block), so a baseline that skipped deltas still finds its blocks.
+the baseline's previous delta from this buffer and the bytes past the
+baseline's used size. The allocator's own writes are touches too (a block
+taken from or given back to a free list, the free directory, the header's
+free state), so a container that moved needs only its own touch: the block it
+left goes with the allocator's. Touches go to a log in the buffer, so one
+buffer can feed any number of baselines (a client, the storage process, a
+relay). While one baseline pairs with the buffer, the log is a short list of
+the byte ranges touched since its last delta (up to 25 runs, adjacent ones
+merged; the baseline's lines of them are fetched into cache as they are
+touched). When the list is full, a run that starts less than a block past
+the end of the one touched before it is joined to it (the untouched bytes
+between go with them); with a second baseline, or
+more runs than that leaves room for, it also stamps each touched 64-byte
+block with the delta it belongs to (four bytes per block), so a baseline that
+skipped deltas still finds its blocks.
 `touch_set(field, value)` assigns and touches only when the value differs.
 
 The rule: **touch everything you change, after you change it** (a container
@@ -111,25 +116,36 @@ forwards them (a relay) gets the blocks each applied delta wrote as touches.
 ### A baseline without a copy
 
 `XDeltaBaseline(XDeltaRecord::touches)` keeps no copy of the payload: each
-delta carries every byte touched since the baseline's previous delta (as if
-`touched_only`), the bytes past the receiver's used size and those of holes
-that came or went. Memory per receiver drops from one copy of the payload
-to a few words; the delta grows by the bytes that were touched but did not
-change, so touch exactly what changes (`touch_set`, which touches only the
-bytes of a scalar that changed, or `touch(p, bytes)` on the field). This holds past the touch log's 24 listed
-blocks too: the log then keeps each block's touched bytes (8 bytes per block),
-so a period with many touches still sends only those bytes. A block goes whole
-only while a second baseline pairs with the buffer or when the baseline
-missed a period. Where the touches do not say what changed (the first delta, content
+delta is a run frame (section 2) of the byte ranges touched since the
+baseline's previous delta and the nonzero bytes past the receiver's used
+size, compared with nothing. Memory per receiver drops from one copy of the
+payload to a few words; the delta grows by the bytes that were touched but
+did not change, so touch exactly what changes (`touch_set`, which touches
+only the bytes of a scalar that changed, or `touch(p, bytes)` on the field).
+Past the list's 25 runs in one period (after the joining above), while a
+second baseline pairs with the buffer, or for a baseline that missed a period,
+the touched 64-byte blocks go whole. Where the touches do not say what changed (the first delta, content
 that was replaced, a baseline that missed deltas the log no longer records)
 the delta is a key delta. `key_delta_into` needs a copy and is not
 available on such a baseline.
 
+When the list holds every run since the baseline's last delta and nothing
+else is due (no `digest`, no `whole_blocks`, the same used size), the run
+frame is written on a short path that one compare selects: one run is copied
+out directly (about 120 instructions for one scalar, `touch_set` included),
+several are sorted and merged in place first. A buffer that recorded a
+failure, a copy of the baseline object and a baseline whose last delta did
+not fit the caller's memory take the general path. `save_delta_into(std::span<char> out,
+baseline, options)` writes into the caller's memory instead of a string and
+returns the delta's size (0: nothing changed); a delta larger than `out` is
+not written, its size is returned, and the baseline keeps it for its next
+`save_delta_into`, which writes it before anything else.
+
 ### Statistics and options
 
-`save_delta_into` returns `XDeltaStats`: `key`, `holes`, `empty`, `blocks`
-(64-byte blocks sent), `changed_bytes` (payload bytes they carry),
-`compared_bytes`, `delta_bytes`. `XDeltaOptions`:
+`save_delta_into` returns `XDeltaStats`: `key`, `empty`, `blocks` (64-byte
+blocks sent, or a run frame's runs), `changed_bytes` (image bytes they
+carry), `compared_bytes`, `delta_bytes`. `XDeltaOptions`:
 
 - `digest` (default false): the delta carries the xxHash64 of the whole
   resulting payload; the receiver rejects a delta whose result differs. This
@@ -138,9 +154,10 @@ available on such a baseline.
 - `touched_only` (default false): see above.
 - `whole_blocks` (default false): each changed block goes whole (64 bytes,
   selector 0) instead of by its mask; a block that ends past `used_end` still
-  goes by its mask. The delta is larger and the receiver applies each block
-  with one copy. Also taken by `XDeltaBaseline::key_delta_into`, for key
-  deltas to receivers where apply time counts more than bytes.
+  goes by its mask (a run frame: each run widened to the 64-byte blocks it
+  touches). The delta is larger and the receiver applies each block with one
+  copy. Also taken by `XDeltaBaseline::key_delta_into`, for key deltas to
+  receivers where apply time counts more than bytes.
 
 The receiver's `XDeltaCursor::last_check()` says what it checked for the last
 delta (`key`, `none`, `in_place`, `full`, or `admit` on a trusted link;
@@ -151,8 +168,15 @@ small deltas, a lost delta and the key delta that recovers from it.
 
 ## 2. Format 2.0
 
-Little-endian. A delta is exactly the header, the optional fields its flags
-announce, the block section and the optional hole section; nothing may follow.
+Little-endian. A delta writes image bytes `[32, used_end)`: the header's
+`free_dir` and `free_bytes` (offsets 32 to 39) and the payload. The free
+blocks are image bytes like the rest (each block's link word, the free
+directory), so a delta carries them as it carries any other bytes; offsets 0
+to 31 never change, and the root is always at 40. There are two frames: a
+block frame (key deltas, and deltas found by comparing with a copy) and a
+run frame (`RUNS`: the deltas of an `XDeltaRecord::touches` baseline). A
+delta is exactly its header, the optional fields its flags announce and its
+block or run section; nothing may follow.
 
 **Stability.** Format 2.0 goes with wire format 3.0 (format 1.0, from 3.4.0
 to 4.1.0, addressed the 2.x image, whose root was at 48). A sender writes 2.0
@@ -163,88 +187,104 @@ rejects. An addition gets a new format byte; a 2.0 receiver rejects any
 format byte but `0x20` (1.0's `0x10` included) with `unsupported_version`
 before reading further, and a sender writes a newer format only to a receiver
 known to read it.
-`tests/test_delta_format.cpp` pins the bytes of a small delta stream (a key
-delta, a scalar delta, a digest delta) both ways, written out field by field
-after the table below: the sender must write them and the receiver must apply
-them, with the full check and with admit, so a framing change fails on every
-compiler. What is not frozen is where the library places data inside the
-payload (the same release on both ends gives the same payload; a delta always
-carries payload bytes at payload offsets of the sender's own buffer).
+`tests/test_delta_format.cpp` pins the bytes of two small delta streams
+(block frames: a key delta, a scalar delta, a digest delta; run frames: the
+same changes touched) both ways, written out field by field after the tables
+below: the sender must write them and the receiver must apply them, with the
+full check and with admit, so a framing change fails on every compiler. What
+is not frozen is where the library places data inside the payload (the same
+release on both ends gives the same payload; a delta always carries image
+bytes at image offsets of the sender's own buffer).
+
+A block frame:
 
 | offset | field | type | value |
 | ---: | --- | --- | --- |
 | 0 | magic | 2 bytes | `'X' 'D'` |
 | 2 | format | u8 | `major << 4 \| minor`: `0x20` (2.0) |
-| 3 | flags | u8 | bit 0 KEY, bit 1 HOLES, bit 2 DIGEST, bit 3 EXTENT; other bits 0 |
+| 3 | flags | u8 | bit 0 KEY, bit 1 RUNS (clear), bit 2 DIGEST, bit 3 EXTENT; other bits 0 |
 | 4 | stream | u64 | the sender's stream id, nonzero |
 | 12 | version | varint | version after this delta, at least 1 |
-| | used | varint | EXTENT only: (payload `used_end` after this delta − 40) / 8 |
-| | root | varint | EXTENT only: root offset after this delta − 40: always 0 (the root is at 40) |
+| | used | varint | EXTENT only: (`used_end` after this delta − 40) / 8 |
 | | block count | varint | entries of the block section |
 
-Without EXTENT, `used_end` and the root offset stay as the replica holds
-them. A delta that keeps both and carries no hole table has a 14-byte header
-while its version and block count are below 128.
+A run frame:
+
+| offset | field | type | value |
+| ---: | --- | --- | --- |
+| 0 | magic | 2 bytes | `'X' 'D'` |
+| 2 | format | u8 | `0x20` (2.0) |
+| 3 | flags | u8 | RUNS set, KEY clear; DIGEST and EXTENT as above |
+| 4 | stream | u64 | the sender's stream id, nonzero |
+| 12 | version | u32 | version after this delta, at least 1 |
+| 16 | used | varint | EXTENT only: (`used_end` after this delta − 40) / 8 |
+
+Without EXTENT, `used_end` stays as the replica holds it. A block frame that
+keeps it has a 14-byte header while its version and block count are below
+128; a run frame that keeps it, a 16-byte header.
 
 Then, in this order:
 
-- KEY: `schema_hash` (u64), `root_type_id` (u64): the wire fingerprint of the
-  root type. A key delta always has HOLES and EXTENT.
-- DIGEST: xxHash64 (seed 0) of payload bytes `[40, used_end)` after this
+- KEY (block frames only): `schema_hash` (u64), `root_type_id` (u64): the
+  wire fingerprint of the root type. A key delta always has EXTENT.
+- DIGEST: xxHash64 (seed 0) of image bytes `[32, used_end)` after this
   delta.
-- Block section: `block count` × { varint `skip`, u8 `selector`, mask bytes,
-  data bytes }. The payload is cut into 64-byte blocks from its start (block
-  `i` holds offsets `64 i` to `64 i + 63`; a payload starts 64-aligned in
-  memory, so a block is one cache line). Block 0 holds the image header in
-  offsets 0 to 39, which no delta writes: block 0 never goes whole and its
-  mask bits for those bytes are 0. An entry's block index is
-  the previous entry's index + 1 + `skip` (the first: `skip`), so blocks are
-  ascending. `selector` 0: the whole block follows (64 bytes; it ends at or
-  before `used_end`). Otherwise bit `w` of `selector` says that a mask byte for
-  the block's 8-byte word `w` follows (in word order, each nonzero); bit `j` of
-  that mask byte stands for byte `8 w + j` of the block. Then the bytes the
-  masks name, in order. Every byte written lies below `used_end`. Those bytes
-  replace the payload bytes; the other bytes of the block stay.
-- HOLES: varint `count`, then `count` × { varint `gap / 8`, varint
-  `bytes / 8` }: the whole new hole table in offset order, each hole starting
-  `gap` bytes after the end of the previous one (the first: after offset 40).
-  Without HOLES the hole table does not change.
+- Block section (block frames): `block count` × { varint `skip`, u8
+  `selector`, mask bytes, data bytes }. The image is cut into 64-byte blocks
+  from its start (block `i` holds offsets `64 i` to `64 i + 63`; an image
+  starts 64-aligned in memory, so a block is one cache line). Block 0 holds
+  the image header in offsets 0 to 39, of which a delta writes 32 to 39 only:
+  block 0 never goes whole and its mask bits for offsets 0 to 31 are 0. An
+  entry's block index is the previous entry's index + 1 + `skip` (the first:
+  `skip`), so blocks are ascending. `selector` 0: the whole block follows (64
+  bytes; it ends at or before `used_end`). Otherwise bit `w` of `selector`
+  says that a mask byte for the block's 8-byte word `w` follows (in word
+  order, each nonzero); bit `j` of that mask byte stands for byte `8 w + j`
+  of the block. Then the bytes the masks name, in order. Every byte written
+  lies below `used_end`. Those bytes replace the image bytes; the other bytes
+  of the block stay.
+- Run section (run frames): runs to the end of the delta, each { varint
+  `gap`, varint `length`, `length` bytes }. A run starts `gap` bytes after
+  the end of the run before it (the first: after offset 32), its `length` is
+  nonzero, and its bytes replace the image bytes there. So runs are
+  ascending and disjoint; every byte written lies below `used_end`. A run
+  frame may have no runs (a new `used_end` alone).
 
 A varint is unsigned LEB128 of at most 5 bytes holding a value below 2^32. The
 sender writes a block whole when the masked form would not be shorter (mask
 bytes plus changed bytes of at least 64).
 
-**Applying.** A key delta applies to an all-zero payload of `used_end` bytes; a
-non-key delta applies to the payload of version `version - 1` of the same
-stream, whose bytes past its `used_end` read as zero (every buffer keeps that
-invariant). The receiver writes the blocks' bytes, writes the payload header
-from `used_end` and the root offset (zeroing what lies past a smaller
-`used_end`), then checks the result (section 3).
+**Applying.** A key delta applies to an all-zero image of `used_end` bytes
+(the receiver writes offsets 0 to 31 of the header from `T`); a non-key
+delta applies to the image of version `version - 1` of the same stream,
+whose bytes past its `used_end` read as zero (every buffer keeps that
+invariant). The receiver writes the blocks' or runs' bytes and `used_end`
+(zeroing what lies past a smaller `used_end`), then checks the result
+(section 3).
 
 **Receiver checks**, in this order: magic, format, length of the fixed header,
-flags, the header varints; a key delta has EXTENT; stream and version nonzero;
-for a key delta the fingerprint (HOLES present, root type id, then schema hash)
-against `T`, for a non-key delta that the cursor holds a key delta of `T` and
-that `stream` is the cursor's and `version` follows it; without EXTENT, that the
-replica holds a verified root; `used_end`, root offset; the block section
-(every entry complete, inside `used_end`, no zero mask byte); the hole section;
-the total length. Then, after patching: the digest, then the check of
-section 3.
+flags (RUNS never with KEY), the header fields; a key delta has EXTENT; stream
+and version nonzero; for a key delta the fingerprint (root type id, then
+schema hash) against `T`, for a non-key delta that the cursor holds a key
+delta of `T` and that `stream` is the cursor's and `version` follows it;
+without EXTENT, that the replica holds a verified root; `used_end` (the root
+at 40 lies below it); the block or run section (every entry complete, every
+byte it writes inside `[32, used_end)`, no zero mask byte, no empty run); the
+total length. Then, after patching: the digest, then the check of section 3.
 
 **Errors.** As for wires (`bad_magic`, `unsupported_version`, `truncated`,
 `unsupported_flags`, `root_type_mismatch`, `schema_mismatch`,
 `size_mismatch`, `root_offset_out_of_bounds`, `invalid_extent_table` for a
-block out of bounds or a zero mask byte, `invalid_payload`, `root_mismatch`,
-`capacity_exceeded`), plus two codes: `delta_base_mismatch` (the delta is for
-another state than the replica holds, or the replica holds no key delta) and
-`digest_mismatch`. The messages start with `apply_delta_verified<T>()`
+block or run out of bounds, a zero mask byte or an empty run,
+`invalid_payload`, `root_mismatch`, `capacity_exceeded`), plus two codes:
+`delta_base_mismatch` (the delta is for another state than the replica
+holds, or the replica holds no key delta) and `digest_mismatch`. The messages start with `apply_delta_verified<T>()`
 (`XReceiver::apply_delta<T, admit>()` for admit).
 
 ## 3. What the receiver checks
 
 The result must pass exactly what `load_verified<T>` checks of a wire of the
-same payload. A key delta, and any delta that changes the root, is verified in
-full (`key`, `full`). For the others the receiver keeps, next to the cursor, a
+same payload. A key delta is verified in full (`key`). For the others the receiver keeps, next to the cursor, a
 map of the bytes verification reads (per 64-byte block, one bit per byte):
 container heads, heap string terminators, set and map keys with everything
 they reach, bools, the length and padding of inline strings, the heads of
@@ -254,8 +294,10 @@ payload may take any value without changing what verification visits or
 decides. So:
 
 - **`none`**: the delta writes no byte the map marks (scalars, vector elements
-  of plain types, map values, inline characters, free bytes) and keeps
-  `used_end` and the hole table. Nothing is checked; no undo copy is kept.
+  of plain types, map values, inline characters, slack bytes of a container
+  block), keeps `used_end`, and writes no byte outside the live blocks (a free
+  block's or the free directory's) and not the header's free state: the free
+  blocks stay as they were. Nothing is checked; no undo copy is kept.
 - **`in_place`**: the marked bytes it writes are bools (0 or 1), inline or
   empty string heads (still inline, length at most 10, zero padding; or all
   zero), sizes of vectors of plain elements (at most the capacity), or the
@@ -266,11 +308,14 @@ decides. So:
   string head that left or entered the inline or empty form, is checked on its
   own the same way, and its new block against the map of live blocks: inside
   the payload, 8-aligned, overlapping no live block once the blocks this delta
-  frees are taken out. With a new `used_end` or hole table, or any such
-  change, the hole table (the delta's, or the replica's when the delta carries
-  none) must tile the rest: every hole valid and in no live block, live and
-  hole bytes adding up to `used_end`. That is the coverage the whole
-  verification checks, without walking the payload. A vector of records
+  frees are taken out. With a new `used_end`, a byte written outside the live
+  blocks or in the header's free state (the free blocks may have changed),
+  or any such change, the image's free directory and free blocks, as
+  patched, must tile the rest: each checked as the whole verification checks
+  it (inside the payload, aligned, each stack of one size, the sizes
+  ascending, the free bytes the header names), in no live block and no other
+  free region, live and free bytes adding up to `used_end`. That is the
+  coverage the whole verification checks, without walking the payload. A vector of records
   (elements with strings, containers or bools) that grows within its
   capacity and keeps its block has only its new records verified, as the
   whole verification would verify them, each block they reach claimed in
@@ -279,8 +324,8 @@ decides. So:
   old records reached taken out of the map of live blocks and the map of
   checked bytes, and all its records verified again the same way from its
   new block: only that vector, not the rest of the payload.
-- **`full`**: anything else (the root moved, a marked byte no in-place check
-  covers), and any delta whose in-place
+- **`full`**: anything else (a marked byte no in-place check covers), and
+  any delta whose in-place
   check fails: the whole verification then decides, so a delta is accepted or
   rejected, with the same error, exactly as a whole verification would.
 
@@ -295,12 +340,12 @@ verification, like a store receiving saves, does not rebuild it each time).
 `XReceiver<XLink::from_server>` apply deltas with `XCheck::admit` by default
 (`apply_delta`; `last_check()` is `admit`). Everything the parse checks stays:
 the format, the stream and version against the cursor, the root type and
-schema fingerprint of a key delta, every block and hole inside `[40,
+schema fingerprint of a key delta, every byte written inside `[32,
 used_end)`, nothing after the last section. Besides that only the root object
-has to lie inside the used payload; what the bytes mean is the sender's, as
-for a whole wire taken with admit. No map of checked bytes is built or kept,
-and no undo copy unless the delta has a digest or a hole table (a digest that
-does not match rolls the delta back as above). The cursor's map then no longer
+has to lie inside the used payload; what the bytes mean (the free blocks
+included) is the sender's, as for a whole wire taken with admit. No map of
+checked bytes is built or kept, and no undo copy unless the delta has a
+digest (a digest that does not match rolls the delta back as above). The cursor's map then no longer
 holds, so a full apply on the same cursor after admits (`apply_delta<T,
 XCheck::full>`, or `try_apply_delta_verified`) verifies the whole payload once
 and builds the map again; the map is never built over a payload that was
@@ -310,12 +355,12 @@ without `NDEBUG` and under ASan or TSan) makes admit the full check.
 
 ## 4. Guarantees
 
-- **Byte identity.** After a delta applies, the receiver's payload
-  `[0, used_end)` equals the sender's, and its hole set equals the sender's
-  free table, so a later `save_compact` or `save_verified` of either side
+- **Byte identity.** After a delta applies, the receiver's image
+  `[0, used_end)` equals the sender's, its free blocks and directory
+  included, so a later `save_compact` or `save_verified` of either side
   carries the same payload.
 - **All or nothing.** A non-key delta that is rejected, at any check, leaves
-  the buffer (bytes, used_end, root, free table) and the cursor exactly as they
+  the buffer (bytes, used_end, free blocks) and the cursor exactly as they
   were: the patched bytes are rolled back from an undo copy the cursor keeps.
   A key delta rejected by its header checks changes nothing; one rejected
   after them leaves the buffer empty (as a failed `reload_verified`) and the
@@ -330,7 +375,7 @@ without `NDEBUG` and under ASan or TSan) makes admit the full check.
   `delta_base_mismatch`. `XDeltaBaseline::reset()` keeps counting, so deltas
   written before a reset never apply after it. When the 32-bit version runs
   out, the baseline starts a new stream with a key delta.
-- **Empty deltas.** When nothing changed (bytes, holes, used_end, root),
+- **Empty deltas.** When nothing changed (bytes, used_end),
   `save_delta_into` writes nothing and does not advance the version.
 - **Pointers.** A successful delta starts a new buffer epoch: element pointers
   into the previous content must not be used; `XHandle`s re-resolve. The root
@@ -364,8 +409,9 @@ without `NDEBUG` and under ASan or TSan) makes admit the full check.
   stable slots: a unit that enters takes a free slot, one that leaves clears
   its slot.
 - **Growth.** A container that outgrows its capacity moves to a new block;
-  the delta then carries the new block and the hole of the old one, and the
-  receiver verifies it in full. Reserving capacity for the expected size keeps
+  the delta then carries the new block and the allocator's writes (the old
+  block's link word, the free directory), and the receiver checks the move
+  against its map of live blocks. Reserving capacity for the expected size keeps
   deltas to the changed elements and on the cheap checks. Strings of at most
   10 bytes are stored inline in their head.
 - **Per receiver, not per message.** One baseline is one copy of the
@@ -376,37 +422,34 @@ without `NDEBUG` and under ASan or TSan) makes admit the full check.
 
 Sender, per delta: the comparison of the payload (or, with `touched_only`, of
 the touched blocks) against the baseline in 64-byte blocks, where each block
-that differs is copied into the baseline; the free table sorted by offset
-(only when it changed since the baseline's last delta: the table carries a
-generation that changes with every block that comes or goes); the
-changed bytes gathered by their masks (one byte shuffle per 8-byte word:
-SSSE3 when the CPU has it, NEON on AArch64, byte by byte elsewhere); with
-`digest`, one hash pass. Receiver, per delta: the header and section checks,
-the bytes scattered by their masks, then the check of section 3: for `none`
-nothing more, for `in_place` an undo copy and the checks of the bytes written
-(for a moved container, its block's bits in the live map and a pass over the
-hole table), for `full` the whole verification (proportional to the payload; the map is
+that differs is copied into the baseline, and the changed bytes gathered by
+their masks (one byte shuffle per 8-byte word: SSSE3 when the CPU has it,
+NEON on AArch64, byte by byte elsewhere); from a touches baseline, the
+touched runs copied as they are; with `digest`, one hash pass. Receiver, per
+delta: the header and section checks, the bytes written, then the check of
+section 3: for `none` nothing more, for `in_place` an undo copy and the
+checks of the bytes written (for a moved container or a changed free block,
+its block's bits in the live map and a walk of the free directory), for
+`full` the whole verification (proportional to the payload; the map is
 rebuilt, also proportional, when a later delta needs it); with `digest`, one
-hash pass. The receiver's maps take 29 bytes
-per 64-byte block of payload (24 for the bits, 4 for the node index, 1 for the
-live blocks), plus about 64 bytes per heap string, vector, set or map of plain
-elements; the sender's
-touch log 384 bytes plus, once two baselines pair with it or a delta
-touches more than 24 blocks, 4 bytes per block (12 with a baseline without a
-copy). The scratch a delta needs while it is applied
-(a copy of a small delta, the old bytes it overwrites, its block list and
-the hole table) is shared by the cursors of one thread, so a receiver that
-holds many replicas keeps one copy, warm in cache, instead of one per
+hash pass. The receiver's maps take 29 bytes per 64-byte block of payload
+(24 for the bits, 4 for the node index, 1 for the live blocks), plus about
+64 bytes per heap string, vector, set or map of plain elements; the sender's
+touch log 320 bytes plus, once two baselines pair with it or a period
+touches more than 25 runs, 4 bytes per block. The scratch a delta needs
+while it is applied (a copy of a small delta, the old bytes it overwrites,
+its block or run list) is shared by the cursors of one thread, so a receiver
+that holds many replicas keeps one copy, warm in cache, instead of one per
 replica (`XDeltaCursor::release_scratch()` frees it); likewise the scratch
-of writing one (the hole table, the changed blocks, the blocks to compare)
-is shared by a thread's baselines (`XDeltaBaseline::release()`). Where
+of writing one (the changed blocks, the runs, the blocks to compare) is
+shared by a thread's baselines (`XDeltaBaseline::release()`). Where
 `XOFFSET_THREAD_CACHES` is 0 (GCC on MinGW and Cygwin) each cursor and
 baseline keeps its own.
 
 Viewport-like model in `tests/test_delta_sync.cpp` (120 units in 128 stable
 slots, each tick 30% move a few cells, 5% lose hp, 2 leave and 2 enter):
-about 270 bytes per tick in 39 blocks, against 5946 bytes for `save_compact`
-and 7225 bytes for `save_verified` of the same view; the key delta is 3214
+about 260 bytes per tick in 39 blocks, against 5946 bytes for `save_compact`
+and 7090 bytes for `save_verified` of the same view; the key delta is 3210
 bytes.
 
 ## 7. Not in format 2.0

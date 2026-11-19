@@ -9,14 +9,14 @@
 //     checked bytes, so it is verified in full: this is the differential of
 //     the receiver's none / in_place fast paths against whole verification.
 //   - the receiver's map of checked bytes equals one built afresh;
-//   - a rejected delta leaves the replica (payload, holes, contents) and the
+//   - a rejected delta leaves the replica (payload, free blocks, contents) and the
 //     cursor exactly as they were (a key delta rejected after its header
 //     checks may instead leave the replica empty and the cursor cleared);
 //   - an accepted delta leaves a payload whose save_verified() wire loads
 //     with load_verified and re-saves byte-identically;
 //   - XReceiver<from_server>::apply_delta with XCheck::admit (trust tier P2),
 //     on another clone with a copy of the cursor: it accepts every delta the
-//     full check accepts, with the same payload, holes and cursor; it rejects
+//     full check accepts, with the same payload, free blocks and cursor; it rejects
 //     with the same error every delta the parse rejects (any code but the
 //     ones the checks of section 3 give); a rejected admit leaves its clone
 //     and cursor as they were, or (key delta) empty; a delta it accepts
@@ -26,10 +26,10 @@
 // The first input byte picks the schema (bit 0: the fuzz model fz::Root of
 // v2_fuzz_core.hpp, or a viewport-like vector of unit records) and the mode
 // (bits 1-2):
-//   0 raw: the rest of the input is the block / hole section of a delta to
+//   0 raw: the rest of the input is the block or run section of a delta to
 //     the replica's next version, behind a header the harness writes (so the
 //     input passes the stream and version checks and reaches the block and
-//     hole parsers and the checks of section 3). Flags come from the input.
+//     run parsers and the checks of section 3). Flags come from the input.
 //   1 stream: the input drives a sequence of sender steps (mutations, sender
 //     options, baseline resets); each real delta is applied, after up to a
 //     few input-chosen corruptions of it that are applied first. The real
@@ -392,8 +392,11 @@ std::string varint(std::uint64_t v) {
     return out + char(v);
 }
 
-// Header of a delta to the cursor's next version, flags from the input. With
-// EXTENT, used and root come from the input (often the replica's own).
+// Header of a delta to the cursor's next version, flags from the input (a
+// run frame with RUNS: the version as a u32), in the order of the format:
+// with EXTENT the used size (from the input, often the replica's own), a
+// block frame's block count, a key delta's fingerprint, with DIGEST the
+// digest (the input's, or 0).
 template <class Root>
 std::string header_for(Fixture<Root>& f, In& in, std::uint8_t flags, bool key) {
     std::string h = {'X', 'D', char(0x20), char(flags)};
@@ -403,23 +406,26 @@ std::string header_for(Fixture<Root>& f, In& in, std::uint8_t flags, bool key) {
     if (tweak == 0xff) stream = in.u64();          // another stream
     if (tweak == 0xfe) version = in.u16();         // another version
     h.append(reinterpret_cast<const char*>(&stream), 8);
-    h += varint(version);
+    if (flags & 2u) h.append(reinterpret_cast<const char*>(&version), 4);
+    else h += varint(version);
     if (flags & 8u) {
         const auto* sm = f.rep.arena();
         std::uint64_t used = sm ? (sm->used_end - xo::XWIRE_PAYLOAD_BEGIN) / 8 : 0;
-        std::uint64_t root = 0; // the root is at 40, the payload's first byte
         const std::uint8_t e = in.u8();
         if (e & 1) used = in.u16();
         else if (e & 2) used += in.u8();
-        if (e & 4) root = std::uint64_t(in.u16()) * 8;
         h += varint(used);
-        h += varint(root);
     }
+    if (!(flags & 2u)) h += varint(in.u8() % (key ? 16 : 8));  // block count
     if (key) {
         std::uint64_t hash = xo::detail::wire_schema_hash<Root>(), type = xo::detail::wire_root_type_id<Root>();
         if (in.u8() == 0xff) hash ^= 1;
         h.append(reinterpret_cast<const char*>(&hash), 8);
         h.append(reinterpret_cast<const char*>(&type), 8);
+    }
+    if (flags & 4u) {
+        std::uint64_t dg = in.u8() == 0 ? in.u64() : 0;
+        h.append(reinterpret_cast<const char*>(&dg), 8);
     }
     return h;
 }
@@ -427,24 +433,17 @@ std::string header_for(Fixture<Root>& f, In& in, std::uint8_t flags, bool key) {
 template <class Root>
 void run_raw(std::uint8_t seed, In& in) {
     Fixture<Root> f(seed, in.u8() % 4);
-    const std::uint8_t flags = in.u8() & 0x0e; // HOLES, DIGEST, EXTENT; not KEY
+    const std::uint8_t flags = in.u8() & 0x0e; // RUNS, DIGEST, EXTENT; not KEY
     std::string d = header_for(f, in, flags, false);
-    if (flags & 4u) { // DIGEST: the input's, or the right one for an unchanged payload
-        std::uint64_t dg = in.u8() == 0 ? in.u64() : 0;
-        d.append(reinterpret_cast<const char*>(&dg), 8);
-    }
-    d += varint(in.u8() % 8);                      // block count
-    d += in.rest();                                // block and hole sections
+    d += in.rest();                                // block or run section
     apply_checked(f.rep, d, f.cur, "raw");
 }
 
 template <class Root>
 void run_key(std::uint8_t seed, In& in) {
     Fixture<Root> f(seed, in.u8() % 2);
-    const std::uint8_t flags = std::uint8_t(1u | 2u | 8u | (in.u8() & 4u));
+    const std::uint8_t flags = std::uint8_t(1u | 8u | (in.u8() & 4u));
     std::string d = header_for(f, in, flags, true);
-    if (flags & 4u) { std::uint64_t dg = in.u64(); d.append(reinterpret_cast<const char*>(&dg), 8); }
-    d += varint(in.u8() % 16);
     d += in.rest();
     apply_checked(f.rep, d, f.cur, "key onto replica");
     xo::TypedXBuffer<Root> empty(4096, xo::XBuffer::maximum_capacity(kLimit));

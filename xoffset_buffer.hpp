@@ -159,7 +159,6 @@ namespace XOffsetDatastructure {
             if (this == &other) return;
             XBufferCore::swap(other);
             reload_scratch_.swap(other.reload_scratch_);
-            touch_log_.swap(other.touch_log_);
             std::swap(direct_reload_open_, other.direct_reload_open_);
         }
 
@@ -737,7 +736,6 @@ namespace XOffsetDatastructure {
         }
 
         std::unique_ptr<detail::WireValidationScratch> reload_scratch_;
-        std::unique_ptr<detail::DeltaTouchLog> touch_log_;  // touch() marks (delta senders)
         // direct_reload_open_ is in XBufferCore's padding (see there).
         template <typename> friend class VerifiedReloadToken;
         friend struct detail::DeltaAccess;
@@ -748,13 +746,21 @@ namespace XOffsetDatastructure {
         /// Writes into `out` a delta that turns the state `baseline` records
         /// (what one receiver holds) into this buffer's current state, and
         /// advances `baseline` to it. Only payload bytes that differ are sent
-        /// (plus the hole table when it changed); an empty baseline gives a
-        /// key delta, which a receiver applies to any buffer. When nothing
-        /// changed, `out` is left empty and the version does not advance
-        /// (send nothing). The buffer is not changed (beyond an incomplete
-        /// free table being recomputed, as save_verified does).
+        /// (the free blocks travel as the image bytes they are); an empty
+        /// baseline gives a key delta, which a receiver applies to any
+        /// buffer. When nothing changed, `out` is left empty and the version
+        /// does not advance (send nothing). The buffer is not changed
+        /// (beyond an incomplete free table being recomputed, as
+        /// save_verified does).
         template <typename T>
         XDeltaStats save_delta_into(std::string& out, XDeltaBaseline& baseline, XDeltaOptions options = {});
+        /// The same into the caller's memory `out`: returns the delta's size
+        /// (0: nothing changed, send nothing). A delta larger than `out` is
+        /// not written: its size is returned and `baseline` keeps it, and
+        /// its next save_delta_into (into memory at least that large, or a
+        /// string) writes it before anything else.
+        template <typename T>
+        std::size_t save_delta_into(std::span<char> out, XDeltaBaseline& baseline, XDeltaOptions options = {});
         template <typename T>
         std::string save_delta(XDeltaBaseline& baseline, XDeltaOptions options = {});
         /// For deltas with XDeltaOptions::touched_only: records that `value`
@@ -1327,6 +1333,10 @@ namespace XOffsetDatastructure {
 
         /// Delta sync (see XBuffer::save_delta_into / apply_delta_verified).
         XDeltaStats save_delta_into(std::string& out, XDeltaBaseline& baseline, XDeltaOptions options = {}) {
+            return XBuffer::save_delta_into<T>(out, baseline, options);
+        }
+        XOFFSET_DETAIL_INLINE std::size_t save_delta_into(std::span<char> out, XDeltaBaseline& baseline,
+                                                          XDeltaOptions options = {}) {
             return XBuffer::save_delta_into<T>(out, baseline, options);
         }
         std::string save_delta(XDeltaBaseline& baseline, XDeltaOptions options = {}) {

@@ -5,7 +5,7 @@
 // byte, both ways: the sender must write exactly these bytes, and the
 // receiver must apply them (with and without the full check). The bytes are
 // written out field by field after the table in section 2, so a change to the
-// framing (header, varints, flags, selector and mask bytes, holes, digest)
+// framing (header, varints, flags, selector and mask bytes, runs, digest)
 // fails here on every compiler and schema backend. Update only together with
 // a new format version. No exception of its own: also built as
 // test_delta_format_noexc.
@@ -53,20 +53,21 @@ std::string le(V v) {
 
 constexpr std::uint64_t kStream = 0x0123456789abcdefull;
 
-// The image: header [0, 40), the root at 40 (16 bytes), used_end 56.
-// Key delta, version 1: KEY | HOLES | EXTENT, used (56 - 40) / 8 = 2, root
-// 40 - 40 = 0, one block; the fingerprint; block 0 (skip 0) with mask bytes
-// for words 5 and 6 (selector 0x60): a's eight bytes (0xff), and of word 6
-// only the nonzero bytes, b's first and c's first (0x11), since a key delta
-// applies to zeros; then those ten bytes; no holes.
+// The image: header [0, 40) (no free blocks: free_dir and free_bytes at
+// [32, 40) are zero), the root at 40 (16 bytes), used_end 56. A delta writes
+// [32, 56).
+// Key delta, version 1: KEY | EXTENT, used (56 - 40) / 8 = 2, one block; the
+// fingerprint; block 0 (skip 0) with mask bytes for words 5 and 6 (selector
+// 0x60): a's eight bytes (0xff), and of word 6 only the nonzero bytes, b's
+// first and c's first (0x11), since a key delta applies to zeros; then those
+// ten bytes. (Word 4, the free state, is zero.)
 std::string key_delta() {
-    std::string d = {'X', 'D', char(0x20), char(0x0b)};
+    std::string d = {'X', 'D', char(0x20), char(0x09)};
     d += le(kStream);
-    d += char(1) + std::string(1, char(2)) + char(0) + char(1);
+    d += char(1) + std::string(1, char(2)) + char(1);
     d += le(detail::wire_schema_hash<FrozenRoot>()) + le(detail::wire_root_type_id<FrozenRoot>());
     d += std::string{char(0), char(0x60), char(0xff), char(0x11)};
     d += le(std::uint64_t(0x1122334455667788ull)) + char(7) + char(9);
-    d += char(0);  // hole count
     return d;
 }
 
@@ -80,7 +81,7 @@ std::string scalar_delta() {
     return d;
 }
 
-// Version 3: a's low four bytes, with DIGEST: xxHash64 of [40, 56) after it.
+// Version 3: a's low four bytes, with DIGEST: xxHash64 of [32, 56) after it.
 std::string digest_delta(std::uint64_t digest) {
     std::string d = {'X', 'D', char(0x20), char(0x04)};
     d += le(kStream);
@@ -92,8 +93,32 @@ std::string digest_delta(std::uint64_t digest) {
 }
 
 std::uint64_t digest_after() {
-    std::string payload = le(std::uint64_t(0x11223344a0b0c0d0ull)) + le(std::uint32_t(8)) + le(std::uint32_t(9));
-    return detail::xxh64(payload.data(), payload.size());
+    std::string image = le(std::uint64_t(0)) + le(std::uint64_t(0x11223344a0b0c0d0ull)) + le(std::uint32_t(8)) +
+                        le(std::uint32_t(9));
+    return detail::xxh64(image.data(), image.size());
+}
+
+// From an XDeltaRecord::touches baseline (the same key delta), version 2
+// after touch_set(b, 8): a run frame (RUNS), its 16-byte header ending in the
+// version as a u32, then one run: gap 48 - 32 = 16, length 1, the byte.
+std::string run_delta() {
+    std::string d = {'X', 'D', char(0x20), char(0x02)};
+    d += le(kStream);
+    d += le(std::uint32_t(2));
+    d += std::string{char(16), char(1), char(8)};
+    return d;
+}
+
+// Version 3: touch_set of a's low four bytes, with DIGEST (after the
+// header): gap 40 - 32 = 8, length 4, the bytes.
+std::string run_digest_delta(std::uint64_t digest) {
+    std::string d = {'X', 'D', char(0x20), char(0x06)};
+    d += le(kStream);
+    d += le(std::uint32_t(3));
+    d += le(digest);
+    d += std::string{char(8), char(4)};
+    d += le(std::uint32_t(0xa0b0c0d0u));
+    return d;
 }
 
 void sender_writes_frozen_bytes() {
@@ -120,6 +145,25 @@ void sender_writes_frozen_bytes() {
     digest.digest = true;
     src.save_delta_into<FrozenRoot>(d, base, digest);
     need(d == digest_delta(digest_after()), "sender: digest delta bytes changed");
+
+    // The same changes, touched, from a touches baseline: run frames.
+    auto tsrc = XBuffer::create<FrozenRoot>(4096, XBuffer::maximum_capacity(1 << 20));
+    auto& t = tsrc.root<FrozenRoot>();
+    t.a = 0x1122334455667788ull;
+    t.b = 7;
+    t.c = 9;
+    XDeltaBaseline touches(XDeltaRecord::touches, kStream);
+    tsrc.save_delta_into<FrozenRoot>(d, touches);
+    need(d == key_delta(), "sender: touches key delta bytes changed");
+    tsrc.touch_set(t.b, 8u);
+    tsrc.save_delta_into<FrozenRoot>(d, touches);
+    if (d != run_delta()) std::fprintf(stderr, "run delta written: %s\n           frozen: %s\n", hex(d).c_str(),
+                                       hex(run_delta()).c_str());
+    need(d == run_delta(), "sender: run delta bytes changed");
+    need(d.size() == 19, "sender: a one-byte run delta is a 16-byte header and a 3-byte run");
+    tsrc.touch_set(t.a, 0x11223344a0b0c0d0ull);
+    tsrc.save_delta_into<FrozenRoot>(d, touches, digest);
+    need(d == run_digest_delta(digest_after()), "sender: run digest delta bytes changed");
 }
 
 template <typename Apply>
@@ -135,6 +179,14 @@ void receiver_applies_frozen_bytes(Apply apply, const char* who) {
     need(apply(dst, digest_delta(digest_after()), cur) && dst.root<FrozenRoot>().a == 0x11223344a0b0c0d0ull,
          (what + "frozen digest delta").c_str());
     need(cur.version() == 3, (what + "cursor after the stream").c_str());
+    // The run frames of a touches baseline.
+    auto tdst = XBuffer::create<FrozenRoot>(4096, XBuffer::maximum_capacity(1 << 20));
+    XDeltaCursor tcur;
+    need(apply(tdst, key_delta(), tcur) && apply(tdst, run_delta(), tcur) && tdst.root<FrozenRoot>().b == 8,
+         (what + "frozen run delta").c_str());
+    need(apply(tdst, run_digest_delta(digest_after()), tcur) && tdst.root<FrozenRoot>().a == 0x11223344a0b0c0d0ull &&
+             tcur.version() == 3,
+         (what + "frozen run digest delta").c_str());
     // Another format byte is refused, whatever follows it.
     std::string other = key_delta();
     other[2] = char(0x21);

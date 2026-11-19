@@ -102,12 +102,18 @@ namespace proxy_detail {
         bool live() const noexcept { return live_at(ctl, version); }
         // Records a failure in the buffer (the first one stays).
         static XOFFSET_DETAIL_NOINLINE void fail_at(detail::XCtl* ctl, std::uint64_t version, XErrc code) noexcept {
-            if (live_at(ctl, version) && ctl->sticky == XErrc::ok) ctl->sticky = code;
+            if (live_at(ctl, version) && ctl->sticky == XErrc::ok) {
+                ctl->sticky = code;
+                if (ctl->core) ctl->core->failure_recorded();
+            }
         }
         // A write through a proxy that names nothing: out_of_range, or
         // stale (nothing recorded) when its buffer is gone.
         static XOFFSET_DETAIL_NOINLINE void miss_at(detail::XCtl* ctl, std::uint64_t version) noexcept {
-            if (live_at(ctl, version) && ctl->sticky == XErrc::ok) ctl->sticky = XErrc::out_of_range;
+            if (live_at(ctl, version) && ctl->sticky == XErrc::ok) {
+                ctl->sticky = XErrc::out_of_range;
+                if (ctl->core) ctl->core->failure_recorded();
+            }
         }
         XOFFSET_DETAIL_INLINE void fail(XErrc code) const noexcept { fail_at(ctl, version, code); }
         // An allocation of up to `bytes` can run in place now: no recorded
