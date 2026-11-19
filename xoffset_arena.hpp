@@ -1204,13 +1204,15 @@ namespace XOffsetDatastructure {
             adopt_ctl();
             other.adopt_ctl();
             owner_record_.swap(other.owner_record_);
-            std::swap(free_table_lost_, other.free_table_lost_);
+            // The free state and the spare watch flag follow the content.
+            std::swap(send_flags_, other.send_flags_);
             publish_host_owner();
             other.publish_host_owner();
             std::swap(root_key_, other.root_key_);
             std::swap(typed_root_access_allowed_, other.typed_root_access_allowed_);
             advance_epoch();
             other.advance_epoch();
+            if (spare_list_ || other.spare_list_) [[unlikely]] swap_spare_lists(other);
             // No record is written: a record follows its payload, so after the
             // two swaps above each record is again its payload's, and the
             // owner it names is read from the host header (record_owner). A
@@ -1491,7 +1493,7 @@ namespace XOffsetDatastructure {
         // end of the payload. Nothing is allocated on the host, and the
         // storage only grows in place: a block that cannot be recorded (no
         // room for a directory) is lost, and the free state is marked
-        // incomplete (free_table_lost_).
+        // incomplete (send_flags_.free_table_lost).
         static constexpr std::size_t inband_dir_at = 32;
         static constexpr std::size_t inband_bytes_at = 36;
         static constexpr std::uint32_t inband_end = 0xFFFFFFFFu;  // an unused entry's size
@@ -1766,7 +1768,7 @@ namespace XOffsetDatastructure {
 
         // A free block could not be recorded: save_verified recomputes the
         // free blocks from the live graph (inband_rebuild).
-        void inband_lose() noexcept { free_table_lost_ = true; }
+        void inband_lose() noexcept { send_flags_.free_table_lost = true; }
 
         std::uint32_t inband_dir() const noexcept {
             const auto* sm = arena();
@@ -1819,7 +1821,7 @@ namespace XOffsetDatastructure {
             if (count == 0) {
                 inband_set(base + inband_dir_at, 0);
                 inband_set(base + inband_bytes_at, 0);
-                free_table_lost_ = false;
+                send_flags_.free_table_lost = false;
                 return inband_adopted::kept;
             }
             std::size_t dir = count;
@@ -1899,7 +1901,7 @@ namespace XOffsetDatastructure {
             inband_set(base + inband_dir_at, directory.offset);
             inband_set(base + inband_bytes_at, static_cast<std::uint32_t>(total));
             inband_log_lost();
-            free_table_lost_ = false;
+            send_flags_.free_table_lost = false;
             return inband_adopted::kept;
         }
 
@@ -1922,7 +1924,7 @@ namespace XOffsetDatastructure {
             inband_set(base + inband_dir_at, 0);
             inband_set(base + inband_bytes_at, 0);
             inband_log_lost();
-            free_table_lost_ = false;
+            send_flags_.free_table_lost = false;
             if (count == 0) return true;
             // The distinct sizes, counted up to 32 (more grow the directory).
             std::uint32_t seen[32], sizes = 0;
@@ -1961,13 +1963,65 @@ namespace XOffsetDatastructure {
                 const WireHole hole = entry(i);
                 inband_push_zeroed(static_cast<std::uint32_t>(hole.offset), static_cast<std::uint32_t>(hole.bytes), 0u);
             }
-            return !free_table_lost_;
+            return !send_flags_.free_table_lost;
         }
 
         // False once a free block could not be recorded, or for the content
         // of an unverified load, until a verified load or save_verified
         // recomputes the free blocks.
-        bool free_table_complete() const noexcept { return !free_table_lost_; }
+        bool free_table_complete() const noexcept { return !send_flags_.free_table_lost; }
+
+        // ---- Spare capacity watch (host only, never on the wire) ---------
+        // Spare capacity (capacity minus size) lies inside live blocks, where
+        // the header's free bytes do not count it: a vector grown in place
+        // (try_expand) and shrunk back leaves no free block. A container
+        // whose size falls from above a quarter of its capacity to a quarter
+        // or below, with a capacity of at least spare_watch_min_bytes,
+        // registers its head here (note_spare_head; growth leaves a size
+        // above half, so the crossing follows a real shrink). When the free
+        // bytes alone keep the image, the automatic emission reads each
+        // listed head from the image and counts its spare with the free bytes
+        // (watched_spare_bytes); a head grown back above half of its
+        // capacity, or no longer read as a head inside used_end, is dropped.
+        // The list follows the content (move, swap, clone) and carries the
+        // epoch it was read in, so a reload, reset or storage replacement
+        // drops it. It only steers that choice: both wires are exact.
+        static constexpr std::uint32_t spare_watch_min_bytes = 1024;
+        static constexpr std::uint32_t spare_watch_slots = 8;
+        bool spare_watched() const noexcept { return send_flags_.spare_watch; }
+        // A complete free state and no watched head: one load and compare.
+        bool send_flags_clear() const noexcept { return std::bit_cast<std::uint16_t>(send_flags_) == 0; }
+        // A shrink crossed a quarter (the containers' only call): registers
+        // the head with the owner of its payload. Cold.
+        XOFFSET_DETAIL_COLD static void note_spare_head(const void* head, std::uint32_t elem_bytes) noexcept {
+            const char* payload = detail::OwnerMap::payload_of(head);
+            XBufferCore* core = owner_from_arena_noexcept(payload);
+            if (!core || core->buffer_.data() != payload) return;
+            core->note_spare(static_cast<std::uint32_t>(static_cast<const char*>(head) - payload), elem_bytes);
+        }
+        // Spare bytes of the listed heads in the current image, at most the
+        // used bytes. Drops the entries that no longer hold, and the flag
+        // with the last one.
+        XOFFSET_DETAIL_NOINLINE std::uint64_t watched_spare_bytes() noexcept {
+            SpareList* list = spare_list_.get();
+            if (!list || list->epoch != m_epoch || buffer_.size() < min_payload_size()) {
+                drop_spare_watch();
+                return 0;
+            }
+            const std::uint64_t used = used_end_clamped();
+            std::uint64_t total = 0;
+            std::uint32_t keep = 0;
+            for (std::uint32_t i = 0; i < list->count; ++i) {
+                SpareList::Entry entry = list->entries[i];
+                if (read_spare(buffer_.data(), used, entry)) {
+                    total += entry.spare;
+                    list->entries[keep++] = entry;
+                }
+            }
+            list->count = keep;
+            if (keep == 0) send_flags_.spare_watch = false;
+            return total < used ? total : used;
+        }
         // The free blocks' count walks their stacks; the directory is not a
         // free block (wire_hole_count counts it).
         std::size_t free_block_count() const noexcept { return inband_count(); }
@@ -2039,7 +2093,7 @@ namespace XOffsetDatastructure {
             } else if (adopted == inband_adopted::rejected) {
                 (void)inband_rebuild(holes.data(), holes.size());
             }
-            if (!arena() || free_table_lost_) [[unlikely]]
+            if (!arena() || send_flags_.free_table_lost) [[unlikely]]
                 XOFFSET_THROW(XException(XErrc::capacity_exceeded, "XBufferCore: no room for the free directory"));
         }
 
@@ -2257,7 +2311,7 @@ namespace XOffsetDatastructure {
             StoragePlan plan;
             XOFFSET_VTRY(plan_storage(size, max_reserved, packed_.growth_policy, pool.enabled(), request, plan));
             XOFFSET_VTRY(as_arena_failure([&]() -> detail::vstatus {
-                free_table_lost_ = false;
+                send_flags_.free_table_lost = false;
                 detail::VirtualMemoryStorage owner;
                 if (packed_.growth_policy == XGrowPolicy::Relocating) {
                     if (!relocating_owner(owner, size, max_reserved, std::max(size, reserve_or_default(reserve, size))))
@@ -2333,7 +2387,7 @@ namespace XOffsetDatastructure {
                 if (wire.extent_count != 0) copy_wire_header(owner.data(), wire.stored);
                 // The image carries its free blocks: the caller's check takes
                 // them (or rejects the load).
-                free_table_lost_ = false;
+                send_flags_.free_table_lost = false;
                 return detail::vok();
             });
         }
@@ -2350,7 +2404,7 @@ namespace XOffsetDatastructure {
             XOFFSET_VTRY(as_arena_failure([&]() -> detail::vstatus {
                 // Free blocks of an unverified payload are unknown until a verified
                 // load checks its free directory (or a typed walk recomputes it).
-                free_table_lost_ = true;
+                send_flags_.free_table_lost = true;
                 detail::VirtualMemoryStorage owner;
                 XOFFSET_VTRY(make(owner));
                 buffer_ = std::move(owner);
@@ -2374,7 +2428,7 @@ namespace XOffsetDatastructure {
                 // it. Each epoch still advances by one.
                 buffer_.swap(other.buffer_);
                 owner_record_.swap(other.owner_record_);
-                free_table_lost_ = std::exchange(other.free_table_lost_, false);
+                send_flags_ = std::exchange(other.send_flags_, SendFlags{});
                 touch_log_.swap(other.touch_log_);
                 publish_host_owner();
                 if (ctl_ || other.ctl_ || packed_.pinned || other.packed_.pinned || handoff_ || other.handoff_)
@@ -2402,6 +2456,7 @@ namespace XOffsetDatastructure {
                 typed_root_access_allowed_ = std::exchange(other.typed_root_access_allowed_, true);
                 advance_epoch();
                 other.advance_epoch();
+                if (other.spare_list_) [[unlikely]] take_spare_list(other);
                 update_registry_owner();
                 return;
             }
@@ -2415,8 +2470,10 @@ namespace XOffsetDatastructure {
             retired.swap(*this);
             swap(other);
             // Preserve the existing one-invalidation-per-Core epoch contract.
+            const auto watch_epoch = m_epoch;  // swap(other) tagged the incoming spare list with it
             m_epoch = target_epoch + 1u;
             other.m_epoch = source_epoch + 1u;
+            if (spare_list_) [[unlikely]] retag_spare_list(watch_epoch);
             // Only now destroy retired target resources. Any delete reentry
             // sees the fully published incoming payload, schema and free cache.
         }
@@ -2730,7 +2787,7 @@ namespace XOffsetDatastructure {
         XOFFSET_DETAIL_INLINE void begin_reinit() noexcept {
             if (ctl_) [[unlikely]] end_lineage();
             advance_epoch();
-            free_table_lost_ = false;
+            send_flags_.free_table_lost = false;
             typed_root_access_allowed_ = false;
             root_key_ = nullptr;
         }
@@ -2750,7 +2807,7 @@ namespace XOffsetDatastructure {
                 if (ctl_) [[unlikely]] end_lineage();
             }
             advance_epoch();
-            free_table_lost_ = false;
+            send_flags_.free_table_lost = false;
             char* const base = buffer_.data();
             arena_header* const sm = arena_unchecked();
             const std::uint32_t used = sm->used_end;
@@ -2822,7 +2879,7 @@ namespace XOffsetDatastructure {
         }
         ZeroTail settled_zero_tail() const noexcept {
             const auto logical = buffer_.size();
-            if (buffer_.zero_from() != logical || free_table_lost_ || logical < min_payload_size()) return {};
+            if (buffer_.zero_from() != logical || send_flags_.free_table_lost || logical < min_payload_size()) return {};
             const auto used = tail_clean_from();
             return {buffer_.data(), used < logical ? used : logical};
         }
@@ -2856,7 +2913,7 @@ namespace XOffsetDatastructure {
                 !replace_storage(size, false))
                 XOFFSET_VFAIL(XBadAlloc, XErrc::out_of_storage, detail::arena_failure_message);
             // Free blocks are unknown until verification checks the free directory.
-            free_table_lost_ = true;
+            send_flags_.free_table_lost = true;
             return detail::vok();
         }
 
@@ -2875,7 +2932,7 @@ namespace XOffsetDatastructure {
             }
             // The free blocks of loaded bytes are unknown until a verified
             // load (or a clone's source) supplies them: no directory.
-            if (free_table_lost_) { sm->free_dir = 0; sm->free_bytes = 0; }
+            if (send_flags_.free_table_lost) { sm->free_dir = 0; sm->free_bytes = 0; }
             zero_past_used_end();
             return detail::vok();
         }
@@ -2886,7 +2943,7 @@ namespace XOffsetDatastructure {
 
         // A wire written into the storage in place (a direct reload) carries
         // its free blocks: the caller's check takes them.
-        void take_loaded_free_state() noexcept { free_table_lost_ = false; }
+        void take_loaded_free_state() noexcept { send_flags_.free_table_lost = false; }
 
         // The header of a sparse wire (its extent count names the form; an
         // image is dense).
@@ -2906,7 +2963,7 @@ namespace XOffsetDatastructure {
                 }
                 // The image carries its free blocks: the caller's check takes
                 // them (or rejects the load).
-                free_table_lost_ = false;
+                send_flags_.free_table_lost = false;
                 return detail::vok();
             });
         }
@@ -2931,7 +2988,7 @@ namespace XOffsetDatastructure {
         XOFFSET_DETAIL_INLINE bool reload_image_in_place(const char* image, size_type size) noexcept {
             if (ctl_) [[unlikely]] end_lineage();
             ++m_epoch;
-            free_table_lost_ = false;
+            send_flags_.free_table_lost = false;
             return buffer_.assign_in_place(image, size, 0);
         }
 
@@ -2959,14 +3016,15 @@ namespace XOffsetDatastructure {
                 XOFFSET_THROW(XBadAlloc());
             // The payload copy holds src's free blocks; its header words
             // (cleared by the load) are src's again.
-            if (!src.free_table_lost_) {
+            if (!src.send_flags_.free_table_lost) {
                 arena()->free_dir = src.arena()->free_dir;
                 arena()->free_bytes = src.arena()->free_bytes;
                 inband_log_lost();
-                free_table_lost_ = false;
+                send_flags_.free_table_lost = false;
             }
             typed_root_access_allowed_ = src.typed_root_access_allowed_;
             root_key_ = src.root_key_;
+            if (src.send_flags_.spare_watch) [[unlikely]] copy_spare_watch(src);
         }
 
         // clone_into(): src's used payload replaces this owner's content in
@@ -2985,7 +3043,9 @@ namespace XOffsetDatastructure {
         // image is cleared. False: anything else (clone_state_general).
         XOFFSET_DETAIL_INLINE bool clone_in_place(const XBufferCore& src) {
             const size_type logical = buffer_.size();
-            if (this == &src || src.buffer_.size() != logical || src.free_table_lost_ || logical < min_payload_size())
+            // A source with watched heads takes clone_state_general, which
+            // copies the list (one test of both flags).
+            if (this == &src || src.buffer_.size() != logical || !src.send_flags_clear() || logical < min_payload_size())
                 return false;
             // src.size() >= 40: its header is there, and used_end <= size().
             const size_type used = src.arena()->used_end;
@@ -3005,7 +3065,7 @@ namespace XOffsetDatastructure {
             }
             // A touch log describes the epoch it was made in: the new epoch
             // starts it over at its next use.
-            free_table_lost_ = false;
+            send_flags_.free_table_lost = false;
             typed_root_access_allowed_ = src.typed_root_access_allowed_;
             root_key_ = src.root_key_;
             return true;
@@ -3117,6 +3177,108 @@ namespace XOffsetDatastructure {
         void advance_epoch() noexcept { ++m_epoch; }
 
     private:
+        // The watched heads (at most spare_watch_slots), by payload offset.
+        struct SpareList {
+            struct Entry {
+                std::uint32_t head;   // payload offset of a container head
+                std::uint32_t elem;   // its element size in bytes
+                std::uint64_t spare;  // (capacity - size) * elem, as last read
+            };
+            std::uint64_t epoch = 0;  // the epoch of the content it was read from
+            std::uint32_t count = 0;
+            Entry entries[spare_watch_slots];
+        };
+        // The head at entry.head as the image holds it (data delta, size,
+        // capacity): true, with entry.spare set, when its size is at most
+        // half of its capacity and the head and its block lie in
+        // [root_at, used). Reads nothing past used.
+        static bool read_spare(const char* base, std::uint64_t used, SpareList::Entry& entry) noexcept {
+            if (entry.head < root_at || std::uint64_t(entry.head) + 12u > used) return false;
+            std::int32_t delta;
+            std::uint32_t size, capacity;
+            std::memcpy(&delta, base + entry.head, 4);
+            std::memcpy(&size, base + entry.head + 4, 4);
+            std::memcpy(&capacity, base + entry.head + 8, 4);
+            if (delta == 0 || capacity == 0 || size > capacity / 2u) return false;
+            const std::int64_t block = std::int64_t(entry.head) + delta;
+            if (block < std::int64_t(root_at) ||
+                std::uint64_t(block) + std::uint64_t(capacity) * entry.elem > used)
+                return false;
+            entry.spare = std::uint64_t(capacity - size) * entry.elem;
+            return true;
+        }
+        void drop_spare_watch() noexcept {
+            if (spare_list_) spare_list_->count = 0;
+            send_flags_.spare_watch = false;
+        }
+        // The list held now was read from content of epoch `from`, which
+        // this owner now holds: it carries over to the current epoch, or is
+        // dropped when it is older.
+        void retag_spare_list(std::uint64_t from) noexcept {
+            if (spare_list_->epoch == from) spare_list_->epoch = m_epoch;
+            else drop_spare_watch();
+        }
+        // swap(), after the flags went with the content and both epochs
+        // advanced by one: each list follows its content.
+        XOFFSET_DETAIL_COLD void swap_spare_lists(XBufferCore& other) noexcept {
+            spare_list_.swap(other.spare_list_);
+            if (spare_list_) retag_spare_list(other.m_epoch - 1u);
+            if (other.spare_list_) other.retag_spare_list(m_epoch - 1u);
+        }
+        // move_from() into an owner that held nothing: other's list follows
+        // its content here (both epochs advanced by one).
+        XOFFSET_DETAIL_COLD void take_spare_list(XBufferCore& other) noexcept {
+            spare_list_.swap(other.spare_list_);
+            other.drop_spare_watch();
+            if (spare_list_) retag_spare_list(other.m_epoch - 1u);
+        }
+        // A clone holds src's bytes: src's list applies to it as it is.
+        XOFFSET_DETAIL_COLD void copy_spare_watch(const XBufferCore& src) noexcept {
+            if (!src.spare_list_ || src.spare_list_->epoch != src.m_epoch) return;
+            if (!spare_list_) {
+                spare_list_.reset(new (std::nothrow) SpareList{});
+                if (!spare_list_) return;
+            }
+            *spare_list_ = *src.spare_list_;
+            spare_list_->epoch = m_epoch;
+            send_flags_.spare_watch = spare_list_->count != 0;
+        }
+        // Registers the head at payload offset `head` (note_spare_head), or
+        // refreshes its entry. A full list replaces its entry of least spare
+        // when this head has more. Without host memory nothing is recorded:
+        // the image then goes as the free bytes alone decide.
+        XOFFSET_DETAIL_COLD void note_spare(std::uint32_t head, std::uint32_t elem) noexcept {
+            if (buffer_.size() < min_payload_size()) return;
+            SpareList::Entry entry{head, elem, 0};
+            if (!read_spare(buffer_.data(), used_end_clamped(), entry)) return;
+            if (!spare_list_) {
+                spare_list_.reset(new (std::nothrow) SpareList{});
+                if (!spare_list_) return;
+            }
+            SpareList& list = *spare_list_;
+            if (list.epoch != m_epoch) {
+                list.count = 0;
+                list.epoch = m_epoch;
+            }
+            send_flags_.spare_watch = true;
+            for (std::uint32_t i = 0; i < list.count; ++i)
+                if (list.entries[i].head == head) {
+                    list.entries[i] = entry;
+                    return;
+                }
+            std::uint32_t slot = list.count;
+            if (slot == spare_watch_slots) {
+                slot = 0;
+                for (std::uint32_t i = 1; i < list.count; ++i)
+                    if (list.entries[i].spare < list.entries[slot].spare) slot = i;
+                if (list.entries[slot].spare >= entry.spare) return;
+            } else {
+                ++list.count;
+            }
+            list.entries[slot] = entry;
+        }
+
+    private:
         friend struct detail::VerifiedPathsAccess;
         friend struct detail::DeltaAccess;
         friend struct fixed_detail::StableEraseOwnerWitness;
@@ -3128,7 +3290,16 @@ namespace XOffsetDatastructure {
         // and the allocations of a fresh message find all of it there.
         // Growth (maximum capacity, zero watermark) and the owner record
         // follow. Fields of different access keep this declaration order.
-        alignas(64) bool free_table_lost_ = false;
+        // free_table_lost: a free block could not be recorded, or the content
+        // came from an unverified load (free_table_complete()); spare_watch:
+        // spare_list_ may hold heads (spare_watched()). save_small_into reads
+        // both in one load (send_flags_clear()).
+        struct SendFlags {
+            bool free_table_lost = false;
+            bool spare_watch = false;
+        };
+        static_assert(sizeof(SendFlags) == 2);
+        alignas(64) SendFlags send_flags_;
 
     protected:
         // XBuffer's flag for an open direct reload (VerifiedReloadToken),
@@ -3193,6 +3364,9 @@ namespace XOffsetDatastructure {
         // content). The scope closes on it (pin_close_bare_slow). It stays
         // with this object, not with the content.
         detail::XCtl* handoff_ = nullptr;
+        // The spare watch's heads (note_spare); host only, allocated by the
+        // first registration.
+        std::unique_ptr<SpareList> spare_list_;
     };
 } // namespace XOffsetDatastructure
 
