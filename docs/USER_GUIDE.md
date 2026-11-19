@@ -406,10 +406,14 @@ in.read([](const Profile& r) { print(r.name.view()); });   // read plain members
   wire has an extent table after the header; see [WIRE_FORMAT.md](WIRE_FORMAT.md) section 3). By
   default (`XWireEmission::automatic`) a buffer whose free blocks are at least 512 bytes and an
   eighth of the image (after many edits) is sent as its compact wire (`save_compact`, below):
-  the same contents, laid out afresh, faster to send and receive than the churned image. Any
-  other buffer is sent as its image; only the bodies of free blocks in runs that are "at least
-  4 KiB long and made of free blocks of at least 1 KiB" are skipped (for example the hole left by
-  deleting many records at once), and the rest is copied in one go.
+  the same contents, laid out afresh, faster to send and receive than the churned image. Spare
+  capacity counts too: a vector that grew to at least 1 KiB of capacity and then shrank to a
+  quarter of it or less (`pop_back`, `erase`, `resize`, `clear`, `stable_erase_if`, a shorter
+  assign) is remembered by its buffer (up to 8 of them, on the host only), and its spare is
+  added to the free bytes for this choice. Any other buffer is sent as its image; only the
+  bodies of free blocks in runs that are "at least 4 KiB long and made of free blocks of at least
+  1 KiB" are skipped (for example the hole left by deleting many records at once), and the rest
+  is copied in one go.
   `XSaveOptions{.emission = XWireEmission::free_runs}` always sends the image, and
   `XSaveOptions{.emission = XWireEmission::dense}` forces a full copy of it.
 - When sending across machines you can turn on zero-run omission:

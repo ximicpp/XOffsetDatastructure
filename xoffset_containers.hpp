@@ -1506,6 +1506,7 @@ namespace XOffsetDatastructure {
                     T* items = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta);
                     [[maybe_unused]] const size_type old_size = size_;
                     std::memmove(static_cast<void*>(items), other.data(), std::size_t(count) * sizeof(T));
+                    note_shrinking(count);
                     size_ = count;
                     if constexpr (detail::scrub_erased)
                         if (old_size > count)
@@ -1588,9 +1589,17 @@ namespace XOffsetDatastructure {
                     }
                 }
             }
-            return (*this = static_cast<const XVectorCore&>(other));
+            return copy_assign_out_of_line(other);
         }
 
+    private:
+        // A move between payloads copies, out of line, so the move above
+        // (a relocation within one payload) stays small enough to inline.
+        XOFFSET_DETAIL_NOINLINE XVectorCore& copy_assign_out_of_line(const XVectorCore& other) {
+            return *this = other;
+        }
+
+    public:
         // Bound = the head lies in a registered payload. Each call is one
         // owner-table read: callers look the binding up only to allocate,
         // grow or retire a block, once per operation (WIRE_FORMAT, owner by address).
@@ -1673,7 +1682,16 @@ namespace XOffsetDatastructure {
         T& back() noexcept { return live_data()[size_ - 1]; }
         const T& back() const noexcept { return live_data()[size_ - 1]; }
 
-        void clear() noexcept { truncate(0); }
+        // truncate(0), with the old-size hook (note_cleared).
+        void clear() noexcept {
+            const auto old_size = size_;
+            if (old_size == 0) return;
+            if constexpr (!std::is_trivially_destructible_v<T>)
+                fixed_detail::destroy_n_in(binding(), data(), old_size);
+            size_ = 0;
+            note_cleared(old_size);
+            scrub(0, old_size);
+        }
 
         // Destroys the elements from count on with one binding lookup (rule 5).
         void truncate(size_type count) noexcept {
@@ -1682,6 +1700,7 @@ namespace XOffsetDatastructure {
             if constexpr (!std::is_trivially_destructible_v<T>)
                 fixed_detail::destroy_n_in(binding(), data() + count, old_size - count);
             size_ = count;
+            note_shrunk(old_size, count);
             scrub(count, old_size);
         }
 
@@ -1763,7 +1782,7 @@ namespace XOffsetDatastructure {
         // allocator control bytes that allocation itself mutates are not a
         // stable source range. No default construction or old-prefix copy is
         // needed for these implicit-lifetime, trivially destructible objects.
-        void assign_range(std::span<const T> values)
+        XOFFSET_DETAIL_INLINE void assign_range(std::span<const T> values)
             requires (!std::is_const_v<T> && !std::is_volatile_v<T> &&
                       std::is_trivially_copyable_v<T> &&
                       std::is_trivially_copy_constructible_v<T> &&
@@ -1803,7 +1822,7 @@ namespace XOffsetDatastructure {
         // src, which need not be aligned for T (a message or file buffer): the
         // bytes are copied as they are (memmove) and no T* to src is formed.
         // The same overlap rules as assign_range.
-        void assign_bytes(const void* src, std::size_t count)
+        XOFFSET_DETAIL_INLINE void assign_bytes(const void* src, std::size_t count)
             requires (!std::is_const_v<T> && !std::is_volatile_v<T> &&
                       std::is_trivially_copyable_v<T> &&
                       std::is_trivially_copy_constructible_v<T> &&
@@ -1811,13 +1830,16 @@ namespace XOffsetDatastructure {
             if (count > capacity_)
                 XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::array_bytes<T>(count), );
             const auto n = checked_count(count);
-            if (n == 0) { clear(); return; }
+            // No element: clear() out of line, so that with the spare watch's
+            // hooks the function stays small enough to inline.
+            if (n == 0) { clear_out_of_line(); return; }
             // n <= capacity_ means a live block, so the head is bound; only
             // assign_range_regrow looks the binding up.
             const auto bytes = static_cast<std::uint32_t>(n * sizeof(T));
             if (n <= capacity_) {
                 const auto old_size = size_;
                 std::memmove(data(), src, bytes);
+                note_shrinking(n);
                 size_ = n;
                 scrub(n, old_size);
                 return;
@@ -1836,6 +1858,8 @@ namespace XOffsetDatastructure {
             }
             assign_range_regrow(src, n, bytes);
         }
+
+        XOFFSET_DETAIL_NOINLINE void clear_out_of_line() noexcept { clear(); }
 
         // assign_bytes into a fresh block; out of line, so the in-capacity
         // path above stays small enough to inline at the caller.
@@ -1977,6 +2001,7 @@ namespace XOffsetDatastructure {
                 }
             }
             size_ = write; // publication follows the complete no-throw commit
+            note_shrunk(original_size, write);
             scrub(write, original_size);
             return removed;
         }
@@ -1994,6 +2019,7 @@ namespace XOffsetDatastructure {
             T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + last;
             fixed_detail::destroy_n(slot, 1);
             size_ = last;
+            note_popped(last);
             if constexpr (detail::scrub_popped) std::memset(static_cast<void*>(slot), 0, sizeof(T));
             else if constexpr (detail::settles_vacated_heads<T>()) detail::empty_vacated_slot(slot);
         }
@@ -2418,16 +2444,16 @@ namespace XOffsetDatastructure {
             return data() + index;
         }
 
+        // One hook for every branch below (a second inline copy of it was
+        // enough for clang to stop inlining the flat map and set erase).
         void erase_index(size_type index) {
             if (index >= size_) return;
             if (index + 1 == size_) {
                 // With XOFFSET_SCRUB_ERASED, erase zeroes the slot when
                 // pop_back does not.
-                pop_back();
+                pop_last();
                 if constexpr (detail::scrub_erased && !detail::scrub_popped) scrub(size_, size_ + 1);
-                return;
-            }
-            if constexpr (std::is_trivially_copyable_v<T>) {
+            } else if constexpr (std::is_trivially_copyable_v<T>) {
                 // size_ > 1 names a live block. The head stays in registers
                 // across the move (compilers reload it after the memmove
                 // otherwise); the vacated slot is zeroed as by scrub(n - 1, n).
@@ -2465,7 +2491,9 @@ namespace XOffsetDatastructure {
                 rebuild(size_ - 1, capacity_, [&](T* dst, size_type i) {
                     fixed_detail::transfer_construct(dst, data()[i < index ? i : i + 1], alloc);
                 });
+                return;
             }
+            note_popped(size_);
         }
 
         template <typename Construct>
@@ -2588,6 +2616,7 @@ namespace XOffsetDatastructure {
             if (count <= size_) {
                 const auto old_size = size_;
                 size_ = count;
+                note_shrunk(old_size, count);
                 scrub(count, old_size);
                 return;
             }
@@ -2674,6 +2703,77 @@ namespace XOffsetDatastructure {
         }
 
     private:
+        // Spare watch (XBufferCore::note_spare_head): a shrink in place that
+        // takes the size from above a quarter of the capacity to a quarter or
+        // below registers the head, when the capacity holds at least
+        // spare_watch_min_bytes. Growth leaves the size above half of the
+        // capacity, so the crossing follows a real shrink. Inline, each hook
+        // is one compare (the capacity, or the old size) and a branch; the
+        // rest is one more compare (one element removed) or out of line.
+        // A function, not a data member: MSVC evaluates a static data
+        // member's initializer when the class is instantiated, where T may
+        // still be incomplete (a node holding an XVector of itself).
+        static constexpr size_type spare_watch_min_capacity() noexcept {
+            return static_cast<size_type>((XBufferCore::spare_watch_min_bytes + sizeof(T) - 1u) / sizeof(T));
+        }
+        // pop_back without the watch, for erase_index (one hook after its
+        // branches): size_ > 0, which names a live block (no null test).
+        size_type pop_last() {
+            const size_type last = size_ - 1u;
+            T* const slot = fixed_detail::resolve_rel32_live<T>(&data_delta, data_delta) + last;
+            fixed_detail::destroy_n(slot, 1);
+            size_ = last;
+            if constexpr (detail::scrub_popped) std::memset(static_cast<void*>(slot), 0, sizeof(T));
+            else if constexpr (detail::settles_vacated_heads<T>()) detail::empty_vacated_slot(slot);
+            return last;
+        }
+        // One element removed (pop_back, erase): the size passes every value,
+        // so the crossing is the size reaching a quarter. The compiler fence
+        // makes the quarter test read the capacity again, so the capacity test
+        // compares memory directly instead of loading a register for both
+        // (one instruction fewer on every pop of a small container).
+        XOFFSET_DETAIL_INLINE void note_popped(size_type new_size) const noexcept {
+            if (capacity_ >= spare_watch_min_capacity()) [[unlikely]] {
+                std::atomic_signal_fence(std::memory_order_seq_cst);
+                if (new_size == (static_cast<size_type>(capacity_) >> 2)) [[unlikely]]
+                    XBufferCore::note_spare_head(this, static_cast<std::uint32_t>(sizeof(T)));
+            }
+        }
+        // Several removed (truncate, resize, remove): the capacity test
+        // inline, the crossing test out of line.
+        XOFFSET_DETAIL_INLINE void note_shrunk(size_type old_size, size_type new_size) const noexcept {
+            if (capacity_ >= spare_watch_min_capacity()) [[unlikely]] note_shrunk_cold(old_size, new_size);
+        }
+        // All removed (clear): a crossing needs the old size, which is in a
+        // register, above a quarter of the minimum capacity, so the inline
+        // test reads no memory (a capacity load there is one a refill loop
+        // after the clear may keep, which cost reloc's push_back loop an
+        // instruction per element).
+        XOFFSET_DETAIL_INLINE void note_cleared(size_type old_size) const noexcept {
+            if (old_size > spare_watch_min_capacity() / 4u) [[unlikely]] note_shrunk_cold(old_size, 0);
+        }
+        XOFFSET_DETAIL_COLD void note_shrunk_cold(size_type old_size, size_type new_size) const noexcept {
+            if (capacity_ < spare_watch_min_capacity()) return;
+            const size_type quarter = static_cast<size_type>(capacity_) >> 2;
+            if (new_size <= quarter && old_size > quarter)
+                XBufferCore::note_spare_head(this, static_cast<std::uint32_t>(sizeof(T)));
+        }
+        // An assign in place (any new size), after the copy and before the
+        // size is stored: the capacity test inline, compared with memory
+        // after the copy; out of line the old size is read from the head, so
+        // no register holds it across the copy. The out-of-line part stores
+        // the new size itself before it registers (the caller stores the same).
+        XOFFSET_DETAIL_INLINE void note_shrinking(size_type new_size) noexcept {
+            if (capacity_ >= spare_watch_min_capacity()) [[unlikely]] note_shrinking_cold(new_size);
+        }
+        XOFFSET_DETAIL_COLD void note_shrinking_cold(size_type new_size) noexcept {
+            const size_type quarter = static_cast<size_type>(capacity_) >> 2;
+            if (new_size <= quarter && size_ > quarter) {
+                size_ = new_size;
+                XBufferCore::note_spare_head(this, static_cast<std::uint32_t>(sizeof(T)));
+            }
+        }
+
         // M4 (threat model T5/P2, XOFFSET_SCRUB_ERASED): storage of destroyed
         // elements is zeroed, so a later save does not emit the old values as
         // spare capacity. Without it the bytes stay until an append
@@ -2919,8 +3019,10 @@ namespace XOffsetDatastructure {
             }
         }
 
+        // Clang: inline at the caller (find plus one erase_index), as it
+        // chose before the spare watch's hook made erase_index larger.
         template <typename KeyLike>
-        std::uint32_t erase(const KeyLike& key) {
+        XOFFSET_DETAIL_INLINE_CLANG std::uint32_t erase(const KeyLike& key) {
             auto it = find(key);
             if (it == Base::end()) return 0;
             auto index = static_cast<std::uint32_t>(it - Base::begin());
@@ -3112,8 +3214,9 @@ namespace XOffsetDatastructure {
             return value_base::data() + index;
         }
 
+        // Clang: inline at the caller, as XSet::erase.
         template <typename KeyLike>
-        std::uint32_t erase(const KeyLike& key) {
+        XOFFSET_DETAIL_INLINE_CLANG std::uint32_t erase(const KeyLike& key) {
             auto it = find(key);
             if (it == value_base::end()) return 0;
             erase_at(it);
