@@ -184,13 +184,10 @@ void later_word_hole_is_found_after_clone() {
     need(same_free_table(c, src) && same_free_table(target, src), "free table after split diverged");
 }
 
-// A copied table's bins were assigned, so it counts as grown: the first
-// keep-recycle (reload_verified) must take the full path and drop bin storage
-// over keep_bin_entries, as it does for the source, whose bin grew by
-// insertion. Taking the fast path would keep the copy's 100-entry bin, and
-// refilling it would then need no host allocation where the source needs some.
-void copied_table_first_recycle_applies_limits() {
-    constexpr int holes = 100; // > keep_bin_entries (64)
+// After a reload, refilling a clone or a clone_into target makes the same
+// host allocations as refilling the source.
+void clone_refills_like_source() {
+    constexpr int holes = 100;
     auto fill = [](XBuffer& b) {
         std::vector<void*> p;
         for (int i = 0; i < holes; ++i) {
@@ -202,21 +199,19 @@ void copied_table_first_recycle_applies_limits() {
     };
     const auto wire = XBuffer::create<CloneRoot>(1u << 16, cap()).save_verified<CloneRoot>();
     auto refill_calls = [&](XBuffer& b) {
-        b.reload_verified<CloneRoot>(wire); // keep-recycle of b's table
+        b.reload_verified<CloneRoot>(wire);
         const auto before = host_new::calls;
         fill(b);
         return host_new::calls - before;
     };
-    XBufferCore::trim_free_table_cache();
     auto src = XBuffer::create<CloneRoot>(1u << 16, cap());
     fill(src);
     auto c = src.clone();
     auto target = XBuffer::create<CloneRoot>(4096, cap());
     src.clone_into(target);
     const auto from_src = refill_calls(src);
-    need(from_src > 0, "the source's over-limit bin kept its storage");
-    need(refill_calls(c) == from_src, "clone: first keep-recycle kept bin storage over the limit");
-    need(refill_calls(target) == from_src, "clone_into: first keep-recycle kept bin storage over the limit");
+    need(refill_calls(c) == from_src, "clone: refill after a reload differs from the source");
+    need(refill_calls(target) == from_src, "clone_into: refill after a reload differs from the source");
 }
 
 void wire_identical_and_round_trip() {
@@ -422,7 +417,7 @@ int main() {
         clone_is_independent();
         free_table_and_allocation_match();
         later_word_hole_is_found_after_clone();
-        copied_table_first_recycle_applies_limits();
+        clone_refills_like_source();
         wire_identical_and_round_trip();
         clone_into_reuses_destination();
         explicit_growth_keeps_room();

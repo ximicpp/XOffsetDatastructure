@@ -1,7 +1,7 @@
 # Reusing one XBuffer (4.1.0, experimental API)
 
 When many KB-sized messages are sent and received one by one, the fixed cost of creating and destroying
-an `XBuffer` per message (mapping, owner registration, free table) exceeds the serialization itself.
+an `XBuffer` per message (mapping, owner registration) exceeds the serialization itself.
 Besides reusing mappings with `XBufferPool`, each side can keep one long-lived buffer and reuse it per
 message:
 
@@ -111,7 +111,7 @@ buf.clone_into(scratch);      // reuses scratch
   source, and copies the source's used region over; `clone_into(dst)` copies the same content into dst,
   reusing dst's mapping, address and owner registration; dst's `maximum_capacity` and growth policy do
   not change, and its size becomes the source's size (not above dst's limit).
-- The free table is carried over as is (an incomplete free table stays incomplete), so when the copy and
+- The free blocks are carried over as they are (an incomplete free state stays incomplete), so when the copy and
   the source then make the same changes, allocation positions and bytes are identical; the
   `save_verified` output equals the source's. Typed root access and schema binding carry over too: an
   unvalidated source still only allows `unsafe_root<T>()` after copying.

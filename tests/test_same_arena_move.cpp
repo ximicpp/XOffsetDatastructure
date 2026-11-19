@@ -401,28 +401,24 @@ void reloaded_moves() {
 
 void retire_metadata_failure() {
     auto buffer = make_buffer(); auto& r = buffer.root<MoveRoot>();
-    // V2 retirement records every block in the host-side free table (here the
-    // large-block table). Its host bookkeeping allocation may fail; the noexcept
-    // retirement swallows it and marks the table incomplete, and save_verified
-    // recomputes the hole table from the live graph.
+    // A retirement records the block in the payload (the free directory): a
+    // failing host allocation is never reached, and nothing is lost.
     r.a.resize(100000); r.a[99999] = 8; r.b.push_back(500); r.b.push_back(501);
     auto* source = r.b.data(); const auto sb = r.b.binding();
     require(buffer.free_table_complete(), "fixture free table already incomplete");
     { new_failure::Arm arm(0); r.a = std::move(r.b); }
     retire_new_attempts += new_failure::attempts; retire_new_hits += new_failure::hits;
-    // The in-band allocator records the block in the payload: no host allocation.
-    require(new_failure::hits == (detail::inband_allocator ? 0u : 1u),
-            "fresh large-retirement host allocation failpoint not reached");
+    // The allocator records the block in the payload: no host allocation.
+    require(new_failure::hits == 0u, "large retirement made a host allocation");
     require(r.a.data() == source && r.a.size() == 2 && r.a[0] == 500 && r.a[1] == 501,
         "retirement metadata OOM broke ownership commit");
-    require(buffer.free_table_complete() == detail::inband_allocator,
-            "lost retirement was not recorded as an incomplete free table");
+    require(buffer.free_table_complete(), "the retirement lost its free block");
     require_empty_reusable_binding(r.b, sb); r.b.push_back(999);
     verified_roundtrip(buffer);
-    // (In-band nothing was lost: the freed block's end holds the free directory
-    // and r.b's new 32-byte block is its front.)
+    // (Nothing was lost: the freed block's end holds the free directory and
+    // r.b's new 32-byte block is its front.)
     require(buffer.free_table_complete() &&
-            buffer.free_block_bytes() + buffer.free_directory().bytes >= 400000 - (detail::inband_allocator ? 32 : 0),
+            buffer.free_block_bytes() + buffer.free_directory().bytes >= 400000 - 32,
         "save_verified did not recompute the lost hole");
     // The fresh owner has no earlier core-retired block. This observes an actual
     // hook exception, not an allocation callsite inferred from its request size.
