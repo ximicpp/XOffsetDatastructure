@@ -115,7 +115,17 @@ namespace detail {
         // of T left them, and T's fingerprint in the image header), a
         // complete free state, and a used end below save_small_max. Anything
         // else takes save_into_general, which runs them all.
-        if (!source.template root_is<T>() || !source.free_table_complete()) return false;
+        // Without Band (each message's first test) one load tests the free
+        // state and the spare watch together; a buffer whose watch holds
+        // heads sends with automatic emission through save_watched_into.
+        if (!source.template root_is<T>()) return false;
+        if constexpr (Band) {
+            if (!source.free_table_complete()) return false;
+        } else if (!source.send_flags_clear()) [[unlikely]] {
+            if (source.spare_watched() && emission == XWireEmission::automatic)
+                return save_watched_into<T>(source, out);
+            if (!source.free_table_complete()) return false;
+        }
         const auto* image = static_cast<const char*>(source.get_address());
         const auto* arena = std::launder(reinterpret_cast<const XBufferCore::arena_header*>(image));
         const std::size_t used = arena->used_end;
@@ -170,6 +180,27 @@ namespace detail {
         out.assign(image, used);
 #endif
         return true;
+    }
+
+    // The automatic emission of a buffer whose spare watch holds heads
+    // (save_into's small path): the watched spare counts with the free bytes
+    // (watched_spare_bytes, read only when the free bytes alone keep the
+    // image), and a churned image goes compact as for any buffer. An image
+    // that stays the image takes the band copy; false: save_into_general
+    // sends it (the free bytes alone keep it there).
+    template<class T>
+    XOFFSET_DETAIL_NOINLINE bool VerifiedPathsAccess::save_watched_into(XBufferCore& source, std::string& out) {
+        if constexpr (compact_direct_supported<T>()) {
+            if (!source.free_table_complete()) [[unlikely]] (void)header<T>(source);
+            const auto* arena = source.arena();
+            if (arena && (wire_prefers_compact(arena->used_end, arena->free_bytes) ||
+                          wire_prefers_compact(arena->used_end, arena->free_bytes + source.watched_spare_bytes()))) {
+                constexpr auto slack_div = XCompactOptions{}.slack_div;
+                if (!try_save_compact_into<T>(source, out, slack_div)) save_compact_into<T>(source, out, XCompactOptions{});
+                return true;
+            }
+        }
+        return save_small_into<T, true>(source, out, XWireEmission::automatic);
     }
 
     template<class T>

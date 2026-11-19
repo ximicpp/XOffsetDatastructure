@@ -81,12 +81,31 @@ of this file and in the pull requests.
   12 KB of image the trusted pair is 0.85 to 1.17 of before (copying an image that stays in L1
   costs about as much as the compact walk; 2.9 KB Character about +5%, still 0.41 of zpp::bits),
   the checked pair 0.52 to 0.75. Spare capacity inside containers (no free block) is not in the
-  header and still goes as the image.
+  header; the next entry counts it.
   SLG demo, M scale (time): B 0.82, S save and receive 0.57-0.86, A 0.98 (its responses: 9% of
   them go compact, a ~4 KB message of many small blocks, +5.8% for encode plus decode). SLG
   instructions (GCC 16 / P2996): A 0.996 / 1.005, B 0.980 / 0.974, C 1.000 / 1.000, D 0.978 /
   1.000; on P2996 slg.A rises in `A.apply`, battle results written into players that arrived
   compact (small vectors without spare capacity), not in a send or receive.
+- The automatic emission counts spare capacity. A vector grown in place and shrunk back keeps its
+  spare capacity inside its live block, where the header's free bytes do not see it, so such an
+  image went out whole (the premises g8 cells, every vector grown 8 times and shrunk back: 7 to
+  10 times zpp::bits). A container whose size falls from above a quarter of its capacity to a
+  quarter or below, with a capacity of at least 1 KiB, now registers its head in a host-side list
+  of up to 8 heads (allocated on the first registration, never on the wire). When the free bytes
+  alone keep the image, the automatic emission reads the listed heads from the image, drops the
+  ones grown back above half of their capacity or no longer read as a head inside `used_end`, and
+  applies the same rule to the free bytes plus the spare. The list follows move, swap and clone;
+  reload and reset drop it. Every in-place shrink registers (`pop_back`, `erase`, map erase,
+  `resize`, `clear`, `stable_erase_if`, a shorter `assign_range`/`assign_bytes`, POD assignment);
+  `XString` does not. Premises sweep (GCC 16, 15 processes, send plus receive ÷ zpp::bits): g8
+  trusted 1.38-8.83 -> 0.32-0.59, full check 2.28-10.01 -> 0.57-0.75, the wire now the compact
+  wire (12,392 -> 992 bytes at k = 1/4, 717,680 -> 53,184 at k = 16); k = 1/4 g4 likewise
+  (0.71 -> 0.47); the other 442 cells send the same bytes with at most 3 more instructions per
+  message (30 of them 13 to 62 fewer). Instructions (ops cells, GCC 16): push
+  and pop +1, append 8 and resize back +2, insert and erase in the middle of a vector +4, map
+  insert and erase +6; the clean send unchanged (the flag shares the free state's 16-bit word: one
+  load and compare); checked receive -12 (`reload_into`'s small path is inline).
 - Fixed: a client that includes `<windows.h>` before the library compiles again (a variable in
   `save_delta_into` was named `small`, which `rpcndr.h` defines as a macro).
 - `xoffsetdatastructure.hpp` includes seven parts in its former order: `xoffset_arena.hpp`,
