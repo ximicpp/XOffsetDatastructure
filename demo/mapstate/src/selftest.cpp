@@ -112,12 +112,25 @@ std::vector<XB::WireHole> holes(const XB& b) {
     return v;
 }
 
-// Hole table straight from the wire: [header][extents][payload][holes].
+// Free blocks straight from a dense wire (the image): the free directory at
+// header.free_dir, {n, cap} then {size, head} per size, each size's blocks
+// linked through their first word.
 std::vector<XB::WireHole> wire_holes(const std::string& w) {
-    XOffsetDatastructure::XWireHeaderV2 h{};
+    XOffsetDatastructure::XWireHeader h{};
     std::memcpy(&h, w.data(), sizeof h);
-    std::vector<XB::WireHole> v(h.hole_count);
-    std::memcpy(v.data(), w.data() + w.size() - h.hole_count * sizeof(XB::WireHole), h.hole_count * sizeof(XB::WireHole));
+    std::vector<XB::WireHole> v;
+    if (h.free_dir == 0 || h.extent_count != 0 || w.size() != h.used_bytes) return v;
+    const auto word = [&](std::uint32_t at) {
+        std::uint32_t x = 0;
+        if (std::size_t(at) + 4 <= w.size()) std::memcpy(&x, w.data() + at, 4);
+        return x;
+    };
+    const std::uint32_t n = word(h.free_dir);
+    for (std::uint32_t i = 0; i < n; ++i) {
+        const std::uint32_t size = word(h.free_dir + 8 + 8 * i);
+        for (std::uint32_t at = word(h.free_dir + 12 + 8 * i); at != 0 && v.size() <= w.size() / 8; at = word(at))
+            v.push_back(XB::WireHole{at, size});
+    }
     std::sort(v.begin(), v.end(), [](XB::WireHole a, XB::WireHole c) { return a.offset < c.offset; });
     return v;
 }
@@ -189,7 +202,7 @@ void test_reuse(bool via_reload) {
         const auto before_save = holes(b);
         const std::string wire = b.save_verified<UnitStateBatch>();
         const auto wh = wire_holes(wire);
-        rx(same_holes(wh, before_save), "wire hole table " + holes_text(wh) + " != in-memory " + holes_text(before_save));
+        rx(same_holes(wh, before_save), "wire free blocks " + holes_text(wh) + " != in-memory " + holes_text(before_save));
         XB fresh;
         if (via_reload) b.reload_verified<UnitStateBatch>(wire);
         else fresh = XB::load_verified<UnitStateBatch>(wire, cap_batch());
@@ -352,11 +365,11 @@ void failure_inputs(const char* point, const std::string& good, const std::strin
         ex(false, std::string("valid wire rejected: ") + e.what());
     }
     detail += expect_reject<T>(ex, "truncated_1", good.substr(0, good.size() - 1), real_cap) + " ";
-    detail += expect_reject<T>(ex, "header_only", good.substr(0, sizeof(XOffsetDatastructure::XWireHeaderV2)), real_cap) + " ";
+    detail += expect_reject<T>(ex, "header_only", good.substr(0, sizeof(XOffsetDatastructure::XWireHeader)), real_cap) + " ";
     detail += expect_reject<T>(ex, "empty", std::string(), real_cap) + " ";
     detail += expect_reject<T>(ex, "wrong_schema", other, real_cap) + " ";
     // used_bytes over the receiver's maximum_capacity (a cap one byte below the wire's used size).
-    XOffsetDatastructure::XWireHeaderV2 h{};
+    XOffsetDatastructure::XWireHeader h{};
     std::memcpy(&h, good.data(), sizeof h);
     detail += expect_reject<T>(ex, "over_cap", good, small_cap(std::size_t(h.used_bytes) - 1)) + " ";
     // A header that claims a huge used size.

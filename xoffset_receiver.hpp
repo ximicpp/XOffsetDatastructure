@@ -9,8 +9,8 @@
 // client connection's receiver as server_peer is not caught by the types.
 // XOFFSET_FORCE_FULL_CHECK=1 (the default without NDEBUG and under
 // sanitizers) runs the full check wherever admit was chosen. The input is a
-// V2 wire: admit runs the same parse and copy as full and skips only the
-// graph walk.
+// wire 3.0 image: admit runs the same parse and copy as full and skips the
+// graph walk and the check of the free blocks.
 
 #include "xoffsetdatastructure.hpp"
 #include "xoffset_shared_delta.hpp"
@@ -19,10 +19,10 @@ namespace XOffsetDatastructure {
 
 enum class XLink : std::uint8_t { server_peer, from_server, from_client };
 enum class XCheck : std::uint8_t {
-    // The wire framing only: magic, flags, root type id and schema hash,
-    // used_bytes within the maximum capacity, the extent and hole tables'
-    // lengths, the root object and every hole (an aligned 8-byte multiple)
-    // inside the payload; no walk of the object graph. A delta: its framing,
+    // The wire framing only: magic, header size, root type id and schema
+    // hash, used_bytes within the maximum capacity, the extent table and the
+    // length, the root object inside the image; no walk of the object graph,
+    // and the free blocks are taken as they are. A delta: its framing,
     // stream and version, every block and hole inside the used payload, the
     // root inside it. For a sender that is our own code over a protected
     // transport with the same schema. The result is mutable.
@@ -94,11 +94,10 @@ namespace detail {
 
     // ---- XCheck::bounds (views of client uplinks) -------------------------
     // One walk from the root over the container heads it reaches, in the
-    // wire's bytes. Addresses are payload offsets: `base` is the address of
-    // payload offset 0 (the wire's payload bytes start at offset 48), held as
-    // an integer because it lies before the wire. Every block a head names
-    // must lie in [48, used) and be aligned; nothing else in the payload is
-    // read before it is checked. Blocks may overlap (a view only reads), so
+    // wire's bytes. Addresses are image offsets: `base` is the address of
+    // the wire's first byte (a dense wire is the image), held as an integer.
+    // Every block a head names must lie in [40, used) and be aligned;
+    // nothing else in the image is read before it is checked. Blocks may overlap (a view only reads), so
     // the element bytes walked are counted against `budget` (the payload
     // size): one small wire cannot make the walk revisit one block many times.
     struct BoundsWalk {
@@ -205,23 +204,18 @@ namespace detail {
         }
     }
 
-    // The header fields of a dense wire for T that do not depend on the
-    // payload, as words (used_bytes, root_offset, hole_count and extent_count 0).
+    // The header words of a wire for T that do not depend on the image:
+    // the magic and header size, then the fingerprint.
     template <typename T>
-    constexpr std::array<std::uint64_t, 5> view_wire_image() noexcept {
-        XWireHeaderV2 h{};
-        h.magic = XWIRE_MAGIC;
-        h.flags = XWIRE_FLAGS;
-        h.schema_hash = wire_schema_hash<T>();
-        h.root_type_id = wire_root_type_id<T>();
-        return std::bit_cast<std::array<std::uint64_t, 5>>(h);
+    constexpr std::array<std::uint64_t, 3> view_wire_image() noexcept {
+        return {XBufferCore::image_magic, wire_schema_hash<T>(), wire_root_type_id<T>()};
     }
 
     // The framing a view needs, as a status with the error the full check
     // would give for the same header (only reached when the fast test fails).
     template <typename T>
     vstatus view_framing_error(std::span<const std::byte> wire, std::size_t cap, const char* who) {
-        XWireHeaderV2 header;
+        XWireHeader header;
         XOFFSET_VTRY(read_wire_header(wire.data(), wire.size_bytes(), who, header));
         if (header.root_type_id != wire_root_type_id<T>())
             XOFFSET_VFAIL(XException, XErrc::root_type_mismatch, std::string(who) + ": root type id mismatch");
@@ -384,11 +378,12 @@ public:
     /// build sets XOFFSET_CHECK_UPLINK=0) walks the containers once so that no
     /// const access reads outside the payload; XCheck::admit (the default
     /// otherwise) checks the framing and that the root lies in the payload.
-    /// Either way the framing is checked as for reload (magic, flags, root type and schema
-    /// fingerprint, used_bytes within maximum_capacity(), root offset, section
-    /// lengths). The wire must be dense (no extent table: wires below 4 KiB
-    /// always are, larger ones when sent with XWireEmission::dense), start on
-    /// an 8-byte boundary, and outlive the view. With XOFFSET_FORCE_FULL_CHECK
+    /// Either way the framing is checked as for reload (magic, header size, root type and schema
+    /// fingerprint, used_bytes within maximum_capacity() and equal to the wire's
+    /// length). The wire must be dense (no extent table: the default emission
+    /// sends an image whose free blocks hold less than 4 KiB dense, and
+    /// XWireEmission::dense always does), start on an 8-byte boundary, and
+    /// outlive the view. With XOFFSET_FORCE_FULL_CHECK
     /// the full check also runs on a copy, and what it rejects is rejected.
     template <typename T, XCheck C = default_view_check<L>>
     [[nodiscard]] XResult<XView<T>> view(std::span<const std::byte> wire) const {
@@ -396,8 +391,8 @@ public:
         static_assert(is_wire_admitted_v<T>, "XReceiver::view<T>() requires an admitted fixed-schema wire type.");
         constexpr const char* who = C == XCheck::bounds ? "XReceiver::view<T, bounds>()" : "XReceiver::view<T, admit>()";
         constexpr auto image = detail::view_wire_image<T>();
-        constexpr std::size_t head = sizeof(XWireHeaderV2);
-        std::array<std::uint64_t, 5> words;
+        constexpr std::size_t head = sizeof(XWireHeader);
+        std::array<std::uint64_t, 4> words;
         if (wire.size_bytes() < head) [[unlikely]] return framing_error<T>(wire, who);
         // A view copies nothing, so the first read of each line of the wire
         // falls in the caller's use of the view, one miss after another
@@ -412,23 +407,20 @@ public:
             for (auto line = first + 64; line <= last; line += 64)
                 XOFFSET_DETAIL_PREFETCH_WITH_MSVC(reinterpret_cast<const void*>(line), 0);
         }
-        std::memcpy(words.data(), wire.data(), head);
-        const auto used = std::uint64_t(std::uint32_t(words[1]));
-        const auto root = std::uint64_t(std::uint32_t(words[1] >> 32));
-        const auto holes = std::uint64_t(std::uint32_t(words[2]));
-        // Word 0: magic, flags; word 2 high: extent_count (0: dense); 3, 4: fingerprint.
-        const std::uint64_t diff = (words[0] ^ image[0]) | (words[2] >> 32) | (words[3] ^ image[3]) | (words[4] ^ image[4]);
-        const std::uint64_t body = wire.size_bytes() - head;
-        if (diff != 0 || used < XWIRE_PAYLOAD_BEGIN || used > cap_.value || (used & 7u) != 0 ||
-            root < XWIRE_PAYLOAD_BEGIN || root >= used || used - XWIRE_PAYLOAD_BEGIN > body ||
-            body - (used - XWIRE_PAYLOAD_BEGIN) != holes * 8u) [[unlikely]]
+        std::memcpy(words.data(), wire.data(), sizeof(words));
+        // Words 0..2: magic and header size, fingerprint; word 3: used_bytes
+        // and extent_count (0: dense), the wire's size with nothing else.
+        const std::uint64_t used = wire.size_bytes();
+        const std::uint64_t diff = (words[0] ^ image[0]) | (words[1] ^ image[1]) | (words[2] ^ image[2]) |
+                                   (words[3] ^ used);
+        if (diff != 0 || used <= XWIRE_PAYLOAD_BEGIN || used > cap_.value || (used & 7u) != 0) [[unlikely]]
             return framing_error<T>(wire, who);
         if ((reinterpret_cast<std::uintptr_t>(wire.data()) & 7u) != 0) [[unlikely]]
             return XError{XErrc::invalid_argument, std::string(who) + ": the wire must start on an 8-byte boundary"};
-        // Payload offset 0 lies 8 bytes before the wire (the payload header is not sent).
-        const auto base = reinterpret_cast<std::uintptr_t>(wire.data()) + head - XWIRE_PAYLOAD_BEGIN;
-        if (sizeof(T) > used - root || (root & (alignof(T) - 1u)) != 0 ||
-            ((base + root) & (alignof(T) - 1u)) != 0) [[unlikely]]
+        // The wire is the image: offset 0 is its first byte.
+        const auto base = reinterpret_cast<std::uintptr_t>(wire.data());
+        constexpr std::uint64_t root = XWIRE_PAYLOAD_BEGIN;
+        if (sizeof(T) > used - root) [[unlikely]]
             return XError{XErrc::root_mismatch, std::string(who) + ": root not found"};
         const auto* object = reinterpret_cast<const T*>(base + root);
         if constexpr (C == XCheck::bounds) {

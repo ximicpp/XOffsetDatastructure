@@ -18,6 +18,9 @@
 # reflection build with the C++20 field-list build. TypeLayout is on the include
 # path only for C++26 flags. XOFFSET_DIFF_SAME_INPUTS=1 makes different inputs
 # (different saved wires) a failure instead of "not comparable".
+# Checkouts of different wire format majors (a format break, such as 2.1 ->
+# 3.0) are not comparable: the harness is written for HEAD's format, so the
+# script reports that and exits 0 without building.
 set -euo pipefail
 base=$1 head=$2 cases=$3
 shift 3
@@ -26,6 +29,17 @@ cxx=${CXX:-g++}
 read -r -a lang <<< "${XOFFSET_DIFF_FLAGS:--std=c++26 -freflection}"
 read -r -a base_lang <<< "${XOFFSET_DIFF_BASE_FLAGS:-${lang[*]}}"
 mkdir -p "$out"
+format_major() {   # <checkout>: XWIRE_FORMAT_MAJOR, or the image format major it names
+    grep -ohE '(XWIRE_FORMAT_MAJOR|image_format_major) = [0-9]+' "$1"/xoffset_wire.hpp "$1"/xoffset_arena.hpp 2>/dev/null |
+        grep -oE '[0-9]+$' | head -n 1
+}
+base_major=$(format_major "$base") head_major=$(format_major "$head")
+if [[ -n $base_major && -n $head_major && $base_major != "$head_major" ]]; then
+    for seed in "$@"; do
+        echo "seed $seed: wire format $base_major (base) vs $head_major (head); not comparable"
+    done
+    exit 0
+fi
 flags() {   # <checkout> <language flags...>
     local dir=$1
     shift

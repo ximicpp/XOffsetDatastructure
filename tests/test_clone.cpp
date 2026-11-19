@@ -240,7 +240,7 @@ void wire_identical_and_round_trip() {
     // An empty arena (no root yet) clones to an empty arena.
     XBuffer empty(4096, cap());
     auto ec = empty.clone();
-    need(ec.arena() && ec.arena()->root_offset == 0 && !ec.has_root<CloneRoot>(), "clone of an empty arena");
+    need(ec.arena() && ec.arena()->used_end == XBufferCore::root_at && !ec.has_root<CloneRoot>(), "clone of an empty arena");
     ec.make<CloneRoot>()->id = 6;
     need(ec.root<CloneRoot>().id == 6, "make after cloning an empty arena");
 }
@@ -314,7 +314,7 @@ void self_copy_is_refused() {
 }
 
 void expect_empty_arena(XBuffer& dst, const char* what) {
-    need(dst.arena() != nullptr && dst.arena()->root_offset == 0, what);
+    need(dst.arena() != nullptr && dst.arena()->used_end == XBufferCore::root_at, what);
     need(root_refused(dst) && !dst.has_root<CloneRoot>(), what);
     bool save_refused = false;
     try { (void)dst.save_verified<CloneRoot>(); } catch (const XException&) { save_refused = true; }

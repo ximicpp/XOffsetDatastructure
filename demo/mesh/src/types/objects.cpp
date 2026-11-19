@@ -344,16 +344,16 @@ Result<EvilPart> make_evil(TypeId type, std::uint64_t seed, Scale scale, SaveMod
             case EvilCase::SchemaHash:
                 break;
             case EvilCase::BadOffset: {
-                // A dense wire (payload right after the 40-byte header), then
+                // A dense wire (the image itself: the root at offset 40), then
                 // the trail's data offset pointed far outside the arena.
                 Result<std::string> w = save_as<X>(o->buffer(), mode, XWireEmission::dense);
                 if (!w) return std::move(w).error();
-                XWireHeaderV2 h{};
+                XWireHeader h{};
                 std::memcpy(&h, w->data(), sizeof h);
                 if (h.extent_count != 0) return Error{"make_evil: the dense wire has extents"};
                 const std::size_t field = std::size_t(reinterpret_cast<const char*>(&root.trail) -
                                                       reinterpret_cast<const char*>(&root));
-                const std::size_t at = sizeof h + (h.root_offset - XWIRE_PAYLOAD_BEGIN) + field;
+                const std::size_t at = XWIRE_PAYLOAD_BEGIN + field;
                 const std::int32_t outside = 0x3ffffff0;
                 if (at + sizeof outside > w->size()) return Error{"make_evil: trail head outside the wire"};
                 std::memcpy(w->data() + at, &outside, sizeof outside);
@@ -383,7 +383,7 @@ Result<EvilPart> make_evil(TypeId type, std::uint64_t seed, Scale scale, SaveMod
         if (!w) return std::move(w).error();
         part.wire = std::move(*w);
         if (evil == EvilCase::Truncated) part.wire.resize(part.wire.size() / 2);
-        if (evil == EvilCase::SchemaHash) part.wire[offsetof(XWireHeaderV2, schema_hash)] ^= 0x01;
+        if (evil == EvilCase::SchemaHash) part.wire[offsetof(XWireHeader, schema_hash)] ^= 0x01;
         if (part.wire.size() > protocol::kMaxDataBytes) return Error{"make_evil: the part is over 16 MiB"};
         return part;
     });

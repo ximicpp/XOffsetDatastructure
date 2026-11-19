@@ -462,6 +462,11 @@ public:
     bool can_assign_in_place(std::size_t length) const noexcept {
         return base_ != nullptr && length != 0 && length <= accessible_bytes_ && length <= maximum_capacity_;
     }
+    // can_assign_in_place for a length known not to be 0: without storage
+    // the accessible prefix is 0.
+    bool holds_in_place(std::size_t length) const noexcept {
+        return length <= accessible_bytes_ && length <= maximum_capacity_;
+    }
     bool assign_in_place(const char* bytes, std::size_t length, std::size_t at) noexcept {
         if (consume_vm_failure(VmOperation::Prepare)) return false;
         std::memcpy(base_ + at, bytes, length - at);

@@ -53,10 +53,10 @@ namespace XOffsetDatastructure {
             out.status = XPeekStatus::unsupported_version;
             return out;
         }
-        if (size < sizeof(XWireHeaderV2)) { out.status = XPeekStatus::truncated; return out; }
-        XWireHeaderV2 header;
+        if (size < sizeof(XWireHeader)) { out.status = XPeekStatus::truncated; return out; }
+        XWireHeader header;
         std::memcpy(&header, data, sizeof(header));
-        if (header.flags != XWIRE_FLAGS) { out.status = XPeekStatus::unsupported_flags; return out; }
+        if (header.header_bytes != sizeof(XWireHeader)) { out.status = XPeekStatus::unsupported_flags; return out; }
         out.status = XPeekStatus::ok;
         out.fingerprint = {header.root_type_id, header.schema_hash};
         return out;
@@ -73,7 +73,7 @@ namespace XOffsetDatastructure {
     // ---- handshake messages -------------------------------------------------
 
     inline constexpr std::uint32_t XSCHEMA_HELLO_WIRE_FORMAT =
-        (std::uint32_t(XWIRE_FORMAT_MAJOR) << 8) | XWIRE_FORMAT_MINOR;   // 0x0201
+        (std::uint32_t(XWIRE_FORMAT_MAJOR) << 8) | XWIRE_FORMAT_MINOR;   // 0x0300
     // Receive limits of a handshake message.
     inline constexpr std::size_t XSCHEMA_HELLO_MAX_BYTES = 64 * 1024;
     inline constexpr std::size_t XSCHEMA_HELLO_MAX_ENTRIES = 1024;

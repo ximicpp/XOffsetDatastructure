@@ -396,7 +396,7 @@ std::string varint(std::uint64_t v) {
 // EXTENT, used and root come from the input (often the replica's own).
 template <class Root>
 std::string header_for(Fixture<Root>& f, In& in, std::uint8_t flags, bool key) {
-    std::string h = {'X', 'D', char(0x10), char(flags)};
+    std::string h = {'X', 'D', char(0x20), char(flags)};
     std::uint64_t stream = f.cur.stream();
     std::uint32_t version = f.cur.version() + 1;
     const std::uint8_t tweak = in.u8();
@@ -406,8 +406,8 @@ std::string header_for(Fixture<Root>& f, In& in, std::uint8_t flags, bool key) {
     h += varint(version);
     if (flags & 8u) {
         const auto* sm = f.rep.arena();
-        std::uint64_t used = sm ? (sm->used_end - 48) / 8 : 0;
-        std::uint64_t root = sm ? sm->root_offset - 48 : 0;
+        std::uint64_t used = sm ? (sm->used_end - xo::XWIRE_PAYLOAD_BEGIN) / 8 : 0;
+        std::uint64_t root = 0; // the root is at 40, the payload's first byte
         const std::uint8_t e = in.u8();
         if (e & 1) used = in.u16();
         else if (e & 2) used += in.u8();

@@ -24,7 +24,7 @@ XOFFSET_RECORD_DERIVED(AllocatorFailureRoot, (), values)
 XOFFSET_REGISTER_SCHEMA_NAME(AllocatorFailureRoot,"test.AllocatorFailureRoot")
 namespace {
 using Holes=std::vector<XBufferCore::WireHole>;
-constexpr std::uint64_t payload_header_bytes=48;
+constexpr std::uint64_t payload_header_bytes=XBufferCore::root_at;
 constexpr std::uint64_t root_extent=(sizeof(AllocatorFailureRoot)+7u)&~std::uint64_t(7);
 Holes holes_of(const XBufferCore& b) { Holes out; b.for_each_free_block([&](XBufferCore::WireHole h){out.push_back(h);}); return out; }
 bool same(const Holes& a,const Holes& c) {
@@ -55,9 +55,10 @@ Outcome exercise(long n,bool cold) {
         ranges.push_back({off,off+128,0,0}); }
     auto off=std::uint64_t(static_cast<char*>(guard)-b.data());ranges.push_back({off,off+64,0,0});
     ranges.push_back({0,payload_header_bytes,0,2});
-    ranges.push_back({b.arena()->root_offset,b.arena()->root_offset+root_extent,0,0});
-    // A surviving free entry must never name live bytes or duplicate another.
-    b.for_each_free_block([&](XBufferCore::WireHole h) { ranges.push_back({h.offset,std::uint64_t(h.offset)+h.bytes,0,1}); });
+    ranges.push_back({XBufferCore::root_at,XBufferCore::root_at+root_extent,0,0});
+    // A surviving free entry (or the free directory) must never name live
+    // bytes or duplicate another.
+    b.for_each_free_region([&](XBufferCore::WireHole h) { ranges.push_back({h.offset,std::uint64_t(h.offset)+h.bytes,0,1}); });
     allocator_model::validate(ranges,b.arena()->used_end);
     if(b.free_table_complete()) allocator_model::require_exact_cover(ranges,b.arena()->used_end);
     // V2 exact coverage: unreachable raw blocks must be released before a verified save.
@@ -67,7 +68,7 @@ Outcome exercise(long n,bool cold) {
     require(b.free_table_complete(),"save_verified did not recompute the lost hole table");
     auto loaded=XBuffer::load_verified<AllocatorFailureRoot>(frame);
     require(loaded.root<AllocatorFailureRoot>().values.empty(),"post-failure wire corruption");
-    require(loaded.free_block_bytes()+payload_header_bytes+root_extent==loaded.arena()->used_end,
+    require(loaded.free_block_bytes()+loaded.free_directory().bytes+payload_header_bytes+root_extent==loaded.arena()->used_end,
             "post-failure hole table does not cover every unreachable byte");
     return result;
 }

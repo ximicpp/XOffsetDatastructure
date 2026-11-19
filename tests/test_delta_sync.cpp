@@ -306,7 +306,7 @@ std::string varint(std::uint32_t v) {
 
 // A delta header (format 1.0) without EXTENT: used_end and root unchanged.
 std::string delta_header(std::uint64_t stream, std::uint32_t version, std::uint32_t blocks, std::uint32_t flags = 0) {
-    std::string h = {'X', 'D', char(0x10), char(flags)};
+    std::string h = {'X', 'D', char(0x20), char(flags)};
     h.append(reinterpret_cast<const char*>(&stream), 8);
     return h + varint(version) + varint(blocks);
 }
@@ -442,19 +442,19 @@ void fixed_cases() {
         base.reset();
         src.plain_root().epoch += 3;
         key = delta_of(src, base);
-        // The root offset (the third header varint) one word further: the
-        // header checks pass, verification of the patched payload rejects.
+        // used_end (the second header varint) one word further: the header
+        // checks pass, verification of the patched payload rejects (its last
+        // word is neither live nor free).
         std::size_t at = 12;
         const auto skip_varint = [&] { while (std::uint8_t(key[at]) & 0x80) ++at; ++at; };
         skip_varint();  // version
-        skip_varint();  // used_end
-        const std::size_t root_at = at;
-        std::uint32_t root = 0;
+        const std::size_t used_at = at;
+        std::uint32_t used = 0;
         for (int shift = 0;; shift += 7) {
-            root |= std::uint32_t(std::uint8_t(key[at]) & 0x7F) << shift;
+            used |= std::uint32_t(std::uint8_t(key[at]) & 0x7F) << shift;
             if (!(std::uint8_t(key[at++]) & 0x80)) break;
         }
-        const std::string bad = key.substr(0, root_at) + varint(root + 8) + key.substr(at);
+        const std::string bad = key.substr(0, used_at) + varint(used + 1) + key.substr(at);
         auto r = apply_entry(rep, bad, cur);
         need(!r && cur.empty() && !rep.has_root(), "rejected key delta did not leave the buffer empty");
         need(bool(apply_entry(rep, key, cur)), "good key delta after a rejected one");
@@ -647,17 +647,18 @@ void block_section_case() {
         {"a missing mask byte", make(1, std::string("\x01\x03\x01", 3)), xo::XErrc::size_mismatch},
         {"a block count past the section", make(100, std::string("\x01\x01\x01", 3) + "a"), xo::XErrc::size_mismatch},
         {"trailing bytes", make(1, std::string("\x01\x01\x01", 3) + "ab"), xo::XErrc::size_mismatch},
-        // Block 0 starts in the arena header [0, 48), which no delta writes.
+        // Block 0 starts in the image header [0, 40), which no delta writes.
         {"block 0 whole", make(1, std::string(2, '\0') + std::string(64, 'w')), xo::XErrc::invalid_extent_table},
         {"a mask bit in the header", make(1, std::string("\0\x01\x01", 3) + "a"), xo::XErrc::invalid_extent_table},
-        {"a mask bit just below 48", make(1, std::string("\0\x60\x80\x01", 4) + "ab"),
+        {"a mask bit just below 40", make(1, std::string("\0\x30\x80\x01", 4) + "ab"),
          xo::XErrc::invalid_extent_table},
     };
     // Header cases.
     const std::string body = good.substr(header_size);
     cases.push_back({"a bad magic", "XE" + good.substr(2), xo::XErrc::bad_magic});
-    cases.push_back({"format 2.0", good.substr(0, 2) + char(0x20) + good.substr(3), xo::XErrc::unsupported_version});
-    cases.push_back({"format 1.1", good.substr(0, 2) + char(0x11) + good.substr(3), xo::XErrc::unsupported_version});
+    cases.push_back({"format 1.0", good.substr(0, 2) + char(0x10) + good.substr(3), xo::XErrc::unsupported_version});
+    cases.push_back({"format 2.1", good.substr(0, 2) + char(0x21) + good.substr(3), xo::XErrc::unsupported_version});
+    cases.push_back({"format 3.0", good.substr(0, 2) + char(0x30) + good.substr(3), xo::XErrc::unsupported_version});
     cases.push_back({"an unknown flag", delta_header(cur.stream(), cur.version() + 1, 1, 0x10) + body,
                      xo::XErrc::unsupported_flags});
     cases.push_back({"a header cut before its varints", good.substr(0, 12), xo::XErrc::truncated});
@@ -699,19 +700,28 @@ void block_section_case() {
 
 // A delta with one block that writes `bytes` at payload offset `at`, as the
 // next delta of the cursor's stream onto the replica's current extent.
+// One delta writing `bytes` at payload offset `at` (one block entry per
+// 64-byte block it touches: block k is payload bytes [64k, 64k + 64)).
 std::string poke_delta(const xo::XBuffer& rep, const xo::XDeltaCursor& cur, std::size_t at, const std::string& bytes) {
-    const std::size_t i = at;  // block k: payload bytes [64k, 64k + 64)
-    need(i % 64 + bytes.size() <= 64, "poke: bytes cross a block");
-    std::uint64_t mask = 0;
-    for (std::size_t k = 0; k < bytes.size(); ++k) mask |= std::uint64_t(1) << (i % 64 + k);
-    std::string section = varint(std::uint32_t(i / 64));
-    unsigned sel = 0;
-    for (int w = 0; w < 8; ++w) if ((mask >> (8 * w)) & 0xFF) sel |= 1u << w;
-    section += char(sel);
-    for (int w = 0; w < 8; ++w) if ((mask >> (8 * w)) & 0xFF) section += char(mask >> (8 * w));
-    section += bytes;
+    std::string section;
+    std::uint32_t blocks = 0;
+    std::size_t prev = 0;
+    for (std::size_t from = 0; from < bytes.size();) {
+        const std::size_t i = at + from, block = i / 64, n = std::min(bytes.size() - from, 64 - i % 64);
+        std::uint64_t mask = 0;
+        for (std::size_t k = 0; k < n; ++k) mask |= std::uint64_t(1) << (i % 64 + k);
+        section += varint(std::uint32_t(blocks == 0 ? block : block - prev - 1));
+        unsigned sel = 0;
+        for (int w = 0; w < 8; ++w) if ((mask >> (8 * w)) & 0xFF) sel |= 1u << w;
+        section += char(sel);
+        for (int w = 0; w < 8; ++w) if ((mask >> (8 * w)) & 0xFF) section += char(mask >> (8 * w));
+        section += bytes.substr(from, n);
+        prev = block;
+        ++blocks;
+        from += n;
+    }
     (void)rep;
-    return delta_header(cur.stream(), cur.version() + 1, 1) + section;
+    return delta_header(cur.stream(), cur.version() + 1, blocks) + section;
 }
 
 // Which check each kind of change takes, and the in-place checks rejecting
@@ -833,7 +843,6 @@ void check_path_case() {
             std::memcpy(&b[8], &capacity, 4);
             return b;
         };
-        need(head % 64 + 12 <= 64, "check path: vector head crosses a block");
         rejects("a vector block onto another live block",
                 poke_delta(rep, cur, head, head_bytes(std::int64_t(off(rep.plain_root().items[2].vals.data())), 2, 4)),
                 "wire validation");
@@ -857,7 +866,6 @@ void check_path_case() {
             // then the size that takes it in.
             const std::size_t items = off(&rep.plain_root().items);
             const std::uint32_t size = rep.plain_root().items.size() + 1u;
-            need((items + 4) % 64 + 4 <= 64, "check path: vector size crosses a block");
             const auto& slot = rep.plain_root().items.data()[size - 1];
             const std::size_t flag = off(&slot.flag);
             auto res = apply_entry(rep, poke_delta(rep, cur, flag, std::string(1, '\x02')), cur);
@@ -901,7 +909,6 @@ void check_path_case() {
             std::memcpy(&b[8], &capacity, 4);
             return b;
         };
-        need(items % 64 + 12 <= 64, "check path: records head crosses a block");
         need(!rep.plain_root().title.empty() && rep.plain_root().title.size() > 10, "check path: no heap title");
         rejects("a vector of records moved onto a live block",
                 poke_delta(rep, cur, items, items_head(std::int64_t(off(rep.plain_root().title.data())), 1, 1)),

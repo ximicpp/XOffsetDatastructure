@@ -188,7 +188,7 @@ template <class Root> void failure_sweep() {
 
 void same_wires(const std::vector<std::string>& a, const std::vector<std::string>& b, const char* what) {
     if (a.size() != b.size() || a.empty()) fail(std::string(what) + ": checkpoint count");
-    constexpr std::size_t header = sizeof(xo::XWireHeaderV2);
+    constexpr std::size_t header = sizeof(xo::XWireHeader);
     for (std::size_t i = 0; i < a.size(); ++i)
         if (a[i].size() != b[i].size() || a[i].compare(header, std::string::npos, b[i], header, std::string::npos) != 0)
             fail(std::string(what) + ": SHIFT and per-element wires differ at checkpoint " + std::to_string(i));

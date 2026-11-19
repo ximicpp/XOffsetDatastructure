@@ -24,8 +24,8 @@ struct Point { float x{}; float y{}; };
 struct Rect { Point min; Point max; };   // half-open: min inclusive, max exclusive
 enum class Behavior : std::uint32_t { Patrol = 0, Hold = 1, Alert = 2 };
 
-// Container heads (XString, XVector) are 12 bytes aligned to 4 (wire format
-// 2.1). Records without an 8-byte member are therefore 4-aligned, and every
+// Container heads (XString, XVector) are 12 bytes aligned to 4 (since wire
+// format 2.1). Records without an 8-byte member are therefore 4-aligned, and every
 // record below is laid out without implicit padding (checked at the end of
 // this file); a reserved field fills the gap where one would remain.
 struct SceneData {

@@ -4,7 +4,7 @@ This guide is for users of the library. It explains how to define types, build,
 modify, save and load them, and the constraints you must follow.
 If this is your first time, start with [GETTING_STARTED.md](GETTING_STARTED.md): it has one runnable
 example of the recommended pattern per use case (server to client, client uplink, server to server).
-Deployment requirements are in [DEPLOYMENT.md](DEPLOYMENT.md), format details in [V2_FORMAT.md](V2_FORMAT.md),
+Deployment requirements are in [DEPLOYMENT.md](DEPLOYMENT.md), format details in [WIRE_FORMAT.md](WIRE_FORMAT.md),
 and the input and compatibility boundary in [ALPHA_COMPATIBILITY.md](ALPHA_COMPATIBILITY.md).
 
 ## 1. Basic model
@@ -402,10 +402,11 @@ std::int32_t id = in.root().id();                       // a proxy read gives a 
 in.read([](const Profile& r) { print(r.name.view()); });   // read plain members inside a pinned scope
 ```
 
-- A wire consists of a 40-byte header, the payload and a hole table (a sparse wire has an extent
-  table after the header; see [V2_FORMAT.md](V2_FORMAT.md) section 3). By default only runs that
-  are "at least 4 KiB long and made of free blocks of at least 256 B" are skipped (for example the
-  hole left by deleting many records at once); the rest of the payload is copied in one go.
+- A wire is the buffer's image: a 40-byte header, then the payload with its free blocks (a sparse
+  wire has an extent table after the header; see [WIRE_FORMAT.md](WIRE_FORMAT.md) section 3). By
+  default only the bodies of free blocks in runs that are "at least 4 KiB long and made of free
+  blocks of at least 1 KiB" are skipped (for example the hole left by deleting many records at
+  once); the rest of the image is copied in one go.
   `XSaveOptions{.emission = XWireEmission::dense}` forces a full copy.
 - When sending across machines you can turn on zero-run omission:
   `save_verified<Profile>(XSaveOptions{.emission = XWireEmission::zero_runs})`
@@ -660,8 +661,8 @@ const Profile& r = in->root<Profile>();
 
 if (auto s = buf.try_reload_verified<Profile>(wire); !s) drop(s.error());
 
-auto token = buf.try_begin_verified_reload<Profile>(used, holes, extents);
-// ... write token->header_bytes() / payload_bytes() / hole_bytes(), complete(...)
+auto token = buf.try_begin_verified_reload<Profile>(used, extents);
+// ... write token->image_bytes() / extent_bytes(), complete(...)
 XStatus done = token ? token->try_finish() : XStatus(token.error());
 ```
 
@@ -720,7 +721,7 @@ tests behind each are in [STABILITY_TESTS.md](STABILITY_TESTS.md).
 | K6 | Schema fingerprints must match exactly; different versions use the evolution handshake (E0) | Wire header `schema_hash` |
 | K7 | The same object representation on every verified compiler and platform | `XOFFSET_PIN_SCHEMA`; library signature baselines in `tools/sigs/`; the cross-compiler wire corpus |
 | K8 | Clients (Windows, iOS, Android) build as C++20 with their native compilers and use the same library and wire as servers ([CLIENT_TARGETS.md](CLIENT_TARGETS.md)) | Field-list backend; `tools/native_targets.sh` |
-| K9 | Native delta sync: whole-state deltas (format 1.0) and shared viewport deltas (XS 2.0), checked at the link's tier and fuzzed before release | `apply_delta`, `apply_sync` ([DELTA_SYNC.md](DELTA_SYNC.md), [SHARED_DELTA.md](SHARED_DELTA.md)) |
+| K9 | Native delta sync: whole-state deltas (format 2.0) and shared viewport deltas (XS 2.0), checked at the link's tier and fuzzed before release | `apply_delta`, `apply_sync` ([DELTA_SYNC.md](DELTA_SYNC.md), [SHARED_DELTA.md](SHARED_DELTA.md)) |
 
 The unit that moves is the whole region (container heads cannot be copied on their own). A buffer moves
 only at explicit points (output, receive, reload, `XCompactor`); `XHandle` follows it by epoch.

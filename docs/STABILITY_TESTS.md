@@ -28,7 +28,7 @@ There are two builds: the server's C++26 reflection build and the client's C++20
 | | | `test_mutation_failures`, `test_allocator_failures` | A single modification is atomic when allocation fails |
 | K3 | Independent output: `save_verified` emits a copy owned by the caller, and the buffer can keep changing after sending | `test_stability_contract` (K3 part) | After saving, modifying, growing, clearing and destroying the source buffer, the sent wire is unchanged and still loads the original content |
 | | | `test_verified_paths` | `save_verified_into` does not overlap the source storage, and is rejected when the owner changes in a callback |
-| K4 | Receive checks come in three tiers; the full tier's structural validation rejects truncation, out-of-range offsets, overlap, incomplete tiling, invalid values and schema mismatches (the trusted and bounds tier interfaces were added in 3.4, with their tests) | `test_wire_validation`, `test_validation_granules` | Malicious offsets, container headers, hole tables and payload metadata are rejected before dereferencing |
+| K4 | Receive checks come in three tiers; the full tier's structural validation rejects truncation, out-of-range offsets, overlap, incomplete tiling, invalid values and schema mismatches (the trusted and bounds tier interfaces were added in 3.4, with their tests) | `test_wire_validation`, `test_validation_granules` | Malicious offsets, container headers, free directories and payload metadata are rejected before dereferencing |
 | | | `test_v2_fuzz` | An independent spec oracle agrees with `load_verified`, `reload_verified` and receiving directly into a reused slot (`begin_verified_reload`) on accepting/rejecting mutated wires; aborting a direct receive midway, under-reporting lengths and declared lengths disagreeing with the header are always rejected |
 | | | `fuzz_v2_wire_replay`, `fuzz_wire_schemas_replay` (with `_corpus`; no-exception versions `_replay_noexc`) | The two libFuzzer harnesses compiled without libFuzzer, replaying the crash inputs in `tests/fuzz/regressions/` and their own seed corpora; every ci.yml job (P2996 Clang, GCC 16, two sanitizers, arm64, Windows) includes them; while Actions is off, the full CTest and the daily long run (GCC 16 ASan+UBSan) run them |
 | | | `test_reload_reset` | Receiving directly into a reused slot |
@@ -59,7 +59,7 @@ The scope of the guarantee is in [USER_GUIDE.md](USER_GUIDE.md) section 8, and p
 ## K9 (core promise, since 3.5.0): native delta sync
 
 Only the changed bytes are sent; the receiver merges them and checks per the link's tier (API added in
-3.3, promoted to a core promise in 3.5.0). Whole-state deltas (format 1.0): `test_delta_sync` (rejection
+3.3, promoted to a core promise in 3.5.0). Whole-state deltas (format 2.0): `test_delta_sync` (rejection
 cases and random streams, including no-exception builds), `test_delta_format` (golden files of the frozen
 delta wire 1.0), `fuzz_delta_sync` (pre-release ASan fuzz, both server and client builds, admit versus full
 differential), `test_receiver` (`apply_delta`'s default tier per link). Full conditions in

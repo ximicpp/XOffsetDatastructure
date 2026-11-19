@@ -332,7 +332,7 @@ void small_reload_matches_general_path() {
     std::size_t fast_eligible = 0;
     for (const auto& w : wires) {
         std::uint32_t used = 0;
-        std::memcpy(&used, w.data() + 8, sizeof(used));
+        std::memcpy(&used, w.data() + offsetof(XWireHeader, used_bytes), sizeof(used));
         fast_eligible += used <= 32768;
         // Every target kind, fresh and after a larger and a smaller content.
         for (const auto make : targets) {
@@ -349,14 +349,15 @@ void small_reload_matches_general_path() {
         // Every header byte changed, and every truncation and extension: the
         // same outcome and first error with the fast path on and off.
         auto on = XBuffer::create<ReloadRoot>(4096, cap()), off = XBuffer::create<ReloadRoot>(4096, cap());
-        for (std::size_t i = 0; i < sizeof(XWireHeaderV2); ++i)
+        for (std::size_t i = 0; i < sizeof(XWireHeader); ++i)
             for (const unsigned char x : {0x01, 0x80, 0xff}) {
                 auto m = w;
                 m[i] = char(m[i] ^ x);
                 need(same(small_reload(on, m, true), small_reload(off, m, false)), "mutated header outcome differs");
             }
-        // Each size field at its bounds: used_bytes, root_offset, hole_count, extent_count.
-        for (const std::size_t field : {8u, 12u, 16u, 20u})
+        // Each size field at its bounds: header_bytes, used_bytes, extent_count,
+        // free_dir, free_bytes.
+        for (const std::size_t field : {4u, 24u, 28u, 32u, 36u})
             for (const std::uint32_t v : {0u, 8u, 40u, 47u, 48u, used - 8u, used, used + 8u, 32768u, 32776u, ~0u}) {
                 auto m = w;
                 std::memcpy(m.data() + field, &v, sizeof(v));
@@ -366,10 +367,10 @@ void small_reload_matches_general_path() {
         for (const std::uint32_t d : {1u, 4u, 7u}) {
             auto m = w + std::string(d, '\0');
             const std::uint32_t v = used + d;
-            std::memcpy(m.data() + 8, &v, sizeof(v));
+            std::memcpy(m.data() + offsetof(XWireHeader, used_bytes), &v, sizeof(v));
             need(same(small_reload(on, m, true), small_reload(off, m, false)), "unaligned used outcome differs");
         }
-        for (const std::size_t cut : {std::size_t(0), sizeof(XWireHeaderV2) - 1, sizeof(XWireHeaderV2), w.size() - 8, w.size() - 1})
+        for (const std::size_t cut : {std::size_t(0), sizeof(XWireHeader) - 1, sizeof(XWireHeader), w.size() - 8, w.size() - 1})
             need(same(small_reload(on, w.substr(0, cut), true), small_reload(off, w.substr(0, cut), false)),
                  "truncated wire outcome differs");
         for (const std::size_t extra : {1, 8, 16})
@@ -388,40 +389,40 @@ void small_reload_matches_general_path() {
     }
 }
 
-// Transport stand-in: header, extent table, each extent at its payload offset
-// - 48 (or the dense payload bytes), hole table; `payload_limit` stops the
-// payload bytes early.
+// Transport stand-in: the header into the image's first bytes, the extent
+// table, then each extent at its image offset (or the rest of a dense image);
+// `image_limit` stops the image bytes early.
 template <class Token>
-void deliver(Token& t, const std::string& w, std::size_t payload_limit = SIZE_MAX) {
+void deliver(Token& t, const std::string& w, std::size_t image_limit = SIZE_MAX) {
     std::size_t at = 0;
     auto take = [&](std::byte* to, std::size_t n) { std::memcpy(to, w.data() + at, n); at += n; };
-    take(t.header_bytes().data(), t.header_bytes().size());
-    if (!t.extent_bytes().empty()) take(t.extent_bytes().data(), t.extent_bytes().size());
+    const auto image = t.image_bytes();
+    take(image.data(), sizeof(XWireHeader));
     const auto table = t.extent_bytes();
+    if (!table.empty()) take(table.data(), table.size());
     if (table.empty()) {
-        take(t.payload_bytes().data(), std::min(payload_limit, t.payload_bytes().size()));
+        take(image.data() + sizeof(XWireHeader), std::min(image_limit, image.size()) - sizeof(XWireHeader));
     } else {
         for (std::size_t i = 0; i < table.size() / 8; ++i) {
             std::uint32_t e[2];
             std::memcpy(e, table.data() + i * 8, 8);
-            take(t.payload_bytes().data() + e[0] - XWIRE_PAYLOAD_BEGIN, e[1]);
+            take(image.data() + e[0], e[1]);
         }
     }
-    if (!t.hole_bytes().empty()) take(t.hole_bytes().data(), t.hole_bytes().size());
-    if (payload_limit == SIZE_MAX) need(at == w.size(), "test transport framing");
+    if (image_limit == SIZE_MAX) need(at == w.size(), "test transport framing");
 }
 
-XWireHeaderV2 header_of(const std::string& w) {
-    XWireHeaderV2 h{};
+XWireHeader header_of(const std::string& w) {
+    XWireHeader h{};
     std::memcpy(&h, w.data(), sizeof(h));
     return h;
 }
 
 void direct_reload(XBuffer& in, const std::string& w) {
     const auto h = header_of(w);
-    auto t = in.begin_verified_reload<ReloadRoot>(h.used_bytes, h.hole_count, h.extent_count);
+    auto t = in.begin_verified_reload<ReloadRoot>(h.used_bytes, h.extent_count);
     deliver(t, w);
-    t.complete(t.header_bytes().size(), t.payload_bytes().size(), t.hole_bytes().size(), t.extent_bytes().size());
+    t.complete(t.image_bytes().size(), t.extent_bytes().size());
     t.finish();
 }
 
@@ -452,7 +453,7 @@ void direct_reload_equals_reload() {
         need(in.save_verified<ReloadRoot>() == *w, "direct reload re-save not byte stable");
     }
     // Sparse gaps were dirty from the big content and still read as zero.
-    need(header_of(gaps).extent_count != 0 || header_of(gaps).hole_count != 0, "gap wire has no gap");
+    need(header_of(gaps).extent_count != 0, "gap wire has no gap");
     const auto size = in.get_size();
     need(in.grow(1u << 20), "grow after direct reload");
     for (std::size_t i = size; i < in.get_size(); ++i) need(in.data()[i] == 0, "stale byte after growth");
@@ -507,50 +508,49 @@ void direct_reload_rejects_interrupted_input() {
     };
     // Dropped half-way: the token's destructor leaves the buffer rootless.
     rejects([&] {
-        { auto t = in.begin_verified_reload<ReloadRoot>(h.used_bytes, h.hole_count, h.extent_count);
+        { auto t = in.begin_verified_reload<ReloadRoot>(h.used_bytes, h.extent_count);
           deliver(t, good, h.used_bytes / 2); }
         (void)in.root<ReloadRoot>();
     }, "dropped direct reload left a root");
     // Received counts disagree with the declared sections.
-    for (int k = 0; k < 4; ++k)
+    for (int k = 0; k < 2; ++k)
         rejects([&] {
-            auto t = in.begin_verified_reload<ReloadRoot>(h.used_bytes, h.hole_count, h.extent_count);
+            auto t = in.begin_verified_reload<ReloadRoot>(h.used_bytes, h.extent_count);
             deliver(t, good);
-            std::size_t n[4] = {t.header_bytes().size(), t.payload_bytes().size(), t.hole_bytes().size(),
-                                t.extent_bytes().size()};
+            std::size_t n[2] = {t.image_bytes().size(), t.extent_bytes().size()};
             n[k] = n[k] ? n[k] - 1 : 8;
-            t.complete(n[0], n[1], n[2], n[3]);
+            t.complete(n[0], n[1]);
             t.finish();
         }, "short count accepted");
     rejects([&] {
-        auto t = in.begin_verified_reload<ReloadRoot>(h.used_bytes, h.hole_count, h.extent_count);
+        auto t = in.begin_verified_reload<ReloadRoot>(h.used_bytes, h.extent_count);
         deliver(t, good);
         t.finish(); // no complete()
     }, "finish without complete accepted");
     // Declared lengths other than the header's.
     rejects([&] {
-        auto t = in.begin_verified_reload<ReloadRoot>(h.used_bytes, h.hole_count + 1, h.extent_count);
-        deliver(t, good + std::string(8, '\0'));
-        t.complete(t.header_bytes().size(), t.payload_bytes().size(), t.hole_bytes().size(), t.extent_bytes().size());
+        auto t = in.begin_verified_reload<ReloadRoot>(h.used_bytes, h.extent_count + 1);
+        std::memcpy(t.image_bytes().data(), good.data(), good.size()); // the dense image
+        t.complete(t.image_bytes().size(), t.extent_bytes().size());
         t.finish();
-    }, "hole_count mismatch accepted");
+    }, "extent_count mismatch accepted");
     rejects([&] {
-        auto t = in.begin_verified_reload<ReloadRoot>(h.used_bytes + 8, h.hole_count, h.extent_count);
-        deliver(t, good, h.used_bytes - XWIRE_PAYLOAD_BEGIN);
-        t.complete(t.header_bytes().size(), t.payload_bytes().size(), t.hole_bytes().size(), t.extent_bytes().size());
+        auto t = in.begin_verified_reload<ReloadRoot>(h.used_bytes + 8, h.extent_count);
+        deliver(t, good, h.used_bytes);
+        t.complete(t.image_bytes().size(), t.extent_bytes().size());
         t.finish();
     }, "used_bytes mismatch accepted");
-    rejects([&] { (void)in.begin_verified_reload<ReloadRoot>(h.used_bytes, h.used_bytes, 0); },
-            "impossible hole count accepted");
+    rejects([&] { (void)in.begin_verified_reload<ReloadRoot>(h.used_bytes, h.used_bytes); },
+            "impossible extent count accepted");
     // One token at a time; a consumed token cannot finish again.
     {
-        auto t = in.begin_verified_reload<ReloadRoot>(h.used_bytes, h.hole_count, h.extent_count);
+        auto t = in.begin_verified_reload<ReloadRoot>(h.used_bytes, h.extent_count);
         bool second = false;
         try { (void)in.begin_verified_reload<ReloadRoot>(h.used_bytes); } catch (const XException&) { second = true; }
         need(second, "second open direct reload allowed");
         deliver(t, good);
         in.release_reload_scratch(); // keeps the open token's tables
-        t.complete(t.header_bytes().size(), t.payload_bytes().size(), t.hole_bytes().size(), t.extent_bytes().size());
+        t.complete(t.image_bytes().size(), t.extent_bytes().size());
         t.finish();
         need(!t, "token still open after finish");
         bool again = false;

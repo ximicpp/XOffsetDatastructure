@@ -299,7 +299,7 @@ void require_same(const std::string& name, const std::string& wire, const std::s
 void check_wire(const Case& c, const std::string& wire, const std::string& expected) {
     const std::string name = c.name;
     try {
-        xo::XWireHeaderV2 header{};
+        xo::XWireHeader header{};
         std::memcpy(&header, wire.data(), sizeof(header));
         auto loaded = Buffer::load(wire, cap());
         if (c.resave) {
@@ -389,7 +389,7 @@ int main(int argc, char** argv) {
         const auto e = edited(wire);
         check_edited(c, edited(wire), e);
         if (e.verified == wire) fail(std::string(c.name) + ": edit() changed nothing");
-        xo::XWireHeaderV2 header{};
+        xo::XWireHeader header{};
         std::memcpy(&header, wire.data(), sizeof(header));
         const std::string_view name(c.name);
         sparse_seen += (name == "sparse" || name == "elided") && header.extent_count != 0;

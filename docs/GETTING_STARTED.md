@@ -48,7 +48,7 @@ The check tier follows the link and is decided by the receiver's type; there is 
 ([user guide section 8](USER_GUIDE.md#8-core-guarantees-and-api-stability)):
 
 - **Trusted tier**: the default for server to server and server to client. It checks only the wire header
-  (schema fingerprint, limit, root offset) and hole table bounds, without walking the object graph. It
+  (schema fingerprint, limit, sizes) and that the root fits, without walking the object graph. It
   assumes the sender is your own service from the same build and the link has TLS or mTLS or is on an
   internal network. Debug and sanitizer builds still validate fully.
 - **Bounds tier**: the default for client uplink. It guarantees that no read goes outside the message,
