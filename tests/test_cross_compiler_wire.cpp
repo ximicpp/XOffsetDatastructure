@@ -2,18 +2,19 @@
 //
 // Builds a fixed set of V2 wires from deterministic inputs: every container
 // kind, inline and heap strings, holes left by mutation, a zero-run-elided
-// (sparse) wire, compact wires (save_compact, slack 0 and 8), enum keys
-// ordered only by operator<=>, nested records, arrays, bool and floating point
-// fields. The same source must produce byte-identical wires with every
-// supported compiler (P2996 Clang with libc++, GCC 16 with libstdc++, the
-// client compilers), and each compiler must accept the other's wires through
-// load_verified.
+// (sparse) wire, compact wires (save_compact, slack 0 and 8, and the default
+// automatic emission of a churned buffer), enum keys ordered only by
+// operator<=>, nested records, arrays, bool and floating point fields. The
+// same source must produce byte-identical wires with every supported compiler
+// (P2996 Clang with libc++, GCC 16 with libstdc++, the client compilers), and
+// each compiler must accept the other's wires through load_verified.
 //
 // Each case also has two edited wires: the case's wire loaded, changed by the
 // fixed steps of edit() (scalars, container inserts and erases, short strings
-// made long), then saved with save_verified (<case>.edit.xwire) and with
-// save_compact, slack 0 (<case>.edit-compact.xwire). A receiver that edits a
-// wire written elsewhere must write the same bytes as the writer would.
+// made long), then saved with save_verified, free-run emission
+// (<case>.edit.xwire), and with save_compact, slack 0
+// (<case>.edit-compact.xwire). A receiver that edits a wire written elsewhere
+// must write the same bytes as the writer would.
 //
 // usage:
 //   test_cross_compiler_wire                  write and read in memory
@@ -192,6 +193,7 @@ void edit(cw::Root& r) {
     r.rank_set.erase(cw::Rank::r1);
 }
 
+constexpr xo::XSaveOptions kRuns{.emission = xo::XWireEmission::free_runs};
 constexpr xo::XCompactOptions kTight{.slack_div = 0};
 constexpr xo::XCompactOptions kSlack8{.slack_div = 8};
 
@@ -203,14 +205,14 @@ struct Edited {
 Edited edited(const std::string& wire) {
     auto b = Buffer::load(wire, cap());
     edit(b.plain_root());
-    return {b.save_verified(), b.save_compact(kTight)};
+    return {b.save_verified(kRuns), b.save_compact(kTight)};
 }
 
 struct Case {
     const char* name;
     std::function<std::string()> make;
-    // Re-save of a loaded wire that must give the same bytes; empty: the
-    // default emission, or zero-run elision for a wire it cannot be.
+    // Re-save of a loaded wire that must give the same bytes; empty: free-run
+    // emission, or zero-run elision for a wire it cannot be.
     std::function<std::string(Buffer&)> resave;
 };
 
@@ -218,29 +220,29 @@ std::vector<Case> cases() {
     return {
         {"empty", [] {
             auto b = Buffer::create(4096, cap());
-            return b.save_verified();
+            return b.save_verified(kRuns);
         }},
         {"small", [] {
             Source in(0x5eed0001);
             auto b = Buffer::create(65536, cap());
             fill(b.plain_root(), in, 4);
-            return b.save_verified();
+            return b.save_verified(kRuns);
         }},
         {"medium_holes", [] {
             Source in(0x5eed0002);
             auto b = Buffer::create(1u << 20, cap());
             fill(b.plain_root(), in, 200);
             churn(b.plain_root(), in);
-            return b.save_verified();
+            return b.save_verified(kRuns);
         }},
         {"reloaded_mutated", [] {
             Source in(0x5eed0003);
             auto b = Buffer::create(1u << 20, cap());
             fill(b.plain_root(), in, 60);
-            auto again = Buffer::load(b.save_verified(), cap());
+            auto again = Buffer::load(b.save_verified(kRuns), cap());
             churn(again.plain_root(), in);
             fill(again.plain_root(), in, 10); // reuses holes from the hole table
-            return again.save_verified();
+            return again.save_verified(kRuns);
         }},
         {"sparse", [] {
             Source in(0x5eed0004);
@@ -249,8 +251,8 @@ std::vector<Case> cases() {
             fill(r, in, 8);
             r.labels.emplace_back(std::string(64 * 1024, 'x'));
             r.items.emplace_back().name = "after the large block";
-            r.labels.pop_back(); // frees a 64 KiB run: the default emission skips it
-            return b.save_verified();
+            r.labels.pop_back(); // frees a 64 KiB run: free-run emission skips it
+            return b.save_verified(kRuns);
         }},
         {"elided", [] {
             Source in(0x5eed0005);
@@ -262,6 +264,15 @@ std::vector<Case> cases() {
             r.labels.pop_back();
             r.items.reserve(r.items.size() * 4); // zero slack outside holes too
             return b.save_verified(xo::XSaveOptions{.emission = xo::XWireEmission::zero_runs});
+        }},
+        {"automatic", [] { // the default emission of a churned buffer: compact
+            Source in(0x5eed0008);
+            auto b = Buffer::create(1u << 20, cap());
+            fill(b.plain_root(), in, 120);
+            churn(b.plain_root(), in);
+            auto wire = b.save_verified();
+            if (wire != b.save_compact()) fail("automatic: the default emission of a churned buffer is not compact");
+            return wire;
         }},
         {"compact_slack0", [] {
             Source in(0x5eed0006);
@@ -305,7 +316,7 @@ void check_wire(const Case& c, const std::string& wire, const std::string& expec
         if (c.resave) {
             if (c.resave(loaded) != wire)
                 fail(name + ": load_verified -> save_compact is not byte-identical");
-        } else if (loaded.save_verified() != wire &&
+        } else if (loaded.save_verified(kRuns) != wire &&
                    (header.extent_count == 0 ||
                     loaded.save_verified(xo::XSaveOptions{.emission = xo::XWireEmission::zero_runs}) != wire)) {
             fail(name + ": load_verified -> save_verified is not byte-identical");

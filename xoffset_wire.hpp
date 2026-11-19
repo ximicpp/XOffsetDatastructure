@@ -1472,12 +1472,19 @@ namespace XOffsetDatastructure {
                   offsetof(XWireHeader, free_bytes) == offsetof(XBufferCore::arena_header, free_bytes));
 
     // Emission forms of save_verified / save_verified_into. Receivers
-    // accept every form; the loaded payload is byte-identical.
+    // accept every form. Every form but `automatic` loads as the sender's
+    // image, byte for byte.
     enum class XWireEmission : std::uint8_t {
-        // Default. Skips each run of at least 4 KiB of adjacent free blocks
-        // of at least 1 KiB (one large deletion, for example); everything
-        // else is copied (the link word of each skipped block too). Skipped
-        // bytes are zero free-block bodies, so every receiver accepts it.
+        // Default. An image whose free blocks make up at least an eighth of
+        // it (and at least 512 bytes, from the header: no walk) goes as the
+        // compact wire of save_compact (default slack): the receiver gets
+        // the same contents in fewer bytes, laid out afresh. Any other image
+        // goes as with free_runs.
+        automatic,
+        // Skips each run of at least 4 KiB of adjacent free blocks of at
+        // least 1 KiB (one large deletion, for example); everything else is
+        // copied (the link word of each skipped block too). Skipped bytes are
+        // zero free-block bodies, so every receiver accepts it.
         free_runs,
         // One copy of the whole payload.
         dense,
@@ -1488,7 +1495,7 @@ namespace XOffsetDatastructure {
         zero_runs,
     };
     struct XSaveOptions {
-        XWireEmission emission = XWireEmission::free_runs;
+        XWireEmission emission = XWireEmission::automatic;
     };
 
     // Options of save_compact / save_compact_into.
@@ -1771,7 +1778,7 @@ namespace XOffsetDatastructure {
             return copier;
         }
 
-        // ---- Free-run emission (XWireEmission::free_runs, the default) ------
+        // ---- Free-run emission (XWireEmission::free_runs) -------------------
         // Candidates are free blocks of at least wire_free_run_min_block
         // bytes; sorted by offset, adjacent candidates form runs, and in every
         // run of at least wire_free_run_min_gap bytes each block's body (all
@@ -1789,6 +1796,22 @@ namespace XOffsetDatastructure {
         // a run would each add one.
         inline constexpr std::uint32_t wire_free_run_min_block = 1024;
         inline constexpr std::uint32_t wire_free_run_min_gap = 4096;
+
+        // ---- Automatic emission (XWireEmission::automatic, the default) ----
+        // The compact walk costs about its blocks plus the live bytes, the
+        // image copy the used bytes, on both ends. Premises sweep (Character,
+        // images of 1 KB to 400 KB, GCC 16), churned senders: the compact
+        // wire took 0.10 to 0.75 of the image's send and checked receive time
+        // at every size, and 0.08 to 0.77 of send and trusted receive from
+        // 12 KB up; below that the trusted pair took 0.85 to 1.17 (a copy that
+        // stays in L1 costs about as much as the walk). Clean senders: 1.3 to
+        // 2.1. The header's free bytes tell the two apart without a walk.
+        // Below 512 free bytes the walk's fixed cost is not worth it.
+        inline constexpr std::uint32_t wire_auto_compact_min_free = 512;
+        inline constexpr std::uint32_t wire_auto_compact_share = 8; // free >= used / 8
+        constexpr bool wire_prefers_compact(std::uint64_t used, std::uint64_t free_bytes) noexcept {
+            return free_bytes >= wire_auto_compact_min_free && free_bytes * wire_auto_compact_share >= used;
+        }
         inline constexpr std::size_t wire_free_run_local = 64;
         inline constexpr std::size_t wire_free_run_local_runs = 8;
 

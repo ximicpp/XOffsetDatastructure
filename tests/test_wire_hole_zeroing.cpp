@@ -198,8 +198,9 @@ void emitted_holes_are_zero() {
 // forwards those bytes unchanged (they are the sender's, not the receiver's),
 // and a block the receiver itself retires is cleared.
 void loaded_holes_keep_sender_bytes() {
+    constexpr xo::XSaveOptions image{.emission = xo::XWireEmission::free_runs};
     auto b = make(false);
-    std::string wire = b.save_verified();
+    std::string wire = b.save_verified(image);
     const auto p = parse(wire);
     const auto blocks = free_blocks(wire.data());
     if (blocks.empty() || p.header.extent_count != 0) fail("fixture: need a dense wire with free blocks");
@@ -208,12 +209,12 @@ void loaded_holes_keep_sender_bytes() {
     constexpr std::uint32_t header = xo::XBufferCore::free_block_header_bytes;
     std::memset(wire.data() + hole.offset + header, 0x5a, hole.bytes - header);
     auto loaded = Buffer::load(wire, cap());
-    if (loaded.save_verified() != wire) fail("sender hole bytes were not forwarded unchanged");
+    if (loaded.save_verified(image) != wire) fail("sender hole bytes were not forwarded unchanged");
     auto& r = loaded.plain_root();
     r.secret = std::string(kSecret);
     r.entries.emplace_back().note = "keeps the secret's block off the tail";
     r.secret = std::string(300, 'y');           // the receiver retires the secret's block
-    const auto again = loaded.save_verified();
+    const auto again = loaded.save_verified(image);
     if (again.find(kSecret.substr(0, 12)) != std::string::npos) fail("receiver-freed contents reached the wire");
     const char* arena = static_cast<const char*>(loaded.get_address());
     if (std::string_view(arena, loaded.arena()->used_end).find(kSecret.substr(0, 12)) != std::string_view::npos)
@@ -284,14 +285,18 @@ void declared_size_limits() {
     what = rejection([&] { (void)Buffer::load(claim, xo::XBuffer::maximum_capacity(1u << 20)); });
     if (what.find("exceeds maximum_capacity 1048576") == std::string::npos)
         fail("explicit limit message: " + what);
-    // Within the default limit a claim is still accepted, and the default
+    // Within the default limit a claim is still accepted, and free-run
     // emission skips the claimed free run again.
     const auto ok = inflate_sparse(base, 32u << 20);
     auto loaded = Buffer::load(ok);
-    const auto resent = loaded.save_verified();
+    const auto resent = loaded.save_verified(xo::XSaveOptions{.emission = xo::XWireEmission::free_runs});
     // The resent wire also carries the free block's link word.
     if (resent.size() > ok.size() + 64 || Buffer::load(resent).arena()->used_end != (32u << 20))
         fail("a 32 MiB sparse claim did not round-trip sparsely");
+    // The default (automatic) emission sends it compact: no free block at all.
+    const auto automatic = loaded.save_verified();
+    if (automatic.size() > base.size() + 64 || parse(automatic).header.free_dir != 0)
+        fail("the default emission of a 32 MiB free claim is not compact");
     // An explicit limit admits larger wires.
     auto large = Buffer::load(inflate_sparse(base, 96u << 20), xo::XBuffer::maximum_capacity(128u << 20));
     if (large.arena()->used_end != (96u << 20)) fail("explicit limit did not admit 96 MiB");
