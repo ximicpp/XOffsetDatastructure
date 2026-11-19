@@ -318,6 +318,27 @@ void fixed_cases() {
     const auto version = base.version();
     st = src.save_delta_into(d, base);
     need(st.empty && d.empty() && base.version() == version, "fixed: an untouched buffer sent a delta");
+    // A recorded failure drops the short path's token: the string overload
+    // refuses (an empty delta, or XException) like the span overload, and
+    // after clear_error() the buffer pairs again.
+    src.record_error(xo::XErrc::out_of_storage);
+    src.touch_set(r.epoch, r.epoch + 1);
+    bool refused = false;
+#if XOFFSET_NO_EXCEPTIONS
+    st = src.save_delta_into(d, base);
+    refused = d.empty();
+#else
+    try {
+        (void)src.save_delta_into(d, base);
+    } catch (const xo::XException& e) {
+        refused = e.code() == xo::XErrc::out_of_storage && d.empty();
+    }
+#endif
+    need(refused, "fixed: a failed buffer sent a delta through the string overload");
+    src.clear_error();
+    st = src.save_delta_into(d, base);
+    need(!d.empty() && bool(apply(false, rep, d, cur)) && payload_of(rep) == payload_of(src),
+         "fixed: the delta after clear_error()");
     // Up to the touch log's 25 runs: the sender's short path, 26: the
     // list overflows, its general path (whole blocks from the stamps); up
     // to 16 runs: the receiver's short path, 17: its general path. (Every

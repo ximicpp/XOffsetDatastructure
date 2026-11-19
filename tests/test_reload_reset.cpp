@@ -188,7 +188,7 @@ void expect_root(XBuffer& b, std::uint64_t id, const char* what) {
     need(&r == &b.unsafe_root<ReloadRoot>() && r.id == id, what);
 }
 
-void root_cache_follows_epoch() {
+void root_follows_reloads() {
     const auto w2 = make_wire(2, 10), w3 = make_wire(3, 20, 2);
     auto a = XBuffer::create<ReloadRoot>(4096, cap());
     a.root<ReloadRoot>().id = 1;
@@ -216,7 +216,7 @@ void root_cache_follows_epoch() {
     expect_root(a, 3, "root after recovery reload");
     bool mismatch = false;
     try { (void)a.root<OtherRoot>(); } catch (const XException&) { mismatch = true; }
-    need(mismatch, "root<U>() of another schema after a cached root<T>()");
+    need(mismatch, "root<U>() of another schema after a root<T>()");
     expect_root(a, 3, "root after another type was refused");
 
     // Move construction and both move assignments (to an empty and to a
@@ -573,7 +573,7 @@ int main() {
         reset_equals_create();
         save_into_is_an_independent_copy();
         reload_scratch_survives_release_and_swap();
-        root_cache_follows_epoch();
+        root_follows_reloads();
         small_reload_matches_general_path();
         direct_reload_equals_reload();
         direct_reload_rejects_interrupted_input();

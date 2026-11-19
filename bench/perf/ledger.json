@@ -10,6 +10,16 @@
       "reason": "The bench translation unit lost the removed direct-receive column, and GCC 16 now inlines XFixedFlatMap<int, int>::operator[] into the SLG shard_ticks loop (+90,491 Ir). Against the anchor built with the same bench sources the base is already 1.0226; head/base is 0.9997. No library code on that path changed.",
       "evidence": "PR #313 local_validate --tier pr: slg.C head/base 0.9997, head/anchor 1.0223; function diff: operator[] inlined into shard_ticks only in head, +90,491 Ir.",
       "approved_by": "susu (2026-11-18 08:11Z, card cmsg_01W8h2niLCspyDhp6DxMomYuGsyJL4ehkci7KyZEj4bNhM in the simplification thread)"
+    },
+    {
+      "id": "pr327-slg-a-gcc16-inline-budget",
+      "pr": 327,
+      "metric": "slg.A",
+      "compiler": "gcc16",
+      "max_ratio": 1.02,
+      "reason": "GCC 16 reaches its inline-unit-growth limit in the SLG bench translation unit in both trees. Head's unit is smaller (IPA size 88,211 vs 101,842), so its growth budget is smaller and the XString validator is no longer inlined into the Hero validator. P2996 builds the same sources at 0.9998.",
+      "evidence": "PR #327 Ir (GCC 16, SLG S scale, cycles 5-8): slg.A head/base 1.0150 (2,903,839 -> 2,947,485); function diff: outlined XString validator +109,978 Ir, Hero validator -87,474 Ir. Attempted change: forcing the validators inline (always_inline) moved the excess to slg.B (1.0102), so it was dropped. P2996 slg.A 0.9998, slg.B 0.9987.",
+      "approved_by": "performance thread (ops-vs-floor review), 2026-11-19 08:28Z: GCC 16 bench-TU inline budget, P2996 0.9998, no product-path change"
     }
   ]
 }

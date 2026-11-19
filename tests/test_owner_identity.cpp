@@ -232,19 +232,18 @@ void lookup_ignores_other_owners_and_registration_failures() {
     host::fail_after = -1;
     need(raw == warm && seed.free_table_complete() && seed.free_block_count() == 1, "free-table reuse differs");
     need(registry_and_tls_untouched(), "owner lookup consulted the registry");
-    bool caught = false; try { (void)make_buffer(); } catch (const xo::XBadAlloc&) { caught = true; }
+    // The record is made on an owner's first identity request.
+    bool caught = false;
+    try { auto made = make_buffer(); (void)made.owner_identity(); } catch (const xo::XBadAlloc&) { caught = true; }
     dt::clear_registry_failures(); need(caught, "lookup consumed registration-only failure");
-    host::fail_after = 0; caught = false;
-    try { (void)make_buffer(); } catch (const xo::XBadAlloc&) { caught = true; }
+    // Neither creation nor the record (from malloc) is an operator new
+    // allocation: an armed host failure is not reached.
+    host::fail_after = 0;
+    { auto made = make_buffer(); (void)made.owner_identity(); }
+    need(host::fail_after == 0, "creation or its owner record used operator new");
     host::fail_after = -1;
-    need(caught, "record registration host failure not exercised");
     auto* p = fd::allocate_dynamic_bytes(ref, 24, 8); fd::retire_dynamic_bytes(ref, p, 24);
     need(owner_of(ref) == &seed, "failed registration changed an existing owner");
-    // An ordinary owner is not indexed: its record is its only host allocation.
-    host::fail_after = 1;
-    { auto unindexed = make_buffer(); }
-    need(host::fail_after == 0, "ordinary registration allocated more than its record");
-    host::fail_after = -1;
 }
 
 void transfers_and_deterministic_reused_payload_base() {
@@ -399,14 +398,17 @@ void free_table_host_oom_is_recorded_and_recomputed() {
 
 void registry_new_handler_reentry_is_unlocked() {
     auto other = make_buffer(), nested = make_buffer(); auxiliary = &other; target = &nested;
-    // The record is an ordinary owner's only registration allocation.
-    for (int point : {0}) {
-        HandlerScope handler(Action::register_reenter); host::fail_after = point;
+    // Creation and the owner record (from malloc) run no new_handler: no
+    // registration can be reentered.
+    {
+        HandlerScope handler(Action::register_reenter); host::fail_after = 0;
         auto b = make_buffer();
-        need(host::calls == 1 && other.root<OwnerRoot>().numbers.size() == 9,
-             "registration record allocation reentry not exercised");
+        (void)b.owner_identity();
+        need(host::calls == 0 && other.root<OwnerRoot>().numbers.size() != 9,
+             "creation or its owner record ran a new_handler");
+        host::fail_after = -1;
         auto ref = binding(b); auto* p = fd::allocate_dynamic_bytes(ref, 24, 8); fd::retire_dynamic_bytes(ref, p, 24);
-        need(owner_of(ref) == &b && owner_of(binding(nested)) == &nested, "reentrant registration owner differs");
+        need(owner_of(ref) == &b && owner_of(binding(nested)) == &nested, "registration owner differs");
     }
 }
 

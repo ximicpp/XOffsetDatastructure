@@ -1876,7 +1876,9 @@ namespace XOffsetDatastructure {
                 const DeltaTouchLog* const log = core.touch_log_.get();
                 if (log == nullptr || token_of<T>(core, *log) != b.token_.v) [[unlikely]] return false;
                 std::size_t bound = XDELTA_RUN_HEADER;
-                for (std::uint32_t k = 0; k < log->listed; ++k) bound += 10u + log->runs[k].bytes;
+                const std::uint32_t listed = log->listed;
+                if (listed == 1u) [[likely]] bound += 10u + log->runs[0].bytes;
+                else for (std::uint32_t k = 0; k < listed; ++k) bound += 10u + log->runs[k].bytes;
                 std::size_t n = 0;
                 bool sent = false;
 #if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
@@ -2010,7 +2012,7 @@ namespace XOffsetDatastructure {
             // offset, disjoint, inside [32, used)) with their bytes from src.
             static void write_run_frame(std::string& out, std::uint32_t flags, std::uint64_t stream,
                                         std::uint32_t version, std::size_t used, const char* src,
-                                        const std::vector<DeltaTouchRun>& runs, std::uint64_t bytes) {
+                                        std::span<const DeltaTouchRun> runs, std::uint64_t bytes) {
                 std::size_t size = XDELTA_RUN_HEADER + bytes;
                 if (flags & XDELTA_FLAG_EXTENT)
                     size += delta_varint_size(static_cast<std::uint32_t>((used - payload_begin) / 8u));
@@ -2037,9 +2039,9 @@ namespace XOffsetDatastructure {
                     }
                     std::size_t at = delta_begin;
                     for (const DeltaTouchRun& r : runs) {
-                        p = delta_put_varint(p, static_cast<std::uint32_t>(r.at - at));
-                        p = delta_put_varint(p, r.bytes);
-                        std::memcpy(p, src + r.at, r.bytes);
+                        p = put_varint_short(p, static_cast<std::uint32_t>(r.at - at));
+                        p = put_varint_short(p, r.bytes);
+                        copy_run(p, src + r.at, r.bytes);
                         p += r.bytes;
                         at = std::size_t(r.at) + r.bytes;
                     }
@@ -2229,15 +2231,34 @@ namespace XOffsetDatastructure {
                         stats.empty = true;
                         return stats;
                     }
-                    DeltaHeader header{};
-                    header.flags = flags | (key ? XDELTA_FLAG_KEY : 0u);
-                    header.stream = b.stream_;
-                    header.version = version;
-                    header.used_bytes = static_cast<std::uint32_t>(used);
-                    header.block_count = static_cast<std::uint32_t>(blocks.size());
-                    write_delta(out, header, b.schema_hash_, b.root_type_id_, cur, blocks, totals);
-                    stats.blocks = header.block_count;
-                    stats.changed_bytes = totals.changed;
+                    // One changed block whose changed bytes are one run (a
+                    // field set): a run frame, which the receiver copies
+                    // instead of applying a masked block. Adding the lowest
+                    // bit of a mask of one run carries through it and leaves
+                    // no bit of the mask set.
+                    std::uint64_t one = 0;
+                    if (blocks.size() == 1u && !key && used == base_used && !options.digest && !options.whole_blocks)
+                        one = blocks[0].whole ? ~std::uint64_t(0) : blocks[0].mask;
+                    if (one != 0 && ((one + (one & (~one + 1u))) & one) == 0) {
+                        const unsigned lo = unsigned(std::countr_zero(one));
+                        const unsigned len = unsigned(std::countr_one(one >> lo));
+                        const DeltaTouchRun run{blocks[0].offset + lo, len};
+                        // flags is 0 here: no digest, the same used size.
+                        write_run_frame(out, XDELTA_FLAG_RUNS, b.stream_, version, used, cur,
+                                        std::span<const DeltaTouchRun>(&run, 1), len);
+                        stats.blocks = 1;
+                        stats.changed_bytes = len;
+                    } else {
+                        DeltaHeader header{};
+                        header.flags = flags | (key ? XDELTA_FLAG_KEY : 0u);
+                        header.stream = b.stream_;
+                        header.version = version;
+                        header.used_bytes = static_cast<std::uint32_t>(used);
+                        header.block_count = static_cast<std::uint32_t>(blocks.size());
+                        write_delta(out, header, b.schema_hash_, b.root_type_id_, cur, blocks, totals);
+                        stats.blocks = header.block_count;
+                        stats.changed_bytes = totals.changed;
+                    }
                 }
                 if (used < base.size()) base.resize(used); // shrinking never allocates
                 b.used_ = used;
@@ -3851,8 +3872,6 @@ namespace XOffsetDatastructure {
                     touch_written(*relay, parsed);
                     relay->epoch = core.epoch();
                 }
-                T* root_ptr = find_root<T>(core);
-                if (root_ptr) core.cache_root(root_ptr);
                 cursor.version_ = parsed.header.version;
                 if (check == XDeltaCheck::full) {
                     defer_checks(cursor, core);
@@ -3922,7 +3941,6 @@ namespace XOffsetDatastructure {
                     touch_written(*relay, parsed);
                     relay->epoch = core.epoch();
                 }
-                if (T* root_ptr = find_root<T>(core)) core.cache_root(root_ptr);
                 cursor.version_ = parsed.header.version;
                 cursor.last_check_ = XDeltaCheck::admit;
                 return vok();
@@ -3940,7 +3958,7 @@ namespace XOffsetDatastructure {
                 static_assert(XBufferCore::root_at % alignof(Storage) == 0);
                 if (version - 1u != cursor.version_ || version < 2u || stream != cursor.stream_ ||
                     cursor.root_type_id_ != wire_root_type_id<T>() || cursor.schema_hash_ != wire_schema_hash<T>() ||
-                    !core.typed_root_access_allowed_ || !core.template root_type_matches<T>())
+                    !core.template root_is<T>())
                     return false;
                 const auto* const sm = core.arena();
                 if (sm == nullptr) return false;
@@ -3948,18 +3966,16 @@ namespace XOffsetDatastructure {
                 return used <= core.get_size() && used >= XBufferCore::root_at + sizeof(Storage);
             }
             // The end of a short path's apply, after its bytes are written: a
-            // new epoch (the root does not move: a root the buffer cached
-            // stays), the bytes as touches of a relay (touches(log)), the
-            // cursor at `version`.
-            template <typename T, typename Touches>
+            // new epoch (the root and its key stay), the bytes as touches of
+            // a relay (touches(log)), the cursor at `version`.
+            template <typename Touches>
             static XOFFSET_DETAIL_INLINE void finish_small(XBufferCore& core, XDeltaCursor& cursor, std::uint32_t version,
-                                                           DeltaTouchLog* relay, T* cached, Touches&& touches) noexcept {
+                                                           DeltaTouchLog* relay, Touches&& touches) noexcept {
                 core.advance_epoch();
                 if (relay) [[unlikely]] {
                     touches(*relay);
                     relay->epoch = core.epoch();
                 }
-                if (T* root_ptr = cached ? cached : find_root<T>(core)) core.cache_root(root_ptr);
                 cursor.checks_valid_ = false;
                 cursor.version_ = version;
                 cursor.last_check_ = XDeltaCheck::admit;
@@ -4035,7 +4051,6 @@ namespace XOffsetDatastructure {
 
                 // Applied (apply_incremental_admit without an undo copy).
                 DeltaTouchLog* const relay = relay_log(core);
-                T* const cached = core.template cached_root<T>();
                 char* const base = core.data();
                 for (std::uint32_t k = 0; k < count; ++k) {
                     char* const blk = base + refs[k].offset;
@@ -4058,7 +4073,7 @@ namespace XOffsetDatastructure {
                         }
                     }
                 }
-                finish_small<T>(core, cursor, version, relay, cached, [&](DeltaTouchLog& log) {
+                finish_small(core, cursor, version, relay, [&](DeltaTouchLog& log) {
                     for (std::uint32_t k = 0; k < count; ++k) {
                         const auto lo = static_cast<std::uint32_t>(std::countr_zero(refs[k].mask));
                         const auto hi = 64u - static_cast<std::uint32_t>(std::countl_zero(refs[k].mask));
@@ -4105,9 +4120,8 @@ namespace XOffsetDatastructure {
                 if (q + bytes != end) return apply_runs_list<T>(xbuf, p, end, cursor, version);
                 XOFFSET_DELTA_TEST_COUNT_SMALL(1);
                 DeltaTouchLog* const relay = relay_log(core);
-                T* const cached = core.template cached_root<T>();
                 copy_run(core.data() + at, reinterpret_cast<const char*>(q), bytes);
-                finish_small<T>(core, cursor, version, relay, cached,
+                finish_small(core, cursor, version, relay,
                                 [&](DeltaTouchLog& log) { log.add(static_cast<std::uint32_t>(at), bytes); });
                 return true;
             }
@@ -4136,11 +4150,10 @@ namespace XOffsetDatastructure {
                 }
                 XOFFSET_DELTA_TEST_COUNT_SMALL(1);
                 DeltaTouchLog* const relay = relay_log(core);
-                T* const cached = core.template cached_root<T>();
                 char* const base = core.data();
                 for (std::uint32_t k = 0; k < count; ++k)
                     copy_run(base + refs[k].offset, reinterpret_cast<const char*>(p + refs[k].src), refs[k].bytes);
-                finish_small<T>(core, cursor, version, relay, cached, [&](DeltaTouchLog& log) {
+                finish_small(core, cursor, version, relay, [&](DeltaTouchLog& log) {
                     for (std::uint32_t k = 0; k < count; ++k) log.add(refs[k].offset, refs[k].bytes);
                 });
                 return true;
@@ -4174,8 +4187,7 @@ namespace XOffsetDatastructure {
                 XOFFSET_DETAIL_PREFETCH_WITH_MSVC(reinterpret_cast<const char*>(&cursor) + 128, 1);
                 // A non-key delta patches a verified root of T that this
                 // cursor's key delta produced.
-                const bool has_state = core.typed_root_access_allowed_ && core.template root_type_matches<T>() &&
-                                       core.arena() != nullptr;
+                const bool has_state = core.template root_is<T>() && core.arena() != nullptr;
                 const std::size_t old_used = has_state ? static_cast<std::size_t>(core.arena()->used_end) : 0u;
                 // A small delta is read from a copy with room past its end, so
                 // that every block's bytes are scattered a word at a time.
@@ -4244,29 +4256,38 @@ namespace XOffsetDatastructure {
     }
 
     template <typename T>
-    XDeltaStats XBuffer::save_delta_into(std::string& out, XDeltaBaseline& baseline, XDeltaOptions options) {
+    XOFFSET_DETAIL_INLINE XDeltaStats XBuffer::save_delta_into(std::string& out, XDeltaBaseline& baseline,
+                                                               XDeltaOptions options) {
         static_assert(is_wire_admitted_v<T>, "save_delta<T>() requires an admitted fixed-schema wire type.");
 #ifdef XOFFSET_REJECT_IMPLICIT_PADDING
         static_assert(!has_implicit_padding_v<T>,
             "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");
 #endif
-        if (refuse_failed_emit(out)) return XDeltaStats{};
-        // The short path (its token holds only for this content and a root
-        // of T that passed the checks below when the baseline paired).
+        // The short path first: its token holds only for this content and a
+        // root of T that passed the general path's checks when the baseline
+        // paired, and a recorded failure drops it (the general path then
+        // refuses), as for the span overload.
         if (!options.digest && !options.whole_blocks) [[likely]] {
-            if (XDeltaStats stats; detail::DeltaAccess::publish_touches<T>(*this, baseline, out, stats)) return stats;
+            if (XDeltaStats stats; detail::DeltaAccess::publish_touches<T>(*this, baseline, out, stats)) [[likely]]
+                return stats;
         }
+        return save_delta_into_general<T>(out, baseline, options);
+    }
+
+    template <typename T>
+    XOFFSET_DETAIL_NOINLINE XDeltaStats XBuffer::save_delta_into_general(std::string& out, XDeltaBaseline& baseline,
+                                                                         XDeltaOptions options) {
+        if (refuse_failed_emit(out)) return XDeltaStats{};
         if (detail::DeltaAccess::has_pending(baseline)) [[unlikely]] return detail::DeltaAccess::take_pending(baseline, out);
         T* root_ptr;
-        if (this->template root_cached_as<T>()) [[likely]] {
-            // A root cached in this epoch passed the checks below (root<T>()).
-            root_ptr = this->template cached_root_hit<T>();
+        if (this->template root_is<T>()) [[likely]] {
+            // The root key is T's: the checks below hold (root<T>()).
+            root_ptr = detail::image_root<T>(*this);
         } else {
             require_typed_root_access("save_delta<T>(): unverified payload cannot be relabeled as verified");
             require_schema_match<T>("save_delta<T>(): schema mismatch for requested root type");
             root_ptr = detail::find_root<T>(*this);
             if (!root_ptr) XOFFSET_THROW(XException(XErrc::no_root, "save_delta<T>(): no root object of requested type"));
-            if (this->template holds_fingerprint<T>()) this->cache_root(root_ptr);
         }
         ensure_hole_table(*root_ptr);
         return detail::DeltaAccess::encode<T>(*this, out, baseline, options);

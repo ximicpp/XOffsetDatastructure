@@ -31,6 +31,21 @@ of this file and in the pull requests.
   (GCC 16) 2,695 -> 2,503 instructions, a wire with free blocks 3,694 -> 3,621, the formal
   scenario's reload 15.75 M -> 15.51 M. A live block over a free block is now reported as
   "invalid free blocks" (or as overlapping live ranges when it also meets a live block).
+- Less host-side state per buffer. The root type is one key per type (`root_is<T>()` is one
+  compare; `reset<T>()` of the same type keeps it), the owner record is made on first use (the
+  verified paths and `stable_erase_if` still find their owner through it), and the root cache and
+  the binding fields are gone. `edit`, `build` and `read` with no expected growth, on a buffer with
+  no other scope open whose payload stays put, open without a control block, and each instantiates
+  its callable once. A first block is taken with a lean bump; every load checks that `used_bytes`
+  is a multiple of 8, as the format requires. Instructions (callgrind, fixed part, GCC 16 / P2996):
+  clone 264 -> 44 / 367 -> 42, reset to an empty root 82 -> 37 / 74 -> 27, an empty edit scope
+  60 -> 13 / 59 -> 12, create and destroy a buffer 1,088 -> 756 / 1,320 -> 896; a build of one
+  layout through the map's sorted base 1,621 -> 1,507 (GCC 16).
+- `save_delta_into(std::string&, ...)` of a touches baseline takes the run-frame short path inline
+  (a buffer with a recorded failure still refuses). A compared delta whose changed bytes are one
+  run in one block is a run frame ([DELTA_SYNC.md](docs/DELTA_SYNC.md), "One changed field").
+  GCC 16, Character fixture, one scalar: touches publish 182 -> 126, publish and apply 327 -> 269;
+  compared publish 1,907 -> 1,863, publish and apply 2,243 -> 2,034.
 - Fixed: a client that includes `<windows.h>` before the library compiles again (a variable in
   `save_delta_into` was named `small`, which `rpcndr.h` defines as a macro).
 - `xoffsetdatastructure.hpp` includes seven parts in its former order: `xoffset_arena.hpp`,

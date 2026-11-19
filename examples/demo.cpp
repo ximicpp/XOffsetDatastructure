@@ -188,7 +188,7 @@ void demo_memory_management() {
     print_info("After grow()", std::string("level = ") + std::to_string(h->level));
     print_check("XHandle followed the root through grow()");
     
-    // Logical shrink also preserves the cached root.
+    // The handle also follows the root through a shrink.
     hbuf.shrink_to_fit();
     print_info("After shrink()", std::string("player_name = ") + std::string(h->player_name.c_str()));
     print_check("XHandle survived shrink_to_fit()");
