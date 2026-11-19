@@ -278,21 +278,9 @@
 #  endif
 #endif
 
-// ---- Allocator --------------------------------------------------------------
-// The allocator's state is payload bytes (wire 3.0 carries it): free blocks
-// of one size are linked through their first 4 bytes, and a directory block
-// of the payload holds one list head per size (see XBufferCore, "In-band
-// allocator"). XOFFSET_INBAND_ALLOCATOR remains only until the host-side free
-// table is deleted; 0 is no longer supported.
-#if defined(XOFFSET_INBAND_ALLOCATOR) && !XOFFSET_INBAND_ALLOCATOR
-#  error "XOFFSET_INBAND_ALLOCATOR=0 is not supported: wire 3.0 carries the in-band allocator"
-#endif
-#undef XOFFSET_INBAND_ALLOCATOR
-#define XOFFSET_INBAND_ALLOCATOR 1
-
 // ---- Per-thread caches -----------------------------------------------------
-// Per-thread caches (this slab's free lists, the free-table cache and the
-// owner cache in xoffsetdatastructure.hpp). Each keeps a trivial thread_local
+// Per-thread caches (this slab's free lists and the owner cache in
+// xoffsetdatastructure.hpp). Each keeps a trivial thread_local
 // flag that its nontrivial cache clears on thread exit, so late destructors
 // take the global path. GCC on MinGW and Cygwin emulates TLS (emutls): a
 // thread's TLS blocks can be freed before its thread_local destructors run,
@@ -317,5 +305,4 @@ inline constexpr bool scrub_reset = XOFFSET_SCRUB_RESET != 0;
 inline constexpr bool pin_quarantine = XOFFSET_PIN_QUARANTINE != 0;
 inline constexpr bool save_self_check = XOFFSET_SAVE_SELF_CHECK != 0;
 inline constexpr bool check_sorted = XOFFSET_CHECK_SORTED != 0;
-inline constexpr bool inband_allocator = XOFFSET_INBAND_ALLOCATOR != 0;
 } // namespace XOffsetDatastructure::detail

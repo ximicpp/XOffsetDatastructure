@@ -1,23 +1,15 @@
-// V2 replacement for the retired V1 FreelistIndex test. V1's in-arena
-// segregated free lists, skip cursors, host runtime cache, XAllocatorStateV1
-// and release_cached_blocks no longer exist (and their diagnostics are gone),
-// so the V1 visit-count gates have no equivalent. V2 keeps an exact-size binned
-// free table on the host (XBufferCore). This test checks the documented V2
-// reuse policy against an independent oracle, on the same workloads:
-//  - exact-size bins up to 4096 B reuse LIFO (O(1), no scan);
-//  - otherwise the smallest larger small bin, then the smallest large block
-//    (earliest inserted among equal sizes) is split; the remainder stays free;
+// The allocator's reuse policy against an independent oracle (XBufferCore,
+// "In-band allocator"):
+//  - one LIFO stack per block size; the smallest size with a block serves a
+//    request (split at its front), the remainder stays free;
 //  - a block is never handed out larger than requested;
 //  - otherwise the tail grows (alignment padding > 8 becomes a free block);
-//  - retire never lowers used_end; live + free blocks tile [48, used_end);
-//  - the free table follows the storage on move/swap and reloads in
-//    canonical order (identical subsequent allocation decisions).
-// With the in-band allocator (XOFFSET_INBAND_ALLOCATOR) the oracle is that
-// allocator's policy instead (see the second Oracle): one LIFO stack per size,
-// the smallest size with a block serves a request (split at its front), and
-// the free directory is a block of the payload (made in the first retired
-// block of at least 40 bytes, at its end, else at the end of the payload;
-// when full, compacted or moved to a block twice its size).
+//  - retire never lowers used_end; live + free blocks tile [40, used_end);
+//  - the free directory is a block of the payload (made in the first retired
+//    block of at least 40 bytes, at its end, else at the end of the payload;
+//    when full, compacted or moved to a block twice its size);
+//  - the free state follows the storage on move/swap and reloads (identical
+//    subsequent allocation decisions).
 #include "xoffsetdatastructure.hpp"
 #include <algorithm>
 #include <cstdint>
@@ -33,7 +25,6 @@ namespace xo = XOffsetDatastructure;
 namespace fd = xo::fixed_detail;
 namespace {
 using Hole = xo::XBufferCore::WireHole;
-constexpr std::uint32_t kSmallMax = 4096;
 constexpr std::uint32_t kHeader = 40; // the image header; the first block (the root, when there is one) follows
 
 void need(bool value, const char* message) {
@@ -41,85 +32,6 @@ void need(bool value, const char* message) {
 }
 std::uint32_t block_of(std::uint32_t n) { return n == 0 ? 8u : (n + 7u) & ~7u; }
 
-#if !XOFFSET_INBAND_ALLOCATOR
-struct Oracle {
-    struct Free { std::uint32_t offset, bytes; std::uint64_t seq; };
-    std::vector<Free> free;
-    std::map<std::uint32_t, std::uint32_t> live; // offset -> block bytes
-    std::uint64_t used_end = kHeader, seq = 0;
-    std::size_t reused = 0, bumped = 0, splits = 0;
-
-    std::uint64_t dir_bumped = 0; // bytes the free directory took at the end (none here)
-
-    void push(std::uint32_t offset, std::uint32_t bytes) { free.push_back({offset, bytes, seq++}); }
-    std::size_t free_count() const { return free.size(); }
-    std::uint64_t free_bytes() const {
-        std::uint64_t total = 0;
-        for (const auto& f : free) total += f.bytes;
-        return total;
-    }
-    // Index of the free block the V2 policy selects, or npos.
-    std::size_t select(std::uint32_t bytes) const {
-        constexpr auto npos = static_cast<std::size_t>(-1);
-        std::size_t best = npos;
-        if (bytes <= kSmallMax) {
-            for (std::size_t i = 0; i < free.size(); ++i)   // exact size, latest first
-                if (free[i].bytes == bytes && (best == npos || free[i].seq > free[best].seq)) best = i;
-            if (best != npos) return best;
-            for (std::size_t i = 0; i < free.size(); ++i) { // smallest larger small size, latest first
-                const auto b = free[i].bytes;
-                if (b <= bytes || b > kSmallMax) continue;
-                if (best == npos || b < free[best].bytes || (b == free[best].bytes && free[i].seq > free[best].seq))
-                    best = i;
-            }
-            if (best != npos) return best;
-        }
-        for (std::size_t i = 0; i < free.size(); ++i) {     // large: smallest fit, earliest first
-            const auto b = free[i].bytes;
-            if (b <= kSmallMax || b < bytes) continue;
-            if (best == npos || b < free[best].bytes || (b == free[best].bytes && free[i].seq < free[best].seq))
-                best = i;
-        }
-        return best;
-    }
-    std::uint32_t allocate(std::uint32_t bytes, std::size_t alignment) {
-        if (alignment <= 8) {
-            const auto i = select(bytes);
-            if (i != static_cast<std::size_t>(-1)) {
-                const auto f = free[i];
-                free.erase(free.begin() + static_cast<std::ptrdiff_t>(i));
-                if (f.bytes > bytes) { push(f.offset + bytes, f.bytes - bytes); ++splits; }
-                live[f.offset] = bytes;
-                ++reused;
-                return f.offset;
-            }
-        }
-        const auto a = std::max<std::uint64_t>(alignment, 8);
-        const auto start = (used_end + a - 1) & ~(a - 1);
-        if (start != used_end) push(static_cast<std::uint32_t>(used_end), static_cast<std::uint32_t>(start - used_end));
-        used_end = start + bytes;
-        live[static_cast<std::uint32_t>(start)] = bytes;
-        ++bumped;
-        return static_cast<std::uint32_t>(start);
-    }
-    void retire(std::uint32_t offset, std::uint32_t bytes) {
-        auto it = live.find(offset);
-        need(it != live.end() && it->second == bytes, "oracle retire of a block that is not live");
-        live.erase(it);
-        push(offset, bytes);
-    }
-    // Canonical emission order: ascending size, insertion order within a size.
-    std::vector<Hole> canonical() const {
-        auto sorted = free;
-        std::sort(sorted.begin(), sorted.end(), [](const Free& a, const Free& b) {
-            return a.bytes != b.bytes ? a.bytes < b.bytes : a.seq < b.seq;
-        });
-        std::vector<Hole> out;
-        for (const auto& f : sorted) out.push_back({f.offset, f.bytes});
-        return out;
-    }
-};
-#else
 struct Oracle {
     // Entries in use, ascending size; a stack's head is its back. An emptied
     // stack keeps its entry.
@@ -223,7 +135,6 @@ struct Oracle {
         return out;
     }
 };
-#endif
 constexpr bool kInband = xo::XBufferCore::free_block_header_bytes != 0;
 
 std::vector<Hole> holes_of(const xo::XBufferCore& core) {
@@ -243,11 +154,7 @@ struct Arena {
     Arena() : core(16u * 1024u * 1024u, xo::XBufferCore::maximum_capacity(32u * 1024u * 1024u)) {}
     fd::allocator_ref ref() { return {core.arena()}; }
     std::uint32_t directory_at() const {
-#if XOFFSET_INBAND_ALLOCATOR
         return oracle.dir_at;
-#else
-        return 0;
-#endif
     }
     // In-band: makes the free directory first (all of a 40-byte block), so
     // that the next retired blocks stay whole free blocks.

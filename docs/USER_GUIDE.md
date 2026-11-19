@@ -214,7 +214,7 @@ operation. Addresses come in three levels:
 | Region | The whole payload: the root object and everything reachable from it | `buf.root<Profile>()` |
 
 **Container operations only affect that container.** Allocation takes new blocks only from free
-blocks or the end of the region, and freeing only records blocks in the free table; elements and
+blocks or the end of the region, and freeing only records blocks in the free directory; elements and
 child data of other containers never move.
 
 | Operation | References, pointers, iterators to this container's elements | Compare |
@@ -448,12 +448,12 @@ in.read([](const Profile& r) { print(r.name.view()); });   // read plain members
   containing containers must be a valid object in some XOffset buffer, which the sender does not
   validate. Implicit padding bytes of a target are written as 0. Breaking a rule or exceeding the
   wire limit throws `XException` and leaves `out` empty.
-- Validation on load covers: header and version, schema identity, hole table, a full graph walk
-  from the root, and "live blocks + holes exactly tile the used area". If any check fails it throws
+- Validation on load covers: header and version, schema identity, the free directory and its free
+  blocks, a full graph walk from the root, and "live blocks + free blocks exactly tile the used area". If any check fails it throws
   `XException` and the root is never published. To avoid exceptions call `try_load_verified`; see
   section 6.1.
-- A loaded buffer can be modified and saved again; free space from before the save comes along with
-  the hole table and keeps being reused.
+- A loaded buffer can be modified and saved again; free space from before the save comes along in the
+  image (the free blocks and their directory) and keeps being reused.
 - `load_unverified` skips validation and is only for data the caller already trusts.
 
 ### 4.1 Many small messages: slots, or reuse mappings with `XBufferPool`
@@ -489,7 +489,7 @@ XBuffer snapshot = buf.clone();     // new owner: size, maximum_capacity, growth
 buf.clone_into(scratch);            // reuses scratch's mapping and address, like reload_verified
 ```
 
-- Copies the used area once and carries the free table, typed root access and schema binding along;
+- Copies the used area once (free blocks included) and carries typed root access and schema binding along;
   no wire is produced and nothing is validated (the source is a buffer this process is using). The
   copy is fully independent of the source; the same edits afterwards give the same bytes, and
   `save_verified` output is identical too.
@@ -510,20 +510,19 @@ Two conventions are prerequisites for whole-region relocation (K0) and "what is 
 bytes" (K3, K5). Their cost falls on a few kinds of operations, and the contract will not change to
 remove it. Below are the causes and what users can do.
 
-**Convention one: one arena per buffer, with its own free table.** Free space is recorded in the
-buffer's own table and is sent and loaded with the hole table, so after a whole-region move or send,
-further edits do not degrade (K5) and nothing depends on process-global allocator state. The cost is
-that metadata is spread per buffer: the first time a buffer uses a size class, that class's metadata
-is cold, so loads where many buffers are each edited once or twice hit cold metadata almost every
-time.
+**Convention one: one arena per buffer, with its own free blocks.** Free space is recorded in the
+buffer's own payload (a directory block and the free blocks themselves) and travels with the image, so
+after a whole-region move or send, further edits do not degrade (K5) and nothing depends on
+process-global allocator state. The cost is that metadata is spread per buffer: the first edit of a
+buffer that has gone cold reads its header and directory from memory.
 
 - Remedies: keep buffers long-lived and reuse them message by message (`reload_verified` /
-  `reset<T>()`, see [BUFFER_REUSE.md](BUFFER_REUSE.md)), so the free table and mapping stay in
-  place; concentrate mergeable edits on a few buffers.
+  `reset<T>()`, see [BUFFER_REUSE.md](BUFFER_REUSE.md)), so the mapping stays in place; concentrate
+  mergeable edits on a few buffers.
 - When you know which buffers are about to be edited while the data for the edit is still on its way
   (for example a battle result is being received and decoded), call `prefetch_for_update()` on those
   buffers first. It only issues non-blocking cache prefetches (owner map entry, owner word, arena
-  header, free-table counters, bitmap and the first few small bins) and changes no content or
+  header) and changes no content or
   allocation decision; the cold-metadata misses then overlap with receiving instead of being waited
   for one by one during the edit.
 
@@ -748,7 +747,7 @@ outside clients that way.
 
 // Receivers are built per connection type, and the type decides the tier; there is no global switch and no trusted member on XBuffer.
 XReceiver<XLink::from_server> rx(XBuffer::maximum_capacity(16 << 20));   // client receiving from the server
-XStatus st = rx.reload<Profile>(held, wire);        // trusted tier: parse header and tables, copy, load the free table, no graph walk
+XStatus st = rx.reload<Profile>(held, wire);        // trusted tier: check the header, copy (the free directory comes along), no graph walk
 XStatus full = rx.reload<Profile, XCheck::full>(held, wire);   // explicit full validation on the same link
 auto fresh = rx.load<Profile>(wire);                // new buffer (a new mapping each time; use reload on hot paths)
 XDeltaCursor cur;                                   // which delta stream held follows

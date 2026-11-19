@@ -223,12 +223,12 @@ void repeated_full_replacement_operation_gate() {
     // I1: initial values of at most 10 bytes are inline and own no block.
     constexpr unsigned n = 4096;
     auto buffer = make_buffer(8u * 1024u * 1024u); auto& root = buffer.root<ReplaceRoot>();
-    root.words.resize(n); std::uint64_t old_bytes = 0, old_extents = 0; std::size_t heap_words = 0;
+    root.words.resize(n); std::uint64_t old_bytes = 0, old_extents = 0;
     for (unsigned i = 0; i < n; ++i) {
         const auto size = 8u + i % 57u; old_bytes += size;
         root.words[i].assign(std::string(size, char('a' + i % 26)));
         need(root.words[i].is_inline() == (size <= 10), "initial word placement");
-        if (!root.words[i].is_inline()) { ++heap_words; old_extents += extent(root.words[i].owned_extent()); }
+        if (!root.words[i].is_inline()) { old_extents += extent(root.words[i].owned_extent()); }
     }
     root.blocker.assign(std::string(1024, 'b')); const std::string desired(128, 'X');
     need(buffer.free_block_count() == 0, "operation gate fixture has holes");
@@ -238,11 +238,9 @@ void repeated_full_replacement_operation_gate() {
 #endif
     for (auto& word : root.words) word.assign(desired);
     // One exact 129 -> 136-byte allocation per word and one retire per heap
-    // word; every retired block (at most 72 bytes) stays a distinct hole (in-band,
-    // the free directory is made of or next to them: the live bytes say it all).
-    need(live(buffer) == live_before + std::uint64_t(n) * extent(129) - old_extents &&
-         (xo::detail::inband_allocator ||
-          (buffer.free_block_count() == heap_words && buffer.free_block_bytes() == old_extents)),
+    // word (the free directory is made of or next to the retired blocks: the
+    // live bytes say it all).
+    need(live(buffer) == live_before + std::uint64_t(n) * extent(129) - old_extents,
          "full replacement operation gate changed allocation count");
 #ifdef XOFFSET_STRING_REPLACE_COPY_AUDIT
     need(fd::string_replace_audit_stats.fresh_replacements == n &&

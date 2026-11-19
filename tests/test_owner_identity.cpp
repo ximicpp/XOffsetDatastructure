@@ -290,110 +290,8 @@ void callback_during_allocation_bookkeeping() {
         need(raw && from.root<OwnerRoot>().numbers[0] == 29, "growth probe allocation failed");
         std::memset(raw, 0x43, 65536); fd::retire_dynamic_bytes(ref, raw, 65536);
     }
-    // V2's allocation-path host request (V1: release_cached_blocks' host
-    // reservation): splitting a larger free block pushes its remainder into
-    // the host free table. That new_handler may transfer, release or reenter
-    // the owner; the allocation must commit to, and return memory of, the
-    // actual payload owner, or fail closed once that payload is released.
-    // A bin records its first free_table_inline_entries holes without host
-    // storage, so the fixture first fills the remainder's bin (16 bytes): the
-    // remainder is the hole that needs bin storage. (The in-band allocator
-    // makes no host allocation: no callback point.)
-    if constexpr (xo::detail::inband_allocator) return;
-    constexpr std::size_t fillers = xo::XBufferCore::free_table_inline_entries;
-    for (Action which : {Action::move, Action::swap, Action::release, Action::reenter}) {
-        auto from = make_buffer(), to = make_buffer(), unrelated = make_buffer();
-        from.root<OwnerRoot>().numbers.resize(3, 29u); auto ref = binding(from);
-        auto* larger = fd::allocate_dynamic_bytes(ref, 48, 8);
-        std::array<void*, fillers> small{};
-        for (auto& q : small) q = fd::allocate_dynamic_bytes(ref, 16, 8);
-        for (auto q : small) fd::retire_dynamic_bytes(ref, q, 16);
-        fd::retire_dynamic_bytes(ref, larger, 48);
-        need(from.free_block_count() == fillers + 1 && from.free_block_bytes() == 48 + fillers * 16,
-             "fixture free block missing");
-        source = &from; target = &to; auxiliary = &unrelated; active = ref;
-        void* raw = nullptr; bool caught = false;
-        {
-            HandlerScope handler(which); host::fail_after = 0;
-            try { raw = fd::allocate_dynamic_bytes(ref, 32, 8); }
-            catch (const xo::XException&) { caught = true; }
-            need(host::calls == 1, "split-remainder new_handler not exercised");
-        }
-        if (which == Action::release) {
-            need(caught && from.data() == nullptr, "released payload identity revived/read");
-        } else {
-            auto& current = which == Action::move || which == Action::swap ? to : from;
-            need(!caught && raw && in_payload(current, raw, 32) && current.root<OwnerRoot>().numbers[0] == 29,
-                 "allocation after callback owner transfer");
-            need(raw == larger, "split did not hand out the front of the larger free block");
-            std::memset(raw, 0x43, 32); fd::retire_dynamic_bytes(ref, raw, 32);
-            const std::uint64_t expected = (which == Action::reenter ? 72 : 48) + fillers * 16;
-            need(current.free_table_complete() && current.free_block_bytes() == expected,
-                 "split remainder lost or committed to a stale owner");
-            auto loaded = xo::XBuffer::load_verified<OwnerRoot>(current.save_verified<OwnerRoot>(), policy());
-            need(loaded.root<OwnerRoot>().numbers[2] == 29, "post-callback owner failed verified round trip");
-        }
-        dt::clear_vm_failures();
-    }
-}
-
-void callback_during_free_table_retirement() {
-    // V1 Core reclamation reserved a host vector; V2 retirement creates/grows
-    // the host free table. That new_handler may transfer, release or reenter.
-    // (The in-band allocator makes no host allocation: no callback point.)
-    if constexpr (xo::detail::inband_allocator) return;
-    for (Action which : {Action::move, Action::swap, Action::release, Action::reclaim_reenter}) {
-        auto from = make_buffer(), to = make_buffer(); auto ref = binding(from);
-        auto* p = ref.segment->allocate_aligned(32, 8);
-        need(from.free_block_count() == 0, "fixture already has a free table entry");
-        source = &from; target = &to; active = ref;
-        // With no cached table, the table itself is the host allocation (one
-        // hole needs no bin storage).
-        xo::XBufferCore::trim_free_table_cache();
-        {
-            HandlerScope handler(which); host::fail_after = 0;
-            ref.segment->deallocate(p, 32); // the first retirement creates the host table
-            need(host::calls == 1, "free-table retirement new_handler not exercised");
-        }
-        if (which == Action::release) { need(from.data() == nullptr, "retirement revived released owner"); continue; }
-        auto& current = which == Action::move || which == Action::swap ? to : from;
-        need(static_cast<void*>(current.data()) == static_cast<void*>(ref.segment), "retirement payload transfer");
-        auto* q = ref.segment->allocate_aligned(32, 8);
-        if (which == Action::reclaim_reenter) {
-            auto* second = ref.segment->allocate_aligned(32, 8);
-            need((q == p && second == reentrant_freed[1]) || (q == reentrant_freed[1] && second == p),
-                 "outer or reentrant retired block lost after reentry");
-            auto* third = ref.segment->allocate_aligned(24, 8);
-            need(third == reentrant_freed[0], "reentrant 24-byte retirement lost after outer retirement");
-            ref.segment->deallocate(third, 24); ref.segment->deallocate(second, 32);
-        } else {
-            need(q == p, "retirement committed into stale Core instead of actual payload owner");
-        }
-        ref.segment->deallocate(q, 32);
-        need(current.free_table_complete(), "retirement left the actual owner's free table incomplete");
-        auto loaded = xo::XBuffer::load_verified<OwnerRoot>(current.save_verified<OwnerRoot>(), policy());
-        (void)loaded.root<OwnerRoot>();
-    }
-}
-
-void free_table_host_oom_is_recorded_and_recomputed() {
-    // V2 replacement of V1's best-effort Core cache under host OOM: a lost
-    // retirement marks the host table incomplete and saving recomputes holes.
-    // (The in-band allocator makes no host allocation.)
-    if constexpr (xo::detail::inband_allocator) return;
-    auto b = make_buffer(); auto ref = binding(b);
-    auto* p = fd::allocate_dynamic_bytes(ref, 24, 8);
-    xo::XBufferCore::trim_free_table_cache(); // the table is the failing host allocation
-    host::fail_after = 0; fd::retire_dynamic_bytes(ref, p, 24); host::fail_after = -1;
-    need(!b.free_table_complete(), "host OOM during retirement was not recorded");
-    const auto wire = b.save_verified<OwnerRoot>();
-    need(b.free_table_complete() && b.free_block_count() == 1 && b.free_block_bytes() == 24,
-         "save did not recompute the lost hole");
-    auto loaded = xo::XBuffer::load_verified<OwnerRoot>(wire, policy());
-    need(loaded.free_block_count() == 1 && loaded.free_block_bytes() == 24, "recomputed hole not on the wire");
-    auto* again = fd::allocate_dynamic_bytes(ref, 24, 8);
-    need(again == p, "recomputed hole not reusable");
-    fd::retire_dynamic_bytes(ref, again, 24);
+    // Splitting a larger free block records its remainder in the payload:
+    // no host allocation, so no callback point.
 }
 
 void registry_new_handler_reentry_is_unlocked() {
@@ -413,31 +311,6 @@ void registry_new_handler_reentry_is_unlocked() {
 }
 
 void delete_callbacks_observe_complete_move() {
-    // Target's actual free-table allocation is captured, not a guessed size or
-    // the earlier registry-node delete. Its delete fires in the move gap.
-    // (The in-band allocator has no host table.)
-    if constexpr (!xo::detail::inband_allocator) {
-        auto from = make_buffer();
-        auto to = xo::XBuffer::create<OtherOwnerRoot>(4096, policy());
-        from.root<OwnerRoot>().numbers.resize(3, 313u);
-        // Releasing the table returns its bins' host storage. A bin holds its
-        // first free_table_inline_entries holes inline, so the fixture fills
-        // bin 32 first and captures the storage the next hole allocates.
-        std::array<void*, xo::XBufferCore::free_table_inline_entries> fill{};
-        for (auto& q : fill) q = to.arena()->allocate_aligned(32, 8);
-        auto* p = to.arena()->allocate_aligned(32, 8);
-        for (auto q : fill) to.arena()->deallocate(q, 32);
-        begin_capture(); to.arena()->deallocate(p, 32);
-        need(!host::capture_next, "target free-table allocation not captured");
-        auto* old_table = host::captured;
-        delete_binding = binding(from); delete_expected_owner = &to; delete_expected_word = 313;
-        const auto from_epoch = from.epoch(), to_epoch = to.epoch();
-        arm_delete(old_table, check_delete_owner); to = std::move(from);
-        need(host::delete_calls == 1 && delete_ok, "delete callback saw partial Core/schema/free-table transfer");
-        disarm_delete();
-        need(to.epoch() == to_epoch + 1 && from.epoch() == from_epoch + 1, "move epoch changed more than once");
-        need(to.root<OwnerRoot>().numbers[0] == 313, "incoming schema not transferred");
-    }
     // A sole pool State is another callback boundary in VM move assignment.
     // Capture its preallocated owner-slot vector, then drop every external pool
     // handle. Destruction must wait until the incoming Core is fully published.
@@ -516,8 +389,6 @@ int main() {
         {"other owners/registration failures", lookup_ignores_other_owners_and_registration_failures},
         {"transfers/reused base", transfers_and_deterministic_reused_payload_base},
         {"allocation bookkeeping callbacks", callback_during_allocation_bookkeeping},
-        {"free-table retirement callbacks", callback_during_free_table_retirement},
-        {"free-table host OOM", free_table_host_oom_is_recorded_and_recomputed},
         {"registry new_handler reentry", registry_new_handler_reentry_is_unlocked},
         {"alias/thread exit", alias_roundtrip_and_thread_exit},
         {"delete callbacks", delete_callbacks_observe_complete_move},
@@ -533,7 +404,7 @@ int main() {
     try {
         late_owner=make_buffer(); late_owner.root<OwnerRoot>().numbers.resize(3, 617u);
         late_armed=true;
-        std::cout << "9 owner identity groups passed; late global destructor armed; Core bytes "
+        std::cout << "7 owner identity groups passed; late global destructor armed; Core bytes "
                   << sizeof(xo::XBufferCore) << "; no timing\n";
     } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }
 }
