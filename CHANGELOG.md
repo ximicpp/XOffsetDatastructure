@@ -68,6 +68,25 @@ of this file and in the pull requests.
   arena, then send) is 115 ns. Instructions (callgrind, GCC 16 / P2996): 1,853 -> 1,442 /
   2,027 -> 1,801, a nearly empty root 475 -> 194 / 618 -> 378. SLG A 0.974 / 0.963; B to D,
   formal, delta and build cells unchanged.
+- **Changed default:** `XSaveOptions{}` is `XWireEmission::automatic`. `save_verified` and
+  `save_verified_into` send an image whose free blocks are at least 512 bytes and at least an
+  eighth of it as its compact wire (`save_compact`, default slack), and any other image as before
+  (`free_runs`). The choice reads the header's free bytes: a clean send runs the same instructions
+  as before. The receiver gets the same contents with no free block. `free_runs`, `dense` and
+  `zero_runs` still send the image; tests and the cross-compiler corpus that pin image bytes now
+  ask for `free_runs`. `save_compact_into` is inline up to its reused-output path (P2996 1,801 ->
+  1,476 instructions). Character after churn, send plus trusted receive vs zpp::bits (premises
+  sweep, 15 processes, GCC 16): 11.5 KB 1.27-4.3 -> 0.33-0.36, 46 KB 1.01-3.5 -> 0.59-0.62; with
+  the full check 1.65-4.96 -> 0.54-0.57 and 1.27-4.31 -> 0.73-0.77; clean cells unchanged. Below
+  12 KB of image the trusted pair is 0.85 to 1.17 of before (copying an image that stays in L1
+  costs about as much as the compact walk; 2.9 KB Character about +5%, still 0.41 of zpp::bits),
+  the checked pair 0.52 to 0.75. Spare capacity inside containers (no free block) is not in the
+  header and still goes as the image.
+  SLG demo, M scale (time): B 0.82, S save and receive 0.57-0.86, A 0.98 (its responses: 9% of
+  them go compact, a ~4 KB message of many small blocks, +5.8% for encode plus decode). SLG
+  instructions (GCC 16 / P2996): A 0.996 / 1.005, B 0.980 / 0.974, C 1.000 / 1.000, D 0.978 /
+  1.000; on P2996 slg.A rises in `A.apply`, battle results written into players that arrived
+  compact (small vectors without spare capacity), not in a send or receive.
 - Fixed: a client that includes `<windows.h>` before the library compiles again (a variable in
   `save_delta_into` was named `small`, which `rpcndr.h` defines as a macro).
 - `xoffsetdatastructure.hpp` includes seven parts in its former order: `xoffset_arena.hpp`,

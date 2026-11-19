@@ -381,8 +381,9 @@ public:
     /// Either way the framing is checked as for reload (magic, header size, root type and schema
     /// fingerprint, used_bytes within maximum_capacity() and equal to the wire's
     /// length). The wire must be dense (no extent table: the default emission
-    /// sends an image whose free blocks hold less than 4 KiB dense, and
-    /// XWireEmission::dense always does), start on an 8-byte boundary, and
+    /// sends an image whose free blocks hold less than 4 KiB, or a churned
+    /// image's compact wire, dense, and XWireEmission::dense always does),
+    /// start on an 8-byte boundary, and
     /// outlive the view. With XOFFSET_FORCE_FULL_CHECK
     /// the full check also runs on a copy, and what it rejects is rejected.
     template <typename T, XCheck C = default_view_check<L>>

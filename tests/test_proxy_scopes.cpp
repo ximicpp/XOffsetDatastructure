@@ -94,6 +94,9 @@ bool g_scope_ok = true;
     } while (0)
 
 namespace {
+// Image sizes: the automatic default would send a churned image compact.
+constexpr XSaveOptions kImage{.emission = XWireEmission::free_runs};
+
 XBuffer make_relocating(std::size_t reserve = 0) {
     auto cap = XBuffer::relocating();
     if (reserve) cap = cap.with_reserve(reserve);
@@ -328,18 +331,18 @@ bool test_pin_scopes() {
         });
     };
     for (int i = 0; i < 8; ++i) CHECK(churn_scope(4));
-    const auto small_wire = churn.save_verified<Root>().size();
+    const auto small_wire = churn.save_verified<Root>(kImage).size();
     for (int i = 0; i < 2000; ++i) CHECK(churn_scope(4));
-    CHECK(churn.save_verified<Root>().size() == small_wire);
+    CHECK(churn.save_verified<Root>(kImage).size() == small_wire);
     CHECK(churn_scope(5000));
-    const auto large_wire = churn.save_verified<Root>().size();
+    const auto large_wire = churn.save_verified<Root>(kImage).size();
 #if XOFFSET_PIN_QUARANTINE
     CHECK(large_wire > small_wire);    // the scope held every block it retired
 #else
     CHECK(large_wire == small_wire);   // blocks are reused inside the scope
 #endif
     for (int i = 0; i < 2000; ++i) CHECK(churn_scope(4));
-    CHECK(churn.save_verified<Root>().size() == large_wire && churn.ok());
+    CHECK(churn.save_verified<Root>(kImage).size() == large_wire && churn.ok());
     CHECK(churn.root<Root>().players.empty());
     // On entry a Relocating buffer whose reservation is more than half used
     // moves first.
@@ -689,9 +692,9 @@ bool test_bare_edit_scopes() {
         });
     };
     for (int i = 0; i < 8; ++i) CHECK(churn_scope());
-    const auto wire = churn.save_verified<Root>().size();
+    const auto wire = churn.save_verified<Root>(kImage).size();
     for (int i = 0; i < 2000; ++i) CHECK(churn_scope());
-    CHECK(churn.save_verified<Root>().size() == wire && !churn.pinned());
+    CHECK(churn.save_verified<Root>(kImage).size() == wire && !churn.pinned());
     return true;
 }
 } // namespace

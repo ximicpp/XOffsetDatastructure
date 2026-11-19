@@ -404,10 +404,14 @@ in.read([](const Profile& r) { print(r.name.view()); });   // read plain members
 
 - A wire is the buffer's image: a 40-byte header, then the payload with its free blocks (a sparse
   wire has an extent table after the header; see [WIRE_FORMAT.md](WIRE_FORMAT.md) section 3). By
-  default only the bodies of free blocks in runs that are "at least 4 KiB long and made of free
-  blocks of at least 1 KiB" are skipped (for example the hole left by deleting many records at
-  once); the rest of the image is copied in one go.
-  `XSaveOptions{.emission = XWireEmission::dense}` forces a full copy.
+  default (`XWireEmission::automatic`) a buffer whose free blocks are at least 512 bytes and an
+  eighth of the image (after many edits) is sent as its compact wire (`save_compact`, below):
+  the same contents, laid out afresh, faster to send and receive than the churned image. Any
+  other buffer is sent as its image; only the bodies of free blocks in runs that are "at least
+  4 KiB long and made of free blocks of at least 1 KiB" are skipped (for example the hole left by
+  deleting many records at once), and the rest is copied in one go.
+  `XSaveOptions{.emission = XWireEmission::free_runs}` always sends the image, and
+  `XSaveOptions{.emission = XWireEmission::dense}` forces a full copy of it.
 - When sending across machines you can turn on zero-run omission:
   `save_verified<Profile>(XSaveOptions{.emission = XWireEmission::zero_runs})`
   (`save_verified_into` takes the same option). It skips all-zero runs of at least 64 bytes
@@ -416,7 +420,7 @@ in.read([](const Profile& r) { print(r.name.view()); });   // read plain members
   slower. The cost is one extra scan of the payload when sending; when the payload is under 4 KiB
   or the saving is less than max(256 B, 1/16 of the payload) it falls back to dense. Keep the
   default for same-machine shared memory or in-process transfer. The receiver needs no setting and
-  accepts all three wire kinds.
+  accepts every wire kind.
 - To make the wire smaller, use `save_compact<Profile>()` (or `save_compact_into<Profile>(out)`):
   it walks the object graph in validation order and writes a compact wire (no holes) directly,
   without a temporary buffer, and leaves the source buffer unchanged. By default containers

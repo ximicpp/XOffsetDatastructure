@@ -117,7 +117,17 @@ size`. Errors are prefixed with the calling API's name.
 **Emission.** `XSaveOptions{.emission}` selects the form; `save_verified` and
 `save_verified_into` emit the same bytes for the same state.
 
-- `free_runs` (default): dense unless `free_bytes` is at least 4 KiB (one
+- `automatic` (default): the compact wire (`save_compact` with the default
+  slack, below) when the image's free blocks are at least 512 bytes and at
+  least 1/8 of `used_bytes` (one header read), otherwise as `free_runs`. In
+  the premises sweep (Character, images of 1 KB to 400 KB) churned images
+  sent this way took 0.10 to 0.75 of the image's send plus checked receive
+  time at every size, and 0.08 to 0.77 of send plus trusted receive from
+  12 KB up; below 12 KB the trusted pair took 0.85 to 1.17, since copying an
+  image that stays in L1 costs about as much as the compact walk. Clean
+  images are faster as the image (compact 1.3 to 2.1 times slower). A root
+  type that `save_compact` does not admit always goes as `free_runs`.
+- `free_runs`: dense unless `free_bytes` is at least 4 KiB (one
   header read). Otherwise free blocks of at least 1 KiB are sorted by offset,
   adjacent ones merge, and in every merged run of at least 4 KiB each block's
   body (all of it but its first word, the link) is skipped. A free block's
@@ -130,8 +140,10 @@ size`. Errors are prefixed with the calling API's name.
   word after the header. Images below 4 KiB, and emissions that would save
   less than max(256 B, used_bytes / 16), stay dense.
 
-The loaded image is byte-identical in every form, so spare capacity and the
-free blocks survive the transfer.
+Every form but `automatic` loads as the sender's image, byte for byte, so
+spare capacity and the free blocks survive the transfer. A compact wire loads
+as the same contents in a new layout with no free block (and is itself an
+image: its re-save is the same bytes).
 
 `save_compact` emits a compact wire directly: the root at offset 40, then
 every block in validation (preorder) order, strings of at most 10 bytes

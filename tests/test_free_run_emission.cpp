@@ -1,4 +1,4 @@
-// Default (free-run) emission: in each run of at least 4 KiB of adjacent free
+// Free-run emission: in each run of at least 4 KiB of adjacent free
 // blocks of at least 1 KiB (kMinBlock), skips every block's body (all of it
 // but its first word, the link to the next block of its size), nothing else.
 //   - a run next to small free blocks skips only its large blocks' bodies;
@@ -24,7 +24,7 @@
 
 namespace xo = XOffsetDatastructure;
 
-// The smallest free block whose body the default emission skips.
+// The smallest free block whose body free-run emission skips.
 constexpr std::uint32_t kMinBlock = xo::detail::wire_free_run_min_block;
 static_assert(kMinBlock == 1024);
 
@@ -56,6 +56,7 @@ struct Hole { std::uint32_t offset, bytes; };
 void need(bool ok, const std::string& what) { if (!ok) fail(what); }
 
 constexpr xo::XSaveOptions kDense{.emission = xo::XWireEmission::dense};
+constexpr xo::XSaveOptions kRuns{.emission = xo::XWireEmission::free_runs};
 
 // Retires the blocks of blobs `indices` (ascending) by erasing the blobs.
 void release(Buffer& b, std::vector<std::size_t> indices) {
@@ -154,9 +155,9 @@ std::vector<Hole> reference_gaps(const std::string& dense) {
 // Checks the common properties and returns the skipped ranges.
 std::vector<Hole> emit(Buffer& b, const std::string& where) {
     const auto dense = b.save_verified(kDense);
-    const auto wire = b.save_verified();
+    const auto wire = b.save_verified(kRuns);
     std::string into = "reused";
-    b.save_verified_into(into);
+    b.save_verified_into(into, kRuns);
     need(into == wire, where + ": save_verified_into differs");
     const auto p = parse(wire);
     const auto expected = reference_gaps(dense);
@@ -237,7 +238,7 @@ int main() {
         const auto dir = b.free_directory();
         need(dir.offset + dir.bytes == c + 4096, "two runs: the directory is not at the second block's end");
         need(gaps.size() == 1 && gaps[0].offset == a + 8 && gaps[0].bytes == 4088, "two runs: expected the first block");
-        need(parse(b.save_verified()).h.extent_count == 2, "two runs: expected two extents");
+        need(parse(b.save_verified(kRuns)).h.extent_count == 2, "two runs: expected two extents");
     }
     {   // Random layouts: up to 64 candidates (local storage), and more
         // candidates with more than 8 runs (heap storage).
