@@ -1,8 +1,9 @@
-// Small deltas (xoffset_delta.hpp): encode_small writes the delta of an
-// XDeltaRecord::touches baseline whose touch log lists at most 8 blocks, and
-// apply_small applies a delta with no flags and at most 8 blocks on an
-// admitting receiver, each in one pass. Both must give exactly what the
-// general path gives.
+// Small deltas (xoffset_delta.hpp): publish_touches writes the delta of an
+// XDeltaRecord::touches baseline whose touch log lists every run since its
+// last delta, apply_runs_small applies a run frame with no other flag and at
+// most 16 runs, and apply_small a block frame with no flags and at most 8
+// blocks, on an admitting receiver, each in one pass. Each must give exactly
+// what the general path gives.
 //
 // XOFFSET_TEST_DELTA_GENERAL turns on DeltaAccess::test_general_path(), a
 // per-thread switch that sends every delta on this thread through the
@@ -10,15 +11,15 @@
 // the short path allowed and one through the general path, must give the
 // same delta bytes and stats after every step, through random streams of
 // touched edits (scalars, touch_set, strings, containers that grow, erasure
-// that leaves holes, more blocks than the list holds), options (digest, whole
+// that frees blocks, more runs than the list holds), options (digest, whole
 // blocks), a copy baseline pairing in between (a shared touch log), a
 // baseline object that moves (another owner of the log), resets and a
 // content replacement (key deltas). Each delta is applied to two replicas,
 // one per path, through XReceiver<from_server> (trust tier admit); the
-// replicas must hold the same payload, holes and cursor, and each relays
-// what it applies with a touches baseline of its own (the receiver's touch
-// log replay), whose deltas must also match. Corrupted copies of each delta
-// (flipped, truncated, extended, a changed block count, version or stream)
+// replicas must hold the same payload and cursor, and each relays what it
+// applies with a touches baseline of its own (the receiver's touch log
+// replay), whose deltas must also match. Corrupted copies of each delta
+// (flipped, truncated, extended, a changed version, stream or flags)
 // applied to clones of both replicas must have the same outcome, error and
 // result. Counters check that the short paths ran.
 #define XOFFSET_TEST_DELTA_GENERAL 1
@@ -34,17 +35,6 @@ void need(bool ok, const std::string& what) {
 std::string payload_of(const xo::XBuffer& b) {
     const auto* sm = b.arena();
     return std::string(static_cast<const char*>(b.get_address()), static_cast<std::size_t>(sm->used_end));
-}
-
-std::vector<std::pair<std::uint32_t, std::uint32_t>> holes_of(const xo::XBuffer& b) {
-    std::vector<std::pair<std::uint32_t, std::uint32_t>> out;
-    // In-band, the free blocks are payload bytes (payload_of compares them),
-    // and a corrupted delta this trusted link accepts can leave a directory
-    // that names bytes outside the payload: not walked.
-    if constexpr (xo::detail::inband_allocator) return out;
-    b.for_each_free_block([&](xo::XBufferCore::WireHole h) { out.emplace_back(h.offset, h.bytes); });
-    std::sort(out.begin(), out.end());
-    return out;
 }
 
 // Runs fn with deltas on this thread forced through the general path or not.
@@ -150,7 +140,7 @@ struct Stats {
 } totals;
 
 void same_stats(const xo::XDeltaStats& a, const xo::XDeltaStats& b, const std::string& where) {
-    need(a.key == b.key && a.holes == b.holes && a.empty == b.empty && a.blocks == b.blocks &&
+    need(a.key == b.key && a.empty == b.empty && a.blocks == b.blocks &&
              a.changed_bytes == b.changed_bytes && a.compared_bytes == b.compared_bytes &&
              a.delta_bytes == b.delta_bytes,
          where + ": stats differ between the short and the general path");
@@ -158,8 +148,8 @@ void same_stats(const xo::XDeltaStats& a, const xo::XDeltaStats& b, const std::s
 
 void same_replica(const Buffer& a, const xo::XDeltaCursor& ca, const Buffer& b, const xo::XDeltaCursor& cb,
                   const std::string& where) {
+    // (The free blocks are payload bytes: compared with them.)
     need(payload_of(a) == payload_of(b), where + ": replica payloads differ");
-    need(holes_of(a) == holes_of(b), where + ": replica hole tables differ");
     need(ca.stream() == cb.stream() && ca.version() == cb.version() && ca.last_check() == cb.last_check(),
          where + ": cursors differ");
 }
@@ -180,8 +170,8 @@ void corrupt_trials(const Buffer& ra, const xo::XDeltaCursor& ca, const Buffer& 
         case 1: bad.resize(rng() % bad.size()); break;
         case 2: bad.push_back(char(rng())); break;
         case 3: if (bad.size() > 12) bad[12 + rng() % (bad.size() - 12)] = char(rng()); break;  // past the stream
-        case 4: if (bad.size() > 13) bad[13] = char(rng() % 12); break;  // a block count (one-byte version)
-        case 5: if (bad.size() > 12) bad[12] = char(bad[12] + 1); break;  // the version
+        case 4: if (bad.size() > 13) bad[13] = char(rng() % 12); break;  // a block count, or the version
+        case 5: if (bad.size() > 12) bad[12] = char(bad[12] + 1); break;  // the version (its low byte)
         case 6: bad[4 + rng() % 8] ^= 1; break;  // the stream
         case 7: bad[3] = char(rng() % 16); break;  // the flags
         }
@@ -299,14 +289,14 @@ void stream(std::uint64_t seed, int steps) {
     }
 }
 
-// Fixed cases: a scalar, a whole block, eight and nine blocks, an empty
-// delta, a version past one varint byte.
+// Fixed cases: a scalar, 1, 2, 16, 17, 25 and 26 runs, an empty delta,
+// runs of 55 to 57 bytes, a long stream.
 void fixed_cases() {
     const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
     auto src = Buffer::create(4096, cap);
     auto& r = src.plain_root();
     std::mt19937_64 rng(5);
-    for (int i = 0; i < 64; ++i) {
+    for (int i = 0; i < 80; ++i) {
         auto& it = r.items.emplace_back();
         it.id = std::uint32_t(i);
         it.name = random_text(rng, 30);
@@ -328,31 +318,29 @@ void fixed_cases() {
     const auto version = base.version();
     st = src.save_delta_into(d, base);
     need(st.empty && d.empty() && base.version() == version, "fixed: an untouched buffer sent a delta");
-    // Eight blocks: short; nine: general (the list holds them, more than 8).
-    const auto items_block = [&](std::size_t i) {
-        return (reinterpret_cast<const char*>(&r.items[std::uint32_t(i)].id) -
-                static_cast<const char*>(src.get_address())) / 64;
-    };
-    for (std::size_t want : {std::size_t(8), std::size_t(9)}) {
-        std::vector<std::size_t> touched;
-        for (std::size_t i = 0; i < r.items.size() && touched.size() < want; ++i) {
-            const auto block = items_block(i);
-            if (std::find(touched.begin(), touched.end(), block) != touched.end()) continue;
-            touched.push_back(block);
-            src.touch_set(r.items[std::uint32_t(i)].id, r.items[std::uint32_t(i)].id + 1000);
+    // Up to the touch log's 25 runs: the sender's short path, 26: the
+    // list overflows, its general path (whole blocks from the stamps); up
+    // to 16 runs: the receiver's short path, 17: its general path. (Every
+    // third item's id: runs a block or more apart, which the full list does
+    // not join, given in reverse too: the short path sorts them.)
+    constexpr std::size_t listed = xo::detail::DeltaTouchLog::run_capacity;
+    for (std::size_t want : {std::size_t(1), std::size_t(2), std::size_t(16), std::size_t(17), listed, listed + 1}) {
+        for (std::size_t k = 0; k < want; ++k) {
+            const std::size_t i = want % 2 ? want - 1 - k : k;
+            auto& id = r.items[std::uint32_t(3 * i)].id;
+            src.touch_set(id, id + 1000u);
         }
-        need(touched.size() == want, "fixed: not enough blocks");
         const auto small = Access::test_small_counts()[0];
         st = src.save_delta_into(d, base);
-        need(st.blocks == want && (Access::test_small_counts()[0] == small + 1) == (want <= 8),
-             "fixed: " + std::to_string(want) + " blocks took the wrong path");
+        need((Access::test_small_counts()[0] == small + 1) == (want <= listed) && (want > listed || st.blocks == want),
+             "fixed: " + std::to_string(want) + " runs took the wrong path");
         const auto applied = Access::test_small_counts()[1];
-        need(bool(apply(false, rep, d, cur)) && payload_of(rep) == payload_of(src), "fixed: blocks applied");
-        need((Access::test_small_counts()[1] == applied + 1) == (want <= 8),
-             "fixed: " + std::to_string(want) + " blocks applied on the wrong path");
+        need(bool(apply(false, rep, d, cur)) && payload_of(rep) == payload_of(src), "fixed: runs applied");
+        need(want > listed || (Access::test_small_counts()[1] == applied + 1) == (want <= 16),
+             "fixed: " + std::to_string(want) + " runs applied on the wrong path");
     }
-    // A touch of 56 bytes of a block, every word: whole (64 bytes); of 55:
-    // the mask form. Both against the general path on a twin.
+    // Runs of 55 to 57 bytes, against the general path on a twin: the same
+    // frame but for the header (its stream differs).
     {
         auto twin = src.clone();
         Buffer twin_rep(4096, cap);
@@ -360,12 +348,7 @@ void fixed_cases() {
         xo::XDeltaCursor twin_cur;
         std::string td;
         need(bool(apply(true, twin_rep, twin.save_delta(twin_base), twin_cur)), "fixed: twin key delta");
-        // The block section (past the header, whose stream and version differ).
-        const auto body = [](const std::string& x) {
-            std::size_t at = 12;
-            while (static_cast<unsigned char>(x[at]) >= 0x80u) ++at;
-            return x.substr(at + 1);
-        };
+        const auto body = [](const std::string& x) { return x.substr(xo::XDELTA_RUN_HEADER); };
         r.title = std::string(200, 'x');
         twin.plain_root().title = std::string(200, 'x');
         src.touch(r.title);
@@ -380,18 +363,20 @@ void fixed_cases() {
             for (auto* b : {&src, &twin}) {
                 char* base_at = const_cast<char*>(static_cast<const char*>(b->get_address())) + block;
                 for (std::size_t k = 7; k < 7 + n; ++k) base_at[k] = char('a' + (k + n) % 26);
-                b->touch(base_at + 7, n);  // bytes [7, 7 + n): every word
+                b->touch(base_at + 7, n);
             }
+            const auto small = Access::test_small_counts()[0];
             st = src.save_delta_into(d, base);
             const auto tst = on_path(true, [&] { return twin.save_delta_into(td, twin_base); });
             same_stats(st, tst, "fixed: " + std::to_string(n) + " bytes");
-            need(st.changed_bytes == (n >= 56 ? 64u : n), "fixed: " + std::to_string(n) + " touched bytes in the wrong form");
+            need(Access::test_small_counts()[0] == small + 1 && st.changed_bytes == n,
+                 "fixed: " + std::to_string(n) + " touched bytes did not go as one run");
             need(body(d) == body(td), "fixed: " + std::to_string(n) + " bytes: delta differs");
-            need(bool(apply(false, rep, d, cur)) && payload_of(rep) == payload_of(src), "fixed: whole block applied");
+            need(bool(apply(false, rep, d, cur)) && payload_of(rep) == payload_of(src), "fixed: run applied");
             need(bool(apply(true, twin_rep, td, twin_cur)), "fixed: twin applied");
         }
     }
-    // Versions past 127 and 16383 (two and three varint bytes).
+    // A long stream (versions past 127 and 16383).
     for (int i = 0; i < 17000; ++i) {
         src.touch_set(r.epoch, r.epoch + 1);
         const auto s1 = src.save_delta_into(d, base);
@@ -402,10 +387,10 @@ void fixed_cases() {
 }
 // Hand-made deltas around the edges a receiver checks: one written byte
 // at every position of the first, a middle and the last blocks (block 0
-// starts in the arena header; the last ends past used), whole blocks there,
-// non-canonical varints, several blocks out of order or repeated, and the
-// most blocks the short path takes plus one. Both paths: the same outcome,
-// error and result.
+// starts in the image header; the last ends past used), whole blocks there,
+// non-canonical varints, several blocks out of order or repeated, the most
+// blocks the short path takes plus one, and the same for run frames. Both
+// paths: the same outcome, error and result.
 void crafted_cases() {
     const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
     auto src = Buffer::create(4096, cap);
@@ -495,7 +480,69 @@ void crafted_cases() {
         }
         both(d, std::to_string(count) + " blocks");
     }
-    need(cases > 6 * 64, "crafted: too few cases");
+    // Run frames: one byte and one word at offsets from 32 on, in the
+    // middle and up to used; a zero length, a run past used, cut bytes, a
+    // trailing gap, non-canonical varints, 16 and 17 runs, other flags.
+    const auto run_header = [&](std::string& d, unsigned flags) {
+        d.assign("XD", 2);
+        d.push_back(char(0x20));
+        d.push_back(char(flags));
+        const std::uint64_t stream = cur.stream();
+        d.append(reinterpret_cast<const char*>(&stream), 8);
+        const std::uint32_t v = cur.version() + 1u;
+        d.append(reinterpret_cast<const char*>(&v), 4);
+    };
+    const auto varint = [](std::string& d, std::size_t v) {
+        while (v >= 0x80u) { d.push_back(char((v & 0x7Fu) | 0x80u)); v >>= 7; }
+        d.push_back(char(v));
+    };
+    const auto one_run = [&](std::size_t at, std::size_t bytes, unsigned flags = xo::XDELTA_FLAG_RUNS) {
+        std::string d;
+        run_header(d, flags);
+        varint(d, at - 32);
+        varint(d, bytes);
+        d.append(bytes, char(0x5A));
+        return d;
+    };
+    std::vector<std::size_t> offsets;
+    for (std::size_t at = 32; at < 48; ++at) offsets.push_back(at);
+    for (std::size_t at = used / 2 - 4; at < used / 2 + 4; ++at) offsets.push_back(at);
+    for (std::size_t at = used - 9; at <= used + 1; ++at) offsets.push_back(at);
+    for (const std::size_t at : offsets) {
+        both(one_run(at, 1), "run byte at " + std::to_string(at));
+        both(one_run(at, 8), "run word at " + std::to_string(at));
+    }
+    both(one_run(40, 0), "a run of no bytes");
+    both(one_run(used - 4, 8), "a run past used");
+    both(one_run(40, 4).substr(0, 16 + 2 + 2), "a run cut short");
+    both(one_run(40, 4) + std::string(1, char(3)), "a trailing gap");
+    both(one_run(40, 4, xo::XDELTA_FLAG_RUNS | xo::XDELTA_FLAG_KEY), "a key run frame");
+    both(one_run(40, 4, xo::XDELTA_FLAG_RUNS | xo::XDELTA_FLAG_DIGEST), "a run frame with a wrong digest");
+    {
+        std::string d;
+        run_header(d, xo::XDELTA_FLAG_RUNS);
+        d.push_back(char(0x88));  // gap 8 in two bytes
+        d.push_back(char(0x00));
+        d.push_back(char(1));
+        d.push_back(char(7));
+        both(d, "a two-byte gap");
+        run_header(d, xo::XDELTA_FLAG_RUNS);
+        both(d, "a run frame with no runs");
+        run_header(d, xo::XDELTA_FLAG_RUNS | xo::XDELTA_FLAG_EXTENT);
+        varint(d, (used - 40) / 8);
+        both(d + std::string("\x08\x01\x07", 3), "a run frame with its extent");
+    }
+    for (std::uint32_t count : {16u, 17u}) {
+        std::string d;
+        run_header(d, xo::XDELTA_FLAG_RUNS);
+        for (std::uint32_t k = 0; k < count; ++k) {
+            d.push_back(char(k == 0 ? 8 : 1));  // gaps: from 40, one byte apart
+            d.push_back(char(1));
+            d.push_back(char(k + 1));
+        }
+        both(d, std::to_string(count) + " runs");
+    }
+    need(cases > 6 * 64 + 2 * 35, "crafted: too few cases");
 }
 } // namespace
 

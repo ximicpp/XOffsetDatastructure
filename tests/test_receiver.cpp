@@ -554,13 +554,13 @@ void delta_admit_rejects() {
                                          std::string(1, '\0') + std::string(64, 'x'), cur);
     need(!st && st.code() == XErrc::invalid_extent_table, "block past used");
     unchanged("a block past used changed the replica");
-    // The root is at 40: any other root offset is out of bounds, and an
-    // image of 48 bytes cannot hold the root object.
-    const auto words = std::uint32_t((used(dst) - XWIRE_PAYLOAD_BEGIN) / 8);
-    st = rx.apply_delta<RxRoot>(dst, header(8) + varint(words) + varint(8) + varint(0), cur);
-    need(!st && st.code() == XErrc::root_offset_out_of_bounds, "root offset other than 40");
-    unchanged("a moved root changed the replica");
-    st = rx.apply_delta<RxRoot>(dst, header(8) + varint(1) + varint(0) + varint(0), cur);
+    // The root is at 40: an image of 40 bytes has none, and one of 48 bytes
+    // cannot hold the root object. (EXTENT: the used size in words past
+    // the header.)
+    st = rx.apply_delta<RxRoot>(dst, header(8) + varint(0) + varint(0), cur);
+    need(!st && st.code() == XErrc::root_offset_out_of_bounds, "image without a root");
+    unchanged("an image without a root changed the replica");
+    st = rx.apply_delta<RxRoot>(dst, header(8) + varint(1) + varint(0), cur);
     need(!st && st.code() == XErrc::root_mismatch, "root object past used");
     unchanged("a root past used changed the replica");
 

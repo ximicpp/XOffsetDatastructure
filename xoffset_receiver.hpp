@@ -23,8 +23,8 @@ enum class XCheck : std::uint8_t {
     // hash, used_bytes within the maximum capacity, the extent table and the
     // length, the root object inside the image; no walk of the object graph,
     // and the free blocks are taken as they are. A delta: its framing,
-    // stream and version, every block and hole inside the used payload, the
-    // root inside it. For a sender that is our own code over a protected
+    // stream and version, every run or block inside [32, used) of the
+    // image, the root inside it. For a sender that is our own code over a protected
     // transport with the same schema. The result is mutable.
     admit,
     // Read-only: admit's framing, then one walk from the root over every
@@ -308,7 +308,7 @@ public:
     /// content, the others patch it in place. With admit (the default on
     /// server_peer and from_server) the delta's framing is checked as for the
     /// full check (format, stream and version against the cursor, root type
-    /// and schema fingerprint, every block and hole inside the used payload)
+    /// and schema fingerprint, every run or block inside [32, used) of the image)
     /// plus the root object inside the used payload; what the bytes say is the
     /// sender's. No map of checked bytes is kept, so a full apply that later
     /// follows admits on the same cursor verifies the whole payload once. On

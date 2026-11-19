@@ -14,6 +14,23 @@ of this file and in the pull requests.
   extent_count)` takes the image size; root types are aligned to at most 8 bytes. Whole-state
   deltas move to format 2.0 (the same framing, image offsets with the root at 40); a 2.0
   receiver rejects 1.0 deltas.
+- Deltas of the one image (format 2.0): the hole table section is gone. The allocator's own writes
+  (the header's free state, the free directory, the blocks it takes and gives back) are touches,
+  so a delta carries them like any other change, and the receiver's free state is the bytes it
+  applies. The touch log lists byte runs (up to 25 a period; when full, runs less than a block
+  apart in touch order are joined before it overflows to stamps). An `XDeltaRecord::touches`
+  baseline whose log lists every run since its last delta writes the run frame on a short path,
+  one run or several, and `save_delta_into(std::span<char>, ...)` writes it into the caller's
+  memory. Instructions (callgrind, `touch_set` and the delta, Character fixture), GCC 16 / P2996:
+  publish one scalar 448 -> 118 / 584 -> 117, publish and apply (admit) 749 -> 283 / 920 -> 266,
+  32 scattered fields published and applied with the full check 11,082 -> 6,526 / 12,211 -> 6,894.
+  SLG demo delta keys (GCC 16): sends 17-26% fewer instructions, receives 0.8-3.8% fewer, full
+  compares 0.6-12.5% fewer.
+- The full check registers the free blocks after the live walk: a live block is checked against
+  the live blocks only, each free block against both. Checked receive of the Character wire
+  (GCC 16) 2,695 -> 2,503 instructions, a wire with free blocks 3,694 -> 3,621, the formal
+  scenario's reload 15.75 M -> 15.51 M. A live block over a free block is now reported as
+  "invalid free blocks" (or as overlapping live ranges when it also meets a live block).
 - Fixed: a client that includes `<windows.h>` before the library compiles again (a variable in
   `save_delta_into` was named `small`, which `rpcndr.h` defines as a macro).
 - `xoffsetdatastructure.hpp` includes seven parts in its former order: `xoffset_arena.hpp`,

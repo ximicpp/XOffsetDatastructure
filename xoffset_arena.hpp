@@ -399,6 +399,184 @@ namespace XOffsetDatastructure {
                 }
             }
         };
+
+        // A delta sender's touch marks: XBuffer::touch and touch_set, and the
+        // in-band allocator's own writes (xoffset_delta.hpp reads them). A
+        // buffer keeps one (XBufferCore::touch_log_) once a delta from it
+        // paired with a baseline. Touches are counted in periods: a delta
+        // from the buffer ends one. The image ranges touched in the current
+        // period are listed as runs, in touch order (a touch that starts
+        // inside the last run or at its end extends it), up to run_capacity
+        // of them. Per-block stamps (the period of a 64-byte block's last
+        // touch) are kept only where a delta needs more than the list: once
+        // a second baseline pairs (each finds what was touched since its own
+        // last delta), and in a period whose touches overflow the list.
+        struct DeltaTouchRun {
+            std::uint32_t at;     // image offset
+            std::uint32_t bytes;  // nonzero
+        };
+        struct alignas(64) DeltaTouchLog {
+            static constexpr std::uint32_t run_capacity = 25;  // the fields below and the runs: four lines
+            static constexpr std::size_t block = 64;            // the bytes one stamp stands for
+            static constexpr std::size_t group = 16;            // blocks per entry of `groups`
+            static constexpr std::uint32_t no_dir = 0xFFFFFFFFu;
+            // Nonzero while the list holds every touch since the last delta
+            // of the only baseline that pairs, an XDeltaRecord::touches one,
+            // which keeps it (mixed with the buffer's epoch and its root
+            // type): its next delta is the listed runs, found with one compare.
+            std::uint64_t token = 0;
+            std::uint32_t listed = 0;     // runs in `runs`
+            std::uint32_t now = 1;        // the current period
+            bool overflow = false;        // more runs in this period than the list holds: stamped
+            bool shared = false;          // several baselines pair: every touch is stamped
+            bool lost = false;            // a touch could not be recorded
+            bool slow = false;            // overflow, shared or a copy to fetch: add takes add_slow
+            // The free directory whose bytes (and the header's free_dir and
+            // free_bytes) the allocator recorded in this period (no_dir: none).
+            std::uint32_t dir_at = no_dir;
+            // Where the copy of the only baseline that pairs is (0: none, or
+            // several): a touched range's first line of it is fetched ahead
+            // of the next delta (a hint: the address is never dereferenced).
+            std::uintptr_t copy = 0;
+            std::uint64_t epoch = 0;      // the buffer content (epoch) the marks describe
+            std::uint64_t id = 0;         // changes when the log starts over
+            const void* owner = nullptr;  // the baseline that paired last
+            DeltaTouchRun runs[run_capacity];
+            std::uint32_t stamps_from = 0xFFFFFFFFu;  // stamps hold every touch of the periods from this one
+            std::vector<std::uint32_t> stamps;
+            std::vector<std::uint32_t> groups;  // per `group` blocks: the latest of their stamps
+
+            // Records a touch of image bytes [at, at + bytes) (bytes > 0).
+            XOFFSET_DETAIL_INLINE void add(std::uint32_t at, std::uint32_t bytes) noexcept {
+                const std::uint32_t n = listed;
+                if (!slow && n < run_capacity) [[likely]] {
+                    list(n, at, bytes);
+                    return;
+                }
+                add_slow(at, bytes);
+            }
+            // Into the list of n < run_capacity runs: a touch that starts
+            // inside the last run or at its end extends it.
+            XOFFSET_DETAIL_INLINE void list(std::uint32_t n, std::uint32_t at, std::uint32_t bytes) noexcept {
+                if (n != 0 && at - runs[n - 1].at <= runs[n - 1].bytes) {  // (at >= runs[n - 1].at)
+                    DeltaTouchRun& last = runs[n - 1];
+                    if (at + bytes - last.at > last.bytes) last.bytes = at + bytes - last.at;
+                } else {
+                    runs[n] = DeltaTouchRun{at, bytes};
+                    listed = n + 1;
+                }
+            }
+            // add when the list is full or overflowed, every touch is
+            // stamped, or the copy of the only baseline that pairs is
+            // fetched ahead.
+            XOFFSET_DETAIL_NOINLINE void add_slow(std::uint32_t at, std::uint32_t bytes) noexcept {
+                if (!overflow) {
+                    if (copy) XOFFSET_DETAIL_PREFETCH_WITH_MSVC(reinterpret_cast<const char*>(copy + at), 1);
+                    const std::uint32_t n = listed;
+                    if (n < run_capacity || at - runs[n - 1].at <= runs[n - 1].bytes) {
+                        list(n, at, bytes);
+                    } else if (join()) {
+                        list(listed, at, bytes);
+                    } else {
+                        overflow_list();  // stamps the list; this touch below
+                    }
+                }
+                if (overflow || shared) stamp(at, bytes);
+            }
+            // The full list with each run that starts less than a block past
+            // the end of the run kept before it (in touch order) joined to
+            // it: the bytes between go with them (untouched, they are what
+            // the receiver holds, and the stamps would send their blocks
+            // whole). False when that leaves fewer than a quarter of the list
+            // free (the list then overflows, so that joins stay rare).
+            XOFFSET_DETAIL_NOINLINE bool join() noexcept {
+                std::uint32_t w = 1;
+                for (std::uint32_t i = 1; i < run_capacity; ++i) {
+                    DeltaTouchRun& last = runs[w - 1];
+                    const DeltaTouchRun r = runs[i];
+                    if (r.at - last.at < std::uint64_t(last.bytes) + block) {  // (r.at >= last.at)
+                        if (r.at + r.bytes - last.at > last.bytes) last.bytes = r.at + r.bytes - last.at;
+                    } else {
+                        runs[w++] = r;
+                    }
+                }
+                listed = w;
+                return w <= run_capacity - run_capacity / 4;
+            }
+            // slow after overflow, shared or copy changed.
+            void settle() noexcept { slow = overflow || shared || copy != 0; }
+            // The list holds no more: its runs go into the stamps, and so
+            // does every later touch of the period.
+            XOFFSET_DETAIL_NOINLINE void overflow_list() noexcept {
+                overflow = slow = true;
+                token = 0;
+                stamp_list();
+            }
+            // The listed runs into the stamps: from now on this period's
+            // touches are all stamped.
+            void stamp_list() noexcept {
+                for (std::uint32_t k = 0; k < listed; ++k) stamp(runs[k].at, runs[k].bytes);
+                stamps_from = (std::min)(stamps_from, now);
+            }
+            XOFFSET_DETAIL_NOINLINE void stamp(std::uint32_t at, std::uint32_t bytes) noexcept {
+                const std::size_t first = at / block, last = (std::size_t(at) + bytes - 1u) / block;
+                if (!reserve(last)) return;
+                for (std::size_t i = first; i <= last; ++i) stamps[i] = now;
+                for (std::size_t g = first / group; g <= last / group; ++g) groups[g] = now;
+            }
+            // Room in the stamps for block `last` (and every block below
+            // `used`); false (the log lost a touch) when there is none.
+            bool reserve(std::size_t last, std::size_t used = 0) noexcept {
+                if (stamps.size() > last && stamps.size() * block >= used) return true;
+                XOFFSET_TRY {
+                    const std::size_t blocks = (std::max)(last + 1u, (used + block - 1u) / block);
+                    if (stamps.size() < blocks) {
+                        stamps.resize(blocks, 0u);
+                        groups.resize((blocks + group - 1u) / group, 0u);
+                    }
+                } XOFFSET_CATCH(const std::bad_alloc&) {
+                    lose();
+                    return false;
+                }
+                return true;
+            }
+            // A touch could not be recorded: the next delta compares
+            // everything (from a touches baseline: a key delta).
+            void lose() noexcept {
+                lost = true;
+                token = 0;
+            }
+            // Starts over for buffer content `content_epoch`, as log `new_id`:
+            // the baselines that paired before compare everything next.
+            void restart(std::uint64_t content_epoch, std::uint64_t new_id) noexcept {
+                token = 0;
+                listed = 0;
+                now = 1;
+                overflow = shared = lost = slow = false;
+                dir_at = no_dir;
+                copy = 0;
+                epoch = content_epoch;
+                id = new_id;
+                owner = nullptr;
+                stamps_from = 0xFFFFFFFFu;
+                stamps.clear();  // regrown with zeros when stamps are needed
+                groups.clear();
+            }
+            // A delta from the buffer ends the period: the next one lists
+            // what is touched from now on.
+            void next_period() noexcept {
+                listed = 0;
+                overflow = false;
+                dir_at = no_dir;
+                settle();
+            }
+            // next_period while the log's token is set: the list held every
+            // touch, alone (no overflow, not shared, no copy: slow is off).
+            void next_listed_period() noexcept {
+                listed = 0;
+                dir_at = no_dir;
+            }
+        };
     }
 
     class XBufferCore {
@@ -722,7 +900,17 @@ namespace XOffsetDatastructure {
         // Records `code` unless an earlier failure is recorded.
         void record_error(XErrc code) noexcept {
             if (code == XErrc::ok) return;
-            if (auto* ctl = control(); ctl && ctl->sticky == XErrc::ok) ctl->sticky = code;
+            if (auto* ctl = control(); ctl && ctl->sticky == XErrc::ok) {
+                ctl->sticky = code;
+                failure_recorded();
+            }
+        }
+        // A failure was just recorded: the touch log's token stands for a
+        // buffer that emits (xoffset_delta.hpp's short path compares only
+        // it), so it is dropped; the general path refuses the delta, and
+        // after clear_error() pairs again.
+        void failure_recorded() noexcept {
+            if (touch_log_) [[unlikely]] touch_log_->token = 0;
         }
         // An open pin scope: the payload does not move, retired blocks wait.
         bool pinned() const noexcept { return packed_.pinned; }
@@ -731,9 +919,10 @@ namespace XOffsetDatastructure {
         // and, with exceptions, XException(error()) is thrown; without them
         // the entry returns (true here) and the caller sees an empty wire.
         XOFFSET_DETAIL_INLINE bool refuse_failed_emit(std::string& out) {
-            if (!ctl_ || ctl_->sticky == XErrc::ok) [[likely]] return false;
+            if (!emit_failed()) [[likely]] return false;
             return refuse_failed_emit_slow(out);
         }
+        XOFFSET_DETAIL_INLINE bool emit_failed() const noexcept { return ctl_ && ctl_->sticky != XErrc::ok; }
         XOFFSET_DETAIL_NOINLINE bool refuse_failed_emit_slow(std::string& out) {
             out.clear();
 #if XOFFSET_NO_EXCEPTIONS
@@ -956,8 +1145,9 @@ namespace XOffsetDatastructure {
             }
             quarantine_.swap(other.quarantine_);
             buffer_.swap(other.buffer_);
-            inband_stale();
-            other.inband_stale();
+            // A touch log follows the content (its epoch no longer matches,
+            // so it starts over before its next use).
+            touch_log_.swap(other.touch_log_);
             // After the payloads swapped: each block names its content's base.
             adopt_ctl();
             other.adopt_ctl();
@@ -1361,7 +1551,7 @@ namespace XOffsetDatastructure {
                     e[1] = inband_word(base + offset);
                     inband_set(base + offset, 0);
                     inband_set(base + inband_bytes_at, inband_word(base + inband_bytes_at) - bytes);
-                    inband_stale();
+                    if (touch_log_) [[unlikely]] inband_log(offset, 4u);
                     return base + offset;
                 }
                 // The first larger size whose stack holds a block: split.
@@ -1390,13 +1580,13 @@ namespace XOffsetDatastructure {
             e[1] = inband_word(base + offset);
             inband_set(base + offset, 0);
             inband_set(base + inband_bytes_at, inband_word(base + inband_bytes_at) - found);
-            inband_stale();
+            if (touch_log_) [[unlikely]] inband_log(offset, 4u);
             // The tail becomes a free block of its own: its header is
             // cleared first (a wire load writes only each block's own
             // header, so an accepted input may leave other bytes there).
             if (found > bytes) {
                 std::memset(base + offset + bytes, 0, 8);
-                inband_push_zeroed(offset + bytes, found - bytes);
+                inband_push_zeroed(offset + bytes, found - bytes, 8u);
             }
             return base + offset;
         }
@@ -1418,11 +1608,13 @@ namespace XOffsetDatastructure {
         XOFFSET_DETAIL_INLINE void inband_retire_small(void* ptr, std::uint32_t bytes, std::uint32_t offset) noexcept {
             check_owner_resolves();
             zero_retired(ptr, bytes);
-            inband_push_zeroed(offset, bytes);
+            inband_push_zeroed(offset, bytes, bytes);
         }
 
-        // Records a free block whose bytes are all zero.
-        XOFFSET_DETAIL_INLINE void inband_push_zeroed(std::uint32_t offset, std::uint32_t bytes) noexcept {
+        // Records a free block whose bytes are all zero; its first `changed`
+        // bytes were just written (a touch log records them).
+        XOFFSET_DETAIL_INLINE void inband_push_zeroed(std::uint32_t offset, std::uint32_t bytes,
+                                                      std::uint32_t changed) noexcept {
             char* const base = buffer_.data();
             if (const std::uint32_t dir = inband_word(base + inband_dir_at); dir != 0) [[likely]] {
                 std::uint32_t* const e = inband_find(reinterpret_cast<std::uint32_t*>(base + dir), bytes);
@@ -1430,16 +1622,26 @@ namespace XOffsetDatastructure {
                     inband_set(base + offset, e[1]);
                     e[1] = offset;
                     inband_set(base + inband_bytes_at, inband_word(base + inband_bytes_at) + bytes);
-                    inband_stale();
+                    if (touch_log_) [[unlikely]] inband_log(offset, changed);
                     return;
                 }
             }
-            inband_add_class(offset, bytes);
+            inband_add_class(offset, bytes, changed);
         }
 
         // inband_push_zeroed for a size the directory has no entry for (or
         // with no directory yet).
-        XOFFSET_DETAIL_NOINLINE void inband_add_class(std::uint32_t offset, std::uint32_t bytes) noexcept {
+        XOFFSET_DETAIL_NOINLINE void inband_add_class(std::uint32_t offset, std::uint32_t bytes,
+                                                      std::uint32_t changed) noexcept {
+            // Whatever happens below, the block's changed bytes and the
+            // directory are recorded for a touch log at the end.
+            struct Log {
+                XBufferCore* core;
+                std::uint32_t offset, changed;
+                ~Log() {
+                    if (core->touch_log_) [[unlikely]] core->inband_log(offset, changed);
+                }
+            } const log{this, offset, changed};
             char* const base = buffer_.data();
             std::uint32_t dir = inband_word(base + inband_dir_at);
             if (dir == 0) {
@@ -1457,7 +1659,6 @@ namespace XOffsetDatastructure {
                 }
                 inband_dir_init(base + dir, 0, cap);
                 inband_set(base + inband_dir_at, dir);
-                inband_stale();
                 if (bytes == 0) return;
             }
             auto* d = reinterpret_cast<std::uint32_t*>(base + dir);
@@ -1492,14 +1693,12 @@ namespace XOffsetDatastructure {
                     for (std::uint32_t k = 2; k < 2u + 2u * n; ++k) nd[k] = d[k];
                     inband_dir_init(base + at, n, grown);
                     inband_set(base + inband_dir_at, at);
-                    // The old directory's block becomes free (a delta from
-                    // touch marks compares it: XDeltaBaseline keeps the
-                    // directory's offset).
+                    // The old directory's block becomes free.
                     const std::uint32_t old_bytes = inband_dir_bytes(cap);
                     for (std::uint32_t k = 0; k < old_bytes / 4u; ++k) d[k] = 0;
-                    inband_push_zeroed(dir, old_bytes);
+                    inband_push_zeroed(dir, old_bytes, old_bytes);
                     d = nd;
-                    if (bytes == 0) return inband_stale();
+                    if (bytes == 0) return;
                 }
             }
             std::uint32_t* const e = inband_find(d, bytes);
@@ -1518,7 +1717,28 @@ namespace XOffsetDatastructure {
                 ++d[0];
             }
             inband_set(base + inband_bytes_at, inband_word(base + inband_bytes_at) + bytes);
-            inband_stale();
+        }
+
+        // The in-band allocator wrote image bytes [at, at + bytes) (none for
+        // bytes 0), the header's free_dir and free_bytes, and the directory:
+        // into the touch log, which a delta from touch marks sends. The
+        // header words and the directory are recorded once per period
+        // (again when the directory moved).
+        XOFFSET_DETAIL_NOINLINE void inband_log(std::uint32_t at, std::uint32_t bytes) noexcept {
+            detail::DeltaTouchLog& log = *touch_log_;
+            const char* const base = buffer_.data();
+            const std::uint32_t dir = inband_word(base + inband_dir_at);
+            if (log.dir_at != dir) {
+                log.add(static_cast<std::uint32_t>(inband_dir_at), 8u);
+                if (dir != 0) log.add(dir, inband_dir_bytes(inband_word(base + dir + 4u)));
+                log.dir_at = dir;
+            }
+            if (bytes != 0) log.add(at, bytes);
+        }
+        // The free state was rewritten as a whole: a touch log no longer
+        // says what changed.
+        void inband_log_lost() noexcept {
+            if (touch_log_) [[unlikely]] touch_log_->lose();
         }
 
         // `bytes` at the end of the payload (a directory: its writer sets
@@ -1553,30 +1773,6 @@ namespace XOffsetDatastructure {
             const auto* sm = arena();
             return sm ? inband_word(reinterpret_cast<const char*>(sm) + inband_bytes_at) : 0u;
         }
-        // The generation of the set of free blocks (free_block_gen): 0 with
-        // no directory (no free block); else the value read last, or, after
-        // a change, a new one, unique in the process. It is host state
-        // (inband_gen_): reading it leaves the payload as it is.
-        std::uint64_t inband_gen() const noexcept {
-#if XOFFSET_INBAND_ALLOCATOR
-            const auto* sm = arena();
-            if (!sm || inband_word(reinterpret_cast<const char*>(sm) + inband_dir_at) == 0) return 0;
-            if (inband_gen_ & 1u) {
-                static std::atomic<std::uint64_t> next{0};
-                inband_gen_ = 2u * (next.fetch_add(1, std::memory_order_relaxed) + 1u);
-            }
-            return inband_gen_;
-#else
-            return 0;
-#endif
-        }
-        // The free blocks changed: the next generation read takes a new value.
-        XOFFSET_DETAIL_INLINE void inband_stale() const noexcept {
-#if XOFFSET_INBAND_ALLOCATOR
-            inband_gen_ |= 1u;
-#endif
-        }
-
         // fn(WireHole) for each free block of at least min_bytes: by size,
         // each size's stack from its head. fn must not change the blocks.
         template <typename Fn>
@@ -1599,24 +1795,15 @@ namespace XOffsetDatastructure {
             return count;
         }
 
-        // A loaded table of free blocks (`holes` need not be aligned): a key
-        // delta's, by offset, whose payload bytes (link words included) are
-        // already the sender's. The directory is the entry whose second word
-        // is not zero (a free block's is zero; a directory's is its
-        // capacity); a table without one is recorded anew (inband_rebuild).
-        // `check` (the delta's map checked that the entries tile the payload
-        // with the live blocks): one directory at most, and it holds exactly
-        // the other entries, in stack order.
-        detail::vstatus inband_adopt(const void* holes, std::size_t count, bool check) {
-            if (!arena()) XOFFSET_VFAIL(XException, XErrc::invalid_state, "XBufferCore: buffer has no payload");
-            if (inband_adopt_table(holes, count, check) == inband_adopted::rejected) [[unlikely]]
-                XOFFSET_VFAIL(XException, XErrc::invalid_payload,
-                              "wire validation failed: free blocks differ from the free directory");
-            return detail::vok();
-        }
-        // inband_adopt's work: the directory kept, the blocks recorded anew
-        // (a table without a directory), or rejected by `check` (nothing
-        // changed).
+        // A table of free blocks (`holes` need not be aligned) whose
+        // payload bytes (link words included) may already hold a directory
+        // of exactly those blocks (replace_free_blocks: a copy of a
+        // buffer's bytes given its wire holes). The directory is the entry
+        // whose second word is not zero (a free block's is zero; a
+        // directory's is its capacity): kept, the blocks recorded anew (a
+        // table without one: inband_rebuild), or rejected by `check` (one
+        // directory at most, holding exactly the other entries, in stack
+        // order), nothing changed.
         enum class inband_adopted { kept, rebuilt, rejected };
         inband_adopted inband_adopt_table(const void* holes, std::size_t count, bool check) noexcept {
             char* const base = buffer_.data();
@@ -1708,7 +1895,7 @@ namespace XOffsetDatastructure {
             }
             inband_set(base + inband_dir_at, directory.offset);
             inband_set(base + inband_bytes_at, static_cast<std::uint32_t>(total));
-            inband_stale();
+            inband_log_lost();
             free_table_lost_ = false;
             return inband_adopted::kept;
         }
@@ -1731,7 +1918,7 @@ namespace XOffsetDatastructure {
             };
             inband_set(base + inband_dir_at, 0);
             inband_set(base + inband_bytes_at, 0);
-            inband_stale();
+            inband_log_lost();
             free_table_lost_ = false;
             if (count == 0) return true;
             // The distinct sizes, counted up to 32 (more grow the directory).
@@ -1765,11 +1952,11 @@ namespace XOffsetDatastructure {
             }
             inband_dir_init(base + at, 0, cap);
             inband_set(base + inband_dir_at, at);
-            if (rest != 0) inband_push_zeroed(at - rest, rest);
+            if (rest != 0) inband_push_zeroed(at - rest, rest, 0u);
             for (std::size_t i = 0; i < count; ++i) {
                 if (i == host) continue;
                 const WireHole hole = entry(i);
-                inband_push_zeroed(static_cast<std::uint32_t>(hole.offset), static_cast<std::uint32_t>(hole.bytes));
+                inband_push_zeroed(static_cast<std::uint32_t>(hole.offset), static_cast<std::uint32_t>(hole.bytes), 0u);
             }
             return !free_table_lost_;
         }
@@ -1795,15 +1982,6 @@ namespace XOffsetDatastructure {
         std::uint64_t free_block_bytes() const noexcept {
             if constexpr (detail::inband_allocator) return inband_free_bytes();
             return free_table_ ? free_table_->bytes : 0;
-        }
-        // Changes whenever a free block comes or goes; two tables (of any
-        // buffers) with the same generation hold the same blocks. A read
-        // after a change counts the generation up, so it is not a read for
-        // concurrent use (save_delta_into reads it, and takes the buffer
-        // non-const).
-        std::uint64_t free_block_gen() const noexcept {
-            if constexpr (detail::inband_allocator) return inband_gen();
-            return free_table_ ? free_table_->current_gen() : 0;
         }
 
         // The image's free regions: in-band, the directory block first, then
@@ -2485,8 +2663,11 @@ namespace XOffsetDatastructure {
             if (!detail::discard_retired_pages(ptr, cleared)) std::memset(ptr, 0, cleared);
             if constexpr (detail::inband_allocator) {
                 // A block that ends past the payload is not a block of it.
-                if ((bytes & 7u) != 0 || cleared != bytes) return;
-                return inband_push_zeroed(offset, bytes);
+                if ((bytes & 7u) != 0 || cleared != bytes) {
+                    if (touch_log_) [[unlikely]] inband_log(offset, static_cast<std::uint32_t>(cleared));
+                    return;
+                }
+                return inband_push_zeroed(offset, bytes, bytes);
             }
             push_free_block(offset, bytes);
         }
@@ -2601,7 +2782,7 @@ namespace XOffsetDatastructure {
             if constexpr (detail::inband_allocator) {
                 // Its bytes may hold anything (alignment padding): cleared.
                 std::memset(buffer_.data() + offset, 0, bytes);
-                return inband_push_zeroed(offset, bytes);
+                return inband_push_zeroed(offset, bytes, bytes);
             }
             (void)insert_free_block(offset, bytes);
         }
@@ -2974,7 +3155,7 @@ namespace XOffsetDatastructure {
                 owner_record_.swap(other.owner_record_);
                 free_table_.swap(other.free_table_);
                 free_table_lost_ = std::exchange(other.free_table_lost_, false);
-                inband_stale();
+                touch_log_.swap(other.touch_log_);
                 publish_host_owner();
                 if (ctl_ || other.ctl_ || packed_.pinned || other.packed_.pinned) [[unlikely]] {
                     promote_bare_pin();
@@ -3575,7 +3756,7 @@ namespace XOffsetDatastructure {
                 if (!src.free_table_lost_) {
                     arena()->free_dir = src.arena()->free_dir;
                     arena()->free_bytes = src.arena()->free_bytes;
-                    inband_stale();
+                    inband_log_lost();
                     free_table_lost_ = false;
                 }
             } else if (!src.free_table_lost_) {
@@ -3775,11 +3956,11 @@ namespace XOffsetDatastructure {
     private:
         uint64_t dirty_epoch_ = 0;  // m_epoch when dirty_step_ was last reset
         const void* root_type_identity_ = nullptr;
-#if XOFFSET_INBAND_ALLOCATOR
-        // The in-band free blocks' generation (inband_gen), odd while stale.
-        // It fills the padding before packed_.
-        mutable std::uint64_t inband_gen_ = 1;
-#endif
+        // A delta sender's touch marks (detail::DeltaTouchLog), made by the
+        // first delta from this buffer that pairs with a baseline; the
+        // in-band allocator records its writes in it. It follows the
+        // content (move, swap). It fills the padding before packed_.
+        std::unique_ptr<detail::DeltaTouchLog> touch_log_;
         // Three small members in one 8-byte word, so that a move or a swap
         // carries all of them with one load and one store per side (what the
         // policy byte alone took). It starts the line of ctl_, which a reset
