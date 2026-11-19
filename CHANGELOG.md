@@ -54,6 +54,20 @@ of this file and in the pull requests.
   `free_table_complete()` stays: a free block the directory has no room for is still lost until
   `save_verified` recomputes the free blocks. Instructions unchanged (SLG and formal totals 0.9995
   to 1.0000, GCC 16 and P2996).
+- `save_compact_into` into a reused output takes one walk with nothing else around it: a buffer
+  with T's root key writes the compact wire straight into the output's capacity (no owner record,
+  no header recheck; the alias and header checks run with `XOFFSET_SAVE_SELF_CHECK`, as for
+  `save_verified_into`), and anything else, a first save into a short string for example, takes
+  the general path as before. The writer builds each container head, inline string and the wire
+  header in registers: they were assembled on the stack and copied out, and each copy waited on a
+  failed store-to-load forward, which cost more time than all the writer's instructions. Blocks
+  of up to 64 bytes are copied and spare capacity zeroed by a few moves instead of `memcpy` and
+  `memset` calls; the bytes past the last element in the last word are still cleared. Character
+  fixture, GCC 16 (scratch timing, median of 5 interleaved runs): tight 185 -> 62 ns, default
+  slack after 2,000 read-write rounds 194 -> 87 ns; the hand-written floor (compact into a fresh
+  arena, then send) is 115 ns. Instructions (callgrind, GCC 16 / P2996): 1,853 -> 1,442 /
+  2,027 -> 1,801, a nearly empty root 475 -> 194 / 618 -> 378. SLG A 0.974 / 0.963; B to D,
+  formal, delta and build cells unchanged.
 - Fixed: a client that includes `<windows.h>` before the library compiles again (a variable in
   `save_delta_into` was named `small`, which `rpcndr.h` defines as a macro).
 - `xoffsetdatastructure.hpp` includes seven parts in its former order: `xoffset_arena.hpp`,
