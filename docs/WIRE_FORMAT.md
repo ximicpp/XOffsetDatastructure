@@ -118,7 +118,7 @@ size`. Errors are prefixed with the calling API's name.
 `save_verified_into` emit the same bytes for the same state.
 
 - `free_runs` (default): dense unless `free_bytes` is at least 4 KiB (one
-  header read). Otherwise free blocks of at least 256 B are sorted by offset,
+  header read). Otherwise free blocks of at least 1 KiB are sorted by offset,
   adjacent ones merge, and in every merged run of at least 4 KiB each block's
   body (all of it but its first word, the link) is skipped. A free block's
   body is zero, so the loaded image is the sender's.

@@ -758,7 +758,8 @@ void mutate_valid(fz::Root& r, std::mt19937_64& rng) {
                   it.name = random_text(rng, 30); } break;
         case 5: r.tags.emplace_back(random_text(rng, 24), r.tags.get_stored_allocator()); break;
         case 6: r.keys.insert(std::uint32_t(rng() % 1000)); break;
-        case 7: r.attrs.insert_or_assign(std::string_view(random_text(rng, 16)), std::uint64_t(rng())); break;
+        case 7: { const auto key = random_text(rng, 16); // arguments are unsequenced
+                  r.attrs.insert_or_assign(std::string_view(key), std::uint64_t(rng())); } break;
         }
     }
 }
@@ -781,8 +782,10 @@ std::string build_wire(std::mt19937_64& rng) {
     }
     for (int i = int(rng() % 5); i > 0; --i) r.tags.emplace_back(random_text(rng, 20), r.tags.get_stored_allocator());
     for (int i = int(rng() % 6); i > 0; --i) r.keys.insert(std::uint32_t(rng() % 1000));
-    for (int i = int(rng() % 5); i > 0; --i)
-        r.attrs.insert_or_assign(std::string_view(random_text(rng, 14)), std::uint64_t(rng()));
+    for (int i = int(rng() % 5); i > 0; --i) {
+        const auto key = random_text(rng, 14); // arguments are unsequenced
+        r.attrs.insert_or_assign(std::string_view(key), std::uint64_t(rng()));
+    }
     if (rng() % 3) mutate_valid(r, rng); // leaves holes
     if (rng() % 3 == 0) {
         // A large freed block (>= 4 KiB) makes the emission sparse.
@@ -1058,12 +1061,16 @@ void mutate_wire(std::string& w, std::mt19937_64& rng, const std::vector<std::si
         break; }
     case 8: { // truncate / extend
         if (rng() & 1) { if (w.size() > kHeader) w.resize(w.size() - 1 - rng() % std::min<std::size_t>(16, w.size() - kHeader)); }
-        else w.append(std::size_t(1 + rng() % 16), char(rng()));
+        else {
+            const auto n = std::size_t(1 + rng() % 16); // arguments are unsequenced
+            w.append(n, char(rng()));
+        }
         if (rng() & 1) fix_header_sizes(w);
         break; }
     case 10: { // extent table entry
         if (h.extent_count == 0 || h.extent_count > body / 8) break;
-        const auto e = kHeader + std::size_t(rng() % h.extent_count) * 8 + (rng() & 1) * 4;
+        const auto entry = std::size_t(rng() % h.extent_count); // operands are unsequenced
+        const auto e = kHeader + entry * 8 + (rng() & 1) * 4;
         put32(w, e, rng() % 2 ? get32(w, e) + 8 : get32(w, e) - 8);
         break; }
     case 11: case 12: // a gap over arbitrary image bytes
@@ -1072,7 +1079,7 @@ void mutate_wire(std::string& w, std::mt19937_64& rng, const std::vector<std::si
     case 9: { // header_bytes, the version or the root (a dense wire cut to its header)
         switch (rng() % 3) {
         case 0: put32(w, 4, (rng() & 1) ? kHeader + 8 : kHeader - 8); break;
-        case 1: w[2 + rng() % 2] = char(w[2 + (rng() % 2)] ^ (1 + rng() % 3)); break;
+        case 1: { const auto at = std::size_t(2 + rng() % 2); w[at] = char(w[at] ^ (1 + rng() % 3)); break; }
         default:
             if (h.extent_count == 0) { w.resize(kHeader); fix_header_sizes(w); }
             break;
@@ -1283,7 +1290,7 @@ void check_golden(const std::string& w, const std::string& where) {
     auto reloaded = typed_load(again);
     if (!reloaded || reloaded->save_verified() != again) fail(where + ": golden write-read-write not byte stable");
     // The default emission (docs/WIRE_FORMAT.md section 3, free_runs): dense
-    // below 4 KiB of free blocks; else the free blocks of at least 256 bytes,
+    // below 4 KiB of free blocks; else the free blocks of at least 1 KiB,
     // sorted, merge where adjacent, and in every merged run of at least
     // 4 KiB each block's body (all but its link word) is skipped. Nothing
     // else is.
@@ -1298,7 +1305,7 @@ void check_golden(const std::string& w, const std::string& where) {
     std::vector<Range> blocks;
     std::uint64_t candidates = 0;
     for (std::size_t i = h.free_dir ? 1 : 0; i < run.ranges.size(); ++i)
-        if (run.ranges[i].end - run.ranges[i].begin >= 256) {
+        if (run.ranges[i].end - run.ranges[i].begin >= 1024) {
             blocks.push_back({run.ranges[i].begin, run.ranges[i].end});
             candidates += run.ranges[i].end - run.ranges[i].begin;
         }
