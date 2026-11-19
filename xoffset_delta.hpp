@@ -1610,7 +1610,7 @@ namespace XOffsetDatastructure {
                 // used == b.used_ (nonzero): a baseline with recorded state
                 // (and a stream), whose last delta checked the extent.
                 if (b.record_ != XDeltaRecord::touches || used != b.used_ ||
-                    static_cast<std::uint32_t>(sm->root_offset) != b.root_offset_ || log == nullptr ||
+                    static_cast<std::uint32_t>(XBufferCore::root_at) != b.root_offset_ || log == nullptr ||
                     options.digest || options.whole_blocks || used > core.get_size() ||
                     b.version_ == UINT32_MAX || b.schema_hash_ != wire_schema_hash<T>() ||
                     b.root_type_id_ != wire_root_type_id<T>())
@@ -1746,7 +1746,7 @@ namespace XOffsetDatastructure {
                 const char* cur = static_cast<const char*>(core.get_address());
                 const auto* sm = core.arena();
                 const std::size_t used = static_cast<std::size_t>(sm->used_end);
-                const auto root = static_cast<std::uint32_t>(sm->root_offset);
+                const auto root = static_cast<std::uint32_t>(XBufferCore::root_at);
                 if (used < payload_begin || used > XBufferCore::MAX_PAYLOAD || used > core.get_size())
                     XOFFSET_THROW(XException(XErrc::invalid_state, "save_delta<T>(): payload extent out of range"));
 
@@ -2655,7 +2655,8 @@ namespace XOffsetDatastructure {
                 }
                 if (used > XBufferCore::MAX_PAYLOAD)
                     XOFFSET_VFAIL(XException, XErrc::size_mismatch, msg(who, "used size mismatch"));
-                if (root >= used)
+                // The root is the image's first block (wire 3.0).
+                if (root != XBufferCore::root_at || root >= used)
                     XOFFSET_VFAIL(XException, XErrc::root_offset_out_of_bounds, msg(who, "root offset out of bounds"));
                 h.used_bytes = static_cast<std::uint32_t>(used);
                 h.root_offset = static_cast<std::uint32_t>(root);
@@ -2800,7 +2801,7 @@ namespace XOffsetDatastructure {
                 const XArena* sm = core.arena();
                 return c.checks_valid_ && c.checks_core_ == &core && c.checks_base_ == core.get_address() &&
                        c.checks_epoch_ == core.epoch() && c.checks_used_ == sm->used_end &&
-                       c.checks_root_ == sm->root_offset && c.checks_free_ == checks_free_key(core) &&
+                       c.checks_root_ == XBufferCore::root_at && c.checks_free_ == checks_free_key(core) &&
                        c.checks_free_complete_ == core.free_table_complete();
             }
             static void note_checks(XDeltaCursor& c, const XBufferCore& core) noexcept {
@@ -2808,7 +2809,7 @@ namespace XOffsetDatastructure {
                 c.checks_base_ = core.get_address();
                 c.checks_epoch_ = core.epoch();
                 c.checks_used_ = core.arena()->used_end;
-                c.checks_root_ = core.arena()->root_offset;
+                c.checks_root_ = std::uint64_t(XBufferCore::root_at);
                 c.checks_free_ = checks_free_key(core);
                 c.checks_free_complete_ = core.free_table_complete();
                 c.checks_valid_ = true;
@@ -2868,9 +2869,9 @@ namespace XOffsetDatastructure {
             // false when it cannot be built (the delta is then verified in
             // full).
             template <typename T>
-            static bool ensure_checks(XDeltaCursor& c, XBufferCore& core, std::uint64_t root_offset) {
+            static bool ensure_checks(XDeltaCursor& c, XBufferCore& core, std::uint64_t) {
                 if (c.checks_built_) return true;
-                const T* root = find_root_at<T>(core, root_offset);
+                const T* root = find_root<T>(core);
                 if (!root) {
                     c.checks_valid_ = false;
                     return false;
@@ -2905,7 +2906,7 @@ namespace XOffsetDatastructure {
                 what = "";
                 if (!c.checks_valid_ || !c.checks_built_ || !checks_match(c, core)) return true;
                 const std::size_t used = static_cast<std::size_t>(core.arena()->used_end);
-                const T* root = find_root_at<T>(core, core.arena()->root_offset);
+                const T* root = find_root<T>(core);
                 if (!root) return (what = "root not found"), false;
                 std::vector<DeltaCheckBits> bits((used + delta_block - 1) / delta_block);
                 std::vector<std::uint64_t> live(live_words(used));
@@ -3609,20 +3610,16 @@ namespace XOffsetDatastructure {
                         written = offset + 8 * words;
                     });
                     if (written < stale_end) std::memset(base + written, 0, stale_end - written);
-                    XBufferCore::write_payload_header(base, parsed.header.root_offset, used);
+                    XBufferCore::write_image_header(base, used, wire_schema_hash<T>(), wire_root_type_id<T>());
                     XOFFSET_VTRY(check_digest<T>(core, parsed, who));
-                    XWireHeaderV2 header{};
-                    header.used_bytes = parsed.header.used_bytes;
-                    header.root_offset = parsed.header.root_offset;
-                    header.hole_count = static_cast<std::uint32_t>(scratch.holes.size());
+                    // The hole table is by offset: the payload holds the
+                    // sender's directory and link words.
+                    XOFFSET_VTRY(core.inband_adopt(scratch.holes.data(), scratch.holes.size(), !Admit, false));
                     if constexpr (Admit) {
-                        // In-band, the table is by offset (WireOrder false).
-                        XOFFSET_VTRY(xbuf.template finish_admitted_load<T, !detail::inband_allocator>(
-                            header, reinterpret_cast<const char*>(scratch.holes.data()), scratch.holes.size(), who));
+                        XOFFSET_VTRY(xbuf.template finish_admitted_load<T>(used, who));
                     } else {
-                        XOFFSET_VTRY(xbuf.template finish_verified_load<T, !detail::inband_allocator>(
-                            header, reinterpret_cast<const char*>(scratch.holes.data()), scratch.holes.size(),
-                            default_wire_upstream(), who, &xbuf.retained_reload_scratch()));
+                        XOFFSET_VTRY(xbuf.template finish_verified_load<T>(used, default_wire_upstream(), who,
+                                                                           &xbuf.retained_reload_scratch()));
                     }
                 XOFFSET_ROLLBACK_END(core.reset_arena(0))
                 cursor.stream_ = parsed.header.stream;
@@ -3661,7 +3658,6 @@ namespace XOffsetDatastructure {
                 if (used < old_used) std::memcpy(base + used, undo, old_used - used);
                 auto* sm = core.arena();
                 sm->used_end = old_used;
-                sm->root_offset = old_root;
             }
 
             template <typename T>
@@ -3671,7 +3667,7 @@ namespace XOffsetDatastructure {
                 const std::size_t used = parsed.header.used_bytes;
                 const auto root = static_cast<std::uint64_t>(parsed.header.root_offset);
                 const std::size_t old_used = static_cast<std::size_t>(core.arena()->used_end);
-                const std::uint64_t old_root = core.arena()->root_offset;
+                const std::uint64_t old_root = std::uint64_t(XBufferCore::root_at);
                 const bool touch_log_current = xbuf.touch_log_ && xbuf.touch_log_->epoch == core.epoch();
 
                 // What the result needs: no check when the delta writes only
@@ -3750,7 +3746,6 @@ namespace XOffsetDatastructure {
                 }
                 auto* sm = core.arena();
                 sm->used_end = used;
-                sm->root_offset = root;
 
                 XOFFSET_ROLLBACK_BEGIN
                     XOFFSET_VTRY(check_digest<T>(core, parsed, who));
@@ -3760,7 +3755,7 @@ namespace XOffsetDatastructure {
                         XOFFSET_VTRY(prepare_full(core, parsed, cursor, scratch.holes, who));
                     }
                     if (check == XDeltaCheck::full) {
-                        auto* root_ptr = find_root_at<T>(core, root);
+                        auto* root_ptr = find_root<T>(core);
                         if (!root_ptr) XOFFSET_VFAIL(XException, XErrc::root_mismatch, msg(who, "root not found"));
                         const auto actual = static_cast<std::uint64_t>(
                             reinterpret_cast<std::uintptr_t>(root_ptr) -
@@ -3791,7 +3786,7 @@ namespace XOffsetDatastructure {
                     });
                     log.epoch = core.epoch();
                 }
-                T* root_ptr = find_root_at<T>(core, root);
+                T* root_ptr = find_root<T>(core);
                 if (root_ptr) core.cache_root(root_ptr);
                 cursor.version_ = parsed.header.version;
                 if (check == XDeltaCheck::full) {
@@ -3821,7 +3816,7 @@ namespace XOffsetDatastructure {
                 const std::size_t used = parsed.header.used_bytes;
                 const auto root = static_cast<std::uint64_t>(parsed.header.root_offset);
                 const std::size_t old_used = static_cast<std::size_t>(core.arena()->used_end);
-                const std::uint64_t old_root = core.arena()->root_offset;
+                const std::uint64_t old_root = std::uint64_t(XBufferCore::root_at);
                 const bool touch_log_current = xbuf.touch_log_ && xbuf.touch_log_->epoch == core.epoch();
                 using Storage = std::conditional_t<has_wire_allocator_ctor<T>, T, ReflectRoot<T>>;
                 if (sizeof(Storage) > used - root || root % alignof(Storage) != 0)
@@ -3868,7 +3863,6 @@ namespace XOffsetDatastructure {
                 }
                 auto* sm = core.arena();
                 sm->used_end = used;
-                sm->root_offset = root;
                 if (keep_undo) {
                     XOFFSET_ROLLBACK_BEGIN
                         XOFFSET_VTRY(check_digest<T>(core, parsed, who));
@@ -3885,7 +3879,7 @@ namespace XOffsetDatastructure {
                     });
                     log.epoch = core.epoch();
                 }
-                if (T* root_ptr = find_root_at<T>(core, root)) core.cache_root(root_ptr);
+                if (T* root_ptr = find_root<T>(core)) core.cache_root(root_ptr);
                 cursor.version_ = parsed.header.version;
                 cursor.last_check_ = XDeltaCheck::admit;
                 return vok();
@@ -3927,7 +3921,7 @@ namespace XOffsetDatastructure {
                 // The buffer's used size and root (a payload within its
                 // maximum capacity: it already holds it).
                 const std::size_t used = static_cast<std::size_t>(core.arena()->used_end);
-                const std::uint64_t root = core.arena()->root_offset;
+                const std::uint64_t root = std::uint64_t(XBufferCore::root_at);
                 using Storage = std::conditional_t<has_wire_allocator_ctor<T>, T, ReflectRoot<T>>;
                 if (used == 0 || used > XBufferCore::MAX_PAYLOAD || used > core.get_size() || root >= used ||
                     sizeof(Storage) > used - root || root % alignof(Storage) != 0)
@@ -3999,14 +3993,13 @@ namespace XOffsetDatastructure {
                 }
                 auto* sm = core.arena();
                 sm->used_end = used;
-                sm->root_offset = root;
                 core.advance_epoch();
                 if (touch_log_current) {
                     DeltaTouchLog& log = *xbuf.touch_log_;
                     for (std::uint32_t k = 0; k < count; ++k) touch_block(log, refs[k].offset / delta_block, refs[k].mask);
                     log.epoch = core.epoch();
                 }
-                if (T* root_ptr = cached ? cached : find_root_at<T>(core, root)) core.cache_root(root_ptr);
+                if (T* root_ptr = cached ? cached : find_root<T>(core)) core.cache_root(root_ptr);
                 cursor.version_ = version;
                 cursor.last_check_ = XDeltaCheck::admit;
                 return true;
@@ -4038,7 +4031,7 @@ namespace XOffsetDatastructure {
                 const bool has_state = core.typed_root_access_allowed_ && core.template root_type_matches<T>() &&
                                        core.arena() != nullptr;
                 const std::size_t old_used = has_state ? static_cast<std::size_t>(core.arena()->used_end) : 0u;
-                const std::uint64_t old_root = has_state ? core.arena()->root_offset : 0u;
+                const std::uint64_t old_root = has_state ? std::uint64_t(XBufferCore::root_at) : 0u;
                 // A small delta is read from a copy with room past its end, so
                 // that every block's bytes are scattered a word at a time.
                 DeltaReceiveScratch& scratch = receive_scratch(cursor);
@@ -4120,7 +4113,7 @@ namespace XOffsetDatastructure {
             require_schema_match<T>("save_delta<T>(): schema mismatch for requested root type");
             root_ptr = detail::find_root<T>(*this);
             if (!root_ptr) XOFFSET_THROW(XException(XErrc::no_root, "save_delta<T>(): no root object of requested type"));
-            this->cache_root(root_ptr);
+            if (this->template holds_fingerprint<T>()) this->cache_root(root_ptr);
         }
         ensure_hole_table(*root_ptr);
         // Not named `small`: <windows.h> (rpcndr.h) defines that as a macro.

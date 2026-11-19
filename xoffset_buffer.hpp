@@ -81,12 +81,10 @@ namespace XOffsetDatastructure {
             static bool owns_record(const XBufferCore& source) noexcept {
                 return XBufferCore::record_owner(source.owner_record_) == &source;
             }
-            template<class T> static XWireHeaderV2 header(XBufferCore&);
+            template<class T> static XWireHeader header(XBufferCore&);
             // header<T>'s body, inlined into save_into's fast path.
-            template<class T> XOFFSET_DETAIL_INLINE static XWireHeaderV2 header_inline(XBufferCore&);
+            template<class T> XOFFSET_DETAIL_INLINE static XWireHeader header_inline(XBufferCore&);
             template<class T> static void save_into(XBufferCore&, std::string&, XSaveOptions);
-            // In-band: save_small_into's hole table gathered on its frame.
-            static constexpr std::size_t small_wire_holes = 16;
             template<class T> static bool save_small_into(XBufferCore&, std::string&, XWireEmission);
             template<class T> static void save_into_general(XBufferCore&, std::string&, XSaveOptions);
             template<class T> static void rebuild_free_table(T&, XBufferCore&);
@@ -202,7 +200,7 @@ namespace XOffsetDatastructure {
                 "Allowed: primitives, XString, XVector<T>, XMap<K,V>, XSet<T>, "
                 "or structs composed of these.");
             if (!arena()) XOFFSET_THROW(XException(XErrc::invalid_state, "make<T>(): buffer has no arena"));
-            if (arena()->root_offset != 0) {
+            if (arena()->used_end != root_at) {
                 XOFFSET_THROW(XException(XErrc::invalid_state, "make<T>(): root object already exists. "
                     "Call root<T>() to access the existing object."));
             }
@@ -269,8 +267,10 @@ namespace XOffsetDatastructure {
             }
             // Passed the checks make<T>() and a verified load pass, so the
             // next call takes the fast path (a buffer moved into a container
-            // pays this path once, not on every call).
-            this->cache_root(ptr);
+            // pays this path once, not on every call). Only an image with T's
+            // fingerprint is cached as T (a root of T without a schema name
+            // read through another type stays on this path).
+            if (holds_fingerprint<T>()) this->cache_root(ptr);
             return *ptr;
         }
 
@@ -463,14 +463,15 @@ namespace XOffsetDatastructure {
             return XArenaAllocator<T>(this->arena());
         }
 
+        // The binding is T's: a root of T was made or loaded, and the image
+        // header holds T's fingerprint.
         template <typename T>
         bool matches_schema() const {
             if (!schema_bound_) return false;
             if constexpr (!has_schema_name_v<T>) {
                 return false;
             } else {
-                return bound_root_type_id_ == detail::wire_root_type_id<T>() &&
-                    bound_schema_hash_ == detail::wire_schema_hash<T>();
+                return holds_fingerprint<T>();
             }
         }
 
@@ -540,8 +541,8 @@ namespace XOffsetDatastructure {
             return out;
         }
 
-        // V2: if a host allocation failure (or an unverified load) left the
-        // free table incomplete, recompute it exactly from the live graph.
+        // If a host allocation failure (or an unverified load) left the free
+        // state incomplete, recompute it exactly from the live graph.
         template <typename T>
         void ensure_hole_table(const T& root) {
             if (this->free_table_complete()) return;
@@ -551,16 +552,16 @@ namespace XOffsetDatastructure {
             this->replace_free_blocks(holes);
         }
 
+        // The wire header of this image as T's: the image's own header with
+        // T's fingerprint.
         template <typename T>
-        XWireHeaderV2 wire_header_v2(const T& root) const {
-            // The used extent (what the logical length was after the
-            // shrink_to_fit that saves no longer do): used_end, at least the
-            // header, at most the logical length.
+        XWireHeader image_wire_header() const {
+            // The used extent: used_end, at least the header, at most the
+            // logical length.
+            const auto* sm = this->arena();
             const auto used = std::min<std::uint64_t>(
-                std::max<std::uint64_t>(this->arena()->used_end, sizeof(arena_header)), this->get_size());
-            return detail::make_wire_header<T>(used,
-                reinterpret_cast<std::uintptr_t>(&root) - reinterpret_cast<std::uintptr_t>(this->get_address()),
-                this->wire_hole_count());
+                std::max<std::uint64_t>(sm->used_end, sizeof(arena_header)), this->get_size());
+            return detail::make_wire_header<T>(used, sm->free_dir, sm->free_bytes);
         }
 
         template <typename T>
@@ -583,22 +584,22 @@ namespace XOffsetDatastructure {
             }
             ensure_hole_table(*root_ptr);
             const char* base = static_cast<const char*>(this->get_address());
-            const auto header = wire_header_v2(*root_ptr);
+            const auto header = image_wire_header<T>();
             detail::WireGaps gaps;
             if (options.emission == XWireEmission::free_runs) gaps = detail::wire_free_runs(*this, header.used_bytes);
             const auto output_size = options.emission == XWireEmission::zero_runs
-                ? detail::wire_dense_size(header, "save_verified<T>()")
-                : detail::wire_free_run_size(header, gaps, "save_verified<T>()");
+                ? std::size_t(header.used_bytes)
+                : detail::wire_free_run_size(header.used_bytes, gaps);
             std::string out;
             if (output_size > out.max_size())
                 XOFFSET_THROW(std::length_error("save_verified<T>(): output size exceeds string limit"));
 #if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
             out.resize_and_overwrite(output_size, [&](char* output, std::size_t) noexcept {
-                return detail::write_wire(output, header, base, *this, options.emission, gaps);
+                return detail::write_wire(output, header, base, options.emission, gaps);
             });
 #else
             out.resize(output_size);
-            out.resize(detail::write_wire(out.data(), header, base, *this, options.emission, gaps));
+            out.resize(detail::write_wire(out.data(), header, base, options.emission, gaps));
 #endif
             return out;
         }
@@ -611,8 +612,6 @@ namespace XOffsetDatastructure {
                 : XBuffer(reinterpret_cast<const char*>(data.data()), data.size_bytes());
             xbuf.typed_root_access_allowed_ = false;
             xbuf.schema_bound_ = false;
-            xbuf.bound_root_type_id_ = 0;
-            xbuf.bound_schema_hash_ = 0;
             return xbuf;
         }
 
@@ -689,17 +688,14 @@ namespace XOffsetDatastructure {
         template <typename T>
         detail::vstatus reload_into(std::span<const std::byte> data, std::pmr::memory_resource* upstream) {
             constexpr const char* who = "reload_verified<T>()";
-            XWireHeaderV2 header;
-            if (admit_small_wire<T>(data, header)) [[likely]] {
-                // Payload <= small_reload_max: the inline bitmaps suffice, so
+            const std::size_t size = data.size_bytes();
+            if (admit_image<T>(data) && size <= small_reload_max && this->can_reload_image_in_place(size)) [[likely]] {
+                // An image <= small_reload_max: the inline bitmaps suffice, so
                 // neither upstream nor the retained scratch is touched.
+                if (!this->reload_image_in_place(reinterpret_cast<const char*>(data.data()), size)) [[unlikely]]
+                    return reload_storage_failed();
                 XOFFSET_ROLLBACK_BEGIN
-                    const char* stored = reinterpret_cast<const char*>(data.data()) + sizeof(XWireHeaderV2);
-                    const auto used = static_cast<std::size_t>(header.used_bytes);
-                    XOFFSET_VTRY(reinit_from_dense_wire_in_place(stored, header.root_offset, used));
-                    XOFFSET_VTRY(finish_verified_load<T>(header, stored + (used - XWIRE_PAYLOAD_BEGIN),
-                                                         static_cast<std::size_t>(header.hole_count),
-                                                         upstream ? upstream : detail::default_wire_upstream(),
+                    XOFFSET_VTRY(finish_verified_load<T>(size, upstream ? upstream : detail::default_wire_upstream(),
                                                          who, nullptr));
                 XOFFSET_ROLLBACK_END(reset_arena(0))
                 return detail::vok();
@@ -711,12 +707,11 @@ namespace XOffsetDatastructure {
                     retained = reload_scratch_.get();
                     upstream = detail::default_wire_upstream();
                 }
-                header = XWireHeaderV2{};
+                XWireHeader header{};
                 detail::WireLayout layout;
                 XOFFSET_VTRY(admit_wire_header<T>(data, header, who, layout));
-                XOFFSET_VTRY(reinit_from_wire({header.root_offset, layout.stored, layout.extents, layout.extent_count},
-                                              header.used_bytes));
-                XOFFSET_VTRY(finish_verified_load<T>(header, layout, upstream, who, retained));
+                XOFFSET_VTRY(reinit_from_wire({layout.stored, layout.extents, layout.extent_count}, header.used_bytes));
+                XOFFSET_VTRY(finish_verified_load<T>(header.used_bytes, upstream, who, retained));
             XOFFSET_ROLLBACK_END(reset_arena(0))
             return detail::vok();
         }
@@ -728,7 +723,7 @@ namespace XOffsetDatastructure {
             constexpr const char* who = "load_verified<T>()";
             if (!upstream)
                 XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument, "validation scratch: null upstream");
-            XWireHeaderV2 header{};
+            XWireHeader header{};
             detail::WireLayout layout;
             XOFFSET_VTRY(admit_wire_header<T>(data, header, who, layout));
             const auto used = static_cast<std::size_t>(header.used_bytes);
@@ -738,10 +733,8 @@ namespace XOffsetDatastructure {
             const auto capacity = cap ? *cap : MaximumCapacity{DEFAULT_MAXIMUM_CAPACITY};
             XOFFSET_VTRY(detail::require_wire_within_capacity(used, capacity.value, cap.has_value(),
                                                               "load_verified<T>()"));
-            XOFFSET_VTRY(init_wire_v(WirePayload{header.root_offset, layout.stored, layout.extents,
-                                                 layout.extent_count},
-                                     used, capacity));
-            return finish_verified_load<T>(header, layout, upstream, who);
+            XOFFSET_VTRY(init_wire_v(WirePayload{layout.stored, layout.extents, layout.extent_count}, used, capacity));
+            return finish_verified_load<T>(used, upstream, who);
         }
 
         detail::WireValidationScratch& retained_reload_scratch() {
@@ -811,13 +804,13 @@ namespace XOffsetDatastructure {
 
     public:
         /// Direct receive into this buffer: reload_verified<T>() without the
-        /// library copy. The transport writes the wire's sections into the
-        /// token's spans (header; extent table; the payload bytes, densely or
-        /// each extent at its payload offset - XWIRE_PAYLOAD_BEGIN with gaps
-        /// untouched; hole table), calls complete() with the byte counts it
-        /// wrote, then finish().
-        /// `payload_bytes`, `holes` and `extents` are the header's used_bytes,
-        /// hole_count and extent_count. Admission, verification, rejection
+        /// library copy. The transport writes the wire into the token's
+        /// spans: the image (its 40-byte header as on the wire, then the
+        /// image bytes, densely or each extent at its offset with gaps
+        /// untouched) and, for a sparse wire, the extent table. It calls
+        /// complete() with the byte counts it wrote (the image's counts the
+        /// gaps), then finish(). `used_bytes` and `extents` are the header's
+        /// used_bytes and extent_count. Admission, verification, rejection
         /// and the result are exactly those of reload_verified<T>() on the
         /// same wire; a length that disagrees with the header, an incomplete
         /// transfer, or a token dropped before finish() rejects. From begin
@@ -827,49 +820,44 @@ namespace XOffsetDatastructure {
         /// open; one token per buffer at a time. No host allocation per
         /// message once the retained scratch has grown (sparse wires excepted).
         template <typename T>
-        VerifiedReloadToken<T> begin_verified_reload(std::size_t payload_bytes,
-                                                     std::size_t holes = 0,
-                                                     std::size_t extents = 0) {
-            std::byte* tables = nullptr;
+        VerifiedReloadToken<T> begin_verified_reload(std::size_t used_bytes, std::size_t extents = 0) {
+            std::byte* table = nullptr;
             std::size_t clean_from = 0;
-            XOFFSET_VREQUIRE(begin_verified_reload_v<T>(payload_bytes, holes, extents, tables, clean_from));
-            return VerifiedReloadToken<T>(*this, tables, payload_bytes, holes, extents, clean_from);
+            XOFFSET_VREQUIRE(begin_verified_reload_v<T>(used_bytes, extents, table, clean_from));
+            return VerifiedReloadToken<T>(*this, table, used_bytes, extents, clean_from);
         }
 
         /// begin_verified_reload without exceptions: the token, or the code
         /// and message begin_verified_reload would have thrown.
         template <typename T>
-        XResult<VerifiedReloadToken<T>> try_begin_verified_reload(std::size_t payload_bytes,
-                                                                  std::size_t holes = 0,
-                                                                  std::size_t extents = 0) {
-            std::byte* tables = nullptr;
+        XResult<VerifiedReloadToken<T>> try_begin_verified_reload(std::size_t used_bytes, std::size_t extents = 0) {
+            std::byte* table = nullptr;
             std::size_t clean_from = 0;
             XStatus status = detail::try_v([&] {
-                return begin_verified_reload_v<T>(payload_bytes, holes, extents, tables, clean_from);
+                return begin_verified_reload_v<T>(used_bytes, extents, table, clean_from);
             });
             if (!status) return std::move(status).error();
             return XResult<VerifiedReloadToken<T>>(
-                VerifiedReloadToken<T>(*this, tables, payload_bytes, holes, extents, clean_from));
+                VerifiedReloadToken<T>(*this, table, used_bytes, extents, clean_from));
         }
 
     private:
         template <typename T>
-        detail::vstatus begin_verified_reload_v(std::size_t payload_bytes, std::size_t holes, std::size_t extents,
-                                                std::byte*& tables, std::size_t& clean_from) {
+        detail::vstatus begin_verified_reload_v(std::size_t used_bytes, std::size_t extents,
+                                                std::byte*& table, std::size_t& clean_from) {
             static_assert(is_wire_admitted_v<T>,
                 "begin_verified_reload<T>() requires an admitted fixed-schema wire type.");
             if (direct_reload_open_)
                 XOFFSET_VFAIL(XException, XErrc::invalid_state,
                               "begin_verified_reload<T>(): a direct reload is already open");
             XOFFSET_ROLLBACK_BEGIN
-                // Holes and extents are disjoint, non-empty 8-byte multiples
-                // inside the payload, so larger counts never verify; they
-                // are refused before the tables are sized.
-                if (holes > payload_bytes / 8u || extents > payload_bytes / 8u)
+                // Extents are disjoint, non-empty 8-byte multiples inside the
+                // image, so larger counts never verify; they are refused
+                // before the table is sized.
+                if (extents > used_bytes / 8u)
                     XOFFSET_VFAIL(XException, XErrc::size_mismatch, "reload_verified<T>(): used size mismatch");
-                XOFFSET_VTRY(reinit_for_overwrite(payload_bytes, clean_from));
-                tables = retained_reload_scratch().tables(
-                    sizeof(XWireHeaderV2) + extents * 8u + holes * sizeof(WireHole));
+                XOFFSET_VTRY(reinit_for_overwrite(used_bytes, clean_from));
+                table = retained_reload_scratch().tables(extents * 8u + 8u);
                 direct_reload_open_ = true;
             XOFFSET_ROLLBACK_END(reset_arena(0))
             return detail::vok();
@@ -933,49 +921,44 @@ namespace XOffsetDatastructure {
         }
 
     private:
-        // Small dense reload (reload_verified): a payload of at most
-        // small_reload_max bytes and no extent table. One pass over the
-        // header checks exactly what admit_wire_header, parse_wire_layout and
-        // the reinit admission check; any other wire, valid or not, takes the
-        // general path, which reports the same first error.
+        // Small dense reload (reload_verified): an image of at most
+        // small_reload_max bytes, which the inline bitmaps validate.
         static constexpr std::size_t small_reload_max = detail::WireGranuleIndex::inline_extent;
-        static constexpr std::size_t wire_header_words = sizeof(XWireHeaderV2) / 8u;
 
-        // The header fields that do not depend on the payload, as words;
-        // used_bytes, root_offset and hole_count are 0, extent_count is 0 (dense).
+        // T's fixed header words: the magic and header size, then the
+        // fingerprint.
         template <typename T>
-        static constexpr std::array<std::uint64_t, wire_header_words> small_wire_image() noexcept {
-            XWireHeaderV2 h{};
-            h.magic = XWIRE_MAGIC;
-            h.flags = XWIRE_FLAGS;
-            h.schema_hash = detail::wire_schema_hash<T>();
-            h.root_type_id = detail::wire_root_type_id<T>();
-            return std::bit_cast<std::array<std::uint64_t, wire_header_words>>(h);
+        static constexpr std::array<std::uint64_t, 3> image_words() noexcept {
+            return {XBufferCore::image_magic, detail::wire_schema_hash<T>(), detail::wire_root_type_id<T>()};
         }
-
+        // The smallest image of T: the header and the root object.
         template <typename T>
-        XOFFSET_DETAIL_INLINE static bool admit_small_wire(std::span<const std::byte> data,
-                                                                XWireHeaderV2& header) noexcept {
-            static_assert(sizeof(XWireHeaderV2) == 40 && offsetof(XWireHeaderV2, used_bytes) == 8 &&
-                          offsetof(XWireHeaderV2, hole_count) == 16 && offsetof(XWireHeaderV2, schema_hash) == 24);
-            if (!detail::small_reload_fast_path || data.size_bytes() < sizeof(XWireHeaderV2)) return false;
-            std::memcpy(&header, data.data(), sizeof(header));
-            constexpr auto image = small_wire_image<T>();
-            const auto words = std::bit_cast<std::array<std::uint64_t, wire_header_words>>(header);
-            // Word 1: used_bytes, root_offset; word 2: hole_count, extent_count (0).
-            const std::uint64_t diff = (words[0] ^ image[0]) | (words[2] >> 32) | (words[3] ^ image[3]) |
-                                       (words[4] ^ image[4]);
-            const std::uint64_t used = header.used_bytes;
-            const std::uint64_t body = data.size_bytes() - sizeof(XWireHeaderV2);
-            const std::uint64_t stored = used - XWIRE_PAYLOAD_BEGIN;
-            return diff == 0 && used >= XWIRE_PAYLOAD_BEGIN && used <= small_reload_max && (used & 7u) == 0 &&
-                header.root_offset >= XWIRE_PAYLOAD_BEGIN && header.root_offset < used && stored <= body &&
-                body - stored == std::uint64_t(header.hole_count) * 8u;
+        static constexpr std::size_t root_end = XWIRE_PAYLOAD_BEGIN + sizeof(detail::root_storage_t<T>);
+
+        // A dense image of T: the wire is T's image with nothing else, so it
+        // is copied as it is. The header's fixed words are T's, and its
+        // used_bytes and extent count (one word: extent_count 0) are the
+        // wire's size; the image holds the root and ends on a word. Any other
+        // wire, valid or not, takes the general path (admit_wire_header),
+        // which reports the first error.
+        template <typename T>
+        XOFFSET_DETAIL_INLINE static bool admit_image(std::span<const std::byte> data) noexcept {
+            static_assert(offsetof(XWireHeader, used_bytes) == 24 && offsetof(XWireHeader, extent_count) == 28);
+            static_assert(root_end<T> >= sizeof(XWireHeader));
+            const std::uint64_t size = data.size_bytes();
+            if (size < root_end<T> || (size & 7u) != 0) return false;
+            const std::byte* at = data.data();
+            XOFFSET_DETAIL_OPAQUE(at);
+            std::uint64_t words[4];
+            std::memcpy(words, at, sizeof(words));
+            // Compared word by word with T's constants (immediates).
+            constexpr auto image = image_words<T>();
+            return words[0] == image[0] && words[1] == image[1] && words[2] == image[2] && words[3] == size;
         }
 
         // Wire admission shared by load_verified and reload_verified.
         template <typename T>
-        static detail::vstatus admit_wire_header(std::span<const std::byte> data, XWireHeaderV2& header,
+        static detail::vstatus admit_wire_header(std::span<const std::byte> data, XWireHeader& header,
                                                  const char* who, detail::WireLayout& layout) {
             static_assert(is_wire_admitted_v<T>,
                 "load_verified<T>() requires an admitted fixed-schema wire type.");
@@ -986,121 +969,106 @@ namespace XOffsetDatastructure {
             if (header.schema_hash != detail::wire_schema_hash<T>()) {
                 XOFFSET_VFAIL(XException, XErrc::schema_mismatch, std::string(who) + ": schema hash mismatch");
             }
-            return detail::parse_wire_layout(
-                header, reinterpret_cast<const char*>(data.data()) + sizeof(XWireHeaderV2),
-                data.size_bytes() - sizeof(XWireHeaderV2), who, layout);
+            return detail::parse_wire_layout(header, reinterpret_cast<const char*>(data.data()), data.size_bytes(),
+                                             who, layout);
         }
 
-        // Post-copy verification shared by load_verified and reload_verified.
+        // The root of a loaded image of `used` bytes (T's, or its reflected
+        // wrapper's, at offset 40), or null when the image cannot hold it.
         template <typename T>
-        detail::vstatus finish_verified_load(const XWireHeaderV2& header, const detail::WireLayout& layout,
-                                             std::pmr::memory_resource* upstream, const char* who,
-                                             detail::WireValidationScratch* retained = nullptr) {
-            return finish_verified_load<T>(header, layout.holes, layout.hole_count, upstream, who, retained);
+        T* loaded_root(std::size_t used) noexcept {
+            if (this->arena()->used_end != used || used < root_end<T>) return nullptr;
+            return detail::find_root<T>(*this);
         }
 
-        // WireOrder: false for a key delta's table (see load_free_blocks).
-        template <typename T, bool WireOrder = true>
-        detail::vstatus finish_verified_load(const XWireHeaderV2& header, const char* holes, std::size_t hole_count,
-                                             std::pmr::memory_resource* upstream, const char* who,
-                                             detail::WireValidationScratch* retained) {
-            if (this->arena()->used_end != header.used_bytes) {
-                XOFFSET_VFAIL(XException, XErrc::root_mismatch, std::string(who) + ": non-normalized payload extent");
-            }
-            // Every caller wrote the payload header from `header`: its root
-            // offset is header.root_offset.
-            auto* root_ptr = detail::find_root_at<T>(*this, header.root_offset);
+        // Typed access to the root of T that a load admitted.
+        template <typename T>
+        XOFFSET_DETAIL_INLINE void publish_loaded_root(T* root) noexcept {
+            typed_root_access_allowed_ = true;
+            bind_schema<T>();
+            this->cache_root(root);
+        }
+
+        // Post-copy verification shared by load_verified and reload_verified:
+        // the graph walk, with the image's free blocks (the directory and
+        // its stacks, walked and checked here) tiling the image with the live
+        // blocks. Up to local_free_blocks of them stay on the frame.
+        static constexpr std::size_t local_free_blocks = 32;
+        template <typename T>
+        detail::vstatus finish_verified_load(std::size_t used, std::pmr::memory_resource* upstream, const char* who,
+                                             detail::WireValidationScratch* retained = nullptr) {
+            auto* root_ptr = loaded_root<T>(used);
             if (!root_ptr) {
                 XOFFSET_VFAIL(XException, XErrc::root_mismatch, std::string(who) + ": root not found");
             }
-            auto actual_offset = static_cast<std::uint64_t>(
-                reinterpret_cast<std::uintptr_t>(root_ptr) -
-                reinterpret_cast<std::uintptr_t>(this->get_address()));
-            if (actual_offset != header.root_offset) {
-                XOFFSET_VFAIL(XException, XErrc::root_mismatch, std::string(who) + ": root offset mismatch");
+            std::array<WireHole, local_free_blocks> local;
+            std::vector<WireHole> more;
+            std::size_t count = 0;
+            const bool formed = this->inband_collect([&](WireHole hole) {
+                if (count < local.size()) local[count] = hole;
+                else {
+                    if (more.empty()) more.assign(local.begin(), local.end());
+                    more.push_back(hole);
+                }
+                ++count;
+            });
+            if (!formed) {
+                XOFFSET_VFAIL(XException, XErrc::invalid_payload, std::string(who) + ": invalid free blocks");
             }
-            XOFFSET_VTRY(detail::verify_structural_wire_graph(*root_ptr, *this, upstream, holes, hole_count,
-                                                              true, nullptr, retained));
-            XOFFSET_VTRY(this->template load_free_blocks<WireOrder>(holes, hole_count));
-            typed_root_access_allowed_ = true;
-            bind_schema<T>();
-            this->cache_root(root_ptr);
+            XOFFSET_VTRY(detail::verify_structural_wire_graph(*root_ptr, *this, upstream,
+                                                              count <= local.size() ? local.data() : more.data(),
+                                                              count, true, nullptr, retained));
+            publish_loaded_root<T>(root_ptr);
             return detail::vok();
         }
 
         // ---- Trust tier admit (xoffset_receiver.hpp, XCheck::admit) ------
         // The wire parse and admission of reload_verified / load_verified
-        // (header, fingerprint, extent and hole tables, capacity) and the same
-        // copy into the arena, without the structural graph walk. Besides the
-        // header, only what the free table and the root binding rely on is
-        // checked: the root object lies inside the used payload, and every
-        // hole is an aligned, non-empty 8-byte multiple inside the payload
-        // (allocations write into holes). Everything else about the payload is
-        // the sender's promise: only for trusted links.
-        template <typename T, bool WireOrder = true>
-        detail::vstatus finish_admitted_load(const XWireHeaderV2& header, const char* holes, std::size_t hole_count,
-                                             const char* who) {
-            const std::uint64_t used = header.used_bytes;
-            if (this->arena()->used_end != used) {
-                XOFFSET_VFAIL(XException, XErrc::root_mismatch, std::string(who) + ": non-normalized payload extent");
-            }
-            using Storage = std::conditional_t<detail::has_wire_allocator_ctor<T>, T, detail::ReflectRoot<T>>;
-            auto* root_ptr = detail::find_root_at<T>(*this, header.root_offset);
-            if (!root_ptr || header.root_offset < XWIRE_PAYLOAD_BEGIN || header.root_offset >= used ||
-                sizeof(Storage) > used - header.root_offset) {
+        // (header, fingerprint, extent table, capacity) and the same copy
+        // into the arena, without the graph walk: only that the image holds
+        // the root is checked. Everything else about the image, the free
+        // blocks included, is the sender's promise: only for trusted links.
+        template <typename T>
+        XOFFSET_DETAIL_INLINE detail::vstatus finish_admitted_load(std::size_t used, const char* who) {
+            auto* root_ptr = loaded_root<T>(used);
+            if (!root_ptr) [[unlikely]] {
                 XOFFSET_VFAIL(XException, XErrc::root_mismatch, std::string(who) + ": root not found");
             }
-            // One pass over the hole table with no early exit and no branch
-            // per hole; the verdict is taken once at the end. A hole is valid
-            // when offset >= 48, bytes >= 1 and offset + bytes <= used. With
-            // o = offset - 48 and b = bytes - 1 in 32-bit arithmetic (an
-            // offset below 48 or a size of 0 wraps to near 2^32) that is
-            // o + b < used - 48 in 64-bit arithmetic, as used (this arena's
-            // used_end) is at most MAX_PAYLOAD < 2^31: so only the largest
-            // o + b is compared. Alignment: no low bit set in the OR of all
-            // offsets and sizes.
-            std::uint32_t low_bits = 0;
-            std::uint64_t reach = 0;
-            for (std::size_t i = 0; i < hole_count; ++i) {
-                WireHole hole;
-                std::memcpy(&hole, holes + i * sizeof(hole), sizeof(hole));
-                low_bits |= hole.offset | hole.bytes;
-                const std::uint64_t r = std::uint64_t(std::uint32_t(hole.offset - std::uint32_t(XWIRE_PAYLOAD_BEGIN))) +
-                                        std::uint32_t(hole.bytes - 1u);
-                reach = r > reach ? r : reach;
-            }
-            if ((low_bits & 7u) != 0 || reach >= used - XWIRE_PAYLOAD_BEGIN) [[unlikely]] {
-                XOFFSET_VFAIL(XException, XErrc::invalid_payload, std::string(who) + ": hole out of range");
-            }
-            if constexpr (detail::inband_allocator) XOFFSET_VTRY(this->inband_adopt(holes, hole_count, false, WireOrder));
-            else XOFFSET_VTRY(this->load_free_blocks(holes, hole_count));
-            typed_root_access_allowed_ = true;
-            bind_schema<T>();
-            this->cache_root(root_ptr);
+            publish_loaded_root<T>(root_ptr);
             return detail::vok();
         }
 
+        // A dense image of T in place (each message of a stream): the header
+        // compare, one copy and the stores that publish T's root at offset
+        // 40, inline in the caller. Everything else takes the general path.
         template <typename T>
-        detail::vstatus reload_admit_v(std::span<const std::byte> data) {
-            constexpr const char* who = "XReceiver::reload<T, admit>()";
-            XWireHeaderV2 header;
-            if (admit_small_wire<T>(data, header)) [[likely]] {
-                XOFFSET_ROLLBACK_BEGIN
-                    const char* stored = reinterpret_cast<const char*>(data.data()) + sizeof(XWireHeaderV2);
-                    const auto used = static_cast<std::size_t>(header.used_bytes);
-                    XOFFSET_VTRY(reinit_from_dense_wire_in_place(stored, header.root_offset, used));
-                    XOFFSET_VTRY(finish_admitted_load<T>(header, stored + (used - XWIRE_PAYLOAD_BEGIN),
-                                                         static_cast<std::size_t>(header.hole_count), who));
-                XOFFSET_ROLLBACK_END(reset_arena(0))
+        XOFFSET_DETAIL_INLINE detail::vstatus reload_admit_v(std::span<const std::byte> data) {
+            const std::size_t size = data.size_bytes();
+            if (admit_image<T>(data) && this->can_reload_image_in_place(size)) [[likely]] {
+                if (!this->reload_image_in_place(reinterpret_cast<const char*>(data.data()), size)) [[unlikely]]
+                    return reload_storage_failed();
+                publish_loaded_root<T>(detail::image_root<T>(*this));
                 return detail::vok();
             }
+            return reload_admit_general<T>(data);
+        }
+
+        // An injected storage failure of reload_image_in_place: the buffer
+        // is left empty, as after any failed reload.
+        XOFFSET_DETAIL_COLD detail::vstatus reload_storage_failed() {
+            reset_arena(0);
+            XOFFSET_VFAIL(XBadAlloc, XErrc::out_of_storage, detail::arena_failure_message);
+        }
+
+        template <typename T>
+        XOFFSET_DETAIL_NOINLINE detail::vstatus reload_admit_general(std::span<const std::byte> data) {
+            constexpr const char* who = "XReceiver::reload<T, admit>()";
             XOFFSET_ROLLBACK_BEGIN
-                header = XWireHeaderV2{};
+                XWireHeader header{};
                 detail::WireLayout layout;
                 XOFFSET_VTRY(admit_wire_header<T>(data, header, who, layout));
-                XOFFSET_VTRY(reinit_from_wire({header.root_offset, layout.stored, layout.extents, layout.extent_count},
-                                              header.used_bytes));
-                XOFFSET_VTRY(finish_admitted_load<T>(header, layout.holes, layout.hole_count, who));
+                XOFFSET_VTRY(reinit_from_wire({layout.stored, layout.extents, layout.extent_count}, header.used_bytes));
+                XOFFSET_VTRY(finish_admitted_load<T>(header.used_bytes, who));
             XOFFSET_ROLLBACK_END(reset_arena(0))
             return detail::vok();
         }
@@ -1109,15 +1077,13 @@ namespace XOffsetDatastructure {
         template <typename T>
         detail::vstatus load_admit_v(std::span<const std::byte> data, MaximumCapacity cap) {
             constexpr const char* who = "XReceiver::load<T, admit>()";
-            XWireHeaderV2 header{};
+            XWireHeader header{};
             detail::WireLayout layout;
             XOFFSET_VTRY(admit_wire_header<T>(data, header, who, layout));
             const auto used = static_cast<std::size_t>(header.used_bytes);
             XOFFSET_VTRY(detail::require_wire_within_capacity(used, cap.value, true, who));
-            XOFFSET_VTRY(init_wire_v(WirePayload{header.root_offset, layout.stored, layout.extents,
-                                                 layout.extent_count},
-                                     used, cap));
-            return finish_admitted_load<T>(header, layout.holes, layout.hole_count, who);
+            XOFFSET_VTRY(init_wire_v(WirePayload{layout.stored, layout.extents, layout.extent_count}, used, cap));
+            return finish_admitted_load<T>(used, who);
         }
 
         void require_typed_root_access(const char* message) const {
@@ -1126,21 +1092,40 @@ namespace XOffsetDatastructure {
             }
         }
 
+        // make<T>(): the binding, and T's fingerprint in the image header
+        // (a load's image already holds the sender's).
         template <typename T>
         void bind_schema_if_available() noexcept {
-            if constexpr (has_schema_name_v<T>) {
-                bind_schema<T>();
+            if constexpr (has_schema_name_v<T>) bind_schema<T>();
+            if constexpr (is_wire_admitted_v<T>) write_fingerprint<T>();
+        }
+
+        // T's fingerprint in the image header. A buffer whose root is cached
+        // as a wire type T holds it (make<T>(), a load or delta of T, a
+        // clone), so a save copies the image as it is.
+        template <typename T>
+        void write_fingerprint() noexcept {
+            auto* sm = this->arena();
+            sm->schema_hash = detail::wire_schema_hash<T>();
+            sm->root_type_id = detail::wire_root_type_id<T>();
+        }
+        template <typename T>
+        bool holds_fingerprint() const noexcept {
+            using U = std::remove_cv_t<T>;
+            if constexpr (is_wire_admitted_v<U>) {
+                const auto* sm = this->arena();
+                return sm && sm->schema_hash == detail::wire_schema_hash<U>() &&
+                       sm->root_type_id == detail::wire_root_type_id<U>();
+            } else {
+                return true;
             }
         }
 
         template <typename T>
         void bind_schema() noexcept {
             this->template bind_root_type<T>();
-            if constexpr (has_schema_name_v<T>) {
-                schema_bound_ = true;
-                bound_root_type_id_ = detail::wire_root_type_id<T>();
-                bound_schema_hash_ = detail::wire_schema_hash<T>();
-            }
+            // The fingerprint itself is the image header's.
+            if constexpr (has_schema_name_v<T>) schema_bound_ = true;
         }
 
         template <typename T>
@@ -1166,38 +1151,27 @@ namespace XOffsetDatastructure {
     class VerifiedReloadToken {
     public:
         VerifiedReloadToken(VerifiedReloadToken&& other) noexcept
-            : buffer_(std::exchange(other.buffer_, nullptr)), tables_(other.tables_),
-              payload_(other.payload_), holes_(other.holes_), extents_(other.extents_),
-              clean_from_(other.clean_from_), received_(other.received_), complete_(other.complete_) {}
+            : buffer_(std::exchange(other.buffer_, nullptr)), table_(other.table_), used_(other.used_),
+              extents_(other.extents_), clean_from_(other.clean_from_), received_(other.received_),
+              complete_(other.complete_) {}
         VerifiedReloadToken& operator=(VerifiedReloadToken&&) = delete;
         VerifiedReloadToken(const VerifiedReloadToken&) = delete;
         VerifiedReloadToken& operator=(const VerifiedReloadToken&) = delete;
         ~VerifiedReloadToken() { if (buffer_) abort(); }
 
         explicit operator bool() const noexcept { return buffer_ != nullptr; }
-        std::span<std::byte> header_bytes() const noexcept {
-            return buffer_ ? std::span<std::byte>(tables_, sizeof(XWireHeaderV2)) : std::span<std::byte>{};
+        // The image: [0, used_bytes) of the buffer, its header first.
+        std::span<std::byte> image_bytes() const noexcept {
+            return buffer_ ? std::span<std::byte>(reinterpret_cast<std::byte*>(buffer_->data()), used_)
+                           : std::span<std::byte>{};
         }
         std::span<std::byte> extent_bytes() const noexcept {
-            return buffer_ ? std::span<std::byte>(tables_ + sizeof(XWireHeaderV2), extents_ * 8u)
-                           : std::span<std::byte>{};
+            return buffer_ ? std::span<std::byte>(table_, extents_ * 8u) : std::span<std::byte>{};
         }
-        // The payload bytes of the wire: payload [48, used_bytes).
-        std::span<std::byte> payload_bytes() const noexcept {
-            return buffer_ ? std::span<std::byte>(reinterpret_cast<std::byte*>(buffer_->data()) + XWIRE_PAYLOAD_BEGIN,
-                                                  payload_ - XWIRE_PAYLOAD_BEGIN)
-                           : std::span<std::byte>{};
-        }
-        std::span<std::byte> hole_bytes() const noexcept {
-            return buffer_ ? std::span<std::byte>(tables_ + sizeof(XWireHeaderV2) + extents_ * 8u,
-                                                  holes_ * sizeof(XBufferCore::WireHole))
-                           : std::span<std::byte>{};
-        }
-        // payload_bytes counts the payload bytes including sparse gaps
-        // (used_bytes - 48).
-        void complete(std::size_t header_bytes, std::size_t payload_bytes,
-                      std::size_t hole_bytes = 0, std::size_t extent_bytes = 0) noexcept {
-            received_ = {header_bytes, payload_bytes, hole_bytes, extent_bytes};
+        // image_bytes counts the image's bytes including sparse gaps
+        // (used_bytes).
+        void complete(std::size_t image_bytes, std::size_t extent_bytes = 0) noexcept {
+            received_ = {image_bytes, extent_bytes};
             complete_ = true;
         }
 
@@ -1219,50 +1193,43 @@ namespace XOffsetDatastructure {
             if (!buffer) XOFFSET_VFAIL(XException, XErrc::invalid_state, "verified reload: token consumed");
             struct Close { XBuffer& b; ~Close() { b.direct_reload_open_ = false; } } close{*buffer};
             XOFFSET_ROLLBACK_BEGIN
-                if (!complete_ || received_[0] != sizeof(XWireHeaderV2) ||
-                    received_[1] != payload_ - XWIRE_PAYLOAD_BEGIN ||
-                    received_[2] != holes_ * sizeof(XBufferCore::WireHole) || received_[3] != extents_ * 8u)
+                if (!complete_ || received_[0] != used_ || received_[1] != extents_ * 8u)
                     XOFFSET_VFAIL(XException, XErrc::incomplete_input, "verified reload: incomplete input");
-                // admit_wire_header and parse_wire_layout, with the section
-                // lengths fixed by begin instead of read from one wire.
-                XWireHeaderV2 header;
-                XOFFSET_VTRY(detail::read_wire_header(tables_, sizeof(XWireHeaderV2), who, header));
+                // admit_wire_header and parse_wire_layout, with the lengths
+                // fixed by begin instead of read from one wire.
+                auto* base = buffer->data();
+                XWireHeader header;
+                XOFFSET_VTRY(detail::read_wire_header(base, used_, who, header));
                 if (header.root_type_id != detail::wire_root_type_id<T>())
                     XOFFSET_VFAIL(XException, XErrc::root_type_mismatch, std::string(who) + ": root type id mismatch");
                 if (header.schema_hash != detail::wire_schema_hash<T>())
                     XOFFSET_VFAIL(XException, XErrc::schema_mismatch, std::string(who) + ": schema hash mismatch");
                 XOFFSET_VTRY(detail::check_wire_extent(header, who));
-                if (header.used_bytes != payload_ || header.extent_count != extents_ ||
-                    header.hole_count != holes_)
+                if (header.used_bytes != used_ || header.extent_count != extents_)
                     XOFFSET_VFAIL(XException, XErrc::size_mismatch, std::string(who) + ": used size mismatch");
-                detail::WireLayout layout;
-                layout.extent_count = extents_;
-                if (extents_) layout.extents = reinterpret_cast<const char*>(tables_ + sizeof(XWireHeaderV2));
+                std::vector<XBufferCore::WireHole> gaps;
                 std::uint64_t stored;
-                XOFFSET_VTRY(detail::parse_extent_table(layout.extents, extents_, header.used_bytes, who, layout.gaps,
-                                                        stored));
-                layout.holes = reinterpret_cast<const char*>(tables_ + sizeof(XWireHeaderV2) + extents_ * 8u);
-                layout.hole_count = holes_;
+                XOFFSET_VTRY(detail::parse_extent_table(reinterpret_cast<const char*>(table_), extents_,
+                                                        header.used_bytes, who, gaps, stored));
                 // Gaps read as zero, as in assign_extents: clear what an
                 // earlier content may have left below clean_from_.
-                auto* base = buffer->data();
-                for (const auto& gap : layout.gaps) {
+                for (const auto& gap : gaps) {
                     const auto end = std::min<std::size_t>(std::size_t(gap.offset) + gap.bytes, clean_from_);
                     if (gap.offset < end) std::memset(base + gap.offset, 0, end - gap.offset);
                 }
-                XBufferCore::write_payload_header(base, header.root_offset, header.used_bytes);
+                buffer->arena()->extent_count = 0;
+                buffer->take_loaded_free_state();
                 XOFFSET_VTRY(buffer->check_reinit_payload());
-                XOFFSET_VTRY(buffer->template finish_verified_load<T>(header, layout, std::pmr::new_delete_resource(),
+                XOFFSET_VTRY(buffer->template finish_verified_load<T>(used_, std::pmr::new_delete_resource(),
                                                                       who, &buffer->retained_reload_scratch()));
             XOFFSET_ROLLBACK_END(buffer->reset_arena(0))
             return detail::vok();
         }
 
         friend class XBuffer;
-        VerifiedReloadToken(XBuffer& buffer, std::byte* tables, std::size_t payload, std::size_t holes,
-                            std::size_t extents, std::size_t clean_from) noexcept
-            : buffer_(&buffer), tables_(tables), payload_(payload), holes_(holes), extents_(extents),
-              clean_from_(clean_from) {}
+        VerifiedReloadToken(XBuffer& buffer, std::byte* table, std::size_t used, std::size_t extents,
+                            std::size_t clean_from) noexcept
+            : buffer_(&buffer), table_(table), used_(used), extents_(extents), clean_from_(clean_from) {}
         void abort() noexcept {
             auto* buffer = std::exchange(buffer_, nullptr);
             buffer->reset_arena(0);
@@ -1270,9 +1237,9 @@ namespace XOffsetDatastructure {
         }
 
         XBuffer* buffer_;
-        std::byte* tables_;
-        std::size_t payload_, holes_, extents_, clean_from_;
-        std::array<std::size_t, 4> received_{};
+        std::byte* table_;
+        std::size_t used_, extents_, clean_from_;
+        std::array<std::size_t, 2> received_{};
         bool complete_ = false;
     };
 
