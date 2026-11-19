@@ -1081,18 +1081,13 @@ namespace XOffsetDatastructure {
         template <typename T>
         vstatus verify_structural_wire_graph(const T& root, XBufferCore& xbuf,
                                              std::pmr::memory_resource* upstream = std::pmr::new_delete_resource()) {
-            // A live buffer's own free table is its hole table.
+            // A live buffer's own free regions, the directory block too: they
+            // tile the payload with the live blocks.
             std::vector<XBufferCore::WireHole> holes;
             const bool complete = xbuf.free_table_complete();
             if (complete) {
-                if constexpr (detail::inband_allocator) {
-                    // The directory block too: the entries tile the payload with the live blocks.
-                    holes.reserve(xbuf.free_region_count());
-                    xbuf.for_each_free_region([&](XBufferCore::WireHole hole) { holes.push_back(hole); });
-                } else {
-                    holes.reserve(xbuf.free_block_count());
-                    xbuf.for_each_free_block([&](XBufferCore::WireHole hole) { holes.push_back(hole); });
-                }
+                holes.reserve(xbuf.free_region_count());
+                xbuf.for_each_free_region([&](XBufferCore::WireHole hole) { holes.push_back(hole); });
             }
             return verify_structural_wire_graph(root, xbuf, upstream,
                 complete ? holes.data() : nullptr, holes.size(), complete);
