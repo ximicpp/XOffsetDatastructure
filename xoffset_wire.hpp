@@ -231,8 +231,9 @@ namespace XOffsetDatastructure {
             }
 
             // [g0, g1) nonempty, g1 <= granules(). 0 none, 1 live, 2 free. A
-            // live hit anywhere in the range wins over a free hit.
-            // One word inline, more out of line (the callers stay small).
+            // live hit anywhere in the range wins over a free hit (a free
+            // region's check). One word inline, more out of line (the callers
+            // stay small).
             XOFFSET_DETAIL_INLINE unsigned overlap(std::size_t g0, std::size_t g1) const noexcept {
                 const auto w0 = g0 / 64u, w1 = (g1 - 1u) / 64u;
                 if (w0 == w1) [[likely]] {
@@ -241,6 +242,24 @@ namespace XOffsetDatastructure {
                     return (free_[w0] & m) ? 2 : 0;
                 }
                 return overlap_words(g0, g1);
+            }
+            // True when a granule of [g0, g1) (nonempty, g1 <= granules()) is
+            // live. A live block is checked against the live blocks only: the
+            // free regions are registered after every live block, each checked
+            // against both (verify_structural_wire_graph_with).
+            XOFFSET_DETAIL_INLINE bool live_hit(std::size_t g0, std::size_t g1) const noexcept {
+                const auto w0 = g0 / 64u, w1 = (g1 - 1u) / 64u;
+                if (w0 == w1) [[likely]]
+                    return (owned_[w0] & (~std::uint64_t(0) << (g0 % 64u)) &
+                            (~std::uint64_t(0) >> (63u - (g1 - 1u) % 64u))) != 0;
+                return live_hit_words(g0, g1);
+            }
+            XOFFSET_DETAIL_NOINLINE bool live_hit_words(std::size_t g0, std::size_t g1) const noexcept {
+                const auto w0 = g0 / 64u, w1 = (g1 - 1u) / 64u;
+                if (owned_[w0] & (~std::uint64_t(0) << (g0 % 64u))) return true;
+                for (auto w = w0 + 1u; w < w1; ++w)
+                    if (owned_[w]) return true;
+                return (owned_[w1] & (~std::uint64_t(0) >> (63u - (g1 - 1u) % 64u))) != 0;
             }
             XOFFSET_DETAIL_NOINLINE unsigned overlap_words(std::size_t g0, std::size_t g1) const noexcept {
                 const auto w0 = g0 / 64u, w1 = (g1 - 1u) / 64u;
@@ -275,19 +294,30 @@ namespace XOffsetDatastructure {
                 bits[w1] |= last;
             }
 
-            // Marks [g0, g1) free unless one of its granules is free already
-            // (false, nothing marked). For free regions registered before
-            // every live block but the arena header, which they lie past.
+            // Marks [g0, g1) free unless one of its granules is free or live
+            // already (false, nothing marked).
             XOFFSET_DETAIL_INLINE bool mark_free_disjoint(std::size_t g0, std::size_t g1) noexcept {
                 const auto w0 = g0 / 64u, w1 = (g1 - 1u) / 64u;
                 if (w0 == w1) [[likely]] {
                     const auto m = (~std::uint64_t(0) << (g0 % 64u)) & (~std::uint64_t(0) >> (63u - (g1 - 1u) % 64u));
-                    if (free_[w0] & m) [[unlikely]] return false;
+                    if ((free_[w0] | owned_[w0]) & m) [[unlikely]] return false;
                     free_[w0] |= m;
                     return true;
                 }
-                if (overlap_words(g0, g1) != 0) return false;
-                mark_words(free_, g0, g1);
+                return mark_free_words(g0, g1);
+            }
+            // mark_free_disjoint over several words: one pass checks, one marks.
+            XOFFSET_DETAIL_NOINLINE bool mark_free_words(std::size_t g0, std::size_t g1) noexcept {
+                const auto w0 = g0 / 64u, w1 = (g1 - 1u) / 64u;
+                const auto first = ~std::uint64_t(0) << (g0 % 64u);
+                const auto last = ~std::uint64_t(0) >> (63u - (g1 - 1u) % 64u);
+                if ((free_[w0] | owned_[w0]) & first) return false;
+                for (auto w = w0 + 1u; w < w1; ++w)
+                    if (free_[w] | owned_[w]) return false;
+                if ((free_[w1] | owned_[w1]) & last) return false;
+                free_[w0] |= first;
+                for (auto w = w0 + 1u; w < w1; ++w) free_[w] = ~std::uint64_t(0);
+                free_[w1] |= last;
                 return true;
             }
 
@@ -450,7 +480,7 @@ namespace XOffsetDatastructure {
 
         // Bitmap registration, kept out of line so that the validators the
         // cursor path inlines into stay small. A range within one bitmap word
-        // that meets nothing is marked here with no further call (prepared
+        // that meets no live block is marked here with no further call (prepared
         // bitmaps hold the cursor's range already: see general()); the first
         // registration off the cursor, a longer range and every rejection go
         // through register_owned_general.
@@ -458,7 +488,7 @@ namespace XOffsetDatastructure {
                                                                WireValidationContext& ctx) {
             auto& index = ctx.granules;
             const auto g0 = begin / 8u, g1 = (begin + bytes) / 8u;
-            if (index.prepared() && g0 / 64u == (g1 - 1u) / 64u && index.overlap(g0, g1) == 0) [[likely]] {
+            if (index.prepared() && g0 / 64u == (g1 - 1u) / 64u && !index.live_hit(g0, g1)) [[likely]] {
                 index.mark(false, g0, g1);
                 ctx.owned_bytes += bytes;
                 return vok();
@@ -470,14 +500,7 @@ namespace XOffsetDatastructure {
                                                                 WireValidationContext& ctx) {
             auto& index = ctx.general();
             const auto g0 = begin / 8u, g1 = (begin + bytes) / 8u;
-            const auto overlap = index.overlap(g0, g1);
-            if (overlap == 1) {
-                return wire_reject(
-                    "wire validation detected overlapping dynamic ranges");
-            }
-            if (overlap == 2) {
-                return wire_reject("wire validation detected live/free overlap");
-            }
+            if (index.live_hit(g0, g1)) return wire_reject("wire validation detected overlapping dynamic ranges");
             index.mark(false, g0, g1);
             ctx.owned_bytes += bytes;
             /* XBV3: owned-registered */
@@ -621,15 +644,16 @@ namespace XOffsetDatastructure {
             XOFFSET_VFAIL(XException, XErrc::invalid_payload, std::string(who) + ": invalid free blocks");
         }
 
-        // The full check of a loaded image's free state, each region
-        // registered in ctx's bitmaps as the walk reaches it: the directory
-        // and every stack hold what the allocator relies on (blocks inside
-        // the image, aligned, each stack of one size, the sizes ascending,
-        // the unused entries unused, a second word of zero in every free
-        // block, the free bytes the header names), and no region overlaps
-        // another (a stack that loops comes back to a marked block, so every
-        // walk ends). The graph walk then checks that they tile the image
-        // with the live blocks.
+        // The full check of a loaded image's free state, after the graph
+        // walk registered the live blocks, each region registered in ctx's
+        // bitmaps as the walk reaches it: the directory and every stack hold
+        // what the allocator relies on (blocks inside the image, aligned,
+        // each stack of one size, the sizes ascending, the unused entries
+        // unused, a second word of zero in every free block, the free bytes
+        // the header names), and no region overlaps a live block or another
+        // region (a stack that loops comes back to a marked block, so every
+        // walk ends). The coverage check then requires that they tile the
+        // image with the live blocks.
         inline vstatus register_inband_free_regions(const XBufferCore& xbuf, WireValidationContext& ctx,
                                                     const char* who) {
             const auto* const sm = xbuf.arena();
@@ -644,10 +668,10 @@ namespace XOffsetDatastructure {
             if ((dir & 7u) != 0 || dir < XBufferCore::root_at || std::uint64_t(dir) + 8u > used) [[unlikely]]
                 return reject_free_blocks(who);
             const std::uint32_t n = word(dir), cap = word(dir + 4u);
-            const std::uint64_t dir_bytes = XBufferCore::inband_dir_bytes(cap);
+            const std::uint64_t dir_bytes = 8u + 8u * std::uint64_t(cap);  // not inband_dir_bytes: no wrap
             if (n >= cap || dir + dir_bytes > used) [[unlikely]] return reject_free_blocks(who);
             auto& index = ctx.general();
-            index.mark(true, dir / 8u, (dir + dir_bytes) / 8u);
+            if (!index.mark_free_disjoint(dir / 8u, (dir + dir_bytes) / 8u)) [[unlikely]] return reject_free_blocks(who);
             std::uint64_t total = 0;
             std::uint32_t previous = 0;
             for (std::uint32_t i = 0; i < cap; ++i) {
@@ -973,8 +997,8 @@ namespace XOffsetDatastructure {
                 true, nullptr, retained);
         }
 
-        // register_free(ctx) registers the free regions (before the live
-        // blocks, so each block is checked against them as it is reached).
+        // register_free(ctx) registers the free regions (after the live
+        // blocks, each region checked against them as it is registered).
         template <typename T, typename RegisterFree>
         vstatus verify_structural_wire_graph_with(const T& root, XBufferCore& xbuf,
                                                   std::pmr::memory_resource* upstream,
@@ -1019,9 +1043,12 @@ namespace XOffsetDatastructure {
                 return wire_reject("wire validation: unsupported arena header flags");
             }
             XOFFSET_VTRY(register_owned_range(ctx.base, sizeof(XArena), ctx, "wire validation: invalid arena header"));
-            XOFFSET_VTRY(register_free(ctx));
             XOFFSET_VTRY(register_allocation(&root, sizeof(T), alignof(T), ctx));
             XOFFSET_VTRY(validate_wire_value(root, ctx));
+            // The free regions after the live blocks (the graph walk's
+            // cursor then covers the live blocks up to the first gap), each
+            // checked against them and against each other.
+            XOFFSET_VTRY(register_free(ctx));
             if (check_coverage) XOFFSET_VTRY(require_exact_coverage(ctx));
 #if defined(XOFFSET_VALIDATION_LAYOUT_STATS)
             auto& stats = wire_layout_stats<T>();
@@ -1495,13 +1522,13 @@ namespace XOffsetDatastructure {
         bool digest = false;
         // Compare only what changed by this buffer's touch() marks: the
         // 64-byte blocks touched since the baseline's last delta from this
-        // buffer, plus the bytes past the baseline's used size and the
-        // holes that came or went, instead of the whole payload. The sender
-        // touches everything it changes (a change it does not touch is not
-        // sent). A baseline's first such delta from a buffer (unless a key
-        // delta from a buffer already keeping touches came before), and any
-        // after the buffer's content was replaced (reload, reset, swap, a
-        // move of its storage), compares everything.
+        // buffer (the allocator's own writes are touches too), plus the
+        // bytes past the baseline's used size, instead of the whole image.
+        // The sender touches everything it changes (a change it does not
+        // touch is not sent). A baseline's first such delta from a buffer
+        // (unless a key delta from a buffer already keeping touches came
+        // before), and any after the buffer's content was replaced (reload,
+        // reset, swap, a move of its storage), compares everything.
         bool touched_only = false;
         // Send each changed 64-byte block whole instead of its changed bytes
         // (a block that ends past used_end still goes by its mask): a larger
@@ -1509,49 +1536,9 @@ namespace XOffsetDatastructure {
         // deltas to receivers where apply time counts more than bytes.
         bool whole_blocks = false;
     };
-    namespace detail {
-        // A delta sender's touch marks (XBuffer::touch). Touches are counted
-        // in periods: a delta from the buffer (DeltaAccess::pair_touch_log)
-        // ends one. The blocks (block k: payload bytes [64k, 64k + 64))
-        // touched in the current period are listed, up to list_capacity of
-        // them, in the first cache line; with masks, the bytes touched in
-        // each. Per-block stamps (the period of the block's last touch) are
-        // kept only where a delta needs more than the list: once a second
-        // baseline pairs with the log (each finds what was touched since its
-        // own last delta), and in a period whose touches overflow the list.
-        struct alignas(64) DeltaTouchLog {
-            static constexpr std::uint32_t list_capacity = 24;  // the header and the first 8 in one line
-            std::uint32_t now = 1;     // the current period
-            std::uint16_t listed = 0;  // entries of `blocks` (and `masks`), in touch order
-            std::uint16_t seen = 0;    // bit k % 16 set for each listed block k: a block whose bit is clear is new
-            std::uint64_t epoch = 0;   // the buffer content (epoch) the marks describe
-            bool lost = false;         // a touch could not be recorded
-            bool overflow = false;     // more blocks touched in this period than the list holds
-            bool shared = false;       // several baselines pair: every touch is stamped
-            bool masks_on = false;     // an XDeltaRecord::touches baseline pairs: masks are kept
-            std::uint32_t stamps_from = UINT32_MAX;  // stamps hold every touch of the periods from this one
-            // Where the copy of the only baseline that pairs is (0: none, or
-            // several): a touched block's line of it is fetched ahead of the
-            // next delta (a hint: the address is never dereferenced).
-            std::uintptr_t copy = 0;
-            std::uint32_t blocks[list_capacity];
-            std::uint64_t masks[list_capacity];
-            std::uint64_t id = 0;            // changes when the log starts over
-            const void* owner = nullptr;     // the baseline that paired last
-            std::vector<std::uint32_t> stamps;
-            std::vector<std::uint32_t> groups;  // per 16 blocks: the latest of their stamps
-            // With masks and one baseline, a period that overflows the list
-            // keeps the bytes touched per block: block_masks[i] holds block
-            // i's touches of period masks_period where stamps[i] is that
-            // period (0: no period's bytes are kept).
-            std::vector<std::uint64_t> block_masks;
-            std::uint32_t masks_period = 0;
-        };
-    } // namespace detail
     // What one save_delta_into wrote.
     struct XDeltaStats {
         bool key = false;                 // a key delta: the receiver starts from an empty payload
-        bool holes = false;               // the hole table changed and was sent
         bool empty = false;               // nothing changed: no delta written, version not advanced
         std::uint32_t blocks = 0;         // 64-byte payload blocks sent (those with a changed byte)
         std::uint64_t changed_bytes = 0;  // payload bytes carried in them

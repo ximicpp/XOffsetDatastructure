@@ -48,21 +48,30 @@
 
 namespace XOffsetDatastructure {
 
-    // Delta format 2.0 (docs/DELTA_SYNC.md; 1.0 addressed the 2.x image, its
-    // root at 48). Little-endian. The header:
-    // 'X' 'D', the format byte (major << 4 | minor), the flags byte, the
-    // stream (u64), then varints: the version, with EXTENT (used_end - 40) / 8
-    // and root_offset - 40 (always 0: the root is at 40), and the block
-    // count. Block k of the block section is image bytes [64k, 64k + 64); no
-    // delta writes the image header [0, 40).
+    // Delta format 2.0 (docs/DELTA_SYNC.md). Little-endian. A delta writes
+    // image bytes [32, used_end): the header's free_dir and free_bytes, then
+    // the payload; [0, 32) never changes. Two frames:
+    // - A block frame (a key delta, and a delta found by comparing): 'X' 'D',
+    //   the format byte (major << 4 | minor), the flags byte, the stream
+    //   (u64), then varints: the version, with EXTENT (used_end - 40) / 8,
+    //   and the block count. Block k of the block section is image bytes
+    //   [64k, 64k + 64) (block 0 writes only its bytes from 32 on).
+    // - A run frame (RUNS: a delta from an XDeltaRecord::touches baseline's
+    //   touch marks): 'X' 'D', the format byte, the flags byte, the stream
+    //   (u64), the version (u32), with EXTENT a varint (used_end - 40) / 8,
+    //   with DIGEST the digest, then runs to the end: a varint gap, a varint
+    //   length (nonzero) and that many bytes. A run starts `gap` bytes past
+    //   the end of the run before it (the first: past offset 32).
     inline constexpr std::uint32_t XDELTA_FORMAT_MAJOR = 2;
     inline constexpr std::uint32_t XDELTA_FORMAT_MINOR = 0;
-    inline constexpr std::uint32_t XDELTA_FLAG_KEY = 1u;    // apply to an all-zero payload; carries the fingerprint
-    inline constexpr std::uint32_t XDELTA_FLAG_HOLES = 2u;  // carries the whole new hole table
-    inline constexpr std::uint32_t XDELTA_FLAG_DIGEST = 4u; // carries the digest of the resulting payload
-    inline constexpr std::uint32_t XDELTA_FLAG_EXTENT = 8u; // carries used_end and the root offset (else unchanged)
+    inline constexpr std::uint32_t XDELTA_FLAG_KEY = 1u;    // apply to an all-zero image; carries the fingerprint
+    inline constexpr std::uint32_t XDELTA_FLAG_RUNS = 2u;   // a run frame (never with KEY)
+    inline constexpr std::uint32_t XDELTA_FLAG_DIGEST = 4u; // carries the digest of the resulting image [32, used_end)
+    inline constexpr std::uint32_t XDELTA_FLAG_EXTENT = 8u; // carries used_end (else unchanged)
     inline constexpr std::uint32_t XDELTA_FLAGS_KNOWN = 15u;
-    inline constexpr std::size_t XDELTA_HEADER_FIXED = 12;  // bytes before the varints
+    inline constexpr std::size_t XDELTA_HEADER_FIXED = 12;  // block frame: bytes before the varints
+    inline constexpr std::size_t XDELTA_RUN_HEADER = 16;    // run frame: bytes before the optional fields
+    inline constexpr std::size_t XDELTA_IMAGE_BEGIN = 32;   // the first image byte a delta writes
 
     /// What the receiver checked for the last delta it applied
     /// (XDeltaCursor::last_check()).
@@ -147,9 +156,8 @@ namespace XOffsetDatastructure {
             std::uint32_t flags = 0;        // XDELTA_FLAG_*
             std::uint64_t stream = 0;       // the sender's baseline stream (nonzero)
             std::uint32_t version = 0;      // version after this delta (>= 1); a non-key delta applies to version - 1
-            std::uint32_t used_bytes = 0;   // payload used_end after this delta
-            std::uint32_t root_offset = 0;  // root offset after this delta
-            std::uint32_t block_count = 0;  // entries of the block section
+            std::uint32_t used_bytes = 0;   // used_end after this delta
+            std::uint32_t block_count = 0;  // entries of the block section (run frame: runs)
         };
 
         // A block the sender found: its payload offset, whether it is sent
@@ -160,11 +168,19 @@ namespace XOffsetDatastructure {
             std::uint64_t mask;
         };
         // A block of a received delta: payload offset, where its bytes start
-        // in the delta, and the mask of the bytes it writes.
+        // in the delta, and the mask of the bytes it writes. (Of a run frame:
+        // the blocks its runs write, src unused.)
         struct DeltaBlockRef {
             std::uint32_t offset;
             std::uint32_t src;
             std::uint64_t mask;
+        };
+        // A run of a received run frame: image offset, bytes, where they
+        // start in the delta.
+        struct DeltaRunRef {
+            std::uint32_t offset;
+            std::uint32_t bytes;
+            std::uint32_t src;
         };
 
         // ---- xxHash64 (the digest of XDELTA_FLAG_DIGEST, seed 0) -------------
@@ -260,11 +276,8 @@ namespace XOffsetDatastructure {
             return p;
         }
         // False on truncation, a value of 2^32 or more, or more than 5 bytes.
-        inline bool delta_get_varint(const unsigned char*& p, const unsigned char* end, std::uint32_t& out) noexcept {
-            if (p != end && *p < 0x80u) [[likely]] {
-                out = *p++;
-                return true;
-            }
+        XOFFSET_DETAIL_NOINLINE inline bool delta_get_varint_long(const unsigned char*& p, const unsigned char* end,
+                                                                  std::uint32_t& out) noexcept {
             std::uint32_t v = 0;
             for (unsigned shift = 0; shift < 35; shift += 7) {
                 if (p == end) return false;
@@ -277,6 +290,15 @@ namespace XOffsetDatastructure {
                 }
             }
             return false;
+        }
+        // delta_get_varint_long, a value of one byte inline.
+        XOFFSET_DETAIL_INLINE bool delta_get_varint(const unsigned char*& p, const unsigned char* end,
+                                                    std::uint32_t& out) noexcept {
+            if (p != end && *p < 0x80u) [[likely]] {
+                out = *p++;
+                return true;
+            }
+            return delta_get_varint_long(p, end, out);
         }
 
         // delta_get_varint with values of one and two bytes inline.
@@ -422,6 +444,20 @@ namespace XOffsetDatastructure {
             const std::uint64_t below_hi = hi == delta_block ? ~std::uint64_t(0) : (std::uint64_t(1) << hi) - 1u;
             return below_hi & (~std::uint64_t(0) << lo);
         }
+        // The bytes of the 8-byte words of block `index` that lie in both
+        // [at, end) and [0, old_used) and that src (the bytes for [at, end))
+        // holds as the image does already.
+        inline std::uint64_t delta_unchanged_words(const char* image, const char* src, std::size_t at, std::size_t end,
+                                                   std::size_t index, std::size_t old_used) noexcept {
+            const std::size_t start = index * delta_block;
+            std::size_t w = std::max(start, (at + 7u) & ~std::size_t(7));
+            const std::size_t stop = std::min({start + delta_block, end, old_used}) & ~std::size_t(7);
+            std::uint64_t same = 0;
+            for (; w < stop; w += 8u) {
+                if (std::memcmp(image + w, src + (w - at), 8) == 0) same |= std::uint64_t(0xFF) << (w - start);
+            }
+            return same;
+        }
         // Appends block `index` with the bytes `mask` (of [from, n)) to the
         // blocks at w, adding its encoded size (its skip from `next`, the
         // index after the last block appended) to totals.
@@ -565,6 +601,18 @@ namespace XOffsetDatastructure {
             return t;
         }
         inline constexpr DeltaShuffleTables delta_shuffle = make_delta_shuffle_tables();
+        // Per bit mask m of a block's 8 words: the mask of their bytes.
+        struct DeltaWordBytes {
+            std::uint64_t of[256];
+        };
+        constexpr DeltaWordBytes make_delta_word_bytes() noexcept {
+            DeltaWordBytes t{};
+            for (unsigned m = 0; m < 256; ++m)
+                for (unsigned j = 0; j < 8; ++j)
+                    if ((m >> j) & 1u) t.of[m] |= std::uint64_t(0xFF) << (8 * j);
+            return t;
+        }
+        inline constexpr DeltaWordBytes delta_word_bytes = make_delta_word_bytes();
 
         // Plain versions: a whole word is one copy, other words byte by byte.
         inline char* delta_put_masked_plain(char* p, const char* blk, std::uint64_t mask) noexcept {
@@ -1317,37 +1365,57 @@ namespace XOffsetDatastructure {
             return true;
         }
 
-        // What writing one delta needs only while it runs: the buffer's hole
-        // table, the blocks that changed and, for touched_only, the blocks to
-        // compare. A thread writes one delta at a time, so its baselines
+        // What writing one delta needs only while it runs: the blocks that
+        // changed, for a run frame its runs. A thread writes one delta at a time, so its baselines
         // share one (see DeltaReceiveScratch).
         struct DeltaSendScratch {
-            std::vector<XBufferCore::WireHole> holes;
             DeltaBlockBuffer blocks;
-            std::vector<std::uint8_t> want;
-            std::vector<std::uint64_t> masks;  // XDeltaRecord::touches: bytes to send per block
+            std::vector<DeltaTouchRun> runs;  // XDeltaRecord::touches: the runs to send
             void release() noexcept {
-                std::vector<XBufferCore::WireHole>().swap(holes);
                 blocks.release();
-                std::vector<std::uint8_t>().swap(want);
-                std::vector<std::uint64_t>().swap(masks);
+                std::vector<DeltaTouchRun>().swap(runs);
             }
         };
         // What applying one delta needs only while it runs: the delta copied
-        // with room past its end, the old bytes it overwrites, its blocks and
-        // the replica's holes. A thread applies one delta at a time, so its
+        // with room past its end, the old bytes it overwrites, and its
+        // blocks or runs. A thread applies one delta at a time, so its
         // cursors share one: a replica's next delta finds it in cache, and a
         // thousand replicas do not keep a thousand copies.
+        // Storage of a std::vector of a trivial type as a list: count kept
+        // by the caller, grown (doubled, at least 16) when full, never shrunk.
+        template <typename V>
+        XOFFSET_DETAIL_NOINLINE typename V::value_type* delta_scratch_grow(V& v, std::size_t& cap) {
+            v.resize((std::max)(std::size_t(16u), 2u * cap));
+            cap = v.size();
+            return v.data();
+        }
+        // A run frame's blocks (storage v, at its data at, cap entries), by
+        // offset: a run in the block of the last one adds its mask to it.
+        template <typename Ref>
+        struct DeltaScratchList {
+            std::vector<Ref>& v;
+            Ref* at;
+            std::size_t cap;
+            XOFFSET_DETAIL_INLINE void add(std::size_t& n, std::uint64_t i, std::uint64_t mask) {
+                const auto offset = static_cast<std::uint32_t>(i * delta_block);
+                if (n != 0 && at[n - 1].offset == offset) {
+                    at[n - 1].mask |= mask;
+                    return;
+                }
+                if (n == cap) [[unlikely]] at = delta_scratch_grow(v, cap);
+                at[n++] = {offset, 0u, mask};
+            }
+        };
         struct DeltaReceiveScratch {
-            std::vector<XBufferCore::WireHole> holes;
             std::vector<char> undo;
             std::vector<char> input;  // a small delta, copied with room past its end
             std::vector<DeltaBlockRef> blocks;
+            std::vector<DeltaRunRef> runs;
             void release() noexcept {
-                std::vector<XBufferCore::WireHole>().swap(holes);
                 std::vector<char>().swap(undo);
                 std::vector<char>().swap(input);
                 std::vector<DeltaBlockRef>().swap(blocks);
+                std::vector<DeltaRunRef>().swap(runs);
             }
         };
 #if XOFFSET_THREAD_CACHES
@@ -1386,15 +1454,38 @@ namespace XOffsetDatastructure {
         copy,
         /// No copy: a delta carries every byte the buffer's touch() marks
         /// name since the baseline's last delta from it (touched_only is
-        /// implied), plus the bytes past the receiver's used size and those
-        /// of holes that came or went, compared with nothing. The sender
-        /// touches everything it changes; bytes touched but unchanged are
-        /// sent too. Where the touches do not say what changed (the first
-        /// delta, a buffer whose content was replaced, a touch log that
-        /// started over), the delta is a key delta. For senders whose
-        /// changes are few and touched exactly: no copy to keep or read.
+        /// implied; the allocator's own writes are touches too), plus the
+        /// nonzero bytes past the receiver's used size, compared with
+        /// nothing, as runs of bytes (a run frame). The sender touches
+        /// everything it changes; bytes touched but unchanged are sent too.
+        /// Where the touches do not say what changed (the first delta, a
+        /// buffer whose content was replaced, a touch log that started
+        /// over), the delta is a key delta. For senders whose changes are
+        /// few and touched exactly: no copy to keep or read.
         touches,
     };
+
+    namespace detail {
+        // XDeltaBaseline's short path token: a copy or a move of a baseline
+        // starts without one, and a moved-from baseline loses its own, so the
+        // short path stays with the one baseline that paired with a touch
+        // log (two would each send the same touches, once).
+        struct DeltaToken {
+            std::uint64_t v = 0;
+            DeltaToken() = default;
+            DeltaToken(const DeltaToken&) noexcept {}
+            DeltaToken(DeltaToken&& other) noexcept { other.v = 0; }
+            DeltaToken& operator=(const DeltaToken&) noexcept {
+                v = 0;
+                return *this;
+            }
+            DeltaToken& operator=(DeltaToken&& other) noexcept {
+                v = 0;
+                other.v = 0;
+                return *this;
+            }
+        };
+    }
 
     /// Sender side of one delta stream: the state one receiver (or a group of
     /// receivers that always get the same deltas) holds, by default as a copy
@@ -1421,12 +1512,10 @@ namespace XOffsetDatastructure {
         /// so deltas written before the reset never apply after it.
         void reset() noexcept {
             payload_.clear();
-            holes_.clear();
-            holes_gen_ = 0;
-#if XOFFSET_INBAND_ALLOCATOR
-            inband_dir_ = 0;
-#endif
             touch_log_ = 0;
+            token_.v = 0;
+            pending_.clear();
+            pending_stats_ = XDeltaStats{};
             used_ = 0;
         }
         /// A key delta of the recorded state, at this stream and version, for a
@@ -1446,30 +1535,31 @@ namespace XOffsetDatastructure {
         void release() noexcept {
             reset();
             payload_.release();
-            std::vector<XBufferCore::WireHole>().swap(holes_);
+            std::string().swap(pending_);
             own_scratch_.release();
             if (detail::DeltaThreadScratch* s = detail::delta_thread_scratch()) s->send.release();
         }
 
     private:
         friend struct detail::DeltaAccess;
+        // The short path's token: the paired touch log's, mixed with the
+        // buffer's epoch and the root type (DeltaAccess::publish_touches;
+        // 0: none). First, with what that path reads.
+        detail::DeltaToken token_;
         std::uint64_t stream_ = 0;
         std::uint32_t version_ = 0;
-        std::uint32_t root_offset_ = 0;
         std::uint64_t schema_hash_ = 0;                   // fingerprint of the recorded root type
         std::uint64_t root_type_id_ = 0;
         std::size_t used_ = 0;                            // the receiver's used_end (0: nothing recorded)
         XDeltaRecord record_ = XDeltaRecord::copy;
-        detail::DeltaCopy payload_;  // [0, used_end) as the receiver holds it ([0, 40) unused)
-        std::vector<XBufferCore::WireHole> holes_;        // its hole table, by offset
-        std::uint64_t holes_gen_ = 0;                     // the free-block table's generation it was taken at
-#if XOFFSET_INBAND_ALLOCATOR
-        std::uint32_t inband_dir_ = 0;                    // the free directory's offset then (0: none)
-#endif
+        detail::DeltaCopy payload_;  // [0, used_end) as the receiver holds it ([0, 32) unused)
         // touched_only: the touch log of the buffer the last delta came from
         // (0: none) and the stamp it had then (touches since have a later one).
         std::uint64_t touch_log_ = 0;
         std::uint32_t touch_stamp_ = 0;
+        // A delta written for a caller's buffer it did not fit, given next.
+        std::string pending_;
+        XDeltaStats pending_stats_;
         // Used instead of the thread's shared scratch where there is none
         // (XOFFSET_THREAD_CACHES 0, or after the thread's is destroyed).
         detail::DeltaSendScratch own_scratch_;
@@ -1536,7 +1626,6 @@ namespace XOffsetDatastructure {
         const void* checks_base_ = nullptr;
         std::uint64_t checks_epoch_ = 0;
         std::uint64_t checks_used_ = 0;
-        std::uint64_t checks_root_ = 0;
         std::size_t checks_free_ = 0;
         bool checks_free_complete_ = false;
         bool checks_valid_ = false;  // the recorded state is a verified one
@@ -1562,19 +1651,24 @@ namespace XOffsetDatastructure {
             // delta_padding bytes of room (a whole block plus a word).
             static constexpr std::size_t delta_padded_max = 4096;
             static constexpr std::size_t delta_padding = delta_block + 8;
-            static constexpr std::size_t delta_touch_group = 16;  // blocks per DeltaTouchLog::groups entry
 
-            // ---- small deltas -----------------------------------------------
-            // A delta of at most this many blocks, with no flags (no key, hole
-            // table, digest or extent), takes a shorter path on both ends:
-            // encode_small on the sender, apply_small on an admitting
-            // receiver. Each writes and accepts exactly what the general path
-            // does (tests/test_delta_small.cpp compares them byte for byte).
+            // ---- short paths --------------------------------------------------
+            // A delta from an XDeltaRecord::touches baseline whose buffer's
+            // touch log lists every touch since its last delta, with nothing
+            // else to send, takes a short path on the sender
+            // (publish_touches). On an admitting receiver, a run frame with no
+            // other flag and at most delta_small_runs runs takes one
+            // (apply_runs_small), and so does a block frame with no flags and
+            // at most delta_small_blocks blocks (apply_small). Each writes and
+            // accepts exactly what the general path does
+            // (tests/test_delta_small.cpp compares them byte for byte).
             static constexpr std::uint32_t delta_small_blocks = 8;
+            static constexpr std::uint32_t delta_small_runs = 16;
 #if defined(XOFFSET_TEST_DELTA_GENERAL)
             // Test hooks (tests/test_delta_small.cpp only): while set, deltas
             // on this thread take the general path on both ends; the deltas
-            // encode_small wrote ([0]) and apply_small applied ([1]) on it.
+            // the sender's short path wrote ([0]) and the receiver's short
+            // paths applied ([1]) on it.
             static bool& test_general_path() noexcept {
                 static thread_local bool general = false;
                 return general;
@@ -1588,166 +1682,415 @@ namespace XOffsetDatastructure {
 #define XOFFSET_DELTA_TEST_COUNT_SMALL(k) ((void)0)
 #endif
 
-            // ---- sender ---------------------------------------------------
-            // The delta from an XDeltaRecord::touches baseline whose buffer's
-            // touch log lists every block touched since the baseline's last
-            // delta (at most delta_small_blocks), when the hole table, the
-            // used size and the root are as the baseline recorded and no
-            // digest or whole blocks are asked for: the touched bytes of the
-            // listed blocks. It is what the usual case of touched_bytes and
-            // write_delta give, written in one pass without the block table.
-            // False, with nothing changed, for any other delta (encode then
-            // writes it, or throws).
+            // The first image byte a delta writes: the header's free_dir and
+            // free_bytes, then the payload ([0, 32) never changes).
+            static constexpr std::size_t delta_begin = XDELTA_IMAGE_BEGIN;
+            static_assert(delta_begin == XBufferCore::inband_dir_at && payload_begin == 40);
+            // A stream's root type, folded into the one compare of the short
+            // path (XDeltaBaseline::token_). Its top bit is set, and an
+            // epoch has it clear, so a log without a token (0) never matches
+            // a baseline without one (0).
             template <typename T>
-            static bool encode_small(XBuffer& xbuf, std::string& out, XDeltaBaseline& b, XDeltaOptions options,
-                                     XDeltaStats& stats) {
+            static constexpr std::uint64_t type_mix =
+                ((wire_schema_hash<T>() * 0x9E3779B97F4A7C15ull) ^ wire_root_type_id<T>()) | (std::uint64_t(1) << 63);
+            // The token baseline b holds while the short path applies to it.
+            static XOFFSET_DETAIL_INLINE std::uint64_t token_of(const XBufferCore& core, const DeltaTouchLog& log,
+                                                               std::uint64_t mix) noexcept {
+                return log.token ^ core.epoch() ^ mix;
+            }
+            template <typename T>
+            static XOFFSET_DETAIL_INLINE std::uint64_t token_of(const XBufferCore& core, const DeltaTouchLog& log) noexcept {
+                return token_of(core, log, type_mix<T>);
+            }
+            static std::uint32_t used_of(const char* image) noexcept {
+                std::uint32_t used;
+                std::memcpy(&used, image + offsetof(XBufferCore::arena_header, used_end), sizeof(used));
+                return used;
+            }
+
+            // ---- run frames (XDELTA_FLAG_RUNS) --------------------------------
+            static constexpr std::uint32_t run_frame_word(std::uint32_t flags) noexcept {
+                return std::uint32_t('X') | (std::uint32_t('D') << 8) |
+                       (((XDELTA_FORMAT_MAJOR << 4) | XDELTA_FORMAT_MINOR) << 16) | (flags << 24);
+            }
+            // A varint, its values of one and two bytes inline.
+            XOFFSET_DETAIL_INLINE static char* put_varint_short(char* p, std::uint32_t v) noexcept {
+                if (v < 0x80u) [[likely]] {
+                    *p = static_cast<char>(v);
+                    return p + 1;
+                }
+                if (v < 0x4000u) {
+                    p[0] = static_cast<char>(v | 0x80u);
+                    p[1] = static_cast<char>(v >> 7);
+                    return p + 2;
+                }
+                return put_varint_long(p, v);
+            }
+            XOFFSET_DETAIL_NOINLINE static char* put_varint_long(char* p, std::uint32_t v) noexcept {
+                return delta_put_varint(p, v);
+            }
+            // n bytes (n > 0); the short runs of single fields with
+            // overlapping fixed-size moves instead of a call.
+            XOFFSET_DETAIL_INLINE static void copy_run(char* d, const char* s, std::size_t n) noexcept {
+                if (n < 4u) [[likely]] {
+                    // 1 to 3 bytes (runs are nonempty): the first, the
+                    // middle, the last.
+                    const char a = s[0], b = s[n >> 1], c = s[n - 1u];
+                    d[0] = a;
+                    d[n >> 1] = b;
+                    d[n - 1u] = c;
+                } else if (n <= 8u) {
+                    std::uint32_t a, b;
+                    std::memcpy(&a, s, 4);
+                    std::memcpy(&b, s + n - 4u, 4);
+                    std::memcpy(d, &a, 4);
+                    std::memcpy(d + n - 4u, &b, 4);
+                } else if (n <= 16u) {
+                    std::uint64_t a, b;
+                    std::memcpy(&a, s, 8);
+                    std::memcpy(&b, s + n - 8u, 8);
+                    std::memcpy(d, &a, 8);
+                    std::memcpy(d + n - 8u, &b, 8);
+                } else {
+                    std::memcpy(d, s, n);
+                }
+            }
+
+            // The run frame of touches baseline b when its buffer's touch log
+            // lists every touch since b's last delta and nothing else is to
+            // be sent (the used size as b recorded it; no digest or whole
+            // blocks asked for, which the callers check): written into
+            // [out, out + room) when it fits, its size in n (0: nothing was
+            // touched, no delta, the version stays). False, with nothing
+            // sent, when this path does not apply or the frame may not fit
+            // (the general path then writes the delta). With stats: its runs
+            // and bytes there.
+            template <typename T>
+            XOFFSET_DETAIL_INLINE static bool publish_touches(XBufferCore& core, XDeltaBaseline& b, char* out,
+                                                              std::size_t room, std::size_t& n,
+                                                              XDeltaStats* stats = nullptr) noexcept {
 #if defined(XOFFSET_TEST_DELTA_GENERAL)
                 if (test_general_path()) return false;
 #endif
-                const XBufferCore& core = xbuf;
-                DeltaTouchLog* const log = xbuf.touch_log_.get();
-                const auto* sm = core.arena();
-                const std::size_t used = static_cast<std::size_t>(sm->used_end);
-                // used == b.used_ (nonzero): a baseline with recorded state
-                // (and a stream), whose last delta checked the extent.
-                if (b.record_ != XDeltaRecord::touches || used != b.used_ ||
-                    static_cast<std::uint32_t>(XBufferCore::root_at) != b.root_offset_ || log == nullptr ||
-                    options.digest || options.whole_blocks || used > core.get_size() ||
-                    b.version_ == UINT32_MAX || b.schema_hash_ != wire_schema_hash<T>() ||
-                    b.root_type_id_ != wire_root_type_id<T>())
-                    return false;
-                if (log->lost || log->epoch != core.epoch() || b.touch_log_ != log->id ||
-                    !listed_since(*log, b.touch_stamp_) || log->listed > delta_small_blocks ||
-                    b.holes_gen_ != core.free_block_gen())
-                    return false;
-                XOFFSET_DELTA_TEST_COUNT_SMALL(0);
-
+                DeltaTouchLog* const log = core.touch_log_.get();
+                // One compare: the log is paired with b alone (this baseline,
+                // not a copy of it), for this content and type, lists
+                // everything touched since, and the buffer has no recorded
+                // failure (XBufferCore::failure_recorded).
+                if (log == nullptr || token_of<T>(core, *log) != b.token_.v) [[unlikely]] return false;
                 const std::uint32_t listed = log->listed;
-                if (listed > 1) sort_touch_list(*log);
-                const char* const cur = static_cast<const char*>(core.get_address());
-                const std::size_t count = (used + delta_block - 1) / delta_block;
+                const char* const image = core.data();
+                if (used_of(image) != b.used_) [[unlikely]] return false;
+                if (listed != 1u) [[unlikely]] {
+                    n = listed == 0 ? 0 : publish_list(*log, b, image, out, room, stats);
+                    return n != SIZE_MAX;
+                }
+                // One run (the common case: one field set): it lies inside
+                // [32, used), as every listed run does (touches are cut at
+                // used, and the allocator writes inside it).
+                const DeltaTouchRun run = log->runs[0];
+                if (XDELTA_RUN_HEADER + 10u + run.bytes > room) [[unlikely]] return false;
                 const std::uint32_t version = b.version_ + 1u;
-                const std::uint64_t stream = b.stream_;
-                // At most: the header (a version varint, a block count below
-                // 128), then per block a skip varint, the selector, 8 mask
-                // bytes and 64 bytes.
-                const std::size_t bound =
-                    XDELTA_HEADER_FIXED + 5u + 1u + std::size_t(listed) * (5u + 1u + 8u + delta_block);
-                std::uint32_t blocks = 0;
-                std::uint64_t changed = 0;
-                const auto emit = [&](char* const start) noexcept {
-                    char* p = start;
-                    p[0] = 'X';
-                    p[1] = 'D';
-                    p[2] = static_cast<char>((XDELTA_FORMAT_MAJOR << 4) | XDELTA_FORMAT_MINOR);
-                    p[3] = 0;
-                    std::memcpy(p + 4, &stream, 8);
-                    p = delta_put_varint(p + XDELTA_HEADER_FIXED, version);
-                    char* const block_count = p++;
-                    std::size_t next = 0;
-                    const bool masks_on = log->masks_on;
-                    for (std::uint32_t k = 0; k < listed; ++k) {
-                        const std::uint32_t block = log->blocks[k];
-                        if (block >= count) break;
-                        const std::uint64_t mask = (masks_on ? log->masks[k] : ~std::uint64_t(0)) &
-                                                   delta_range_mask(block, payload_begin, used);
-                        if (mask == 0) continue;
-                        p = delta_put_varint(p, static_cast<std::uint32_t>(block - next));
-                        next = std::size_t(block) + 1u;
-                        ++blocks;
-                        const char* const src = cur + std::size_t(block) * delta_block;
-                        const std::uint64_t sel = delta_byte_flags(mask);
-                        // Whole (delta_block_form): the mask form, popcount(sel)
-                        // + popcount(mask) bytes, would not be shorter, which
-                        // takes all 8 mask bytes nonzero and 56 bytes or more.
-                        if (sel == 0xFFu && src >= cur + payload_begin && src + delta_block <= cur + used &&
-                            delta_popcount(mask) >= delta_block - 8u) {
-                            *p++ = 0;
-                            std::memcpy(p, src, delta_block);
-                            p += delta_block;
-                            changed += delta_block;
-                            continue;
-                        }
-                        // The selector, the nonzero mask bytes, the bytes of
-                        // the mask (delta_put_masked_plain).
-                        *p++ = static_cast<char>(sel);
-                        char* bytes;
-                        if ((sel & (sel - 1)) == 0) {
-                            // One word (a field of up to 8 bytes): its mask byte, its bytes.
-                            const unsigned w = static_cast<unsigned>(std::countr_zero(sel));
-                            const unsigned bits = static_cast<unsigned>(mask >> (8 * w));
-                            *p++ = static_cast<char>(bits);
-                            bytes = p;
-                            const char* const word = src + 8 * w;
-                            for (unsigned bit = bits; bit != 0; bit &= bit - 1) *p++ = word[std::countr_zero(bit)];
-                        } else {
-                            for (std::uint64_t s = sel; s != 0; s &= s - 1)
-                                *p++ = static_cast<char>(mask >> (8 * std::countr_zero(s)));
-                            bytes = p;
-                            for (std::uint64_t s = sel; s != 0; s &= s - 1) {
-                                const unsigned w = static_cast<unsigned>(std::countr_zero(s));
-                                const unsigned bits = static_cast<unsigned>(mask >> (8 * w)) & 0xFFu;
-                                const char* const word = src + 8 * w;
-                                if (bits == 0xFFu) {
-                                    std::memcpy(p, word, 8);
-                                    p += 8;
-                                } else {
-                                    for (unsigned bit = bits; bit != 0; bit &= bit - 1) *p++ = word[std::countr_zero(bit)];
-                                }
-                            }
-                        }
-                        changed += std::uint64_t(p - bytes);
+                write_run_header(out, b.stream_, version);
+                char* p = put_varint_short(out + XDELTA_RUN_HEADER, run.at - static_cast<std::uint32_t>(delta_begin));
+                p = put_varint_short(p, run.bytes);
+                copy_run(p, image + run.at, run.bytes);
+                sent_touches(*log, b, version);
+                if (stats) {
+                    stats->blocks = 1;
+                    stats->changed_bytes = run.bytes;
+                }
+                n = std::size_t(p - out) + run.bytes;
+                return true;
+            }
+            XOFFSET_DETAIL_INLINE static void write_run_header(char* out, std::uint64_t stream,
+                                                               std::uint32_t version) noexcept {
+                constexpr std::uint32_t word = run_frame_word(XDELTA_FLAG_RUNS);
+                std::memcpy(out, &word, 4);
+                std::memcpy(out + 4, &stream, 8);
+                std::memcpy(out + 12, &version, 4);
+            }
+            // The listed touches went out as b's delta `version`.
+            XOFFSET_DETAIL_INLINE static void sent_touches(DeltaTouchLog& log, XDeltaBaseline& b,
+                                                           std::uint32_t version) noexcept {
+                b.version_ = version;
+                // Versions are exhausted: the next delta starts a new stream.
+                if (version == UINT32_MAX) [[unlikely]] b.token_.v = 0;
+                log.next_listed_period();
+                XOFFSET_DELTA_TEST_COUNT_SMALL(0);
+            }
+            // publish_touches for a list of more than one run: by offset,
+            // merged where they meet (in the log: the bytes they stand for
+            // stay the same), then written as one run is.
+            XOFFSET_DETAIL_NOINLINE static std::size_t publish_list(DeltaTouchLog& log, XDeltaBaseline& b,
+                                                                    const char* image, char* out, std::size_t room,
+                                                                    XDeltaStats* stats) noexcept {
+                DeltaTouchRun* const r = log.runs;
+                const std::uint32_t n = log.listed;
+                // In touch order, which is mostly by offset: insertion sort.
+                for (std::uint32_t i = 1; i < n; ++i) {
+                    if (r[i - 1].at <= r[i].at) [[likely]] continue;
+                    const DeltaTouchRun x = r[i];
+                    std::uint32_t j = i;
+                    for (; j > 0 && r[j - 1].at > x.at; --j) r[j] = r[j - 1];
+                    r[j] = x;
+                }
+                std::uint32_t w = 0;
+                for (std::uint32_t i = 1; i < n; ++i) {
+                    const std::uint32_t end = r[w].at + r[w].bytes;
+                    if (r[i].at <= end) {
+                        if (r[i].at + r[i].bytes > end) r[w].bytes = r[i].at + r[i].bytes - r[w].at;
+                    } else {
+                        r[++w] = r[i];
                     }
-                    *block_count = static_cast<char>(blocks);
-                    return std::size_t(p - start);
-                };
-                struct DropOnFailure {
-                    XDeltaBaseline* b;
-                    ~DropOnFailure() {
-                        if (b) b->reset();
-                    }
-                } drop{&b};
+                }
+                log.listed = ++w;
+                std::size_t bound = XDELTA_RUN_HEADER;
+                std::uint64_t bytes = 0;
+                for (std::uint32_t k = 0; k < w; ++k) bytes += r[k].bytes;
+                bound += 10u * std::size_t(w) + bytes;
+                if (bound > room) return SIZE_MAX;
+                const std::uint32_t version = b.version_ + 1u;
+                write_run_header(out, b.stream_, version);
+                char* p = out + XDELTA_RUN_HEADER;
+                std::uint32_t at = static_cast<std::uint32_t>(delta_begin);
+                for (std::uint32_t k = 0; k < w; ++k) {
+                    p = put_varint_short(p, r[k].at - at);
+                    p = put_varint_short(p, r[k].bytes);
+                    copy_run(p, image + r[k].at, r[k].bytes);
+                    p += r[k].bytes;
+                    at = r[k].at + r[k].bytes;
+                }
+                sent_touches(log, b, version);
+                if (stats) {
+                    stats->blocks = w;
+                    stats->changed_bytes = bytes;
+                }
+                return std::size_t(p - out);
+            }
+            // publish_touches into a string; false (out cleared) when it does
+            // not apply.
+            template <typename T>
+            XOFFSET_DETAIL_INLINE static bool publish_touches(XBufferCore& core, XDeltaBaseline& b, std::string& out,
+                                                              XDeltaStats& stats) {
+                const DeltaTouchLog* const log = core.touch_log_.get();
+                if (log == nullptr || token_of<T>(core, *log) != b.token_.v) [[unlikely]] return false;
+                std::size_t bound = XDELTA_RUN_HEADER;
+                for (std::uint32_t k = 0; k < log->listed; ++k) bound += 10u + log->runs[k].bytes;
+                std::size_t n = 0;
+                bool sent = false;
 #if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
-                out.resize_and_overwrite(bound, [&](char* p, std::size_t) noexcept { return emit(p); });
+                out.resize_and_overwrite(bound, [&](char* p, std::size_t room) noexcept {
+                    sent = publish_touches<T>(core, b, p, room, n, &stats);
+                    return sent ? n : 0u;
+                });
 #else
                 out.resize(bound);
-                out.resize(emit(out.data()));
+                sent = publish_touches<T>(core, b, out.data(), out.size(), n, &stats);
+                out.resize(sent ? n : 0u);
 #endif
-                drop.b = nullptr;
-                if (blocks == 0) {
-                    // Nothing listed changed: no delta (as the general path).
-                    out.clear();
-                    stats.empty = true;
-                } else {
-                    b.version_ = version;
-                    stats.blocks = blocks;
-                    stats.changed_bytes = changed;
-                    stats.delta_bytes = out.size();
-                }
-                // pair_touch_log for the baseline that paired last (no stamps
-                // to start, no copy to note).
-                if (log->owner != &b || log->now == UINT32_MAX) [[unlikely]] {
-                    pair_touch_log(xbuf, b);
-                } else {
-                    log->copy = 0;
-                    b.touch_stamp_ = log->now;
-                    ++log->now;
-                    log->listed = 0;
-                    log->seen = 0;
-                    log->overflow = false;
-                    if (!log->shared) log->stamps_from = UINT32_MAX;
-                    log->masks_on = true;
-                }
+                if (!sent) return false;
+                if (n == 0) stats.empty = true;
+                else stats.delta_bytes = n;
                 return true;
+            }
+
+            // A delta that did not fit the caller's buffer: kept by the
+            // baseline, given by its next save_delta_into before anything
+            // else (its short path is off meanwhile).
+            static bool has_pending(const XDeltaBaseline& b) noexcept { return !b.pending_.empty(); }
+            static XDeltaStats take_pending(XDeltaBaseline& b, std::string& out) {
+                out.swap(b.pending_);
+                b.pending_.clear();
+                XDeltaStats stats = b.pending_stats_;
+                b.pending_stats_ = XDeltaStats{};
+                return stats;
+            }
+            // XDeltaOptions as one word for the calls a short path falls
+            // back to (an aggregate argument is built in memory by some
+            // compilers, ahead of the short path).
+            XOFFSET_DETAIL_INLINE static std::uint32_t options_word(XDeltaOptions o) noexcept {
+                return std::uint32_t(o.digest) | std::uint32_t(o.touched_only) << 1 | std::uint32_t(o.whole_blocks) << 2;
+            }
+            template <typename T>
+            XOFFSET_DETAIL_NOINLINE static std::size_t save_into_span(XBuffer& xbuf, std::span<char> out,
+                                                                      XDeltaBaseline& b, std::uint32_t word) {
+                const XDeltaOptions options{(word & 1u) != 0, (word & 2u) != 0, (word & 4u) != 0};
+                std::string& delta = b.pending_;
+                if (delta.empty()) {
+                    b.pending_stats_ = xbuf.template save_delta_into<T>(delta, b, options);
+                    if (delta.empty()) return 0;
+                }
+                const std::size_t n = delta.size();
+                if (n <= out.size()) {
+                    std::memcpy(out.data(), delta.data(), n);
+                    delta.clear();
+                    b.pending_stats_ = XDeltaStats{};
+                } else {
+                    b.token_.v = 0;
+                }
+                return n;
+            }
+
+            // The runs a delta of touches baseline b sends: the bytes touched
+            // since its last delta (from the list, or whole 64-byte blocks
+            // from the stamps) below its used size and the current one, and
+            // past its used size the nonzero bytes, by offset, merged where
+            // they meet, inside [32, used). whole_blocks: each run widened to
+            // the blocks it touches (within [32, used)). Returns the bytes.
+            static std::uint64_t touched_runs(const XDeltaBaseline& b, const DeltaTouchLog& log, const char* cur,
+                                              std::size_t base_used, std::size_t used, bool whole_blocks,
+                                              std::vector<DeltaTouchRun>& runs) {
+                runs.clear();
+                const std::size_t below = std::min(base_used, used);
+                const auto add = [&](std::size_t at, std::size_t end, std::size_t limit) {
+                    if (whole_blocks) {
+                        at = at / delta_block * delta_block;
+                        end = (end + delta_block - 1) / delta_block * delta_block;
+                    }
+                    at = std::max(at, delta_begin);
+                    end = std::min(end, limit);
+                    if (at < end) runs.push_back({static_cast<std::uint32_t>(at), static_cast<std::uint32_t>(end - at)});
+                };
+                if (listed_since(log, b.touch_stamp_)) {
+                    for (std::uint32_t k = 0; k < log.listed; ++k)
+                        add(log.runs[k].at, std::size_t(log.runs[k].at) + log.runs[k].bytes, below);
+                } else {
+                    const std::size_t stamped = std::min((below + delta_block - 1) / delta_block, log.stamps.size());
+                    const std::uint32_t since = b.touch_stamp_;
+                    for (std::size_t i = 0; i < stamped;) {
+                        if (log.stamps[i] <= since) {
+                            ++i;
+                            continue;
+                        }
+                        std::size_t j = i + 1;
+                        while (j < stamped && log.stamps[j] > since) ++j;
+                        add(i * delta_block, j * delta_block, below);
+                        i = j;
+                    }
+                }
+                if (used > base_used) {
+                    // Past the receiver's used size its bytes are zero: the
+                    // nonzero words (used sizes are 8-aligned).
+                    for (std::size_t at = std::max(base_used, delta_begin); at < used; at += 8) {
+                        if (delta_load64(cur + at) == 0) continue;
+                        std::size_t end = at + 8;
+                        while (end < used && delta_load64(cur + end) != 0) end += 8;
+                        add(at, end, used);
+                        at = end;
+                    }
+                }
+                // By offset (the list is short and mostly in order), merged.
+                DeltaTouchRun* r = runs.data();
+                const std::size_t n = runs.size();
+                for (std::size_t i = 1; i < n; ++i) {
+                    if (r[i - 1].at <= r[i].at) continue;
+                    const DeltaTouchRun x = r[i];
+                    std::size_t j = i;
+                    for (; j > 0 && r[j - 1].at > x.at; --j) r[j] = r[j - 1];
+                    r[j] = x;
+                }
+                std::size_t w = 0;
+                std::uint64_t bytes = 0;
+                for (std::size_t i = 0; i < n; ++i) {
+                    if (w != 0 && r[i].at <= r[w - 1].at + r[w - 1].bytes) {
+                        const std::uint32_t end = std::max(r[w - 1].at + r[w - 1].bytes, r[i].at + r[i].bytes);
+                        r[w - 1].bytes = end - r[w - 1].at;
+                    } else {
+                        r[w++] = r[i];
+                    }
+                }
+                runs.resize(w);
+                for (const DeltaTouchRun& x : runs) bytes += x.bytes;
+                return bytes;
+            }
+
+            // Writes a run frame: the header, with EXTENT the used size, with
+            // DIGEST the digest of src's image [32, used), and the runs (by
+            // offset, disjoint, inside [32, used)) with their bytes from src.
+            static void write_run_frame(std::string& out, std::uint32_t flags, std::uint64_t stream,
+                                        std::uint32_t version, std::size_t used, const char* src,
+                                        const std::vector<DeltaTouchRun>& runs, std::uint64_t bytes) {
+                std::size_t size = XDELTA_RUN_HEADER + bytes;
+                if (flags & XDELTA_FLAG_EXTENT)
+                    size += delta_varint_size(static_cast<std::uint32_t>((used - payload_begin) / 8u));
+                if (flags & XDELTA_FLAG_DIGEST) size += 8u;
+                std::size_t prev = delta_begin;
+                for (const DeltaTouchRun& r : runs) {
+                    size += delta_varint_size(static_cast<std::uint32_t>(r.at - prev)) + delta_varint_size(r.bytes);
+                    prev = std::size_t(r.at) + r.bytes;
+                }
+                if (size > out.max_size())
+                    XOFFSET_THROW(std::length_error("save_delta<T>(): output size exceeds string limit"));
+                const auto emit = [&](char* p) noexcept {
+                    const std::uint32_t word = run_frame_word(flags);
+                    std::memcpy(p, &word, 4);
+                    std::memcpy(p + 4, &stream, 8);
+                    std::memcpy(p + 12, &version, 4);
+                    p += XDELTA_RUN_HEADER;
+                    if (flags & XDELTA_FLAG_EXTENT)
+                        p = delta_put_varint(p, static_cast<std::uint32_t>((used - payload_begin) / 8u));
+                    if (flags & XDELTA_FLAG_DIGEST) {
+                        const std::uint64_t d = xxh64(src + delta_begin, used - delta_begin);
+                        std::memcpy(p, &d, 8);
+                        p += 8;
+                    }
+                    std::size_t at = delta_begin;
+                    for (const DeltaTouchRun& r : runs) {
+                        p = delta_put_varint(p, static_cast<std::uint32_t>(r.at - at));
+                        p = delta_put_varint(p, r.bytes);
+                        std::memcpy(p, src + r.at, r.bytes);
+                        p += r.bytes;
+                        at = std::size_t(r.at) + r.bytes;
+                    }
+                };
+#if defined(__cpp_lib_string_resize_and_overwrite) && __cpp_lib_string_resize_and_overwrite >= 202110L
+                out.resize_and_overwrite(size, [&](char* p, std::size_t) noexcept {
+                    emit(p);
+                    return size;
+                });
+#else
+                out.resize(size);
+                emit(out.data());
+#endif
+            }
+
+            // The block ranges [first, last) of the runs listed in the log,
+            // below block `below`, by block, merged, into r (room for the
+            // list's run_capacity); returns their count (a touched_only delta
+            // of a copy baseline compares them).
+            struct DeltaBlockRange { std::size_t first, second; };
+            static std::size_t listed_block_ranges(const DeltaTouchLog& log, std::size_t below,
+                                                   DeltaBlockRange* r) noexcept {
+                std::size_t n = 0;
+                for (std::uint32_t k = 0; k < log.listed; ++k) {
+                    const std::size_t first = log.runs[k].at / delta_block;
+                    const std::size_t last =
+                        std::min((std::size_t(log.runs[k].at) + log.runs[k].bytes - 1u) / delta_block + 1u, below);
+                    if (first >= last) continue;
+                    if (n != 0 && first >= r[n - 1].first && first <= r[n - 1].second) [[likely]] {
+                        r[n - 1].second = std::max(r[n - 1].second, last);  // touched in order
+                        continue;
+                    }
+                    std::size_t j = n++;
+                    for (; j > 0 && r[j - 1].first > first; --j) r[j] = r[j - 1];
+                    r[j] = {first, last};
+                }
+                std::size_t w = 0;
+                for (std::size_t i = 0; i < n; ++i) {
+                    if (w != 0 && r[i].first <= r[w - 1].second) r[w - 1].second = std::max(r[w - 1].second, r[i].second);
+                    else r[w++] = r[i];
+                }
+                return w;
             }
 
             template <typename T>
             static XDeltaStats encode(XBuffer& xbuf, std::string& out, XDeltaBaseline& b, XDeltaOptions options) {
                 XBufferCore& core = xbuf;
+                if (!b.pending_.empty()) [[unlikely]] return take_pending(b, out);
                 const char* cur = static_cast<const char*>(core.get_address());
                 const auto* sm = core.arena();
                 const std::size_t used = static_cast<std::size_t>(sm->used_end);
-                const auto root = static_cast<std::uint32_t>(XBufferCore::root_at);
                 if (used < payload_begin || used > XBufferCore::MAX_PAYLOAD || used > core.get_size())
                     XOFFSET_THROW(XException(XErrc::invalid_state, "save_delta<T>(): payload extent out of range"));
 
@@ -1769,46 +2112,16 @@ namespace XOffsetDatastructure {
                 // A touches baseline whose touches no longer say what changed
                 // starts over with a key delta.
                 const bool touches = b.record_ == XDeltaRecord::touches;
-                if (touches && !b.empty() && !touches_known(xbuf, b)) b.reset();
+                if (touches && !b.empty() && !touches_known(core, b)) b.reset();
                 const bool key = b.empty();
-                // The free-block table as of the baseline's last delta (the
-                // same generation): the same holes, not listed again.
-                const std::uint64_t holes_gen = core.free_block_gen();
-                const bool holes_same = !key && b.holes_gen_ == holes_gen;
-                // The delta is written into out's storage; the old hole table
-                // is compared: their lines are fetched while the rest runs.
+                // The delta is written into out's storage: its line is
+                // fetched while the rest runs.
                 XOFFSET_DETAIL_PREFETCH_WITH_MSVC(out.data(), 1);
-                if (!holes_same && !b.holes_.empty()) XOFFSET_DETAIL_PREFETCH_WITH_MSVC(b.holes_.data(), 1);
-
-                // The hole table, by offset.
                 DeltaSendScratch& scratch = send_scratch(b);
-                auto& holes = scratch.holes;
-                holes.clear();
-                if (!holes_same) {
-                    if constexpr (detail::inband_allocator) {
-                        // The directory block too (the receiver finds it among them).
-                        holes.reserve(core.free_region_count());
-                        core.for_each_free_region([&](XBufferCore::WireHole h) { holes.push_back(h); });
-                    } else {
-                        holes.reserve(core.free_block_count());
-                        core.for_each_free_block([&](XBufferCore::WireHole h) { holes.push_back(h); });
-                    }
-                    std::sort(holes.begin(), holes.end(), [](const XBufferCore::WireHole& x, const XBufferCore::WireHole& y) {
-                        return x.offset < y.offset;
-                    });
-                }
-                const bool holes_changed = !holes_same &&
-                    (key || holes.size() != b.holes_.size() ||
-                     (!holes.empty() &&
-                      std::memcmp(holes.data(), b.holes_.data(), holes.size() * sizeof(XBufferCore::WireHole)) != 0));
-
-                // The hole section is checked and sized before the baseline
-                // changes.
-                const std::size_t hole_section = holes_changed ? hole_section_size(holes, used) : 0u;
 
                 // The receiver's bytes past its used_end read as zero, so the
                 // recorded copy grows with zeros (a key delta compares against
-                // an all-zero payload).
+                // an all-zero image).
                 const std::size_t base_used = b.used_;
                 auto& base = b.payload_;
                 if (!touches) {
@@ -1825,139 +2138,115 @@ namespace XOffsetDatastructure {
                         if (b) b->reset();
                     }
                 } drop{&b};
-                auto& blocks = scratch.blocks;
-                DeltaTouchLog* const log = xbuf.touch_log_.get();
-                DeltaBlockTotals totals;
-                if (touches) {
-                    totals = key ? delta_nonzero_blocks(cur, payload_begin, used, blocks, options.whole_blocks)
-                                 : touched_bytes(b, scratch, *log, cur, holes,
-                                                 detail::inband_allocator ? !holes_same : holes_changed,
-                                                 base_used, used, options.whole_blocks);
-                } else if (options.touched_only && !key && touches_known(xbuf, b)) {
-                    const std::size_t count = (used + delta_block - 1) / delta_block;
-                    const std::size_t grown =
-                        used > base_used ? std::max(base_used, payload_begin) / delta_block : count;
-                    // Blocks the touches decide (below both used sizes): by the
-                    // list, or by the stamps (none past them was stamped).
-                    const std::size_t below =
-                        std::min((std::min(base_used, used) + delta_block - 1) / delta_block, grown);
-                    if (detail::inband_allocator ? !holes_same : holes_changed) {
-                        select_touched(b, scratch.want, *log, holes, base_used, used);
-                        if constexpr (detail::inband_allocator)
-                            inband_mark_allocator(b, cur, holes, used, [&](std::size_t from, std::size_t to) {
-                                std::fill(scratch.want.begin() + std::ptrdiff_t(from / delta_block),
-                                          scratch.want.begin() + std::ptrdiff_t((to - 1) / delta_block + 1), 1);
-                            });
-                        const std::uint8_t* want = scratch.want.data();
-                        totals = delta_scan<true>(
-                            cur, base.data(), payload_begin, used, blocks,
-                            [=](std::size_t i) {
-                                while (i < count && want[i] == 0) ++i;
-                                std::size_t j = i;
-                                while (j < count && want[j] != 0) ++j;
-                                return std::pair<std::size_t, std::size_t>(i, j);
-                            },
-                            options.whole_blocks);
-                    } else if (listed_since(*log, b.touch_stamp_)) {
-                        // The blocks listed since the baseline's stamp, or past
-                        // its used size.
-                        sort_touch_list(*log);
-                        const std::uint32_t* list = log->blocks;
-                        const std::uint32_t listed = log->listed;
-                        for (std::uint32_t q = 0; q < listed && list[q] < below; ++q)
-                            XOFFSET_DETAIL_PREFETCH_WITH_MSVC(base.data() + std::size_t(list[q]) * delta_block, 1);
-                        std::uint32_t k = 0;
-                        totals = delta_scan<true>(
-                            cur, base.data(), payload_begin, used, blocks,
-                            [=, &k](std::size_t i) {
-                                if (i >= grown) return std::pair<std::size_t, std::size_t>(i, SIZE_MAX);
-                                while (k < listed && list[k] < i) ++k;
-                                if (k < listed && list[k] < below) {
-                                    const std::size_t j = list[k];
-                                    std::size_t e = j + 1;
-                                    for (++k; k < listed && list[k] == e && e < below; ++k) ++e;
-                                    return std::pair<std::size_t, std::size_t>(j, e);
-                                }
-                                return std::pair<std::size_t, std::size_t>(grown, SIZE_MAX);
-                            },
-                            options.whole_blocks);
-                    } else {
-                        // Touched since the baseline's stamp (groups of 16
-                        // blocks untouched since are skipped whole), or past
-                        // its used size.
-                        const std::uint32_t* stamps = log->stamps.data();
-                        const std::uint32_t* groups = log->groups.data();
-                        const std::uint32_t since = b.touch_stamp_;
-                        const std::size_t stamped = std::min(below, log->stamps.size());
-                        totals = delta_scan<true>(
-                            cur, base.data(), payload_begin, used, blocks,
-                            [=](std::size_t i) {
-                                if (i >= grown) return std::pair<std::size_t, std::size_t>(i, SIZE_MAX);
-                                while (i < stamped) {
-                                    if (i % delta_touch_group == 0 && groups[i / delta_touch_group] <= since) {
-                                        i += delta_touch_group;
-                                        continue;
-                                    }
-                                    if (stamps[i] > since) {
-                                        std::size_t j = i + 1;
-                                        while (j < stamped && stamps[j] > since) ++j;
-                                        return std::pair<std::size_t, std::size_t>(i, j);
-                                    }
-                                    ++i;
-                                }
-                                // From grown on (a skipped group may reach past it), every block.
-                                return std::pair<std::size_t, std::size_t>(grown, SIZE_MAX);
-                            },
-                            options.whole_blocks);
-                    }
-                } else {
-                    totals = delta_diff_update(cur, base.data(), payload_begin, used, blocks, options.whole_blocks);
-                }
-
+                DeltaTouchLog* const log = core.touch_log_.get();
                 XDeltaStats stats;
                 stats.key = key;
-                stats.compared_bytes = totals.compared;
                 const bool pair = options.touched_only || touches;
-                if (!key && blocks.empty() && !holes_changed && used == base_used && root == b.root_offset_) {
-                    if (pair) pair_touch_log(xbuf, b);
-                    b.holes_gen_ = holes_gen;
-#if XOFFSET_INBAND_ALLOCATOR
-                    b.inband_dir_ = core.inband_dir();
-#endif
-                    drop.b = nullptr;
-                    out.clear();
-                    stats.empty = true;
-                    return stats;
+                const std::uint32_t version = b.version_ + 1u;
+                std::uint32_t flags = (options.digest ? XDELTA_FLAG_DIGEST : 0u) |
+                                      (key || used != base_used ? XDELTA_FLAG_EXTENT : 0u);
+                if (touches && !key) {
+                    // A run frame: the touched bytes, compared with nothing.
+                    auto& runs = scratch.runs;
+                    const std::uint64_t bytes =
+                        touched_runs(b, *log, cur, base_used, used, options.whole_blocks, runs);
+                    if (runs.empty() && used == base_used) {
+                        pair_touch_log(core, b, type_mix<T>);
+                        drop.b = nullptr;
+                        out.clear();
+                        stats.empty = true;
+                        return stats;
+                    }
+                    flags |= XDELTA_FLAG_RUNS;
+                    write_run_frame(out, flags, b.stream_, version, used, cur, runs, bytes);
+                    stats.blocks = static_cast<std::uint32_t>(runs.size());
+                    stats.changed_bytes = bytes;
+                } else {
+                    // A block frame.
+                    auto& blocks = scratch.blocks;
+                    DeltaBlockTotals totals;
+                    if (touches) {
+                        totals = delta_nonzero_blocks(cur, delta_begin, used, blocks, options.whole_blocks);
+                    } else if (options.touched_only && !key && touches_known(core, b)) {
+                        const std::size_t count = (used + delta_block - 1) / delta_block;
+                        const std::size_t grown =
+                            used > base_used ? std::max(base_used, delta_begin) / delta_block : count;
+                        // Blocks the touches decide (below both used sizes):
+                        // by the list, or by the stamps (none past them was
+                        // stamped); from `grown` on, every block.
+                        const std::size_t below =
+                            std::min((std::min(base_used, used) + delta_block - 1) / delta_block, grown);
+                        if (listed_since(*log, b.touch_stamp_)) {
+                            XOFFSET_INDETERMINATE DeltaBlockRange ranges[DeltaTouchLog::run_capacity];
+                            const DeltaBlockRange* r = ranges;
+                            const std::size_t n = listed_block_ranges(*log, below, ranges);
+                            std::size_t k = 0;
+                            totals = delta_scan<true>(
+                                cur, base.data(), delta_begin, used, blocks,
+                                [=, &k](std::size_t i) {
+                                    if (i >= grown) return std::pair<std::size_t, std::size_t>(i, SIZE_MAX);
+                                    while (k < n && r[k].second <= i) ++k;
+                                    if (k < n) return std::pair<std::size_t, std::size_t>(std::max(r[k].first, i), r[k].second);
+                                    return std::pair<std::size_t, std::size_t>(grown, SIZE_MAX);
+                                },
+                                options.whole_blocks);
+                        } else {
+                            // Touched since the baseline's stamp (groups of 16
+                            // blocks untouched since are skipped whole).
+                            const std::uint32_t* stamps = log->stamps.data();
+                            const std::uint32_t* groups = log->groups.data();
+                            const std::uint32_t since = b.touch_stamp_;
+                            const std::size_t stamped = std::min(below, log->stamps.size());
+                            totals = delta_scan<true>(
+                                cur, base.data(), delta_begin, used, blocks,
+                                [=](std::size_t i) {
+                                    if (i >= grown) return std::pair<std::size_t, std::size_t>(i, SIZE_MAX);
+                                    while (i < stamped) {
+                                        if (i % DeltaTouchLog::group == 0 && groups[i / DeltaTouchLog::group] <= since) {
+                                            i += DeltaTouchLog::group;
+                                            continue;
+                                        }
+                                        if (stamps[i] > since) {
+                                            std::size_t j = i + 1;
+                                            while (j < stamped && stamps[j] > since) ++j;
+                                            return std::pair<std::size_t, std::size_t>(i, j);
+                                        }
+                                        ++i;
+                                    }
+                                    // From grown on (a skipped group may reach past it), every block.
+                                    return std::pair<std::size_t, std::size_t>(grown, SIZE_MAX);
+                                },
+                                options.whole_blocks);
+                        }
+                    } else {
+                        totals = delta_diff_update(cur, base.data(), delta_begin, used, blocks, options.whole_blocks);
+                    }
+                    stats.compared_bytes = totals.compared;
+                    if (!key && blocks.empty() && used == base_used) {
+                        if (pair) pair_touch_log(core, b, type_mix<T>);
+                        drop.b = nullptr;
+                        out.clear();
+                        stats.empty = true;
+                        return stats;
+                    }
+                    DeltaHeader header{};
+                    header.flags = flags | (key ? XDELTA_FLAG_KEY : 0u);
+                    header.stream = b.stream_;
+                    header.version = version;
+                    header.used_bytes = static_cast<std::uint32_t>(used);
+                    header.block_count = static_cast<std::uint32_t>(blocks.size());
+                    write_delta(out, header, b.schema_hash_, b.root_type_id_, cur, blocks, totals);
+                    stats.blocks = header.block_count;
+                    stats.changed_bytes = totals.changed;
                 }
-
-                DeltaHeader header{};
-                header.flags = (key ? XDELTA_FLAG_KEY : 0u) | (holes_changed ? XDELTA_FLAG_HOLES : 0u) |
-                               (options.digest ? XDELTA_FLAG_DIGEST : 0u) |
-                               (key || used != base_used || root != b.root_offset_ ? XDELTA_FLAG_EXTENT : 0u);
-                header.stream = b.stream_;
-                header.version = b.version_ + 1u;
-                header.used_bytes = static_cast<std::uint32_t>(used);
-                header.root_offset = root;
-                header.block_count = static_cast<std::uint32_t>(blocks.size());
-                write_delta(out, header, b.schema_hash_, b.root_type_id_, cur, blocks, totals, holes, hole_section);
-                if (holes_changed) b.holes_.swap(holes);
-                b.holes_gen_ = holes_gen;
-#if XOFFSET_INBAND_ALLOCATOR
-                b.inband_dir_ = core.inband_dir();
-#endif
                 if (used < base.size()) base.resize(used); // shrinking never allocates
                 b.used_ = used;
-                b.version_ = header.version;
-                b.root_offset_ = root;
+                b.version_ = version;
                 // A key delta also pairs with a touch log the buffer already
                 // keeps, so the baseline's next touched_only delta compares
                 // only what was touched since.
-                if (pair || (key && xbuf.touch_log_)) pair_touch_log(xbuf, b);
+                if (pair || (key && log)) pair_touch_log(core, b, type_mix<T>);
                 drop.b = nullptr;
-
-                stats.holes = holes_changed;
-                stats.blocks = header.block_count;
-                stats.changed_bytes = totals.changed;
                 stats.delta_bytes = out.size();
                 return stats;
             }
@@ -1965,15 +2254,13 @@ namespace XOffsetDatastructure {
             // Whether the buffer's touch log describes its content and holds
             // what was touched since the baseline's last delta from it (in its
             // list, or in stamps kept since then).
-            static bool touches_known(const XBuffer& xbuf, const XDeltaBaseline& b) noexcept {
-                const XBufferCore& core = xbuf;
-                const DeltaTouchLog* log = xbuf.touch_log_.get();
+            static bool touches_known(const XBufferCore& core, const XDeltaBaseline& b) noexcept {
+                const DeltaTouchLog* log = core.touch_log_.get();
                 return log && !log->lost && log->epoch == core.epoch() && b.touch_log_ == log->id &&
                        (listed_since(*log, b.touch_stamp_) || stamped_since(*log, b.touch_stamp_));
             }
-            // Whether the log's list holds every block touched since period
-            // `since` (only the current period came since, and it did not
-            // overflow).
+            // Whether the log's list holds every touch since period `since`
+            // (only the current period came since, and it did not overflow).
             static bool listed_since(const DeltaTouchLog& log, std::uint32_t since) noexcept {
                 return since + 1u == log.now && !log.overflow;
             }
@@ -1981,354 +2268,99 @@ namespace XOffsetDatastructure {
             static bool stamped_since(const DeltaTouchLog& log, std::uint32_t since) noexcept {
                 return since + 1u >= log.stamps_from;
             }
-            // The list by block (it is short, and mostly in order).
-            static void sort_touch_list(DeltaTouchLog& log) noexcept {
-                std::uint32_t* blocks = log.blocks;
-                std::uint64_t* masks = log.masks;
-                const bool with_masks = log.masks_on;
-                for (std::uint32_t i = 1; i < log.listed; ++i) {
-                    if (blocks[i - 1] < blocks[i]) continue;
-                    const std::uint32_t b = blocks[i];
-                    const std::uint64_t m = with_masks ? masks[i] : 0u;
-                    std::uint32_t j = i;
-                    for (; j > 0 && blocks[j - 1] > b; --j) {
-                        blocks[j] = blocks[j - 1];
-                        if (with_masks) masks[j] = masks[j - 1];
-                    }
-                    blocks[j] = b;
-                    if (with_masks) masks[j] = m;
-                }
-            }
-            // The blocks of a delta from an XDeltaRecord::touches baseline: the
-            // bytes touched since its stamp (whole blocks where the list does
-            // not hold them), those past its used size where nonzero, those
-            // of holes that came or went.
-            static DeltaBlockTotals touched_bytes(const XDeltaBaseline& b, DeltaSendScratch& scratch, DeltaTouchLog& log,
-                                                  const char* cur, const std::vector<XBufferCore::WireHole>& holes,
-                                                  bool holes_changed, std::size_t base_used, std::size_t used,
-                                                  bool whole_blocks) {
-                DeltaBlockBuffer& blocks = scratch.blocks;
-                DeltaBlockTotals totals;
-                const std::size_t count = (used + delta_block - 1) / delta_block;
-                const bool listed = listed_since(log, b.touch_stamp_);
-                const auto listed_mask = [&](std::uint32_t k) {
-                    return log.masks_on ? log.masks[k] : ~std::uint64_t(0);
-                };
-                std::size_t next = 0;
-                if (listed && !holes_changed && used <= base_used) {
-                    // The usual case: the listed blocks, in order.
-                    sort_touch_list(log);
-                    DeltaBlock* w = blocks.reset_for(log.listed);
-                    for (std::uint32_t k = 0; k < log.listed; ++k) {
-                        const std::uint32_t block = log.blocks[k];
-                        if (block >= count) break;
-                        const std::uint64_t m = listed_mask(k) & delta_range_mask(block, payload_begin, used);
-                        if (m != 0) delta_append_block(w, totals, next, block, m, payload_begin, used, whole_blocks);
-                    }
-                    blocks.commit(w);
-                    return totals;
-                }
-                // Otherwise the bytes to send per block.
-                auto& masks = scratch.masks;
-                masks.assign(count, 0);
-                std::uint64_t* m = masks.data();
-                if (listed) {
-                    for (std::uint32_t k = 0; k < log.listed; ++k)
-                        if (log.blocks[k] < count) m[log.blocks[k]] |= listed_mask(k);
-                } else {
-                    const std::size_t stamped = std::min(log.stamps.size(), count);
-                    const std::uint32_t since = b.touch_stamp_;
-                    // Only the current period came since and it kept its bytes:
-                    // those; otherwise whole blocks.
-                    const bool kept = log.masks_period == log.now && since + 1u == log.now && !log.shared &&
-                                      log.block_masks.size() >= stamped;
-                    for (std::size_t i = 0; i < stamped; ++i)
-                        if (log.stamps[i] > since) m[i] = kept ? log.block_masks[i] : ~std::uint64_t(0);
-                }
-                const auto mark = [&](std::size_t from, std::size_t to) {
-                    to = std::min(to, used);
-                    for (std::size_t i = from / delta_block; from < to && i * delta_block < to; ++i)
-                        m[i] |= delta_range_mask(i, from, to);
-                };
-                if (holes_changed) for_each_hole_change(b.holes_, holes, mark);
-                if constexpr (detail::inband_allocator)
-                    if (holes_changed) inband_mark_allocator(b, cur, holes, used, mark);
-                if (used > base_used) {
-                    // Past the receiver's used size its bytes are zero: the nonzero ones.
-                    (void)delta_nonzero_blocks(cur, std::max(base_used, payload_begin), used, blocks);
-                    for (const DeltaBlock& blk : blocks) m[blk.offset / delta_block] |= blk.mask;
-                }
-                DeltaBlock* w = blocks.reset_for(count);
-                for (std::size_t i = 0; i < count; ++i) {
-                    const std::uint64_t bytes = m[i] == 0 ? 0 : m[i] & delta_range_mask(i, payload_begin, used);
-                    if (bytes != 0) delta_append_block(w, totals, next, i, bytes, payload_begin, used, whole_blocks);
-                }
-                blocks.commit(w);
-                return totals;
-            }
-            // fn(from, to) for the bytes of each hole in one table and not the
-            // other (both by offset).
-            template <typename Fn>
-            static void for_each_hole_change(const std::vector<XBufferCore::WireHole>& old,
-                                             const std::vector<XBufferCore::WireHole>& holes, Fn&& fn) {
-                std::size_t i = 0, j = 0;
-                while (i < old.size() || j < holes.size()) {
-                    if (j == holes.size() || (i < old.size() && old[i].offset < holes[j].offset)) {
-                        fn(std::size_t(old[i].offset), std::size_t(old[i].offset) + old[i].bytes);
-                        ++i;
-                    } else if (i == old.size() || holes[j].offset < old[i].offset) {
-                        fn(std::size_t(holes[j].offset), std::size_t(holes[j].offset) + holes[j].bytes);
-                        ++j;
-                    } else {
-                        if (old[i].bytes != holes[j].bytes)
-                            fn(std::size_t(old[i].offset), std::size_t(old[i].offset) + std::max(old[i].bytes, holes[j].bytes));
-                        ++i;
-                        ++j;
-                    }
-                }
-            }
-
-            // In-band allocator: a change of the free blocks writes bytes no
-            // touch marks: the directory's, the link word of a block that
-            // stayed free while the stack above it changed, and the old
-            // directory's block when the directory moved (it became a free
-            // block, maybe of the same offset and size). fn(from, to) for
-            // each (`holes`: the current ones by offset, the directory among
-            // them; `b`: the baseline's).
-            template <typename Fn>
-            static void inband_mark_allocator(const XDeltaBaseline& b, const char* cur,
-                                              const std::vector<XBufferCore::WireHole>& holes, std::size_t used,
-                                              Fn&& fn) {
-                std::uint32_t dir = 0, cap = 0;
-                std::memcpy(&dir, cur + XBufferCore::inband_dir_at, sizeof(dir));
-#if XOFFSET_INBAND_ALLOCATOR
-                if (const std::uint32_t old = b.inband_dir_; old != 0 && old != dir) {
-                    const auto it = std::lower_bound(b.holes_.begin(), b.holes_.end(), old,
-                        [](const XBufferCore::WireHole& h, std::uint32_t at) { return h.offset < at; });
-                    if (it != b.holes_.end() && it->offset == old && old < used)
-                        fn(std::size_t(old), std::min<std::size_t>(std::size_t(old) + it->bytes, used));
-                }
-#else
-                (void)b;
-#endif
-                if (dir == 0 || std::size_t(dir) + 8u > used) return;
-                std::memcpy(&cap, cur + dir + 4u, sizeof(cap));
-                for (const XBufferCore::WireHole& h : holes) {
-                    if (h.offset == dir)
-                        fn(std::size_t(dir),
-                           std::min<std::size_t>(std::size_t(dir) + XBufferCore::inband_dir_bytes(cap), used));
-                    else if (std::size_t(h.offset) + 4u <= used)
-                        fn(std::size_t(h.offset), std::size_t(h.offset) + 4u);
-                }
-            }
 
             // ---- sender: touch marks (XDeltaOptions::touched_only) -----------
             // The buffer's touch log, made or started over when it no longer
             // describes the content (or lost a touch); null when it cannot be
             // made (then every delta compares everything).
-            static DeltaTouchLog* touch_log_for(XBuffer& xbuf) noexcept {
-                const XBufferCore& core = xbuf;
-                auto& log = xbuf.touch_log_;
+            static DeltaTouchLog* touch_log_for(XBufferCore& core) noexcept {
+                auto& log = core.touch_log_;
                 if (!log) {
                     log.reset(new (std::nothrow) DeltaTouchLog);
                     if (!log) return nullptr;
                     log->id = new_delta_stream();
                     log->epoch = core.epoch();
                 } else if (log->epoch != core.epoch() || log->lost) {
-                    restart_touch_log(*log, core);
+                    log->restart(core.epoch(), new_delta_stream());
                 }
                 return log.get();
             }
-            static void restart_touch_log(DeltaTouchLog& log, const XBufferCore& core) noexcept {
-                log.copy = 0;
-                log.stamps.clear();  // regrown with zeros when stamps are needed
-                log.groups.clear();
-                log.id = new_delta_stream();
-                log.epoch = core.epoch();
-                log.now = 1;
-                log.listed = 0;
-                log.seen = 0;
-                log.lost = false;
-                log.overflow = false;
-                log.shared = false;
-                log.masks_on = false;
-                log.stamps_from = UINT32_MAX;
-                log.owner = nullptr;
-                log.masks_period = 0;
-            }
-            // Where touches go: the log and the payload they describe.
-            struct TouchSink {
-                DeltaTouchLog* log = nullptr;
-                const char* base = nullptr;
-                std::size_t used = 0, segment = 0;
-            };
-            static bool touch_sink(XBuffer& xbuf, TouchSink& sink) noexcept {
-                const XBufferCore& core = xbuf;
-                sink.log = touch_log_for(xbuf);
-                if (!sink.log) return false;
-                sink.base = static_cast<const char*>(core.get_address());
-                const XArena* sm = core.arena();
-                sink.used = sm ? static_cast<std::size_t>(sm->used_end) : 0u;
-                sink.segment = core.get_size();
-                return true;
-            }
-            // Room in the stamps for block `last` (and every block below
-            // used); false (the log lost a touch) when there is none.
-            static bool reserve_touch_blocks(DeltaTouchLog& log, std::size_t last, std::size_t used = 0) noexcept {
-                if (log.stamps.size() > last && (log.masks_period == 0 || log.block_masks.size() > last)) return true;
-                XOFFSET_TRY {
-                    const std::size_t blocks = std::max(last + 1, (used + delta_block - 1) / delta_block);
-                    if (log.stamps.size() < blocks) {
-                        log.stamps.resize(blocks, 0u);
-                        log.groups.resize((blocks + delta_touch_group - 1) / delta_touch_group, 0u);
-                    }
-                    if (log.masks_period != 0 && log.block_masks.size() < log.stamps.size())
-                        log.block_masks.resize(log.stamps.size(), 0u);
-                } XOFFSET_CATCH(const std::bad_alloc&) {
-                    log.lost = true;
-                    return false;
-                }
-                return true;
-            }
-            static void stamp_block(DeltaTouchLog& log, std::size_t i) noexcept {
-                if (!reserve_touch_blocks(log, i)) return;
-                log.stamps[i] = log.now;
-                log.groups[i / delta_touch_group] = log.now;
-            }
-            // The listed blocks into the stamps: from now on this period's
-            // touches are all stamped.
-            static void stamp_touch_list(DeltaTouchLog& log) noexcept {
-                // With masks and one baseline the listed bytes go along, and
-                // the period's later touches keep theirs (block_masks).
-                log.masks_period = log.masks_on && !log.shared ? log.now : 0u;
-                for (std::uint32_t k = 0; k < log.listed; ++k) {
-                    stamp_block(log, log.blocks[k]);
-                    if (log.masks_period != 0 && log.block_masks.size() > log.blocks[k])
-                        log.block_masks[log.blocks[k]] = log.masks[k];
-                }
-                log.stamps_from = std::min(log.stamps_from, log.now);
-            }
-            // A stamped touch of the bytes `mask` of block i.
-            static void stamp_touch(DeltaTouchLog& log, std::size_t i, std::uint64_t mask) noexcept {
-                if (log.masks_period != log.now || log.shared) {
-                    stamp_block(log, i);
+            // A touch of image bytes [at, at + bytes) of the buffer (an
+            // address into its storage): inside [40, used) it is recorded,
+            // past used it is cut there (the bytes past a receiver's used
+            // size go by themselves), and outside the payload it cannot be
+            // recorded (the next delta compares everything).
+            XOFFSET_DETAIL_INLINE static void touch_range(XBufferCore& core, DeltaTouchLog& log, const void* p,
+                                                          std::size_t bytes) noexcept {
+                const auto* sm = core.arena();
+                if (sm == nullptr) [[unlikely]] return log.lose();
+                const std::uint64_t at = std::uint64_t(static_cast<const char*>(p) - reinterpret_cast<const char*>(sm));
+                const std::uint64_t used = sm->used_end;
+                if (at - payload_begin < used - payload_begin && bytes <= used - at) [[likely]] {
+                    if (bytes != 0) log.add(static_cast<std::uint32_t>(at), static_cast<std::uint32_t>(bytes));
                     return;
                 }
-                if (!reserve_touch_blocks(log, i)) return;
-                std::uint64_t& kept = log.block_masks[i];
-                kept = log.stamps[i] == log.now ? kept | mask : mask;
-                log.stamps[i] = log.now;
-                log.groups[i / delta_touch_group] = log.now;
+                touch_range_cut(core, log, at, bytes);
             }
-            // Records a touch of the bytes `mask` of block i.
-            XOFFSET_DETAIL_INLINE static void touch_block(DeltaTouchLog& log, std::size_t i, std::uint64_t mask) noexcept {
-                if (!log.overflow) [[likely]] {
-                    const auto block = static_cast<std::uint32_t>(i);
-                    const auto bit = static_cast<std::uint16_t>(1u << (block % 16u));
-                    std::uint32_t k = 0;
-                    if (log.seen & bit) {  // touched before in this period?
-                        k = log.listed;
-                        while (k > 0 && log.blocks[k - 1] != block) --k;
-                    }
-                    if (k > 0) {
-                        if (log.masks_on) log.masks[k - 1] |= mask;
-                    } else if (log.listed < DeltaTouchLog::list_capacity) {
-                        log.seen = static_cast<std::uint16_t>(log.seen | bit);
-                        log.blocks[log.listed] = block;
-                        if (log.masks_on) log.masks[log.listed] = mask;
-                        // The next delta compares this block with the baseline's copy.
-                        if (log.copy) XOFFSET_DETAIL_PREFETCH_WITH_MSVC(reinterpret_cast<const char*>(log.copy + i * delta_block), 1);
-                        ++log.listed;
-                    } else {
-                        log.overflow = true;  // stamped from here on
-                        stamp_touch_list(log);
-                    }
-                }
-                if (log.shared || log.overflow) [[unlikely]] stamp_touch(log, i, mask);
-            }
-            // Records a touch of payload bytes [offset, end) (end past used is cut).
-            static void stamp_touch_log(DeltaTouchLog& log, std::size_t offset, std::size_t end,
-                                        std::size_t used) noexcept {
-                end = std::min(end, used);
-                if (end <= offset) return;
-                const std::size_t first = offset / delta_block;
-                const std::size_t last = (end - 1) / delta_block;
-                if (first == last) [[likely]] {  // most touches: one field, one block
-                    const std::size_t n = end - offset;
-                    touch_block(log, first,
-                                (n == delta_block ? ~std::uint64_t(0) : (std::uint64_t(1) << n) - 1u) << (offset % delta_block));
-                    return;
-                }
-                for (std::size_t i = first; i <= last; ++i) {
-                    const std::size_t lo = i == first ? offset % delta_block : 0u;
-                    const std::size_t hi = i == last ? (end - 1) % delta_block + 1u : delta_block;
-                    const std::uint64_t ones = hi - lo == delta_block ? ~std::uint64_t(0)
-                                                                      : (std::uint64_t(1) << (hi - lo)) - 1u;
-                    touch_block(log, i, ones << lo);
-                }
-            }
-            static void touch_bytes(TouchSink& sink, const void* p, std::size_t bytes) noexcept {
+            XOFFSET_DETAIL_NOINLINE static void touch_range_cut(XBufferCore& core, DeltaTouchLog& log, std::uint64_t at,
+                                                                std::size_t bytes) noexcept {
+                const std::uint64_t used = core.arena()->used_end, size = core.get_size();
                 if (bytes == 0) return;
-                const char* at = static_cast<const char*>(p);
-                // Bytes outside the payload are not this buffer's (nothing to
-                // compare them with): every block is compared next time.
-                if (!sink.base || at < sink.base + payload_begin || std::size_t(at - sink.base) > sink.segment ||
-                    bytes > sink.segment - std::size_t(at - sink.base)) {
-                    sink.log->lost = true;
-                    return;
-                }
-                const auto offset = static_cast<std::size_t>(at - sink.base);
-                stamp_touch_log(*sink.log, offset, offset + bytes, sink.used);
+                if (at < payload_begin || at > size || bytes > size - at) return log.lose();
+                if (at < used) log.add(static_cast<std::uint32_t>(at), static_cast<std::uint32_t>(used - at));
             }
             static void touch(XBuffer& xbuf, const void* p, std::size_t bytes) noexcept {
-                TouchSink sink;
-                if (touch_sink(xbuf, sink)) touch_bytes(sink, p, bytes);
+                XBufferCore& core = xbuf;
+                if (DeltaTouchLog* log = core.touch_log_.get()) touch_range(core, *log, p, bytes);
             }
-            // A touch of the bytes of [p, p + bytes) (bytes <= 8) that changed:
-            // bit k of `changed` set when byte k did.
-            static void touch_changed(XBuffer& xbuf, const void* p, std::size_t bytes, std::uint64_t changed) noexcept {
-                if (changed == 0) return;
-                TouchSink sink;
-                if (!touch_sink(xbuf, sink)) return;
-                const char* at = static_cast<const char*>(p);
-                if (!sink.base || at < sink.base + payload_begin || std::size_t(at - sink.base) > sink.segment ||
-                    bytes > sink.segment - std::size_t(at - sink.base)) {
-                    sink.log->lost = true;
-                    return;
+            // A touch of the bytes of a scalar at p (at most 8 bytes) that
+            // changed: x is its old bytes xor its new ones (nonzero, in a
+            // word, little endian), the bytes from the first changed one to
+            // the last. touch_range's checks, for one to eight bytes.
+            XOFFSET_DETAIL_INLINE static void touch_changed(XBuffer& xbuf, const void* p, std::uint64_t x) noexcept {
+                XBufferCore& core = xbuf;
+                DeltaTouchLog* const log = core.touch_log_.get();
+                if (log == nullptr) return;
+                const unsigned lo = static_cast<unsigned>(std::countr_zero(x)) >> 3;
+                const unsigned bytes = ((71u - static_cast<unsigned>(std::countl_zero(x))) >> 3) - lo;
+                const char* const first = static_cast<const char*>(p) + lo;
+                if (core.get_size() >= sizeof(XBufferCore::arena_header)) [[likely]] {
+                    const char* const image = core.data();
+                    const std::uint64_t at = std::uint64_t(first - image);
+                    const std::uint64_t used = used_of(image);
+                    if (at - payload_begin < used - payload_begin && bytes <= used - at) [[likely]]
+                        return log->add(static_cast<std::uint32_t>(at), bytes);
                 }
-                const auto offset = static_cast<std::size_t>(at - sink.base);
-                if (offset + bytes > sink.used) {
-                    stamp_touch_log(*sink.log, offset, offset + bytes, sink.used);
-                    return;
-                }
-                const std::size_t first = offset / delta_block, lo = offset % delta_block;
-                if (const std::uint64_t low = changed << lo) touch_block(*sink.log, first, low);
-                if (lo + bytes > delta_block) {
-                    if (const std::uint64_t high = changed >> (delta_block - lo)) touch_block(*sink.log, first + 1, high);
-                }
+                touch_range_out(core, *log, first, bytes);
+            }
+            XOFFSET_DETAIL_NOINLINE static void touch_range_out(XBufferCore& core, DeltaTouchLog& log, const void* p,
+                                                                std::size_t bytes) noexcept {
+                touch_range(core, log, p, bytes);
             }
             // value's bytes and the blocks of every string and container it reaches.
             template <typename T>
             static void touch_value(XBuffer& xbuf, const T& value) noexcept {
-                TouchSink sink;
-                if (!touch_sink(xbuf, sink)) return;
-                touch_bytes(sink, &value, sizeof(T));
-                touch_reached(sink, value);
+                XBufferCore& core = xbuf;
+                DeltaTouchLog* const log = core.touch_log_.get();
+                if (log == nullptr) return;
+                touch_range(core, *log, &value, sizeof(T));
+                touch_reached(core, *log, value);
             }
             template <typename T>
-            static void touch_reached(TouchSink& sink, const T& value) noexcept {
+            static void touch_reached(XBufferCore& core, DeltaTouchLog& log, const T& value) noexcept {
                 using CleanT = std::remove_cv_t<T>;
                 if constexpr (!wire_value_needs_validation_v<CleanT>) {
-                    (void)sink;
+                    (void)core;
+                    (void)log;
                     (void)value;
                 } else if constexpr (std::is_array_v<CleanT>) {
-                    for (const auto& elem : value) touch_reached(sink, elem);
+                    for (const auto& elem : value) touch_reached(core, log, elem);
                 } else if constexpr (is_fixed_string_v<CleanT>) {
                     const auto& str = static_cast<const XString&>(value);
                     // The whole block, slack included (a block freed and
                     // reused may leave its old bytes zeroed in the slack).
                     if (!str.is_inline() && str.capacity_ != 0)
-                        touch_bytes(sink, delta_heap_data<char>(str.data_delta),
+                        touch_range(core, log, delta_heap_data<char>(str.data_delta),
                                     XBufferCore::arena_header::block_size(str.capacity_ + 1u));
                 } else if constexpr (is_fixed_flat_set_v<CleanT> || is_fixed_flat_map_v<CleanT> ||
                                      is_fixed_vector_v<CleanT>) {
@@ -2336,28 +2368,31 @@ namespace XOffsetDatastructure {
                     const auto& v = static_cast<const XVectorCore<Elem>&>(value);
                     if (v.capacity_ == 0) return;
                     const Elem* data = delta_heap_data<Elem>(v.data_delta);
-                    touch_bytes(sink, data,
+                    touch_range(core, log, data,
                                 XBufferCore::arena_header::block_size(
                                     static_cast<std::uint32_t>(std::size_t(v.capacity_) * sizeof(Elem))));
                     if constexpr (wire_value_needs_validation_v<Elem>)
-                        for (std::uint32_t i = 0; i < v.size_; ++i) touch_reached(sink, data[i]);
+                        for (std::uint32_t i = 0; i < v.size_; ++i) touch_reached(core, log, data[i]);
                 } else if constexpr (std::is_class_v<CleanT>) {
                     (void)for_each_reflected_subobject_v<CleanT>(
                         [&](auto index) {
-                            touch_reached(sink, static_cast<const schema::base_t<CleanT, decltype(index)::value>&>(value));
+                            touch_reached(core, log, static_cast<const schema::base_t<CleanT, decltype(index)::value>&>(value));
                             return vok();
                         },
                         [&](auto index) {
                             using member = schema::member_t<CleanT, decltype(index)::value>;
-                            touch_reached(sink, member::get(value));
+                            touch_reached(core, log, member::get(value));
                             return vok();
                         });
                 }
             }
-            // After a delta from xbuf: the baseline holds what the buffer held
-            // at the log's current stamp; later touches are newer.
-            static void pair_touch_log(XBuffer& xbuf, XDeltaBaseline& b) noexcept {
-                DeltaTouchLog* log = touch_log_for(xbuf);
+            // After a delta from the buffer: the baseline holds what the
+            // buffer held at the log's current period; later touches are
+            // newer. A touches baseline that pairs alone gets the token of
+            // the short path (mix: its root type's).
+            static void pair_touch_log(XBufferCore& core, XDeltaBaseline& b, std::uint64_t mix) noexcept {
+                b.token_.v = 0;
+                DeltaTouchLog* log = touch_log_for(core);
                 if (!log) {
                     b.touch_log_ = 0;
                     return;
@@ -2366,8 +2401,8 @@ namespace XOffsetDatastructure {
                     // A second baseline: from now on every touch is stamped,
                     // so each finds what was touched since its own last delta.
                     log->shared = true;
-                    stamp_touch_list(*log);
-                    log->masks_period = 0;
+                    log->token = 0;
+                    log->stamp_list();
                 }
                 log->owner = &b;
                 log->copy = !log->shared && b.record_ == XDeltaRecord::copy && !b.payload_.empty()
@@ -2376,81 +2411,27 @@ namespace XOffsetDatastructure {
                 b.touch_log_ = log->id;
                 b.touch_stamp_ = log->now;
                 if (log->now == UINT32_MAX) {
-                    restart_touch_log(*log, xbuf);  // the next delta compares everything
+                    log->restart(core.epoch(), new_delta_stream());  // the next delta compares everything
                     return;
                 }
                 ++log->now;
-                log->listed = 0;
-                log->seen = 0;
-                log->overflow = false;
+                log->next_period();
                 // The only baseline needs no stamps beyond the list.
                 if (!log->shared) log->stamps_from = UINT32_MAX;
-                // A touches baseline needs the bytes, from the period that starts now.
-                if (b.record_ == XDeltaRecord::touches) log->masks_on = true;
-            }
-            // The blocks a touched_only delta compares when the holes changed
-            // (want, per block): those touched since the
-            // baseline's stamp, those past its used size, those of holes that
-            // came or went.
-            // Blocks below both used sizes that the log has stamps for.
-            static std::size_t touched_blocks(const DeltaTouchLog& log, std::size_t base_used, std::size_t used) noexcept {
-                const std::size_t common = std::min(base_used, used);
-                return std::min((common + delta_block - 1) / delta_block,
-                                log.stamps.size());
-            }
-            static void select_touched(const XDeltaBaseline& b, std::vector<std::uint8_t>& want,
-                                       const DeltaTouchLog& log, const std::vector<XBufferCore::WireHole>& holes,
-                                       std::size_t base_used, std::size_t used) {
-                const std::size_t count = (used + delta_block - 1) / delta_block;
-                want.assign(count, 0);
-                const auto mark = [&](std::size_t from, std::size_t to) {
-                    from = std::max(from, payload_begin);
-                    to = std::min(to, used);
-                    if (to <= from) return;
-                    std::fill(want.begin() + std::ptrdiff_t(from / delta_block),
-                              want.begin() + std::ptrdiff_t((to - 1) / delta_block + 1), 1);
-                };
-                const std::size_t stamped = touched_blocks(log, base_used, used);
-                const std::uint32_t since = b.touch_stamp_;
-                std::uint8_t* w = want.data();
-                if (listed_since(log, since)) {
-                    for (std::uint32_t k = 0; k < log.listed; ++k)
-                        if (log.blocks[k] < count) w[log.blocks[k]] = 1;
+                if (b.record_ == XDeltaRecord::touches && !log->shared && !log->lost) {
+                    log->token = (log->id + log->now) | 1u;
+                    b.token_.v = token_of(core, *log, mix);
                 } else {
-                    const std::uint32_t* stamps = log.stamps.data();
-                    for (std::size_t i = 0; i < stamped; ++i) w[i] = stamps[i] > since ? 1 : 0;
+                    log->token = 0;
                 }
-                mark(base_used, used);
-                for_each_hole_change(b.holes_, holes, mark);
             }
 
-            // Size of the hole section for a table by offset; an inconsistent
-            // table (overlap, misalignment, past used) is a library error.
-            static std::size_t hole_section_size(const std::vector<XBufferCore::WireHole>& holes, std::size_t used) {
-                if (holes.size() > UINT32_MAX)
-                    XOFFSET_THROW(XException(XErrc::invalid_state, "save_delta<T>(): hole table too large"));
-                std::size_t size = delta_varint_size(static_cast<std::uint32_t>(holes.size()));
-                std::size_t prev = payload_begin;
-                for (const auto& h : holes) {
-                    if (h.offset < prev || (h.offset & 7u) != 0 || (h.bytes & 7u) != 0 || h.bytes == 0 ||
-                        std::size_t(h.offset) + h.bytes > used)
-                        XOFFSET_THROW(XException(XErrc::invalid_state, "save_delta<T>(): inconsistent free table"));
-                    size += delta_varint_size(static_cast<std::uint32_t>((h.offset - prev) / 8u)) +
-                            delta_varint_size(h.bytes / 8u);
-                    prev = std::size_t(h.offset) + h.bytes;
-                }
-                return size;
-            }
-
-            // Writes the delta `header` announces: the fingerprint (KEY), the
-            // digest of src (DIGEST), the blocks with their bytes from src
-            // (`totals` is their encoded size), the holes (HOLES,
-            // hole_section bytes).
+            // Writes the block frame `header` announces: the fingerprint (KEY),
+            // the digest of src's image [32, used) (DIGEST), the blocks with
+            // their bytes from src (`totals` is their encoded size).
             static std::size_t header_size(const DeltaHeader& h) noexcept {
                 std::size_t size = XDELTA_HEADER_FIXED + delta_varint_size(h.version) + delta_varint_size(h.block_count);
-                if (h.flags & XDELTA_FLAG_EXTENT)
-                    size += delta_varint_size((h.used_bytes - payload_begin) / 8u) +
-                            delta_varint_size(h.root_offset - static_cast<std::uint32_t>(payload_begin));
+                if (h.flags & XDELTA_FLAG_EXTENT) size += delta_varint_size((h.used_bytes - payload_begin) / 8u);
                 return size;
             }
             static char* put_header(char* p, const DeltaHeader& h) noexcept {
@@ -2461,22 +2442,16 @@ namespace XOffsetDatastructure {
                 std::memcpy(p + 4, &h.stream, 8);
                 p += XDELTA_HEADER_FIXED;
                 p = delta_put_varint(p, h.version);
-                if (h.flags & XDELTA_FLAG_EXTENT) {
-                    p = delta_put_varint(p, (h.used_bytes - payload_begin) / 8u);
-                    p = delta_put_varint(p, h.root_offset - static_cast<std::uint32_t>(payload_begin));
-                }
+                if (h.flags & XDELTA_FLAG_EXTENT) p = delta_put_varint(p, (h.used_bytes - payload_begin) / 8u);
                 return delta_put_varint(p, h.block_count);
             }
 
             static void write_delta(std::string& out, const DeltaHeader& header, std::uint64_t schema_hash,
                                     std::uint64_t root_type_id, const char* src, const DeltaBlockBuffer& blocks,
-                                    DeltaBlockTotals totals, const std::vector<XBufferCore::WireHole>& holes,
-                                    std::size_t hole_section) {
+                                    DeltaBlockTotals totals) {
                 const bool key = (header.flags & XDELTA_FLAG_KEY) != 0;
                 const bool digest = (header.flags & XDELTA_FLAG_DIGEST) != 0;
-                const bool with_holes = (header.flags & XDELTA_FLAG_HOLES) != 0;
-                const std::size_t size = header_size(header) + (key ? 16u : 0u) + (digest ? 8u : 0u) +
-                                         totals.encoded + (with_holes ? hole_section : 0u);
+                const std::size_t size = header_size(header) + (key ? 16u : 0u) + (digest ? 8u : 0u) + totals.encoded;
                 if (size > out.max_size() - 8u)
                     XOFFSET_THROW(std::length_error("save_delta<T>(): output size exceeds string limit"));
                 const auto emit = [&](char* p) noexcept {
@@ -2487,7 +2462,7 @@ namespace XOffsetDatastructure {
                         p += 16;
                     }
                     if (digest) {
-                        const std::uint64_t d = xxh64(src + payload_begin, header.used_bytes - payload_begin);
+                        const std::uint64_t d = xxh64(src + delta_begin, header.used_bytes - delta_begin);
                         std::memcpy(p, &d, 8);
                         p += 8;
                     }
@@ -2507,15 +2482,6 @@ namespace XOffsetDatastructure {
                         // The nonzero mask bytes: the mask is a word whose bytes sel selects.
                         p = delta_put_masked(p, reinterpret_cast<const char*>(&blk.mask), sel);
                         p = delta_put_masked(p, src + blk.offset, blk.mask);
-                    }
-                    if (with_holes) {
-                        p = delta_put_varint(p, static_cast<std::uint32_t>(holes.size()));
-                        std::size_t prev_hole = payload_begin;
-                        for (const auto& h : holes) {
-                            p = delta_put_varint(p, static_cast<std::uint32_t>((h.offset - prev_hole) / 8u));
-                            p = delta_put_varint(p, h.bytes / 8u);
-                            prev_hole = std::size_t(h.offset) + h.bytes;
-                        }
                     }
                 };
                 // The gather of the block bytes stores 8 bytes at a time: 8
@@ -2538,17 +2504,14 @@ namespace XOffsetDatastructure {
                 const std::size_t used = b.payload_.size();
                 DeltaBlockBuffer blocks;
                 const DeltaBlockTotals totals =
-                    delta_nonzero_blocks(b.payload_.data(), payload_begin, used, blocks, options.whole_blocks);
+                    delta_nonzero_blocks(b.payload_.data(), delta_begin, used, blocks, options.whole_blocks);
                 DeltaHeader header{};
-                header.flags = XDELTA_FLAG_KEY | XDELTA_FLAG_HOLES | XDELTA_FLAG_EXTENT |
-                               (options.digest ? XDELTA_FLAG_DIGEST : 0u);
+                header.flags = XDELTA_FLAG_KEY | XDELTA_FLAG_EXTENT | (options.digest ? XDELTA_FLAG_DIGEST : 0u);
                 header.stream = b.stream_;
                 header.version = b.version_;
                 header.used_bytes = static_cast<std::uint32_t>(used);
-                header.root_offset = b.root_offset_;
                 header.block_count = static_cast<std::uint32_t>(blocks.size());
-                write_delta(out, header, b.schema_hash_, b.root_type_id_, b.payload_.data(), blocks, totals, b.holes_,
-                            hole_section_size(b.holes_, used));
+                write_delta(out, header, b.schema_hash_, b.root_type_id_, b.payload_.data(), blocks, totals);
             }
 
             // ---- receiver -------------------------------------------------
@@ -2557,14 +2520,18 @@ namespace XOffsetDatastructure {
                 const unsigned char* data;       // the delta
                 const unsigned char* end;        // its end
                 const unsigned char* readable_end = nullptr;  // end of the readable bytes (end, or past it)
-                const DeltaBlockRef* blocks;     // its blocks, decoded
-                std::size_t block_count;
+                // Its blocks, decoded (of a run frame: the blocks its runs
+                // write, with their masks, when the parse was asked for them).
+                const DeltaBlockRef* blocks = nullptr;
+                std::size_t block_count = 0;
+                const DeltaRunRef* runs = nullptr;  // a run frame's runs
+                std::size_t run_count = 0;
                 std::uint64_t digest = 0;
                 std::uint64_t schema_hash = 0;
                 std::uint64_t root_type_id = 0;
-                std::size_t undo_bytes = 0;      // old bytes of the blocks written, below old_used
+                std::size_t undo_bytes = 0;      // old bytes the delta overwrites (its blocks', its runs'), below old_used
                 bool key = false;
-                bool holes = false;
+                bool run_frame = false;
                 bool digest_present = false;
             };
 
@@ -2572,18 +2539,18 @@ namespace XOffsetDatastructure {
                 return std::string(who) + ": " + what;
             }
 
-            // Header, block and hole sections; nothing is written to the buffer.
-            // room: readable bytes past the end of data. old_used, old_root:
-            // the replica's current used_end and root (0 when it holds no
-            // verified root of T).
+            // Header and blocks or runs; nothing is written to the buffer.
+            // room: readable bytes past the end of data. old_used: the
+            // replica's current used_end (0 when it holds no verified root of
+            // T). replica: the image a non-key delta will patch (null: none);
+            // its lines and those of the cursor's check map that the delta
+            // needs are fetched while the rest is parsed. block_masks: a run
+            // frame's blocks are wanted too (the in-place checks read them).
             template <typename T>
-            // replica: the payload a non-key delta will patch (null: none);
-            // its lines and those of the cursor's check map that the blocks
-            // need are fetched while the rest is parsed.
             static vstatus parse(std::span<const std::byte> data, std::size_t room, const XDeltaCursor& cursor,
-                                 std::size_t old_used, std::uint64_t old_root,
-                                 std::vector<XBufferCore::WireHole>& holes, std::vector<DeltaBlockRef>& blocks,
-                                 Parsed& out, const char* who, const char* replica = nullptr) {
+                                 std::size_t old_used, std::vector<DeltaBlockRef>& blocks,
+                                 std::vector<DeltaRunRef>& runs, Parsed& out, const char* who,
+                                 const char* replica = nullptr, bool block_masks = false) {
                 const auto* p = reinterpret_cast<const unsigned char*>(data.data());
                 out.data = p;
                 const std::size_t n = data.size_bytes();
@@ -2604,24 +2571,31 @@ namespace XOffsetDatastructure {
                     XOFFSET_VFAIL(XException, XErrc::unsupported_flags, msg(who, "unsupported delta flags"));
                 std::memcpy(&h.stream, p + 4, 8);
                 out.key = (h.flags & XDELTA_FLAG_KEY) != 0;
-                out.holes = (h.flags & XDELTA_FLAG_HOLES) != 0;
+                out.run_frame = (h.flags & XDELTA_FLAG_RUNS) != 0;
                 out.digest_present = (h.flags & XDELTA_FLAG_DIGEST) != 0;
                 const bool extent = (h.flags & XDELTA_FLAG_EXTENT) != 0;
+                if (out.key && out.run_frame)
+                    XOFFSET_VFAIL(XException, XErrc::unsupported_flags, msg(who, "key delta as a run frame"));
                 const auto* q = p + XDELTA_HEADER_FIXED;
                 const auto* const end = p + n;
-                std::uint32_t used_words = 0, root_from_begin = 0;
-                if (!delta_get_varint(q, end, h.version) ||
-                    (extent && (!delta_get_varint(q, end, used_words) || !delta_get_varint(q, end, root_from_begin))) ||
-                    !delta_get_varint(q, end, h.block_count))
+                std::uint32_t used_words = 0;
+                if (out.run_frame) {
+                    if (n < XDELTA_RUN_HEADER)
+                        XOFFSET_VFAIL(XException, XErrc::truncated, msg(who, "delta shorter than its header"));
+                    std::memcpy(&h.version, q, 4);
+                    q += 4;
+                    if (extent && !delta_get_varint(q, end, used_words))
+                        XOFFSET_VFAIL(XException, XErrc::truncated, msg(who, "delta shorter than its header"));
+                } else if (!delta_get_varint(q, end, h.version) || (extent && !delta_get_varint(q, end, used_words)) ||
+                           !delta_get_varint(q, end, h.block_count)) {
                     XOFFSET_VFAIL(XException, XErrc::truncated, msg(who, "delta shorter than its header"));
+                }
                 if (out.key && !extent)
                     XOFFSET_VFAIL(XException, XErrc::unsupported_flags, msg(who, "key delta without extent"));
                 if (h.stream == 0 || h.version == 0)
                     XOFFSET_VFAIL(XException, XErrc::delta_base_mismatch, msg(who, "delta without stream or version"));
                 if (out.key) {
                     if (end - q < 16) XOFFSET_VFAIL(XException, XErrc::truncated, msg(who, "delta shorter than its header"));
-                    if (!out.holes)
-                        XOFFSET_VFAIL(XException, XErrc::unsupported_flags, msg(who, "key delta without hole table"));
                     std::memcpy(&out.schema_hash, q, 8);
                     std::memcpy(&out.root_type_id, q + 8, 8);
                     q += 16;
@@ -2646,10 +2620,9 @@ namespace XOffsetDatastructure {
                     std::memcpy(&out.digest, q, 8);
                     q += 8;
                 }
-                std::uint64_t used = old_used, root = old_root;
+                std::uint64_t used = old_used;
                 if (extent) {
                     used = payload_begin + std::uint64_t(used_words) * 8u;
-                    root = payload_begin + std::uint64_t(root_from_begin);
                 } else if (old_used == 0) {
                     XOFFSET_VFAIL(XException, XErrc::delta_base_mismatch,
                                   msg(who, "buffer holds no verified root of this type (ask for a key delta)"));
@@ -2657,13 +2630,83 @@ namespace XOffsetDatastructure {
                 if (used > XBufferCore::MAX_PAYLOAD)
                     XOFFSET_VFAIL(XException, XErrc::size_mismatch, msg(who, "used size mismatch"));
                 // The root is the image's first block (wire 3.0).
-                if (root != XBufferCore::root_at || root >= used)
+                if (XBufferCore::root_at >= used)
                     XOFFSET_VFAIL(XException, XErrc::root_offset_out_of_bounds, msg(who, "root offset out of bounds"));
                 h.used_bytes = static_cast<std::uint32_t>(used);
-                h.root_offset = static_cast<std::uint32_t>(root);
+                const bool fetch = replica != nullptr && !out.key;
+                const DeltaCheckBits* const checks = cursor.checks_.data();
+                const std::size_t check_count = cursor.checks_valid_ ? cursor.checks_.size() : 0u;
+                std::size_t undo = 0;
+
+                if (out.run_frame) {
+                    // Runs: each one past the end of the one before (the
+                    // first past 32), nonempty, inside [32, used).
+                    // runs and blocks are storage here (grown, never shrunk):
+                    // rn and bn count what this delta put in them.
+                    std::size_t rn = 0, bn = 0;
+                    XOFFSET_TRY {
+                        DeltaRunRef* rr = runs.data();
+                        std::size_t rcap = runs.size();
+                        DeltaScratchList<DeltaBlockRef> bl{blocks, blocks.data(), blocks.size()};
+                        std::uint64_t at = delta_begin;
+                        while (q != end) {
+                            std::uint32_t gap = 0, bytes = 0;
+                            if (!delta_get_varint(q, end, gap) || !delta_get_varint(q, end, bytes))
+                                XOFFSET_VFAIL(XException, XErrc::size_mismatch, msg(who, "delta run truncated"));
+                            at += gap;
+                            if (bytes == 0 || at + bytes > used)
+                                XOFFSET_VFAIL(XException, XErrc::invalid_extent_table, msg(who, "delta run out of bounds"));
+                            if (std::size_t(end - q) < bytes)
+                                XOFFSET_VFAIL(XException, XErrc::size_mismatch, msg(who, "delta run truncated"));
+                            if (rn == rcap) [[unlikely]] rr = delta_scratch_grow(runs, rcap);
+                            rr[rn++] = {static_cast<std::uint32_t>(at), bytes, static_cast<std::uint32_t>(q - p)};
+                            undo += bytes;
+                            if (fetch) XOFFSET_DETAIL_PREFETCH_WITH_MSVC(replica + at, 1);
+                            if (block_masks) {
+                                const std::uint64_t first = at / delta_block;
+                                if (bytes < 8u && (at + bytes - 1u) / delta_block == first) [[likely]] {
+                                    // A field: its bytes in one block.
+                                    bl.add(bn, first, std::uint64_t((1u << bytes) - 1u) << (at % delta_block));
+                                    if (fetch && first < check_count) XOFFSET_DETAIL_PREFETCH_WITH_MSVC(checks + first, 1);
+                                } else {
+                                    for (std::uint64_t i = first; i * delta_block < at + bytes; ++i) {
+                                        std::uint64_t mask = delta_range_mask(i, at, at + bytes);
+                                        // The checks need only the bytes the
+                                        // run changes (whole blocks sent from
+                                        // stamps rewrite slack and free bytes
+                                        // as they were).
+                                        if (fetch) {
+                                            mask &= ~delta_unchanged_words(replica, reinterpret_cast<const char*>(q),
+                                                                           at, at + bytes, i, old_used);
+                                            if (mask == 0) continue;
+                                        }
+                                        bl.add(bn, i, mask);
+                                        if (fetch && i < check_count) XOFFSET_DETAIL_PREFETCH_WITH_MSVC(checks + i, 1);
+                                    }
+                                }
+                            }
+                            q += bytes;
+                            at += bytes;
+                        }
+                    } XOFFSET_CATCH(const std::bad_alloc&) {
+                        XOFFSET_VFAIL_BAD_ALLOC();
+                    }
+                    // The undo copy keeps the bytes below old_used (the runs
+                    // past it come last).
+                    const DeltaRunRef* const rr = runs.data();
+                    for (std::size_t k = rn; k-- > 0 && rr[k].offset + rr[k].bytes > old_used;)
+                        undo -= rr[k].offset + rr[k].bytes - std::max<std::size_t>(rr[k].offset, old_used);
+                    h.block_count = static_cast<std::uint32_t>(rn);
+                    out.runs = rr;
+                    out.run_count = rn;
+                    out.blocks = blocks.data();
+                    out.block_count = bn;
+                    out.undo_bytes = undo;
+                    return vok();
+                }
 
                 // Blocks: ascending; a mask byte that is present is nonzero; every
-                // byte written lies inside [40, used). Each takes at least 3 bytes.
+                // byte written lies inside [32, used). Each takes at least 3 bytes.
                 if (h.block_count > std::size_t(end - q) / 3u)
                     XOFFSET_VFAIL(XException, XErrc::size_mismatch, msg(who, "delta block table truncated"));
                 XOFFSET_TRY {
@@ -2673,10 +2716,6 @@ namespace XOffsetDatastructure {
                 }
                 DeltaBlockRef* refs = blocks.data();
                 std::uint64_t next = 0;
-                std::size_t undo = 0;
-                const bool fetch = replica != nullptr && !out.key;
-                const DeltaCheckBits* const checks = cursor.checks_.data();
-                const std::size_t check_count = cursor.checks_valid_ ? cursor.checks_.size() : 0u;
                 // Mask bytes are expanded with one shuffle where 8 bytes are
                 // readable (before the end of the input, or in its room).
                 const bool shuffle = delta_shuffle_supported();
@@ -2690,8 +2729,9 @@ namespace XOffsetDatastructure {
                     if (start >= used)
                         XOFFSET_VFAIL(XException, XErrc::invalid_extent_table, msg(who, "delta block out of bounds"));
                     const unsigned sel = *q++;
-                    // Block 0 starts in the arena header, which no delta writes.
-                    if (start < payload_begin && sel == 0)
+                    // Block 0 starts in the image header, whose first 32
+                    // bytes no delta writes.
+                    if (start == 0 && sel == 0)
                         XOFFSET_VFAIL(XException, XErrc::invalid_extent_table, msg(who, "delta block writes the header"));
                     std::uint64_t mask = ~std::uint64_t(0);
                     std::size_t bytes = delta_block;
@@ -2720,7 +2760,7 @@ namespace XOffsetDatastructure {
                             XOFFSET_VFAIL(XException, XErrc::invalid_extent_table, msg(who, "delta block mask byte is zero"));
                         if (start + 63u - unsigned(std::countl_zero(mask)) >= used)
                             XOFFSET_VFAIL(XException, XErrc::invalid_extent_table, msg(who, "delta block out of bounds"));
-                        if (start < payload_begin && start + unsigned(std::countr_zero(mask)) < payload_begin)
+                        if (start == 0 && unsigned(std::countr_zero(mask)) < delta_begin)
                             XOFFSET_VFAIL(XException, XErrc::invalid_extent_table, msg(who, "delta block writes the header"));
                     }
                     if (std::size_t(end - q) < bytes)
@@ -2731,41 +2771,18 @@ namespace XOffsetDatastructure {
                         if (index < check_count) XOFFSET_DETAIL_PREFETCH_WITH_MSVC(checks + index, 1);
                     }
                     q += bytes;
-                    const std::size_t lo = std::max<std::size_t>(std::size_t(start), payload_begin);
+                    const std::size_t lo = std::max<std::size_t>(std::size_t(start), delta_begin);
                     if (lo < old_used) undo += std::min<std::size_t>(std::size_t(start) + delta_block, old_used) - lo;
                     next = index + 1;
                 }
                 out.blocks = refs;
                 out.block_count = h.block_count;
                 out.undo_bytes = undo;
-
-                // Holes: whole new table (key deltas always carry one).
-                holes.clear();
-                if (out.holes) {
-                    std::uint32_t count = 0;
-                    if (!delta_get_varint(q, end, count))
-                        XOFFSET_VFAIL(XException, XErrc::size_mismatch, msg(who, "delta hole table truncated"));
-                    // Each entry takes at least 2 bytes and covers at least 8.
-                    if (count > used / 8u || count > std::size_t(end - q) / 2u)
-                        XOFFSET_VFAIL(XException, XErrc::size_mismatch, msg(who, "delta hole table truncated"));
-                    holes.reserve(count);
-                    std::uint64_t prev_hole = payload_begin;
-                    for (std::uint32_t k = 0; k < count; ++k) {
-                        std::uint32_t gap = 0, bytes = 0;
-                        if (!delta_get_varint(q, end, gap) || !delta_get_varint(q, end, bytes))
-                            XOFFSET_VFAIL(XException, XErrc::size_mismatch, msg(who, "delta hole table truncated"));
-                        const std::uint64_t offset = prev_hole + std::uint64_t(gap) * 8u;
-                        const std::uint64_t size = std::uint64_t(bytes) * 8u;
-                        if (size == 0 || offset + size > used)
-                            XOFFSET_VFAIL(XException, XErrc::invalid_payload, msg(who, "delta hole out of bounds"));
-                        holes.push_back({static_cast<std::uint32_t>(offset), static_cast<std::uint32_t>(size)});
-                        prev_hole = offset + size;
-                    }
-                }
                 if (q != end) XOFFSET_VFAIL(XException, XErrc::size_mismatch, msg(who, "delta length mismatch"));
                 return vok();
             }
 
+            // A run's bytes `mask` of block i into the blocks (ascending).
             template <typename BlockFn>
             static void for_each_block(const Parsed& parsed, BlockFn&& fn) {
                 for (std::size_t k = 0; k < parsed.block_count; ++k) {
@@ -2773,13 +2790,68 @@ namespace XOffsetDatastructure {
                     fn(std::size_t(r.offset), reinterpret_cast<const char*>(parsed.data + r.src), r.mask);
                 }
             }
+            // Writes the delta's bytes into the image at base.
+            static void patch(char* base, const Parsed& parsed) noexcept {
+                if (parsed.run_frame) {
+                    for (std::size_t k = 0; k < parsed.run_count; ++k) {
+                        const DeltaRunRef& r = parsed.runs[k];
+                        copy_run(base + r.offset, reinterpret_cast<const char*>(parsed.data + r.src), r.bytes);
+                    }
+                    return;
+                }
+                const char* const src_end = reinterpret_cast<const char*>(parsed.readable_end);
+                for_each_block(parsed, [&](std::size_t offset, const char* bytes, std::uint64_t mask) {
+                    delta_get_masked(base + offset, bytes, mask, src_end);
+                });
+            }
+            // patch, first saving the bytes it overwrites below old_used
+            // (parsed.undo_bytes of them) at undo.
+            static void patch_saving(char* base, const Parsed& parsed, std::size_t old_used, char* undo) noexcept {
+                if (parsed.run_frame) {
+                    for (std::size_t k = 0; k < parsed.run_count; ++k) {
+                        const DeltaRunRef& r = parsed.runs[k];
+                        if (r.offset < old_used) {
+                            const std::size_t kept = std::min<std::size_t>(std::size_t(r.offset) + r.bytes, old_used) - r.offset;
+                            std::memcpy(undo, base + r.offset, kept);
+                            undo += kept;
+                        }
+                        copy_run(base + r.offset, reinterpret_cast<const char*>(parsed.data + r.src), r.bytes);
+                    }
+                    return;
+                }
+                const char* const src_end = reinterpret_cast<const char*>(parsed.readable_end);
+                for_each_block(parsed, [&](std::size_t offset, const char* bytes, std::uint64_t mask) {
+                    const std::size_t lo = std::max(offset, delta_begin);  // block 0: from 32
+                    if (lo < old_used) {
+                        const std::size_t kept = std::min(offset + delta_block, old_used) - lo;
+                        if (kept == delta_block) std::memcpy(undo, base + offset, delta_block);
+                        else std::memcpy(undo, base + lo, kept);
+                        undo += kept;
+                    }
+                    delta_get_masked(base + offset, bytes, mask, src_end);
+                });
+            }
+            // A buffer that also sends deltas (touched_only) gets the bytes a
+            // delta wrote as touches (log: its touch log, current before the
+            // delta's epoch).
+            static void touch_written(DeltaTouchLog& log, const Parsed& parsed) noexcept {
+                if (parsed.run_frame) {
+                    for (std::size_t k = 0; k < parsed.run_count; ++k) log.add(parsed.runs[k].offset, parsed.runs[k].bytes);
+                    return;
+                }
+                for_each_block(parsed, [&](std::size_t offset, const char*, std::uint64_t mask) {
+                    const auto lo = static_cast<std::uint32_t>(std::countr_zero(mask));
+                    const auto hi = 64u - static_cast<std::uint32_t>(std::countl_zero(mask));
+                    log.add(static_cast<std::uint32_t>(offset) + lo, hi - lo);
+                });
+            }
 
             template <typename T>
             static vstatus check_digest(const XBufferCore& core, const Parsed& parsed, const char* who) {
                 if (!parsed.digest_present) return vok();
                 const char* base = static_cast<const char*>(core.get_address());
                 const std::size_t used = parsed.header.used_bytes;
-                if (xxh64(base + payload_begin, used - payload_begin) != parsed.digest)
+                if (xxh64(base + delta_begin, used - delta_begin) != parsed.digest)
                     XOFFSET_VFAIL(XException, XErrc::digest_mismatch,
                                   msg(who, "result differs from the sender's digest (ask for a key delta)"));
                 return vok();
@@ -2791,18 +2863,16 @@ namespace XOffsetDatastructure {
             // that allocated or freed since, no longer matches, and the next
             // delta is verified in full. (A replica is not changed in place
             // between deltas: docs/DELTA_SYNC.md.)
-            // The free blocks as of the map: their count, or in-band (where
-            // counting walks them) the directory's offset and their bytes.
+            // The free blocks as of the map: the directory's offset and their
+            // bytes.
             static XOFFSET_DETAIL_INLINE std::size_t checks_free_key(const XBufferCore& core) noexcept {
-                if constexpr (detail::inband_allocator)
-                    return (std::size_t(core.inband_dir()) << 32) | std::size_t(core.inband_free_bytes());
-                return core.free_block_count();
+                return (std::size_t(core.inband_dir()) << 32) | std::size_t(core.inband_free_bytes());
             }
             static bool checks_match(const XDeltaCursor& c, const XBufferCore& core) noexcept {
                 const XArena* sm = core.arena();
                 return c.checks_valid_ && c.checks_core_ == &core && c.checks_base_ == core.get_address() &&
                        c.checks_epoch_ == core.epoch() && c.checks_used_ == sm->used_end &&
-                       c.checks_root_ == XBufferCore::root_at && c.checks_free_ == checks_free_key(core) &&
+                       c.checks_free_ == checks_free_key(core) &&
                        c.checks_free_complete_ == core.free_table_complete();
             }
             static void note_checks(XDeltaCursor& c, const XBufferCore& core) noexcept {
@@ -2810,7 +2880,6 @@ namespace XOffsetDatastructure {
                 c.checks_base_ = core.get_address();
                 c.checks_epoch_ = core.epoch();
                 c.checks_used_ = core.arena()->used_end;
-                c.checks_root_ = std::uint64_t(XBufferCore::root_at);
                 c.checks_free_ = checks_free_key(core);
                 c.checks_free_complete_ = core.free_table_complete();
                 c.checks_valid_ = true;
@@ -2870,7 +2939,7 @@ namespace XOffsetDatastructure {
             // false when it cannot be built (the delta is then verified in
             // full).
             template <typename T>
-            static bool ensure_checks(XDeltaCursor& c, XBufferCore& core, std::uint64_t) {
+            static bool ensure_checks(XDeltaCursor& c, XBufferCore& core) {
                 if (c.checks_built_) return true;
                 const T* root = find_root<T>(core);
                 if (!root) {
@@ -3185,14 +3254,11 @@ namespace XOffsetDatastructure {
             // After the patch, with the moves of the delta found: their freed
             // blocks leave the map of live blocks, their new blocks enter it
             // (each must have been free), no live block lies past used_end,
-            // and the hole table (the delta's, or the replica's when the delta
-            // carries none) tiles the rest: every hole valid and free, live
-            // and hole bytes adding up to used_end. This is the coverage that
-            // the whole verification checks. False: it does not hold (the map
-            // is then rebuilt by the whole verification).
-            static bool cover(XDeltaCursor& c, const XBufferCore& core, const char* base, const Parsed& parsed,
-                              const std::vector<XBufferCore::WireHole>& holes, std::size_t used,
-                              std::size_t old_used) {
+            // and the image's free directory and blocks, as patched, tile the
+            // rest (free_regions_cover). This is the coverage that the whole
+            // verification checks. False: it does not hold (the map is then
+            // rebuilt by the whole verification).
+            static bool cover(XDeltaCursor& c, const char* base, std::size_t used, std::size_t old_used) {
                 std::uint64_t* live = c.live_.data();
                 std::size_t count = c.live_granules_;
                 for (const DeltaMove& mv : c.moves_) {
@@ -3257,28 +3323,69 @@ namespace XOffsetDatastructure {
                 }
                 if (used < old_used && delta_bits_any(live, used / 8u, (old_used - used) / 8u)) return false;
                 std::uint64_t free = 0;
-                const auto hole_ok = [&](XBufferCore::WireHole h) noexcept {
-                    if (h.bytes == 0 || (h.bytes & 7u) != 0 || (h.offset & 7u) != 0 || h.offset < payload_begin ||
-                        h.offset > used || h.bytes > used - h.offset)
-                        return false;
-                    if (delta_bits_any(live, h.offset / 8u, h.bytes / 8u)) return false;
-                    free += h.bytes;
-                    return true;
-                };
-                // In-band, `holes` holds the replica's own when the delta
-                // has none (read before the patch).
-                if (parsed.holes || detail::inband_allocator) {
-                    for (const XBufferCore::WireHole& h : holes)
-                        if (!hole_ok(h)) return false;
-                } else {
-                    if (!core.free_table_complete()) return false;
-                    bool ok = true;
-                    core.for_each_free_block([&](XBufferCore::WireHole h) { ok = ok && hole_ok(h); });
-                    if (!ok) return false;
-                }
+                if (!free_regions_cover(live, base, used, free)) return false;
                 if (std::uint64_t(count) * 8u + free != used) return false;
                 c.live_granules_ = count;
                 return true;
+            }
+            // Calls fn(offset, bytes) for the image's free directory, then
+            // for each block of its stacks, checked as the whole verification
+            // checks them (register_inband_free_regions): each inside
+            // [40, used) and aligned, the stacks' sizes ascending, the unused
+            // entries unused, a free block's second word zero, the header's
+            // free bytes their total. False at the first that fails, or when
+            // fn returns false.
+            template <typename Fn>
+            static bool walk_free_regions(const char* base, std::size_t used, Fn&& fn) noexcept {
+                const auto word = [&](std::uint64_t at) noexcept { return XBufferCore::inband_word(base + at); };
+                const std::uint32_t dir = word(XBufferCore::inband_dir_at);
+                if (dir == 0) return word(XBufferCore::inband_bytes_at) == 0;
+                if ((dir & 7u) != 0 || dir < XBufferCore::root_at || std::uint64_t(dir) + 8u > used) return false;
+                const std::uint32_t n = word(dir), cap = word(dir + 4u);
+                const std::uint64_t dir_bytes = 8u + 8u * std::uint64_t(cap);
+                if (n >= cap || dir + dir_bytes > used || !fn(std::uint64_t(dir), dir_bytes)) return false;
+                std::uint64_t total = 0;
+                std::uint32_t previous = 0;
+                for (std::uint32_t i = 0; i < cap; ++i) {
+                    const std::uint32_t bytes = word(dir + 8u + 8u * i);
+                    const std::uint32_t head = word(dir + 12u + 8u * i);
+                    if (i >= n) {
+                        if (bytes != XBufferCore::inband_end || head != 0) return false;
+                        continue;
+                    }
+                    if (bytes <= previous || (bytes & 7u) != 0 || bytes == XBufferCore::inband_end) return false;
+                    previous = bytes;
+                    const std::uint64_t last = bytes <= used ? used - bytes : 0u;
+                    for (std::uint64_t at = head; at != 0; at = word(at)) {
+                        if ((at & 7u) != 0 || at < XBufferCore::root_at || at > last || word(at + 4u) != 0 ||
+                            !fn(at, std::uint64_t(bytes)))
+                            return false;
+                        total += bytes;
+                    }
+                }
+                return total == word(XBufferCore::inband_bytes_at);
+            }
+            // The free regions (walk_free_regions) in no live block and no
+            // other region; free: their bytes. Each is marked in `live` while
+            // the walk goes on (a stack that loops comes back to a marked
+            // block, so the walk ends), and cleared by a second walk.
+            static bool free_regions_cover(std::uint64_t* live, const char* base, std::size_t used,
+                                           std::uint64_t& free) noexcept {
+                std::size_t claimed = 0;
+                const bool ok = walk_free_regions(base, used, [&](std::uint64_t at, std::uint64_t bytes) noexcept {
+                    if (delta_bits_any(live, at / 8u, bytes / 8u)) return false;
+                    delta_bits_set(live, at / 8u, bytes / 8u);
+                    ++claimed;
+                    free += bytes;
+                    return true;
+                });
+                (void)walk_free_regions(base, used, [&](std::uint64_t at, std::uint64_t bytes) noexcept {
+                    if (claimed == 0) return false;
+                    --claimed;
+                    delta_bits_clear(live, at / 8u, bytes / 8u);
+                    return true;
+                });
+                return ok;
             }
             // A vector of records that moved or shrank (a rebuild move): the
             // nodes inside its old elements, and inside theirs, become dead,
@@ -3358,13 +3465,13 @@ namespace XOffsetDatastructure {
             // a string head that left the inline or empty form, has its head
             // and new block checked on its own and the coverage checked
             // against the map of live blocks (cover). `structural`: the delta
-            // changes used_end or the hole table. False when a check does not
-            // hold, or the delta changes something these checks do not cover:
-            // the whole verification then decides (so a delta is accepted or
-            // rejected, with the same error, as the whole verification would).
-            static bool holds_incremental(XDeltaCursor& c, const XBufferCore& core, const char* base,
-                                          const Parsed& parsed, const std::vector<XBufferCore::WireHole>& holes,
-                                          std::size_t used, std::size_t old_used, bool structural) {
+            // changes used_end or may change the free blocks. False when a
+            // check does not hold, or the delta changes something these
+            // checks do not cover: the whole verification then decides (so a
+            // delta is accepted or rejected, with the same error, as the whole
+            // verification would).
+            static bool holds_incremental(XDeltaCursor& c, const char* base, const Parsed& parsed, std::size_t used,
+                                          std::size_t old_used, bool structural) {
                 c.moves_.clear();
                 XOFFSET_TRY {
                     // Vectors of records first: what the old elements of one
@@ -3434,7 +3541,7 @@ namespace XOffsetDatastructure {
                 } XOFFSET_CATCH(const std::bad_alloc&) {
                     return false;
                 }
-                return cover(c, core, base, parsed, holes, used, old_used);
+                return cover(c, base, used, old_used);
             }
             // The node ranges, from the nodes (after nodes came, went or moved);
             // nodes that are no longer containers are dropped.
@@ -3535,54 +3642,21 @@ namespace XOffsetDatastructure {
                     [](std::size_t) { return true; });
                 if (ranges_changed) rebuild_ranges(c);
             }
-            // A delta's hole table (by offset). In-band the payload bytes
-            // already hold the sender's free blocks and directory: adopted,
-            // and checked against the table unless admitted.
-            static XOFFSET_DETAIL_INLINE vstatus load_holes(XBufferCore& core,
-                                                            const std::vector<XBufferCore::WireHole>& holes,
-                                                            bool check) {
-                return core.inband_adopt(holes.data(), holes.size(), check);
-            }
-
-            // The scratch the whole verification needs: the replica's holes,
-            // unless the delta carries them, and room for the new map.
-            static vstatus prepare_full(XBufferCore& core, const Parsed& parsed, XDeltaCursor& cursor,
-                                        std::vector<XBufferCore::WireHole>& holes, const char* who) {
-                XOFFSET_VTRY(size_checks(cursor, parsed.header.used_bytes));
-                // In-band, apply_incremental read the replica's holes before
-                // the patch (its links may have changed since).
-                if (parsed.holes || detail::inband_allocator) return vok();
-                return replica_holes(core, holes, who);
-            }
-            // The replica's own free regions (the directory first).
-            static XOFFSET_DETAIL_INLINE vstatus replica_holes(XBufferCore& core,
-                                                               std::vector<XBufferCore::WireHole>& holes,
-                                                               const char* who) {
-                XOFFSET_TRY {
-                    holes.clear();
-                    if constexpr (detail::inband_allocator) {
-                        holes.reserve(core.free_region_count());
-                        core.for_each_free_region([&](XBufferCore::WireHole h) { holes.push_back(h); });
-                    } else {
-                        holes.reserve(core.free_block_count());
-                        core.for_each_free_block([&](XBufferCore::WireHole h) { holes.push_back(h); });
-                    }
-                } XOFFSET_CATCH(const std::bad_alloc&) {
-                    XOFFSET_VFAIL_BAD_ALLOC();
-                }
-                if (!core.free_table_complete())
-                    XOFFSET_VFAIL(XException, XErrc::delta_base_mismatch,
-                                  msg(who, "replica free table incomplete (ask for a key delta)"));
-                return vok();
+            // The touch log of a buffer that also sends deltas (touched_only),
+            // when it describes the buffer's content: the bytes a delta writes
+            // are added to it as touches.
+            static DeltaTouchLog* relay_log(XBufferCore& core) noexcept {
+                DeltaTouchLog* const log = core.touch_log_.get();
+                return log && log->epoch == core.epoch() ? log : nullptr;
             }
 
             // Admit: the key delta's payload is taken like XReceiver::reload<T,
             // admit> takes a wire (finish_admitted_load: the root object inside
-            // the used payload; holes are inside it by the parse), and no map
-            // of checked bytes is built.
+            // the used payload), and no map of checked bytes is built. Its
+            // free blocks are the image's (the sender's directory and links),
+            // checked by the whole verification unless admitted.
             template <typename T, bool Admit = false>
-            static vstatus apply_key(XBuffer& xbuf, const Parsed& parsed, XDeltaCursor& cursor,
-                                     DeltaReceiveScratch& scratch, const char* who) {
+            static vstatus apply_key(XBuffer& xbuf, const Parsed& parsed, XDeltaCursor& cursor, const char* who) {
                 XBufferCore& core = xbuf;
                 const std::size_t used = parsed.header.used_bytes;
                 cursor.clear();
@@ -3591,28 +3665,27 @@ namespace XOffsetDatastructure {
                     std::size_t clean_from = 0;
                     XOFFSET_VTRY(core.reinit_for_overwrite(used, clean_from));
                     char* base = core.data();
+                    // The header first: the delta writes from byte 32 on.
+                    XBufferCore::write_image_header(base, used, wire_schema_hash<T>(), wire_root_type_id<T>());
                     // The bytes a key delta leaves out are zero. Bytes from
                     // clean_from on are zero already; below, each byte is
                     // written once (a block's words with their zeros, the
                     // gaps between blocks zeroed).
                     const std::size_t stale_end = std::min(clean_from, used);
-                    std::size_t written = payload_begin;
+                    std::size_t written = delta_begin;
                     const char* const src_end = reinterpret_cast<const char*>(parsed.readable_end);
                     for_each_block(parsed, [&](std::size_t offset, const char* bytes, std::uint64_t mask) {
                         if (written < std::min(offset, stale_end))
                             std::memset(base + written, 0, std::min(offset, stale_end) - written);
                         const std::size_t words = std::min<std::size_t>(delta_block, used - offset) / 8u;
-                        // Block 0 starts in the arena header: its words from payload_begin.
-                        const std::size_t skip = offset < payload_begin ? payload_begin - offset : 0u;
+                        // Block 0 starts in the image header: its words from delta_begin.
+                        const std::size_t skip = offset < delta_begin ? delta_begin - offset : 0u;
                         delta_set_masked(base + offset + skip, bytes, mask >> skip, words - skip / 8u, src_end);
                         written = offset + 8 * words;
                     });
                     if (written < stale_end) std::memset(base + written, 0, stale_end - written);
-                    XBufferCore::write_image_header(base, used, wire_schema_hash<T>(), wire_root_type_id<T>());
                     XOFFSET_VTRY(check_digest<T>(core, parsed, who));
-                    // The hole table is by offset: the payload holds the
-                    // sender's directory and link words.
-                    XOFFSET_VTRY(core.inband_adopt(scratch.holes.data(), scratch.holes.size(), !Admit));
+                    core.take_loaded_free_state();
                     if constexpr (Admit) {
                         XOFFSET_VTRY(xbuf.template finish_admitted_load<T>(used, who));
                     } else {
@@ -3629,33 +3702,63 @@ namespace XOffsetDatastructure {
                 } else {
                     // Deltas follow a key delta: its map is built now.
                     defer_checks(cursor, core);
-                    (void)ensure_checks<T>(cursor, core, parsed.header.root_offset);
+                    (void)ensure_checks<T>(cursor, core);
                     cursor.last_check_ = XDeltaCheck::key;
                 }
                 return vok();
             }
 
-            // Restores what apply_incremental changed (bytes, used_end, root).
-            static void roll_back(XBufferCore& core, const Parsed& parsed, const char* undo, std::size_t old_used,
-                                  std::uint64_t old_root) noexcept {
+            // Restores what an incremental delta changed (its bytes, used_end)
+            // from the undo copy patch_saving made.
+            static void roll_back(XBufferCore& core, const Parsed& parsed, const char* undo, std::size_t old_used) noexcept {
                 char* base = core.data();
                 const std::size_t used = parsed.header.used_bytes;
-                for_each_block(parsed, [&](std::size_t offset, const char*, std::uint64_t) {
-                    const std::size_t lo = std::max(offset, payload_begin);  // block 0: past the arena header
-                    if (lo < old_used) {
-                        const std::size_t kept = std::min(offset + delta_block, old_used) - lo;
-                        std::memcpy(base + lo, undo, kept);
-                        undo += kept;
+                // Bytes at or past old_used were zero (zero tail); the delta
+                // wrote only below used.
+                if (parsed.run_frame) {
+                    for (std::size_t k = 0; k < parsed.run_count; ++k) {
+                        const std::size_t offset = parsed.runs[k].offset, end = offset + parsed.runs[k].bytes;
+                        if (offset < old_used) {
+                            const std::size_t kept = std::min(end, old_used) - offset;
+                            std::memcpy(base + offset, undo, kept);
+                            undo += kept;
+                        }
+                        const std::size_t from = std::max(offset, old_used);
+                        if (end > from) std::memset(base + from, 0, end - from);
                     }
-                    // Bytes at or past old_used were zero (zero tail); the block wrote
-                    // only below used.
-                    const std::size_t from = std::max(offset, old_used);
-                    const std::size_t to = std::min(offset + delta_block, used);
-                    if (to > from) std::memset(base + from, 0, to - from);
-                });
+                } else {
+                    for_each_block(parsed, [&](std::size_t offset, const char*, std::uint64_t) {
+                        const std::size_t lo = std::max(offset, delta_begin);  // block 0: from 32
+                        if (lo < old_used) {
+                            const std::size_t kept = std::min(offset + delta_block, old_used) - lo;
+                            std::memcpy(base + lo, undo, kept);
+                            undo += kept;
+                        }
+                        const std::size_t from = std::max(offset, old_used);
+                        const std::size_t to = std::min(offset + delta_block, used);
+                        if (to > from) std::memset(base + from, 0, to - from);
+                    });
+                }
                 if (used < old_used) std::memcpy(base + used, undo, old_used - used);
-                auto* sm = core.arena();
-                sm->used_end = old_used;
+                core.arena()->used_end = old_used;
+            }
+
+            // Whether the delta writes a byte in no live block (one of a free
+            // block or of the free directory) or the header's free_dir or
+            // free_bytes. A change of the free blocks writes one of those
+            // bytes or changes used_end: a delta that does neither keeps
+            // them.
+            static bool writes_free_state(const XDeltaCursor& c, const Parsed& parsed) noexcept {
+                const std::uint64_t* const live = c.live_.data();
+                for (std::size_t k = 0; k < parsed.block_count; ++k) {
+                    const DeltaBlockRef& r = parsed.blocks[k];
+                    const std::size_t g = r.offset / 8u;  // a block's 8 granules: one byte of a word of the map
+                    const auto in_live = static_cast<unsigned>((live[g / 64u] >> (g % 64u)) & 0xFFu);
+                    if ((r.mask & ~delta_word_bytes.of[in_live]) != 0) return true;
+                }
+                // Bytes [32, 40) of block 0 (in the live header).
+                return parsed.block_count != 0 && parsed.blocks[0].offset == 0 &&
+                       ((parsed.blocks[0].mask >> delta_begin) & 0xFFu) != 0;
             }
 
             template <typename T>
@@ -3663,41 +3766,28 @@ namespace XOffsetDatastructure {
                                              DeltaReceiveScratch& scratch, const char* who) {
                 XBufferCore& core = xbuf;
                 const std::size_t used = parsed.header.used_bytes;
-                const auto root = static_cast<std::uint64_t>(parsed.header.root_offset);
                 const std::size_t old_used = static_cast<std::size_t>(core.arena()->used_end);
-                const std::uint64_t old_root = std::uint64_t(XBufferCore::root_at);
-                const bool touch_log_current = xbuf.touch_log_ && xbuf.touch_log_->epoch == core.epoch();
+                DeltaTouchLog* const relay = relay_log(core);
 
                 // What the result needs: no check when the delta writes only
-                // bytes that verification does not read and keeps used_end, the
-                // root and the holes; the in-place checks when it writes bools,
-                // inline string heads, vector sizes or containers checked on
-                // their own, or changes used_end or the holes (the coverage is
-                // then checked against the map of live blocks); else the whole
-                // verification.
-                const bool structural = parsed.holes || used != old_used;
+                // bytes that verification does not read and changes neither
+                // used_end nor the free blocks; the in-place checks when it
+                // writes bools, inline string heads, vector sizes or containers
+                // checked on their own, or may change used_end or the free
+                // blocks (the coverage is then checked against the map of live
+                // blocks); else the whole verification.
+                bool structural = used != old_used;
                 XDeltaCheck check = XDeltaCheck::full;
-                if (root == old_root && checks_match(cursor, core) && ensure_checks<T>(cursor, core, old_root) &&
-                    (!structural || grow_checks(cursor, used))) {
-                    check = structural ? XDeltaCheck::in_place : XDeltaCheck::none;
-                    const DeltaCheckBits* bits = cursor.checks_.data();
-                    for (std::size_t k = 0; check == XDeltaCheck::none && k < parsed.block_count; ++k) {
-                        const DeltaBlockRef& r = parsed.blocks[k];
-                        const DeltaCheckBits& b = bits[r.offset / delta_block];
-                        if ((r.mask & b.checked) != 0) check = XDeltaCheck::in_place;
-                    }
-                    if (check == XDeltaCheck::in_place && !collect_nodes(cursor, parsed)) check = XDeltaCheck::full;
-                }
-
-                // In-band, the free blocks' links and the free directory are
-                // payload bytes a delta may write: with free blocks and no hole
-                // table in the delta, the replica's own (read before the patch)
-                // are checked against the patched bytes.
-                bool inband_check = false;
-                if constexpr (detail::inband_allocator) {
-                    if (!parsed.holes) {
-                        XOFFSET_VTRY(replica_holes(core, scratch.holes, who));
-                        inband_check = !scratch.holes.empty();
+                if (checks_match(cursor, core) && ensure_checks<T>(cursor, core)) {
+                    structural = structural || writes_free_state(cursor, parsed);
+                    if (!structural || grow_checks(cursor, used)) {
+                        check = structural ? XDeltaCheck::in_place : XDeltaCheck::none;
+                        const DeltaCheckBits* bits = cursor.checks_.data();
+                        for (std::size_t k = 0; check == XDeltaCheck::none && k < parsed.block_count; ++k) {
+                            const DeltaBlockRef& r = parsed.blocks[k];
+                            if ((r.mask & bits[r.offset / delta_block].checked) != 0) check = XDeltaCheck::in_place;
+                        }
+                        if (check == XDeltaCheck::in_place && !collect_nodes(cursor, parsed)) check = XDeltaCheck::full;
                     }
                 }
 
@@ -3705,7 +3795,7 @@ namespace XOffsetDatastructure {
                 // before a byte changes. Nothing can fail after an unchecked
                 // delta without a digest, so it keeps no undo copy.
                 auto& undo = scratch.undo;
-                const bool keep_undo = check != XDeltaCheck::none || parsed.digest_present || inband_check;
+                const bool keep_undo = check != XDeltaCheck::none || parsed.digest_present;
                 if (keep_undo) {
                     const std::size_t undo_bytes = parsed.undo_bytes + (used < old_used ? old_used - used : 0u);
                     XOFFSET_TRY {
@@ -3714,75 +3804,52 @@ namespace XOffsetDatastructure {
                         XOFFSET_VFAIL_BAD_ALLOC();
                     }
                 }
-                if (check == XDeltaCheck::full) XOFFSET_VTRY(prepare_full(core, parsed, cursor, scratch.holes, who));
+                // Room for the map the whole verification leaves to be built.
+                if (check == XDeltaCheck::full) XOFFSET_VTRY(size_checks(cursor, used));
                 if (used > core.get_size() && !core.grow(used - core.get_size()))
                     XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, arena_failure_message);
 
                 // Save, then patch. Bytes at or past old_used are zero (zero tail).
                 char* base = core.data();
-                const char* const src_end = reinterpret_cast<const char*>(parsed.readable_end);
                 if (keep_undo) {
-                    char* u = undo.data();
-                    for_each_block(parsed, [&](std::size_t offset, const char* bytes, std::uint64_t mask) {
-                        const std::size_t lo = std::max(offset, payload_begin);  // block 0: past the arena header
-                        if (lo < old_used) {
-                            const std::size_t kept = std::min(offset + delta_block, old_used) - lo;
-                            if (kept == delta_block) std::memcpy(u, base + offset, delta_block);
-                            else std::memcpy(u, base + lo, kept);
-                            u += kept;
-                        }
-                        delta_get_masked(base + offset, bytes, mask, src_end);
-                    });
+                    patch_saving(base, parsed, old_used, undo.data());
                     if (used < old_used) {
-                        std::memcpy(u, base + used, old_used - used);
+                        std::memcpy(undo.data() + parsed.undo_bytes, base + used, old_used - used);
                         std::memset(base + used, 0, old_used - used);
                     }
                 } else {
-                    for_each_block(parsed, [&](std::size_t offset, const char* bytes, std::uint64_t mask) {
-                        delta_get_masked(base + offset, bytes, mask, src_end);
-                    });
+                    patch(base, parsed);
                 }
-                auto* sm = core.arena();
-                sm->used_end = used;
+                core.arena()->used_end = used;
 
                 XOFFSET_ROLLBACK_BEGIN
                     XOFFSET_VTRY(check_digest<T>(core, parsed, who));
                     if (check == XDeltaCheck::in_place &&
-                        !holds_incremental(cursor, core, base, parsed, scratch.holes, used, old_used, structural)) {
+                        !holds_incremental(cursor, base, parsed, used, old_used, structural)) {
                         check = XDeltaCheck::full;
-                        XOFFSET_VTRY(prepare_full(core, parsed, cursor, scratch.holes, who));
+                        XOFFSET_VTRY(size_checks(cursor, used));
                     }
                     if (check == XDeltaCheck::full) {
-                        auto* root_ptr = find_root<T>(core);
+                        const T* root_ptr = find_root<T>(core);
                         if (!root_ptr) XOFFSET_VFAIL(XException, XErrc::root_mismatch, msg(who, "root not found"));
-                        const auto actual = static_cast<std::uint64_t>(
-                            reinterpret_cast<std::uintptr_t>(root_ptr) -
-                            reinterpret_cast<std::uintptr_t>(core.get_address()));
-                        if (actual != root)
-                            XOFFSET_VFAIL(XException, XErrc::root_mismatch, msg(who, "root offset mismatch"));
-                        XOFFSET_VTRY(verify_structural_wire_graph(*root_ptr, core, default_wire_upstream(),
-                                                                  scratch.holes.data(), scratch.holes.size(), true,
-                                                                  nullptr, &xbuf.retained_reload_scratch()));
-                        if (parsed.holes || inband_check) XOFFSET_VTRY(load_holes(core, scratch.holes, true));
-                    } else if (parsed.holes || inband_check) {
-                        XOFFSET_VTRY(load_holes(core, scratch.holes, true));
+                        XOFFSET_VTRY(verify_loaded_image(*root_ptr, core, default_wire_upstream(),
+                                                         &xbuf.retained_reload_scratch(), who));
                     }
                 // The map of live blocks may have changed: rebuilt by the next
                 // delta's whole verification.
-                XOFFSET_ROLLBACK_END(roll_back(core, parsed, undo.data(), old_used, old_root);
-                                     cursor.checks_valid_ = false)
+                XOFFSET_ROLLBACK_END(roll_back(core, parsed, undo.data(), old_used); cursor.checks_valid_ = false)
 
-                // Committed. A new epoch: element pointers and XHandles of the
-                // previous content re-resolve.
+                // Committed. The free blocks the checks walked (the whole
+                // verification's, or cover's) are the buffer's.
+                if (check == XDeltaCheck::full ||
+                    (check == XDeltaCheck::in_place && (structural || !cursor.moves_.empty())))
+                    core.take_loaded_free_state();
+                // A new epoch: element pointers and XHandles of the previous
+                // content re-resolve.
                 core.advance_epoch();
-                // A buffer that also sends deltas (touched_only) gets the
-                // blocks written as touches.
-                if (touch_log_current) {
-                    DeltaTouchLog& log = *xbuf.touch_log_;
-                    for_each_block(parsed, [&](std::size_t offset, const char*, std::uint64_t mask) {
-                        touch_block(log, offset / delta_block, mask);
-                    });
-                    log.epoch = core.epoch();
+                if (relay) {
+                    touch_written(*relay, parsed);
+                    relay->epoch = core.epoch();
                 }
                 T* root_ptr = find_root<T>(core);
                 if (root_ptr) core.cache_root(root_ptr);
@@ -3798,31 +3865,30 @@ namespace XOffsetDatastructure {
             }
 
             // Trust tier admit of a non-key delta (XReceiver<L>::apply_delta<T,
-            // admit>). What the parse checks stays (format,
-            // stream and version, root type and fingerprint, every block and hole
-            // inside [40, used), the root below used) and the root object must lie
-            // inside the used payload, aligned; the payload itself is the sender's
-            // promise. No map of checked bytes is kept: the cursor's map no longer
-            // matches, so a later verified delta on this cursor verifies the whole
-            // payload (and rebuilds the map), and the map is never rebuilt over a
-            // payload that was only admitted. An undo copy is kept only for a
-            // digest or a hole table, the two steps that can fail after the patch.
+            // admit>). What the parse checks stays (format, stream and
+            // version, root type and fingerprint, every byte written inside
+            // [32, used), the root below used) and the root object must lie
+            // inside the used payload; the payload itself, its free blocks
+            // included, is the sender's promise. No map of checked bytes is
+            // kept: the cursor's map no longer matches, so a later verified
+            // delta on this cursor verifies the whole payload (and rebuilds
+            // the map), and the map is never rebuilt over a payload that was
+            // only admitted. An undo copy is kept only for a digest, the one
+            // step that can fail after the patch.
             template <typename T>
             static vstatus apply_incremental_admit(XBuffer& xbuf, const Parsed& parsed, XDeltaCursor& cursor,
                                                    DeltaReceiveScratch& scratch, const char* who) {
                 XBufferCore& core = xbuf;
                 const std::size_t used = parsed.header.used_bytes;
-                const auto root = static_cast<std::uint64_t>(parsed.header.root_offset);
                 const std::size_t old_used = static_cast<std::size_t>(core.arena()->used_end);
-                const std::uint64_t old_root = std::uint64_t(XBufferCore::root_at);
-                const bool touch_log_current = xbuf.touch_log_ && xbuf.touch_log_->epoch == core.epoch();
+                DeltaTouchLog* const relay = relay_log(core);
                 using Storage = std::conditional_t<has_wire_allocator_ctor<T>, T, ReflectRoot<T>>;
-                if (sizeof(Storage) > used - root || root % alignof(Storage) != 0)
+                if (sizeof(Storage) > used - XBufferCore::root_at || XBufferCore::root_at % alignof(Storage) != 0)
                     XOFFSET_VFAIL(XException, XErrc::root_mismatch, msg(who, "root not found"));
                 cursor.checks_valid_ = false;
 
                 auto& undo = scratch.undo;
-                const bool keep_undo = parsed.digest_present || parsed.holes;
+                const bool keep_undo = parsed.digest_present;
                 if (keep_undo) {
                     const std::size_t undo_bytes = parsed.undo_bytes + (used < old_used ? old_used - used : 0u);
                     XOFFSET_TRY {
@@ -3836,46 +3902,25 @@ namespace XOffsetDatastructure {
 
                 // Bytes at or past old_used are zero (zero tail).
                 char* base = core.data();
-                const char* const src_end = reinterpret_cast<const char*>(parsed.readable_end);
                 if (keep_undo) {
-                    char* u = undo.data();
-                    for_each_block(parsed, [&](std::size_t offset, const char* bytes, std::uint64_t mask) {
-                        const std::size_t lo = std::max(offset, payload_begin);  // block 0: past the arena header
-                        if (lo < old_used) {
-                            const std::size_t kept = std::min(offset + delta_block, old_used) - lo;
-                            if (kept == delta_block) std::memcpy(u, base + offset, delta_block);
-                            else std::memcpy(u, base + lo, kept);
-                            u += kept;
-                        }
-                        delta_get_masked(base + offset, bytes, mask, src_end);
-                    });
-                    if (used < old_used) {
-                        std::memcpy(u, base + used, old_used - used);
-                        std::memset(base + used, 0, old_used - used);
-                    }
+                    patch_saving(base, parsed, old_used, undo.data());
+                    if (used < old_used) std::memcpy(undo.data() + parsed.undo_bytes, base + used, old_used - used);
                 } else {
-                    for_each_block(parsed, [&](std::size_t offset, const char* bytes, std::uint64_t mask) {
-                        delta_get_masked(base + offset, bytes, mask, src_end);
-                    });
-                    if (used < old_used) std::memset(base + used, 0, old_used - used);
+                    patch(base, parsed);
                 }
-                auto* sm = core.arena();
-                sm->used_end = used;
+                if (used < old_used) std::memset(base + used, 0, old_used - used);
+                core.arena()->used_end = used;
                 if (keep_undo) {
                     XOFFSET_ROLLBACK_BEGIN
                         XOFFSET_VTRY(check_digest<T>(core, parsed, who));
-                        if (parsed.holes) XOFFSET_VTRY(load_holes(core, scratch.holes, false));
-                    XOFFSET_ROLLBACK_END(roll_back(core, parsed, undo.data(), old_used, old_root))
+                    XOFFSET_ROLLBACK_END(roll_back(core, parsed, undo.data(), old_used))
                 }
 
                 // Committed: a new epoch, as for a verified delta.
                 core.advance_epoch();
-                if (touch_log_current) {
-                    DeltaTouchLog& log = *xbuf.touch_log_;
-                    for_each_block(parsed, [&](std::size_t offset, const char*, std::uint64_t mask) {
-                        touch_block(log, offset / delta_block, mask);
-                    });
-                    log.epoch = core.epoch();
+                if (relay) {
+                    touch_written(*relay, parsed);
+                    relay->epoch = core.epoch();
                 }
                 if (T* root_ptr = find_root<T>(core)) core.cache_root(root_ptr);
                 cursor.version_ = parsed.header.version;
@@ -3883,7 +3928,44 @@ namespace XOffsetDatastructure {
                 return vok();
             }
 
-            // Trust tier admit: a delta with no flags and at most
+            // Whether the buffer holds an admitted root of T that the
+            // cursor's stream patches with this version: what the short
+            // paths below need (they keep the used size, so the root stays
+            // where it is). A version past 1 that follows the cursor's: the
+            // cursor holds a key delta (version at least 1, stream nonzero).
+            template <typename T>
+            static XOFFSET_DETAIL_INLINE bool small_base_ok(const XBufferCore& core, const XDeltaCursor& cursor,
+                                                            std::uint64_t stream, std::uint32_t version) noexcept {
+                using Storage = std::conditional_t<has_wire_allocator_ctor<T>, T, ReflectRoot<T>>;
+                static_assert(XBufferCore::root_at % alignof(Storage) == 0);
+                if (version - 1u != cursor.version_ || version < 2u || stream != cursor.stream_ ||
+                    cursor.root_type_id_ != wire_root_type_id<T>() || cursor.schema_hash_ != wire_schema_hash<T>() ||
+                    !core.typed_root_access_allowed_ || !core.template root_type_matches<T>())
+                    return false;
+                const auto* const sm = core.arena();
+                if (sm == nullptr) return false;
+                const std::size_t used = static_cast<std::size_t>(sm->used_end);
+                return used <= core.get_size() && used >= XBufferCore::root_at + sizeof(Storage);
+            }
+            // The end of a short path's apply, after its bytes are written: a
+            // new epoch (the root does not move: a root the buffer cached
+            // stays), the bytes as touches of a relay (touches(log)), the
+            // cursor at `version`.
+            template <typename T, typename Touches>
+            static XOFFSET_DETAIL_INLINE void finish_small(XBufferCore& core, XDeltaCursor& cursor, std::uint32_t version,
+                                                           DeltaTouchLog* relay, T* cached, Touches&& touches) noexcept {
+                core.advance_epoch();
+                if (relay) [[unlikely]] {
+                    touches(*relay);
+                    relay->epoch = core.epoch();
+                }
+                if (T* root_ptr = cached ? cached : find_root<T>(core)) core.cache_root(root_ptr);
+                cursor.checks_valid_ = false;
+                cursor.version_ = version;
+                cursor.last_check_ = XDeltaCheck::admit;
+            }
+
+            // Trust tier admit: a block frame with no flags and at most
             // delta_small_blocks blocks to a buffer that holds a root of T,
             // read in place in one pass (no padded copy, no block table) with
             // the checks parse and apply_incremental_admit make, then applied
@@ -3899,33 +3981,22 @@ namespace XOffsetDatastructure {
                 const auto* const p = reinterpret_cast<const unsigned char*>(data.data());
                 const auto* const end = p + data.size();
                 // Header: magic, format, no flags (one word), the stream and
-                // the next version of the cursor's; the used size and root
-                // stay.
-                constexpr std::uint32_t head = 'X' | ('D' << 8) | (((XDELTA_FORMAT_MAJOR << 4) | XDELTA_FORMAT_MINOR) << 16);
+                // the next version of the cursor's; the used size stays.
+                constexpr std::uint32_t head = run_frame_word(0);
                 std::uint32_t word;
                 std::uint64_t stream;
                 if (data.size() < XDELTA_HEADER_FIXED + 2u) return false;
                 std::memcpy(&word, p, 4);
                 std::memcpy(&stream, p + 4, 8);
-                if (word != head || cursor.empty() || stream == 0 || stream != cursor.stream_ ||
-                    cursor.root_type_id_ != wire_root_type_id<T>() || cursor.schema_hash_ != wire_schema_hash<T>() ||
-                    !core.typed_root_access_allowed_ || !core.template root_type_matches<T>() || core.arena() == nullptr)
-                    return false;
+                if (word != head) return false;
                 const auto* q = p + XDELTA_HEADER_FIXED;
                 std::uint32_t version = 0, count = 0;
-                if (!delta_get_varint_short(q, end, version) || !delta_get_varint_short(q, end, count) || version == 0 ||
-                    version - 1u != cursor.version_ || count > delta_small_blocks)
+                if (!delta_get_varint_short(q, end, version) || !delta_get_varint_short(q, end, count) ||
+                    count > delta_small_blocks || !small_base_ok<T>(core, cursor, stream, version))
                     return false;
-                // The buffer's used size and root (a payload within its
-                // maximum capacity: it already holds it).
                 const std::size_t used = static_cast<std::size_t>(core.arena()->used_end);
-                const std::uint64_t root = std::uint64_t(XBufferCore::root_at);
-                using Storage = std::conditional_t<has_wire_allocator_ctor<T>, T, ReflectRoot<T>>;
-                if (used == 0 || used > XBufferCore::MAX_PAYLOAD || used > core.get_size() || root >= used ||
-                    sizeof(Storage) > used - root || root % alignof(Storage) != 0)
-                    return false;
                 // Blocks (parse): ascending, a mask byte that is present is
-                // nonzero, every byte written inside [payload_begin, used).
+                // nonzero, every byte written inside [32, used).
                 XOFFSET_INDETERMINATE DeltaBlockRef refs[delta_small_blocks];
                 XOFFSET_INDETERMINATE unsigned char sels[delta_small_blocks];
                 std::uint64_t next = 0;
@@ -3938,7 +4009,7 @@ namespace XOffsetDatastructure {
                     std::uint64_t mask = ~std::uint64_t(0);
                     std::size_t bytes = delta_block;
                     if (sel == 0) {
-                        if (start < payload_begin || start + delta_block > used) return false;
+                        if (start == 0 || start + delta_block > used) return false;
                     } else {
                         if (start >= used || std::size_t(end - q) < delta_shuffle.count[sel]) return false;
                         mask = 0;
@@ -3950,7 +4021,7 @@ namespace XOffsetDatastructure {
                             mask |= std::uint64_t(byte) << (8 * std::countr_zero(s));
                         }
                         if (start + 63u - unsigned(std::countl_zero(mask)) >= used ||
-                            (start < payload_begin && start + unsigned(std::countr_zero(mask)) < payload_begin))
+                            (start == 0 && unsigned(std::countr_zero(mask)) < delta_begin))
                             return false;
                     }
                     if (std::size_t(end - q) < bytes) return false;
@@ -3962,11 +4033,9 @@ namespace XOffsetDatastructure {
                 if (q != end) return false;
                 XOFFSET_DELTA_TEST_COUNT_SMALL(1);
 
-                // Applied (apply_incremental_admit without an undo copy). The
-                // root does not move: a root the buffer has cached stays.
-                const bool touch_log_current = xbuf.touch_log_ && xbuf.touch_log_->epoch == core.epoch();
+                // Applied (apply_incremental_admit without an undo copy).
+                DeltaTouchLog* const relay = relay_log(core);
                 T* const cached = core.template cached_root<T>();
-                cursor.checks_valid_ = false;
                 char* const base = core.data();
                 for (std::uint32_t k = 0; k < count; ++k) {
                     char* const blk = base + refs[k].offset;
@@ -3989,17 +4058,91 @@ namespace XOffsetDatastructure {
                         }
                     }
                 }
-                auto* sm = core.arena();
-                sm->used_end = used;
-                core.advance_epoch();
-                if (touch_log_current) {
-                    DeltaTouchLog& log = *xbuf.touch_log_;
-                    for (std::uint32_t k = 0; k < count; ++k) touch_block(log, refs[k].offset / delta_block, refs[k].mask);
-                    log.epoch = core.epoch();
+                finish_small<T>(core, cursor, version, relay, cached, [&](DeltaTouchLog& log) {
+                    for (std::uint32_t k = 0; k < count; ++k) {
+                        const auto lo = static_cast<std::uint32_t>(std::countr_zero(refs[k].mask));
+                        const auto hi = 64u - static_cast<std::uint32_t>(std::countl_zero(refs[k].mask));
+                        log.add(refs[k].offset + lo, hi - lo);
+                    }
+                });
+                return true;
+            }
+
+            // Trust tier admit: a run frame with no other flag and at most
+            // delta_small_runs runs to a buffer that holds a root of T, read
+            // in place with the checks parse and apply_incremental_admit
+            // make, then applied as apply_incremental_admit applies it (one
+            // run here, more in apply_runs_list). False, with nothing changed,
+            // for any other delta and for one a check fails on: the general
+            // path then applies it or says why not.
+            template <typename T>
+            static XOFFSET_DETAIL_INLINE bool apply_runs_small(XBuffer& xbuf, std::span<const std::byte> data,
+                                                               XDeltaCursor& cursor) {
+#if defined(XOFFSET_TEST_DELTA_GENERAL)
+                if (test_general_path()) return false;
+#endif
+                XBufferCore& core = xbuf;
+                const auto* const p = reinterpret_cast<const unsigned char*>(data.data());
+                const auto* const end = p + data.size();
+                // Header: magic, format and the run flag (one word), the stream
+                // and the next version of the cursor's; the used size stays.
+                // Then at least one run (a gap, a length, a byte).
+                std::uint32_t word, version;
+                std::uint64_t stream;
+                if (data.size() < XDELTA_RUN_HEADER + 3u) return false;
+                std::memcpy(&word, p, 4);
+                std::memcpy(&stream, p + 4, 8);
+                std::memcpy(&version, p + 12, 4);
+                if (word != run_frame_word(XDELTA_FLAG_RUNS) || !small_base_ok<T>(core, cursor, stream, version))
+                    return false;
+                const std::size_t used = static_cast<std::size_t>(core.arena()->used_end);
+                // The first run (parse): past 32, nonempty, inside [32, used).
+                const auto* q = p + XDELTA_RUN_HEADER;
+                std::uint32_t gap = 0, bytes = 0;
+                if (!delta_get_varint_short(q, end, gap) || !delta_get_varint_short(q, end, bytes)) return false;
+                const std::uint64_t at = delta_begin + std::uint64_t(gap);
+                if (bytes == 0 || at + bytes > used || std::size_t(end - q) < bytes) return false;
+                if (q + bytes != end) return apply_runs_list<T>(xbuf, p, end, cursor, version);
+                XOFFSET_DELTA_TEST_COUNT_SMALL(1);
+                DeltaTouchLog* const relay = relay_log(core);
+                T* const cached = core.template cached_root<T>();
+                copy_run(core.data() + at, reinterpret_cast<const char*>(q), bytes);
+                finish_small<T>(core, cursor, version, relay, cached,
+                                [&](DeltaTouchLog& log) { log.add(static_cast<std::uint32_t>(at), bytes); });
+                return true;
+            }
+            // apply_runs_small for more than one run (the header checked).
+            template <typename T>
+            XOFFSET_DETAIL_NOINLINE static bool apply_runs_list(XBuffer& xbuf, const unsigned char* p,
+                                                                const unsigned char* end, XDeltaCursor& cursor,
+                                                                std::uint32_t version) {
+                XBufferCore& core = xbuf;
+                const std::size_t used = static_cast<std::size_t>(core.arena()->used_end);
+                // Runs (parse): each past the end of the one before (the first
+                // past 32), nonempty, inside [32, used).
+                XOFFSET_INDETERMINATE DeltaRunRef refs[delta_small_runs];
+                std::uint32_t count = 0;
+                std::uint64_t at = delta_begin;
+                for (const auto* q = p + XDELTA_RUN_HEADER; q != end;) {
+                    std::uint32_t gap = 0, bytes = 0;
+                    if (count == delta_small_runs || !delta_get_varint_short(q, end, gap) ||
+                        !delta_get_varint_short(q, end, bytes))
+                        return false;
+                    at += gap;
+                    if (bytes == 0 || at + bytes > used || std::size_t(end - q) < bytes) return false;
+                    refs[count++] = {static_cast<std::uint32_t>(at), bytes, static_cast<std::uint32_t>(q - p)};
+                    q += bytes;
+                    at += bytes;
                 }
-                if (T* root_ptr = cached ? cached : find_root<T>(core)) core.cache_root(root_ptr);
-                cursor.version_ = version;
-                cursor.last_check_ = XDeltaCheck::admit;
+                XOFFSET_DELTA_TEST_COUNT_SMALL(1);
+                DeltaTouchLog* const relay = relay_log(core);
+                T* const cached = core.template cached_root<T>();
+                char* const base = core.data();
+                for (std::uint32_t k = 0; k < count; ++k)
+                    copy_run(base + refs[k].offset, reinterpret_cast<const char*>(p + refs[k].src), refs[k].bytes);
+                finish_small<T>(core, cursor, version, relay, cached, [&](DeltaTouchLog& log) {
+                    for (std::uint32_t k = 0; k < count; ++k) log.add(refs[k].offset, refs[k].bytes);
+                });
                 return true;
             }
 
@@ -4010,7 +4153,12 @@ namespace XOffsetDatastructure {
                 static_assert(is_wire_admitted_v<T>,
                               "apply_delta_verified<T>() requires an admitted fixed-schema wire type.");
                 if constexpr (Admit) {
-                    if (apply_small<T>(xbuf, data, cursor)) return vok();
+                    if (data.size() >= 4u) {
+                        const auto flags = std::to_integer<unsigned>(data[3]);
+                        if (flags == XDELTA_FLAG_RUNS ? apply_runs_small<T>(xbuf, data, cursor)
+                                                      : flags == 0 && apply_small<T>(xbuf, data, cursor))
+                            return vok();
+                    }
                 }
                 return apply_general<T, Admit>(xbuf, data, cursor);
             }
@@ -4029,7 +4177,6 @@ namespace XOffsetDatastructure {
                 const bool has_state = core.typed_root_access_allowed_ && core.template root_type_matches<T>() &&
                                        core.arena() != nullptr;
                 const std::size_t old_used = has_state ? static_cast<std::size_t>(core.arena()->used_end) : 0u;
-                const std::uint64_t old_root = has_state ? std::uint64_t(XBufferCore::root_at) : 0u;
                 // A small delta is read from a copy with room past its end, so
                 // that every block's bytes are scattered a word at a time.
                 DeltaReceiveScratch& scratch = receive_scratch(cursor);
@@ -4047,15 +4194,16 @@ namespace XOffsetDatastructure {
                     }
                 }
                 Parsed parsed{};
-                XOFFSET_VTRY(parse<T>(data, room, cursor, old_used, old_root, scratch.holes, scratch.blocks, parsed, who,
-                                      has_state ? static_cast<const char*>(core.get_address()) : nullptr));
+                // The in-place checks read a run frame's blocks too.
+                XOFFSET_VTRY(parse<T>(data, room, cursor, old_used, scratch.blocks, scratch.runs, parsed, who,
+                                      has_state ? static_cast<const char*>(core.get_address()) : nullptr, !Admit));
                 // A payload past the replica's maximum capacity is refused before
                 // anything is sized for it: the map of checked bytes (about a
                 // third of the payload) and the undo copy would otherwise be
                 // allocated first and the arena's growth refused only after.
                 if (const std::size_t cap = core.maximum_capacity(); cap != 0 && parsed.header.used_bytes > cap)
                     [[unlikely]] XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, arena_failure_message);
-                if (parsed.key) return apply_key<T, Admit>(xbuf, parsed, cursor, scratch, who);
+                if (parsed.key) return apply_key<T, Admit>(xbuf, parsed, cursor, who);
                 if (!has_state)
                     XOFFSET_VFAIL(XException, XErrc::delta_base_mismatch,
                                   msg(who, "buffer holds no verified root of this type (ask for a key delta)"));
@@ -4072,7 +4220,7 @@ namespace XOffsetDatastructure {
     }
     inline void XBuffer::touch(const void* p, std::size_t bytes) noexcept { detail::DeltaAccess::touch(*this, p, bytes); }
     template <typename T, typename V>
-    bool XBuffer::touch_set(T& field, const V& value) {
+    XOFFSET_DETAIL_INLINE bool XBuffer::touch_set(T& field, const V& value) {
         if (field == value) return false;
         if constexpr (std::is_trivially_copyable_v<T> && !std::is_class_v<T> && !std::is_array_v<T> &&
                       sizeof(T) <= 8) {
@@ -4082,7 +4230,8 @@ namespace XOffsetDatastructure {
             std::memcpy(&before, &field, sizeof(T));
             field = value;
             std::memcpy(&after, &field, sizeof(T));
-            detail::DeltaAccess::touch_changed(*this, &field, sizeof(T), detail::delta_byte_flags(before ^ after));
+            // (A value equal but for its bytes, a NaN, may change none.)
+            if (before != after) [[likely]] detail::DeltaAccess::touch_changed(*this, &field, before ^ after);
         } else {
             field = value;
             touch(field);
@@ -4102,6 +4251,12 @@ namespace XOffsetDatastructure {
             "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");
 #endif
         if (refuse_failed_emit(out)) return XDeltaStats{};
+        // The short path (its token holds only for this content and a root
+        // of T that passed the checks below when the baseline paired).
+        if (!options.digest && !options.whole_blocks) [[likely]] {
+            if (XDeltaStats stats; detail::DeltaAccess::publish_touches<T>(*this, baseline, out, stats)) return stats;
+        }
+        if (detail::DeltaAccess::has_pending(baseline)) [[unlikely]] return detail::DeltaAccess::take_pending(baseline, out);
         T* root_ptr;
         if (this->template root_cached_as<T>()) [[likely]] {
             // A root cached in this epoch passed the checks below (root<T>()).
@@ -4114,9 +4269,19 @@ namespace XOffsetDatastructure {
             if (this->template holds_fingerprint<T>()) this->cache_root(root_ptr);
         }
         ensure_hole_table(*root_ptr);
-        // Not named `small`: <windows.h> (rpcndr.h) defines that as a macro.
-        if (XDeltaStats stats; detail::DeltaAccess::encode_small<T>(*this, out, baseline, options, stats)) return stats;
         return detail::DeltaAccess::encode<T>(*this, out, baseline, options);
+    }
+
+    template <typename T>
+    XOFFSET_DETAIL_INLINE std::size_t XBuffer::save_delta_into(std::span<char> out, XDeltaBaseline& baseline,
+                                                               XDeltaOptions options) {
+        // (A recorded failure drops the touch log's token: the short path
+        // does not apply then, and the general one refuses.)
+        std::size_t n = 0;
+        if (!options.digest && !options.whole_blocks &&
+            detail::DeltaAccess::publish_touches<T>(*this, baseline, out.data(), out.size(), n)) [[likely]]
+            return n;
+        return detail::DeltaAccess::save_into_span<T>(*this, out, baseline, detail::DeltaAccess::options_word(options));
     }
 
     template <typename T>

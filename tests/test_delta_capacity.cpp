@@ -3,10 +3,10 @@
 // it (pre-release fuzz 3.5.0, input tests/fuzz/regressions/delta_sync/
 // 509a8c24e3): the map of checked bytes is about a third of the announced
 // payload, and was allocated before the arena's growth was refused. Key and
-// non-key deltas, the full check and the trust tier admit; the replica and
-// the cursor are left as they were, and no single allocation during the
-// apply is larger than 1 MiB. Not in NO_EXCEPTIONS_TESTS: the hook on
-// operator new throws.
+// non-key deltas, block and run frames, the full check and the trust tier
+// admit; the replica and the cursor are left as they were, and no single
+// allocation during the apply is larger than 1 MiB. Not in
+// NO_EXCEPTIONS_TESTS: the hook on operator new throws.
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
@@ -52,6 +52,8 @@ XOFFSET_REGISTER_SCHEMA_NAME(dc::Root, "test.delta.capacity")
 namespace {
 using Buffer = xo::TypedXBuffer<dc::Root>;
 constexpr std::size_t kHeaderFixed = 12;    // 'X' 'D', format, flags, stream
+constexpr std::size_t kRunHeader = 16;      // a run frame's: then the version (u32)
+constexpr std::uint8_t kFlagRuns = 2;
 constexpr std::uint8_t kFlagExtent = 8;
 constexpr std::size_t kHuge = std::size_t(1) << 30;  // 1 GiB announced
 constexpr std::size_t kReplicaCap = 64 * 1024;
@@ -79,22 +81,23 @@ std::uint64_t get_varint(const std::string& d, std::size_t& at) {
     }
 }
 
-// The same delta announcing a payload of `used` bytes (root unchanged).
-std::string announce(const std::string& d, std::uint64_t root_from_begin, std::size_t used) {
+// The same delta announcing a payload of `used` bytes (EXTENT: (used -
+// 40) / 8 after the version).
+std::string announce(const std::string& d, std::size_t used) {
     const auto flags = std::uint8_t(d[3]);
     std::size_t at = kHeaderFixed;
-    const std::uint64_t version = get_varint(d, at);
-    if (flags & kFlagExtent) { (void)get_varint(d, at); (void)get_varint(d, at); }
+    std::string version;
+    if (flags & kFlagRuns) {
+        version = d.substr(kHeaderFixed, 4);
+        at = kRunHeader;
+    } else {
+        version = varint(get_varint(d, at));
+    }
+    if (flags & kFlagExtent) (void)get_varint(d, at);
     std::string out = d.substr(0, kHeaderFixed);
     out[3] = char(flags | kFlagExtent);
-    out += varint(version) + varint((used - 48) / 8) + varint(root_from_begin) + d.substr(at);
+    out += version + varint((used - 40) / 8) + d.substr(at);
     return out;
-}
-std::uint64_t root_of_key(const std::string& key) {
-    std::size_t at = kHeaderFixed;
-    (void)get_varint(key, at);  // version
-    (void)get_varint(key, at);  // used words
-    return get_varint(key, at);
 }
 
 void fill(dc::Root& r, int n) {
@@ -130,19 +133,19 @@ xo::XStatus admit(Buffer& rep, const std::string& d, xo::XDeltaCursor& cur) {
     return rx.apply_delta<xo::XCheck::admit>(rep, d, cur);
 }
 
-void run(const char* name, xo::XStatus (*apply)(Buffer&, const std::string&, xo::XDeltaCursor&)) {
+// Block frames (a copy baseline), or run frames (a touches baseline).
+void run(const char* name, xo::XStatus (*apply)(Buffer&, const std::string&, xo::XDeltaCursor&), bool runs) {
     auto src = Buffer::create(4096, xo::XBuffer::maximum_capacity(kReplicaCap));
     fill(src.plain_root(), 20);
-    xo::XDeltaBaseline base;
+    xo::XDeltaBaseline base(runs ? xo::XDeltaRecord::touches : xo::XDeltaRecord::copy);
     std::string key;
     (void)src.save_delta_into(key, base);
-    const std::uint64_t root = root_of_key(key);
 
     // A key delta: refused before the buffer is reinitialised.
     {
         Buffer rep(4096, xo::XBuffer::maximum_capacity(kReplicaCap));
         xo::XDeltaCursor cur;
-        refused((std::string(name) + " key").c_str(), rep, cur, announce(key, root, kHuge), apply);
+        refused((std::string(name) + " key").c_str(), rep, cur, announce(key, kHuge), apply);
         need(bool(apply(rep, key, cur)), std::string(name) + ": the good key delta after the refusal");
     }
     // A delta after the key delta, as a payload growing past the capacity.
@@ -152,11 +155,14 @@ void run(const char* name, xo::XStatus (*apply)(Buffer&, const std::string&, xo:
         need(bool(apply(rep, key, cur)), std::string(name) + ": key delta");
         src.plain_root().epoch += 1;
         src.plain_root().items[3].vals.push_back(7);
+        src.touch(src.plain_root().epoch);
+        src.touch(src.plain_root().items[3].vals);
         std::string d;
         (void)src.save_delta_into(d, base);
+        need((std::uint8_t(d[3]) & kFlagRuns) == (runs ? kFlagRuns : 0), std::string(name) + ": unexpected frame");
         for (std::size_t used : {kHuge, kReplicaCap + 4096, std::size_t(0x7ffffff8)})
             refused((std::string(name) + " delta used " + std::to_string(used)).c_str(), rep, cur,
-                    announce(d, root, used), apply);
+                    announce(d, used), apply);
         need(bool(apply(rep, d, cur)), std::string(name) + ": the good delta after the refusals");
         need(rep.plain_root().items[3].vals.size() == src.plain_root().items[3].vals.size(), std::string(name) + ": replica differs");
         base.reset();
@@ -167,8 +173,10 @@ void run(const char* name, xo::XStatus (*apply)(Buffer&, const std::string&, xo:
 } // namespace
 
 int main() {
-    run("full", &full);
-    run("admit", &admit);
+    run("full", &full, false);
+    run("admit", &admit, false);
+    run("full runs", &full, true);
+    run("admit runs", &admit, true);
     if (failures) return 1;
     std::cout << "test_delta_capacity: all checks passed\n";
     return 0;
