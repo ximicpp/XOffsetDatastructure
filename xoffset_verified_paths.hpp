@@ -553,7 +553,8 @@ namespace detail {
     XOFFSET_DETAIL_NOINLINE bool VerifiedPathsAccess::save_root_spare_into(XBufferCore& source, std::string& out) {
         const auto* arena = source.arena();
         const std::uint64_t used = arena->used_end, free_bytes = arena->free_bytes;
-        if (wire_prefers_compact(used, dead_with_root_spare<T>(source, used, free_bytes)))
+        if (wire_prefers_compact(used, free_bytes) ||
+            wire_prefers_compact(used, dead_with_root_spare<T>(source, used, free_bytes)))
             return save_auto_compact_into<T>(source, out);
         if (free_bytes < wire_auto_compact_min_free) return false;
         save_into_general<T>(source, out, XSaveOptions{XWireEmission::free_runs});
