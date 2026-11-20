@@ -59,8 +59,11 @@ using cc24::stdm::Character;
 
 // ---------------------------------------------------------------- data
 struct Scale { const char* label; double k; };
+// k = 5 and 17 leave every container half empty after its last doubling
+// (push_back builds); the powers of two fill them to capacity.
 static const Scale kSizes[] = {{"0", 0}, {"1/64", 1.0 / 64}, {"1/16", 1.0 / 16}, {"1/8", 0.125}, {"1/4", 0.25},
-                               {"1/2", 0.5}, {"1", 1}, {"2", 2}, {"4", 4}, {"16", 16}, {"64", 64}, {"256", 256}};
+                               {"1/2", 0.5}, {"1", 1}, {"2", 2}, {"4", 4}, {"5", 5}, {"16", 16}, {"17", 17},
+                               {"64", 64}, {"256", 256}};
 static size_t cnt(double base, double k) { return size_t(std::floor(base * k + 0.5)); }
 
 // The 2024 make_character with every count scaled by k (k = 1 gives the same Character).

@@ -410,7 +410,13 @@ in.read([](const Profile& r) { print(r.name.view()); });   // read plain members
   capacity counts too: a vector that grew to at least 1 KiB of capacity and then shrank to a
   quarter of it or less (`pop_back`, `erase`, `resize`, `clear`, `stable_erase_if`, a shorter
   assign) is remembered by its buffer (up to 8 of them, on the host only), and its spare is
-  added to the free bytes for this choice. Any other buffer is sent as its image; only the
+  added to the free bytes for this choice. From 16 KiB of image the choice also reads the
+  containers held directly in the root object (its members and the records it holds by value,
+  not the containers inside container elements): `push_back` doubles capacity, so a freshly built
+  message can be up to half spare, and the spare beyond the slack the compact wire keeps (an
+  eighth of each vector plus one element) counts as well. Below 16 KiB the image copy stays in
+  L1 and is faster than the compact walk, so a small message is sent as its image whatever its
+  spare. Any other buffer is sent as its image; only the
   bodies of free blocks in runs that are "at least 4 KiB long and made of free blocks of at least
   1 KiB" are skipped (for example the hole left by deleting many records at once), and the rest
   is copied in one go.
