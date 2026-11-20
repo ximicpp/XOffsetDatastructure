@@ -1475,11 +1475,15 @@ namespace XOffsetDatastructure {
     // accept every form. Every form but `automatic` loads as the sender's
     // image, byte for byte.
     enum class XWireEmission : std::uint8_t {
-        // Default. An image whose free blocks make up at least an eighth of
-        // it (and at least 512 bytes, from the header: no walk) goes as the
-        // compact wire of save_compact (default slack): the receiver gets
-        // the same contents in fewer bytes, laid out afresh. Any other image
-        // goes as with free_runs.
+        // Default. An image whose dead bytes make up at least an eighth of
+        // it (and at least 512 bytes) goes as the compact wire of
+        // save_compact (default slack): the receiver gets the same contents
+        // in fewer bytes, laid out afresh. Dead bytes are the free blocks
+        // (from the header: no walk), the spare capacity of the containers
+        // the spare watch holds (up to 8 that shrank) and, from 16 KiB of
+        // image, the spare capacity of the root object's own containers
+        // beyond the slack the compact wire keeps (detail::wire_spare_scan_min).
+        // Any other image goes as with free_runs.
         automatic,
         // Skips each run of at least 4 KiB of adjacent free blocks of at
         // least 1 KiB (one large deletion, for example); everything else is
@@ -1804,14 +1808,39 @@ namespace XOffsetDatastructure {
         // wire took 0.10 to 0.75 of the image's send and checked receive time
         // at every size, and 0.08 to 0.77 of send and trusted receive from
         // 12 KB up; below that the trusted pair took 0.85 to 1.17 (a copy that
-        // stays in L1 costs about as much as the walk). Clean senders: 1.3 to
-        // 2.1. The header's free bytes tell the two apart without a walk.
-        // Below 512 free bytes the walk's fixed cost is not worth it.
+        // stays in L1 costs about as much as the walk). Senders whose
+        // containers are filled to capacity (no dead bytes): 1.3 to 2.1. The
+        // header's free bytes tell the two apart without a walk. Below 512
+        // free bytes the walk's fixed cost is not worth it.
         inline constexpr std::uint32_t wire_auto_compact_min_free = 512;
         inline constexpr std::uint32_t wire_auto_compact_share = 8; // free >= used / 8
         constexpr bool wire_prefers_compact(std::uint64_t used, std::uint64_t free_bytes) noexcept {
             return free_bytes >= wire_auto_compact_min_free && free_bytes * wire_auto_compact_share >= used;
         }
+        // Spare capacity is dead bytes too, but no free block: push_back
+        // doubles a vector in place, so a freshly built message can carry up
+        // to half of each block as spare. From wire_spare_scan_min used bytes
+        // the choice also counts the spare of the root object's own container
+        // heads (its members, records held by value, fixed arrays; not the
+        // heads inside container elements): each adds (capacity - size -
+        // size / 8 - 1) elements, signed, the bytes the compact wire would
+        // not send (it keeps size / 8 + 1 spare elements). A root type with
+        // more than wire_spare_scan_max_heads such heads is not read.
+        // Character built by push_back, every count times k (cloud x86,
+        // 48 KiB L1d, GCC 16, compact / image time of send and trusted
+        // receive): k = 2.5 and 3 (11.5 KB, compact 0.74 and 0.87 of the
+        // bytes) 1.36 and 1.79, so below 16 KiB the image copy, which stays
+        // in L1 on both ends, wins; k = 5, 6, 10, 12, 17, 24, 40, 48, 96
+        // (23 to 373 KB, 0.61 to 0.87 of the bytes) 0.37 to 1.02; k = 7, 8,
+        // 14, 28, 64 (0.98 to 1.14 of the bytes) 0.99 to 1.28. From 16 KiB
+        // the time ratio is about 1.13 times the byte ratio: compact wins
+        // from about 1/8 dead, the share above. 120 random Character shapes
+        // (1 to 340 KB), geometric mean against always the image: 0.931
+        // with this floor and share (0.927 picking the faster wire each
+        // time; floors 0, 12 KiB and 24 KiB 0.984, 0.946, 0.951; shares 1/6
+        // and 1/10 0.935, 0.934).
+        inline constexpr std::uint64_t wire_spare_scan_min = 16384;
+        inline constexpr std::size_t wire_spare_scan_max_heads = 64;
         inline constexpr std::size_t wire_free_run_local = 64;
         inline constexpr std::size_t wire_free_run_local_runs = 8;
 

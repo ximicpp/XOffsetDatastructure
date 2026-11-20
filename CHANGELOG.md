@@ -114,6 +114,29 @@ of this file and in the pull requests.
   followed), an assignment in place tests the capacity after the copy and reads the old size out of
   line, `erase` has one hook after its branches, the flat map and set `erase(key)` are inline at
   the caller under Clang, and a move assignment between payloads copies out of line.
+- The automatic emission counts the spare capacity of freshly built messages from 16 KiB of
+  image. `push_back` doubles a vector's capacity in place, so a message built element by element
+  can be up to half spare; nothing shrank, so the spare watch does not list it (premises k = 5,
+  every container just past a doubling: 23,544 bytes sent whole). From 16 KiB of `used_bytes`
+  (`wire_spare_scan_min`), when the free bytes and the watched heads alone keep the image, the
+  choice also reads the vector, map and set heads inside the root object (its members, the
+  records it holds by value, fixed arrays; not the heads inside container elements, not strings;
+  a root type with more than 64 such heads, `wire_spare_scan_max_heads`, is not read) and counts
+  capacity - size - (size / 8 + 1) elements of each, signed (the compact wire keeps size / 8 + 1
+  spare elements, so a vector filled to capacity counts minus that slack); the same rule then
+  applies (at least 512 bytes and an eighth of the image). Below 16 KiB the image copy stays in
+  L1 and beats the compact walk whatever the spare. No container hook, no state, no wire change:
+  the heads' positions are known at compile time, and `save_verified_into` reaches the scan from
+  the compare that already bounds its small path (16 KiB instead of 1 MiB for such a root, out
+  of line from there). Premises (GCC 16): k = 5 23,544 -> 16,792 bytes, k = 17 93,432 -> 56,488;
+  send plus trusted receive 0.45 and 0.77 of before (0.35 and 0.61 of zpp::bits; 15 processes),
+  with the full check 0.51 and 0.73; instructions 0.67 and 0.58. The other 494 cells send the
+  same bytes. Instructions per message: below 16 KiB the same (the shrunk g4 and g8 cells +1);
+  from 16 KiB, images that stay the image +77 (the scan of Character's 5 heads; k = 16 to 256),
+  churned images that go compact on their free bytes -18 (they no longer pass through the
+  general path). Ops cells unchanged except building a Character element by element, +25 (0.4%;
+  nothing of this runs there: GCC inlines a container accessor differently inside that build
+  function). SLG instructions (GCC 16): A, D and S unchanged, B -0.8%, C +0.01%.
 - Fixed: a client that includes `<windows.h>` before the library compiles again (a variable in
   `save_delta_into` was named `small`, which `rpcndr.h` defines as a macro).
 - `xoffsetdatastructure.hpp` includes seven parts in its former order: `xoffset_arena.hpp`,

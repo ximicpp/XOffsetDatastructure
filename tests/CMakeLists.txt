@@ -160,6 +160,7 @@ set(REFLECTION_TESTS
     test_free_run_emission
     test_automatic_emission
     test_spare_watch
+    test_root_spare
     test_wire_populate
     test_reload_reset
     test_reset_used_range
@@ -315,6 +316,7 @@ set(NO_EXCEPTIONS_TESTS
     test_no_exceptions
     test_automatic_emission
     test_spare_watch
+    test_root_spare
     test_enum_support
     test_free_run_emission
     test_hot_path_constants
