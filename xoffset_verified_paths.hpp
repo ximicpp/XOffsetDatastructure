@@ -129,6 +129,12 @@ namespace detail {
         const auto* image = static_cast<const char*>(source.get_address());
         const auto* arena = std::launder(reinterpret_cast<const XBufferCore::arena_header*>(image));
         const std::size_t used = arena->used_end;
+        // From wire_spare_scan_min used bytes the automatic emission also
+        // counts the root's own spare capacity (out of line).
+        if constexpr (!Band) {
+            if (used >= wire_spare_scan_min && emission == XWireEmission::automatic) [[unlikely]]
+                if (save_root_spare_into<T>(source, out)) return true;
+        }
         if (used >= save_small_max) return false;
         static_assert(wire_auto_compact_min_free <= wire_free_run_min_gap);
         if (emission == XWireEmission::automatic || emission == XWireEmission::free_runs) {
@@ -188,24 +194,47 @@ namespace detail {
     // image), and a churned image goes compact as for any buffer. An image
     // that stays the image takes the band copy; false: save_into_general
     // sends it (the free bytes alone keep it there).
+    // The compact wire of the automatic emission (default slack).
+    template<class T>
+    XOFFSET_DETAIL_NOINLINE bool VerifiedPathsAccess::save_auto_compact_into(XBufferCore& source, std::string& out) {
+        if constexpr (compact_direct_supported<T>()) {
+            constexpr auto slack_div = XCompactOptions{}.slack_div;
+            if (!try_save_compact_into<T>(source, out, slack_div)) save_compact_into<T>(source, out, XCompactOptions{});
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     template<class T>
     XOFFSET_DETAIL_NOINLINE bool VerifiedPathsAccess::save_watched_into(XBufferCore& source, std::string& out) {
         if constexpr (compact_direct_supported<T>()) {
             if (!source.free_table_complete()) [[unlikely]] (void)header<T>(source);
-            const auto* arena = source.arena();
-            if (arena && (wire_prefers_compact(arena->used_end, arena->free_bytes) ||
-                          wire_prefers_compact(arena->used_end, arena->free_bytes + source.watched_spare_bytes()))) {
-                constexpr auto slack_div = XCompactOptions{}.slack_div;
-                if (!try_save_compact_into<T>(source, out, slack_div)) save_compact_into<T>(source, out, XCompactOptions{});
-                return true;
-            }
+            if (auto_compact<T>(source)) return save_auto_compact_into<T>(source, out);
         }
-        return save_small_into<T, true>(source, out, XWireEmission::automatic);
+        // Decided: the image, as with free_runs.
+        if (save_small_into<T, true>(source, out, XWireEmission::free_runs)) return true;
+        save_into_general<T>(source, out, XSaveOptions{XWireEmission::free_runs});
+        return true;
     }
 
     template<class T>
     XOFFSET_DETAIL_NOINLINE void VerifiedPathsAccess::save_into_general(XBufferCore& source, std::string& out,
                                                                             XSaveOptions options) {
+        // automatic from wire_spare_scan_min used bytes or with a spare
+        // watch: decided here (spare capacity counts), then as free_runs.
+        if constexpr (compact_direct_supported<T>()) {
+            if (options.emission == XWireEmission::automatic && source.free_table_complete()) {
+                const auto* arena = source.arena();
+                if (arena && (source.spare_watched() || arena->used_end >= wire_spare_scan_min)) {
+                    if (auto_compact<T>(source)) {
+                        (void)save_auto_compact_into<T>(source, out);
+                        return;
+                    }
+                    options.emission = XWireEmission::free_runs;
+                }
+            }
+        }
         // 512 or more free bytes that still go as the image (below the
         // compact share, below one run): the small path's copy.
         if ((options.emission == XWireEmission::automatic || options.emission == XWireEmission::free_runs) &&
@@ -217,8 +246,7 @@ namespace detail {
         if (options.emission == XWireEmission::automatic) {
             if constexpr (compact_direct_supported<T>()) {
                 if (!source.free_table_complete()) [[unlikely]] (void)header<T>(source);
-                const auto* arena = source.arena();
-                if (arena && wire_prefers_compact(arena->used_end, arena->free_bytes)) {
+                if (auto_compact<T>(source)) {
                     constexpr auto slack_div = XCompactOptions{}.slack_div;
                     if (try_save_compact_into<T>(source, out, slack_div)) return;
                     save_compact_into<T>(source, out, XCompactOptions{});
@@ -453,6 +481,83 @@ namespace detail {
         CompactMeasure w{compact_root_end<T>(), limit, slack_div};
         compact_value(root, w);
         return w.overflow ? 0 : w.cursor;
+    }
+
+    // ---- Spare capacity of the root's own containers (automatic emission) ----
+    // What the compact wire saves on the vectors whose heads lie inside the
+    // root object (its members, records held by value, fixed arrays; not the
+    // heads inside container elements): capacity - (size + size / 8 + 1)
+    // elements each, signed, so a tight vector counts the slack the compact
+    // wire adds to it. Two loads per head, no walk; strings are skipped.
+    template <class U>
+    XOFFSET_DETAIL_INLINE std::int64_t root_spare_value(const U& src) noexcept {
+        using C = std::remove_cv_t<U>;
+        if constexpr (!compact_has_heads<C>() || is_fixed_string_v<C>) {
+            return 0;
+        } else if constexpr (is_fixed_vector_v<C>) {
+            using E = typename C::value_type;
+            static_assert(XCompactOptions{}.slack_div == 8);
+            const auto& v = static_cast<const XVectorCore<E>&>(src);
+            const std::int64_t n = v.size_;
+            return (std::int64_t(v.capacity_) - n - (n >> 3) - 1) * std::int64_t(sizeof(E));
+        } else if constexpr (std::is_array_v<C>) {
+            std::int64_t total = 0;
+            for (std::size_t i = 0; i < std::extent_v<C>; ++i) total += root_spare_value(src[i]);
+            return total;
+        } else {
+            std::int64_t total = 0;
+            static_for<schema::member_count_v<C>>([&](auto index) {
+                using member = schema::member_t<C, decltype(index)::value>;
+                total += root_spare_value(member::get(src));
+            });
+            return total;
+        }
+    }
+    // free_bytes plus the root's own spare, from wire_spare_scan_min used
+    // bytes (below it free_bytes).
+    template <class T>
+    XOFFSET_DETAIL_INLINE std::uint64_t dead_with_root_spare(XBufferCore& source, std::uint64_t used,
+                                                              std::uint64_t free_bytes) noexcept {
+        if (used < wire_spare_scan_min || !source.template root_is<T>()) return free_bytes;
+        const std::int64_t spare = root_spare_value(*image_root<T>(source));
+        return spare > 0 ? free_bytes + std::uint64_t(spare) : free_bytes;
+    }
+
+    // The automatic emission's choice for a source with a complete free
+    // state: compact when the dead bytes reach the compact share. Dead =
+    // the header's free bytes; from wire_spare_scan_min used bytes also the
+    // root's own spare; with a spare watch, the watched heads outside the root.
+    template<class T>
+    XOFFSET_DETAIL_NOINLINE bool VerifiedPathsAccess::auto_compact(XBufferCore& source) {
+        const auto* arena = source.arena();
+        if (!arena) return false;
+        const std::uint64_t used = arena->used_end, free_bytes = arena->free_bytes;
+        if (wire_prefers_compact(used, free_bytes)) return true;
+        // The watched heads first (as before the root's spare counted), then
+        // from wire_spare_scan_min the root's own spare with the watched
+        // heads outside the root.
+        if (source.spare_watched() && wire_prefers_compact(used, free_bytes + source.watched_spare_bytes()))
+            return true;
+        if (used < wire_spare_scan_min) return false;
+        std::uint64_t dead = dead_with_root_spare<T>(source, used, free_bytes);
+        if (source.spare_watched()) dead += source.watched_spare_bytes(XBufferCore::root_at + sizeof(T));
+        return wire_prefers_compact(used, dead);
+    }
+
+    // save_small_into's automatic emission from wire_spare_scan_min used
+    // bytes (no spare watch, complete free state): the compact wire when the
+    // free bytes and the root's own spare reach the compact share. Otherwise
+    // the image: true when written here (free_runs, from 512 free bytes),
+    // false when the caller's copy sends it.
+    template<class T>
+    XOFFSET_DETAIL_NOINLINE bool VerifiedPathsAccess::save_root_spare_into(XBufferCore& source, std::string& out) {
+        const auto* arena = source.arena();
+        const std::uint64_t used = arena->used_end, free_bytes = arena->free_bytes;
+        if (wire_prefers_compact(used, dead_with_root_spare<T>(source, used, free_bytes)))
+            return save_auto_compact_into<T>(source, out);
+        if (free_bytes < wire_auto_compact_min_free) return false;
+        save_into_general<T>(source, out, XSaveOptions{XWireEmission::free_runs});
+        return true;
     }
 }
 

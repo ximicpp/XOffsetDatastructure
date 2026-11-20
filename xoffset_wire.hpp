@@ -1809,6 +1809,11 @@ namespace XOffsetDatastructure {
         // Below 512 free bytes the walk's fixed cost is not worth it.
         inline constexpr std::uint32_t wire_auto_compact_min_free = 512;
         inline constexpr std::uint32_t wire_auto_compact_share = 8; // free >= used / 8
+        // From this many used bytes the choice also counts the spare
+        // capacity of the root's own containers (growth leaves up to half of
+        // a block). Below it the image copy stays in L1 on both ends and
+        // beats the walk unless most of the image is dead.
+        inline constexpr std::uint64_t wire_spare_scan_min = 16384;
         constexpr bool wire_prefers_compact(std::uint64_t used, std::uint64_t free_bytes) noexcept {
             return free_bytes >= wire_auto_compact_min_free && free_bytes * wire_auto_compact_share >= used;
         }
