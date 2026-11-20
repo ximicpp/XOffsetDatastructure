@@ -84,6 +84,9 @@ namespace XOffsetDatastructure {
             template<class T, bool Band> static bool save_small_into(XBufferCore&, std::string&, XWireEmission);
             template<class T> static void save_into_general(XBufferCore&, std::string&, XSaveOptions);
             template<class T> static bool save_watched_into(XBufferCore&, std::string&);
+            template<class T> static bool auto_compact(XBufferCore&);
+            template<class T> static bool save_auto_compact_into(XBufferCore&, std::string&);
+            template<class T> static bool save_root_spare_into(XBufferCore&, std::string&);
             template<class T> static void rebuild_free_table(T&, XBufferCore&);
             template<class T> static bool try_save_compact_into(XBufferCore&, std::string&, std::uint32_t);
             template<class T> static void save_compact_into(XBufferCore&, std::string&, XCompactOptions);
@@ -655,9 +658,7 @@ namespace XOffsetDatastructure {
             const auto header = image_wire_header<T>();
             if (options.emission == XWireEmission::automatic) {
                 if constexpr (detail::compact_direct_supported<T>())
-                    if (detail::wire_prefers_compact(header.used_bytes, header.free_bytes) ||
-                        (spare_watched() &&
-                         detail::wire_prefers_compact(header.used_bytes, header.free_bytes + watched_spare_bytes())))
+                    if (detail::VerifiedPathsAccess::auto_compact<T>(*this))
                         return save_compact<T>();
                 options.emission = XWireEmission::free_runs;
             }

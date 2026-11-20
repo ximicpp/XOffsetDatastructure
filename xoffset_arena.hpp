@@ -2002,7 +2002,9 @@ namespace XOffsetDatastructure {
         // Spare bytes of the listed heads in the current image, at most the
         // used bytes. Drops the entries that no longer hold, and the flag
         // with the last one.
-        XOFFSET_DETAIL_NOINLINE std::uint64_t watched_spare_bytes() noexcept {
+        // Heads below `counted_end` are kept but not summed (the caller
+        // already counted them: the root object's own heads).
+        XOFFSET_DETAIL_NOINLINE std::uint64_t watched_spare_bytes(std::uint64_t counted_end = 0) noexcept {
             SpareList* list = spare_list_.get();
             if (!list || list->epoch != m_epoch || buffer_.size() < min_payload_size()) {
                 drop_spare_watch();
@@ -2014,7 +2016,7 @@ namespace XOffsetDatastructure {
             for (std::uint32_t i = 0; i < list->count; ++i) {
                 SpareList::Entry entry = list->entries[i];
                 if (read_spare(buffer_.data(), used, entry)) {
-                    total += entry.spare;
+                    if (entry.head >= counted_end) total += entry.spare;
                     list->entries[keep++] = entry;
                 }
             }
