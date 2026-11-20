@@ -73,6 +73,7 @@ namespace XOffsetDatastructure {
     namespace detail {
         // save_compact's admission (xoffset_verified_paths.hpp).
         template <class U> consteval bool compact_direct_supported();
+        template <class T> std::size_t measure_compact(const T& root, std::size_t limit, std::uint32_t slack_div) noexcept;
 
         // Internal friend bridge; no Core/container/wire field is added.
         struct VerifiedPathsAccess {
@@ -1052,6 +1053,48 @@ namespace XOffsetDatastructure {
             dst.clone_state_from(*this);
         }
 
+        /// PROTOTYPE relayout: compact image into a thread scratch, then in place.
+        template <typename T>
+        XErrc relayout() {
+            if (!ok()) return error();
+            if (this->pinned()) return XErrc::borrowed;
+            if (!this->template root_is<T>()) return XErrc::no_root;
+            static thread_local std::string scratch;
+            const std::size_t used = this->arena()->used_end;
+            auto write = [&](std::uint32_t slack) -> bool {
+                if (detail::VerifiedPathsAccess::try_save_compact_into<T>(*this, scratch, slack)) return true;
+                const auto bound = detail::measure_compact(*detail::image_root<T>(*this), (std::numeric_limits<std::uint32_t>::max)(), slack);
+                if (bound == 0) return false;
+                scratch.reserve(bound + bound / 8);
+                return detail::VerifiedPathsAccess::try_save_compact_into<T>(*this, scratch, slack);
+            };
+            if (!write(8)) return XErrc::capacity_exceeded;
+            if (scratch.size() >= used || scratch.size() > this->get_size()) {
+                if (!write(0)) return XErrc::capacity_exceeded;
+                if (scratch.size() >= used) {  // nothing to shed
+                    this->relayout_mark_ = static_cast<std::uint32_t>(used);
+                    this->relayout_epoch_ = this->epoch();
+                    return XErrc::ok;
+                }
+            }
+            return this->relayout_in_place(scratch.data(), scratch.size()) ? XErrc::ok : XErrc::out_of_storage;
+        }
+        /// PROTOTYPE hint: used >= 2 x the relayout mark (measured once per content).
+        template <typename T>
+        bool relayout_advised() {
+            const std::uint32_t used = this->arena()->used_end;
+            if (this->relayout_epoch_ != this->epoch()) [[unlikely]] return relayout_advised_measure<T>(used);
+            return used >= 2u * std::uint64_t(this->relayout_mark_);
+        }
+        template <typename T>
+        XOFFSET_DETAIL_NOINLINE bool relayout_advised_measure(std::uint32_t used) {
+            if (!this->template root_is<T>()) return false;
+            const auto m = detail::measure_compact(*detail::image_root<T>(*this), (std::numeric_limits<std::uint32_t>::max)(), 8);
+            this->relayout_mark_ = static_cast<std::uint32_t>(m);
+            this->relayout_epoch_ = this->epoch();
+            return m != 0 && used >= 2u * std::uint64_t(m);
+        }
+
         MemoryStats stats() {
             return memory_stats(*this);
         }
@@ -1417,6 +1460,8 @@ namespace XOffsetDatastructure {
             return XBuffer::ref<T>();
         }
 
+        XErrc relayout() { return XBuffer::relayout<T>(); }
+        bool relayout_advised() { return XBuffer::relayout_advised<T>(); }
         TypedXBuffer clone() const { return TypedXBuffer(XBuffer::clone()); }
         void clone_into(TypedXBuffer& dst) const { XBuffer::clone_into(dst); }
 
