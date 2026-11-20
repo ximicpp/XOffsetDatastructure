@@ -513,11 +513,31 @@ namespace detail {
             return total;
         }
     }
+    // Vector heads root_spare_value reads in a U.
+    template <class U>
+    consteval std::size_t root_head_count() {
+        using C = std::remove_cv_t<U>;
+        if constexpr (!compact_has_heads<C>() || is_fixed_string_v<C>) {
+            return 0;
+        } else if constexpr (is_fixed_vector_v<C>) {
+            return 1;
+        } else if constexpr (std::is_array_v<C>) {
+            return std::extent_v<C> * root_head_count<std::remove_extent_t<C>>();
+        } else {
+            return []<std::size_t... I>(std::index_sequence<I...>) {
+                return (std::size_t(0) + ... + root_head_count<typename schema::member_t<C, I>::type>());
+            }(std::make_index_sequence<schema::member_count_v<C>>{});
+        }
+    }
+    // A root with more heads is not read (its sends cost as before).
+    inline constexpr std::size_t wire_spare_scan_max_heads = 64;
+
     // free_bytes plus the root's own spare, from wire_spare_scan_min used
     // bytes (below it free_bytes).
     template <class T>
     XOFFSET_DETAIL_INLINE std::uint64_t dead_with_root_spare(XBufferCore& source, std::uint64_t used,
                                                               std::uint64_t free_bytes) noexcept {
+        if constexpr (root_head_count<T>() > wire_spare_scan_max_heads) return free_bytes;
         if (used < wire_spare_scan_min || !source.template root_is<T>()) return free_bytes;
         const std::int64_t spare = root_spare_value(*image_root<T>(source));
         return spare > 0 ? free_bytes + std::uint64_t(spare) : free_bytes;
