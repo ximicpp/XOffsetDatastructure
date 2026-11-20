@@ -2022,6 +2022,19 @@ namespace XOffsetDatastructure {
             if (keep == 0) send_flags_.spare_watch = false;
             return total < used ? total : used;
         }
+        // Spare bytes of the listed heads at payload offset `outside_from` or
+        // later, as the last watched_spare_bytes() read them, at most the
+        // used bytes (the automatic emission passes the end of the root
+        // object, whose own heads it reads itself).
+        std::uint64_t watched_spare_outside(std::uint64_t outside_from) const noexcept {
+            const SpareList* list = spare_list_.get();
+            if (!list) return 0;
+            std::uint64_t total = 0;
+            for (std::uint32_t i = 0; i < list->count; ++i)
+                if (list->entries[i].head >= outside_from) total += list->entries[i].spare;
+            const std::uint64_t used = used_end_clamped();
+            return total < used ? total : used;
+        }
         // The free blocks' count walks their stacks; the directory is not a
         // free block (wire_hole_count counts it).
         std::size_t free_block_count() const noexcept { return inband_count(); }

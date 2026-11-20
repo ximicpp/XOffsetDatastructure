@@ -124,9 +124,10 @@ size`. Errors are prefixed with the calling API's name.
   sent this way took 0.10 to 0.75 of the image's send plus checked receive
   time at every size, and 0.08 to 0.77 of send plus trusted receive from
   12 KB up; below 12 KB the trusted pair took 0.85 to 1.17, since copying an
-  image that stays in L1 costs about as much as the compact walk. Clean
-  images are faster as the image (compact 1.3 to 2.1 times slower). A root
-  type that `save_compact` does not admit always goes as `free_runs`.
+  image that stays in L1 costs about as much as the compact walk. Images
+  whose containers are filled to capacity are faster as the image (compact
+  1.3 to 2.1 times slower). A root type that `save_compact` does not admit
+  always goes as `free_runs`.
   Spare capacity is not in the header: a vector grown in place and shrunk
   back leaves no free block. The sender keeps a host-side list of up to 8
   container heads (never on the wire) whose size fell from above a quarter of
@@ -137,6 +138,19 @@ size`. Errors are prefixed with the calling API's name.
   a head inside `used_bytes`, leaves the list. The list follows the content
   (move, swap, clone) and is dropped by a reload or reset. It only chooses
   between the two forms, each of which carries the same contents.
+  From 16 KiB of `used_bytes` the sender also reads the container heads that
+  lie inside the root object (its members and the records it holds by
+  value, at most 64 heads; not the heads inside container elements, not
+  strings): `push_back` doubles capacity in place, so a freshly built image
+  can be up to half spare. Each head adds (capacity - size - size / 8 - 1)
+  elements, signed (the compact wire keeps size / 8 + 1 spare elements, so a
+  container filled to capacity counts minus that slack), and the same rule
+  applies to the free bytes, that sum and the listed heads outside the root
+  object. Character built by `push_back` with every count times 5 (23.5 KB)
+  goes compact (16.8 KB), send plus trusted receive 0.45 of the image's
+  time; times 3 (11.6 KB, 0.87 of the bytes compact) stays the image, whose
+  copy is 1.8 times faster there. Below 16 KiB only the free bytes and the
+  listed heads count.
 - `free_runs`: dense unless `free_bytes` is at least 4 KiB (one
   header read). Otherwise free blocks of at least 1 KiB are sorted by offset,
   adjacent ones merge, and in every merged run of at least 4 KiB each block's

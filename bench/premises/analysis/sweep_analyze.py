@@ -15,7 +15,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from stats import median, median_ci, bootstrap, verdict  # noqa: E402
 
-SIZES = ["0", "1/64", "1/16", "1/8", "1/4", "1/2", "1", "2", "4", "16", "64", "256"]
+SIZES = ["0", "1/64", "1/16", "1/8", "1/4", "1/2", "1", "2", "4", "5", "16", "17", "64", "256"]
 TRUSTED = ["zpp_bits", "cista_raw_unchecked", "cista_offset_cast", "flatbuffers_noverify", "protobuf", "cereal"]
 CHECKED = ["zpp_bits", "cista_raw_checked", "cista_raw_deep", "flatbuffers_verify", "protobuf", "cereal"]
 SHORT = {"zpp_bits": "zpp", "cista_raw_unchecked": "cista raw U", "cista_offset_cast": "cista off CAST",
@@ -90,8 +90,9 @@ def main():
     procs = sorted({p for d in ns.values() for p in d})
     res = {"procs": len(procs), "size": {}, "dirt": {}, "churn": {}, "cross": {}}
     print(f"# Premises sweep: {len(procs)} processes\n")
-    sizes = [s for s in SIZES if ("size", "zpp_bits", s, "clean") in info]
-    zpp_bytes = {s: info[("size", "zpp_bits", s, "clean")]["bytes"] for s in sizes}
+    # Runs before k = 5 and 17 were added have no such cells.
+    SIZES[:] = [s for s in SIZES if ("size", "zpp_bits", s, "clean") in info]
+    zpp_bytes = {s: info[("size", "zpp_bits", s, "clean")]["bytes"] for s in SIZES}
     if not dirt_only:
         size_sections(ns, info, res, zpp_bytes)
     dirt_sections(ns, info, res, zpp_bytes, procs)
