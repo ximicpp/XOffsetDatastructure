@@ -3005,6 +3005,37 @@ namespace XOffsetDatastructure {
             return buffer_.assign_in_place(image, size, 0);
         }
 
+        // XBuffer::relayout<T>(): `image` (`size` bytes, a dense image of
+        // this content as save_compact writes it, at most the logical
+        // length) replaces the image in place. The lineage stays: proxies
+        // re-resolve (their paths are logical), as after a move of the
+        // payload; root key, typed access and fingerprint stay (the same
+        // root at root_at). The epoch advances: plain references are
+        // invalid, XHandles re-resolve, a touch log starts over, the spare
+        // watch is dropped. What the old image left past the new used_end
+        // is remembered as a reset remembers it. False: an injected storage
+        // failure, nothing changed.
+        XOFFSET_DETAIL_NOINLINE bool relayout_in_place(const char* image, size_type size) noexcept {
+            const auto old_used = used_end_clamped();
+            if (!buffer_.overwrite_in_place(image, size)) return false;
+            if (ctl_) {
+                ctl_->version += 2;
+                quarantine_.clear();
+                packed_.quarantined = 0;
+            }
+            advance_epoch();
+            send_flags_.free_table_lost = false;
+            drop_spare_watch();
+            if constexpr (detail::scrub_reset) {
+                if (old_used > size) std::memset(buffer_.data() + size, 0, old_used - size);
+            } else {
+                if (old_used > packed_.reset_dirty_end) packed_.reset_dirty_end = static_cast<std::uint32_t>(old_used);
+            }
+            relayout_mark_ = static_cast<std::uint32_t>(size);
+            relayout_epoch_ = m_epoch;
+            return true;
+        }
+
         // In-place direct receive (XBuffer::begin_verified_reload): the
         // admission of reinit, then [0, size) exposed to the writer without
         // clearing. Sets `clean_from` to the offset from which bytes are
@@ -3345,6 +3376,13 @@ namespace XOffsetDatastructure {
         // in-band allocator records its writes in it. It follows the
         // content (move, swap). It fills the padding before packed_.
         std::unique_ptr<detail::DeltaTouchLog> touch_log_;
+    public:
+        // The relayout mark (relayout_advised): the used size a relayout of
+        // the content gave or would give, valid while relayout_epoch_ is the
+        // current epoch. In the padding before packed_.
+        std::uint32_t relayout_mark_ = 0;
+        std::uint64_t relayout_epoch_ = ~std::uint64_t(0);
+    private:
         // Three small members in one 8-byte word, so that a move or a swap
         // carries all of them with one load and one store per side (what the
         // policy byte alone took). It starts the line of ctl_, which a reset
