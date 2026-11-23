@@ -113,7 +113,7 @@ namespace detail {
 
         // The block of `bytes` at head-relative `delta` (head at &delta).
         template <std::size_t Align>
-        bool block(const std::int32_t& delta, std::uint64_t bytes, const char*& out) noexcept {
+        XOFFSET_DETAIL_INLINE bool block(const std::int32_t& delta, std::uint64_t bytes, const char*& out) noexcept {
             const std::uint64_t head = reinterpret_cast<std::uintptr_t>(&delta) - base;
             const std::int64_t off = std::int64_t(head) + delta;
             if (off < std::int64_t(XWIRE_PAYLOAD_BEGIN) || std::uint64_t(off) > used ||
@@ -129,9 +129,9 @@ namespace detail {
     };
 
     template <typename T>
-    bool bounds_value(const T& value, BoundsWalk& walk) noexcept;
+    XOFFSET_DETAIL_INLINE bool bounds_value(const T& value, BoundsWalk& walk) noexcept;
 
-    inline bool bounds_string(const XString& value, BoundsWalk& walk) noexcept {
+    XOFFSET_DETAIL_INLINE bool bounds_string(const XString& value, BoundsWalk& walk) noexcept {
         if (value.is_inline()) [[likely]] {
             // Bytes past the length are not read; the length must stay in the head.
             if (((value.capacity_ >> 24) & 0x7fu) > XString::inline_max) [[unlikely]]
@@ -147,7 +147,7 @@ namespace detail {
     }
 
     template <typename E>
-    bool bounds_vector(const XVectorCore<E>& value, BoundsWalk& walk) noexcept {
+    XOFFSET_DETAIL_INLINE bool bounds_vector(const XVectorCore<E>& value, BoundsWalk& walk) noexcept {
         if (value.size_ > value.capacity_) [[unlikely]] return walk.fail("vector size exceeds capacity");
         if (value.data_delta == 0) return value.size_ == 0 || walk.fail("empty vector with a size");
         const char* raw;
@@ -166,9 +166,9 @@ namespace detail {
     }
 
     template <typename T, std::size_t... Bs, std::size_t... Ms>
-    bool bounds_record(const T& value, BoundsWalk& walk, std::index_sequence<Bs...>,
-                       std::index_sequence<Ms...>) noexcept {
-        auto member = [&]<std::size_t N>(std::integral_constant<std::size_t, N>) {
+    XOFFSET_DETAIL_INLINE bool bounds_record(const T& value, BoundsWalk& walk, std::index_sequence<Bs...>,
+                                             std::index_sequence<Ms...>) noexcept {
+        auto member = [&]<std::size_t N>(std::integral_constant<std::size_t, N>) XOFFSET_DETAIL_LAMBDA_INLINE {
             using M = schema::member_t<T, N>;
             if constexpr (wire_value_needs_validation_v<typename M::type>) return bounds_value(M::get(value), walk);
             else return true;
@@ -178,7 +178,7 @@ namespace detail {
     }
 
     template <typename T>
-    bool bounds_value(const T& value, BoundsWalk& walk) noexcept {
+    XOFFSET_DETAIL_INLINE bool bounds_value(const T& value, BoundsWalk& walk) noexcept {
         using CleanT = std::remove_cv_t<T>;
         if constexpr (std::is_same_v<CleanT, bool>) {
             unsigned char bits;
@@ -387,47 +387,51 @@ public:
     /// outlive the view. With XOFFSET_FORCE_FULL_CHECK
     /// the full check also runs on a copy, and what it rejects is rejected.
     template <typename T, XCheck C = default_view_check<L>>
-    [[nodiscard]] XResult<XView<T>> view(std::span<const std::byte> wire) const {
+    [[nodiscard]] XOFFSET_DETAIL_INLINE XResult<XView<T>> view(std::span<const std::byte> wire) const {
         check_view<C>();
         static_assert(is_wire_admitted_v<T>, "XReceiver::view<T>() requires an admitted fixed-schema wire type.");
         constexpr const char* who = C == XCheck::bounds ? "XReceiver::view<T, bounds>()" : "XReceiver::view<T, admit>()";
         constexpr auto image = detail::view_wire_image<T>();
         constexpr std::size_t head = sizeof(XWireHeader);
-        std::array<std::uint64_t, 4> words;
         if (wire.size_bytes() < head) [[unlikely]] return framing_error<T>(wire, who);
+        const std::byte* const raw = wire.data();
+        const std::uint64_t used = wire.size_bytes();
         // A view copies nothing, so the first read of each line of the wire
         // falls in the caller's use of the view, one miss after another
         // inside its loops. A small wire (one message, a few lines) has all
         // its lines requested here, so those misses overlap each other and
         // the checks below. Larger wires are left to the hardware's
         // sequential prefetch.
-        if (wire.size_bytes() <= view_prefetch_bytes) {
+        if (used <= view_prefetch_bytes) {
             // Every line after the first (the header read below loads it).
-            const auto first = reinterpret_cast<std::uintptr_t>(wire.data()) & ~std::uintptr_t(63);
-            const auto last = reinterpret_cast<std::uintptr_t>(wire.data()) + wire.size_bytes() - 1;
+            const auto first = reinterpret_cast<std::uintptr_t>(raw) & ~std::uintptr_t(63);
+            const auto last = reinterpret_cast<std::uintptr_t>(raw) + used - 1;
             for (auto line = first + 64; line <= last; line += 64)
                 XOFFSET_DETAIL_PREFETCH_WITH_MSVC(reinterpret_cast<const void*>(line), 0);
         }
-        std::memcpy(words.data(), wire.data(), sizeof(words));
+        // Scalar loads avoid a local array on the stack (which triggers MSVC /GS cookies).
+        std::uint64_t w0, w1, w2, w3;
+        std::memcpy(&w0, raw, 8);
+        std::memcpy(&w1, raw + 8, 8);
+        std::memcpy(&w2, raw + 16, 8);
+        std::memcpy(&w3, raw + 24, 8);
         // Words 0..2: magic and header size, fingerprint; word 3: used_bytes
         // and extent_count (0: dense), the wire's size with nothing else.
-        const std::uint64_t used = wire.size_bytes();
-        const std::uint64_t diff = (words[0] ^ image[0]) | (words[1] ^ image[1]) | (words[2] ^ image[2]) |
-                                   (words[3] ^ used);
+        const std::uint64_t diff = (w0 ^ image[0]) | (w1 ^ image[1]) | (w2 ^ image[2]) | (w3 ^ used);
         if (diff != 0 || used <= XWIRE_PAYLOAD_BEGIN || used > cap_.value || (used & 7u) != 0) [[unlikely]]
             return framing_error<T>(wire, who);
-        if ((reinterpret_cast<std::uintptr_t>(wire.data()) & 7u) != 0) [[unlikely]]
-            return XError{XErrc::invalid_argument, std::string(who) + ": the wire must start on an 8-byte boundary"};
+        if ((reinterpret_cast<std::uintptr_t>(raw) & 7u) != 0) [[unlikely]]
+            return view_error(XErrc::invalid_argument, who, "the wire must start on an 8-byte boundary");
         // The wire is the image: offset 0 is its first byte.
-        const auto base = reinterpret_cast<std::uintptr_t>(wire.data());
+        const auto base = reinterpret_cast<std::uintptr_t>(raw);
         constexpr std::uint64_t root = XWIRE_PAYLOAD_BEGIN;
         if (sizeof(T) > used - root) [[unlikely]]
-            return XError{XErrc::root_mismatch, std::string(who) + ": root not found"};
+            return view_error(XErrc::root_mismatch, who, "root not found");
         const auto* object = reinterpret_cast<const T*>(base + root);
         if constexpr (C == XCheck::bounds) {
             detail::BoundsWalk walk{base, used, used};
             if (!detail::bounds_value(*object, walk)) [[unlikely]]
-                return XError{XErrc::invalid_payload, std::string(who) + ": " + walk.why};
+                return view_error(XErrc::invalid_payload, who, walk.why);
         }
         if constexpr (detail::force_full_check) {
             auto full = XBuffer::try_load_verified<T>(wire, cap_);
@@ -445,8 +449,12 @@ private:
     // The largest wire view() prefetches whole (16 lines).
     static constexpr std::size_t view_prefetch_bytes = 1024;
 
+    XOFFSET_DETAIL_COLD static XError view_error(XErrc code, const char* who, const char* detail) {
+        return XError{code, std::string(who) + ": " + detail};
+    }
+
     template <typename T>
-    XError framing_error(std::span<const std::byte> wire, const char* who) const {
+    XOFFSET_DETAIL_COLD XError framing_error(std::span<const std::byte> wire, const char* who) const {
         XStatus status = detail::try_v([&] { return detail::view_framing_error<T>(wire, cap_.value, who); });
         if (!status) return std::move(status).error();
         return XError{XErrc::unspecified, std::string(who) + ": framing"};
