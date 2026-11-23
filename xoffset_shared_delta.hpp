@@ -56,12 +56,18 @@ namespace XOffsetDatastructure::xsync {
         }
         template <class M> XOFFSET_DETAIL_INLINE void store(char* p, M v) noexcept { std::memcpy(p, &v, sizeof v); }
 
-        // n bytes from s to d. Up to 32 bytes it moves 32: d keeps kSyncSlack
-        // writable and s kSyncSlack readable past n.
+        // n bytes from s to d. Up to 32 bytes it moves 32 (d keeps kSyncSlack
+        // writable and s kSyncSlack readable past n); up to 64 bytes two
+        // overlapping 32-byte copies stay strictly within [0, n) and avoid
+        // out-of-line memcpy calls. Larger bodies call std::memcpy directly
+        // (not cold-wrapped, since conflict/combat deltas frequently exceed 64B).
         XOFFSET_DETAIL_INLINE void copy_body(char* d, const char* s, std::size_t n) noexcept {
             if (n <= 32) {
                 std::memcpy(d, s, 16);
                 std::memcpy(d + 16, s + 16, 16);
+            } else if (n <= 64) {
+                std::memcpy(d, s, 32);
+                std::memcpy(d + n - 32, s + n - 32, 32);
             } else std::memcpy(d, s, n);
         }
 
@@ -396,7 +402,14 @@ namespace XOffsetDatastructure::xsync {
             XOFFSET_DETAIL_INLINE static char* put(char* d, const T& r) noexcept {
                 const auto* s = reinterpret_cast<const char*>(&r);
                 if constexpr (flat) {
-                    std::memcpy(d, s, sizeof(T));
+                    if constexpr (sizeof(T) == 16 && alignof(T) >= 8) {
+                        // Two 8-byte copies avoid 8+8 -> 16-byte store-forwarding
+                        // stalls when r was just constructed from two 64-bit scalars.
+                        std::memcpy(d, s, 8);
+                        std::memcpy(d + 8, s + 8, 8);
+                    } else {
+                        std::memcpy(d, s, sizeof(T));
+                    }
                     return d + sizeof(T);
                 } else {
                     [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_DETAIL_LAMBDA_INLINE {
@@ -516,11 +529,130 @@ namespace XOffsetDatastructure::xsync {
             }();
             static constexpr std::uint64_t all = low_bits<N>;
             static constexpr std::uint64_t container_mask = all & ~plain_mask;
+            static constexpr std::size_t container_member_count = std::size_t(std::popcount(container_mask));
+
+            template <std::size_t S>
+            static constexpr std::uint64_t plain_size_mask = [] {
+                std::uint64_t m = 0;
+                [&]<std::size_t... K>(std::index_sequence<K...>) {
+                    ((m |= (kind<K> == kMemberPlain && size<K> == S) ? std::uint64_t(1) << K : 0), ...);
+                }(std::make_index_sequence<N>{});
+                return m;
+            }();
+            static constexpr std::uint64_t plain_other_mask =
+                plain_mask & ~(plain_size_mask<1> | plain_size_mask<2> | plain_size_mask<4> | plain_size_mask<8>);
+            static constexpr std::size_t plain_max_bytes = [] {
+                std::size_t s = 0;
+                [&]<std::size_t... K>(std::index_sequence<K...>) {
+                    ((s += kind<K> == kMemberPlain ? size<K> : 0), ...);
+                }(std::make_index_sequence<N>{});
+                return s;
+            }();
+
+            struct PlainGroup {
+                std::uint8_t lo;
+                std::uint8_t hi;
+                std::uint8_t count;
+                std::uint8_t elem_sz;
+                bool uniform_loop;
+                std::uint32_t base_off;
+                std::uint64_t mask;
+            };
+            static constexpr std::array<std::uint8_t, N> kinds = [] {
+                std::array<std::uint8_t, N> a{};
+                [&]<std::size_t... K>(std::index_sequence<K...>) { ((a[K] = kind<K>), ...); }(std::make_index_sequence<N>{});
+                return a;
+            }();
+            static constexpr std::array<std::uint32_t, N> offsets = [] {
+                std::array<std::uint32_t, N> a{};
+                [&]<std::size_t... K>(std::index_sequence<K...>) { ((a[K] = std::uint32_t(offset<K>)), ...); }(std::make_index_sequence<N>{});
+                return a;
+            }();
+            static constexpr std::array<std::uint32_t, N> sizes = [] {
+                std::array<std::uint32_t, N> a{};
+                [&]<std::size_t... K>(std::index_sequence<K...>) { ((a[K] = std::uint32_t(size<K>)), ...); }(std::make_index_sequence<N>{});
+                return a;
+            }();
+            static constexpr auto build_plain_groups() {
+                std::array<PlainGroup, N> g{};
+                std::size_t gn = 0;
+                auto uniform_run_at = [&](std::size_t idx) -> std::size_t {
+                    if (idx >= N || kinds[idx] != kMemberPlain) return 0;
+                    const std::uint32_t sz = sizes[idx];
+                    if (sz != 1 && sz != 2 && sz != 4 && sz != 8) return 0;
+                    std::size_t j = idx + 1;
+                    while (j < N && kinds[j] == kMemberPlain && sizes[j] == sz &&
+                           offsets[j] == offsets[idx] + std::uint32_t(j - idx) * sz) {
+                        ++j;
+                    }
+                    return (j - idx >= 4) ? (j - idx) : 0;
+                };
+                std::size_t i = 0;
+                while (i < N) {
+                    if (kinds[i] != kMemberPlain) { ++i; continue; }
+                    if (const std::size_t run = uniform_run_at(i)) {
+                        const std::size_t hi = i + run;
+                        const std::uint64_t m = ((hi == 64 ? ~std::uint64_t(0) : (std::uint64_t(1) << hi) - 1) &
+                                                 ~((std::uint64_t(1) << i) - 1));
+                        g[gn++] = PlainGroup{std::uint8_t(i), std::uint8_t(hi), std::uint8_t(run),
+                                             std::uint8_t(sizes[i]), true, offsets[i], m};
+                        i = hi;
+                        continue;
+                    }
+                    const std::size_t lo = i;
+                    std::uint64_t m = 0;
+                    std::size_t cnt = 0;
+                    while (i < N && cnt < 8) {
+                        if (kinds[i] == kMemberPlain) {
+                            if (i > lo && uniform_run_at(i) != 0) break;
+                            m |= std::uint64_t(1) << i;
+                            ++cnt;
+                        }
+                        ++i;
+                    }
+                    g[gn++] = PlainGroup{std::uint8_t(lo), std::uint8_t(i), std::uint8_t(cnt),
+                                         0, false, 0, m};
+                }
+                return std::pair{g, gn};
+            }
+            static constexpr auto plain_groups_pair = build_plain_groups();
+            static constexpr std::size_t plain_group_count = plain_groups_pair.second;
+            static constexpr auto plain_groups = plain_groups_pair.first;
+
+            template <std::size_t Lo, std::size_t Hi, class F>
+            XOFFSET_DETAIL_INLINE static void for_each_uniform_bit(std::uint64_t mask, F&& f) noexcept {
+                constexpr std::size_t width = Hi - Lo;
+                if constexpr (width <= 32) {
+                    constexpr std::uint32_t low_mask = width == 32 ? ~std::uint32_t(0) : ((std::uint32_t(1) << width) - 1u);
+                    if (std::uint32_t m = std::uint32_t(mask >> Lo) & low_mask) {
+                        do {
+                            const unsigned idx = unsigned(std::countr_zero(m));
+                            f(idx);
+                            m &= m - 1;
+                        } while (m);
+                    }
+                } else {
+                    constexpr std::uint64_t low_mask = width == 64 ? ~std::uint64_t(0) : ((std::uint64_t(1) << width) - 1u);
+                    if (std::uint64_t m = (mask >> Lo) & low_mask) {
+                        do {
+                            const unsigned idx = unsigned(std::countr_zero(m));
+                            f(idx);
+                            m &= m - 1;
+                        } while (m);
+                    }
+                }
+            }
 
             // f.template operator()<K>() for member k (k < N).
             template <class F> XOFFSET_DETAIL_INLINE static void member(unsigned k, F&& f) {
                 [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_DETAIL_LAMBDA_INLINE {
                     (void)((k == K ? (f.template operator()<K>(), true) : false) || ...);
+                }(std::make_index_sequence<N>{});
+            }
+            // f.template operator()<K>() for container member k (bit k in container_mask).
+            template <class F> XOFFSET_DETAIL_INLINE static void container_member(unsigned k, F&& f) {
+                [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_DETAIL_LAMBDA_INLINE {
+                    (void)(((kind<K> != kMemberPlain && k == K) ? (f.template operator()<K>(), true) : false) || ...);
                 }(std::make_index_sequence<N>{});
             }
         };
@@ -558,9 +690,37 @@ namespace XOffsetDatastructure::xsync {
         XOFFSET_DETAIL_INLINE static std::size_t change_room(const T& r, std::uint64_t mask) noexcept {
             using M = members;
             std::size_t n = sizeof(typename M::Mask);
-            [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_DETAIL_LAMBDA_INLINE {
-                ((mask >> K & 1u ? (void)(n += member_room<K>(r)) : (void)0), ...);
-            }(std::make_index_sequence<M::N>{});
+            if constexpr (M::plain_max_bytes <= 256) {
+                // Upper bound for all plain members: avoids popcount/branches in room
+                // reservation while keeping reservation headroom tiny (<= 256 B).
+                n += M::plain_max_bytes;
+            } else {
+                n += plain_size_room<1>(mask) + plain_size_room<2>(mask)
+                   + plain_size_room<4>(mask) + plain_size_room<8>(mask);
+                if constexpr (M::plain_other_mask != 0) {
+                    if (mask & M::plain_other_mask) {
+                        [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_DETAIL_LAMBDA_INLINE {
+                            (((((M::plain_other_mask >> K) & 1u) && ((mask >> K) & 1u))
+                                  ? (void)(n += M::template size<K>) : (void)0), ...);
+                        }(std::make_index_sequence<M::N>{});
+                    }
+                }
+            }
+            if constexpr (M::container_mask != 0) {
+                if (const std::uint64_t cm = mask & M::container_mask) {
+                    if constexpr (M::container_member_count <= 8) {
+                        [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_DETAIL_LAMBDA_INLINE {
+                            ((M::template kind<K> != sd_detail::kMemberPlain && ((cm >> K) & 1u)
+                                  ? (void)(n += member_room<K>(r)) : (void)0), ...);
+                        }(std::make_index_sequence<M::N>{});
+                    } else {
+                        for (std::uint64_t m = cm; m; m &= m - 1)
+                            M::container_member(unsigned(std::countr_zero(m)), [&]<std::size_t K>() XOFFSET_DETAIL_LAMBDA_INLINE {
+                                n += member_room<K>(r);
+                            });
+                    }
+                }
+            }
             return n;
         }
         /// Writes the change body of the members in mask (bits past the
@@ -572,18 +732,25 @@ namespace XOffsetDatastructure::xsync {
             sd_detail::store<typename M::Mask>(d, typename M::Mask(mask));
             d += sizeof(typename M::Mask);
             const auto* s = reinterpret_cast<const char*>(&r);
-            // One test per plain member, each a copy of a compile-time size.
-            [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_DETAIL_LAMBDA_INLINE {
-                ((M::template kind<K> == sd_detail::kMemberPlain && (mask >> K & 1u)
-                      ? (void)(std::memcpy(d, s + M::template offset<K>, M::template size<K>), d += M::template size<K>)
-                      : (void)0),
-                 ...);
-            }(std::make_index_sequence<M::N>{});
+            // Uniform contiguous runs of same-size plain scalars use a tight ctz loop;
+            // remaining plain members use guarded small chunks with compile-time memcpy sizes.
+            [&]<std::size_t... G>(std::index_sequence<G...>) XOFFSET_DETAIL_LAMBDA_INLINE {
+                (put_plain_group<G>(d, s, mask), ...);
+            }(std::make_index_sequence<M::plain_group_count>{});
             if constexpr (M::container_mask != 0) {
-                for (std::uint64_t m = mask & M::container_mask; m; m &= m - 1)
-                    M::member(unsigned(std::countr_zero(m)), [&]<std::size_t K>() XOFFSET_DETAIL_LAMBDA_INLINE {
-                        d = put_member<K>(d, r);
-                    });
+                if (const std::uint64_t cm = mask & M::container_mask) {
+                    if constexpr (M::container_member_count <= 8) {
+                        [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_DETAIL_LAMBDA_INLINE {
+                            ((M::template kind<K> != sd_detail::kMemberPlain && ((cm >> K) & 1u)
+                                  ? (void)(d = put_member<K>(d, r)) : (void)0), ...);
+                        }(std::make_index_sequence<M::N>{});
+                    } else {
+                        for (std::uint64_t m = cm; m; m &= m - 1)
+                            M::container_member(unsigned(std::countr_zero(m)), [&]<std::size_t K>() XOFFSET_DETAIL_LAMBDA_INLINE {
+                                d = put_member<K>(d, r);
+                            });
+                    }
+                }
             }
             return d;
         }
@@ -629,17 +796,23 @@ namespace XOffsetDatastructure::xsync {
             const std::uint64_t mask = sd_detail::load<typename M::Mask>(p);
             p += sizeof(typename M::Mask);
             auto* d = reinterpret_cast<char*>(&r);
-            [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_DETAIL_LAMBDA_INLINE {
-                ((M::template kind<K> == sd_detail::kMemberPlain && (mask >> K & 1u)
-                      ? (void)(std::memcpy(d + M::template offset<K>, p, M::template size<K>), p += M::template size<K>)
-                      : (void)0),
-                 ...);
-            }(std::make_index_sequence<M::N>{});
+            [&]<std::size_t... G>(std::index_sequence<G...>) XOFFSET_DETAIL_LAMBDA_INLINE {
+                (apply_plain_group<G>(d, p, mask), ...);
+            }(std::make_index_sequence<M::plain_group_count>{});
             if constexpr (M::container_mask != 0) {
-                for (std::uint64_t m = mask & M::container_mask; m; m &= m - 1)
-                    M::member(unsigned(std::countr_zero(m)), [&]<std::size_t K>() XOFFSET_DETAIL_LAMBDA_INLINE {
-                        p = apply_member<K>(p, r);
-                    });
+                if (const std::uint64_t cm = mask & M::container_mask) {
+                    if constexpr (M::container_member_count <= 8) {
+                        [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_DETAIL_LAMBDA_INLINE {
+                            ((M::template kind<K> != sd_detail::kMemberPlain && ((cm >> K) & 1u)
+                                  ? (void)(p = apply_member<K>(p, r)) : (void)0), ...);
+                        }(std::make_index_sequence<M::N>{});
+                    } else {
+                        for (std::uint64_t m = cm; m; m &= m - 1)
+                            M::container_member(unsigned(std::countr_zero(m)), [&]<std::size_t K>() XOFFSET_DETAIL_LAMBDA_INLINE {
+                                p = apply_member<K>(p, r);
+                            });
+                    }
+                }
             }
             return p;
         }
@@ -672,6 +845,102 @@ namespace XOffsetDatastructure::xsync {
     private:
         template <std::size_t K> using member_t = typename members::template type<K>;
         template <std::size_t K> static constexpr std::size_t member_off = members::template offset<K>;
+
+        XOFFSET_DETAIL_INLINE static unsigned fast_popcount32(std::uint32_t x) noexcept {
+#if defined(__POPCNT__) || defined(__aarch64__) || defined(_M_ARM64)
+            return unsigned(std::popcount(x));
+#else
+            x -= (x >> 1) & 0x55555555u;
+            x = (x & 0x33333333u) + ((x >> 2) & 0x33333333u);
+            return unsigned((((x + (x >> 4)) & 0x0F0F0F0Fu) * 0x01010101u) >> 24);
+#endif
+        }
+        template <std::size_t S>
+        XOFFSET_DETAIL_INLINE static std::size_t plain_size_room(std::uint64_t mask) noexcept {
+            using M = members;
+            constexpr std::uint64_t sm = M::template plain_size_mask<S>;
+            if constexpr (sm == 0) {
+                return 0;
+            } else if constexpr (std::popcount(sm) <= 3) {
+                std::size_t bytes = 0;
+                [&]<std::size_t... K>(std::index_sequence<K...>) XOFFSET_DETAIL_LAMBDA_INLINE {
+                    (((((sm >> K) & 1u) && ((mask >> K) & 1u)) ? (void)(bytes += S) : (void)0), ...);
+                }(std::make_index_sequence<M::N>{});
+                return bytes;
+            } else if constexpr ((sm >> 32) == 0) {
+                const std::uint32_t m = std::uint32_t(mask) & std::uint32_t(sm);
+                return m ? std::size_t(fast_popcount32(m)) * S : 0;
+            } else {
+                const std::uint64_t m = mask & sm;
+                return m ? std::size_t(fast_popcount32(std::uint32_t(m)) + fast_popcount32(std::uint32_t(m >> 32))) * S : 0;
+            }
+        }
+        template <std::size_t Lo, std::size_t Len>
+        XOFFSET_DETAIL_INLINE static void put_plain_chunk(char*& d, const char* s, std::uint64_t mask) noexcept {
+            using M = members;
+            [&]<std::size_t... Off>(std::index_sequence<Off...>) XOFFSET_DETAIL_LAMBDA_INLINE {
+                ((M::template kind<Lo + Off> == sd_detail::kMemberPlain && ((mask >> (Lo + Off)) & 1u)
+                      ? (void)(std::memcpy(d, s + M::template offset<Lo + Off>, M::template size<Lo + Off>),
+                               d += M::template size<Lo + Off>)
+                      : (void)0), ...);
+            }(std::make_index_sequence<Len>{});
+        }
+        template <std::size_t Lo, std::size_t Len>
+        XOFFSET_DETAIL_INLINE static void apply_plain_chunk(char* d, const char*& p, std::uint64_t mask) noexcept {
+            using M = members;
+            [&]<std::size_t... Off>(std::index_sequence<Off...>) XOFFSET_DETAIL_LAMBDA_INLINE {
+                ((M::template kind<Lo + Off> == sd_detail::kMemberPlain && ((mask >> (Lo + Off)) & 1u)
+                      ? (void)(std::memcpy(d + M::template offset<Lo + Off>, p, M::template size<Lo + Off>),
+                               p += M::template size<Lo + Off>)
+                      : (void)0), ...);
+            }(std::make_index_sequence<Len>{});
+        }
+        template <std::size_t G>
+        XOFFSET_DETAIL_INLINE static void put_plain_group(char*& d, const char* s, std::uint64_t mask) noexcept {
+            using M = members;
+            constexpr std::size_t kLo = M::plain_groups[G].lo;
+            constexpr std::size_t kHi = M::plain_groups[G].hi;
+            constexpr std::size_t kCount = M::plain_groups[G].count;
+            constexpr std::size_t kElemSz = M::plain_groups[G].elem_sz;
+            constexpr std::size_t kBaseOff = M::plain_groups[G].base_off;
+            constexpr std::uint64_t kMask = M::plain_groups[G].mask;
+            if constexpr (M::plain_groups[G].uniform_loop) {
+                M::template for_each_uniform_bit<kLo, kHi>(mask, [&](unsigned idx) XOFFSET_DETAIL_LAMBDA_INLINE {
+                    std::memcpy(d, s + kBaseOff + std::size_t(idx) * kElemSz, kElemSz);
+                    d += kElemSz;
+                });
+            } else if constexpr (kCount == 1) {
+                if ((mask >> kLo) & 1u) {
+                    std::memcpy(d, s + M::template offset<kLo>, M::template size<kLo>);
+                    d += M::template size<kLo>;
+                }
+            } else {
+                if (mask & kMask) put_plain_chunk<kLo, kHi - kLo>(d, s, mask);
+            }
+        }
+        template <std::size_t G>
+        XOFFSET_DETAIL_INLINE static void apply_plain_group(char* d, const char*& p, std::uint64_t mask) noexcept {
+            using M = members;
+            constexpr std::size_t kLo = M::plain_groups[G].lo;
+            constexpr std::size_t kHi = M::plain_groups[G].hi;
+            constexpr std::size_t kCount = M::plain_groups[G].count;
+            constexpr std::size_t kElemSz = M::plain_groups[G].elem_sz;
+            constexpr std::size_t kBaseOff = M::plain_groups[G].base_off;
+            constexpr std::uint64_t kMask = M::plain_groups[G].mask;
+            if constexpr (M::plain_groups[G].uniform_loop) {
+                M::template for_each_uniform_bit<kLo, kHi>(mask, [&](unsigned idx) XOFFSET_DETAIL_LAMBDA_INLINE {
+                    std::memcpy(d + kBaseOff + std::size_t(idx) * kElemSz, p, kElemSz);
+                    p += kElemSz;
+                });
+            } else if constexpr (kCount == 1) {
+                if ((mask >> kLo) & 1u) {
+                    std::memcpy(d + M::template offset<kLo>, p, M::template size<kLo>);
+                    p += M::template size<kLo>;
+                }
+            } else {
+                if (mask & kMask) apply_plain_chunk<kLo, kHi - kLo>(d, p, mask);
+            }
+        }
 
         template <std::size_t K> XOFFSET_DETAIL_INLINE static std::size_t member_room(const T& r) noexcept {
             constexpr auto kind = members::template kind<K>;
@@ -1176,16 +1445,23 @@ namespace XOffsetDatastructure::xsync {
         template <unsigned N, class F>
         XOFFSET_DETAIL_INLINE const char* sync_switch(unsigned table, F&& f) {
             static_assert(N >= 1 && N <= kSyncTables, "XReceiver::apply_sync: a target has 1 to 64 tables");
-            switch (table) {
 #define XOFFSET_SYNC_CASE(k) case k: if constexpr ((k) < N) return f.template operator()<(k)>(); else break;
 #define XOFFSET_SYNC_CASE8(k) XOFFSET_SYNC_CASE(k) XOFFSET_SYNC_CASE(k + 1) XOFFSET_SYNC_CASE(k + 2) XOFFSET_SYNC_CASE(k + 3) \
                               XOFFSET_SYNC_CASE(k + 4) XOFFSET_SYNC_CASE(k + 5) XOFFSET_SYNC_CASE(k + 6) XOFFSET_SYNC_CASE(k + 7)
-            XOFFSET_SYNC_CASE8(0) XOFFSET_SYNC_CASE8(8) XOFFSET_SYNC_CASE8(16) XOFFSET_SYNC_CASE8(24)
-            XOFFSET_SYNC_CASE8(32) XOFFSET_SYNC_CASE8(40) XOFFSET_SYNC_CASE8(48) XOFFSET_SYNC_CASE8(56)
+            if constexpr (N <= 8) {
+                switch (table) {
+                XOFFSET_SYNC_CASE8(0)
+                default: break;
+                }
+            } else {
+                switch (table) {
+                XOFFSET_SYNC_CASE8(0) XOFFSET_SYNC_CASE8(8) XOFFSET_SYNC_CASE8(16) XOFFSET_SYNC_CASE8(24)
+                XOFFSET_SYNC_CASE8(32) XOFFSET_SYNC_CASE8(40) XOFFSET_SYNC_CASE8(48) XOFFSET_SYNC_CASE8(56)
+                default: break;
+                }
+            }
 #undef XOFFSET_SYNC_CASE8
 #undef XOFFSET_SYNC_CASE
-            default: break;
-            }
             return kUnknownTable;
         }
 

@@ -49,19 +49,62 @@ namespace XOffsetDatastructure::xsync {
         constexpr std::uint32_t section(std::size_t n, unsigned table, XSyncKind kind) noexcept {
             return std::uint32_t(n) << 8 | std::uint32_t(table << 2 | unsigned(kind));
         }
-        // How the slow paths take the application's Src: a light view (two
-        // pointers at most, trivially copyable) by value, so the caller's
-        // copy stays in registers; anything else by reference.
+        // How the slow paths take the application's Src: a light view by value
+        // when it fits in registers on the platform ABI (2 pointers on SysV/ARM64,
+        // 1 pointer on Windows x64 MSVC), otherwise by reference to avoid stack
+        // copies and callee-saved XMM spills in hot dispatchers.
         template <class S, class B = std::remove_cvref_t<S>>
+#if defined(_WIN64) && defined(_MSC_VER) && !defined(__clang__)
+        using src_arg = std::conditional_t<std::is_trivially_copyable_v<B> && sizeof(B) <= sizeof(void*), B, std::remove_reference_t<S>&>;
+#else
         using src_arg = std::conditional_t<std::is_trivially_copyable_v<B> && sizeof(B) <= 2 * sizeof(void*), B, std::remove_reference_t<S>&>;
+#endif
         // A message's bytes up to q kept and n more writable past them:
-        // where q and the end of the room are now.
-        struct Room { char* q; char* end; };
-        XOFFSET_DETAIL_COLD inline Room grow_message(XSyncOut& out, char* q, std::size_t n) {
+        // returns where q is now (end is out.data() + out.capacity()).
+        // Returning a single pointer avoids a 16-byte hidden-return stack temp on Win64.
+        XOFFSET_DETAIL_COLD inline char* grow_message(XSyncOut& out, char* q, std::size_t n) {
             out.commit(std::size_t(q - out.data()) - out.size());
-            char* const r = out.tail(n);
-            return {r, out.data() + out.capacity()};
+            return out.tail(n);
         }
+        // Small compile-time-indexed uint32_t storage without an array member for N <= 4,
+        // so MSVC can SROA XSyncMessage and does not emit /GS stack cookies for it.
+        template <std::size_t N> struct SmallU32 {
+            std::array<std::uint32_t, N> v{};
+            template <std::size_t J> XOFFSET_DETAIL_INLINE std::uint32_t& at() noexcept { return v[J]; }
+            template <std::size_t J> XOFFSET_DETAIL_INLINE std::uint32_t at() const noexcept { return v[J]; }
+        };
+        template <> struct SmallU32<1> {
+            std::uint32_t v0 = 0;
+            template <std::size_t J> XOFFSET_DETAIL_INLINE std::uint32_t& at() noexcept { static_assert(J == 0); return v0; }
+            template <std::size_t J> XOFFSET_DETAIL_INLINE std::uint32_t at() const noexcept { static_assert(J == 0); return v0; }
+        };
+        template <> struct SmallU32<2> {
+            std::uint32_t v0 = 0, v1 = 0;
+            template <std::size_t J> XOFFSET_DETAIL_INLINE std::uint32_t& at() noexcept {
+                if constexpr (J == 0) return v0; else { static_assert(J == 1); return v1; }
+            }
+            template <std::size_t J> XOFFSET_DETAIL_INLINE std::uint32_t at() const noexcept {
+                if constexpr (J == 0) return v0; else { static_assert(J == 1); return v1; }
+            }
+        };
+        template <> struct SmallU32<3> {
+            std::uint32_t v0 = 0, v1 = 0, v2 = 0;
+            template <std::size_t J> XOFFSET_DETAIL_INLINE std::uint32_t& at() noexcept {
+                if constexpr (J == 0) return v0; else if constexpr (J == 1) return v1; else { static_assert(J == 2); return v2; }
+            }
+            template <std::size_t J> XOFFSET_DETAIL_INLINE std::uint32_t at() const noexcept {
+                if constexpr (J == 0) return v0; else if constexpr (J == 1) return v1; else { static_assert(J == 2); return v2; }
+            }
+        };
+        template <> struct SmallU32<4> {
+            std::uint32_t v0 = 0, v1 = 0, v2 = 0, v3 = 0;
+            template <std::size_t J> XOFFSET_DETAIL_INLINE std::uint32_t& at() noexcept {
+                if constexpr (J == 0) return v0; else if constexpr (J == 1) return v1; else if constexpr (J == 2) return v2; else { static_assert(J == 3); return v3; }
+            }
+            template <std::size_t J> XOFFSET_DETAIL_INLINE std::uint32_t at() const noexcept {
+                if constexpr (J == 0) return v0; else if constexpr (J == 1) return v1; else if constexpr (J == 2) return v2; else { static_assert(J == 3); return v3; }
+            }
+        };
         template <class... F> constexpr std::size_t conn_bytes() noexcept {
             return 4 + 6 * sizeof...(F) + (std::size_t(0) + ... + F::hot);
         }
@@ -146,8 +189,10 @@ namespace XOffsetDatastructure::xsync {
         /// of an array of connections included: call it after finish() for the
         /// connection served next.
         XOFFSET_DETAIL_INLINE static void prefetch(const XSyncConn* c) noexcept {
-            const char* p = reinterpret_cast<const char*>(c);
-            for (std::size_t o = 0; o < sizeof(XSyncConn); o += 64) XOFFSET_DETAIL_PREFETCH(p + o, 1);
+            const char* const p = reinterpret_cast<const char*>(c);
+            [p]<std::size_t... I>(std::index_sequence<I...>) XOFFSET_DETAIL_LAMBDA_INLINE {
+                (XOFFSET_DETAIL_PREFETCH_WITH_MSVC(p + I * 64, 1), ...);
+            }(std::make_index_sequence<(sizeof(XSyncConn) + 63) / 64>{});
         }
     };
 
@@ -207,13 +252,18 @@ namespace XOffsetDatastructure::xsync {
         /// Ends the message: the slots that left are free from the next
         /// message on, the version goes up and is written. Returns the length.
         XOFFSET_DETAIL_INLINE std::size_t finish() {
+            XSyncOut& o = *out_;
+            char* const b = o.data();
+            Conn& c = *conn_;
             [&]<std::size_t... J>(std::index_sequence<J...>) XOFFSET_DETAIL_LAMBDA_INLINE {
-                (give<J>(), ...);
+                (give<J>(c, b), ...);
             }(std::make_index_sequence<Conn::keyed>{});
-            char* const b = out_->data();
-            sd_detail::store<std::uint32_t>(b + 4, ++conn_->version);
-            out_->commit(std::size_t(q_ - b) - out_->size());
-            return out_->size();
+            const std::uint32_t ver = c.version + 1;
+            c.version = ver;
+            sd_detail::store<std::uint32_t>(b + 4, ver);
+            const std::size_t n = std::size_t(q_ - b);
+            o.commit(n - o.size());
+            return n;
         }
 
     private:
@@ -224,13 +274,16 @@ namespace XOffsetDatastructure::xsync {
         XOFFSET_DETAIL_INLINE void start(const Root& root, std::uint8_t flags, const std::uint64_t* stream) {
             static_assert(XRecordBody<Root>::container_count == 0, "xsync: the root record (table 0) has no containers");
             pub_->dispatching_ = true;
-            out_->clear();
-            char* b = out_->tail(kSyncHead + 8 + XRecordBody<Root>::whole_body::fixed + kSyncSlack);
+            XSyncOut& o = *out_;
+            o.clear();
+            constexpr std::size_t need = kSyncHead + 8 + XRecordBody<Root>::whole_body::fixed + kSyncSlack;
+            if (o.capacity() < need) [[unlikely]] o.reserve(need);
+            char* const b = o.data();
             b[0] = 'X'; b[1] = 'S'; b[2] = char(kFormat); b[3] = char(flags);
             char* d = b + kSyncHead;
             if (stream) { sd_detail::store<std::uint64_t>(d, *stream); d += 8; }
             q_ = XRecordBody<Root>::put_whole(d, root);
-            end_ = b + out_->capacity();
+            end_ = b + o.capacity();
 #if XOFFSET_SYNC_CHECKS
             tick_ = pub_->tick_;
             serial_ = ++cold_->serial;
@@ -239,18 +292,17 @@ namespace XOffsetDatastructure::xsync {
         // Room for n more bytes at q_.
         XOFFSET_DETAIL_INLINE void room(std::size_t n) {
             if (std::size_t(end_ - q_) < n) [[unlikely]] {
-                const sd_detail::Room r = sd_detail::grow_message(*out_, q_, n);
-                q_ = r.q;
-                end_ = r.end;
+                q_ = sd_detail::grow_message(*out_, q_, n);
+                end_ = out_->data() + out_->capacity();
             }
         }
         // The same inside a section: its cursor q and its head sec move with the bytes.
         XOFFSET_DETAIL_INLINE void room(char*& q, char*& sec, std::size_t n) {
             if (std::size_t(end_ - q) < n) [[unlikely]] {
-                const sd_detail::Room r = sd_detail::grow_message(*out_, q, n);
-                sec = r.q - (q - sec);
-                q = r.q;
-                end_ = r.end;
+                const std::ptrdiff_t off = q - sec;
+                q = sd_detail::grow_message(*out_, q, n);
+                sec = q - off;
+                end_ = out_->data() + out_->capacity();
             }
         }
         XOFFSET_DETAIL_INLINE static void count(std::size_t n) {
@@ -264,7 +316,7 @@ namespace XOffsetDatastructure::xsync {
             Conn& c;
             cold_type& k;
             std::uint32_t n, used;
-            XOFFSET_DETAIL_INLINE explicit Taker(XSyncMessage& m) : c(*m.conn_), k(*m.cold_), n(m.conn_->n[J]), used(m.conn_->used[J]) {}
+            XOFFSET_DETAIL_INLINE Taker(Conn& conn, cold_type& cold) noexcept : c(conn), k(cold), n(conn.n[J]), used(conn.used[J]) {}
             XOFFSET_DETAIL_INLINE std::uint32_t take() {
                 if (n) return c.stack[Conn::at[J] + --n];
                 if (c.spill[J]) [[unlikely]] return unspill<J>(c, k);
@@ -290,18 +342,21 @@ namespace XOffsetDatastructure::xsync {
             }
             c.n[J] = std::uint8_t(n);
         }
-        template <std::size_t J> XOFFSET_DETAIL_INLINE void give() {
-            const std::uint32_t k = ln_[J];
+        template <std::size_t J> XOFFSET_DETAIL_INLINE void give(Conn& c, const char* base) {
+            const std::uint32_t k = ln_.template at<J>();
             if (!k) return;
-            const char* const p = out_->data() + loff_[J];
-            Conn& c = *conn_;
+            const char* const p = base + loff_.template at<J>();
 #if XOFFSET_SYNC_CHECKS
             for (std::uint32_t i = 0; i < k; ++i) cold_->owner[J][sd_detail::load<std::uint32_t>(p + 4 * i)] = 0;
 #endif
             const std::uint32_t n = c.n[J];
             if (n + k <= Conn::hot[J] && c.used[J] <= 256) [[likely]] {
+                std::uint8_t* dst = c.stack.data() + Conn::at[J] + n;
+                std::size_t i = 0;
                 XOFFSET_DETAIL_NOVECTOR
-                for (std::uint32_t i = 0; i < k; ++i) c.stack[Conn::at[J] + n + i] = std::uint8_t(sd_detail::load<std::uint32_t>(p + 4 * i));
+                do {
+                    dst[i] = std::uint8_t(sd_detail::load<std::uint32_t>(p + 4 * i));
+                } while (++i < k);
                 c.n[J] = std::uint8_t(n + k);
             } else give_slow<J>(c, *cold_, p, k);
         }
@@ -335,10 +390,10 @@ namespace XOffsetDatastructure::xsync {
         Conn* conn_;
         cold_type* cold_;
         XSyncOut* out_;
-        char* q_ = nullptr;
-        char* end_ = nullptr;
-        std::array<std::uint32_t, Conn::keyed> loff_{};   // each stack's leave ops, from the message's start
-        std::array<std::uint32_t, Conn::keyed> ln_{};     // and how many
+        char* q_;
+        char* end_;
+        sd_detail::SmallU32<Conn::keyed> loff_{};   // each stack's leave ops, from the message's start
+        sd_detail::SmallU32<Conn::keyed> ln_{};     // and how many
 #if XOFFSET_SYNC_CHECKS
         std::uint32_t tick_ = kSyncNever, serial_ = 0;
 #endif
@@ -373,10 +428,15 @@ namespace XOffsetDatastructure::xsync {
         static_assert(XRecordBody<T>::members::N <= 64, "xsync: a dirty bit per member, at most 64");
 
     public:
-        struct Entry : sd_detail::EntryHead {
-            std::uint64_t now = 0, old = 0;          // bits of tick ptick; bits of earlier ticks no first use took
-            std::uint32_t ptick = kSyncNever, rtick = kSyncNever;   // the tick of now; of the last first use
+        struct Entry {
+            // Hot group 1 (changes): 16 bytes contiguous to minimize cache-line splits.
+            std::uint32_t tick = kSyncNever, off = 0, len = 0, rtick = kSyncNever;
+            // Hot group 2 (enters / leaves): 16 bytes contiguous.
+            std::uint32_t ktick = kSyncNever, koff = 0, klen = 0;
             std::int32_t hold = 0;                   // connections holding the entity
+            // Cold group (publish / fill only).
+            std::uint64_t now = 0, old = 0;          // bits of tick ptick; bits of earlier ticks no first use took
+            std::uint32_t ptick = kSyncNever;        // the tick of now
 #if XOFFSET_SYNC_CHECKS
             std::uint32_t h0 = 0, left = 0, sent = 0;   // at the change body's tick: holders then, leaves, change ops
 #endif
@@ -401,7 +461,7 @@ namespace XOffsetDatastructure::xsync {
             seen_tick_ = tick;
 #endif
             Entry* const es = e_.data();
-            for (const auto i : changed) XOFFSET_DETAIL_PREFETCH(&es[std::size_t(i)], 0);
+            for (const auto i : changed) XOFFSET_DETAIL_PREFETCH_WITH_MSVC(&es[std::size_t(i)], 0);
             const T* images = nullptr;
             if constexpr (requires { src.images(); }) images = src.images();
             const auto image_at = [&](std::uint32_t i) -> const T* {
@@ -413,8 +473,10 @@ namespace XOffsetDatastructure::xsync {
                 if (e.ptick != tick) { e.old |= e.now; e.now = 0; e.ptick = tick; }
                 e.now |= src.dirty(std::uint32_t(i));
                 if (e.hold > 0) {
-                    const char* r = reinterpret_cast<const char*>(image_at(std::uint32_t(i)));
-                    for (std::size_t o = 0; o < sizeof(T); o += 64) XOFFSET_DETAIL_PREFETCH(r + o, 0);
+                    const char* const r = reinterpret_cast<const char*>(image_at(std::uint32_t(i)));
+                    [r]<std::size_t... O>(std::index_sequence<O...>) XOFFSET_DETAIL_LAMBDA_INLINE {
+                        (XOFFSET_DETAIL_PREFETCH_WITH_MSVC(r + O * 64, 0), ...);
+                    }(std::make_index_sequence<(sizeof(T) + 63) / 64>{});
                 }
             }
             for (const auto i : changed) {
@@ -436,7 +498,7 @@ namespace XOffsetDatastructure::xsync {
 #if XOFFSET_SYNC_CHECKS
             m.check_tick();
             if (index.size() != n) sd_detail::sync_fail("xsync: leaves() takes an index per slot");
-            if (m.ln_[J]) sd_detail::sync_fail("xsync: two leave sections of one table in a message");
+            if (m.ln_.template at<J>()) sd_detail::sync_fail("xsync: two leave sections of one table in a message");
             for (std::size_t i = 0; i < n; ++i) {
                 Entry& e = e_[std::size_t(index[i])];
                 m.template check_slot<J>(std::uint32_t(slot[i]), std::uint32_t(index[i]) + 1);
@@ -444,19 +506,30 @@ namespace XOffsetDatastructure::xsync {
                 if (e.tick == m.pub_->tick_) ++e.left;
             }
 #endif
+            const std::int32_t* const ix = index.data();
+            Entry* const es = e_.data();
+            {
+                std::size_t i = 0;
+                XOFFSET_DETAIL_NOVECTOR
+                do { XOFFSET_DETAIL_PREFETCH_WITH_MSVC(&es[std::size_t(ix[i])].hold, 1); } while (++i < n);
+            }
             m.room(4 + 4 * n);
             char* const q = m.q_;
             sd_detail::store<std::uint32_t>(q, sd_detail::section(n, K, XSyncKind::leave));
             const std::int32_t* const s = slot.data();
-            XOFFSET_DETAIL_NOVECTOR
-            for (std::size_t i = 0; i < n; ++i) sd_detail::store<std::uint32_t>(q + 4 + 4 * i, std::uint32_t(s[i]));
-            m.loff_[J] = std::uint32_t(q + 4 - m.out_->data());
-            m.ln_[J] = std::uint32_t(n);
+            {
+                std::size_t i = 0;
+                XOFFSET_DETAIL_NOVECTOR
+                do { sd_detail::store<std::uint32_t>(q + 4 + 4 * i, std::uint32_t(s[i])); } while (++i < n);
+            }
+            m.loff_.template at<J>() = std::uint32_t(q + 4 - m.out_->data());
+            m.ln_.template at<J>() = std::uint32_t(n);
             m.q_ = q + 4 + 4 * n;
-            const std::int32_t* const ix = index.data();
-            Entry* const es = e_.data();
-            XOFFSET_DETAIL_NOVECTOR
-            for (std::size_t i = 0; i < n; ++i) --es[std::size_t(ix[i])].hold;
+            {
+                std::size_t i = 0;
+                XOFFSET_DETAIL_NOVECTOR
+                do { --es[std::size_t(ix[i])].hold; } while (++i < n);
+            }
         }
 
         /// A change section: for each index the client holds (at slot), its
@@ -470,8 +543,11 @@ namespace XOffsetDatastructure::xsync {
             const std::int32_t* const sl = slot.data();
             Entry* const es = e_.data();
             // The whole list is in hand: its entries are fetched first, so their misses overlap.
-            XOFFSET_DETAIL_NOVECTOR
-            for (std::size_t r = 0; r < n; ++r) XOFFSET_DETAIL_PREFETCH(&es[std::size_t(ix[r])], 0);
+            {
+                std::size_t r = 0;
+                XOFFSET_DETAIL_NOVECTOR
+                do { XOFFSET_DETAIL_PREFETCH_WITH_MSVC(&es[std::size_t(ix[r])], 0); } while (++r < n);
+            }
 #if XOFFSET_SYNC_CHECKS
             m.check_tick();
             if (slot.size() != n) sd_detail::sync_fail("xsync: changes() takes a slot per index");
@@ -483,21 +559,41 @@ namespace XOffsetDatastructure::xsync {
             char* sec = q;
             q += 4;
             const std::uint32_t tick = m.pub_->tick_;
+            const char* bodies = m.pub_->bodies_.data();
             std::uint32_t k = 0;
-            for (std::size_t r = 0; r < n; ++r) {
+            std::size_t r = 0;
+            do {
                 Entry& e = es[std::size_t(ix[r])];
-                if (e.rtick != tick) fill<sd_detail::src_arg<Src>>(e, std::uint32_t(ix[r]), *m.pub_, src);
+                if (e.rtick != tick) [[unlikely]] {
+                    fill<sd_detail::src_arg<Src>>(e, std::uint32_t(ix[r]), *m.pub_, src);
+                    bodies = m.pub_->bodies_.data();
+                }
                 if (e.tick == tick) {
-                    if (e.len > ChangeOp) [[unlikely]] m.room(q, sec, (n - r) * kChangeRoom + e.len);
-                    sd_detail::copy_body(q, m.bodies() + e.off, e.len);
+                    const std::uint32_t len = e.len;
+                    if constexpr (ChangeOp >= 64) {
+                        const char* const s = bodies + e.off;
+                        if (len <= 32) {
+                            std::memcpy(q, s, 16);
+                            std::memcpy(q + 16, s + 16, 16);
+                        } else if (len <= 64) {
+                            std::memcpy(q, s, 32);
+                            std::memcpy(q + len - 32, s + len - 32, 32);
+                        } else {
+                            if (len > ChangeOp) [[unlikely]] m.room(q, sec, (n - r) * kChangeRoom + len);
+                            std::memcpy(q, s, len);
+                        }
+                    } else {
+                        if (len > ChangeOp) [[unlikely]] m.room(q, sec, (n - r) * kChangeRoom + len);
+                        sd_detail::copy_body(q, bodies + e.off, len);
+                    }
                     sd_detail::store<std::uint32_t>(q, std::uint32_t(sl[r]));
-                    q += e.len;
+                    q += len;
                     ++k;
 #if XOFFSET_SYNC_CHECKS
                     ++e.sent;
 #endif
                 }
-            }
+            } while (++r < n);
             sd_detail::store<std::uint32_t>(sec, sd_detail::section(k, K, XSyncKind::change));
             m.q_ = k ? q : sec;
         }
@@ -516,32 +612,45 @@ namespace XOffsetDatastructure::xsync {
             Msg::count(n);
             const std::int32_t* const ix = index.data();
             Entry* const es = e_.data();
-            XOFFSET_DETAIL_NOVECTOR
-            for (std::size_t r = 0; r < n; ++r) XOFFSET_DETAIL_PREFETCH(&es[std::size_t(ix[r])], 1);
+            {
+                std::size_t r = 0;
+                XOFFSET_DETAIL_NOVECTOR
+                do { XOFFSET_DETAIL_PREFETCH_WITH_MSVC(&es[std::size_t(ix[r])].ktick, 1); } while (++r < n);
+            }
 #if XOFFSET_SYNC_CHECKS
             m.check_tick();
 #endif
             m.room(4 + n * kEnterRoom);
-            typename Msg::template Taker<J> take(m);
+            typename Msg::template Taker<J> take(*m.conn_, *m.cold_);
             char* q = m.q_;
             char* sec = q;
             q += 4;
             const std::uint32_t tick = m.pub_->tick_;
-            for (std::size_t r = 0; r < n; ++r) {
+            const char* bodies = m.pub_->bodies_.data();
+            std::size_t r = 0;
+            do {
                 const std::uint32_t i = std::uint32_t(ix[r]);
                 Entry& e = es[i];
-                if (e.ktick != tick) key<sd_detail::src_arg<Src>>(e, i, *m.pub_, src);
+                if (e.ktick != tick) [[unlikely]] {
+                    key<sd_detail::src_arg<Src>>(e, i, *m.pub_, src);
+                    bodies = m.pub_->bodies_.data();
+                }
                 ++e.hold;
-                if (e.klen > EnterOp) [[unlikely]] m.room(q, sec, (n - r) * kEnterRoom + e.klen);
+                const std::uint32_t klen = e.klen;
+                if (klen > EnterOp) [[unlikely]] m.room(q, sec, (n - r) * kEnterRoom + klen);
                 const std::uint32_t s = take.take();
 #if XOFFSET_SYNC_CHECKS
                 m.template check_take<J>(s, i);
 #endif
                 out(r, s);
-                sd_detail::copy_body(q, m.bodies() + e.koff, e.klen);
+                if constexpr (4 + XRecordBody<T>::whole_body::fixed > 64) {
+                    std::memcpy(q, bodies + e.koff, klen);
+                } else {
+                    sd_detail::copy_body(q, bodies + e.koff, klen);
+                }
                 sd_detail::store<std::uint32_t>(q, s);
-                q += e.klen;
-            }
+                q += klen;
+            } while (++r < n);
             take.done();
             sd_detail::store<std::uint32_t>(sec, sd_detail::section(n, K, XSyncKind::enter));
             m.q_ = q;
@@ -673,8 +782,8 @@ namespace XOffsetDatastructure::xsync {
         std::size_t bytes() const noexcept { return e_.capacity() * sizeof(Entry); }
         /// The entry of id fetched now (an entity the tick will use).
         void prefetch(std::uint32_t id) const noexcept {
-            if constexpr (kRing) XOFFSET_DETAIL_PREFETCH(&e_[id & (e_.size() - 1)], 1);
-            else XOFFSET_DETAIL_PREFETCH(&e_[id], 1);
+            if constexpr (kRing) XOFFSET_DETAIL_PREFETCH_WITH_MSVC(&e_[id & (e_.size() - 1)], 1);
+            else XOFFSET_DETAIL_PREFETCH_WITH_MSVC(&e_[id], 1);
         }
 
         /// A leave section (keyed tables): the slots that leave.
@@ -686,17 +795,20 @@ namespace XOffsetDatastructure::xsync {
             Msg::count(n);
 #if XOFFSET_SYNC_CHECKS
             m.check_tick();
-            if (m.ln_[J]) sd_detail::sync_fail("xsync: two leave sections of one table in a message");
+            if (m.ln_.template at<J>()) sd_detail::sync_fail("xsync: two leave sections of one table in a message");
             for (std::size_t i = 0; i < n; ++i) m.template check_slot<J>(std::uint32_t(slot[i]), 0);
 #endif
             m.room(4 + 4 * n);
             char* const q = m.q_;
             sd_detail::store<std::uint32_t>(q, sd_detail::section(n, K, XSyncKind::leave));
             const std::int32_t* const s = slot.data();
-            XOFFSET_DETAIL_NOVECTOR
-            for (std::size_t i = 0; i < n; ++i) sd_detail::store<std::uint32_t>(q + 4 + 4 * i, std::uint32_t(s[i]));
-            m.loff_[J] = std::uint32_t(q + 4 - m.out_->data());
-            m.ln_[J] = std::uint32_t(n);
+            {
+                std::size_t i = 0;
+                XOFFSET_DETAIL_NOVECTOR
+                do { sd_detail::store<std::uint32_t>(q + 4 + 4 * i, std::uint32_t(s[i])); } while (++i < n);
+            }
+            m.loff_.template at<J>() = std::uint32_t(q + 4 - m.out_->data());
+            m.ln_.template at<J>() = std::uint32_t(n);
             m.q_ = q + 4 + 4 * n;
         }
 
@@ -720,17 +832,19 @@ namespace XOffsetDatastructure::xsync {
             char* const sec = q;
             q += 4;
             const std::uint32_t tick = m.pub_->tick_;
+            const char* bodies = m.pub_->bodies_.data();
             Entry* es = e_.data();
             std::size_t mk = e_.size() - 1;
             std::uint32_t k = 0;
-            for (std::size_t r = 0; r < n; ++r) {
+            std::size_t r = 0;
+            do {
                 const std::uint32_t rr = std::uint32_t(rf[r]);
-                Entry* e = find(es, mk, rr, tick, *m.pub_, src);
-                std::memcpy(q, m.bodies() + e->off, kChangeOp);
+                Entry* e = find(es, mk, bodies, rr, tick, *m.pub_, src);
+                std::memcpy(q, bodies + e->off, kChangeOp);
                 sd_detail::store<std::uint32_t>(q, std::uint32_t(sl[r]));
                 q += e->len;
                 k += e->len != 0;
-            }
+            } while (++r < n);
             sd_detail::store<std::uint32_t>(sec, sd_detail::section(k, K, XSyncKind::change));
             m.q_ = k ? q : sec;
         }
@@ -745,18 +859,36 @@ namespace XOffsetDatastructure::xsync {
             m.check_tick();
 #endif
             const std::int32_t* const ids = id.data();
+            Entry* es = e_.data();
+            {
+                std::size_t r = 0;
+                XOFFSET_DETAIL_NOVECTOR
+                do { XOFFSET_DETAIL_PREFETCH_WITH_MSVC(&es[std::uint32_t(ids[r])], 0); } while (++r < n);
+            }
             m.room(4 + n * kChangeRoom);
             char* q = m.q_;
             char* const sec = q;
             q += 4;
             const std::uint32_t tick = m.pub_->tick_;
-            Entry* es = e_.data();
+            const char* bodies = m.pub_->bodies_.data();
             std::size_t mk = e_.size() - 1;
             std::uint32_t k = 0;
-            for (std::size_t r = 0; r < n; ++r) {
-                const Entry* e = find(es, mk, std::uint32_t(ids[r]), tick, *m.pub_, src);
-                if (e->len) { sd_detail::copy_body(q, m.bodies() + e->off, e->len); q += e->len; ++k; }
-            }
+            std::size_t r = 0;
+            do {
+                const Entry* e = find(es, mk, bodies, std::uint32_t(ids[r]), tick, *m.pub_, src);
+                const std::uint32_t len = e->len;
+                if (len) {
+                    if constexpr (kChangeOp <= 32) {
+                        const char* const s = bodies + e->off;
+                        std::memcpy(q, s, 16);
+                        std::memcpy(q + 16, s + 16, 16);
+                    } else {
+                        sd_detail::copy_body(q, bodies + e->off, len);
+                    }
+                    q += len;
+                    ++k;
+                }
+            } while (++r < n);
             sd_detail::store<std::uint32_t>(sec, sd_detail::section(k, K, XSyncKind::change));
             m.q_ = k ? q : sec;
         }
@@ -775,14 +907,15 @@ namespace XOffsetDatastructure::xsync {
 #endif
             const std::int32_t* const rf = ref.data();
             m.room(4 + n * kEnterRoom);
-            typename Msg::template Taker<J> take(m);
+            typename Msg::template Taker<J> take(*m.conn_, *m.cold_);
             char* q = m.q_;
             sd_detail::store<std::uint32_t>(q, sd_detail::section(n, K, XSyncKind::enter));
             q += 4;
             const std::uint32_t tick = m.pub_->tick_;
             Entry* es = e_.data();
             std::size_t mk = e_.size() - 1;
-            for (std::size_t r = 0; r < n; ++r) {
+            std::size_t r = 0;
+            do {
                 const std::uint32_t rr = std::uint32_t(rf[r]);
                 const Entry* e = find(es, mk, rr, tick, *m.pub_, src);
                 const std::uint32_t s = take.take();
@@ -792,7 +925,7 @@ namespace XOffsetDatastructure::xsync {
                 out(r, s);
                 sd_detail::store<std::uint32_t>(q, s);
                 q = XRecordBody<T>::put_whole(q + 4, e->image);
-            }
+            } while (++r < n);
             take.done();
             m.q_ = q;
         }
@@ -848,6 +981,27 @@ namespace XOffsetDatastructure::xsync {
             } else {
                 Entry* e = &es[ref];
                 if (e->tick != tick) [[unlikely]] fill<sd_detail::src_arg<Src&>>(ref, ref, pub, src);
+                return e;
+            }
+        }
+        template <class Src>
+        XOFFSET_DETAIL_INLINE Entry* find(Entry*& es, std::size_t& mk, const char*& bodies, std::uint32_t ref, std::uint32_t tick, XSyncPublisher& pub, Src& src) {
+            if constexpr (kRing) {
+                const std::uint32_t id = std::uint32_t(src.id(ref));
+                Entry* e = &es[id & mk];
+                if (std::uint32_t(RI::get(e->image)) != id || e->tick != tick) [[unlikely]] {
+                    e = &fill<sd_detail::src_arg<Src&>>(ref, id, pub, src);
+                    es = e_.data();
+                    mk = e_.size() - 1;
+                    bodies = pub.bodies_.data();
+                }
+                return e;
+            } else {
+                Entry* e = &es[ref];
+                if (e->tick != tick) [[unlikely]] {
+                    fill<sd_detail::src_arg<Src&>>(ref, ref, pub, src);
+                    bodies = pub.bodies_.data();
+                }
                 return e;
             }
         }
