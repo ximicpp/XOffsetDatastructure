@@ -106,6 +106,14 @@
 #define XOFFSET_DETAIL_INLINE_CLANG inline
 #endif
 
+// Forced inlining for MSVC only, where its inline cost model stops at flat-map
+// insert/erase helpers that GCC and Clang already inline.
+#if defined(_MSC_VER) && !defined(__clang__)
+#define XOFFSET_DETAIL_INLINE_MSVC XOFFSET_DETAIL_INLINE
+#else
+#define XOFFSET_DETAIL_INLINE_MSVC inline
+#endif
+
 // Forced inlining only without exceptions (the inline-string check of the
 // wire validation; see validate_wire_element).
 #if XOFFSET_NO_EXCEPTIONS
@@ -121,8 +129,11 @@
 #define XOFFSET_DETAIL_PREFETCH(p, rw) __builtin_prefetch((p), (rw))
 #define XOFFSET_DETAIL_PREFETCH_WITH_MSVC(p, rw) __builtin_prefetch((p), (rw))
 #elif defined(_MSC_VER) && (defined(_M_X64) || defined(_M_AMD64))
+#include <intrin.h>
 #define XOFFSET_DETAIL_PREFETCH(p, rw) ((void)(p))
-#define XOFFSET_DETAIL_PREFETCH_WITH_MSVC(p, rw) _mm_prefetch(reinterpret_cast<const char*>(p), _MM_HINT_T0)
+#define XOFFSET_DETAIL_PREFETCH_WITH_MSVC(p, rw) \
+    ((rw) ? _m_prefetchw(const_cast<void*>(static_cast<const void*>(p))) \
+          : _mm_prefetch(reinterpret_cast<const char*>(p), _MM_HINT_T0))
 #else
 #define XOFFSET_DETAIL_PREFETCH(p, rw) ((void)(p))
 #define XOFFSET_DETAIL_PREFETCH_WITH_MSVC(p, rw) ((void)(p))

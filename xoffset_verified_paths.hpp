@@ -1119,10 +1119,18 @@ namespace detail {
                 }
             }
             char* body = output + sizeof(XWireHeader);
-            const auto* source = reinterpret_cast<const char*>(&root);
-            std::memcpy(body, source, Field::offset);
-            if constexpr (after_field < sizeof(Root))
-                std::memcpy(body + after_field, source + after_field, sizeof(Root) - after_field);
+            if constexpr (!std::is_same_v<Prefix, Root>) {
+                [&]<std::size_t... I>(std::index_sequence<I...>) XOFFSET_DETAIL_LAMBDA_INLINE {
+                    ((std::memcpy(body + schema::member_t<Prefix, I>::offset,
+                                  &schema::member_t<Prefix, I>::get(root),
+                                  sizeof(typename schema::member_t<Prefix, I>::type))), ...);
+                }(std::make_index_sequence<schema::member_count_v<Prefix>>{});
+            } else {
+                const auto* source = reinterpret_cast<const char*>(&root);
+                std::memcpy(body, source, Field::offset);
+                if constexpr (after_field < sizeof(Root))
+                    std::memcpy(body + after_field, source + after_field, sizeof(Root) - after_field);
+            }
             zero_padding_bytes<Root>(body);
             if constexpr (root_bytes != sizeof(Root))
                 std::memset(body + sizeof(Root), 0, root_bytes - sizeof(Root));
@@ -1135,9 +1143,9 @@ namespace detail {
             }
             char* data = body + root_bytes;
             for (std::size_t i = 0; i < count; ++i) {
-                const Element value = generate(i);
-                std::memcpy(data + i * sizeof(Element), &value, sizeof(Element));
-                zero_padding_bytes<Element>(data + i * sizeof(Element));
+                char* slot_dst = data + i * sizeof(Element);
+                ::new (static_cast<void*>(slot_dst)) Element(generate(i));
+                zero_padding_bytes<Element>(slot_dst);
             }
             if constexpr (Framing == FlatRecordFraming::retained) {
                 if (size_ > size) {

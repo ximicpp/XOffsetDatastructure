@@ -10,6 +10,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 namespace XOffsetDatastructure {
@@ -198,54 +199,255 @@ private:
 } // namespace detail
 
 // expected-style result of a try_* entry: a value or an XError.
-template <class T>
-class XResult {
-public:
-    XResult(T value) : value_(std::move(value)) {}
-    XResult(XError error) : error_(std::move(error)) {}
+// Discriminated union storage avoids constructing/destroying XError::message
+// (std::string) on the hot success path (notably XReceiver::view on MSVC).
+// Value constructors take references (T&& / const T&) so heavy non-trivial
+// values like XBuffer incur only a single move into the union, and forced
+// destructor inlining is restricted to trivially destructible T (e.g. XView).
+namespace detail {
+struct xresult_value_tag {};
+struct xresult_error_tag {};
 
-    bool has_value() const noexcept { return value_.has_value(); }
-    explicit operator bool() const noexcept { return has_value(); }
-    T& value() & { require(); return *value_; }
-    const T& value() const& { require(); return *value_; }
-    T&& value() && { require(); return std::move(*value_); }
-    T& operator*() & noexcept { return *value_; }
-    const T& operator*() const& noexcept { return *value_; }
-    T&& operator*() && noexcept { return std::move(*value_); }
-    T* operator->() noexcept { return &*value_; }
-    const T* operator->() const noexcept { return &*value_; }
+template <class T, bool TrivialDtor = std::is_trivially_destructible_v<T>>
+struct XResultStorage {
+    union {
+        T value_;
+        XError error_;
+    };
+    bool has_value_;
+
+    XResultStorage(xresult_value_tag, T&& value) noexcept(std::is_nothrow_move_constructible_v<T>)
+        : has_value_(true) {
+        ::new (static_cast<void*>(&value_)) T(std::move(value));
+    }
+    template <class U = T, std::enable_if_t<std::is_same_v<U, T> && std::is_copy_constructible_v<U>, int> = 0>
+    XResultStorage(xresult_value_tag, const U& value) noexcept(std::is_nothrow_copy_constructible_v<T>)
+        : has_value_(true) {
+        ::new (static_cast<void*>(&value_)) T(value);
+    }
+    XOFFSET_DETAIL_COLD XResultStorage(xresult_error_tag, XError&& error) noexcept : has_value_(false) {
+        ::new (static_cast<void*>(&error_)) XError(std::move(error));
+    }
+    XOFFSET_DETAIL_COLD XResultStorage(xresult_error_tag, const XError& error) : has_value_(false) {
+        ::new (static_cast<void*>(&error_)) XError(error);
+    }
+    XResultStorage(XResultStorage&& other) noexcept(std::is_nothrow_move_constructible_v<T>)
+        : has_value_(other.has_value_) {
+        if (!has_value_) XOFFSET_DETAIL_UNLIKELY {
+            construct_error_move(std::move(other.error_));
+        } else {
+            ::new (static_cast<void*>(&value_)) T(std::move(other.value_));
+        }
+    }
+    XResultStorage(const XResultStorage&) = delete;
+    XResultStorage& operator=(const XResultStorage&) = delete;
+
+    XResultStorage& operator=(XResultStorage&& other) noexcept(std::is_nothrow_move_constructible_v<T>) {
+        if (this == &other) return *this;
+        destroy();
+        has_value_ = other.has_value_;
+        if (!has_value_) XOFFSET_DETAIL_UNLIKELY {
+            construct_error_move(std::move(other.error_));
+        } else {
+            ::new (static_cast<void*>(&value_)) T(std::move(other.value_));
+        }
+        return *this;
+    }
+
+    XOFFSET_DETAIL_COLD void construct_error_move(XError&& error) noexcept {
+        ::new (static_cast<void*>(&error_)) XError(std::move(error));
+    }
+    XOFFSET_DETAIL_COLD void destroy_error() noexcept { error_.~XError(); }
+
+    void destroy() noexcept {
+        if (!has_value_) XOFFSET_DETAIL_UNLIKELY {
+            destroy_error();
+        } else {
+            value_.~T();
+        }
+    }
+
+    ~XResultStorage() noexcept { destroy(); }
+};
+
+template <class T>
+struct XResultStorage<T, true> {
+    union {
+        T value_;
+        XError error_;
+    };
+    bool has_value_;
+
+    XOFFSET_DETAIL_INLINE XResultStorage(xresult_value_tag, T&& value) noexcept(std::is_nothrow_move_constructible_v<T>)
+        : has_value_(true) {
+        ::new (static_cast<void*>(&value_)) T(std::move(value));
+    }
+    template <class U = T, std::enable_if_t<std::is_same_v<U, T> && std::is_copy_constructible_v<U>, int> = 0>
+    XOFFSET_DETAIL_INLINE XResultStorage(xresult_value_tag, const U& value) noexcept(std::is_nothrow_copy_constructible_v<T>)
+        : has_value_(true) {
+        ::new (static_cast<void*>(&value_)) T(value);
+    }
+    XOFFSET_DETAIL_COLD XResultStorage(xresult_error_tag, XError&& error) noexcept : has_value_(false) {
+        ::new (static_cast<void*>(&error_)) XError(std::move(error));
+    }
+    XOFFSET_DETAIL_COLD XResultStorage(xresult_error_tag, const XError& error) : has_value_(false) {
+        ::new (static_cast<void*>(&error_)) XError(error);
+    }
+    XOFFSET_DETAIL_INLINE XResultStorage(XResultStorage&& other) noexcept(std::is_nothrow_move_constructible_v<T>)
+        : has_value_(other.has_value_) {
+        if (!has_value_) XOFFSET_DETAIL_UNLIKELY {
+            construct_error_move(std::move(other.error_));
+        } else {
+            ::new (static_cast<void*>(&value_)) T(std::move(other.value_));
+        }
+    }
+    XResultStorage(const XResultStorage&) = delete;
+    XResultStorage& operator=(const XResultStorage&) = delete;
+
+    XResultStorage& operator=(XResultStorage&& other) noexcept(std::is_nothrow_move_constructible_v<T>) {
+        if (this == &other) return *this;
+        destroy();
+        has_value_ = other.has_value_;
+        if (!has_value_) XOFFSET_DETAIL_UNLIKELY {
+            construct_error_move(std::move(other.error_));
+        } else {
+            ::new (static_cast<void*>(&value_)) T(std::move(other.value_));
+        }
+        return *this;
+    }
+
+    XOFFSET_DETAIL_COLD void construct_error_move(XError&& error) noexcept {
+        ::new (static_cast<void*>(&error_)) XError(std::move(error));
+    }
+    XOFFSET_DETAIL_COLD void destroy_error() noexcept { error_.~XError(); }
+
+    XOFFSET_DETAIL_INLINE void destroy() noexcept {
+        if (!has_value_) XOFFSET_DETAIL_UNLIKELY destroy_error();
+    }
+
+    XOFFSET_DETAIL_INLINE ~XResultStorage() noexcept { destroy(); }
+};
+
+template <class T, bool Copyable = std::is_copy_constructible_v<T>>
+struct XResultCopyStorage : XResultStorage<T> {
+    using XResultStorage<T>::XResultStorage;
+    XResultCopyStorage(const XResultCopyStorage&) = delete;
+    XResultCopyStorage& operator=(const XResultCopyStorage&) = delete;
+    XResultCopyStorage(XResultCopyStorage&&) = default;
+    XResultCopyStorage& operator=(XResultCopyStorage&&) = default;
+};
+
+template <class T>
+struct XResultCopyStorage<T, true> : XResultStorage<T> {
+    using XResultStorage<T>::XResultStorage;
+    XResultCopyStorage(const XResultCopyStorage& other)
+        : XResultStorage<T>(other.has_value_ ? XResultStorage<T>(xresult_value_tag{}, other.value_)
+                                             : XResultStorage<T>(xresult_error_tag{}, other.error_)) {}
+    XResultCopyStorage(XResultCopyStorage&&) = default;
+    XResultCopyStorage& operator=(const XResultCopyStorage& other) {
+        if (this == &other) return *this;
+        XResultCopyStorage tmp(other);
+        XResultStorage<T>::operator=(std::move(tmp));
+        return *this;
+    }
+    XResultCopyStorage& operator=(XResultCopyStorage&&) = default;
+};
+} // namespace detail
+
+template <class T>
+class XResult : private detail::XResultCopyStorage<T> {
+    using Base = detail::XResultCopyStorage<T>;
+public:
+    XOFFSET_DETAIL_INLINE XResult(T&& value) noexcept(std::is_nothrow_move_constructible_v<T>)
+        : Base(detail::xresult_value_tag{}, std::move(value)) {}
+    template <class U = T, std::enable_if_t<std::is_same_v<U, T> && std::is_copy_constructible_v<U>, int> = 0>
+    XOFFSET_DETAIL_INLINE XResult(const U& value) noexcept(std::is_nothrow_copy_constructible_v<T>)
+        : Base(detail::xresult_value_tag{}, value) {}
+    XOFFSET_DETAIL_COLD XResult(XError&& error) noexcept
+        : Base(detail::xresult_error_tag{}, std::move(error)) {}
+    XOFFSET_DETAIL_COLD XResult(const XError& error)
+        : Base(detail::xresult_error_tag{}, error) {}
+
+    XOFFSET_DETAIL_INLINE bool has_value() const noexcept { return this->has_value_; }
+    XOFFSET_DETAIL_INLINE explicit operator bool() const noexcept { return this->has_value_; }
+    T& value() & { require(); return this->value_; }
+    const T& value() const& { require(); return this->value_; }
+    T&& value() && { require(); return std::move(this->value_); }
+    XOFFSET_DETAIL_INLINE T& operator*() & noexcept { return this->value_; }
+    XOFFSET_DETAIL_INLINE const T& operator*() const& noexcept { return this->value_; }
+    XOFFSET_DETAIL_INLINE T&& operator*() && noexcept { return std::move(this->value_); }
+    XOFFSET_DETAIL_INLINE T* operator->() noexcept { return &this->value_; }
+    XOFFSET_DETAIL_INLINE const T* operator->() const noexcept { return &this->value_; }
     // Valid only without a value.
-    const XError& error() const& noexcept { return error_; }
-    XError&& error() && noexcept { return std::move(error_); }
-    XErrc code() const noexcept { return has_value() ? XErrc::ok : error_.code; }
+    const XError& error() const& noexcept { return this->error_; }
+    XError&& error() && noexcept { return std::move(this->error_); }
+    XErrc code() const noexcept { return this->has_value_ ? XErrc::ok : this->error_.code; }
 
 private:
-    void require() const {
-        if (value_) return;
+    XOFFSET_DETAIL_COLD void fail_require() const {
 #if XOFFSET_NO_EXCEPTIONS
-        detail::fatal(error_.code, error_.message.c_str());
+        detail::fatal(this->error_.code, this->error_.message.c_str());
 #else
-        throw XException(error_.code, error_.message);
+        throw XException(this->error_.code, this->error_.message);
 #endif
     }
-    std::optional<T> value_;
-    XError error_;
+    XOFFSET_DETAIL_INLINE void require() const {
+        if (!this->has_value_) XOFFSET_DETAIL_UNLIKELY fail_require();
+    }
 };
 
 template <>
 class XResult<void> {
 public:
-    XResult() = default;
-    XResult(XError error) : error_(std::move(error)) {}
+    XOFFSET_DETAIL_INLINE XResult() noexcept : has_error_(false) {}
+    XOFFSET_DETAIL_COLD XResult(XError error) noexcept : has_error_(error.code != XErrc::ok) {
+        if (has_error_) ::new (static_cast<void*>(&error_)) XError(std::move(error));
+    }
+    XOFFSET_DETAIL_COLD XResult(const XResult& other) : has_error_(other.has_error_) {
+        if (has_error_) ::new (static_cast<void*>(&error_)) XError(other.error_);
+    }
+    XOFFSET_DETAIL_INLINE XResult(XResult&& other) noexcept : has_error_(other.has_error_) {
+        if (has_error_) XOFFSET_DETAIL_UNLIKELY construct_error_move(std::move(other.error_));
+    }
+    XOFFSET_DETAIL_COLD XResult& operator=(const XResult& other) {
+        if (this == &other) return *this;
+        XResult tmp(other);
+        *this = std::move(tmp);
+        return *this;
+    }
+    XOFFSET_DETAIL_INLINE XResult& operator=(XResult&& other) noexcept {
+        if (this == &other) return *this;
+        if (has_error_) XOFFSET_DETAIL_UNLIKELY destroy_error();
+        has_error_ = other.has_error_;
+        if (has_error_) XOFFSET_DETAIL_UNLIKELY construct_error_move(std::move(other.error_));
+        return *this;
+    }
+    XOFFSET_DETAIL_INLINE ~XResult() noexcept {
+        if (has_error_) XOFFSET_DETAIL_UNLIKELY destroy_error();
+    }
 
-    bool has_value() const noexcept { return error_.code == XErrc::ok; }
-    explicit operator bool() const noexcept { return has_value(); }
-    const XError& error() const& noexcept { return error_; }
+    XOFFSET_DETAIL_INLINE bool has_value() const noexcept { return !has_error_; }
+    XOFFSET_DETAIL_INLINE explicit operator bool() const noexcept { return !has_error_; }
+    const XError& error() const& noexcept { return has_error_ ? error_ : ok_error(); }
+    // Valid only without a value.
     XError&& error() && noexcept { return std::move(error_); }
-    XErrc code() const noexcept { return error_.code; }
+    XOFFSET_DETAIL_INLINE XErrc code() const noexcept { return has_error_ ? error_.code : XErrc::ok; }
 
 private:
-    XError error_;
+    XOFFSET_DETAIL_COLD void construct_error_move(XError&& error) noexcept {
+        ::new (static_cast<void*>(&error_)) XError(std::move(error));
+    }
+    XOFFSET_DETAIL_COLD void destroy_error() noexcept { error_.~XError(); }
+    XOFFSET_DETAIL_COLD static const XError& ok_error() noexcept {
+        static const XError empty{};
+        return empty;
+    }
+
+    union {
+        char ok_;
+        XError error_;
+    };
+    bool has_error_;
 };
 using XStatus = XResult<void>;
 
@@ -294,7 +496,7 @@ inline bool record_failure(XErrc code, std::string message) {
 #if !XOFFSET_NO_EXCEPTIONS
 // Inside a catch block: the error a try_* entry reports for the exception
 // in flight. Exceptions that are not std::exception propagate.
-inline XError current_exception_error() {
+XOFFSET_DETAIL_COLD inline XError current_exception_error() {
     try {
         throw;
     } catch (const XException& e) {
@@ -312,7 +514,7 @@ inline XError current_exception_error() {
 #endif
 
 // The pending failure, moved out (no-exceptions builds).
-inline XError take_pending_error() noexcept {
+XOFFSET_DETAIL_COLD inline XError take_pending_error() noexcept {
     XError error = std::move(pending_error());
     pending_error().code = XErrc::ok;
     pending_error().message.clear();
@@ -324,7 +526,7 @@ inline XError take_pending_error() noexcept {
 template <class Step>
 XOFFSET_DETAIL_INLINE XStatus try_v(Step&& step) {
 #if XOFFSET_NO_EXCEPTIONS
-    if (!step()) return take_pending_error();
+    if (!step()) XOFFSET_DETAIL_UNLIKELY return take_pending_error();
     return {};
 #else
     try {
@@ -340,7 +542,7 @@ XOFFSET_DETAIL_INLINE XStatus try_v(Step&& step) {
 template <class T, class Step>
 XOFFSET_DETAIL_INLINE XResult<T> try_v_into(T& out, Step&& step) {
     XStatus status = try_v(step);
-    if (!status) return std::move(status).error();
+    if (!status) XOFFSET_DETAIL_UNLIKELY return std::move(status).error();
     return XResult<T>(std::move(out));
 }
 
