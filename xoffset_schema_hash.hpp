@@ -289,15 +289,40 @@ namespace XOffsetDatastructure {
             });
         }
 
+        template <typename T, typename Alloc>
+        consteval bool reflect_default_init_nothrow();
+
+        template <typename T, typename Alloc, std::size_t... B, std::size_t... M>
+        consteval bool reflect_default_init_nothrow_parts(std::index_sequence<B...>, std::index_sequence<M...>) {
+            return (true && ... && reflect_default_init_nothrow<schema::base_t<T, B>, Alloc>()) &&
+                   (true && ... && reflect_default_init_nothrow<typename schema::member_t<T, M>::type, Alloc>());
+        }
+
+        template <typename T, typename Alloc>
+        consteval bool reflect_default_init_nothrow() {
+            using U = std::remove_cv_t<T>;
+            if constexpr (std::is_array_v<U>) {
+                return reflect_default_init_nothrow<std::remove_extent_t<U>, Alloc>();
+            } else if constexpr (requires(const Alloc& value) { U(value); }) {
+                return noexcept(U(std::declval<const Alloc&>()));
+            } else if constexpr (!std::is_trivially_copyable_v<U> && std::is_class_v<U>) {
+                return reflect_default_init_nothrow_parts<U, Alloc>(
+                    std::make_index_sequence<schema::base_count_v<U>>{},
+                    std::make_index_sequence<schema::member_count_v<U>>{});
+            } else {
+                return std::is_nothrow_default_constructible_v<U>;
+            }
+        }
+
         template <typename T, std::size_t N, typename Alloc>
-        void reflect_init_nth(void* raw, Alloc alloc) {
+        XOFFSET_DETAIL_INLINE void reflect_init_nth(void* raw, Alloc alloc) {
             using member = schema::member_t<T, N>;
             T& obj = *reinterpret_cast<T*>(raw);
             fixed_detail::default_construct(&(member::get(obj)), alloc);
         }
 
         template <typename T, std::size_t N, typename Alloc>
-        void reflect_init_base_nth(void* raw, Alloc alloc) {
+        XOFFSET_DETAIL_INLINE void reflect_init_base_nth(void* raw, Alloc alloc) {
             using BaseType = schema::base_t<T, N>;
             T* obj = reinterpret_cast<T*>(raw);
             reflect_init_all_impl<BaseType>(static_cast<void*>(static_cast<BaseType*>(obj)), alloc);
@@ -305,25 +330,52 @@ namespace XOffsetDatastructure {
 
         template <typename T, typename Alloc>
         void reflect_init_all_impl(void* raw, Alloc alloc) {
-            std::size_t built = 0;
-            XOFFSET_TRY {
+            if constexpr (reflect_default_init_nothrow<T, Alloc>()) {
                 for_each_reflected_subobject<T>(
-                [&](auto index) {
+                [&](auto index) XOFFSET_DETAIL_LAMBDA_INLINE {
                     reflect_init_base_nth<T, decltype(index)::value>(raw, alloc);
-                    ++built;
                 },
-                [&](auto index) {
+                [&](auto index) XOFFSET_DETAIL_LAMBDA_INLINE {
                     reflect_init_nth<T, decltype(index)::value>(raw, alloc);
-                    ++built;
                 });
-            } XOFFSET_CATCH(...) {
-                destroy_reflected_prefix<T>(raw, built);
-                XOFFSET_RETHROW;
+            } else {
+                std::size_t built = 0;
+                XOFFSET_TRY {
+                    for_each_reflected_subobject<T>(
+                    [&](auto index) {
+                        reflect_init_base_nth<T, decltype(index)::value>(raw, alloc);
+                        ++built;
+                    },
+                    [&](auto index) {
+                        reflect_init_nth<T, decltype(index)::value>(raw, alloc);
+                        ++built;
+                    });
+                } XOFFSET_CATCH(...) {
+                    destroy_reflected_prefix<T>(raw, built);
+                    XOFFSET_RETHROW;
+                }
             }
         }
 
         template <typename T, typename Alloc>
-        void reflect_init_all(void* raw, Alloc alloc) {
+        XOFFSET_DETAIL_INLINE void reflect_init_all_small(void* raw, Alloc alloc) noexcept {
+            std::memset(raw, 0, sizeof(T));
+            raw = static_cast<void*>(begin_fresh_ordinary_outer<T>(raw));
+            for_each_reflected_subobject<T>(
+            [&](auto index) XOFFSET_DETAIL_LAMBDA_INLINE {
+                reflect_init_base_nth<T, decltype(index)::value>(raw, alloc);
+            },
+            [&](auto index) XOFFSET_DETAIL_LAMBDA_INLINE {
+                reflect_init_nth<T, decltype(index)::value>(raw, alloc);
+            });
+        }
+
+        template <typename T, typename Alloc>
+        XOFFSET_DETAIL_INLINE void reflect_init_all(void* raw, Alloc alloc) {
+            if constexpr (sizeof(T) <= 256 && reflect_default_init_nothrow<T, Alloc>()) {
+                reflect_init_all_small<T>(raw, alloc);
+                return;
+            }
             std::memset(raw, 0, sizeof(T));  // zero ONCE at top level
             raw = static_cast<void*>(begin_fresh_ordinary_outer<T>(raw));
             reflect_init_all_impl<T>(raw, alloc);
