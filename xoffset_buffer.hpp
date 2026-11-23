@@ -339,12 +339,39 @@ namespace XOffsetDatastructure {
                 entry = edit_enter<T>(expected_growth);
                 if (!entry.root) return false;
             }
+#if XOFFSET_NO_EXCEPTIONS
             PinScope scope(*this, entry.ctl, entry.ctl == nullptr);
             record_error(detail::run_fail_soft([&] { f(*entry.root); }));
             return scope.close();
+#else
+            try {
+                f(*entry.root);
+            } catch (...) {
+                return edit_catch_and_close(entry.ctl);
+            }
+            if (entry.ctl == nullptr) [[likely]] return this->pin_close_bare();
+            return PinScope::close_counted(this, entry.ctl);
+#endif
         }
 
     private:
+#if !XOFFSET_NO_EXCEPTIONS
+        XOFFSET_DETAIL_COLD bool edit_catch_and_close(detail::XCtl* ctl) {
+            try {
+                throw;
+            } catch (const XException& e) {
+                record_error(e.code() == XErrc::unspecified ? XErrc::out_of_storage : e.code());
+            } catch (const std::bad_alloc&) {
+                record_error(XErrc::host_allocation_failed);
+            } catch (...) {
+                if (ctl == nullptr) (void)this->pin_close_bare();
+                else (void)PinScope::close_counted(this, ctl);
+                throw;
+            }
+            if (ctl == nullptr) return this->pin_close_bare();
+            return PinScope::close_counted(this, ctl);
+        }
+#endif
         // An entered scope of edit or build: the root, and the block the
         // scope counts on (null: a bare scope). A null root: nothing entered.
         template<typename T>
