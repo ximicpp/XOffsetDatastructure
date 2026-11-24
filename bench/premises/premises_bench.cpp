@@ -13,6 +13,8 @@
 //               capacity and freed blocks left behind), (b) n iterations of the 2024
 //               read/write loop (logically neutral), (c) 100,000 random edits (the logical
 //               state changes; every rival is then measured on that same final state).
+//               "+relayout" (XOffset only): the same dirty sender after one relayout()
+//               (docs/USER_GUIDE.md 4.7), which lays its content out as save_compact does.
 //   tier:       trusted (no verification: XOffset admit, cista UNCHECKED, FlatBuffers without
 //               Verifier) and checked (safe on hostile input with a mutable result: XOffset
 //               full, cista NONE / DEEP_CHECK, FlatBuffers Verifier + unpack). zpp::bits,
@@ -239,6 +241,12 @@ static void dirty_churn(TypedXBuffer<C>& b, double k, size_t steps) {
   if (!b.ok()) throw std::runtime_error("churn dirt failed");
 }
 
+// The sender sheds what the dirt left behind: one relayout() (same logical state).
+static void relayout_once(TypedXBuffer<C>& b) {
+  const XStatus r = b.relayout();
+  if (!r) throw std::runtime_error("relayout failed: " + std::string(r.error().message));
+}
+
 // ---------------------------------------------------------------- cells
 struct Prepared {
   std::function<uint64_t()> op;
@@ -438,10 +446,14 @@ static void build_cells() {
         return b;
       }, {XoV::admit, XoV::full, XoV::admit_zero_runs, XoV::compact_admit, XoV::compact0_admit});
     }
+    add_xo("dirt", sz, "g8+relayout", [k] { auto b = make_xo(make_scaled(k)); dirty_grow(b, 8); relayout_once(b); return b; },
+           {XoV::admit, XoV::full, XoV::admit_zero_runs, XoV::compact_admit, XoV::compact0_admit});
     // 3. random churn: the logical state changes, so every rival runs on the same final state.
     add_xo("churn", sz, "churn100000", [k] { auto b = make_xo(make_scaled(k)); dirty_churn(b, k, 100000); return b; },
            {XoV::admit, XoV::full, XoV::admit_zero_runs, XoV::compact_admit, XoV::compact0_admit});
     add_rivals("churn", sz, "churn100000", [k] { auto b = make_xo(make_scaled(k)); dirty_churn(b, k, 100000); return to_std(b.plain_root()); });
+    add_xo("churn", sz, "churn100000+relayout", [k] { auto b = make_xo(make_scaled(k)); dirty_churn(b, k, 100000); relayout_once(b); return b; },
+           {XoV::admit, XoV::full, XoV::admit_zero_runs, XoV::compact_admit, XoV::compact0_admit});
   }
 }
 

@@ -137,6 +137,25 @@ of this file and in the pull requests.
   general path). Ops cells unchanged except building a Character element by element, +25 (0.4%;
   nothing of this runs there: GCC inlines a container accessor differently inside that build
   function). SLG instructions (GCC 16): A, D and S unchanged, B -0.8%, C +0.01%.
+- `XBuffer::relayout<T>()` and `TypedXBuffer::relayout()`: a sender that edits its content in
+  place tick after tick rewrites it, in place and with the same values, as the image
+  `save_compact` writes (no holes, vectors with the slack of `XCompactOptions{}`). Freed blocks and
+  spare capacity never left such a buffer, and every path that pays per used byte paid for them:
+  delta compares, key deltas, `touches` runs over whole containers, `clone()`, the replicas'
+  memory (after 100,000 churn edits `used_end` was 2.2-2.5 times the compact size). The lineage
+  stays (proxies and `XHandle` re-resolve), the epoch advances; no delta code changed: a copy
+  baseline (also with `touched_only`) compares the whole payload once, a `touches` baseline sends
+  a key delta. `relayout_advised<T>()` is true once `used_end` is twice the size of the last
+  relayout of the content (measured with one walk on the first call for new content, then 13
+  instructions). Refused with nothing changed: inside a pin scope (`borrowed`), with a recorded
+  failure, without a verified root of `T` (`no_root`), on a storage or scratch allocation
+  failure. Never for a replica that applies deltas. Two words in `XBufferCore`'s padding (size
+  unchanged); no other path changed. Cost (GCC 16, Character fixture): one relayout k = 1
+  0.50 us / 2.2 K instructions, k = 16 9.7 us / 99 K. Steady churn with relayouts as advised
+  (instructions per tick of the hint, the relayout, the delta and its admit receive; the edit not
+  counted), k = 1 / k = 16: compare-all -13% / -26%, `touches` -1% / -35%, `touched_only` -1% /
+  -5%, whole-state send and reload -12% / +1.7%; the sender's (and each replica's) mean `used_end`
+  8,280 -> 5,982 and 128,760 -> 74,618 bytes. USER_GUIDE section 4.7, DELTA_SYNC section 5.
 - Fixed: a client that includes `<windows.h>` before the library compiles again (a variable in
   `save_delta_into` was named `small`, which `rpcndr.h` defines as a macro).
 - `xoffsetdatastructure.hpp` includes seven parts in its former order: `xoffset_arena.hpp`,

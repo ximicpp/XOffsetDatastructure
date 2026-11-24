@@ -96,6 +96,15 @@ template <class M> class XOffsetRunnerT final : public Runner {
     }
     static constexpr auto kPeer = XOffsetDatastructure::XLink::server_peer;
     static constexpr auto kClient = XOffsetDatastructure::XLink::from_server;
+    // A native delta sender between ticks (docs/USER_GUIDE.md 4.7): relayout the
+    // buffer it edits in place when the hint says so; true when it did. Only on
+    // a sender, never on a receiver's copy.
+    template <class T> static bool relayout_sender(XOffsetDatastructure::XBuffer& b) {
+        if (!b.template relayout_advised<T>()) [[likely]] return false;
+        const XOffsetDatastructure::XStatus r = b.template relayout<T>();
+        if (!r) throw std::runtime_error("relayout failed: " + std::string(r.error().message));
+        return true;
+    }
 
     // W3 transport model (runner.hpp, SLG_XPORT=1, report only): the product
     // path with the socket write and read: save_verified_into + write(), then
@@ -542,6 +551,8 @@ public:
             if (!r) throw std::runtime_error("native self delta rejected: " + std::string(r.error().message));
         }
         PlayerState& n_held(int p) { return nh[std::size_t(p)]->template root<PlayerState>(); }
+        // The server's player between rounds (LN.relayout).
+        bool n_relayout(int p) { return relayout_sender<PlayerState>(srv[std::size_t(p)]); }
         std::vector<std::optional<XBuffer>> nhw = std::vector<std::optional<XBuffer>>(kWarmDevices);
         std::vector<XOffsetDatastructure::XDeltaCursor> ncw = std::vector<XOffsetDatastructure::XDeltaCursor>(kWarmDevices);
         std::string_view n_wire() const { return nd; }
