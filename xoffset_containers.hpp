@@ -2245,7 +2245,7 @@ namespace XOffsetDatastructure {
         // fresh exact block is built before the old one is released, so the
         // source may alias this container, as for assign().
         template <typename It, typename S, typename Construct>
-        void fill_construct(It first, S last, std::size_t count, Construct&& construct) {
+        void fill_construct(It first, S /*last*/, std::size_t count, Construct&& construct) {
             XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::array_bytes<T>(count), );
             const auto n = checked_count(count);
             if (n == 0) { clear(); return; }

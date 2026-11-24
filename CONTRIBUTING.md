@@ -6,21 +6,38 @@ library, the platform matrix and storage rules are in
 
 ## Build and test
 
-The full library needs Clang with P2996 reflection
-(`-std=c++26 -freflection -fexpansion-statements -stdlib=libc++`).
-`build.sh` looks for it at `/usr/local/bin/clang++`,
-`~/clang-p2996-install/bin/clang++`, `/opt/clang-p2996/bin/clang++` and
-`/opt/p2996-toolchain/bin/clang++`.
+### C++20 / C++23 field-list build (zero submodules)
+
+Any modern 64-bit little-endian C++20/C++23 compiler (GCC 12+, Clang 16+, Apple
+clang 15+ for macOS 12+ / iOS 14+, Android NDK Clang, MSVC 19.44, clang-cl) can
+build and run the full test suite with no submodules initialized:
 
 ```bash
-git submodule update --init --recursive   # external/typelayout
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DXOFFSET_CXX_STANDARD=20
+cmake --build build --config Release --parallel
+ctest --test-dir build -C Release --output-on-failure
+```
+
+### C++26 reflection build (GCC 16+ or P2996 Clang)
+
+C++26 reflection builds (`-DXOFFSET_CXX_STANDARD=26`, the default when a
+reflection compiler is detected) also initialize the pinned `external/typelayout`
+and `external/boost` submodules (see
+[docs/PACKAGING.md](docs/PACKAGING.md#fixed-inputs) for the LF-preserving
+recipe):
+
+```bash
+git submodule update --init --recursive   # external/typelayout and external/boost
 ./build.sh            # detect compiler, build, run CTest, export signatures
 ./build.sh --debug    # debug build
 ./build.sh -j 8       # parallel jobs
 ```
 
-Without a local P2996 compiler, use the pinned image (the `bash` prefix is
-required; on Apple Silicon add `--platform linux/amd64`):
+`build.sh` looks for GCC 16 or P2996 Clang at `/usr/local/bin/clang++`,
+`~/clang-p2996-install/bin/clang++`, `/opt/clang-p2996/bin/clang++` and
+`/opt/p2996-toolchain/bin/clang++`. Without a local reflection compiler, use the
+pinned image (the `bash` prefix is required; on Apple Silicon add
+`--platform linux/amd64`):
 
 ```bash
 python3 tools/prepare_vm_cmake.py --platform linux-x86_64 --out build/cmake-tool
@@ -52,9 +69,9 @@ run `tools/check_vm_toolchain.py` before comparing against historical results.
 ## CMake
 
 Full-library settings are target-scoped in `cmake/XOffsetBuildChecks.cmake`.
-Full targets need CMake 3.30+ (transitive `cxx_std_26`); the storage targets
-keep a CMake 3.13 minimum and stay C++17. Do not apply full-library settings
-globally.
+C++20/C++23 full targets need CMake 3.20+, C++26 reflection targets need CMake
+3.30+ (transitive `cxx_std_26`), and the storage targets keep a CMake 3.13
+minimum and stay C++17. Do not apply full-library settings globally.
 
 ## Adding a test
 
@@ -109,3 +126,9 @@ regenerate `tools/sigs/*.sig.hpp` through `build.sh`.
 `main` is the only development branch. Work on a topic branch and open a pull
 request into `main`. The old v2.0 line is kept as tag
 `archive/main-v2-practical`.
+
+## Community and security
+
+Participation in issues, pull requests, and reviews is governed by
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). To report a security vulnerability
+privately rather than opening a public issue, follow [SECURITY.md](SECURITY.md).

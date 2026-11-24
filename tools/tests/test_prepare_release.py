@@ -76,9 +76,11 @@ class ReleaseArchiveTests(unittest.TestCase):
         archive.write_bytes(A.canonical_gzip(output.getvalue()))
         return archive
 
-    def make_prefix(self, component):
-        prefix = self.root / ("prefix-" + component)
-        payload = {name: b"// synthetic fixture\n" for name in A.install_required(component)}
+    def make_prefix(self, component, cxx_standard="26"):
+        suffix = component if cxx_standard == "26" else (component + "-cpp" + cxx_standard)
+        prefix = self.root / ("prefix-" + suffix)
+        with_deps = (component == "full" and cxx_standard == "26")
+        payload = {name: b"// synthetic fixture\n" for name in A.install_required(component, with_deps=with_deps)}
         payload["share/XOffsetDatastructure/VERSION"] = (A.VERSION + "\n").encode()
         config = {
             "XOffsetDatastructure_VERSION": '"' + A.VERSION + '"',
@@ -88,12 +90,13 @@ class ReleaseArchiveTests(unittest.TestCase):
             "XOffsetDatastructure_VERSION_COMPATIBILITY": '"exact-full-version-only"',
             "XOffsetDatastructure_full_FOUND": "ON" if component == "full" else "OFF",
             "XOffsetDatastructure_storage_FOUND": "TRUE",
+            "XOffsetDatastructure_CXX_STANDARD": '"' + cxx_standard + '"',
         }
         payload["lib/cmake/XOffsetDatastructure/XOffsetDatastructureConfig.cmake"] = "".join("set(" + key + " " + value + ")\n" for key, value in config.items()).encode()
         payload["lib/cmake/XOffsetDatastructure/XOffsetDatastructureConfigVersion.cmake"] = ('set(PACKAGE_VERSION "' + A.VERSION + '")\n').encode()
         targets = ["XOffset::storage"] + (["XOffset::xoffset"] if component == "full" else [])
         payload["lib/cmake/XOffsetDatastructure/XOffsetTargets.cmake"] = "".join("add_library(" + target + " INTERFACE IMPORTED)\n" for target in targets).encode()
-        if component == "full":
+        if component == "full" and cxx_standard == "26":
             lines = ["Boost " + A.EXPECTED_REVISIONS["boost"], "TypeLayout " + A.EXPECTED_REVISIONS["typelayout"], ""]
             for tree, members in self.tree_members.items():
                 records = "".join(name + " " + A.sha(data) + "\n" for name, data in sorted(members.items()))
@@ -107,6 +110,10 @@ class ReleaseArchiveTests(unittest.TestCase):
                 payload["share/XOffsetDatastructure/licenses/" + name.removeprefix("external/")] = data
                 lines.append(name + " " + A.sha(data))
             payload["share/XOffsetDatastructure/xoffset-third-party-manifest.txt"] = ("\n".join(lines) + "\n").encode()
+        elif component == "full":
+            payload["share/XOffsetDatastructure/xoffset-third-party-manifest.txt"] = (
+                "None (C++" + cxx_standard + " field-list build uses only the C++ standard library)\n"
+            ).encode()
         for name, data in payload.items():
             path = prefix / name
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -348,6 +355,52 @@ class ReleaseArchiveTests(unittest.TestCase):
             self.skipTest("symlink creation unavailable: " + str(exc))
         with self.assertRaisesRegex(ValueError, "symbolic link"):
             A.create_install_package(prefix, "storage", self.root / "bad-prefix")
+
+    def test_zero_dependency_cpp20_and_cpp23_full_prefix_packages_extract_and_audit(self):
+        for std in ("20", "23"):
+            with self.subTest(std=std):
+                prefix = self.make_prefix("full", cxx_standard=std)
+                result = A.create_install_package(prefix, "full", self.root / ("package-full-cpp" + std))
+                audit = A.audit(Path(result["archive"]))
+                self.assertEqual(audit["component"], "full")
+                extracted = A.extract(Path(result["archive"]), self.root / ("extracted-full-cpp" + std))
+                root = Path(extracted["source_dir"])
+                self.assertTrue((root / "include/xoffsetdatastructure.hpp").is_file())
+                self.assertFalse((root / "include/xoffset-deps").exists())
+                self.assertFalse((root / "share/XOffsetDatastructure/licenses/boost").exists())
+                self.assertFalse((root / "share/XOffsetDatastructure/licenses/typelayout").exists())
+
+    def test_zero_dependency_full_prefix_rejects_mismatched_standard_stray_deps_and_bad_manifest(self):
+        prefix = self.make_prefix("full", cxx_standard="20")
+        config_path = prefix / "lib/cmake/XOffsetDatastructure/XOffsetDatastructureConfig.cmake"
+        orig_config = config_path.read_bytes()
+        for bad_std in ("23", "26"):
+            config_path.write_bytes(orig_config.replace(b'"20"', ('"' + bad_std + '"').encode()))
+            with self.subTest(bad_std=bad_std), self.assertRaisesRegex(ValueError, "C\\+\\+ standard differs"):
+                A.create_install_package(prefix, "full", self.root / ("bad-std-" + bad_std))
+        config_path.write_bytes(orig_config)
+
+        stray_cases = [
+            ("include/xoffset-deps/boost/core/fixture.hpp", b"// stray\n", "unexpected"),
+            ("share/XOffsetDatastructure/licenses/boost/LICENSE_1_0.txt", b"license\n", "unexpected"),
+            ("share/XOffsetDatastructure/xoffset-third-party-manifest.txt",
+             b"None (C++17 field-list build uses only the C++ standard library)\n", "missing"),
+            ("include/xoffset_buffer.hpp", None, "missing"),
+        ]
+        for rel, data, expected in stray_cases:
+            path = prefix / rel
+            old = path.read_bytes() if path.exists() else None
+            if data is None:
+                path.unlink()
+            else:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+            with self.subTest(rel=rel), self.assertRaisesRegex(ValueError, expected):
+                A.create_install_package(prefix, "full", self.root / "bad-zero-dep")
+            if old is None:
+                path.unlink()
+            else:
+                path.write_bytes(old)
 
 
 if __name__ == "__main__":

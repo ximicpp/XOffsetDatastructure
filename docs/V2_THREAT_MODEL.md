@@ -148,7 +148,7 @@ Consequence before mitigation: a wire the server sent to a client could contain 
 been stored in that buffer and was already deleted** (other players' information, server-internal
 fields and so on), and P3 could also leak data from the server's stack.
 
-**Status (since 2026-11-16):** susu decided performance comes first, and zeroing for P2 and P3 became
+**Status (since 2026-11-16):** performance comes first by default, so zeroing for P2 and P3 became
 compile switches, **off by default**; since 2026-11-17 so is the zeroing on reset (P4 below).
 `XOFFSET_HARDENED=1` turns them all on (the default behavior in
 4.0.0 and earlier), or each can be turned on separately (section 4.1). In the default build, bytes sent
@@ -214,9 +214,9 @@ the zeroing on reset too, and all are turned on by the switches of section 4.1; 
 ### 4.1 Hardening switches (off by default since 2026-11-16)
 
 The measures below spend time on the hot modification and send paths; they protect against old bytes in
-a buffer being sent with the wire (P2, P3 and P4 of T5) or against the caller's own usage errors. susu
-decided on 2026-11-16 that performance comes first, and confirmed on 2026-11-17 that this includes the
-zeroing on reset: every item is a compile switch, default 0;
+a buffer being sent with the wire (P2, P3 and P4 of T5) or against the caller's own usage errors.
+Because performance comes first by default (including reset zeroing since 2026-11-17), every item is a
+compile switch, default 0;
 `-DXOFFSET_<name>=1` turns one on, and `-DXOFFSET_HARDENED=1` (CMake option `XOFFSET_HARDENED=ON`)
 turns on all items not set individually. The switches change the behavior of inline functions, so all
 translation units of one program must use the same values.
@@ -242,8 +242,7 @@ payload; **any client can then send one crafted message that makes the server re
 (`view`) or write out of bounds (modifying the result of `reload`), crash, or read and change server
 memory**. Calls that name `XCheck::bounds` / `XCheck::full` are not affected. It only suits deployments
 whose clients are their own code over a protected transport. It saves little: receiving an SLG uplink
-order (UL.recv) takes 9.6% fewer instructions, about 46 per order, which is why susu decided on
-2026-11-17 that this item stays on by default.
+order (UL.recv) takes 9.6% fewer instructions, about 46 per order, so this check stays on by default.
 
 Not switches and unchanged:
 
@@ -261,10 +260,9 @@ its four zeroing switches `XOFFSET_SCRUB_ERASED`, `XOFFSET_SCRUB_POPPED`, `XOFFS
 
 ## 5. Continuous fuzzing
 
-Status (since 2026-11-04, susu 11-04 06:15Z): the nightly long runs stopped on 2026-10-28 and will not
-resume; instead, **before every release** one round of `tools/fuzz_prerelease.sh` runs in the cloud
-([RELEASING.md](RELEASING.md) section 3), covering every entry point of section 2, and the release ships
-only with no findings. Entry points and harnesses:
+Status (since 2026-11-04): the nightly long runs stopped on 2026-10-28 and are replaced by a full
+**pre-release** round of `tools/fuzz_prerelease.sh` ([RELEASING.md](RELEASING.md) section 3), covering
+every entry point of section 2, and a release ships only with no findings. Entry points and harnesses:
 
 | Entry point | Harness (ASan+UBSan) |
 | --- | --- |
