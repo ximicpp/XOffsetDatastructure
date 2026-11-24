@@ -4,8 +4,9 @@
 Builds three copies of the benchmarks in one job -- anchor (bench/perf/ANCHOR),
 base and head -- all from the head's benchmark sources, counts the instructions
 of every timed phase of the SLG benchmark (S scale), the formal acceptance
-harness (M fixture), every case of the relocation tax benchmark and the two
-demo-set hole table items (SLGD_*) under callgrind, and judges head/base and head/anchor against the thresholds in
+harness (M fixture), every case of the relocation tax benchmark, the two
+demo-set hole table items (SLGD_*) and the add-only type evolution rows
+(bench/evolution/family_ir.cpp, family.*) under callgrind, and judges head/base and head/anchor against the thresholds in
 docs/PERF_GATE.md.
 
 Instruction counts only block regressions. They are never evidence that code
@@ -44,6 +45,7 @@ from pathlib import Path
 SLG_DIR = "bench/slg"
 FORMAL_DIR = "bench/formal"
 RELOC_DIR = "bench/reloc"
+FAMILY_SRC = "bench/evolution/family_ir.cpp"
 ANCHOR_FILE = "bench/perf/ANCHOR"
 LEDGER_FILE = "bench/perf/ledger.json"
 ROLES = ("anchor", "base", "head")
@@ -64,6 +66,10 @@ SLGD_STEADY_KEYS = ("S.store_recv",)
 SLGD_WHOLE = "whole"
 FORMAL_PHASES = ("load", "query_before", "mutate", "emit_after", "retire", "reload", "query_after", "cleanup")
 RELOC_ROUNDS, RELOC_WARMUP, RELOC_SKIP_ROUNDS = "5", "1", "2"   # collect rounds 2-4 of each case
+# Add-only type evolution (docs/SCHEMA_EVOLUTION.md section 9): every family.<op>.in_family row must
+# equal its family.<op>.same row in the head (a send, receive or delta between two versions of one
+# family is the same work as between two programs of one version). FAMILY_CALLS measured calls per row.
+FAMILY_CALLS = "20"
 
 # Thresholds (docs/PERF_GATE.md, design H3 section 5.3).
 TOTAL_WARN, TOTAL_FAIL = 1.003, 1.010          # head/base, scenario totals and formal judged phases
@@ -238,6 +244,16 @@ def reloc_build_cmd(prof, lib: Path, reloc: Path, outdir: Path, extra):
         "-DRELOC_IR_COUNT=1", f"{reloc}/reloc_bench.cpp", "-o", str(outdir / "reloc_bench")] + prof["link"]
 
 
+def family_build_cmd(prof, lib: Path, bench: Path, outdir: Path, extra):
+    """Compile command of family_ir (FAMILY_SRC of `bench`) against library tree `lib`, or None when there is none."""
+    src = bench / FAMILY_SRC
+    if not src.is_file():
+        return None
+    return shlex.split(prof["cxx"]) + prof["std"] + ["-O3", "-DNDEBUG", f"-I{lib}", "-isystem",
+                                                     f"{lib}/external/typelayout/include"] + extra + [
+        f"-I{bench}/{SLG_DIR}/include", "-DFAMILY_IR_COUNT=1", str(src), "-o", str(outdir / "family_ir")] + prof["link"]
+
+
 def compile_log(cmd, r):
     return f"$ {shlex.join(cmd)}\n{r.stdout}{r.stderr}"
 
@@ -288,8 +304,11 @@ def cmd_build(a):
         reloc_cmd = reloc_build_cmd(tprof, tree, head_bench / reloc_dir, outdir, extra_flags)
         if reloc_cmd:
             cmds["reloc_bench"] = reloc_cmd
+        family_cmd = family_build_cmd(tprof, tree, head_bench, outdir, extra_flags)
+        if family_cmd:
+            cmds["family_ir"] = family_cmd
         setup[sha] = (tprof, extra_flags, tree, outdir, cmds, {})
-    for name in ("slg_bench", "sc_xoffset", "reloc_bench"):
+    for name in ("slg_bench", "sc_xoffset", "reloc_bench", "family_ir"):
         for sha, (_, _, _, _, cmds, futs) in setup.items():
             if name in cmds:
                 futs[name] = submit(cmds[name])
@@ -324,10 +343,19 @@ def cmd_build(a):
                 text += "\n--- reloc_bench ---\n" + compile_log(rcmd, r)
             else:
                 text += "\n--- reloc_bench ---\n"
+        # The family rows are optional the same way: a tree without XSpare and
+        # XOFFSET_SCHEMA_FAMILY (older than the add-only evolution) only loses family.*.
+        family_status = "absent"
+        if status != "incomparable":
+            fcmd = cmds.get("family_ir") if bench == "head" else family_build_cmd(tprof, tree, tree, outdir, extra_flags)
+            if fcmd:
+                r = res.get("family_ir") if bench == "head" else submit(fcmd).result()
+                family_status = "ok" if r.returncode == 0 else "failed"
+                text += "\n--- family_ir ---\n" + compile_log(fcmd, r)
         (work / "logs").mkdir(exist_ok=True)
         (work / "logs" / f"build-{a.compiler}-{short(sha)}.log").write_text(text, encoding="utf-8")
-        log(f"build {a.compiler} {short(sha)}: {status}, reloc {reloc_status}")
-        return {"status": status, "bench": bench, "dir": str(outdir), "reloc": reloc_status}
+        log(f"build {a.compiler} {short(sha)}: {status}, reloc {reloc_status}, family {family_status}")
+        return {"status": status, "bench": bench, "dir": str(outdir), "reloc": reloc_status, "family": family_status}
 
     with pool:
         for sha in plan["trees"]:
@@ -335,7 +363,8 @@ def cmd_build(a):
     dump_json(work / f"build-{a.compiler}.json", builds)
     head = plan["roles"]["head"]
     head_reloc = builds["trees"][head].get("reloc")
-    if builds["trees"][head]["status"] != "ok" or head_reloc == "failed":
+    head_family = builds["trees"][head].get("family")
+    if builds["trees"][head]["status"] != "ok" or head_reloc == "failed" or head_family == "failed":
         log("head does not build; see logs/")
         tail = (work / "logs" / f"build-{a.compiler}-{short(head)}.log").read_text(encoding="utf-8")[-4000:]
         print(tail, file=sys.stderr)
@@ -545,6 +574,20 @@ def reloc_check(binary: Path, tmp: Path):
     return {"ok": r.returncode == 0 and bool(cases), "tail": (r.stdout + r.stderr)[-1500:] if r.returncode else ""}, sorted(cases)
 
 
+def family_cmd(binary, row):
+    return [str(binary), "--row", row, FAMILY_CALLS]
+
+
+def family_check(binary: Path):
+    """family_ir --check (both rows of each pair give the same result) and its rows (--list)."""
+    r = subprocess.run([str(binary), "--check"], text=True, capture_output=True)
+    rows = []
+    if r.returncode == 0:
+        lr = subprocess.run([str(binary), "--list"], text=True, capture_output=True)
+        rows = [l.strip() for l in lr.stdout.splitlines() if l.strip()] if lr.returncode == 0 else []
+    return {"ok": r.returncode == 0 and bool(rows), "tail": (r.stdout + r.stderr)[-1500:] if r.returncode else ""}, rows
+
+
 def cmd_measure(a):
     work = Path(a.work).resolve()
     plan = load_json(work / "plan.json")
@@ -575,15 +618,22 @@ def cmd_measure(a):
         t2.mkdir()
         keys = discover_slg_keys(Path(b["dir"]) / "slg_bench", t2) if chk["ok"] else []
         tr = {"checks": chk, "slg_keys": keys, "slg": {}, "slgd": {}, "formal": {}, "functions": {},
-              "reloc_status": b.get("reloc", "absent"), "reloc_keys": [], "reloc": {}}
+              "reloc_status": b.get("reloc", "absent"), "reloc_keys": [], "reloc": {},
+              "family_status": b.get("family", "absent"), "family_keys": [], "family": {}}
         if chk["ok"] and tr["reloc_status"] == "ok":
             tr["reloc_check"], tr["reloc_keys"] = reloc_check(Path(b["dir"]) / "reloc_bench", t2)
             if not tr["reloc_check"]["ok"]:
                 tr["reloc_status"] = "verify_failed"
                 tr["reloc_keys"] = []
+        if chk["ok"] and tr["family_status"] == "ok":
+            tr["family_check"], tr["family_keys"] = family_check(Path(b["dir"]) / "family_ir")
+            if not tr["family_check"]["ok"]:
+                tr["family_status"] = "verify_failed"
+                tr["family_keys"] = []
         result["trees"][sha] = tr
         log(f"checks {short(sha)}: {'ok' if chk['ok'] else 'FAILED'}; {len(keys)} SLG keys; "
-            f"reloc {tr['reloc_status']}, {len(tr['reloc_keys'])} cases")
+            f"reloc {tr['reloc_status']}, {len(tr['reloc_keys'])} cases; "
+            f"family {tr['family_status']}, {len(tr['family_keys'])} rows")
 
     tasks = []
     for sha, tr in result["trees"].items():
@@ -598,6 +648,8 @@ def cmd_measure(a):
             tasks.append((sha, "formal", ph, 0))
         for k in tr["reloc_keys"]:
             tasks.append((sha, "reloc", k, 0))
+        for k in tr["family_keys"]:
+            tasks.append((sha, "family", k, 0))
     # Determinism: the same binary twice must give bit-identical counts.
     if head in result["trees"] and result["trees"][head]["checks"]["ok"]:
         keys = result["trees"][head]["slg_keys"]
@@ -607,6 +659,8 @@ def cmd_measure(a):
         tasks.append((head, "formal", "mutate", 1))
         if result["trees"][head]["reloc_keys"]:
             tasks.append((head, "reloc", result["trees"][head]["reloc_keys"][0], 1))
+        if result["trees"][head]["family_keys"]:
+            tasks.append((head, "family", result["trees"][head]["family_keys"][0], 1))
 
     def run(task):
         sha, kind, key, rep = task
@@ -624,6 +678,8 @@ def cmd_measure(a):
                 ir, prof = run_cg(a.valgrind, cmd, env, tmp, whole)
             elif kind == "reloc":
                 ir, prof = run_cg(a.valgrind, reloc_cmd(bdir / "reloc_bench", key), reloc_env(key), tmp)
+            elif kind == "family":
+                ir, prof = run_cg(a.valgrind, family_cmd(bdir / "family_ir", key), dict(os.environ), tmp)
             else:
                 env = dict(os.environ, SC_IR_PHASE=key)
                 ir, prof = run_cg(a.valgrind, [str(bdir / "sc_xoffset"), "run", "--wire", str(bdir / "M.wire"),
@@ -651,6 +707,8 @@ def cmd_measure(a):
             tasks.append((sha, "formal", ph, "cache"))
         for k in tr["reloc_keys"]:
             tasks.append((sha, "reloc", k, "cache"))
+        for k in tr["family_keys"]:
+            tasks.append((sha, "family", k, "cache"))
     if cache_roles:
         result["cache_sim"] = {"args": list(CACHE_SIM_ARGS), "roles": list(cache_roles)}
 
@@ -687,7 +745,7 @@ def cmd_measure(a):
 
 def cache_counts(tree, level):
     """One tree's cache-sim misses of one level (D1 or LL, read + write) in the shape metrics_of reads."""
-    t = {"slg": {}, "slgd": {}, "formal": {}, "reloc": {}}
+    t = {"slg": {}, "slgd": {}, "formal": {}, "reloc": {}, "family": {}}
     for k, ev in (tree.get("cache") or {}).items():
         kind, _, key = k.partition(".")
         t[kind][key] = sum(ev[e] for e in CACHE_EVENTS[level])
@@ -715,14 +773,16 @@ def metrics_of(tree):
         m[f"reloc.{k}"] = v
     for k, v in tree.get("slgd", {}).items():
         m[f"slgd.{k}"] = v
+    for k, v in tree.get("family", {}).items():
+        m[f"family.{k}"] = v
     return m
 
 
 def classify(metric, base_m, head_m):
     """total | phase | report, plus the phase's share of its scenario."""
     kind, _, rest = metric.partition(".")
-    if kind == "reloc":
-        return "phase", 1.0  # every case is its own scenario
+    if kind in ("reloc", "family"):
+        return "phase", 1.0  # every case (row) is its own scenario
     if kind == "slgd":           # the whole run is a total; a steady-state key is its own scenario
         return ("total", 1.0) if rest == SLGD_WHOLE else ("phase", 1.0)
     if kind == "slg":
@@ -787,7 +847,7 @@ def validate_ledger(entries):
 def metric_keys(metric, tree):
     """The callgrind runs (keys of a tree's "functions") that a gate metric adds up."""
     kind, _, rest = metric.partition(".")
-    if kind in ("reloc", "slgd"):
+    if kind in ("reloc", "slgd", "family"):
         return [metric]
     if kind == "slg":
         if rest in SLG_TOTALS:
@@ -918,6 +978,8 @@ def cmd_compare(a):
         fail(f"callgrind run failed: {e.splitlines()[0]}")
     if head_tree and head_tree.get("reloc_status") == "verify_failed":
         fail("head's reloc_bench --mode verify failed (result digests disagree), no reloc.* numbers")
+    if head_tree and head_tree.get("family_status") == "verify_failed":
+        fail("head's family_ir --check failed (the rows of a pair disagree), no family.* numbers")
     for k, d in ir.get("determinism", {}).items():
         if not d["identical"]:
             fail(f"the same binary gave two different Ir counts ({k}: {d['first']} vs {d['second']}), gate results are not trustworthy")
@@ -940,12 +1002,27 @@ def cmd_compare(a):
             rs = t.get("reloc_status", "absent")
             if rs in ("failed", "verify_failed") and (head_tree or {}).get("reloc_status") == "ok":
                 warn(f"{role} {short(sha)}'s reloc_bench {'does not compile' if rs == 'failed' else 'failed verification'}: reloc.* is not compared with it")
+            fs = t.get("family_status", "absent")
+            if fs == "verify_failed" and (head_tree or {}).get("family_status") == "ok":
+                warn(f"{role} {short(sha)}'s family_ir failed its check: family.* is not compared with it")
 
     metrics = {}
     for role in ROLES:
         t = ir["trees"].get(roles[role])
         metrics[role] = metrics_of(t) if t and t["checks"]["ok"] else {}
     hm, bm, am = metrics["head"], metrics["base"], metrics["anchor"]
+
+    # Add-only type evolution: each in-family row costs exactly what its same-version row costs.
+    for metric in sorted(hm):
+        if metric.startswith("family.") and metric.endswith(".in_family"):
+            same = metric[: -len(".in_family")] + ".same"
+            if same not in hm:
+                fail(f"{metric}: head has no {same} to compare with")
+            elif hm[metric] != hm[same]:
+                fail(f"{metric} {hm[metric]} Ir != {same} {hm[same]} Ir: between two versions of one family a "
+                     "send, receive or delta must cost what it costs between two programs of one version")
+            else:
+                notes.append(f"{metric} equals {same} ({hm[metric]} Ir)")
 
     if head_tree and head_tree["checks"]["ok"]:
         hw = head_tree["checks"].get("wire_M_sha256")

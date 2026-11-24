@@ -10,6 +10,7 @@ old program.
 | `xoffset_handshake.hpp` | Both | Handshake messages `XSchemaHello` / `XSchemaHelloAck`, `peek_wire_fingerprint` |
 | `xoffset_evolution.hpp` | Server | Conversion, version chains, sending and receiving per peer |
 | `xoffset_schema_freeze.hpp` | Server build | Freezing a version at release, checking the lock file in CTest |
+| `xoffset_schema_family.hpp` (in `xoffsetdatastructure.hpp`) | Both | Add-only versions without conversion: `XSpare<N>`, `XOFFSET_SCHEMA_FAMILY` (section 9) |
 
 `xoffset_evolution.hpp` and `xoffset_schema_freeze.hpp` are server-only and need the C++26 reflection
 backend (GCC 16, P2996 Clang); including them under the field-list backend fails to compile. Clients only
@@ -223,3 +224,125 @@ A complete example in the tests: `tests/schema_freeze/`.
 | `test_schema_freeze` | The freeze tool's snapshots and lock files are byte-identical to the committed versions; every failure of check |
 | `tests/schema_evolution/*_fail.cpp` | Code that must fail to compile, and its error messages |
 | `fuzz_schema_evolution` | libFuzzer: receiving arbitrary wires, sending random objects to every version, arbitrary handshake bytes (see `tests/fuzz/regressions/README.md`) |
+| `test_xspare`, `test_schema_family`, `test_schema_family_xs`, `schema_family_*_fail` | Add-only versions (section 9) |
+| `fuzz_schema_family` | libFuzzer, both backends: the in-place pair of section 9 |
+
+## 9. Add-only versions (no conversion)
+
+Sections 1 to 8 convert between versions on the server. When a type only gains fields, there is a
+cheaper way: reserve bytes in advance and take new fields from them. Two such versions have the same
+image bytes and one fingerprint, so they read each other's data with no run-time mechanism at all, in
+both directions (an old program reads a new one's data and the other way round), on every path: whole
+wires (full check and admit), image deltas, shared deltas (XS), relayout, compact and stored images.
+Clients and servers may update in any order, and clients need nothing but the field-list build.
+
+### 9.1 The rule
+
+A later version only adds fields, and only inside bytes the previous version reserved with `XSpare<N>`.
+
+| Change from the previous version | Allowed |
+| --- | --- |
+| A new field of a plain type (scalar, enum, array or record of them) inside an `XSpare<N>` member, the rest of the spare bytes stay `XSpare` | Yes |
+| The element type `XSpare<N>` of a container (for example `XVector<XSpare<16>>`) becomes a plain record of N bytes | Yes: this is how a list is reserved |
+| Two later versions that each add other fields to one version (branches) | Each is valid; they reject each other at the handshake |
+| A field removed, renamed, moved to another offset, retyped (also `int32` to `uint32`, another enum underlying type, another container kind or element size) | No |
+| A new field in padding, after the end of the record, or overlapping a field | No: the record's size and every offset stay |
+| A new field that holds a container (string, vector, set, map), even inside a record | No: an older program's compact walk would drop its block |
+| Spare bytes that become padding | No: they stay a field or `XSpare` |
+
+Any other change is a new version with its own fingerprint: both ends update together, or the server
+converts as in sections 1 to 8.
+
+### 9.2 Reserving
+
+`XSpare<N>` is N bytes, alignment 1, zero by default. A program never writes anything but zero into its
+own spare members and never reads them; every check treats them as opaque bytes, so a newer peer may keep
+fields there. It has its own token in the wire signature (`spare[N]`), so `XSpare<8>` and
+`std::uint8_t[8]` are different layouts.
+
+Put the spare member last, where it also fills the tail padding of the record, and size it for the fields
+you expect: 8 bytes per frequently repeated element record and 16 at the root are a common choice. The
+bytes cost in every image and on the wire: in the SLG example (8 bytes per hero, 16 at the root) the
+image grows by 6.3%, by 3.0% after zstd level 3. Zero bytes compress well, and `XWireEmission::zero_runs`
+does not send long runs of them. A list a later version will need is reserved as
+`XVector<XSpare<16>>` (an empty vector costs its 12-byte head).
+
+### 9.3 Declaring
+
+Keep the previous version's types in the code (by hand, or as a snapshot header written by the freeze
+tool of section 5) and declare the new one on top of it, at global scope, after the field lists:
+
+```cpp
+using namespace XOffsetDatastructure;
+namespace game_v1 {  // as released: 24 and 40 bytes
+struct Hero { std::int32_t id{}; XString name; XSpare<8> spare{}; };
+struct Player { std::uint64_t uid{}; XVector<Hero> heroes; std::int32_t level{}; XSpare<16> spare{}; };
+}
+namespace game {     // the new version: star at byte 16 of Hero, vip at byte 24 of Player
+struct Hero { std::int32_t id{}; XString name; std::int32_t star{}; XSpare<4> spare{}; };
+struct Player { std::uint64_t uid{}; XVector<Hero> heroes; std::int32_t level{}; std::int64_t vip{}; XSpare<8> spare{}; };
+}
+XOFFSET_RECORD(game_v1::Hero, id, name, spare)
+XOFFSET_RECORD(game_v1::Player, uid, heroes, level, spare)
+XOFFSET_RECORD(game::Hero, id, name, star, spare)
+XOFFSET_RECORD(game::Player, uid, heroes, level, vip, spare)
+XOFFSET_REGISTER_SCHEMA_NAME(game_v1::Player, "game.Player")
+XOFFSET_REGISTER_SCHEMA_NAME(game::Player, "game.Player")   // the same name: the fingerprint covers it
+
+XOFFSET_SCHEMA_FAMILY(game::Player, game_v1::Player)
+```
+
+- A family is a chain: each version names the one before it (`XOFFSET_SCHEMA_FAMILY(v3, v2)`,
+  `XOFFSET_SCHEMA_FAMILY(v2, v1)`). The check recurses through nested records and container elements, so
+  one declaration on the root covers the tree; the nested records need none for whole wires and image
+  deltas.
+- Declare it on every type whose numbering travels: the root (its fingerprint) and every record a shared
+  delta (XS) sends as an entity or as the root record (its change bodies).
+- A version that breaks the rule does not compile. The message names the rule and the field, for
+  example `XOFFSET_SCHEMA_FAMILY: a field of the previous version moved to another offset; fields keep
+  their place (at stats.def)` (C++26; C++20 and MSVC report each rule in its own `static_assert`).
+  `schema_family_successor_v<New, Prev>` asks the same question without failing.
+- Do not put two versions of one family on one version chain of section 2: they have one fingerprint.
+
+### 9.4 What follows from the declaration
+
+- **Fingerprint.** `wire_schema_hash<New>()` is the hash of the family's first version; a type that
+  declares no family keeps its own hash and its own code. Image headers, delta key frames and the
+  handshake carry it.
+- **Handshake.** `make_schema_hello` also lists the earlier versions of the family as `known` entries
+  (their field-name digests); `accept_schema_hello` and `XPeerSchemas::accept` answer `same` to a peer on
+  any version of the working type's family, earlier (its digest is in this program's family) or later
+  (its hello lists this program's digest). Two branches of one version and another family under the same
+  layout are `reject_names`, as before. The hello and ack formats do not change.
+- **Freeze tool.** `check` reports an added field inside a family as such, not as a layout under other
+  names.
+- **Shared deltas.** A change body names the members of the family's first version: a spare region and
+  every field later taken from it are one member, sent as its bytes. Every mask a program passes or gets
+  (`changed()`, `put_change`, `XSyncWriter::change`, the publisher's dirty bits) counts the program's own
+  members (bit i is member i of its type, in declaration order); `XRecordBody<T>::mask_bits` and
+  `mask_all` give their number. Whole bodies need nothing: they are the same bytes.
+- **Cost.** None: the same code and the same bytes. The Ir gate measures it (`family.*` rows of
+  [PERF_GATE.md](PERF_GATE.md), `bench/evolution/family_ir.cpp`): a send to an older client, an older
+  client's receive and a delta tick applied by an older replica cost exactly what they cost between two
+  programs of one version.
+
+### 9.5 Two things the rule cannot check
+
+1. **A new field must mean "unset" at zero**, and must not have a non-zero default member initializer:
+   data written by an earlier version holds zero there, and a later program reads that zero.
+2. **An earlier program that replaces a whole record resets the newer fields.** Editing fields of an
+   existing record, resending, compacting and relayout keep every byte of the later version; but an
+   earlier program that builds a record anew (assigns a default-constructed record, clears and refills a
+   container of records) writes its own zeros into the spare bytes, and the later version reads its new
+   fields as unset. When an earlier program may do that to data a later one owns, keep that data out of
+   its reach or update both together.
+
+### 9.6 Tests
+
+| Test | Contents |
+| --- | --- |
+| `test_xspare` | `XSpare<N>`: layout, signature token, opaque on every tier, plain bytes in shared deltas |
+| `test_schema_family` | Three versions of one type tree and a branch, every pair both ways: whole wires (full check and admit, every emission), an earlier program's edits and resends (compact, relayout), image deltas (byte-identical), stored images, handshake verdicts, the server side |
+| `test_schema_family_xs` | Shared deltas between three versions: whole and change bodies byte-identical both ways, own-numbered masks, bool checks per version, diff ops, whole key and delta messages on clients of every version (full and admit) |
+| `schema_family_<rule>_fail` | One declaration per rule that must not compile, and its message |
+| `fuzz_schema_family` | libFuzzer, both backends: every input read by three versions of one family; a later version accepts nothing an earlier one rejects, and versions that accept an input hold the same bytes |
