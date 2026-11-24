@@ -199,6 +199,7 @@ endif()
 # Schema handshake (xoffset_handshake.hpp) and schema evolution
 # (xoffset_evolution.hpp, server side).
 set(EVOLUTION_TESTS
+    test_xspare            # reserved bytes of later versions (every build)
     test_schema_handshake
     test_schema_snapshot   # a frozen snapshot used by a client (every build)
     test_schema_evolution
@@ -342,6 +343,7 @@ set(NO_EXCEPTIONS_TESTS
     test_xhandle
     test_xstring_direct_assign
     test_schema_handshake
+    test_xspare
     test_delta_sync
     test_delta_format
     test_relayout
