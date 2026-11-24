@@ -11,6 +11,11 @@
 // ends: when the schema handshake (examples/schema_handshake.cpp) does not
 // answer `same` for the root type, send whole wires instead
 // (docs/SCHEMA_EVOLUTION.md).
+//
+// A server that edits the same buffer for a long time leaves holes and spare
+// capacity behind; between ticks it relayouts the buffer when
+// relayout_advised() says so (docs/USER_GUIDE.md section 4.7). Only the
+// sender does that, never the client's copy.
 #include "../xoffset_receiver.hpp"
 
 #include <cstdint>
@@ -55,6 +60,11 @@ int main() {
 
     std::string delta;
     for (int tick = 1; tick <= 6; ++tick) {
+        // Server, between ticks: shed what earlier edits left behind once it
+        // pays. Proxies such as `units` stay valid; the next delta to each
+        // client is larger once.
+        if (world.relayout_advised()) (void)world.relayout();
+
         // Server: change a few fields in place, then write the delta. A pin
         // scope gives plain references at plain speed; the buffer does not
         // move while it runs.

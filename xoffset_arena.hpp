@@ -3005,6 +3005,39 @@ namespace XOffsetDatastructure {
             return buffer_.assign_in_place(image, size, 0);
         }
 
+        // XBuffer::relayout<T>(): `image` (`size` bytes, the dense image of
+        // this content that save_compact writes, smaller than used_end)
+        // replaces the image in place. The lineage stays, as after a move of
+        // the payload: proxies re-resolve (their paths are logical), the
+        // root key, typed access and the root at root_at stay. The epoch
+        // advances: plain references are invalid, XHandles re-resolve, a
+        // touch log starts over at its next use, the spare watch is
+        // dropped. The image's free state is exact (no free block). What the
+        // old image left in [size, old used_end) is remembered as a reset
+        // remembers it. The relayout mark becomes `size`. False: an injected
+        // storage failure, nothing changed. Called outside pin scopes only,
+        // so the quarantine holds nothing to retire.
+        XOFFSET_DETAIL_NOINLINE bool relayout_in_place(const char* image, size_type size) noexcept {
+            const auto old_used = used_end_clamped();
+            if (!buffer_.overwrite_in_place(image, size)) return false;
+            if (ctl_) ctl_->version += 2;
+            advance_epoch();
+            send_flags_.free_table_lost = false;
+            drop_spare_watch();
+            if (old_used > size) {
+                if constexpr (detail::scrub_reset) {
+                    std::memset(buffer_.data() + size, 0, old_used - size);
+                } else {
+                    if (old_used > packed_.reset_dirty_end) packed_.reset_dirty_end = static_cast<std::uint32_t>(old_used);
+#if defined(XOFFSET_STRESS_RELOCATE)
+                    std::memset(buffer_.data() + size, detail::stress_poison_byte, old_used - size);
+#endif
+                }
+            }
+            set_relayout_mark(size);
+            return true;
+        }
+
         // In-place direct receive (XBuffer::begin_verified_reload): the
         // admission of reinit, then [0, size) exposed to the writer without
         // clearing. Sets `clean_from` to the offset from which bytes are
@@ -3189,6 +3222,23 @@ namespace XOffsetDatastructure {
 
         void advance_epoch() noexcept { ++m_epoch; }
 
+        // relayout_advised's mark (XBuffer::relayout_advised): the used size
+        // a relayout of this content gave, or would give. It belongs to the
+        // epoch it was set in: a later epoch (new content, a move, a swap)
+        // measures again.
+        bool relayout_mark_current() const noexcept { return relayout_epoch_ == m_epoch + 1u; }
+        // The current mark, reached: used_end is at least twice the mark.
+        // Only with relayout_mark_current() (the content has a root, so an
+        // arena).
+        bool relayout_mark_reached() const noexcept {
+            return arena_unchecked()->used_end >= 2u * std::uint64_t(relayout_mark_);
+        }
+        void set_relayout_mark(size_type mark) noexcept {
+            relayout_mark_ = mark < (std::numeric_limits<std::uint32_t>::max)()
+                ? static_cast<std::uint32_t>(mark) : (std::numeric_limits<std::uint32_t>::max)();
+            relayout_epoch_ = m_epoch + 1u;
+        }
+
     private:
         // The watched heads (at most spare_watch_slots), by payload offset.
         struct SpareList {
@@ -3345,6 +3395,12 @@ namespace XOffsetDatastructure {
         // in-band allocator records its writes in it. It follows the
         // content (move, swap). It fills the padding before packed_.
         std::unique_ptr<detail::DeltaTouchLog> touch_log_;
+        // relayout_advised's mark and one past the epoch it belongs to (0:
+        // none; zero, so that a new owner's line stores no other constant).
+        // In the padding before packed_: never moved with the content (a
+        // move or swap advances the epoch).
+        std::uint32_t relayout_mark_ = 0;
+        std::uint64_t relayout_epoch_ = 0;
         // Three small members in one 8-byte word, so that a move or a swap
         // carries all of them with one load and one store per side (what the
         // policy byte alone took). It starts the line of ctl_, which a reset

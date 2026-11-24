@@ -426,6 +426,16 @@ without `NDEBUG` and under ASan or TSan) makes admit the full check.
   against its map of live blocks. Reserving capacity for the expected size keeps
   deltas to the changed elements and on the cheap checks. Strings of at most
   10 bytes are stored inline in their head.
+- **Relayout of a long-lived sender.** A sender edited in place for a long
+  time keeps its holes and spare capacity, and every delta compares (and
+  every replica holds) its whole `used_end`. `relayout<T>()` between ticks
+  rewrites it in place as its compact image ([USER_GUIDE.md](USER_GUIDE.md)
+  section 4.7; `relayout_advised<T>()` says when). It advances the epoch, so
+  no delta code is involved: the next delta of a copy baseline (also with
+  `touched_only`, whose touch log belongs to the old epoch) compares the
+  whole payload, nearly every block differs and it is about the size of a
+  key delta; a `touches` baseline sends a key delta. Each stream pays that
+  once per relayout. Never relayout a replica: its layout is its sender's.
 - **Per receiver, not per message.** One baseline is one copy of the
   payload's used bytes on the sender. Receivers that always get the same
   deltas (replicas of one buffer) can share one baseline and one delta.
