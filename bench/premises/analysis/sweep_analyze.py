@@ -23,6 +23,9 @@ SHORT = {"zpp_bits": "zpp", "cista_raw_unchecked": "cista raw U", "cista_offset_
          "flatbuffers_verify": "FB+Verifier", "protobuf": "pb", "cereal": "cereal",
          "flatbuffers_view_noverify": "FB view", "flatbuffers_view_verify": "FB view+Verifier"}
 DIRTS = ["clean", "rw1", "rw100000", "g0.25", "g0.5", "g1", "g2", "g4", "g8"]
+# The same dirty sender after one relayout() (XOffset only): rows of their own, not fit points.
+RELAYOUT_DIRTS = ["g8+relayout"]
+CHURNS = ["churn100000", "churn100000+relayout"]   # rivals: churn100000 (same logical state)
 
 
 def load(raw):
@@ -199,7 +202,7 @@ def dirt_sections(ns, info, res, zpp_bytes, procs):
         print("| dirt | wire B | r = wire ÷ compact | zstd B | zero_runs B | admit ÷ zpp | admit ÷ strongest trusted | full ÷ zpp | full ÷ strongest checked | zero_runs admit ÷ zpp | compact+admit ÷ zpp | admit ns |")
         print("| --- |" + " --- |" * 11)
         res["dirt"][s] = {}
-        for d in DIRTS:
+        for d in DIRTS + RELAYOUT_DIRTS:
             g = "size" if d == "clean" else "dirt"
             k = lambda f: (g, f, s, d)
             if k("xo_admit") not in ns:
@@ -262,25 +265,30 @@ def dirt_sections(ns, info, res, zpp_bytes, procs):
 
     # ---------------- churn
     print("## 4. Random churn (100,000 edits; every rival measured on the same final state)\n")
-    print("| k | wire B | compact B | r | zstd B | compact zstd B | zpp B | admit ÷ zpp | admit ÷ strongest trusted | full ÷ zpp | full ÷ strongest checked | zero_runs admit ÷ zpp | compact+admit ÷ zpp |")
-    print("| --- |" + " --- |" * 12)
+    print("| k | dirt | wire B | compact B | r | zstd B | compact zstd B | zpp B | admit ÷ zpp | admit ÷ strongest trusted | full ÷ zpp | full ÷ strongest checked | zero_runs admit ÷ zpp | compact+admit ÷ zpp |")
+    print("| --- |" + " --- |" * 13)
     for s in [s for s in SIZES if ("churn", "xo_admit", s, "churn100000") in ns]:
-        k = lambda f: ("churn", f, s, "churn100000")
-        inf = info[k("xo_admit")]
-        zk = [k("zpp_bits")]
-        a_z = summarize(ratio_series(ns, k("xo_admit"), zk))
-        a_s = summarize(ratio_series(ns, k("xo_admit"), [k(r) for r in TRUSTED]))
-        f_z = summarize(ratio_series(ns, k("xo_full"), zk))
-        f_s = summarize(ratio_series(ns, k("xo_full"), [k(r) for r in CHECKED]))
-        zr = summarize(ratio_series(ns, k("xo_admit_zero_runs"), zk))
-        cp = summarize(ratio_series(ns, k("xo_compact_admit"), zk))
-        res["churn"][s] = {"wire": inf["bytes"], "compact0": inf["bytes_compact0"], "r": inf["bytes"] / inf["bytes_compact0"], "zstd": inf["bytes_z"],
-                           "zpp_bytes": info[k("zpp_bits")]["bytes"], "admit_zpp": a_z, "admit_strongest": a_s, "full_zpp": f_z, "full_strongest": f_s,
-                           "zero_runs_zpp": zr, "compact_zpp": cp,
-                           "strongest_trusted": min(TRUSTED, key=lambda r: median(list(ns[k(r)].values()))),
-                           "strongest_checked": min(CHECKED, key=lambda r: median(list(ns[k(r)].values())))}
-        print(f"| {s} | {inf['bytes']:.0f} | {inf['bytes_compact0']:.0f} | {inf['bytes'] / inf['bytes_compact0']:.2f} | {inf['bytes_z']:.0f} | {inf['bytes_compact_z']:.0f} | "
-              f"{info[k('zpp_bits')]['bytes']:.0f} | {cell(a_z)} | {cell(a_s)} ({SHORT[res['churn'][s]['strongest_trusted']]}) | {cell(f_z)} | {cell(f_s)} ({SHORT[res['churn'][s]['strongest_checked']]}) | {cell(zr)} | {cell(cp)} |")
+        for d in CHURNS:
+            x = lambda f: ("churn", f, s, d)
+            k = lambda f: ("churn", f, s, "churn100000")
+            if x("xo_admit") not in ns:
+                continue
+            inf = info[x("xo_admit")]
+            zk = [k("zpp_bits")]
+            a_z = summarize(ratio_series(ns, x("xo_admit"), zk))
+            a_s = summarize(ratio_series(ns, x("xo_admit"), [k(r) for r in TRUSTED]))
+            f_z = summarize(ratio_series(ns, x("xo_full"), zk))
+            f_s = summarize(ratio_series(ns, x("xo_full"), [k(r) for r in CHECKED]))
+            zr = summarize(ratio_series(ns, x("xo_admit_zero_runs"), zk))
+            cp = summarize(ratio_series(ns, x("xo_compact_admit"), zk))
+            row = {"wire": inf["bytes"], "compact0": inf["bytes_compact0"], "r": inf["bytes"] / inf["bytes_compact0"], "zstd": inf["bytes_z"],
+                   "zpp_bytes": info[k("zpp_bits")]["bytes"], "admit_zpp": a_z, "admit_strongest": a_s, "full_zpp": f_z, "full_strongest": f_s,
+                   "zero_runs_zpp": zr, "compact_zpp": cp,
+                   "strongest_trusted": min(TRUSTED, key=lambda r: median(list(ns[k(r)].values()))),
+                   "strongest_checked": min(CHECKED, key=lambda r: median(list(ns[k(r)].values())))}
+            res["churn"][s if d == "churn100000" else s + "+relayout"] = row
+            print(f"| {s} | {d} | {inf['bytes']:.0f} | {inf['bytes_compact0']:.0f} | {inf['bytes'] / inf['bytes_compact0']:.2f} | {inf['bytes_z']:.0f} | {inf['bytes_compact_z']:.0f} | "
+                  f"{info[k('zpp_bits')]['bytes']:.0f} | {cell(a_z)} | {cell(a_s)} ({SHORT[row['strongest_trusted']]}) | {cell(f_z)} | {cell(f_s)} ({SHORT[row['strongest_checked']]}) | {cell(zr)} | {cell(cp)} |")
     print()
 
 

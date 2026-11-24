@@ -16,6 +16,9 @@
 // deltas with save_delta_into / try_apply_delta_verified (one baseline per
 // online client); SN.* saves to storage as a delta against what storage holds.
 // Every native receiver's state is checked equal to the application-level one.
+// After each round of LN deltas the server's players are relayouted where
+// relayout_advised() says so (LN.relayout: the hints and the relayouts, timed
+// as one pass; LN.relayouts counts the relayouts; docs/USER_GUIDE.md 4.7).
 #pragma once
 #include <algorithm>
 #include <cstdint>
@@ -130,7 +133,8 @@ template <class P> uint64_t query_self(const P& p) {
 //   std::size_t patch_encode(auto fill)    fill(PlayerPatch&) then encode
 //   void patch_recv()                      the client receives it into the reused receive object
 //   const auto& patch()
-// Optional native: n_login_key(p) -> size, n_login_recv(p), n_diff(p) -> size, n_recv(p), n_held(p).
+// Optional native: n_login_key(p) -> size, n_login_recv(p), n_diff(p) -> size, n_recv(p), n_held(p),
+// n_relayout(p) -> relayouted (the server's player, between rounds).
 // Scoring V3 (2026-11-04): login_wire(), patch_wire(), n_wire() (the last wire each
 // wrote) for the zstd keys (LZ/LKZ/LDZ/LNZ.send timed, *_zstd bytes; compressed
 // after the logins and after the rounds, so the timed stages keep their working
@@ -206,7 +210,7 @@ template <class Ops> void run_login(Ops& ops, uint64_t seed, int cycle, int roun
     zstd_timed(st, "LZ.send", "L.player_zstd", lz);
     zstd_timed(st, "LKZ.send", "LK.player_zstd", lkz);
     SelfDirty dirty;
-    for (int r = 0; r < rounds; ++r)
+    for (int r = 0; r < rounds; ++r) {
         for (int p = 0; p < online; ++p) {
             Rng rng(mix_seed(seed, (uint64_t(cycle) * 64 + uint64_t(r)) * 100003 + uint64_t(p)));
             dirty.clear();
@@ -238,6 +242,21 @@ template <class Ops> void run_login(Ops& ops, uint64_t seed, int cycle, int roun
                 if (p < nw_dev) nwq[std::size_t(p)].emplace_back(ops.n_wire());
             }
         }
+        // Between rounds the server walks its players and relayouts those the
+        // hint names (one timed pass, so the timer is not paid per player).
+        if constexpr (requires { ops.n_relayout(0); }) if (native_on()) {
+            int done = 0;
+            timed(st, "LN.relayout", [&ops, &done, online] {
+                // Locals, so the loop keeps them in registers.
+                Ops& o = ops;
+                const int count = online;
+                int n = 0;
+                for (int p = 0; p < count; ++p) n += o.n_relayout(p);
+                done = n;
+            });
+            st.bytes["LN.relayouts"] += uint64_t(done);
+        }
+    }
     zstd_timed(st, "LDZ.send", "LD.patch_zstd", dz);
     zstd_timed(st, "LNZ.send", "LN.delta_zstd", nz);
     // Streaming compression (report only): each warm device's connection has one

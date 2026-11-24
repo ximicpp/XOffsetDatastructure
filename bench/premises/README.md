@@ -37,9 +37,10 @@ raw and zstd level 3.
   container grown by g times its size and shrunk back (g = 0.25 to 8), the 2024 read/write loop run
   1 or 100,000 times (both leave the state unchanged), and 100,000 random edits (the state changes;
   every rival is then measured on that final state). Churn is given as r = wire bytes ÷ the bytes of
-  `save_compact` with no slack for the same state.
+  `save_compact` with no slack for the same state. Two XOffset-only cells, `g8+relayout` and
+  `churn100000+relayout`, take the same churned sender after one `relayout()` (USER_GUIDE.md 4.7).
 
-Every process runs all 472 cells (churn at k = 1/4, 1, 2, 4 and 16) in its own random order. Each
+Every process runs all 554 cells (churn at k = 1/4, 1, 2, 4 and 16) in its own random order. Each
 cell: 3 warm-up messages, then rounds of about 10 ms, 7 rounds, median. Ratios are taken within a
 process (XOffset ÷ rival), then the median over processes with a distribution-free 95% interval
 (order statistics). A verdict is "firm" when the whole interval is inside its band (win < 0.95, tie
