@@ -178,10 +178,22 @@ namespace XOffsetDatastructure {
         }
 
         template <typename T>
+        consteval void require_natural_layout() {
+            static_assert(natural_record_layout<T>(),
+                "XOffset wire schema: this record does not have the natural layout (each member "
+                "at the next offset its type's alignment allows, the size rounded up to the "
+                "record's alignment). #pragma pack, /Zp, -fpack-struct, alignas on a member, "
+                "[[no_unique_address]] or an unnamed bit-field changed it, and another compiler "
+                "or another flag lays the record out differently, so peers could not exchange "
+                "it byte for byte. Remove it (alignas on the record itself, up to 8, is fine).");
+        }
+
+        template <typename T>
         consteval auto wire_record_signature() {
             using U = std::remove_cv_t<T>;
             static_assert(schema::base_count_v<U> == 0,
                 "wire_abi_signature() does not support base classes in v1");
+            require_natural_layout<U>();
             constexpr std::size_t field_count = schema::member_count_v<U>;
             return ft::FixedString{"record[s:"} +
                    ft::to_fixed_string<sizeof(U)>() +
@@ -235,6 +247,7 @@ namespace XOffsetDatastructure {
                            ft::FixedString{">"};
                 }
             } else if constexpr (is_xkeyvalue_v<U>) {
+                require_natural_layout<U>();
                 return ft::FixedString{"xkv[s:"} +
                        ft::to_fixed_string<sizeof(U)>() +
                        ft::FixedString{",a:"} +
@@ -244,11 +257,21 @@ namespace XOffsetDatastructure {
                        ft::FixedString{","} +
                        wire_abi_signature<typename U::second_type>() +
                        ft::FixedString{">"};
+            } else if constexpr (is_empty_std_array_v<U>) {
+                static_assert(!is_empty_std_array_v<U>,
+                    "XOffset wire schema: std::array<E, 0> is an empty class in libstdc++ and "
+                    "libc++ and one element in MSVC's library, so its layout differs between "
+                    "platforms; leave the member out.");
             } else if constexpr (std::is_class_v<U>) {
                 return wire_record_signature<U>();
             } else {
                 static_assert(sizeof(U) == 0,
-                    "wire_abi_signature() encountered a non-admitted v1 type");
+                    "wire_abi_signature() encountered a non-admitted v1 type. Scalars must be "
+                    "bool, char, signed or unsigned char, std::byte, std::int8_t to std::uint64_t, "
+                    "float or double: long double, wchar_t, char8_t, char16_t, char32_t and integer "
+                    "spellings whose width differs between platforms are not portable (std::int64_t "
+                    "is long on Linux and long long on Windows and Apple, so write the fixed-width "
+                    "name); pointers, references and unions are not admitted.");
             }
         }
 
