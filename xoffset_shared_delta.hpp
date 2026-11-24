@@ -71,6 +71,18 @@ namespace XOffsetDatastructure::xsync {
             } else std::memcpy(d, s, n);
         }
 
+        // 64 < n <= 256: 64-byte blocks from the front and the last 64 bytes
+        // from the back (they may overlap), inline: a loop that copies such
+        // bodies makes no call, so it keeps its values in caller-saved registers.
+        XOFFSET_DETAIL_INLINE void copy_mid(char* d, const char* s, std::size_t n) noexcept {
+            std::memcpy(d, s, 64);
+            if (n > 128) {
+                std::memcpy(d + 64, s + 64, 64);
+                if (n > 192) std::memcpy(d + 128, s + 128, 64);
+            }
+            std::memcpy(d + n - 64, s + n - 64, 64);
+        }
+
         // The mask type of n bits (n <= 64).
         template <std::size_t N>
         using mask_t = std::conditional_t<(N <= 8), std::uint8_t,
