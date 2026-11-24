@@ -17,15 +17,16 @@
 //     finds its fields;
 //   - handshake: earlier and later versions accept each other; two versions
 //     that add other fields to one version, and another family, are rejected;
-//   - with reflection, XPeerSchemas (xoffset_evolution.hpp) and the freeze
-//     check accept the family too.
+//   - with reflection and exceptions (the server side), XPeerSchemas
+//     (xoffset_evolution.hpp) and the freeze check accept the family too.
 // Field lists, so every build runs it; no try/catch: also built without
-// exceptions.
+// exceptions (then without the server side, which needs them).
 #define XOFFSET_FORCE_FULL_CHECK 0
 #include "schema_family/player_versions.hpp"
 #include "../xoffset_handshake.hpp"
 #include "../xoffset_receiver.hpp"
-#if XOFFSET_SCHEMA_REFLECTION
+#define TEST_SERVER_SIDE (XOFFSET_SCHEMA_REFLECTION && !XOFFSET_NO_EXCEPTIONS)
+#if TEST_SERVER_SIDE
 #include "../xoffset_schema_freeze.hpp"
 #endif
 
@@ -400,7 +401,7 @@ void handshake() {
     CHECK((verdict<V3, other::Player>() == XSchemaVerdict::reject_unknown));
 }
 
-#if XOFFSET_SCHEMA_REFLECTION
+#if TEST_SERVER_SIDE
 // The server side: XPeerSchemas and the freeze check.
 void server_side() {
     auto peer_verdict = [](const std::string& hello, auto root) {
@@ -452,7 +453,7 @@ int main() {
     saved_images<V1, V3>();
     saved_images<V2, V3>();
     handshake();
-#if XOFFSET_SCHEMA_REFLECTION
+#if TEST_SERVER_SIDE
     server_side();
 #endif
     if (failures) {
