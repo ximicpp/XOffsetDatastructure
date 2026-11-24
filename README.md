@@ -279,6 +279,7 @@ storage and ownership rules are in
 | [CLIENT_TARGETS.md](docs/CLIENT_TARGETS.md), [DEVICE_TESTING.md](docs/DEVICE_TESTING.md) | Client toolchains and real-device records |
 | [PERFORMANCE.md](docs/PERFORMANCE.md), [bench/cppcon2024](bench/cppcon2024/README.md) | Performance numbers and methods |
 | [CHANGELOG.md](CHANGELOG.md), [RELEASING.md](docs/RELEASING.md) | Releases |
+| [ROADMAP.md](docs/ROADMAP.md) | Decided future work that is not scheduled (big-endian hosts) |
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting and security scope |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Building, testing and conventions for library development |
 
