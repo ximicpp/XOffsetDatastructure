@@ -3225,8 +3225,9 @@ namespace XOffsetDatastructure {
         // relayout_advised's mark (XBuffer::relayout_advised): the used size
         // a relayout of this content gave, or would give. It belongs to the
         // epoch it was set in: a later epoch (new content, a move, a swap)
-        // measures again.
-        bool relayout_mark_current() const noexcept { return relayout_epoch_ == m_epoch + 1u; }
+        // measures again. The tag keeps the low 32 bits of the epoch + 1: a
+        // wrap after 2^32 epochs at most makes one answer stale.
+        bool relayout_mark_current() const noexcept { return relayout_epoch_ == static_cast<std::uint32_t>(m_epoch + 1u); }
         // The current mark, reached: used_end is at least twice the mark.
         // Only with relayout_mark_current() (the content has a root, so an
         // arena).
@@ -3236,7 +3237,7 @@ namespace XOffsetDatastructure {
         void set_relayout_mark(size_type mark) noexcept {
             relayout_mark_ = mark < (std::numeric_limits<std::uint32_t>::max)()
                 ? static_cast<std::uint32_t>(mark) : (std::numeric_limits<std::uint32_t>::max)();
-            relayout_epoch_ = m_epoch + 1u;
+            relayout_epoch_ = static_cast<std::uint32_t>(m_epoch + 1u);
         }
 
     private:
@@ -3395,12 +3396,12 @@ namespace XOffsetDatastructure {
         // in-band allocator records its writes in it. It follows the
         // content (move, swap). It fills the padding before packed_.
         std::unique_ptr<detail::DeltaTouchLog> touch_log_;
-        // relayout_advised's mark and one past the epoch it belongs to (0:
-        // none; zero, so that a new owner's line stores no other constant).
-        // In the padding before packed_: never moved with the content (a
-        // move or swap advances the epoch).
+        // relayout_advised's mark and one past the epoch it belongs to (low
+        // 32 bits; 0: none). One zero word, so that a new owner stores one
+        // more zero and no other constant. In the padding before packed_:
+        // never moved with the content (a move or swap advances the epoch).
         std::uint32_t relayout_mark_ = 0;
-        std::uint64_t relayout_epoch_ = 0;
+        std::uint32_t relayout_epoch_ = 0;
         // Three small members in one 8-byte word, so that a move or a swap
         // carries all of them with one load and one store per side (what the
         // policy byte alone took). It starts the line of ctl_, which a reset
