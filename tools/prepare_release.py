@@ -373,7 +373,24 @@ def create(source, out):
     return write_artifacts(payload, manifest_data, out)
 
 
-def install_required(component):
+ZERO_DEPENDENCY_MANIFEST_RE = re.compile(
+    r"None \(C\+\+(20|23) field-list build uses only the C\+\+ standard library\)\n?"
+)
+
+
+def zero_dependency_install_standard(payload):
+    raw = payload.get("share/XOffsetDatastructure/xoffset-third-party-manifest.txt")
+    if raw is None:
+        return None
+    try:
+        text = raw.decode("utf-8").replace("\r\n", "\n")
+    except UnicodeDecodeError:
+        return None
+    match = ZERO_DEPENDENCY_MANIFEST_RE.fullmatch(text)
+    return match.group(1) if match else None
+
+
+def install_required(component, with_deps=True):
     if component not in ("full", "storage"):
         raise ValueError("install component must be full or storage")
     base = {"include/xoffset_virtual_memory.hpp", "include/xoffset_slot_storage.hpp", "include/xoffset_error.hpp",
@@ -386,7 +403,8 @@ def install_required(component):
     if component == "full":
         base.update("include/" + h for h in FULL_OWN_HEADERS)
         base.add("share/XOffsetDatastructure/xoffset-third-party-manifest.txt")
-        base.update("share/XOffsetDatastructure/licenses/" + name.removeprefix("external/") for name in DEPENDENCY_LICENSES)
+        if with_deps:
+            base.update("share/XOffsetDatastructure/licenses/" + name.removeprefix("external/") for name in DEPENDENCY_LICENSES)
     return base
 
 
@@ -439,7 +457,8 @@ def installed_dependency_headers(payload):
 
 
 def validate_install_payload(payload, component):
-    required = install_required(component)
+    zero_dep_std = zero_dependency_install_standard(payload) if component == "full" else None
+    required = install_required(component, with_deps=(zero_dep_std is None))
     validate_path_set(payload)
     for name in payload:
         valid_name(name)
@@ -465,6 +484,11 @@ def validate_install_payload(payload, component):
         actual = re.findall(r"^set\(" + name + r"\s+([^\n]+)\)$", config, re.MULTILINE)
         if actual != [expected]:
             raise ValueError("installed component/version metadata differs: " + name)
+    if component == "full":
+        cxx_std = re.findall(r"^set\(XOffsetDatastructure_CXX_STANDARD\s+([^\n]+)\)$", config, re.MULTILINE)
+        expected_std = '"' + (zero_dep_std if zero_dep_std is not None else "26") + '"'
+        if cxx_std and cxx_std != [expected_std]:
+            raise ValueError("installed C++ standard differs from dependency manifest")
     version_config = payload["lib/cmake/XOffsetDatastructure/XOffsetDatastructureConfigVersion.cmake"].decode("utf-8").replace("\r\n", "\n")
     if re.findall(r'^set\(PACKAGE_VERSION\s+([^\n]+)\)$', version_config, re.MULTILINE) != ['"' + VERSION + '"']:
         raise ValueError("installed ConfigVersion identity differs")
@@ -473,7 +497,7 @@ def validate_install_payload(payload, component):
     actual_targets = re.findall(r"add_library\(([^\s)]+)\s+INTERFACE\s+IMPORTED\)", targets)
     if set(actual_targets) != expected_targets or len(actual_targets) != len(expected_targets):
         raise ValueError("installed component target inventory differs")
-    expected_files = required | (set(installed_dependency_headers(payload)) if component == "full" else set())
+    expected_files = required | (set(installed_dependency_headers(payload)) if (component == "full" and zero_dep_std is None) else set())
     if set(payload) != expected_files:
         raise ValueError("unexpected installed package files: " + ", ".join(sorted(set(payload) - expected_files)))
     if len(payload) > MAX_MEMBERS or sum(map(len, payload.values())) > MAX_TOTAL_BYTES:

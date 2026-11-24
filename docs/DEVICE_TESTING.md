@@ -198,6 +198,8 @@ the memory limit being measured.
 | --- | --- | --- |
 | 3.2.0-rc.1 (39de636), 2026-10-28 | Xiaomi M2102K1C, Android 11, arm64-v8a | Compile-fail tests 15/15, CTest 114/114, reference wires byte-identical, both demo clients passed ([record](validation/2026-10-28-rc1-platform/README.md)) |
 | 3.2.x (8cf9e16c), 2026-10-29 | iPhone 15 Pro Max, iOS 26.6.2 | Resident test host: CTest 138/138, 24 reference wires byte-identical, slg verify and memory probe passed, both demo clients passed |
+| main (4f544e29, Wire 3.0), 2026-11-24 | Xiaomi M2102K1C, Android 11, arm64-v8a, 4 KB pages (NDK r27, zero submodules) | Full CTest 206/206 (C++20 `PMR=1`) + 9/9 (C++23 `PMR=0`), 27/27 Wire 3.0 corpus byte-identical across 6 platforms, `xo_slg_bench` verify, `xo_mem_probe` (`--single` 2047 MiB, 16 GiB / 64 GiB VA), `test_v2_fuzz` 11,505 cases 0 inconsistencies |
+| main (4f544e29, Wire 3.0), 2026-11-24 | iPhone 15 Pro Max, iOS 26.6.2, arm64, 16 KB pages (`minos 14.0`, `XOFFSET_USE_PMR=0`) | Resident test host: CTest 207/207, 0 `std::pmr` imports, 27/27 Wire 3.0 corpus byte-identical across 6 platforms, `xo_slg_bench` verify, `test_v2_fuzz` 11,505 cases 0 inconsistencies, default VA `xo_mem_probe` (`--single` 2047 MiB, `--va 64` 56 buffers / 3.5 GiB VA) |
 
 On the iPhone, SLG M scale against FlatBuffers 25.12.19 on the same phone (3 runs pooled, geometric
 mean / one-sided 95% upper bound): A 0.305 / 0.322, B 0.179 / 0.183, C 0.252 / 0.267, D 0.858 / 0.909.
