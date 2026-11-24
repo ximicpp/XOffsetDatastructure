@@ -73,6 +73,35 @@ namespace XOffsetDatastructure {
     namespace detail {
         // save_compact's admission (xoffset_verified_paths.hpp).
         template <class U> consteval bool compact_direct_supported();
+        // The payload bytes of save_compact's image (xoffset_verified_paths.hpp).
+        template <class T> std::size_t measure_compact(const T& root, std::size_t limit, std::uint32_t slack_div) noexcept;
+
+        // XBuffer::relayout: the image is written with this slack
+        // (XCompactOptions::slack_div), and relayout_advised measures with it.
+        inline constexpr std::uint32_t relayout_slack_div = 8;
+        // The thread's relayout scratch is kept up to this capacity.
+        inline constexpr std::size_t relayout_scratch_keep_max = std::size_t(256) * 1024;
+#if XOFFSET_THREAD_CACHES
+        inline bool& relayout_scratch_available() noexcept {
+            static thread_local bool available = true;  // trivial: outlives the scratch
+            return available;
+        }
+        struct RelayoutScratch {
+            std::string image;
+            ~RelayoutScratch() { relayout_scratch_available() = false; }
+        };
+        // The thread's relayout scratch; null once it is destroyed (a
+        // relayout from a later thread_local destructor uses its own).
+        inline std::string* relayout_thread_scratch() noexcept {
+            if (!relayout_scratch_available()) return nullptr;
+            static thread_local RelayoutScratch scratch;
+            return &scratch.image;
+        }
+#else
+        // No per-thread caches (XOFFSET_THREAD_CACHES): each relayout uses
+        // its own scratch.
+        constexpr std::string* relayout_thread_scratch() noexcept { return nullptr; }
+#endif
 
         // Internal friend bridge; no Core/container/wire field is added.
         struct VerifiedPathsAccess {
@@ -1236,11 +1265,126 @@ namespace XOffsetDatastructure {
             return detail::try_v([&] { return dst.clone_state_from_v(*this); });
         }
 
+        /// Relayout of a sender that edits its content in place across ticks:
+        /// the content is rewritten, in place and with the same values, as
+        /// the image save_compact writes (preorder blocks, no holes, strings
+        /// of at most 10 bytes inline, vectors with the slack of
+        /// XCompactOptions{}). It sheds what the edits left behind (freed
+        /// blocks, spare capacity), which every path that pays per used byte
+        /// pays for: delta compares, key deltas, touches, clone, and the
+        /// memory of the replicas, which hold the sender's layout. Call it
+        /// between ticks, after the tick's sends; relayout_advised() says
+        /// when. Only for content this process edits: never for a replica
+        /// that applies deltas (its layout must stay its sender's).
+        ///
+        /// Afterwards used_end is the image's size and there is no free
+        /// block. root(), proxies (XRef, nested ones too) and XHandles stay
+        /// valid and re-resolve; every plain reference, pointer, span or
+        /// string_view into the payload is invalid (epoch() advances). Each
+        /// delta stream from this buffer sends one larger delta next (a copy
+        /// baseline compares everything, a touches baseline sends a key
+        /// delta). The logical length and the committed pages stay (see
+        /// reclaim_tail_pages()).
+        ///
+        /// ok also when the image would not be smaller: the content is then
+        /// left as it is. Refused, with nothing changed and no failure
+        /// recorded: inside a pin scope (borrowed), with a recorded failure
+        /// (that error()), without a verified root of type T (no_root), on a
+        /// storage failure (out_of_storage), when the scratch for the image
+        /// cannot be allocated (host_allocation_failed). The scratch is the
+        /// thread's, kept up to 256 KiB.
+        template <typename T>
+        [[nodiscard]] XOFFSET_DETAIL_NOINLINE XStatus relayout() {
+            using U = std::remove_cv_t<T>;
+            if (!this->ok()) [[unlikely]]
+                return XError{this->error(), "relayout<T>(): the buffer has a recorded failure (see clear_error())"};
+            if (this->pinned())
+                return XError{XErrc::borrowed, "relayout<T>(): a pin scope (edit, read, build) is open"};
+            if (!this->template root_is<U>())
+                return XError{XErrc::no_root, "relayout<T>(): no verified root object of type T"};
+            std::string own;
+            std::string* scratch = detail::relayout_thread_scratch();
+            if (!scratch) scratch = &own;
+            XStatus status = relayout_through<U>(*scratch);
+            if (scratch->capacity() > detail::relayout_scratch_keep_max) std::string().swap(*scratch);
+            return status;
+        }
+
+        /// True when relayout<T>() pays: used_end is at least twice the used
+        /// size of the last relayout of this content, or of the image a
+        /// relayout would write. That size is measured (one walk of the
+        /// content) on the first call after the content changed hands: make,
+        /// reset, a load, reload or clone_into, a move or swap, a move of the
+        /// payload. Afterwards the call is a compare and a few loads. A
+        /// relayout is advised again after the content doubles; after a
+        /// known large shrink (a cleared inventory) call relayout() directly.
+        /// False without a verified root of type T.
+        template <typename T>
+        XOFFSET_DETAIL_INLINE bool relayout_advised() noexcept {
+            if (this->relayout_mark_current()) [[likely]] return this->relayout_mark_reached();
+            return relayout_advised_measure<std::remove_cv_t<T>>();
+        }
+
         MemoryStats stats() {
             return memory_stats(*this);
         }
 
     private:
+        // relayout<T>() past its admission (a root of T, no pin scope, no
+        // recorded failure): the image with slack into `scratch`, the plain
+        // one when that is not smaller than used_end, nothing when neither
+        // is; then the image replaces the content in place.
+        template <typename T>
+        XStatus relayout_through(std::string& scratch) {
+            const std::uint32_t used = this->arena_unchecked()->used_end;
+            XOFFSET_TRY {
+                if (!write_relayout_image<T>(scratch, detail::relayout_slack_div) || scratch.size() >= used) {
+                    if (!write_relayout_image<T>(scratch, 0))
+                        return XError{XErrc::capacity_exceeded, "relayout<T>(): the content exceeds its payload"};
+                    if (scratch.size() >= used) {
+                        this->set_relayout_mark(used);
+                        return {};
+                    }
+                }
+            } XOFFSET_CATCH(...) {
+#if !XOFFSET_NO_EXCEPTIONS
+                return detail::current_exception_error();
+#endif
+            }
+            if (!this->relayout_in_place(scratch.data(), scratch.size())) [[unlikely]]
+                return XError{XErrc::out_of_storage, "relayout<T>(): the storage failed; the content is unchanged"};
+            return {};
+        }
+        // save_compact's image of the content (slack_div as XCompactOptions)
+        // into `out`, which keeps its storage for the next relayout. False:
+        // the image exceeds the format's limit.
+        template <typename T>
+        bool write_relayout_image(std::string& out, std::uint32_t slack_div) {
+            if (detail::VerifiedPathsAccess::try_save_compact_into<T>(*this, out, slack_div)) [[likely]] return true;
+            // The writer wants room for used_end bytes without slack (the plain
+            // image is never larger) and for the measured image with it.
+            std::size_t bound = this->arena_unchecked()->used_end;
+            if (slack_div != 0) {
+                bound = detail::measure_compact(*detail::image_root<T>(*this),
+                                                (std::numeric_limits<std::uint32_t>::max)(), slack_div);
+                if (bound == 0) return false;
+            }
+            out.reserve(bound + bound / 8);
+            return detail::VerifiedPathsAccess::try_save_compact_into<T>(*this, out, slack_div);
+        }
+        // relayout_advised() on the first call for this content: the size of
+        // the image a relayout would write becomes the mark.
+        template <typename T>
+        XOFFSET_DETAIL_NOINLINE bool relayout_advised_measure() noexcept {
+            if (!this->template root_is<T>()) return false;
+            const auto size = detail::measure_compact(*detail::image_root<T>(*this),
+                                                      (std::numeric_limits<std::uint32_t>::max)(),
+                                                      detail::relayout_slack_div);
+            // Past the format's limit (0): never advised.
+            this->set_relayout_mark(size != 0 ? size : (std::numeric_limits<std::uint32_t>::max)());
+            return this->relayout_mark_reached();
+        }
+
         // Small dense reload (reload_verified): an image of at most
         // small_reload_max bytes, which the inline bitmaps validate.
         static constexpr std::size_t small_reload_max = detail::WireGranuleIndex::inline_extent;
@@ -1637,6 +1781,10 @@ namespace XOffsetDatastructure {
             return XResult<TypedXBuffer>(TypedXBuffer(std::move(*cloned)));
         }
         XStatus try_clone_into(TypedXBuffer& dst) const { return XBuffer::try_clone_into(dst); }
+
+        /// Relayout of a sender's content in place (see XBuffer::relayout).
+        [[nodiscard]] XStatus relayout() { return XBuffer::relayout<T>(); }
+        bool relayout_advised() noexcept { return XBuffer::relayout_advised<T>(); }
 
         void save_verified_into(std::string& out, XSaveOptions options = {}) {
             XBuffer::save_verified_into<T>(out, options);

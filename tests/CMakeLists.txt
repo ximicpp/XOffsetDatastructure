@@ -165,6 +165,7 @@ set(REFLECTION_TESTS
     test_reload_reset
     test_reset_used_range
     test_clone
+    test_relayout
     test_delta_sync
     test_delta_small
     test_delta_format
@@ -343,6 +344,7 @@ set(NO_EXCEPTIONS_TESTS
     test_schema_handshake
     test_delta_sync
     test_delta_format
+    test_relayout
     test_fixed_message
     test_receiver
     test_receiver_forced
@@ -397,6 +399,7 @@ set(HARDENED_TESTS
     test_reload_reset
     test_regrow_used_range
     test_slot_storage
+    test_relayout
 )
 if(NOT XOFFSET_HARDENED)
     foreach(test_name ${HARDENED_TESTS})

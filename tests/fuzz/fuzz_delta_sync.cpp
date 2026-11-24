@@ -31,7 +31,7 @@
 //     input passes the stream and version checks and reaches the block and
 //     run parsers and the checks of section 3). Flags come from the input.
 //   1 stream: the input drives a sequence of sender steps (mutations, sender
-//     options, baseline resets); each real delta is applied, after up to a
+//     relayouts, options, baseline resets); each real delta is applied, after up to a
 //     few input-chosen corruptions of it that are applied first. The real
 //     delta must apply and make the replica the sender's byte for byte.
 //   2 bare: the input is a whole delta (header included), applied to the
@@ -470,7 +470,16 @@ void run_stream(std::uint8_t seed, In& in) {
         f.rng.seed(0x51e9ull * (step + 1) + in.u16());
         if (op % 16 == 0) f.base.reset();
         else if (op % 16 == 1) { f.src.reset(); fill(f.src.plain_root(), f.rng); }
-        else if (op % 16 != 2) mutate(f.src.plain_root(), f.rng, op >> 4);
+        else if (op % 16 != 2) {
+            mutate(f.src.plain_root(), f.rng, op >> 4);
+            // The sender relayouts its content (XBuffer::relayout): the next
+            // delta of a copy baseline compares everything, a touches one
+            // sends a key delta, and the replica takes the new layout.
+            if (op % 16 == 3) {
+                const auto r = f.src.relayout();
+                need(bool(r), where + ": relayout failed: " + (r ? std::string() : r.error().message));
+            }
+        }
         xo::XDeltaOptions o;
         o.digest = op & 0x20;
         o.whole_blocks = (op & 0xc0) == 0xc0;
@@ -558,6 +567,18 @@ extern "C" int XOffsetFuzzWriteSeeds(const char* dir) {
                 for (int i = 0; i < len; ++i) s += char(rng());
                 put(s);
             }
+        }
+        // Streams whose steps mutate structurally and relayout the sender
+        // (op 0x33), between plain mutations (op 0x34); no corruption.
+        for (int k = 0; k < 4; ++k) {
+            std::string s = {char(schema | 1 << 1), char(k * 7), char(k % 3)};
+            for (int step = 0; step < 12; ++step) {
+                s += char(step % 3 == 2 ? 0x33 : 0x34);
+                s += char(rng());
+                s += char(rng());
+                s += char(0);
+            }
+            put(s);
         }
         // Bare real deltas: the fixture's next delta, written whole.
         for (std::uint8_t seed = 0; seed < 8; ++seed) {
