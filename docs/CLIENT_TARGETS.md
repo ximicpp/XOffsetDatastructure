@@ -111,7 +111,8 @@ compares builds with and without exceptions on the same mutated wires.
 ## Scope
 
 64-bit little-endian only: Windows x64, Android arm64-v8a, iOS arm64 (device and simulator) and macOS
-arm64 clients; Linux x86-64 and arm64 servers. 32-bit and big-endian targets are out of scope.
+arm64 clients; Linux x86-64 and arm64 servers. 32-bit and big-endian targets are out of scope;
+big-endian support is deferred with a decided approach ([ROADMAP.md](ROADMAP.md)).
 
 ## Running on phones: the test host
 
