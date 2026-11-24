@@ -1,4 +1,4 @@
-# 4.1.0 compatibility and input boundaries
+# 4.2.0 compatibility and input boundaries
 
 (The file name dates from the alpha period.) This release targets teams that pin their compiler,
 schemas and wire format 3.0 (`docs/WIRE_FORMAT.md`) and run release acceptance tests for their
@@ -10,13 +10,13 @@ claimed.
 ## Version and toolchain
 
 `XOFFSET_VERSION` at the source root (`share/XOffsetDatastructure/VERSION` after install) is the single
-text source of the full version `4.1.0`; the CMake project's numeric version is `4.1.0`. Installed
+text source of the full version `4.2.0`; the CMake project's numeric version is `4.2.0`. Installed
 consumers look the package up without a version and then check the full string:
 
 ```cmake
 find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
-if(NOT XOffsetDatastructure_VERSION STREQUAL "4.1.0")
-    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 4.1.0")
+if(NOT XOffsetDatastructure_VERSION STREQUAL "4.2.0")
+    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 4.2.0")
 endif()
 ```
 

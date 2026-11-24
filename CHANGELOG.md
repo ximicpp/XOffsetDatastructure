@@ -5,6 +5,26 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+## 4.2.0: one-image Wire 3.0 and in-place relayout
+
+Wire format 3.0 merges the arena image and the wire into one 40-byte-header format with an in-band
+allocator and whole-state delta format 2.0, `XWireEmission::automatic` emits churned buffers
+compact by default, `relayout()` / `relayout_advised()` compact long-lived delta senders in place,
+and same-version layout interoperability is checked at compile time. C++20/C++23 builds drop the
+Boost submodule dependency, optional `std::pmr` (`XOFFSET_USE_PMR=0` default on older Apple
+targets) lowers the Apple floor to macOS 12 / iOS 14, and `-fno-exceptions` builds gain complete
+`try_*` create, clone, save, delta and compact entry points. Pre-release scorecard: 19 main cells,
+17 wins, 2 ties, 0 losses ([PERFORMANCE.md](docs/PERFORMANCE.md)); pre-release K4 fuzz (`--budget
+hour`) with 0 findings across GCC 16 (1.17M differential cases + replay) and P2996 Clang (36M+
+libFuzzer executions across 9 reflection/fieldlist targets + 3-way outcome-diff); Linux C++26
+`gcc`/`asan`/`tsan`/`p2996` and 6-column C++20/23 matrix, Windows MSVC C++20/23 (214/214 each),
+macOS 12.0 C++20/23 and iOS 14.0 simulator (214/214 each) all pass with 27/27 Wire 3.0 corpus
+identity (plus 2026-11-24 physical Android 11 and iPhone 15 Pro Max verification). Ir gate against
+v4.1.0: 0 failures, every scenario total level or better (`slg.A`–`slg.D` 0.863–0.976,
+`formal.emit_after`/`mutate`/`reload` 0.912–0.959); warnings on `reloc.map/set.erase/find`
+(1.020–1.035) and GCC `slg.A.apply` (1.040), plus ledger exemptions for `slg.B.back_encode` and
+P2996 `slg.A.apply`.
+
 - **Breaking:** same-version interoperability is checked at compile time
   ([USER_GUIDE.md](docs/USER_GUIDE.md) section 2.3). A wire record must have the natural layout
   (each member at the next offset its type's alignment allows, the size rounded up to the
@@ -15,6 +35,23 @@ of this file and in the pull requests.
   8-bit bytes, a one-byte `bool`, IEEE 754 `float` and `double` and size-aligned fixed-width
   scalars, and can no longer be turned off (`XOFFSET_DISABLE_PLATFORM_CHECKS`, `XOFFSET_LITTLE_ENDIAN` and `XOFFSET_ARCH_64BIT`
   are gone). Compile time only: no change to the wire or to the generated code.
+- Optional `std::pmr` (`XOFFSET_USE_PMR`, header-only `XMemoryResource` when `0`, default `0` below
+  macOS 14 / iOS 17): lowers Apple deployment targets to macOS 12 / iOS 14 with zero `std::pmr`
+  symbol imports (verified on macOS 12.0, iOS 14.0 simulator and physical iPhone 15 Pro Max).
+- Zero-submodule C++20/C++23 builds: CMake no longer requires `external/boost` for C++20/C++23
+  targets, `tools/prepare_release.py pack-prefix --component full` packages and audits
+  zero-dependency C++20/C++23 installs alongside C++26 installs, and installed C++26 `find_package`
+  accepts GCC 16+ in addition to P2996 Clang.
+- Complete `-fno-exceptions` API coverage: added non-throwing `try_create`, `try_clone`,
+  `try_clone_into`, `try_save_verified`, `try_save_verified_into`, `try_save_compact`,
+  `try_save_compact_into`, `try_save_delta`, `try_save_delta_into` and `try_compact`, and fixed
+  `XCompactor`, `ref()` and `pin_root()` under `-fno-exceptions`.
+- Added schema-driven JSON diagnostics (`xoffset_dump.hpp`), `docs/ROADMAP.md`, and public
+  repository governance docs (`SECURITY.md`, `CODE_OF_CONDUCT.md`, issue and PR templates).
+- Eliminated MSVC `/W3 /WX` narrowing and signed/unsigned comparison warnings
+  (`std::cmp_less`/`std::cmp_equal`) and consumer `-Wextra` warnings; optimized `XResult`, receiver
+  bounds walk, shared-delta publish/fanout/apply, inline container access and `XBuffer::edit()` hot
+  paths.
 - **Breaking:** wire format 3.0 ([WIRE_FORMAT.md](docs/WIRE_FORMAT.md) section 6). A buffer's
   memory and its wire are the same bytes: one 40-byte header (magic and version, fingerprint,
   `used_bytes`, extent count, free directory, free bytes), the root at offset 40, and the free
