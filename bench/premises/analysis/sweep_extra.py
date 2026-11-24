@@ -7,7 +7,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from stats import median, median_ci, bootstrap  # noqa: E402
-from sweep_analyze import load, SIZES, TRUSTED, CHECKED, SHORT, DIRTS, fmt_ns  # noqa: E402
+from sweep_analyze import load, SIZES, TRUSTED, CHECKED, SHORT, DIRTS, RELAYOUT_DIRTS, CHURNS, fmt_ns  # noqa: E402
 
 
 def main():
@@ -29,13 +29,13 @@ def main():
     print("| k | dirt | XO wire | XO zstd | zero_runs | compact (slack 1/8) zstd | zpp zstd | XO zstd ÷ zpp zstd | compact zstd ÷ zpp zstd |")
     print("| --- | --- | --- | --- | --- | --- | --- | --- | --- |")
     for s in [s for s in SIZES if ("dirt", "xo_admit", s, "rw1") in ns]:
-        for d in DIRTS + ["churn100000"]:
+        for d in DIRTS + RELAYOUT_DIRTS + CHURNS:
             g = "size" if d == "clean" else ("churn" if d.startswith("churn") else "dirt")
             k = (g, "xo_admit", s, d)
             if k not in info:
                 continue
             xi = info[k]
-            zk = ("churn" if g == "churn" else "size", "zpp_bits", s, d if g == "churn" else "clean")
+            zk = ("churn", "zpp_bits", s, "churn100000") if g == "churn" else ("size", "zpp_bits", s, "clean")
             zz = info[zk]["bytes_z"]
             print(f"| {s} | {d} | {xi['bytes']:.0f} | {xi['bytes_z']:.0f} | {xi['bytes_zero_runs']:.0f} | {xi['bytes_compact_z']:.0f} | {zz:.0f} | {xi['bytes_z'] / zz:.2f} | {xi['bytes_compact_z'] / zz:.2f} |")
     print()

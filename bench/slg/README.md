@@ -158,6 +158,11 @@ other formats (the PERF_GOAL gates keep the default A/B/C/D set):
   SD, the dirty-module save to storage (all armies and items as a PlayerPatch).
   XOffset native: LK login key delta, LN self deltas, SN delta to what storage
   holds; every native receiver is checked equal to the application-level one.
+  After each LN round, `LN.relayout` asks each online player's server buffer
+  `relayout_advised()` and calls `relayout()` when it is true (the count is
+  `LN.relayouts`). It does not fire at S or M scale. SN and the views do not
+  call it: SN's players get fresh content before every save, and the views
+  keep spare capacity on purpose (docs/USER_GUIDE.md section 4.7).
 
 - client uplink (`include/slg/uplink.hpp`, 2026-11-10, 3.5 W4, report only):
   UL, every online client sends the server one march order per round (4
