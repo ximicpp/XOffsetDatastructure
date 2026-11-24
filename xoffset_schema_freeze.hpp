@@ -7,8 +7,9 @@
 // version of every root as a snapshot header (an unchanged record or enum
 // refers to the previous snapshot, so a lineage never holds two copies of one
 // type) and appends it to the lock file; `check`, run in CTest, fails when a
-// layout equals a frozen one under other field names (without an alias), or
-// changed while the last frozen version is not in the root's lineage.
+// layout equals a frozen one under other field names (without an alias, and
+// not an earlier version of the root's add-only family), or changed while the
+// last frozen version is not in the root's lineage.
 
 #include "xoffset_evolution.hpp"
 
@@ -395,9 +396,12 @@ namespace XOffsetDatastructure {
                 ok = false;
             }
             if (ok) {
+                const bool same_hash = last->schema_hash == wire_schema_hash_v<W>();
                 report += "ok   " + name + ": " +
-                          (last->schema_hash == wire_schema_hash_v<W>() ? "equals " + last->version
-                                                                         : "next version after " + last->version) +
+                          (!same_hash ? "next version after " + last->version
+                           : last->name_digest == schema_name_digest_v<W> ? "equals " + last->version
+                                                                           : "adds fields to " + last->version +
+                                                                                 " (XOFFSET_SCHEMA_FAMILY)") +
                           "\n";
             }
             return ok;

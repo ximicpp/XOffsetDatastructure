@@ -273,27 +273,50 @@ namespace XOffsetDatastructure {
             return result;
         }
 
-        // Without schema evolution: only the exact version is accepted.
+        // Does the hello list `digest` for the root type and fingerprint of e
+        // (the peer's own family: its working entry and its known entries)?
+        inline bool hello_lists(const XSchemaHello& hello, const XSchemaEntry& e, std::uint64_t digest) noexcept {
+            for (const XSchemaEntry& k : hello.entries)
+                if (k.root_type_id == e.root_type_id && k.schema_hash == e.schema_hash && k.name_digest == digest)
+                    return true;
+            return false;
+        }
+
+        // The field names of the peer's working version e of T's fingerprint
+        // are T's, or those of another version of T's family: the peer works
+        // in an earlier version (its digest is in T's family) or in a later
+        // one (its hello lists T's digest among its family's). Two versions
+        // that each add other fields to one version, or the same layout
+        // under other names, are not.
         template <typename T>
-        XSchemaVerdict decide_exact(const XSchemaEntry& e) noexcept {
+        bool family_names_match(const XSchemaEntry& e, const XSchemaHello& hello) noexcept {
+            return schema_family_has_digest<T>(e.name_digest) || hello_lists(hello, e, schema_name_digest_v<T>);
+        }
+
+        // Without schema evolution: only the exact version (or another
+        // version of its add-only family) is accepted.
+        template <typename T>
+        XSchemaVerdict decide_exact(const XSchemaEntry& e, const XSchemaHello& hello) noexcept {
             if (e.schema_hash != wire_schema_hash_v<T>()) return XSchemaVerdict::reject_unknown;
-            return e.name_digest == schema_name_digest_v<T> ? XSchemaVerdict::same : XSchemaVerdict::reject_names;
+            return family_names_match<T>(e, hello) ? XSchemaVerdict::same : XSchemaVerdict::reject_names;
         }
     } // namespace detail::handshake
 
     // Accepting side without schema evolution (xoffset_evolution.hpp has
     // XPeerSchemas, which also accepts older versions): each root type the
     // peer works in is `same` when its fingerprint and field-name digest equal
-    // this program's, else rejected. Writes the ack into `ack_out` (empty when
-    // the hello is not valid). Never throws, except std::bad_alloc.
+    // this program's, or when it works in another version of the root's
+    // add-only family (XOFFSET_SCHEMA_FAMILY), else rejected. Writes the ack
+    // into `ack_out` (empty when the hello is not valid). Never throws, except
+    // std::bad_alloc.
     template <typename... Roots>
     XSchemaHelloResult accept_schema_hello(const void* data, std::size_t size, std::string& ack_out,
                                            std::string_view label = {}) {
         return detail::handshake::accept(data, size, ack_out, label,
-            [](const XSchemaEntry& e, const XSchemaHello&) {
+            [](const XSchemaEntry& e, const XSchemaHello& hello) {
                 XSchemaVerdict v = XSchemaVerdict::reject_unknown;
                 ((e.root_type_id == wire_root_type_id_v<Roots>()
-                      ? (void)(v = detail::handshake::decide_exact<Roots>(e)) : (void)0), ...);
+                      ? (void)(v = detail::handshake::decide_exact<Roots>(e, hello)) : (void)0), ...);
                 return v;
             });
     }
@@ -314,8 +337,19 @@ namespace XOffsetDatastructure {
         return detail::handshake::write<XSchemaHello>([&](XSchemaHello& h) {
             h.wire_format = XSCHEMA_HELLO_WIRE_FORMAT;
             h.role = static_cast<std::uint32_t>(role);
-            h.entries.reserve(sizeof...(Roots));
-            (h.entries.push_back(schema_entry<Roots>()), ...);
+            h.entries.reserve((schema_family_digests_v<Roots>.size() + ... + 0));
+            // The working version of each root, then the earlier versions of
+            // its add-only family as known entries (the same fingerprint,
+            // their field-name digests): a peer of an earlier version finds
+            // its own digest there.
+            auto add = [&]<typename R>() {
+                h.entries.push_back(schema_entry<R>());
+                constexpr auto& family = schema_family_digests_v<R>;
+                for (std::size_t i = 0; i + 1 < family.size(); ++i)
+                    h.entries.push_back({wire_root_type_id_v<R>(), wire_schema_hash_v<R>(), family[i],
+                                         static_cast<std::uint32_t>(XSchemaEntryKind::known), 0});
+            };
+            (add.template operator()<Roots>(), ...);
             h.label.assign(detail::handshake::clip_label(label));
         });
     }

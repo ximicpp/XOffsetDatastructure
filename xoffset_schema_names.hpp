@@ -107,6 +107,37 @@ namespace XOffsetDatastructure {
     template <typename T>
     inline constexpr std::uint64_t schema_name_digest_v = detail::schema_names::name_digest<T>();
 
+    namespace detail::schema_names {
+        template <typename T>
+        consteval std::size_t family_length() {
+            if constexpr (in_schema_family_v<T>) return 1 + family_length<typename xschema_family<T>::previous>();
+            else return 1;
+        }
+
+        template <typename T, std::size_t N>
+        constexpr void family_digests(std::array<std::uint64_t, N>& out, std::size_t at) {
+            out[at] = name_digest<T>();
+            if constexpr (in_schema_family_v<T>) family_digests<typename xschema_family<T>::previous>(out, at - 1);
+        }
+    } // namespace detail::schema_names
+
+    // The field-name digests of T's family (XOFFSET_SCHEMA_FAMILY), from the
+    // first version to T; {schema_name_digest_v<T>} when T declares none.
+    template <typename T>
+    inline constexpr auto schema_family_digests_v = [] {
+        std::array<std::uint64_t, detail::schema_names::family_length<std::remove_cv_t<T>>()> out{};
+        detail::schema_names::family_digests<std::remove_cv_t<T>>(out, out.size() - 1);
+        return out;
+    }();
+
+    // Is digest the field-name digest of T or of an earlier version of its family?
+    template <typename T>
+    constexpr bool schema_family_has_digest(std::uint64_t digest) noexcept {
+        for (const std::uint64_t d : schema_family_digests_v<T>)
+            if (d == digest) return true;
+        return false;
+    }
+
     // The name signature as text (diagnostics, the schema lock file).
     template <typename T>
     std::string schema_name_signature() {
