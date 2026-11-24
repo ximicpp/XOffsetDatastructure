@@ -258,6 +258,7 @@ child data of other containers never move.
 | Explicit `grow()` past a movable slot (section 3.4) | Changes: moves to new storage | All invalidated | +1 |
 | `save_verified`, `save_verified_into`, `save` | Unchanged (only shrinks the logical length) | Valid | Unchanged |
 | `reload_verified`, `begin_verified_reload`, `reset<T>()` | Unchanged (mapping reused); a movable slot that cannot hold the new content switches storage (section 3.4) | All invalidated (`begin_verified_reload` invalidates at the start, not at `finish()`) | +1 |
+| `relayout<T>()` (section 4.7) | Unchanged (rewritten in place) | All invalidated; proxies (`XRef`, nested ones too) stay valid and re-resolve | +1 (unchanged when nothing is shed or the call is refused) |
 | `src.clone_into(dst)` | dst unchanged (mapping reused); a movable-slot dst that cannot hold it switches storage (section 3.4) | Everything previously in dst invalidated; `src` unaffected | dst +1 (unchanged when a self-copy is rejected) |
 | `clone()` | The result is a new buffer with the same storage kind as the source (movable slot or address-stable) | Source unaffected | New buffer starts at 0 |
 | `load_verified`, `load_unverified`, `XCompactor::compact` | The result is a new buffer | Source unaffected (compaction only reads the source, also when retrying with a larger capacity) | New buffer starts at 0 |
@@ -639,6 +640,49 @@ written per record: the server encodes each changed entity once per tick with th
 writes each record in place in its own storage through `XReceiver<L>::apply_sync`. Usage, target
 interface, format and checks: [SHARED_DELTA.md](SHARED_DELTA.md); a complete loop:
 `examples/shared_delta.cpp`.
+
+### 4.7 A sender that edits in place for a long time: `relayout()`
+
+A buffer that is edited in place tick after tick never gives bytes back: freed blocks become holes
+and grown vectors keep their doubled capacity, so `used_end` drifts to two or more times the size of
+its compact image. The automatic emission (section 4) sends the compact image when that pays, but
+every path that pays per used byte keeps paying: a delta's comparison, key deltas, a `touches`
+baseline's runs over whole containers, `clone()`, and the memory of every replica, which holds the
+sender's layout. `relayout<T>()` rewrites the content in place as the image `save_compact` writes
+(the same values, preorder blocks, no holes, short strings inline, vectors with the slack of
+`XCompactOptions{}`); `relayout_advised<T>()` says when it pays. Call them between ticks, after
+the tick's sends:
+
+```cpp
+// The sender's tick: edit, send to every receiver, then
+if (world.relayout_advised()) (void)world.relayout();   // TypedXBuffer<World>
+```
+
+- `relayout_advised()` is true when `used_end` is at least twice the used size of the last
+  relayout of this content (or of the image a relayout would write, measured with one walk on the
+  first call after the content changed hands: `make`, `reset`, a load, reload or `clone_into`, a
+  move or `swap`). Afterwards it is a compare and a few loads. Under steady churn it fires a few
+  times early on and then rarely; content that grows to twice its size triggers one relayout
+  (which also drops the doubled capacity). After a known large shrink (a cleared inventory) call
+  `relayout()` directly.
+- After a relayout every plain reference, pointer, `span` and `string_view` into the payload is
+  invalid and the epoch advances. `root()` (as a proxy), proxies of fields and elements, and
+  `XHandle` stay valid and re-resolve. The address, logical length, committed pages, growth policy
+  and the root's type and fingerprint stay.
+- Each delta stream from the buffer sends one larger delta next: a copy baseline compares the
+  whole payload (about the size of a key delta), a `touches` baseline sends a key delta.
+- **Only for content this process edits.** Never call it on a replica that applies deltas: the
+  next delta assumes the replica's bytes are the sender's (section 4.5). A replica takes the
+  compact layout when its sender relayouts.
+- It returns `XStatus`: ok also when the image would not be smaller (nothing changes then). It is
+  refused, with nothing changed and nothing recorded, inside a pin scope (`borrowed`), on a buffer
+  with a recorded failure (that `error()`), without a verified root of `T` (`no_root`), when the
+  storage fails (`out_of_storage`) or the image's scratch cannot be allocated
+  (`host_allocation_failed`). The scratch is the thread's and is kept up to 256 KiB.
+- Cost (Character fixture, GCC 16): 0.5 us for 8 KB of used bytes, 9.7 us for 129 KB. Under
+  steady churn with relayouts as advised, the instructions per tick of a delta compare fall 13-26%
+  and of a `touches` delta up to 35% (more for larger content), and the sender's and the replicas'
+  `used_end` by 28-42%.
 
 ## 5. Constraints you must follow
 
