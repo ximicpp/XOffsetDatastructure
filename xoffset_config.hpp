@@ -106,6 +106,14 @@
 #define XOFFSET_DETAIL_INLINE_CLANG inline
 #endif
 
+// Kept out of line for Clang only, where inlining a function can make Clang
+// keep its caller out of line in turn (assign_trivial_copy); GCC inlines both.
+#if defined(__clang__)
+#define XOFFSET_DETAIL_NOINLINE_CLANG XOFFSET_DETAIL_NOINLINE
+#else
+#define XOFFSET_DETAIL_NOINLINE_CLANG inline
+#endif
+
 // Forced inlining for MSVC only, where its inline cost model stops at flat-map
 // insert/erase helpers that GCC and Clang already inline.
 #if defined(_MSC_VER) && !defined(__clang__)
