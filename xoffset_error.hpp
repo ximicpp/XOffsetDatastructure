@@ -174,6 +174,10 @@ inline bool soft_fail(XErrc code) noexcept {
     return true;
 }
 inline bool soft_fail_active() noexcept { return soft_fail_state().depth != 0; }
+inline bool soft_fail_failed() noexcept {
+    const auto& state = soft_fail_state();
+    return state.depth != 0 && state.code != XErrc::ok;
+}
 class SoftFailScope {
 public:
     SoftFailScope() noexcept : saved_(soft_fail_state().code) {

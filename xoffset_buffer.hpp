@@ -79,18 +79,30 @@ namespace XOffsetDatastructure {
             using Identity = XBufferCore::OwnerRecordPtr;
             static Identity identity(XBufferCore& source) { return source.owner_identity(); }
             static XBufferCore& owner(const Identity& value) { return XBufferCore::require_record_owner(value); }
+            static vstatus owner_v(const Identity& value, XBufferCore*& out) {
+                return XBufferCore::require_record_owner_v(value, out);
+            }
             template<class T> static XWireHeader header(XBufferCore&);
+            template<class T> static vstatus header_v(XBufferCore&, XWireHeader&);
             template<class T> static void save_into(XBufferCore&, std::string&, XSaveOptions);
+            template<class T> static vstatus save_into_v(XBufferCore&, std::string&, XSaveOptions);
             template<class T, bool Band> static bool save_small_into(XBufferCore&, std::string&, XWireEmission);
             template<class T> static void save_into_general(XBufferCore&, std::string&, XSaveOptions);
+            template<class T> static vstatus save_into_general_v(XBufferCore&, std::string&, XSaveOptions);
             template<class T> static bool save_watched_into(XBufferCore&, std::string&);
+            template<class T> static vstatus save_watched_into_v(XBufferCore&, std::string&, bool&);
             template<class T> static bool save_root_spare_into(XBufferCore&, std::string&);
+            template<class T> static vstatus save_root_spare_into_v(XBufferCore&, std::string&, bool&);
             template<class T> static bool auto_compact(XBufferCore&);
             template<class T> static void rebuild_free_table(T&, XBufferCore&);
+            template<class T> static vstatus rebuild_free_table_v(T&, XBufferCore&);
             template<class T> static bool try_save_compact_into(XBufferCore&, std::string&, std::uint32_t);
             template<class T> static void save_compact_into(XBufferCore&, std::string&, XCompactOptions);
+            template<class T> static vstatus save_compact_into_v(XBufferCore&, std::string&, XCompactOptions);
             template<class T, class... M> static void save_composed_into(XBufferCore&, std::string&, XCompactOptions,
                                                                          const XAssign<M>&...);
+            template<class T, class... M> static vstatus save_composed_into_v(XBufferCore&, std::string&, XCompactOptions,
+                                                                              const XAssign<M>&...);
         };
     }
 
@@ -295,6 +307,14 @@ namespace XOffsetDatastructure {
                 return ok;
             }
         };
+        template<typename T>
+        T* find_verified_root_ptr() noexcept {
+            if (this->template root_is<T>()) [[likely]] return detail::image_root<std::remove_cv_t<T>>(*this);
+            if (!typed_root_access_allowed_) return nullptr;
+            if (this->root_named() && !matches_schema<T>()) return nullptr;
+            return detail::find_root<T>(*this);
+        }
+
         // The root for a pin scope, after the entry move (see edit).
         template<typename T>
         T* pin_root(size_type expected_growth) {
@@ -305,12 +325,8 @@ namespace XOffsetDatastructure {
                 if (used > limit / 2) want = std::max(want, limit - used + 1u);
                 if (want != 0) (void)make_room(want);
             }
-            T* root_ptr = nullptr;
-            XOFFSET_TRY {
-                root_ptr = &root<T>();
-            } XOFFSET_CATCH(...) {
-                record_error(XErrc::no_root);
-            }
+            T* root_ptr = find_verified_root_ptr<T>();
+            if (!root_ptr) record_error(XErrc::no_root);
             return root_ptr;
         }
 
@@ -351,12 +367,7 @@ namespace XOffsetDatastructure {
         // root of type T.
         template<typename T>
         XRef<T> ref() noexcept {
-            T* root_ptr = nullptr;
-            XOFFSET_TRY {
-                root_ptr = &root<T>();
-            } XOFFSET_CATCH(...) {
-                root_ptr = nullptr;
-            }
+            T* root_ptr = find_verified_root_ptr<T>();
             auto* ctl = root_ptr ? control() : nullptr;
             if (!ctl) return XRef<T>();
             return XRef<T>(proxy_detail::Anchor(ctl),
@@ -646,6 +657,25 @@ namespace XOffsetDatastructure {
             detail::VerifiedPathsAccess::save_into<T>(*this, out, options);
         }
 
+        /// Non-throwing save_verified_into (safe in -fno-exceptions builds).
+        template <typename T>
+        XStatus try_save_verified_into(std::string& out, XSaveOptions options = {}) {
+            return detail::try_v([&]() -> detail::vstatus {
+                XOFFSET_VTRY(refuse_failed_emit_v(out));
+                return detail::VerifiedPathsAccess::save_into_v<T>(*this, out, options);
+            });
+        }
+
+        /// Non-throwing save_verified (safe in -fno-exceptions builds).
+        template <typename T>
+        XResult<std::string> try_save_verified(XSaveOptions options = {}) {
+            std::string out;
+            return detail::try_v_into(out, [&]() -> detail::vstatus {
+                XOFFSET_VTRY(refuse_failed_emit_v(out));
+                return detail::VerifiedPathsAccess::save_into_v<T>(*this, out, options);
+            });
+        }
+
         // Compacted wire written by direct traversal: preorder blocks, strings
         // of at most 10 bytes inline, no holes, and capacity == size except
         // for the bounded slack of XCompactOptions (slack_div = 0: the
@@ -660,6 +690,17 @@ namespace XOffsetDatastructure {
             save_compact_into_checked<T>(out, options);
         }
 
+        /// Non-throwing save_compact_into (safe in -fno-exceptions builds).
+        template <typename T>
+        XStatus try_save_compact_into(std::string& out, XCompactOptions options = {}) {
+            return detail::try_v([&]() -> detail::vstatus {
+                XOFFSET_VTRY(refuse_failed_emit_v(out));
+                if (detail::VerifiedPathsAccess::try_save_compact_into<T>(*this, out, options.slack_div)) [[likely]]
+                    return detail::vok();
+                return save_compact_into_checked_v<T>(out, options);
+            });
+        }
+
         // Composes a wire from parts: writes the wire save_compact_into would
         // write after `*a.target = *a.source` for every assignment (all
         // sources read as they were), without changing this buffer or any
@@ -671,16 +712,17 @@ namespace XOffsetDatastructure {
         void save_compact_into(std::string& out, XCompactOptions options, const XAssign<A0>& first,
                                const XAssign<A>&... rest) {
             if (refuse_failed_emit(out)) return;
-            XOFFSET_TRY {
-                require_typed_root_access("save_compact<T>(): unverified payload cannot be relabeled as verified");
-                require_schema_match<T>("save_compact<T>(): schema mismatch for requested root type");
-                if (!detail::find_root<T>(*this))
-                    XOFFSET_THROW(XException(XErrc::no_root, "save_compact<T>(): no root object of requested type"));
-            } XOFFSET_CATCH(...) {
-                out.clear();
-                XOFFSET_RETHROW;
-            }
-            detail::VerifiedPathsAccess::save_composed_into<T>(*this, out, options, first, rest...);
+            XOFFSET_VREQUIRE(save_composed_into_checked_v<T>(out, options, first, rest...));
+        }
+
+        /// Non-throwing composed save_compact_into (safe in -fno-exceptions builds).
+        template <typename T, typename A0, typename... A>
+        XStatus try_save_compact_into(std::string& out, XCompactOptions options, const XAssign<A0>& first,
+                                      const XAssign<A>&... rest) {
+            return detail::try_v([&]() -> detail::vstatus {
+                XOFFSET_VTRY(refuse_failed_emit_v(out));
+                return save_composed_into_checked_v<T>(out, options, first, rest...);
+            });
         }
 
         template <typename T>
@@ -690,15 +732,33 @@ namespace XOffsetDatastructure {
             return out;
         }
 
+        /// Non-throwing save_compact (safe in -fno-exceptions builds).
+        template <typename T>
+        XResult<std::string> try_save_compact(XCompactOptions options = {}) {
+            std::string out;
+            return detail::try_v_into(out, [&]() -> detail::vstatus {
+                XOFFSET_VTRY(refuse_failed_emit_v(out));
+                if (detail::VerifiedPathsAccess::try_save_compact_into<T>(*this, out, options.slack_div)) [[likely]]
+                    return detail::vok();
+                return save_compact_into_checked_v<T>(out, options);
+            });
+        }
+
         // If a host allocation failure (or an unverified load) left the free
         // state incomplete, recompute it exactly from the live graph.
         template <typename T>
         void ensure_hole_table(const T& root) {
-            if (this->free_table_complete()) return;
+            XOFFSET_VREQUIRE(ensure_hole_table_v(root));
+        }
+
+        template <typename T>
+        detail::vstatus ensure_hole_table_v(const T& root) {
+            if (this->free_table_complete()) return detail::vok();
             std::vector<WireHole> holes;
-            XOFFSET_VREQUIRE(detail::verify_structural_wire_graph(root, *this, default_memory_resource(),
-                                                                  nullptr, 0, false, &holes));
+            XOFFSET_VTRY(detail::verify_structural_wire_graph(root, *this, default_memory_resource(),
+                                                              nullptr, 0, false, &holes));
             this->replace_free_blocks(holes);
+            return detail::vok();
         }
 
         // The wire header of this image as T's: the image's own header with
@@ -846,11 +906,28 @@ namespace XOffsetDatastructure {
         // then the general writer (measure, reserve, write).
         template <typename T>
         XOFFSET_DETAIL_NOINLINE void save_compact_into_checked(std::string& out, XCompactOptions options) {
-            require_typed_root_access("save_compact<T>(): unverified payload cannot be relabeled as verified");
-            require_schema_match<T>("save_compact<T>(): schema mismatch for requested root type");
+            XOFFSET_VREQUIRE(save_compact_into_checked_v<T>(out, options));
+        }
+
+        template <typename T>
+        XOFFSET_DETAIL_NOINLINE detail::vstatus save_compact_into_checked_v(std::string& out, XCompactOptions options) {
+            XOFFSET_VTRY(require_typed_root_access_v("save_compact<T>(): unverified payload cannot be relabeled as verified"));
+            XOFFSET_VTRY(require_schema_match_v<T>("save_compact<T>(): schema mismatch for requested root type"));
             if (!detail::find_root<T>(*this))
-                XOFFSET_THROW(XException(XErrc::no_root, "save_compact<T>(): no root object of requested type"));
-            detail::VerifiedPathsAccess::save_compact_into<T>(*this, out, options);
+                XOFFSET_VFAIL(XException, XErrc::no_root, "save_compact<T>(): no root object of requested type");
+            return detail::VerifiedPathsAccess::save_compact_into_v<T>(*this, out, options);
+        }
+
+        template <typename T, typename A0, typename... A>
+        XOFFSET_DETAIL_NOINLINE detail::vstatus save_composed_into_checked_v(
+            std::string& out, XCompactOptions options, const XAssign<A0>& first, const XAssign<A>&... rest) {
+            XOFFSET_ROLLBACK_BEGIN
+                XOFFSET_VTRY(require_typed_root_access_v("save_compact<T>(): unverified payload cannot be relabeled as verified"));
+                XOFFSET_VTRY(require_schema_match_v<T>("save_compact<T>(): schema mismatch for requested root type"));
+                if (!detail::find_root<T>(*this))
+                    XOFFSET_VFAIL(XException, XErrc::no_root, "save_compact<T>(): no root object of requested type");
+            XOFFSET_ROLLBACK_END(out.clear())
+            return detail::VerifiedPathsAccess::save_composed_into_v<T>(*this, out, options, first, rest...);
         }
 
         // upstream == nullptr: this buffer's own reload scratch. The small
@@ -924,6 +1001,7 @@ namespace XOffsetDatastructure {
         std::unique_ptr<detail::WireValidationScratch> reload_scratch_;
         // direct_reload_open_ is in XBufferCore's padding (see there).
         template <typename> friend class VerifiedReloadToken;
+        friend class XCompactor;
         friend struct detail::DeltaAccess;
         friend struct detail::ReceiverAccess;
 
@@ -949,10 +1027,20 @@ namespace XOffsetDatastructure {
         std::size_t save_delta_into(std::span<char> out, XDeltaBaseline& baseline, XDeltaOptions options = {});
         template <typename T>
         std::string save_delta(XDeltaBaseline& baseline, XDeltaOptions options = {});
+        /// Non-throwing delta emission (safe in -fno-exceptions builds).
+        template <typename T>
+        XResult<XDeltaStats> try_save_delta_into(std::string& out, XDeltaBaseline& baseline, XDeltaOptions options = {});
+        template <typename T>
+        XResult<std::size_t> try_save_delta_into(std::span<char> out, XDeltaBaseline& baseline, XDeltaOptions options = {});
+        template <typename T>
+        XResult<std::string> try_save_delta(XDeltaBaseline& baseline, XDeltaOptions options = {});
     private:
         // save_delta_into(std::string&) past its short path.
         template <typename T>
         XDeltaStats save_delta_into_general(std::string& out, XDeltaBaseline& baseline, XDeltaOptions options);
+        template <typename T>
+        detail::vstatus save_delta_into_general_v(std::string& out, XDeltaBaseline& baseline, XDeltaOptions options,
+                                                  XDeltaStats& out_stats);
     public:
         /// For deltas with XDeltaOptions::touched_only: records that `value`
         /// (an object in this buffer's payload) may have changed, with
@@ -1306,6 +1394,13 @@ namespace XOffsetDatastructure {
             }
         }
 
+        detail::vstatus require_typed_root_access_v(const char* message) const {
+            if (!typed_root_access_allowed_) {
+                XOFFSET_VFAIL(XException, XErrc::no_root, message);
+            }
+            return detail::vok();
+        }
+
         // T's fingerprint in the image header (only a type with a schema name
         // has one, and only such a type is sent). make<T>() writes it; a
         // buffer whose root key is such a T holds it (make<T>(), a load or
@@ -1333,6 +1428,14 @@ namespace XOffsetDatastructure {
             if (this->root_named() && !matches_schema<T>()) {
                 XOFFSET_THROW(XException(XErrc::schema_mismatch, message));
             }
+        }
+
+        template <typename T>
+        detail::vstatus require_schema_match_v(const char* message) const {
+            if (this->root_named() && !matches_schema<T>()) {
+                XOFFSET_VFAIL(XException, XErrc::schema_mismatch, message);
+            }
+            return detail::vok();
         }
 
     };
@@ -1538,12 +1641,29 @@ namespace XOffsetDatastructure {
         void save_verified_into(std::string& out, XSaveOptions options = {}) {
             XBuffer::save_verified_into<T>(out, options);
         }
+        XResult<std::string> try_save_verified(XSaveOptions options = {}) {
+            return XBuffer::try_save_verified<T>(options);
+        }
+        XStatus try_save_verified_into(std::string& out, XSaveOptions options = {}) {
+            return XBuffer::try_save_verified_into<T>(out, options);
+        }
         std::string save_compact(XCompactOptions options = {}) { return XBuffer::save_compact<T>(options); }
         void save_compact_into(std::string& out, XCompactOptions options = {}) { XBuffer::save_compact_into<T>(out, options); }
         template <typename A0, typename... A>
         void save_compact_into(std::string& out, XCompactOptions options, const XAssign<A0>& first,
                                const XAssign<A>&... rest) {
             XBuffer::save_compact_into<T>(out, options, first, rest...);
+        }
+        XResult<std::string> try_save_compact(XCompactOptions options = {}) {
+            return XBuffer::try_save_compact<T>(options);
+        }
+        XStatus try_save_compact_into(std::string& out, XCompactOptions options = {}) {
+            return XBuffer::try_save_compact_into<T>(out, options);
+        }
+        template <typename A0, typename... A>
+        XStatus try_save_compact_into(std::string& out, XCompactOptions options, const XAssign<A0>& first,
+                                      const XAssign<A>&... rest) {
+            return XBuffer::try_save_compact_into<T>(out, options, first, rest...);
         }
 
         static TypedXBuffer load_verified(XByteView data, std::optional<MaximumCapacity> cap = std::nullopt,
@@ -1575,6 +1695,17 @@ namespace XOffsetDatastructure {
         }
         std::string save_delta(XDeltaBaseline& baseline, XDeltaOptions options = {}) {
             return XBuffer::save_delta<T>(baseline, options);
+        }
+        XResult<XDeltaStats> try_save_delta_into(std::string& out, XDeltaBaseline& baseline,
+                                                 XDeltaOptions options = {}) {
+            return XBuffer::try_save_delta_into<T>(out, baseline, options);
+        }
+        XResult<std::size_t> try_save_delta_into(std::span<char> out, XDeltaBaseline& baseline,
+                                                 XDeltaOptions options = {}) {
+            return XBuffer::try_save_delta_into<T>(out, baseline, options);
+        }
+        XResult<std::string> try_save_delta(XDeltaBaseline& baseline, XDeltaOptions options = {}) {
+            return XBuffer::try_save_delta<T>(baseline, options);
         }
         void apply_delta_verified(XByteView delta, XDeltaCursor& cursor) {
             XBuffer::apply_delta_verified<T>(delta, cursor);

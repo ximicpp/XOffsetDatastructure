@@ -978,6 +978,16 @@ namespace XOffsetDatastructure {
                 "); it emits no wire until clear_error()");
 #endif
         }
+        XOFFSET_DETAIL_INLINE detail::vstatus refuse_failed_emit_v(std::string& out) {
+            if (!emit_failed()) [[likely]] return detail::vok();
+            return refuse_failed_emit_v_slow(out);
+        }
+        XOFFSET_DETAIL_NOINLINE detail::vstatus refuse_failed_emit_v_slow(std::string& out) {
+            out.clear();
+            XOFFSET_VFAIL(XException, ctl_->sticky,
+                std::string("the buffer has a recorded failure (") + to_string(ctl_->sticky) +
+                "); it emits no wire until clear_error()");
+        }
 
         // Pin scope bracket (XBuffer::read / edit use it; nests). Entering
         // fails only when no control block can be made.
@@ -2255,6 +2265,15 @@ namespace XOffsetDatastructure {
             detail::owner_lookup_count(&detail::OwnerLookupStats::slow_revalidations);
             if (auto* owner = record_owner(record)) return *owner;
             XOFFSET_THROW(XException(XErrc::invalid_state, "arena owner lookup failed"));
+        }
+
+        static detail::vstatus require_record_owner_v(const OwnerRecordPtr& record, XBufferCore*& out) {
+            detail::owner_lookup_count(&detail::OwnerLookupStats::slow_revalidations);
+            if (auto* owner = record_owner(record)) {
+                out = owner;
+                return detail::vok();
+            }
+            XOFFSET_VFAIL(XException, XErrc::invalid_state, "arena owner lookup failed");
         }
 
         static size_type min_payload_size() noexcept {
