@@ -696,7 +696,7 @@ namespace XOffsetDatastructure {
         void ensure_hole_table(const T& root) {
             if (this->free_table_complete()) return;
             std::vector<WireHole> holes;
-            XOFFSET_VREQUIRE(detail::verify_structural_wire_graph(root, *this, std::pmr::new_delete_resource(),
+            XOFFSET_VREQUIRE(detail::verify_structural_wire_graph(root, *this, default_memory_resource(),
                                                                   nullptr, 0, false, &holes));
             this->replace_free_blocks(holes);
         }
@@ -788,7 +788,7 @@ namespace XOffsetDatastructure {
         template <typename T>
         static XBuffer load_verified(XByteView data,
                                      std::optional<MaximumCapacity> cap = std::nullopt,
-                                     std::pmr::memory_resource* upstream = std::pmr::new_delete_resource()) {
+                                     XMemoryResource* upstream = default_memory_resource()) {
             XBuffer xbuf;
             XOFFSET_VREQUIRE(xbuf.load_verified_v<T>(data, cap, upstream));
             return xbuf;
@@ -801,7 +801,7 @@ namespace XOffsetDatastructure {
         template <typename T>
         static XResult<XBuffer> try_load_verified(XByteView data,
                                                   std::optional<MaximumCapacity> cap = std::nullopt,
-                                                  std::pmr::memory_resource* upstream = std::pmr::new_delete_resource()) {
+                                                  XMemoryResource* upstream = default_memory_resource()) {
             XBuffer xbuf;
             return detail::try_v_into(xbuf, [&] { return xbuf.load_verified_v<T>(data, cap, upstream); });
         }
@@ -822,7 +822,7 @@ namespace XOffsetDatastructure {
         /// payloads need none. A non-null `upstream` gives that scratch
         /// instead, one block per call.
         template <typename T>
-        void reload_verified(XByteView data, std::pmr::memory_resource* upstream = nullptr) {
+        void reload_verified(XByteView data, XMemoryResource* upstream = nullptr) {
             XOFFSET_VREQUIRE(reload_into<T>(data, upstream));
         }
 
@@ -831,7 +831,7 @@ namespace XOffsetDatastructure {
         /// reload_verified leaves it (empty, without typed root access, after
         /// a failure).
         template <typename T>
-        XStatus try_reload_verified(XByteView data, std::pmr::memory_resource* upstream = nullptr) {
+        XStatus try_reload_verified(XByteView data, XMemoryResource* upstream = nullptr) {
             return detail::try_v([&] { return reload_into<T>(data, upstream); });
         }
 
@@ -858,7 +858,7 @@ namespace XOffsetDatastructure {
         // loop); any other wire takes reload_into_general.
         template <typename T>
         XOFFSET_DETAIL_INLINE detail::vstatus reload_into(std::span<const std::byte> data,
-                                                          std::pmr::memory_resource* upstream) {
+                                                          XMemoryResource* upstream) {
             constexpr const char* who = "reload_verified<T>()";
             const std::size_t size = data.size_bytes();
             if (admit_image<T>(data) && size <= small_reload_max && detail::small_reload_fast_path &&
@@ -877,7 +877,7 @@ namespace XOffsetDatastructure {
         }
         template <typename T>
         XOFFSET_DETAIL_NOINLINE detail::vstatus reload_into_general(std::span<const std::byte> data,
-                                                                    std::pmr::memory_resource* upstream) {
+                                                                    XMemoryResource* upstream) {
             constexpr const char* who = "reload_verified<T>()";
             XOFFSET_ROLLBACK_BEGIN
                 detail::WireValidationScratch* retained = nullptr;
@@ -898,7 +898,7 @@ namespace XOffsetDatastructure {
         // load_verified into this default-constructed buffer.
         template <typename T>
         detail::vstatus load_verified_v(std::span<const std::byte> data, std::optional<MaximumCapacity> cap,
-                                        std::pmr::memory_resource* upstream) {
+                                        XMemoryResource* upstream) {
             constexpr const char* who = "load_verified<T>()";
             if (!upstream)
                 XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument, "validation scratch: null upstream");
@@ -1225,7 +1225,7 @@ namespace XOffsetDatastructure {
         // its stacks, walked and checked as they are registered) tiling the
         // image with the live blocks.
         template <typename T>
-        detail::vstatus finish_verified_load(std::size_t used, std::pmr::memory_resource* upstream, const char* who,
+        detail::vstatus finish_verified_load(std::size_t used, XMemoryResource* upstream, const char* who,
                                              detail::WireValidationScratch* retained = nullptr) {
             auto* root_ptr = loaded_root<T>(used);
             if (!root_ptr) {
@@ -1420,7 +1420,7 @@ namespace XOffsetDatastructure {
                 buffer->arena()->extent_count = 0;
                 buffer->take_loaded_free_state();
                 XOFFSET_VTRY(buffer->check_reinit_payload());
-                XOFFSET_VTRY(buffer->template finish_verified_load<T>(used_, std::pmr::new_delete_resource(),
+                XOFFSET_VTRY(buffer->template finish_verified_load<T>(used_, default_memory_resource(),
                                                                       who, &buffer->retained_reload_scratch()));
             XOFFSET_ROLLBACK_END(buffer->reset_arena(0))
             return detail::vok();
@@ -1516,7 +1516,7 @@ namespace XOffsetDatastructure {
         }
 
         std::string save_verified(XSaveOptions options = {}) { return XBuffer::save_verified<T>(options); }
-        void reload_verified(XByteView data, std::pmr::memory_resource* upstream = nullptr) {
+        void reload_verified(XByteView data, XMemoryResource* upstream = nullptr) {
             XBuffer::reload_verified<T>(data, upstream);
         }
         /// Empties the buffer and makes a new root; a proxy of it (proxies
@@ -1547,20 +1547,20 @@ namespace XOffsetDatastructure {
         }
 
         static TypedXBuffer load_verified(XByteView data, std::optional<MaximumCapacity> cap = std::nullopt,
-                                          std::pmr::memory_resource* upstream = std::pmr::new_delete_resource()) {
+                                          XMemoryResource* upstream = default_memory_resource()) {
             return TypedXBuffer(XBuffer::load_verified<T>(data, cap, upstream));
         }
 
         /// load_verified / reload_verified without exceptions (see XBuffer).
         static XResult<TypedXBuffer> try_load_verified(XByteView data,
                                                        std::optional<MaximumCapacity> cap = std::nullopt,
-                                                       std::pmr::memory_resource* upstream = std::pmr::new_delete_resource()) {
+                                                       XMemoryResource* upstream = default_memory_resource()) {
             auto loaded = XBuffer::try_load_verified<T>(data, cap, upstream);
             if (!loaded) return loaded.error();
             return XResult<TypedXBuffer>(TypedXBuffer(std::move(*loaded)));
         }
 
-        XStatus try_reload_verified(XByteView data, std::pmr::memory_resource* upstream = nullptr) {
+        XStatus try_reload_verified(XByteView data, XMemoryResource* upstream = nullptr) {
             return XBuffer::try_reload_verified<T>(data, upstream);
         }
 

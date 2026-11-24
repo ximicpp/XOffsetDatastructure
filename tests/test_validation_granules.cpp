@@ -12,7 +12,9 @@
 #include <array>
 #include <cstring>
 #include <iostream>
+#if XOFFSET_USE_PMR
 #include <memory_resource>
+#endif
 #include <string>
 #include <string_view>
 #include <vector>
@@ -51,20 +53,20 @@ void need(bool ok, const char* message) { if (!ok) throw std::runtime_error(mess
 std::size_t oracle_operations{}, priority_cases{}, derived_cases{}, storage_cases{},
     typed_rejections{}, failpoints{}, cursor_operations{};
 
-struct Resource final : std::pmr::memory_resource {
+struct Resource final : xo::XMemoryResource {
     std::size_t allocations{}, deallocations{}, requested{}, live{};
     bool fail_next = false;
     void* do_allocate(std::size_t bytes, std::size_t alignment) override {
         if (fail_next) { fail_next = false; throw std::bad_alloc(); }
-        auto* p = std::pmr::new_delete_resource()->allocate(bytes, alignment);
+        auto* p = xo::default_memory_resource()->allocate(bytes, alignment);
         ++allocations; requested += bytes; live += bytes;
         return p;
     }
     void do_deallocate(void* p, std::size_t bytes, std::size_t alignment) override {
-        std::pmr::new_delete_resource()->deallocate(p, bytes, alignment);
+        xo::default_memory_resource()->deallocate(p, bytes, alignment);
         ++deallocations; live -= bytes;
     }
-    bool do_is_equal(const std::pmr::memory_resource& x) const noexcept override { return this == &x; }
+    bool do_is_equal(const xo::XMemoryResource& x) const noexcept override { return this == &x; }
     void balanced() const { need(live == 0 && allocations == deallocations, "scratch resource not balanced"); }
 };
 
@@ -285,10 +287,12 @@ void recomputed_runs() {
 // Storage: inline up to 32 KiB, one upstream block above, retained words for
 // a reload buffer, no default-resource use, and upstream failure commits nothing.
 void storage() {
+#if XOFFSET_USE_PMR
     struct DefaultGuard {
         std::pmr::memory_resource* old = std::pmr::set_default_resource(std::pmr::null_memory_resource());
         ~DefaultGuard() { std::pmr::set_default_resource(old); }
     } guard;
+#endif
     static_assert(std::is_aggregate_v<wd::WireValidationContext>);
     static_assert(!std::is_copy_constructible_v<wd::WireValidationContext>);
     static_assert(!std::is_move_constructible_v<wd::WireValidationContext>);
@@ -296,7 +300,7 @@ void storage() {
     const char* base = reinterpret_cast<const char*>(storage.data());
     {
         wd::WireValidationContext ctx{.base = base, .end = base + 256};
-        need(ctx.upstream == std::pmr::new_delete_resource(), "context captured the default PMR resource");
+        need(ctx.upstream == xo::default_memory_resource(), "context captured the default memory resource");
         reg(false, base + 8, 8, ctx); reg(true, base + 32, 8, ctx);
         need(ctx.granules.upstream_words() == 0, "small payload took host words");
     }

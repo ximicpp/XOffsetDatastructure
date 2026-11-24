@@ -207,7 +207,7 @@ namespace XOffsetDatastructure {
             // Host words this index took from outside itself (0: inline or retained).
             std::size_t upstream_words() const noexcept { return block_words_; }
 
-            void prepare(std::size_t extent, std::pmr::memory_resource* upstream,
+            void prepare(std::size_t extent, XMemoryResource* upstream,
                          WireValidationScratch* retained) {
                 const auto granules = extent / 8u;
                 const auto words = (granules + 63u) / 64u;
@@ -334,7 +334,7 @@ namespace XOffsetDatastructure {
             std::size_t granules_ = 0;
             std::uint64_t* block_ = nullptr;
             std::size_t block_words_ = 0;
-            std::pmr::memory_resource* block_upstream_ = nullptr;
+            XMemoryResource* block_upstream_ = nullptr;
             std::uint64_t inline_[2 * inline_words];
         };
 
@@ -343,10 +343,10 @@ namespace XOffsetDatastructure {
         // Test switch for XBuffer's small dense reload path (differential on/off runs).
         inline constinit bool small_reload_fast_path = true;
 
-        // std::pmr::new_delete_resource(), looked up once: verified reloads
-        // name it on every read, and the lookup is an out-of-line call.
-        inline std::pmr::memory_resource* default_wire_upstream() noexcept {
-            static std::pmr::memory_resource* const resource = std::pmr::new_delete_resource();
+        // default_memory_resource(), looked up once: verified reloads
+        // name it on every read, and the lookup may be an out-of-line call.
+        inline XMemoryResource* default_wire_upstream() noexcept {
+            static XMemoryResource* const resource = default_memory_resource();
             return resource;
         }
 
@@ -401,7 +401,7 @@ namespace XOffsetDatastructure {
             std::uint64_t free_bytes = 0;
             // Host-only scratch for bitmaps above the inline size: a reload
             // buffer's retained words when set, else one upstream block.
-            std::pmr::memory_resource* upstream = default_wire_upstream();
+            XMemoryResource* upstream = default_wire_upstream();
             WireValidationScratch* retained = nullptr;
             // Cursor path: while no hole is registered and every live block
             // starts where the previous one ended (canonical preorder), the
@@ -965,7 +965,7 @@ namespace XOffsetDatastructure {
         // free regions (used to recompute them from the live set).
         template <typename T, typename RegisterFree>
         vstatus verify_structural_wire_graph_with(const T& root, XBufferCore& xbuf,
-                                                  std::pmr::memory_resource* upstream,
+                                                  XMemoryResource* upstream,
                                                   RegisterFree&& register_free,
                                                   bool check_coverage,
                                                   std::vector<XBufferCore::WireHole>* recomputed,
@@ -973,7 +973,7 @@ namespace XOffsetDatastructure {
 
         template <typename T>
         vstatus verify_structural_wire_graph(const T& root, XBufferCore& xbuf,
-                                             std::pmr::memory_resource* upstream,
+                                             XMemoryResource* upstream,
                                              const void* holes,
                                              std::size_t hole_count,
                                              bool check_coverage = true,
@@ -990,7 +990,7 @@ namespace XOffsetDatastructure {
         // directory and its stacks are checked and tile the image with the
         // live blocks (load_verified, reload_verified, a direct reload).
         template <typename T>
-        vstatus verify_loaded_image(const T& root, XBufferCore& xbuf, std::pmr::memory_resource* upstream,
+        vstatus verify_loaded_image(const T& root, XBufferCore& xbuf, XMemoryResource* upstream,
                                     WireValidationScratch* retained, const char* who) {
             return verify_structural_wire_graph_with(root, xbuf, upstream,
                 [&](WireValidationContext& ctx) -> vstatus { return register_inband_free_regions(xbuf, ctx, who); },
@@ -1001,7 +1001,7 @@ namespace XOffsetDatastructure {
         // blocks, each region checked against them as it is registered).
         template <typename T, typename RegisterFree>
         vstatus verify_structural_wire_graph_with(const T& root, XBufferCore& xbuf,
-                                                  std::pmr::memory_resource* upstream,
+                                                  XMemoryResource* upstream,
                                                   RegisterFree&& register_free,
                                                   bool check_coverage,
                                                   std::vector<XBufferCore::WireHole>* recomputed,
@@ -1080,7 +1080,7 @@ namespace XOffsetDatastructure {
 
         template <typename T>
         vstatus verify_structural_wire_graph(const T& root, XBufferCore& xbuf,
-                                             std::pmr::memory_resource* upstream = std::pmr::new_delete_resource()) {
+                                             XMemoryResource* upstream = default_memory_resource()) {
             // A live buffer's own free regions, the directory block too: they
             // tile the payload with the live blocks.
             std::vector<XBufferCore::WireHole> holes;

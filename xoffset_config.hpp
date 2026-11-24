@@ -315,6 +315,66 @@
 #  endif
 #endif
 
+// ---- Validation scratch memory resource (optional std::pmr) ----------------
+// Wire verification only needs a polymorphic allocate/deallocate hook when a
+// payload exceeds the 32 KiB inline granule bitmap and no retained scratch is
+// passed. Apple's system libc++ exports std::pmr symbols only from macOS 14 /
+// iOS 17 / tvOS 17 / watchOS 10; on older Apple deployment targets (or when
+// -DXOFFSET_USE_PMR=0 is set), XOffset uses a header-only XMemoryResource
+// backed by global operator new/delete with no <memory_resource> dependency.
+#if defined(__APPLE__)
+#  include <version>
+#  if defined(_LIBCPP_HAS_VENDOR_AVAILABILITY_ANNOTATIONS)
+#    define XOFFSET_DETAIL_APPLE_SYSTEM_LIBCXX _LIBCPP_HAS_VENDOR_AVAILABILITY_ANNOTATIONS
+#  elif defined(_LIBCPP_VERSION) && !defined(_LIBCPP_HAS_NO_VENDOR_AVAILABILITY_ANNOTATIONS)
+#    define XOFFSET_DETAIL_APPLE_SYSTEM_LIBCXX 1
+#  else
+#    define XOFFSET_DETAIL_APPLE_SYSTEM_LIBCXX 0
+#  endif
+#else
+#  define XOFFSET_DETAIL_APPLE_SYSTEM_LIBCXX 0
+#endif
+
+#if XOFFSET_DETAIL_APPLE_SYSTEM_LIBCXX && ( \
+    (defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 140000) || \
+    (defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__ < 170000) || \
+    (defined(__ENVIRONMENT_TV_OS_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_TV_OS_VERSION_MIN_REQUIRED__ < 170000) || \
+    (defined(__ENVIRONMENT_WATCH_OS_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_WATCH_OS_VERSION_MIN_REQUIRED__ < 100000))
+#  define XOFFSET_DETAIL_APPLE_PMR_AVAILABLE 0
+#else
+#  define XOFFSET_DETAIL_APPLE_PMR_AVAILABLE 1
+#endif
+
+#if !defined(XOFFSET_USE_PMR)
+#  if !XOFFSET_DETAIL_APPLE_PMR_AVAILABLE
+#    define XOFFSET_USE_PMR 0
+#  elif defined(__has_include)
+#    if __has_include(<memory_resource>)
+#      define XOFFSET_USE_PMR 1
+#    else
+#      define XOFFSET_USE_PMR 0
+#    endif
+#  else
+#    define XOFFSET_USE_PMR 1
+#  endif
+#endif
+
+#if XOFFSET_USE_PMR && !XOFFSET_DETAIL_APPLE_PMR_AVAILABLE
+#  error "XOFFSET_USE_PMR=1 needs macOS 14 / iOS 17 / tvOS 17 / watchOS 10 or newer (std::pmr in the Apple system libc++); omit XOFFSET_USE_PMR or set -DXOFFSET_USE_PMR=0 for older Apple targets"
+#endif
+
+// Floating-point std::to_chars is exported by Apple's system libc++ starting
+// from macOS 13.3 / iOS 16.3 / tvOS 16.3 / watchOS 9.4.
+#if XOFFSET_DETAIL_APPLE_SYSTEM_LIBCXX && ( \
+    (defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 130300) || \
+    (defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__ < 160300) || \
+    (defined(__ENVIRONMENT_TV_OS_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_TV_OS_VERSION_MIN_REQUIRED__ < 160300) || \
+    (defined(__ENVIRONMENT_WATCH_OS_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_WATCH_OS_VERSION_MIN_REQUIRED__ < 90400))
+#  define XOFFSET_DETAIL_TO_CHARS_FLOAT 0
+#else
+#  define XOFFSET_DETAIL_TO_CHARS_FLOAT 1
+#endif
+
 // The switches as constants: code tests them with if constexpr, so each
 // switch has one #if (its definition above).
 namespace XOffsetDatastructure::detail {

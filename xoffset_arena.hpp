@@ -30,7 +30,9 @@
 #include <algorithm>
 #include <limits>
 #include <memory>
+#if XOFFSET_USE_PMR
 #include <memory_resource>
+#endif
 #include <new>
 #include <stdexcept>
 #include <exception>
@@ -57,36 +59,61 @@ static_assert(XOFFSET_LITTLE_ENDIAN,
     "XOffsetDatastructure requires little-endian platform");
 #endif // XOFFSET_DISABLE_PLATFORM_CHECKS
 
-// Apple: load_verified uses std::pmr from the
-// system libc++, which Apple ships from macOS 14 / iOS 17 / tvOS 17 / watchOS 10.
-// The SDK does not mark those symbols with availability, so an older
-// deployment target compiles and links, then fails at launch on the old
-// system. Fail the build instead. Only the system libc++ is checked: its
-// headers are configured with vendor availability annotations, while a
-// toolchain's own libc++ (P2996 Clang, linked with its rpath) and libstdc++
-// carry std::pmr themselves.
-#if defined(__APPLE__)
-#include <version>
-#if defined(_LIBCPP_HAS_VENDOR_AVAILABILITY_ANNOTATIONS)
-#define XOFFSET_DETAIL_APPLE_SYSTEM_LIBCXX _LIBCPP_HAS_VENDOR_AVAILABILITY_ANNOTATIONS
-#elif defined(_LIBCPP_VERSION) && !defined(_LIBCPP_HAS_NO_VENDOR_AVAILABILITY_ANNOTATIONS)
-#define XOFFSET_DETAIL_APPLE_SYSTEM_LIBCXX 1
+namespace XOffsetDatastructure {
+#if XOFFSET_USE_PMR
+    using XMemoryResource = std::pmr::memory_resource;
+    inline XMemoryResource* default_memory_resource() noexcept {
+        return std::pmr::new_delete_resource();
+    }
 #else
-#define XOFFSET_DETAIL_APPLE_SYSTEM_LIBCXX 0
-#endif
-#if !XOFFSET_DETAIL_APPLE_SYSTEM_LIBCXX
-#elif defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 140000
-#error "XOffset needs macOS 14 or newer (std::pmr in the system libc++): build with -mmacosx-version-min=14.0 (CMake: CMAKE_OSX_DEPLOYMENT_TARGET=14.0)"
-#elif defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__ < 170000
-#error "XOffset needs iOS 17 or newer (std::pmr in the system libc++): build with -miphoneos-version-min=17.0 (CMake: CMAKE_OSX_DEPLOYMENT_TARGET=17.0)"
-#elif defined(__ENVIRONMENT_TV_OS_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_TV_OS_VERSION_MIN_REQUIRED__ < 170000
-#error "XOffset needs tvOS 17 or newer (std::pmr in the system libc++): raise the deployment target to 17.0"
-#elif defined(__ENVIRONMENT_WATCH_OS_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_WATCH_OS_VERSION_MIN_REQUIRED__ < 100000
-#error "XOffset needs watchOS 10 or newer (std::pmr in the system libc++): raise the deployment target to 10.0"
-#endif
+    // Minimal polymorphic allocator interface used when std::pmr is disabled
+    // (older Apple deployment targets or -DXOFFSET_USE_PMR=0).
+    class XMemoryResource {
+    public:
+        virtual ~XMemoryResource() = default;
+        void* allocate(std::size_t bytes, std::size_t alignment = alignof(std::max_align_t)) {
+            return do_allocate(bytes, alignment);
+        }
+        void deallocate(void* p, std::size_t bytes, std::size_t alignment = alignof(std::max_align_t)) {
+            do_deallocate(p, bytes, alignment);
+        }
+        bool is_equal(const XMemoryResource& other) const noexcept {
+            return do_is_equal(other);
+        }
+
+    private:
+        virtual void* do_allocate(std::size_t bytes, std::size_t alignment) = 0;
+        virtual void do_deallocate(void* p, std::size_t bytes, std::size_t alignment) = 0;
+        virtual bool do_is_equal(const XMemoryResource& other) const noexcept = 0;
+    };
+
+    namespace detail {
+        class NewDeleteMemoryResource final : public XMemoryResource {
+            void* do_allocate(std::size_t bytes, std::size_t alignment) override {
+                if (alignment > __STDCPP_DEFAULT_NEW_ALIGNMENT__) {
+                    return ::operator new(bytes, std::align_val_t{alignment});
+                }
+                return ::operator new(bytes);
+            }
+            void do_deallocate(void* p, std::size_t, std::size_t alignment) override {
+                if (alignment > __STDCPP_DEFAULT_NEW_ALIGNMENT__) {
+                    ::operator delete(p, std::align_val_t{alignment});
+                    return;
+                }
+                ::operator delete(p);
+            }
+            bool do_is_equal(const XMemoryResource& other) const noexcept override {
+                return this == &other;
+            }
+        };
+    } // namespace detail
+
+    inline XMemoryResource* default_memory_resource() noexcept {
+        static detail::NewDeleteMemoryResource resource;
+        return &resource;
+    }
 #endif
 
-namespace XOffsetDatastructure {
     template <typename T> struct XVectorCore;
 
     namespace detail {

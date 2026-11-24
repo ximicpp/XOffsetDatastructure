@@ -33,7 +33,7 @@ namespace detail {
     template<class T>
     XOFFSET_DETAIL_NOINLINE void VerifiedPathsAccess::rebuild_free_table(T& root, XBufferCore& source) {
         std::vector<XBufferCore::WireHole> holes;
-        XOFFSET_VREQUIRE(verify_structural_wire_graph(root, source, std::pmr::new_delete_resource(),
+        XOFFSET_VREQUIRE(verify_structural_wire_graph(root, source, default_memory_resource(),
                                                       nullptr, 0, false, &holes));
         source.replace_free_blocks(holes);
     }
