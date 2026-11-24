@@ -201,6 +201,7 @@ endif()
 set(EVOLUTION_TESTS
     test_xspare            # reserved bytes of later versions (every build)
     test_schema_family     # add-only versions: one family, every pair both ways (every build)
+    test_schema_family_xs  # add-only versions: shared deltas in the first version's numbering (every build)
     test_schema_handshake
     test_schema_snapshot   # a frozen snapshot used by a client (every build)
     test_schema_evolution
@@ -376,6 +377,7 @@ set(NO_EXCEPTIONS_TESTS
     test_schema_handshake
     test_xspare
     test_schema_family
+    test_schema_family_xs
     test_delta_sync
     test_delta_format
     test_relayout
