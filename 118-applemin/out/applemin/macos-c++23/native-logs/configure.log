@@ -1,0 +1,18 @@
+-- The CXX compiler identification is AppleClang 21.0.0.21000401
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Using C++23 with XOFFSET_RECORD field lists
+-- Full-library C++23 field-list compile/link probe passed
+-- Polymorphic positive control passed; expected rejection diagnostic verified
+-- CTest inventory: 184 test programs + 24 subprocess scenarios + 1 tooling checks = 209; 3 configure checks listed separately
+-- C++23 build: 30 C++26-only tests not built (listed in test-inventory.json)
+-- Test inventory: /Volumes/XOffsetCS/applemin/build-macos-c++23/test-inventory.json
+-- Configuring done (2.3s)
+-- Generating done (0.1s)
+-- Build files have been written to: /Volumes/XOffsetCS/applemin/build-macos-c++23
