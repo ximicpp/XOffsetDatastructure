@@ -102,7 +102,7 @@ tools/fuzz_prerelease.sh --out "$OUT" --phase client --budget hour
 tools/fuzz_prerelease.sh --out "$OUT" --phase verdict --budget hour
 ```
 
-`--budget hour` is about 1 hour plus builds (`release` about 4 hours; `quick` does not count); all phases
+`--budget hour` is about 70 minutes plus builds (`release` about 4.5 hours; `quick` does not count); all phases
 use the same budget. VERDICT is PASS only when every phase ran on a clean C with no findings. On a
 finding: `tools/fuzz_report.py` opens an issue, the fix puts the minimized input in
 `tests/fuzz/regressions/<target>/`, and the round repeats on the new C. Paste `VERDICT.md` into the

@@ -247,6 +247,17 @@ of this file and in the pull requests.
 - Apple clang client columns re-run on the v4.1.0 tag (macOS arm64 C++20 and C++23, iOS 27.0 simulator
   C++20): full CTest 211/211 each, the 24-file reference corpus accepted and written byte for byte.
   Documentation only; the last such run was for 3.3.0.
+- Add-only type versions without conversion ([SCHEMA_EVOLUTION.md](docs/SCHEMA_EVOLUTION.md)
+  section 9). `XSpare<N>` reserves N opaque zero bytes; `XOFFSET_SCHEMA_FAMILY(New, Prev)` declares that
+  `New` only takes fields from `Prev`'s spare bytes (or turns an `XSpare<N>` element into a record of N
+  bytes), and the build fails with the rule and the field when it does anything else. Every version
+  of a family has the first version's fingerprint, so old and new programs exchange whole wires, image
+  deltas and stored images both ways with no conversion, and the handshake answers `same` between them
+  (the hello lists the family's earlier field-name digests; its format does not change). Shared
+  deltas number change bodies by the first version's members, so masks stay compatible. Types that
+  declare no family keep their fingerprints and their code (the same machine code on GCC 16 and P2996);
+  the Ir gate's new `family.*` rows require a send, receive and delta between versions to cost exactly
+  what they cost within one version. New test `fuzz_schema_family` (pre-release fuzz now about 4.5 hours).
 
 ## 4.1.0: speed-first defaults
 
