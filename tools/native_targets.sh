@@ -6,7 +6,7 @@
 #   tools/native_targets.sh TARGET [--std 20|23] [--build DIR] [--ref DIR] [-j N] [--] [cmake args]
 #
 # TARGET (toolchain files in cmake/toolchains/):
-#   macos          host Apple clang, system libc++ (deployment target 14.0)
+#   macos          host Apple clang, system libc++ (deployment target: the CMake default, 12.0 for C++20/23)
 #   ios-sim        Xcode iOS simulator SDK; CTest through `xcrun simctl spawn`
 #                  (boot a device first; -DXOFFSET_IOS_SIM_DEVICE=<udid> picks one)
 #   android-arm64  NDK Clang + static libc++ ($ANDROID_NDK); CTest through qemu-aarch64

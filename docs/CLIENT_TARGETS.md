@@ -34,8 +34,8 @@ for clang-cl.
 | Windows x64 | MSVC 19.44 (VS 2022 17.14), `/MT` | C++20, C++23 | `cmake/toolchains/msvc-wine-x86_64.cmake`, CTest under wine |
 | Windows x64 | clang-cl 19 with the same STL and SDK | C++20 | `cmake/toolchains/clang-cl-x86_64.cmake`, CTest under wine |
 | Windows x64 | MinGW-w64 GCC 13.2, `-static` | C++20 | CTest under wine |
-| macOS arm64 | Apple clang 21, deployment target macOS 12.0+ (`XOFFSET_USE_PMR=0` below 14.0) | C++20, C++23 | Native on a Mac, `tools/native_targets.sh macos` |
-| iOS simulator | Apple clang 21, deployment target iOS 14.0+ (`XOFFSET_USE_PMR=0` below 17.0) | C++20 | `ios-simulator.cmake`, CTest via `simctl spawn` |
+| macOS arm64 | Apple clang 21, deployment target macOS 12.0+ (`XOFFSET_USE_PMR=0` below 14.0; 12.0 to 13.x pending, see below) | C++20, C++23 | Native on a Mac, `tools/native_targets.sh macos` |
+| iOS simulator | Apple clang 21, deployment target iOS 14.0+ (`XOFFSET_USE_PMR=0` below 17.0; 14.0 to 16.x pending, see below) | C++20 | `ios-simulator.cmake`, CTest via `simctl spawn` |
 | Linux x86-64 | GCC 13 / 16, Clang 18, P2996 Clang | C++20, C++23 | Matrix and ASan columns of `tools/local_validate.sh` |
 
 On every target the full CTest passes (including the no-exception `*_noexc` programs) and the corpus
@@ -43,6 +43,12 @@ is accepted and byte-identical. Real devices (3.2.0-rc.1 and 3.2.x): an Android 
 and macOS machines, and an iPhone 15 Pro Max passed CTest and the corpus; evidence in
 [validation/2026-10-28-rc1-platform](validation/2026-10-28-rc1-platform/README.md) and
 [DEVICE_TESTING.md](DEVICE_TESTING.md).
+
+**Pending: the lower Apple minimums.** Commit 11c3c06 (2026-11-24) lowered the defaults from macOS 14.0 /
+iOS 17.0 to macOS 12.0 / iOS 14.0, where `XOFFSET_USE_PMR` is `0`. No Mac or iOS simulator run has
+covered those targets yet, so the verified Apple minimums are still macOS 14.0 and iOS 17.0 (with
+`std::pmr`). This note is removed once `tools/native_targets.sh macos` (deployment target 12.0) and
+`ios-sim` (deployment target 14.0) pass the full CTest and the corpus, with the result recorded here.
 
 ### Notes per target
 
