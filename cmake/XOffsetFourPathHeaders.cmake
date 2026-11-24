@@ -7,6 +7,7 @@ set(XOFFSET_FULL_OWN_HEADERS
     xoffset_buffer.hpp
     xoffset_compactor.hpp
     xoffset_registration.hpp
+    xoffset_schema_family.hpp
     xoffset_admission.hpp
     xoffset_core_lifetime.hpp
     xoffset_fixed_string.hpp
