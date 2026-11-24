@@ -804,9 +804,11 @@ namespace XOffsetDatastructure {
             return npos;
         }
 
+        // T's field names, an alias of them, or those of an earlier version
+        // of T's add-only family (XOFFSET_SCHEMA_FAMILY).
         template <typename T>
         constexpr bool name_digest_matches(std::uint64_t digest) noexcept {
-            if (digest == schema_name_digest_v<T>) return true;
+            if (schema_family_has_digest<T>(digest)) return true;
             for (const std::uint64_t alias : xschema_name_aliases<T>::values)
                 if (alias == digest) return true;
             return false;
@@ -1092,8 +1094,23 @@ namespace XOffsetDatastructure {
                                                                                     : XSchemaVerdict::reject_names;
                 return XSchemaVerdict::reject_unknown;
             }
-            if (!detail::evolve::version_names_match<W>(i, e.name_digest)) return XSchemaVerdict::reject_names;
+            if (!detail::evolve::version_names_match<W>(i, e.name_digest) &&
+                !version_listed<W>(i, e, hello))
+                return XSchemaVerdict::reject_names;
             return i == detail::evolve::working_index<W> ? XSchemaVerdict::same : XSchemaVerdict::convert;
+        }
+
+        // A peer that works in a later version of the add-only family of
+        // version i lists version i's field-name digest in its hello.
+        template <typename W>
+        static bool version_listed(std::size_t i, const XSchemaEntry& e, const XSchemaHello& hello) noexcept {
+            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                bool listed = false;
+                ((i == Is ? (void)(listed = detail::handshake::hello_lists(
+                                       hello, e, schema_name_digest_v<detail::evolve::version_t<W, Is>>))
+                          : (void)0), ...);
+                return listed;
+            }(std::make_index_sequence<detail::evolve::version_count<W>>{});
         }
 
         template <typename... Roots>

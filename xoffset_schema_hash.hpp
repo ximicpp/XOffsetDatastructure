@@ -9,6 +9,35 @@
 #include "xoffset_wire.hpp"
 
 namespace XOffsetDatastructure {
+    // Add-only type evolution (docs/SCHEMA_EVOLUTION.md section 9):
+    // XOFFSET_SCHEMA_FAMILY(New, Prev) (xoffset_schema_family.hpp) names Prev
+    // the version New adds fields to. The versions of one family have the
+    // same image bytes and carry the fingerprint of the first one.
+    template <typename T>
+    struct xschema_family {
+        using previous = void;
+    };
+
+    namespace detail {
+        template <typename T, typename Previous = typename xschema_family<T>::previous>
+        struct schema_family_first {
+            using type = typename schema_family_first<Previous>::type;
+        };
+        template <typename T>
+        struct schema_family_first<T, void> {
+            using type = T;
+        };
+    } // namespace detail
+
+    // The first version of T's family (T itself when it declares none).
+    template <typename T>
+    using schema_family_first_t = typename detail::schema_family_first<std::remove_cv_t<T>>::type;
+
+    // T is a later version of a family: its fingerprint is the first's.
+    template <typename T>
+    inline constexpr bool in_schema_family_v =
+        !std::is_void_v<typename xschema_family<std::remove_cv_t<T>>::previous>;
+
     // ========================================================================
     // Reflection-based construction and transfer (C++26 P2996).
     // ========================================================================
@@ -259,10 +288,20 @@ namespace XOffsetDatastructure {
 
         template <typename T>
         consteval std::uint64_t wire_schema_hash() {
-            constexpr auto sig = wire_abi_signature<T>();
-            std::uint64_t hash = fnv1a(schema_name<T>::value);
-            hash = fnv1a_append(hash, std::string_view(sig));
-            return hash;
+            if constexpr (in_schema_family_v<T>) {
+                // A later version of a family carries the first version's
+                // fingerprint: the same image bytes under one hash.
+                using First = schema_family_first_t<T>;
+                static_assert(schema_name<std::remove_cv_t<T>>::value == schema_name<First>::value,
+                    "XOFFSET_SCHEMA_FAMILY: the versions of one family must register the same "
+                    "schema name (XOFFSET_REGISTER_SCHEMA_NAME), since the fingerprint covers it");
+                return wire_schema_hash<First>();
+            } else {
+                constexpr auto sig = wire_abi_signature<T>();
+                std::uint64_t hash = fnv1a(schema_name<T>::value);
+                hash = fnv1a_append(hash, std::string_view(sig));
+                return hash;
+            }
         }
 
         template <typename T>
