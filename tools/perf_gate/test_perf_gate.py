@@ -304,6 +304,28 @@ def main():
     rc, out = run_case(tree(), base_tree=tree(reloc={}, reloc_status="failed"))
     expect("base that cannot build reloc_bench warns", rc == 0 and any("reloc_bench" in x for x in out["warnings"]))
 
+    # Add-only type evolution rows: each in_family row must equal its same row in the head.
+    fam = {"send.same": 34_595, "send.in_family": 34_595, "recv.same": 32_563, "recv.in_family": 32_563,
+           "delta.same": 7_320, "delta.in_family": 7_320}
+    t_head = tree(); t_head["family"] = dict(fam); t_head["family_status"] = "ok"
+    rc, out = run_case(t_head)
+    expect("family rows new in head, in_family = same: pass", rc == 0 and row(out, "family.recv.in_family")["verdict"] == "new"
+           and any("family.recv.in_family equals" in x for x in out.get("notes", [])))
+    t_head = tree(); t_head["family"] = dict(fam, **{"recv.in_family": 32_564}); t_head["family_status"] = "ok"
+    rc, out = run_case(t_head)
+    expect("an in_family row one Ir above its same row fails", rc == 1 and any("family.recv.in_family" in x for x in out["failures"]))
+    t_head = tree(); t_head["family"] = {"send.in_family": 1}; t_head["family_status"] = "ok"
+    rc, out = run_case(t_head)
+    expect("an in_family row without its same row fails", rc == 1 and any("family.send.in_family" in x for x in out["failures"]))
+    t_base = tree(); t_base["family"] = dict(fam); t_base["family_status"] = "ok"
+    t_head = tree(); t_head["family"] = {k: int(v * 1.06) for k, v in fam.items()}; t_head["family_status"] = "ok"
+    rc, out = run_case(t_head, base_tree=t_base)
+    expect("family rows +6% fail as phases", rc == 1 and row(out, "family.delta.same")["class"] == "phase"
+           and row(out, "family.delta.same")["verdict"] == "fail")
+    t_head = tree(); t_head["family"] = {}; t_head["family_status"] = "verify_failed"
+    rc, out = run_case(t_head)
+    expect("head family_ir check failure fails", rc == 1 and any("family_ir" in x for x in out["failures"]))
+
     # --cache-sim: misses per phase, head/base; warnings only, never a failure, the Ir verdict and rc unchanged.
     ev = pg.cache_events("version: 1\nevents: Ir Dr Dw I1mr D1mr D1mw ILmr DLmr DLmw\n", "100 40 20 3 7 5 2 1 4")
     expect("cache_events maps the collected counts to the event names",

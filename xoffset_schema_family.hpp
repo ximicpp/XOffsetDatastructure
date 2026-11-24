@@ -350,8 +350,10 @@ namespace XOffsetDatastructure {
     (XOFFSET_SCHEMA_FAMILY_DETAIL_ERROR(New, Prev) != ::XOffsetDatastructure::detail::family::Error::e)
 
 // The diagnostic names the field where static_assert takes a computed message
-// (C++26); otherwise one static_assert per rule names the rule.
-#if defined(__cpp_static_assert) && __cpp_static_assert >= 202306L
+// (C++26); otherwise one static_assert per rule names the rule. Clang offers
+// computed messages in C++20 too, but warns (-Wc++26-extensions) in every
+// translation unit that declares a family, so they are used only from C++26.
+#if defined(__cpp_static_assert) && __cpp_static_assert >= 202306L && __cplusplus > 202302L
 #define XOFFSET_SCHEMA_FAMILY_DETAIL_CHECK(New, Prev)                          \
     static_assert(XOFFSET_SCHEMA_FAMILY_DETAIL_ERROR(New, Prev) ==             \
                       ::XOffsetDatastructure::detail::family::Error::none,     \
