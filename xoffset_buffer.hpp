@@ -185,12 +185,64 @@ namespace XOffsetDatastructure {
             return xbuf;
         }
 
+        /// Non-throwing buffer creation (safe in -fno-exceptions builds).
+        template <typename T>
+        static XResult<XBuffer> try_create(std::size_t reserve_bytes = 4096) {
+            XBuffer xbuf;
+            return detail::try_v_into(xbuf, [&]() -> detail::vstatus {
+                XOFFSET_VTRY(xbuf.init_fresh_default_v(reserve_bytes));
+                return xbuf.template make_v<T>();
+            });
+        }
+
+        template <typename T>
+        static XResult<XBuffer> try_create(std::size_t initial_bytes, MaximumCapacity cap) {
+            XBuffer xbuf;
+            return detail::try_v_into(xbuf, [&]() -> detail::vstatus {
+                XOFFSET_VTRY(xbuf.init_fresh_v(initial_bytes, cap));
+                return xbuf.template make_v<T>();
+            });
+        }
+
         /// Create the root object. Growth/shrink/save retain its address;
         /// replacing this buffer's storage or destroying it invalidates the pointer.
         template<typename T>
         T* make() { return make_inline<T>(); }
 
     private:
+        template <typename T>
+        detail::vstatus make_v() {
+            static_assert(is_byte_copy_safe_v<T>,
+                "Type is not byte-copy safe. "
+                "Allowed: primitives, XString, XVector<T>, XMap<K,V>, XSet<T>, "
+                "or structs composed of these.");
+            if (!arena()) XOFFSET_VFAIL(XException, XErrc::invalid_state, "make<T>(): buffer has no arena");
+            if (arena()->used_end != root_at) {
+                XOFFSET_VFAIL(XException, XErrc::invalid_state, "make<T>(): root object already exists. "
+                    "Call root<T>() to access the existing object.");
+            }
+            using StorageT = detail::root_storage_t<T>;
+            if constexpr (sizeof(StorageT) > MAX_PAYLOAD)
+                XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, detail::payload_limit_message);
+            const size_type root_block = arena_header::block_size(static_cast<std::uint32_t>(sizeof(StorageT)));
+            const XErrc room = (this->growth_policy() == XGrowPolicy::Relocating)
+                ? this->make_room(root_block)
+                : this->reserve_in_place(root_block);
+            if (room != XErrc::ok) XOFFSET_VFAIL(XBadAlloc, room, detail::arena_failure_message);
+#if XOFFSET_NO_EXCEPTIONS
+            const XErrc err = detail::run_fail_soft([&] { (void)detail::construct_root<T>(*this); });
+            if (err != XErrc::ok) {
+                clear_used_payload();
+                XOFFSET_VFAIL(XBadAlloc, err, detail::arena_failure_message);
+            }
+#else
+            (void)detail::construct_root<T>(*this);
+#endif
+            typed_root_access_allowed_ = true;
+            this->template bind_root<T>();
+            if constexpr (has_schema_name_v<T>) write_fingerprint<T>();
+            return detail::vok();
+        }
         // make<T>()'s body; reset<T>() inlines it after its reset_arena.
         template<typename T>
         XOFFSET_DETAIL_INLINE T* make_inline() {
@@ -1079,6 +1131,23 @@ namespace XOffsetDatastructure {
             dst.clone_state_from(*this);
         }
 
+        /// Non-throwing counterparts of clone() and clone_into() (safe without exceptions).
+        XResult<XBuffer> try_clone() const {
+            XBuffer out;
+            return detail::try_v_into(out, [&]() -> detail::vstatus {
+                const auto* sm = this->arena();
+                if (!sm) XOFFSET_VFAIL(XException, XErrc::invalid_state, "clone(): buffer has no arena");
+                XOFFSET_VTRY(out.init_bytes_v(reinterpret_cast<const char*>(sm),
+                                              static_cast<std::size_t>(sm->used_end), this->clone_capacity()));
+                out.copy_clone_state(*this);
+                return detail::vok();
+            });
+        }
+
+        XStatus try_clone_into(XBuffer& dst) const {
+            return detail::try_v([&] { return dst.clone_state_from_v(*this); });
+        }
+
         MemoryStats stats() {
             return memory_stats(*this);
         }
@@ -1393,6 +1462,19 @@ namespace XOffsetDatastructure {
             return xbuf;
         }
 
+        /// Non-throwing buffer creation (safe in -fno-exceptions builds).
+        static XResult<TypedXBuffer> try_create(std::size_t reserve_bytes = 4096) {
+            auto created = XBuffer::try_create<T>(reserve_bytes);
+            if (!created) return created.error();
+            return XResult<TypedXBuffer>(TypedXBuffer(std::move(*created)));
+        }
+
+        static XResult<TypedXBuffer> try_create(std::size_t initial_bytes, MaximumCapacity cap) {
+            auto created = XBuffer::try_create<T>(initial_bytes, cap);
+            if (!created) return created.error();
+            return XResult<TypedXBuffer>(TypedXBuffer(std::move(*created)));
+        }
+
         /// Creates the single root object of type T.
         T* make() { return XBuffer::make<T>(); }
 
@@ -1446,6 +1528,12 @@ namespace XOffsetDatastructure {
 
         TypedXBuffer clone() const { return TypedXBuffer(XBuffer::clone()); }
         void clone_into(TypedXBuffer& dst) const { XBuffer::clone_into(dst); }
+        XResult<TypedXBuffer> try_clone() const {
+            auto cloned = XBuffer::try_clone();
+            if (!cloned) return cloned.error();
+            return XResult<TypedXBuffer>(TypedXBuffer(std::move(*cloned)));
+        }
+        XStatus try_clone_into(TypedXBuffer& dst) const { return XBuffer::try_clone_into(dst); }
 
         void save_verified_into(std::string& out, XSaveOptions options = {}) {
             XBuffer::save_verified_into<T>(out, options);
