@@ -425,7 +425,7 @@ namespace XOffsetDatastructure::xsync {
     template <unsigned K, class T, std::size_t ChangeOp = 256, std::size_t EnterOp = 1024>
     class XSyncDirtyTable {
         static_assert(K >= 1 && K < kSyncTables, "xsync: tables 1 to 63");
-        static_assert(XRecordBody<T>::members::N <= 64, "xsync: a dirty bit per member, at most 64");
+        static_assert(XRecordBody<T>::mask_bits <= 64, "xsync: a dirty bit per member, at most 64");
 
     public:
         struct Entry {
