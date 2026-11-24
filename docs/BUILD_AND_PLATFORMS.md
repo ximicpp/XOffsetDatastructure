@@ -77,8 +77,8 @@ An installed full-library consumer uses:
 cmake_minimum_required(VERSION 3.20)   # 3.30+ for C++26 reflection installs
 project(MyConsumer LANGUAGES CXX)
 find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
-if(NOT XOffsetDatastructure_VERSION STREQUAL "4.1.0")
-    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 4.1.0")
+if(NOT XOffsetDatastructure_VERSION STREQUAL "4.2.0")
+    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 4.2.0")
 endif()
 add_executable(my_app main.cpp)
 target_link_libraries(my_app PRIVATE XOffset::xoffset)
@@ -99,7 +99,7 @@ include(FetchContent)
 FetchContent_Declare(
     xoffsetdatastructure
     GIT_REPOSITORY https://github.com/ximicpp/XOffsetDatastructure.git
-    GIT_TAG        v4.1.0   # pin a release tag or commit SHA
+    GIT_TAG        v4.2.0   # pin a release tag or commit SHA
 )
 set(XOFFSET_CXX_STANDARD 20 CACHE STRING "" FORCE)
 FetchContent_MakeAvailable(xoffsetdatastructure)

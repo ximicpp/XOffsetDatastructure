@@ -1,4 +1,4 @@
-# Reusing one XBuffer (4.1.0, experimental API)
+# Reusing one XBuffer (4.2.0, experimental API)
 
 When many KB-sized messages are sent and received one by one, the fixed cost of creating and destroying
 an `XBuffer` per message (mapping, owner registration) exceeds the serialization itself.
