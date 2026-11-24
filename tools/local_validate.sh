@@ -71,8 +71,9 @@
 #                           anyway; FAILS when the host can run none (apt-get install wine
 #                           g++-mingw-w64-x86-64-posix is the quickest way to one)
 # The matrix columns run in parallel after the other steps, at most K at a time (--columns,
-# default min(4, columns)), each with -j max(1, N/K). A column whose compiler, sanitizer
-# runtime or image is missing, or a tree without the C++20 build, is reported as "not run".
+# default min(4, columns)), each with -j max(1, N/K), or -j N when there are at most two
+# columns. A column whose compiler, sanitizer runtime or image is missing, or a tree
+# without the C++20 build, is reported as "not run".
 #
 # The GCC steps run in the pinned gcc:16 image (the digest the CI used). The P2996 steps
 # run on the host with the toolchain at $P2996_ROOT (default /opt/p2996-toolchain): if it
@@ -562,12 +563,38 @@ record() {   # <step> <rc> <minutes>
     printf '%s\t%s\t%s\t%s\n' "$s" "$res" "$mins" "$detail" >> "$RESULTS"
     log "$s: $res in ${mins} min${detail:+ ($detail)}"
 }
-stopped=0
+# fuzz, diff and smoke run at the same time: one after another they left most cores idle
+# (2026-11-24 on 4 cores: 53%, 38% and 31% CPU). Each has its own log and work directory;
+# they are recorded in this order.
+OVERLAP=" fuzz diff smoke "
+stopped=0 overlap_done=0
 for s in $CLASSIC_STEPS; do
     case "$STEPS" in *" $s "*) ;; *) continue ;; esac
     if [[ $s == p2996* ]] && (( ! P2996_OK )); then
         printf '%s\tnot run\t0\tno P2996 toolchain at %s (and no %s)\n' "$s" "$P2996_ROOT" "$P2996_TARBALL" >> "$RESULTS"
         log "$s: not run (no toolchain)"
+        continue
+    fi
+    if [[ $OVERLAP == *" $s "* ]]; then
+        (( overlap_done )) && continue
+        overlap_done=1
+        group=() pids=() grc=0
+        for g in $OVERLAP; do [[ $STEPS == *" $g "* ]] && group+=("$g"); done
+        for g in "${group[@]}"; do
+            log "$g: start"
+            ( t0=$(date +%s); "step_${g//-/_}" > "$WORK/logs/$g.log" 2>&1; rc=$?
+              echo "$rc $(( ($(date +%s) - t0 + 30) / 60 ))" > "$WORK/step-$g.rc" ) &
+            pids+=($!)
+        done
+        wait "${pids[@]}"
+        for g in "${group[@]}"; do
+            rc=1 mins=0
+            [[ -f $WORK/step-$g.rc ]] && read -r rc mins < "$WORK/step-$g.rc"
+            rm -f "$WORK/step-$g.rc"
+            record "$g" "$rc" "$mins"
+            (( rc )) && grc=1
+        done
+        if (( grc && FAIL_FAST )); then stopped=1; break; fi
         continue
     fi
     log "$s: start"
@@ -636,6 +663,9 @@ done
 if (( ${#cols[@]} )); then
     (( COLUMNS > 0 )) || COLUMNS=$(( ${#cols[@]} < 4 ? ${#cols[@]} : 4 ))
     COL_JOBS=$(( JOBS / COLUMNS )); (( COL_JOBS > 0 )) || COL_JOBS=1
+    # Two columns (the pr tier: diff-c++20, about 1 min, and msvc-c++20, the longest step) each
+    # get every core: -j N/2 left msvc-c++20 on half the cores after diff-c++20 ended.
+    (( ${#cols[@]} <= 2 )) && COL_JOBS=$JOBS
     log "matrix: ${#cols[@]} columns, $COLUMNS at a time, -j $COL_JOBS each"
     running=0
     for s in "${cols[@]}"; do

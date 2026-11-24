@@ -211,14 +211,13 @@ def compiler_profile(name, cxx, std="26"):
     raise SystemExit(f"unknown compiler {name}")
 
 
-def build_one(prof, lib: Path, bench: Path, slg_dir, formal_dir, cereal, outdir: Path, extra):
-    """Build slg_bench and sc_xoffset of `bench` against library tree `lib`. Returns (ok, log)."""
-    outdir.mkdir(parents=True, exist_ok=True)
+def bench_cmds(prof, lib: Path, bench: Path, slg_dir, formal_dir, cereal, outdir: Path, extra):
+    """Compile commands of slg_bench and sc_xoffset of `bench` against library tree `lib`."""
     cxx = shlex.split(prof["cxx"])
     common = ["-O3", "-DNDEBUG", f"-I{lib}", "-isystem", f"{lib}/external/typelayout/include"] + extra
     slg = bench / slg_dir
     formal = bench / formal_dir
-    cmds = {
+    return {
         "slg_bench": cxx + prof["std"] + common + [
             f"-I{slg}/include", f"-I{slg}/adapters", f"-I{slg}/bench", "-isystem", str(cereal),
             "-DSLG_WITH_XOFFSET=1", "-DSLG_WITH_CEREAL=1", "-DSLG_IR_COUNT=1",
@@ -228,30 +227,19 @@ def build_one(prof, lib: Path, bench: Path, slg_dir, formal_dir, cereal, outdir:
             '-DSC_ADAPTER_HEADER="adapters/xoffset/adapter.hpp"', "-DSC_ADAPTER_TYPE=sc::XOffsetAdapter",
             f"{formal}/driver.cpp", "-o", str(outdir / "sc_xoffset")] + prof["link"],
     }
-    out = []
-    ok = True
-
-    def run(item):
-        name, cmd = item
-        r = subprocess.run(cmd, text=True, capture_output=True)
-        return name, cmd, r
-
-    with concurrent.futures.ThreadPoolExecutor(2) as ex:
-        for name, cmd, r in ex.map(run, cmds.items()):
-            out.append(f"$ {shlex.join(cmd)}\n{r.stdout}{r.stderr}")
-            ok = ok and r.returncode == 0
-    return ok, "\n".join(out)
 
 
-def build_reloc(prof, lib: Path, reloc: Path, outdir: Path, extra):
-    """Build reloc_bench of `reloc` against library tree `lib`. Returns (status, log)."""
+def reloc_build_cmd(prof, lib: Path, reloc: Path, outdir: Path, extra):
+    """Compile command of reloc_bench of `reloc` against library tree `lib`, or None when the tree has none."""
     if not (reloc / "reloc_bench.cpp").is_file():
-        return "absent", ""
-    cmd = shlex.split(prof["cxx"]) + prof["std"] + ["-O3", "-DNDEBUG", f"-I{lib}", "-isystem",
-                                                    f"{lib}/external/typelayout/include"] + extra + [
+        return None
+    return shlex.split(prof["cxx"]) + prof["std"] + ["-O3", "-DNDEBUG", f"-I{lib}", "-isystem",
+                                                     f"{lib}/external/typelayout/include"] + extra + [
         "-DRELOC_IR_COUNT=1", f"{reloc}/reloc_bench.cpp", "-o", str(outdir / "reloc_bench")] + prof["link"]
-    r = subprocess.run(cmd, text=True, capture_output=True)
-    return ("ok" if r.returncode == 0 else "failed"), f"$ {shlex.join(cmd)}\n{r.stdout}{r.stderr}"
+
+
+def compile_log(cmd, r):
+    return f"$ {shlex.join(cmd)}\n{r.stdout}{r.stderr}"
 
 
 def cmd_build(a):
@@ -277,39 +265,73 @@ def cmd_build(a):
     builds = {"compiler": a.compiler, "compiler_version": version, "trees": {},
               "role_std": role_std, "role_extra_flags": {r: shlex.join(v) for r, v in role_extra.items()}}
 
-    def one(sha):
+    # Every compile of every tree goes to one pool of --jobs workers, the slg_bench compiles (the
+    # longest, about 85 s each with GCC 16) first. Tree by tree, two trees at a time, the 2026-11-24
+    # profile spent 3.3 min here at 25-50% CPU on 4 cores; the longest compile bounds it now.
+    pool = concurrent.futures.ThreadPoolExecutor(max(1, a.jobs))
+
+    def submit(cmd):
+        return pool.submit(subprocess.run, cmd, text=True, capture_output=True)
+
+    reloc_dir = plan.get("reloc_dir", RELOC_DIR)
+    setup = {}
+    for sha in plan["trees"]:
         role = role_of[sha]
-        prof = compiler_profile(a.compiler, a.cxx, role_std.get(role, "26"))
+        tprof = compiler_profile(a.compiler, a.cxx, role_std.get(role, "26"))
         extra_flags = extra + role_extra.get(role, [])
         tree = Path(plan["trees"][sha]["path"])
         outdir = work / "bin" / a.compiler / short(sha)
         if outdir.exists():
             shutil.rmtree(outdir)
-        ok, text = build_one(prof, tree, head_bench, plan["slg_dir"], plan["formal_dir"], a.cereal, outdir, extra_flags)
+        outdir.mkdir(parents=True)
+        cmds = bench_cmds(tprof, tree, head_bench, plan["slg_dir"], plan["formal_dir"], a.cereal, outdir, extra_flags)
+        reloc_cmd = reloc_build_cmd(tprof, tree, head_bench / reloc_dir, outdir, extra_flags)
+        if reloc_cmd:
+            cmds["reloc_bench"] = reloc_cmd
+        setup[sha] = (tprof, extra_flags, tree, outdir, cmds, {})
+    for name in ("slg_bench", "sc_xoffset", "reloc_bench"):
+        for sha, (_, _, _, _, cmds, futs) in setup.items():
+            if name in cmds:
+                futs[name] = submit(cmds[name])
+
+    def finish(sha):
+        tprof, extra_flags, tree, outdir, cmds, futs = setup[sha]
+        res = {n: f.result() for n, f in futs.items()}
+        ok = all(res[n].returncode == 0 for n in ("slg_bench", "sc_xoffset"))
+        text = "\n".join(compile_log(cmds[n], res[n]) for n in ("slg_bench", "sc_xoffset"))
         status, bench = ("ok", "head") if ok else (None, None)
         if not ok and (tree / plan["slg_dir"]).is_dir() and (tree / plan["formal_dir"]).is_dir() and tree != head_bench:
-            ok2, text2 = build_one(prof, tree, tree, plan["slg_dir"], plan["formal_dir"], a.cereal, outdir, extra_flags)
-            text += "\n--- retry with the tree's own benchmarks ---\n" + text2
-            if ok2:
+            own = bench_cmds(tprof, tree, tree, plan["slg_dir"], plan["formal_dir"], a.cereal, outdir, extra_flags)
+            own_res = {n: submit(c) for n, c in own.items()}
+            own_res = {n: f.result() for n, f in own_res.items()}
+            text += "\n--- retry with the tree's own benchmarks ---\n" + "\n".join(
+                compile_log(own[n], own_res[n]) for n in own)
+            if all(r.returncode == 0 for r in own_res.values()):
                 status, bench = "bench_differs", "own"
         if status is None:
             status = "incomparable"
         # The relocation benchmark is optional per tree: it is built from the same benchmark
         # sources as the rest, and an older tree that cannot build it only loses reloc.*.
-        reloc_dir = plan.get("reloc_dir", RELOC_DIR)
         reloc_status = "absent"
         if status != "incomparable":
-            reloc_src = (head_bench if bench == "head" else tree) / reloc_dir
-            reloc_status, rtext = build_reloc(prof, tree, reloc_src, outdir, extra_flags)
-            text += "\n--- reloc_bench ---\n" + rtext
+            if bench == "head":
+                rcmd, r = cmds.get("reloc_bench"), res.get("reloc_bench")
+            else:
+                rcmd = reloc_build_cmd(tprof, tree, tree / reloc_dir, outdir, extra_flags)
+                r = submit(rcmd).result() if rcmd else None
+            if rcmd:
+                reloc_status = "ok" if r.returncode == 0 else "failed"
+                text += "\n--- reloc_bench ---\n" + compile_log(rcmd, r)
+            else:
+                text += "\n--- reloc_bench ---\n"
         (work / "logs").mkdir(exist_ok=True)
         (work / "logs" / f"build-{a.compiler}-{short(sha)}.log").write_text(text, encoding="utf-8")
         log(f"build {a.compiler} {short(sha)}: {status}, reloc {reloc_status}")
-        return sha, {"status": status, "bench": bench, "dir": str(outdir), "reloc": reloc_status}
+        return {"status": status, "bench": bench, "dir": str(outdir), "reloc": reloc_status}
 
-    with concurrent.futures.ThreadPoolExecutor(max(1, min(3, a.jobs // 2))) as ex:
-        for sha, res in ex.map(one, list(plan["trees"])):
-            builds["trees"][sha] = res
+    with pool:
+        for sha in plan["trees"]:
+            builds["trees"][sha] = finish(sha)
     dump_json(work / f"build-{a.compiler}.json", builds)
     head = plan["roles"]["head"]
     head_reloc = builds["trees"][head].get("reloc")
