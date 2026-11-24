@@ -674,6 +674,13 @@ if (world.relayout_advised()) (void)world.relayout();   // TypedXBuffer<World>
 - **Only for content this process edits.** Never call it on a replica that applies deltas: the
   next delta assumes the replica's bytes are the sender's (section 4.5). A replica takes the
   compact layout when its sender relayouts.
+- **Not for spare capacity kept on purpose, nor for content replaced every tick.** The hint counts
+  spare capacity as waste: a buffer laid out once with `reserve()` so that its containers never
+  move is advised at once, and the relayout gives the reserve back, after which the containers
+  move again as they grow (with `touched_only`, touch a container that moved where it is now,
+  docs/DELTA_SYNC.md section 1). A buffer whose content is replaced before each send (a load or
+  `swap` of a received wire) is compact already: the hint measures each new content once (about
+  2,000 instructions for the SLG demo's player) and never fires. Leave the call out in both cases.
 - It returns `XStatus`: ok also when the image would not be smaller (nothing changes then). It is
   refused, with nothing changed and nothing recorded, inside a pin scope (`borrowed`), on a buffer
   with a recorded failure (that `error()`), without a verified root of `T` (`no_root`), when the
