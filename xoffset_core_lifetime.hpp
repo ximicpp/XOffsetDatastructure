@@ -24,6 +24,9 @@ template<class T> struct wire_record_layout {
 template<class K, class V> struct wire_record_layout<XKeyValue<K, V>> {
     static constexpr bool ordinary_members = true;
 };
+template<std::size_t N> struct wire_record_layout<XSpare<N>> {
+    static constexpr bool ordinary_members = true;
+};
 
 } // namespace XOffsetDatastructure
 

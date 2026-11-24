@@ -208,6 +208,11 @@ namespace XOffsetDatastructure {
                        ft::FixedString{"]<"} +
                        wire_abi_signature<std::remove_extent_t<U>>() +
                        ft::FixedString{">"};
+            } else if constexpr (is_spare_v<U>) {
+                // Reserved bytes: opaque, alignment 1, never a record.
+                return ft::FixedString{"spare["} +
+                       ft::to_fixed_string<sizeof(U)>() +
+                       ft::FixedString{"]"};
             } else if constexpr (is_fixed_string_v<U>) {
                 return fixed_sequence_header_signature<U>(ft::FixedString{"xstring"}) +
                        ft::FixedString{"{inline:10}"};

@@ -51,6 +51,14 @@ namespace XOffsetDatastructure {
         inline constexpr bool is_fixed_flat_map_v = is_fixed_flat_map<T>::value;
 
         template <typename T>
+        struct is_spare : std::false_type {};
+        template <std::size_t N>
+        struct is_spare<XSpare<N>> : std::true_type {};
+        // XSpare<N> (reserved bytes of a later version), cv ignored.
+        template <typename T>
+        inline constexpr bool is_spare_v = is_spare<std::remove_cv_t<T>>::value;
+
+        template <typename T>
         struct is_wire_admitted_impl;
 
         template <typename T, std::size_t N>
@@ -1277,6 +1285,7 @@ namespace XOffsetDatastructure {
     // bases/bit-fields and recursive support. Do not specialize for a type
     // whose source layout has not been audited against these obligations.
     template<class T> struct StableEraseOrdinaryMembers : std::false_type {};
+    template<std::size_t N> struct StableEraseOrdinaryMembers<XSpare<N>> : std::true_type {};
 
     // Mechanical part of XOFFSET_ORDINARY_RECORDS. Physical disjointness
     // catches a [[no_unique_address]] member that shares storage, but not one
