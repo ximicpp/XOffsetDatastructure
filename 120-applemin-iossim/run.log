@@ -1,0 +1,4 @@
+ios-sim-c++20 rc=0
+| configure | passed | `native-logs/configure.log` |
+| build | passed | `native-logs/build.log` |
+| ctest summary | 100% tests passed out of 215 | |
