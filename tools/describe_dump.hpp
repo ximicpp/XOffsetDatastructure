@@ -114,6 +114,7 @@ namespace xoffset_describe_dump {
             } else if constexpr (is_library_head<U>::value)
                 visit<typename U::value_type>();
             else if constexpr (is_std_array<U>::value) visit<typename U::value_type>();
+            else if constexpr (xo::detail::is_spare_v<U>) {}   // described by the library
             else if constexpr (is_key_value<U>::value) {
                 visit<typename U::first_type>();
                 visit<typename U::second_type>();
