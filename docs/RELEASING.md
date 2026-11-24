@@ -1,8 +1,8 @@
 # Release process
 
-Releases and prereleases are cut from `main`. GitHub CI is off; all evidence comes from local validation
-in the cloud. The development thread runs the verdicts, the validation and the release PR; the tag is
-pushed by susu, or by a Mac session on request (pushing tags from the cloud is refused).
+Releases and prereleases are cut from `main`. GitHub CI is currently off; release evidence comes from
+running the local validation scripts in this repository. Tags are created and pushed by a repository
+maintainer after validation and the release PR pass (pushing tags from automated runners is disabled).
 
 ## 1. Version numbers
 
@@ -21,8 +21,8 @@ The candidate commit C runs the GCC 16 and P2996 Ir gates against the previous r
 and `p2996-ir` steps of section 3). Each compiler is judged separately on head ÷ base
 ([PERF_GATE.md](PERF_GATE.md) section 3):
 
-- **Fail**: any total > 1.010 or any stage > 1.05. Fix it (find the PR, revert or fix) or take the data
-  to susu.
+- **Fail**: any total > 1.010 or any stage > 1.05. Fix it (find the PR, revert or fix) or escalate the
+  data to a maintainer.
 - **Warning**: any total > 1.003 or any stage > 1.02. Put the metrics and the function diff table in the
   release PR and the release notes.
 
@@ -76,7 +76,7 @@ DC, DPTW, DCTW) with a geometric mean between **1.02 and 1.08** is layout-sensit
 
 2. The cell takes the **median** of the three: ≤ 1.05 tie, > 1.05 loss. All three go into the release
    record. Other cells keep the default-layout verdict.
-3. A loss: do not tag; take the numbers to susu.
+3. A loss: do not tag; escalate the numbers to a maintainer.
 
 ## 3. Before release: local validation
 
@@ -95,11 +95,11 @@ One ASan+UBSan round over every receive entry point, on C, one background job pe
 first for the GCC phase, see `fuzz-nightly/README.md`):
 
 ```sh
-OUT=/mnt/project-files/release-X.Y.Z/fuzz
-tools/fuzz_prerelease.sh --out $OUT --phase gcc --budget hour
-tools/fuzz_prerelease.sh --out $OUT --phase libfuzzer --budget hour
-tools/fuzz_prerelease.sh --out $OUT --phase client --budget hour
-tools/fuzz_prerelease.sh --out $OUT --phase verdict --budget hour
+OUT="$PWD/build/release-X.Y.Z/fuzz"
+tools/fuzz_prerelease.sh --out "$OUT" --phase gcc --budget hour
+tools/fuzz_prerelease.sh --out "$OUT" --phase libfuzzer --budget hour
+tools/fuzz_prerelease.sh --out "$OUT" --phase client --budget hour
+tools/fuzz_prerelease.sh --out "$OUT" --phase verdict --budget hour
 ```
 
 `--budget hour` is about 1 hour plus builds (`release` about 4 hours; `quick` does not count); all phases

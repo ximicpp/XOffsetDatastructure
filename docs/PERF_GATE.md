@@ -9,7 +9,7 @@ attaches a cache-sim comparison (section 5a, warning only). Mac batches only rev
 releases and never block a merge. Where the text below says "run Mac L2 before merging", attach the
 function diff table and the cache-sim comparison instead.
 
-**Tiered validation (susu 2026-11-11 05:57Z)**: `tools/local_validate.sh` runs the PR tier by default
+**Tiered validation**: `tools/local_validate.sh` runs the PR tier by default
 (`--tier pr`); the merge evidence is every step of that tier passing, with the two Ir gates judged per
 section 3:
 
@@ -20,7 +20,7 @@ section 3:
 | `daily` | Once a day, on the latest commit of `main` | tsan, the whole C++20/C++23 matrix, all client columns, wire-matrix (the parts the `pr` tier leaves out) |
 | `release` (= `--release`) | Release candidates | All steps |
 
-**Stacked PRs (susu 2026-11-24 04:39Z)**: in a chain of dependent PRs (each one based on the one below
+**Stacked PRs**: in a chain of dependent PRs (each one based on the one below
 it), only the top PR runs the full `pr` tier, against `main` (on the merge result, as for any PR); that run
 covers the whole chain. Every PR of the chain, the top included, also runs
 `tools/local_validate.sh --steps "ir p2996-ir asm" --base <its parent>` (the PR below it, or `main` for the
@@ -70,8 +70,8 @@ both judged:
    - The measure changed from movsb alone to both on 2026-10-26 (PR: ledger `record_only` entry
      `ir-env-stosb`). Absolute Ir in earlier gate JSON, calibration tables and the ledger use the old
      measure and cannot be compared directly with later absolute values; head÷base ratios differ only when
-     a change alters the number or size of memsets ≥ 2 KiB; re-judgments of existing gate pairs are in
-     `/mnt/project-files/throughput-20261026/ir-calibration/stosb-rejudge/`.
+     a change alters the number or size of memsets ≥ 2 KiB; re-judgments of existing gate pairs were
+     recorded in the 2026-10-26 Ir calibration archive.
 5. One SLG stage of head, formal mutate and the first reloc item each run once more, and the two Ir
    counts must be bit-identical, or the gate fails (results not trustworthy).
 6. Judge by the thresholds of section 3: one table in the job summary and a JSON artifact
@@ -95,7 +95,7 @@ change when the code does not, and the push results already cover every merge.
 SLG builds only XOffset + cereal (cereal v1.3.2, `ebef1e92`, headers). M-scale SLG exceeds the address
 space under valgrind (512 × 256 MiB reservations), so S is used. The formal harness's M input wire is
 encoded by each binary itself and its sha256 recorded; when it differs from anchor the summary says "M
-input wire changed", and format changes are for susu to decide.
+input wire changed", and wire format changes require maintainer approval.
 
 ## 3. Thresholds
 
@@ -133,7 +133,7 @@ regressions on the XOffset side.
       "max_ratio": 1.03,
       "reason": "trades output -23% (emit_after) for 2.4% more instructions in the mutate stage",
       "evidence": "m3v2_RESULT.md; Mac mutate 1.038",
-      "approved_by": "susu (project conversation card, date)"
+      "approved_by": "maintainer (review link, date)"
     }
   ]
 }
@@ -142,15 +142,16 @@ regressions on the XOffset side.
 - `metric` may use wildcards (`slg.A.*`), `compiler` is `*`, `gcc16` or `p2996`, and `max_ratio` > 1.
   All fields are required, and `id`s must be unique.
 - Entries with `"record_only": true` are records only (for example gains Ir cannot see); they exempt
-  nothing and need no approval from susu; `max_ratio` holds the ratio observed at the time.
+  nothing and need no maintainer approval; `max_ratio` holds the ratio observed at the time.
 - **head÷base**: only entries added by this PR (`id`s not in the base's ledger) can exempt. A metric above
   the failure threshold but not above `max_ratio` is marked "exempted" and the summary lists the entry;
   above `max_ratio` it fails as usual.
 - **head÷anchor**: the product of the `max_ratio`s of all matching entries in head's ledger is deducted as
   the exempted part before comparing with the thresholds.
-- **Approval**: entries with scenario totals (`slg.A`–`slg.D`, `formal.*`) ≤ 2% are approved by the
-  performance thread and recorded in `approved_by`; above 2%, or when a security/performance trade-off is
-  involved, susu must confirm and `approved_by` must name susu, otherwise the gate fails outright.
+- **Approval**: entries with scenario totals (`slg.A`–`slg.D`, `formal.*`) ≤ 2% are approved in
+  performance review and recorded in `approved_by`; above 2%, or when a security/performance trade-off is
+  involved, explicit maintainer confirmation is required (`tools/perf_gate/perf_gate.py` checks the
+  maintainer handle in `approved_by`), otherwise the gate fails outright.
 - **Inlining changes**: for a regression whose function diff table is marked "suspected inlining
   change", first try moving the new cold path (error branches, throwing, rare cases) into a
   `[[gnu::noinline]]` function so the hot function keeps its previous inlining; write an entry only if it
@@ -218,8 +219,7 @@ runs as usual:
 - **What is compared**: per scenario and per stage, D1 misses (D1mr+D1mw) and LL misses (DLmr+DLmw), and
   each one's head÷base.
 - **When it warns**: for scenario totals, or stages with at least 5% of their scenario's Ir (the same
-  classification as the Ir gate), a warning needs one level of misses to meet both conditions below
-  (susu / the performance thread, 2026-11-05):
+  classification as the Ir gate), a warning needs one level of misses to meet both conditions below:
   - head÷base > 1.02;
   - the miss increase is ≥ 100, or ≥ one ten-thousandth of the metric's base Ir.
 

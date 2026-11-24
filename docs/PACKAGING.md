@@ -1,18 +1,20 @@
 # Source archives, install archives and external consumption
 
-This library is for users who can pin an experimental compiler, dependencies and schemas. Source API,
-ABI and long-term wire compatibility across arbitrary toolchains or layouts are not promised between
-versions. Read [compatibility and input boundary](ALPHA_COMPATIBILITY.md) first. This version uses the
-V2 storage and wire format and does not read V1 wires; save/load still copy bytes and are not zero-copy
-interfaces.
+This library supports two build paths that produce byte-identical wires: **C++20 / C++23 field-list
+builds** (standard platform compilers, zero external dependencies or submodules) and **C++26 reflection
+builds** (GCC 16+ or P2996 Clang, with pinned TypeLayout/Boost headers for reflection signature tools).
+Source API, ABI and long-term wire compatibility across versions are not promised without an explicit
+release compatibility commitment. Read [compatibility and input boundary](ALPHA_COMPATIBILITY.md) first.
+This version uses Wire Format 3.0 ([WIRE_FORMAT.md](WIRE_FORMAT.md)) and does not read Wire 2.1 or V1
+wires; save/load copy bytes into a working buffer rather than borrowing unaligned external memory directly.
 
 ## Three deliverables
 
 | Deliverable | Contents | Environment inputs not included |
 | --- | --- | --- |
-| `xoffsetdatastructure-<VERSION>.tar.gz` source archive | The two production headers, CMake, tests/examples, required tools and user documentation, the 851 pinned dependency headers and their licenses | Compiler, libc++/system runtime, SDK, build outputs, experiment directories and large historical evidence |
-| `xoffsetdatastructure-<VERSION>-full.tar.gz` install archive | The two production headers, `XOffset::xoffset` and `XOffset::storage`, the 851 private dependency headers, CMake config, version/compatibility documents and licenses | Compiler, SDK, runtime, native program binaries |
-| `xoffsetdatastructure-<VERSION>-storage.tar.gz` install archive | The OS header `xoffset_virtual_memory.hpp`, `XOffset::storage`, CMake config, version/compatibility documents and the project license | Full XBuffer/container headers, Boost, TypeLayout, compiler, SDK, runtime |
+| `xoffsetdatastructure-<VERSION>.tar.gz` source archive | All 30 `xoffset*.hpp` library headers, CMake, tests/examples, required tools and user documentation, plus the 851 pinned Boost/TypeLayout headers and their licenses for C++26 reflection builds | Compiler, libc++/system runtime, SDK, build outputs, experiment directories and large historical evidence |
+| `xoffsetdatastructure-<VERSION>-full.tar.gz` install archive | All 30 `xoffset*.hpp` headers, `XOffset::xoffset` and `XOffset::storage`, CMake config, version/compatibility documents and licenses (C++20/C++23 installs have zero third-party headers; C++26 installs also include the 851 private dependency headers under `include/xoffset-deps/`) | Compiler, SDK, runtime, native program binaries |
+| `xoffsetdatastructure-<VERSION>-storage.tar.gz` install archive | The OS storage headers (`xoffset_virtual_memory.hpp`, `xoffset_slot_storage.hpp`, `xoffset_error.hpp`, `xoffset_config.hpp`), `XOffset::storage`, CMake config, version/compatibility documents and the project license | Full XBuffer/container headers, Boost, TypeLayout, compiler, SDK, runtime |
 
 The source archive's dependency closure can be checked by content lock in an extracted directory with
 no `.git`. It is not a complete Boost distribution, nor an offline research archive containing all
@@ -26,16 +28,15 @@ distribution.
 | Target | Minimum requirements |
 | --- | --- |
 | `XOffset::storage` | C++17, CMake 3.13+, Linux/macOS/Windows VM APIs, thread support |
-| `XOffset::xoffset` | GCC 16+ (libstdc++) or P2996 Clang (with its libc++); CMake 3.30+; 64-bit little-endian |
-| The maintained Python validation entry points and their tests | Python 3.10+; storage JUnit validation needs CMake/CTest 3.21+ and full needs 3.30+; the C++ library has no Python run-time dependency |
+| `XOffset::xoffset` (C++20 / C++23 field-list) | GCC 12+, Clang 16+, Apple clang 15+ (macOS 12+ / iOS 14+, automatic `XOFFSET_USE_PMR=0` below macOS 14 / iOS 17), Android NDK Clang (API 28+ for tests), MSVC 19.44 (`/Zc:preprocessor`), clang-cl, or MinGW-w64 GCC; CMake 3.20+; 64-bit little-endian; zero external submodules |
+| `XOffset::xoffset` (C++26 reflection) | GCC 16+ (`-freflection`, libstdc++) or P2996 Clang (`-freflection -fexpansion-statements`, matching libc++); CMake 3.30+; 64-bit little-endian |
+| The maintained Python validation entry points and their tests | Python 3.10+; storage JUnit validation needs CMake/CTest 3.21+ and full C++26 needs 3.30+; the C++ library has no Python run-time dependency |
 
-The full target propagates `cxx_std_26`, reflection and Threads; with Clang it also propagates
-expansion statements and libc++, and with GCC it uses libstdc++. A consumer project setting C++17 does
-not override the full target's requirements; C++26 compilers without P2996 reflection (for example the
-versions shipped with NDK, Xcode or MSVC) cannot substitute. On Windows x64 the full library was
-verified with MinGW-w64 GCC 16 (local platform matrix, full CTest and wire corpus, see
-[CLIENT_TARGETS.md](CLIENT_TARGETS.md)); MSVC and clang-cl only have V1-era storage records, and the
-full library is not supported there.
+C++20 and C++23 builds propagate `cxx_std_20` / `cxx_std_23` (and `/Zc:preprocessor` on MSVC / clang-cl)
+and require no submodules. C++26 reflection builds propagate `cxx_std_26`, reflection flags and Threads;
+C++26 compilers without P2996 reflection cannot substitute for the reflection path (use
+`-DXOFFSET_CXX_STANDARD=20` or `23` instead). Native Windows (MSVC, clang-cl), Android NDK, macOS and iOS
+use the C++20/C++23 field-list path (see [CLIENT_TARGETS.md](CLIENT_TARGETS.md)).
 
 ## Fixed inputs
 
@@ -142,34 +143,37 @@ overwrites existing artifacts or triggers CI or a release.
 
 ## Building and installing
 
-Build full from the source root:
+Install a zero-dependency C++20/C++23 full package from the source root (no submodules required):
 
 ```sh
-cmake -S . -B build/alpha-package \
-  -DCMAKE_CXX_COMPILER=/path/to/p2996/bin/clang++ \
+cmake -S . -B build/xoffset-install \
+  -DXOFFSET_CXX_STANDARD=20 \
   -DCMAKE_INSTALL_PREFIX=/path/to/xoffset-prefix \
   -DXOFFSET_BUILD_TESTS=OFF -DXOFFSET_BUILD_TOOLS=OFF -DXOFFSET_BUILD_EXAMPLES=OFF
-cmake --build build/alpha-package --config Release
-cmake --install build/alpha-package --config Release
+cmake --build build/xoffset-install --config Release
+cmake --install build/xoffset-install --config Release
 ```
 
-For storage only, add `-DXOFFSET_STORAGE_ONLY=ON`: it uses an ordinary platform compiler and skips the
-full headers, dependencies and P2996 checks. A full install provides both full and storage; requesting
-full from a storage install fails explicitly. At the top level of the source tree, tests/tools/examples
-are built by default; as an `add_subdirectory` dependency these four are off by default and can each be
-turned on explicitly: `XOFFSET_BUILD_TESTS`, `XOFFSET_BUILD_TOOLS`, `XOFFSET_BUILD_EXAMPLES`,
-`XOFFSET_INSTALL`. The full configuration always runs the reflection compile/link probes.
+To install a C++26 reflection package (including the locked Boost/TypeLayout headers), pass
+`-DXOFFSET_CXX_STANDARD=26` and `-DCMAKE_CXX_COMPILER=/path/to/gcc16-or-p2996`.
+
+For storage only, add `-DXOFFSET_STORAGE_ONLY=ON`: it uses an ordinary C++17 platform compiler and skips
+the full headers and reflection checks. A full install provides both `full` and `storage`; requesting
+`full` from a storage install fails explicitly. At the top level of the source tree, tests/tools/examples
+are built by default; as a `FetchContent` or `add_subdirectory` dependency these four are off by default
+and can each be turned on explicitly: `XOFFSET_BUILD_TESTS`, `XOFFSET_BUILD_TOOLS`,
+`XOFFSET_BUILD_EXAMPLES`, `XOFFSET_INSTALL`.
 
 ## Consuming installs and sources
 
 Minimal `CMakeLists.txt` consuming a full install:
 
 ```cmake
-cmake_minimum_required(VERSION 3.30)
+cmake_minimum_required(VERSION 3.20)   # 3.30+ for C++26 reflection installs
 project(MyConsumer LANGUAGES CXX)
 find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
-if(NOT XOffsetDatastructure_VERSION STREQUAL "0.2.0-alpha.1")
-    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 0.2.0-alpha.1")
+if(NOT XOffsetDatastructure_VERSION STREQUAL "4.1.0")
+    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 4.1.0")
 endif()
 add_executable(my_app main.cpp)
 target_link_libraries(my_app PRIVATE XOffset::xoffset)
@@ -177,43 +181,49 @@ target_link_libraries(my_app PRIVATE XOffset::xoffset)
 
 ```sh
 cmake -S /path/to/consumer -B build/consumer \
-  -DCMAKE_PREFIX_PATH=/path/to/xoffset-prefix \
-  -DCMAKE_CXX_COMPILER=/path/to/p2996/bin/clang++
+  -DCMAKE_PREFIX_PATH=/path/to/xoffset-prefix
 cmake --build build/consumer --config Release
 ```
 
 Storage uses `COMPONENTS storage`, `XOffset::storage` and CMake 3.13+. With no component specified,
-full is requested. The install config exposes `XOffsetDatastructure_VERSION="0.2.0-alpha.1"`,
-`XOffsetDatastructure_VERSION_NUMERIC="0.2.0"` and `XOffsetDatastructure_VERSION_PRERELEASE="alpha.1"`.
+full is requested. The install config exposes `XOffsetDatastructure_VERSION` (from `XOFFSET_VERSION`),
+`XOffsetDatastructure_VERSION_NUMERIC` and `XOffsetDatastructure_VERSION_PRERELEASE`.
 **Any numeric, EXACT or range version request is conservatively rejected**, so that CMake does not
-treat an alpha as a stable version. Do not write `find_package(XOffsetDatastructure 0.2.0 ...)`, and do
-not put a string with alpha in a CMake numeric version argument; find without a version and then check
-the full string.
+silently accept an incompatible wire/API version. Find without a numeric version argument and check
+`XOffsetDatastructure_VERSION` explicitly as above.
 
-Source consumption:
+Source consumption via `FetchContent` (recommended for C++20/C++23 projects):
 
 ```cmake
-add_subdirectory(path/to/XOffsetDatastructure)
+include(FetchContent)
+FetchContent_Declare(
+    xoffsetdatastructure
+    GIT_REPOSITORY https://github.com/ximicpp/XOffsetDatastructure.git
+    GIT_TAG        v4.1.0   # pin a release tag or commit SHA
+)
+set(XOFFSET_CXX_STANDARD 20 CACHE STRING "" FORCE)
+FetchContent_MakeAvailable(xoffsetdatastructure)
 target_link_libraries(my_app PRIVATE XOffset::xoffset)
 ```
 
-When you need storage, set `XOFFSET_STORAGE_ONLY=ON` before `add_subdirectory` and link
-`XOffset::storage` instead. The root `project()` version is the numeric `0.2.0`; the source tree's full
-prerelease variable is `XOFFSET_VERSION_FULL`; do not take the root project's numeric variable as the
-install config's full version.
+Or via `add_subdirectory(path/to/XOffsetDatastructure)` followed by
+`target_link_libraries(my_app PRIVATE XOffset::xoffset)`. When you need storage only, set
+`XOFFSET_STORAGE_ONLY=ON` before adding the subdirectory and link `XOffset::storage` instead.
 
 ## Install contents and licenses
 
-The full private include root is `include/xoffset-deps/`, containing TypeLayout's 19 include files and
-Boost container/core/config/throw_exception/static_assert/container_hash/type_traits/winapi/intrusive/predef,
-851 dependency headers in total, with their original copyright notices kept.
-
-- `share/XOffsetDatastructure/xoffset-third-party-manifest.txt` records source versions and per-file
-  SHA-256.
-- Both installs contain `share/XOffsetDatastructure/VERSION`, `CHANGELOG.md` and
+- A **C++20 / C++23 full install** installs all 30 `xoffset*.hpp` headers under `include/`, CMake config
+  files under `lib/cmake/XOffsetDatastructure/`, `share/XOffsetDatastructure/xoffset-third-party-manifest.txt`
+  recording zero third-party dependencies, and the project MIT license under
+  `share/XOffsetDatastructure/licenses/LICENSE`. `tools/prepare_release.py pack-prefix --component full`
+  packs and audits both zero-dependency C++20/C++23 installs and C++26 installs.
+- A **C++26 reflection full install** additionally installs the private dependency root
+  `include/xoffset-deps/` (TypeLayout's 19 include files and 10 Boost modules, 851 headers total, with
+  original copyright notices kept), Boost's `LICENSE_1_0.txt` and TypeLayout's `LICENSE` /
+  `LICENSE_1_0.txt` under `share/XOffsetDatastructure/licenses/`, and per-file SHA-256 digests in
+  `share/XOffsetDatastructure/xoffset-third-party-manifest.txt`.
+- Both full and storage installs contain `share/XOffsetDatastructure/VERSION`, `CHANGELOG.md` and
   `ALPHA_COMPATIBILITY.md`.
-- `share/XOffsetDatastructure/licenses/` contains the project's MIT license; full also contains Boost's
-  `LICENSE_1_0.txt` and TypeLayout's `LICENSE` and `LICENSE_1_0.txt`.
 - The include/lib/share subdirectories must be inside the prefix; exported targets only use relocatable
   install paths.
 
