@@ -778,12 +778,25 @@ namespace XOffsetDatastructure {
             requires(const L& a, const R& b) { operator<=>(a, b); } &&
             !requires(const L& a, const R& b) { operator<(a, b); };
 
+        template <typename T>
+        inline constexpr bool standard_int_v =
+            std::is_integral_v<T> &&
+            !std::is_same_v<std::remove_cv_t<T>, bool> &&
+            !std::is_same_v<std::remove_cv_t<T>, char> &&
+            !std::is_same_v<std::remove_cv_t<T>, char8_t> &&
+            !std::is_same_v<std::remove_cv_t<T>, char16_t> &&
+            !std::is_same_v<std::remove_cv_t<T>, char32_t> &&
+            !std::is_same_v<std::remove_cv_t<T>, wchar_t>;
+
         template <typename L, typename R>
         bool ordered_less(const L& lhs, const R& rhs) {
             if constexpr (ordered_string_like<L> && ordered_string_like<R>) {
                 return ordered_view(lhs) < ordered_view(rhs);
             } else if constexpr (enum_ordered_by_spaceship_only<L, R>) {
                 return (lhs <=> rhs) < 0;
+            } else if constexpr (standard_int_v<L> && standard_int_v<R> &&
+                                 std::is_signed_v<L> != std::is_signed_v<R>) {
+                return std::cmp_less(lhs, rhs);
             } else {
                 return lhs < rhs;
             }
@@ -793,6 +806,9 @@ namespace XOffsetDatastructure {
         bool ordered_equal(const L& lhs, const R& rhs) {
             if constexpr (ordered_string_like<L> && ordered_string_like<R>) {
                 return ordered_view(lhs) == ordered_view(rhs);
+            } else if constexpr (standard_int_v<L> && standard_int_v<R> &&
+                                 std::is_signed_v<L> != std::is_signed_v<R>) {
+                return std::cmp_equal(lhs, rhs);
             } else {
                 return lhs == rhs;
             }
