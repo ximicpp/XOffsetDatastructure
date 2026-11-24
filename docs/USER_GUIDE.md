@@ -651,7 +651,7 @@ interface, format and checks: [SHARED_DELTA.md](SHARED_DELTA.md); a complete loo
 | All translation units in one executable use the same header version, compile options and toolchain | Inconsistent layout or schema identity |
 | Before receiving untrusted input, limit the wire length, `maximum_capacity` and the number of concurrent buffers | Even a single valid wire can use a lot of memory |
 | 64-bit little-endian platforms only (32-bit Android builds are not supported) | `#error` at compile time on other platforms |
-| Apple deployment targets of at least macOS 14 and iOS 17 (tvOS 17, watchOS 10): validated loading and related interfaces use `std::pmr` from the system libc++, which Apple ships only from these versions, and the SDK has no availability annotations | `#error` at compile time for lower deployment targets (otherwise it would fail to launch on older systems) |
+| On Apple deployment targets below macOS 14 / iOS 17 (tvOS 17, watchOS 10), `XOFFSET_USE_PMR` automatically defaults to `0` (header-only `XMemoryResource` without `<memory_resource>`); forcing `-DXOFFSET_USE_PMR=1` on those older targets requires `std::pmr` symbols absent from the older system libc++ | `#error` at compile time if `-DXOFFSET_USE_PMR=1` is forced on older Apple deployment targets |
 
 ## 6. Error handling
 
@@ -680,11 +680,13 @@ XStatus done = token ? token->try_finish() : XStatus(token.error());
 ```
 
 The entries take the wire as a `std::string`, a `std::string_view` or a byte span (`XByteView`),
-and an optional `upstream` memory resource for the validation bitmaps; there are also
-`TypedXBuffer<T>::try_load_verified / try_reload_verified`, and non-throwing lifecycle entries
-`XBuffer::try_create<T>` / `try_clone()` / `try_clone_into(dst)` (and their `TypedXBuffer<T>`
-counterparts). `XResult::value()` throws when there is
-no value (in no-exception builds it calls the fatal handler); `*r` / `r->` do not check.
+and an optional `upstream` `XMemoryResource*` (`std::pmr::memory_resource*` when `XOFFSET_USE_PMR=1`)
+for the validation bitmaps; there are also `TypedXBuffer<T>::try_load_verified / try_reload_verified`,
+non-throwing lifecycle entries `XBuffer::try_create<T>` / `try_clone()` / `try_clone_into(dst)`,
+non-throwing emit entries `try_save_verified*` / `try_save_compact*` / `try_save_delta*` /
+`XDeltaBaseline::try_key_delta*`, and `XCompactor::try_compact<T>` (plus their `TypedXBuffer<T>`
+counterparts). `XResult::value()` throws when there is no value (in no-exception builds it calls the
+fatal handler); `*r` / `r->` do not check.
 
 ### 6.2 No-exception builds (`-fno-exceptions`, MSVC `/EHs-c-`)
 
@@ -692,24 +694,27 @@ The whole library can be used with exceptions disabled, for client engines that 
 It detects `__cpp_exceptions` / `_CPPUNWIND`; `-DXOFFSET_NO_EXCEPTIONS=1` forces it. RTTI is not
 required.
 
-- The lifecycle and receive paths (`try_create`, `try_clone`, `try_clone_into`, `try_load_verified`,
-  `try_reload_verified`, `try_begin_verified_reload`, `XReceiver`, `make_room`, `grow`) return the
-  first failure up the call chain without throwing or calling the fatal handler. The same wire gives
-  the same result and the same error text in builds with and without exceptions
-  (`tools/no_exceptions_differential.sh` compares 200,000 mutated wires one by one).
+- The lifecycle, receive, emit and compaction paths (`try_create`, `try_clone`, `try_clone_into`,
+  `try_load_verified`, `try_reload_verified`, `try_begin_verified_reload`, `try_save_verified*`,
+  `try_save_compact*`, `try_save_delta*`, `XDeltaBaseline::try_key_delta*`, `XCompactor::try_compact`,
+  `XReceiver`, `make_room`, `grow`) return the first failure up the call chain without throwing or
+  calling the fatal handler. The same wire gives the same result and the same error text in builds
+  with and without exceptions (`tools/no_exceptions_differential.sh` compares 200,000 mutated wires
+  one by one).
 - Mutations inside `buf.edit(...)` and `buf.root()` proxies run under `SoftFailScope`: arena
   allocation failures leave the failing operation without effect and record the code in `buf.error()`
-  (`buf.ok() == false`) instead of aborting. Call `buf.make_room(bytes)` or pass `expected_growth` to
-  `edit()` before multi-step mutations.
+  (`buf.ok() == false`) instead of aborting. `XCompactor::compact` / `try_compact` also retry across
+  the `2x -> 2.5x -> 3x -> 4x` multipliers via `SoftFailScope` without aborting. Call
+  `buf.make_room(bytes)` or pass `expected_growth` to `edit()` before multi-step mutations.
 - Other failures (bare `plain_root()` writes that run out of space, `root<T>()` with no root,
-  exceeding the wire limit when saving, a rejection in a throwing entry point, ...) have no caller
-  to return to; they call the fatal handler and then `abort()`. Engines plug in their own crash
-  reporting with `set_fatal_handler(fn)`; `fn(XErrc, const char*)` must not return.
+  calling throwing `save_*` entries on invalid state, ...) have no caller to return to; they call
+  the fatal handler and then `abort()`. Engines plug in their own crash reporting with
+  `set_fatal_handler(fn)`; `fn(XErrc, const char*)` must not return.
 - A failing host `operator new` terminates as the standard library does without exceptions.
-- Two places that recover from `XBadAlloc` when exceptions are on are fatal when they are off: the
-  whole-block copy in container copy assignment (with exceptions it falls back to element-by-element
-  copy) and the doubling retry in `XCompactor::compact` (never reached when 2x the used space is
-  enough). Clients that only receive, read and make small edits are not affected.
+- One internal fallback that recovers from `XBadAlloc` when exceptions are on remains fatal when they
+  are off: the whole-block copy in container copy assignment (with exceptions it falls back to
+  element-by-element copy). Clients that mutate inside `edit()` / proxies or use `try_*` entries are
+  not affected.
 - When an allocation fails during a library container modification, the original logical content is
   kept, but capacity and allocator accounting are not necessarily rolled back. Multi-step business
   operations are not transactions.

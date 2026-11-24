@@ -225,11 +225,12 @@ another client, which validates it again. There are four rules.
 4. **No-exception clients: use `try_*`, `edit()` / proxies, and leave headroom in `maximum_capacity`.**
    Modifying a received buffer makes it grow. In builds without exceptions (`-fno-exceptions`,
    MSVC `/EHs-c- /D_HAS_EXCEPTIONS=0`), use `try_create` / `try_clone` / `try_clone_into` /
-   `try_load_verified` / `try_reload_verified` / `XReceiver` for buffer lifecycle and receive, and
-   mutate only through `buf.edit(...)` or `buf.root()` proxies (not non-const `plain_root()`):
-   mutations inside `edit()` and proxies fail softly via `SoftFailScope`, leave the failing
-   operation without effect, and record the error in `buf.error()` instead of invoking the fatal
-   handler. Call `buf.make_room(bytes)` or pass `expected_growth` to `edit()` before multi-step
+   `try_load_verified` / `try_reload_verified` / `try_save_verified*` / `try_save_compact*` /
+   `try_save_delta*` / `XCompactor::try_compact` / `XReceiver` for buffer lifecycle, receive, send,
+   and compaction, and mutate only through `buf.edit(...)` or `buf.root()` proxies (not non-const
+   `plain_root()`): mutations inside `edit()` and proxies fail softly via `SoftFailScope`, leave the
+   failing operation without effect, and record the error in `buf.error()` instead of invoking the
+   fatal handler. Call `buf.make_room(bytes)` or pass `expected_growth` to `edit()` before multi-step
    edits so a later step does not run after an earlier allocation fails, and register
    `set_fatal_handler(...)` for diagnostics. Leave headroom in `maximum_capacity` ("largest valid
    message + the most one edit can add") for buffers that will be modified. Read-only views

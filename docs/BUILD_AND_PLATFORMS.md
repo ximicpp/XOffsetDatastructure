@@ -8,7 +8,7 @@ Requirements, building, installing and consuming the library, and the storage ru
 | Use | Requirements |
 | --- | --- |
 | Full library, C++26 reflection build (servers), `XOffset::xoffset` | P2996 Clang with `<experimental/meta>` and matching libc++, or GCC 16+ (`-freflection`, `<meta>`, libstdc++); CMake 3.30+; 64-bit little-endian target; Linux, macOS or Windows VM APIs |
-| Client build, field-list backend | C++20 or C++23 with the platform's native compiler (Android NDK Clang, MSVC 19.44 with `/Zc:preprocessor`, clang-cl, MinGW GCC, Apple clang for iOS 17+ and macOS 14+); one `XOFFSET_RECORD` line per record; CMake 3.20+; 64-bit little-endian target |
+| Client build, field-list backend | C++20 or C++23 with the platform's native compiler (Android NDK Clang, MSVC 19.44 with `/Zc:preprocessor`, clang-cl, MinGW GCC, Apple clang for iOS 14+ and macOS 12+); one `XOFFSET_RECORD` line per record; CMake 3.20+; 64-bit little-endian target |
 | OS storage only, `XOffset::storage` | C++17 compiler; CMake 3.13+; Linux, macOS or Windows VM APIs and threads |
 | Maintained validation tools and their tests | Python 3.10+; CMake/CTest 3.21+ for storage, 3.30+ for full; the C++ library has no Python runtime dependency |
 
