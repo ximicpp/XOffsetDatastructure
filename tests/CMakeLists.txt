@@ -176,6 +176,7 @@ set(REFLECTION_TESTS
     test_shared_delta_slots
     test_shared_delta_publisher
     test_shared_delta_publisher_errors
+    test_dump
 )
 
 foreach(test_name ${REFLECTION_TESTS})
@@ -357,6 +358,7 @@ set(NO_EXCEPTIONS_TESTS
     test_proxy_scopes
     test_retire_discard
     test_proxy_fuzz
+    test_dump
 )
 foreach(test_name ${NO_EXCEPTIONS_TESTS})
     if(NOT XOFFSET_TESTS_REFLECTION AND test_name IN_LIST XOFFSET_CXX26_ONLY_TESTS)

@@ -2,7 +2,7 @@
 
 Programs on old and new versions interoperate: the server ships the new version first, and old clients
 still in use keep sending and receiving as before. All conversion happens on the server; the client only
-adds a handshake. Wire format 2.1 is unchanged; an old version's wire is simply the wire written by the
+adds a handshake. Wire format 3.0 is unchanged; an old version's wire is simply the wire written by the
 old program.
 
 | Header | Which end | Contents |

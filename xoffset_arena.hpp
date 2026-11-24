@@ -2785,6 +2785,23 @@ namespace XOffsetDatastructure {
         }
 
     protected:
+        // Non-throwing storage init helpers for try_create / try_clone / try_load.
+        detail::vstatus init_fresh_v(size_type size, MaximumCapacity cap) {
+            packed_.growth_policy = cap.growth;
+            return init_fresh(size, cap.value, cap.pool, cap.storage, cap.reserve);
+        }
+
+        detail::vstatus init_fresh_default_v(size_type size) {
+            if (size > MAX_PAYLOAD)
+                XOFFSET_VFAIL(XBadAlloc, XErrc::capacity_exceeded, detail::payload_limit_message);
+            return init_fresh(size, std::max(size, DEFAULT_MAXIMUM_CAPACITY));
+        }
+
+        detail::vstatus init_bytes_v(const char* data, size_type size, MaximumCapacity cap) {
+            packed_.growth_policy = cap.growth;
+            return init_from_bytes(data, size, cap.value, cap.pool, cap.storage, cap.reserve);
+        }
+
         // The WirePayload constructor's body, for a default-constructed
         // buffer: the non-throwing load entries report failure instead.
         detail::vstatus init_wire_v(const WirePayload& wire, size_type size, MaximumCapacity cap) {
@@ -3079,6 +3096,40 @@ namespace XOffsetDatastructure {
         XOFFSET_DETAIL_INLINE void clone_state_from(const XBufferCore& src) {
             if (clone_in_place(src)) [[likely]] return;
             clone_state_general(src);
+        }
+
+        // Non-throwing counterpart of clone_state_from for try_clone_into().
+        detail::vstatus clone_state_from_v(const XBufferCore& src) {
+            if (this == &src)
+                XOFFSET_VFAIL(XException, XErrc::invalid_state,
+                    "clone_into(): source and destination are the same buffer");
+            const size_type logical = buffer_.size();
+            if (src.buffer_.size() == logical && src.send_flags_clear() && logical >= min_payload_size()) {
+                const size_type used = src.arena()->used_end;
+                const size_type dirty = tail_clean_from();
+                if (ctl_) [[unlikely]] end_lineage();
+                advance_epoch();
+                if (!buffer_.overwrite_in_place(src.buffer_.data(), used)) [[unlikely]] {
+                    reset_arena(0);
+                    XOFFSET_VFAIL(XBadAlloc, XErrc::out_of_storage, detail::arena_failure_message);
+                }
+                if (dirty > used) [[unlikely]] {
+                    std::memset(buffer_.data() + used, 0, dirty - used);
+                    forget_reset_dirt();
+                }
+                send_flags_.free_table_lost = false;
+                typed_root_access_allowed_ = src.typed_root_access_allowed_;
+                root_key_ = src.root_key_;
+                return detail::vok();
+            }
+            XOFFSET_ROLLBACK_BEGIN
+                const auto* sm = src.arena();
+                if (!sm) XOFFSET_VFAIL(XException, XErrc::invalid_state, "clone_into(): source buffer has no arena");
+                XOFFSET_VTRY(reinit_from_bytes(reinterpret_cast<const char*>(sm),
+                                               static_cast<size_type>(sm->used_end)));
+                copy_clone_state(src);
+            XOFFSET_ROLLBACK_END(reset_arena(0))
+            return detail::vok();
         }
 
     private:

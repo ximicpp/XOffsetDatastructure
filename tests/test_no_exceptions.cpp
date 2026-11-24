@@ -184,6 +184,112 @@ void direct_reload(const std::string& good, const std::string& corrupt) {
     need(!target.has_root<NoExcRoot>(), "root after an abandoned direct reload");
 }
 
+void create_and_clone_entries(const std::string& good) {
+    // try_create happy paths (default capacity, explicit capacity, Relocating).
+    {
+        auto b = XBuffer::try_create<NoExcRoot>(4096);
+        need(bool(b) && b->has_root<NoExcRoot>(), "XBuffer::try_create default");
+        auto tb = TypedXBuffer<NoExcRoot>::try_create(4096, cap());
+        need(bool(tb) && tb->has_root(), "TypedXBuffer::try_create explicit cap");
+        if (tb) {
+            const bool edited = tb->edit([](NoExcRoot& r) {
+                r.id = 42;
+                r.name = "created-noexc";
+                r.values.push_back(11);
+                r.values.push_back(22);
+            });
+            need(edited && tb->ok(), "TypedXBuffer::try_create edit");
+            need(tb->plain_root().id == 42 && tb->plain_root().values.size() == 2,
+                 "TypedXBuffer::try_create edited content");
+        }
+        auto rel = TypedXBuffer<NoExcRoot>::try_create(4096, XBuffer::relocating(1u << 20));
+        need(bool(rel) && rel->has_root(), "TypedXBuffer::try_create relocating");
+    }
+
+    // try_create failure modes: payload ceiling, max < initial, invalid storage request, root too large for cap.
+    {
+        auto over = XBuffer::try_create<NoExcRoot>(std::size_t(XBuffer::MAX_PAYLOAD) + 8);
+        need(!over && over.code() == XErrc::capacity_exceeded,
+             "try_create above MAX_PAYLOAD: " + describe(over.error()));
+
+        auto small_max = XBuffer::try_create<NoExcRoot>(4096, XBuffer::maximum_capacity(1024));
+        need(!small_max && small_max.code() == XErrc::capacity_exceeded,
+             "try_create max < initial: " + describe(small_max.error()));
+
+        auto root_overflow = TypedXBuffer<NoExcRoot>::try_create(
+            40, XBuffer::maximum_capacity(48).with_growth(XGrowPolicy::Automatic));
+        need(!root_overflow && root_overflow.code() == XErrc::capacity_exceeded,
+             "try_create root exceeds max: " + describe(root_overflow.error()));
+
+        auto root_explicit = TypedXBuffer<NoExcRoot>::try_create(
+            40, XBuffer::maximum_capacity(4096).with_growth(XGrowPolicy::Explicit));
+        need(!root_explicit && root_explicit.code() == XErrc::out_of_storage,
+             "try_create root exceeds explicit initial size: " + describe(root_explicit.error()));
+
+        auto bad_storage = XBuffer::try_create<NoExcRoot>(
+            4096, XBuffer::maximum_capacity(1u << 20).with_growth(XGrowPolicy::Automatic).with_storage(XStorage::Movable));
+        need(!bad_storage && bad_storage.code() == XErrc::invalid_argument,
+             "try_create invalid Movable storage request: " + describe(bad_storage.error()));
+    }
+
+    // try_clone and try_clone_into happy paths + failure modes.
+    {
+        auto src = TypedXBuffer<NoExcRoot>::try_load_verified(good, cap());
+        need(bool(src), "try_load_verified for clone source");
+        if (!src) return;
+
+        auto copy = src->try_clone();
+        need(bool(copy) && holds(*copy, 7, 300), "TypedXBuffer::try_clone content");
+        if (copy) {
+            need(copy->save_verified() == good, "TypedXBuffer::try_clone wire equality");
+            // Mutate clone independently; source stays unchanged.
+            need(copy->edit([](NoExcRoot& r) { r.id = 99; }), "edit cloned buffer");
+            need(src->plain_root().id == 7 && copy->plain_root().id == 99, "clone independence");
+        }
+
+        auto dst_same = TypedXBuffer<NoExcRoot>::try_create(4096, cap());
+        need(bool(dst_same), "dst_same try_create");
+        if (dst_same) {
+            const XStatus st = src->try_clone_into(*dst_same);
+            need(bool(st) && holds(*dst_same, 7, 300), "TypedXBuffer::try_clone_into general");
+            // Second clone hits in-place fast path (same logical size).
+            const XStatus st2 = src->try_clone_into(*dst_same);
+            need(bool(st2) && holds(*dst_same, 7, 300), "TypedXBuffer::try_clone_into in-place");
+            need(dst_same->save_verified() == good, "try_clone_into wire equality");
+        }
+
+        // Self-clone fails with invalid_state and leaves source untouched.
+        const XStatus self = src->try_clone_into(*src);
+        need(!self && self.code() == XErrc::invalid_state && holds(*src, 7, 300),
+             "try_clone_into self: " + describe(self.error()));
+#if !XOFFSET_NO_EXCEPTIONS
+        const auto thrown_self = thrown_by([&] { src->clone_into(*src); });
+        need(thrown_self.code == self.code() && thrown_self.message == self.error().message,
+             "clone_into self parity: " + describe(thrown_self));
+#endif
+
+        // Cloning an empty (no-arena) buffer fails cleanly.
+        XBuffer empty;
+        auto empty_clone = empty.try_clone();
+        need(!empty_clone && empty_clone.code() == XErrc::invalid_state,
+             "try_clone empty: " + describe(empty_clone.error()));
+        if (dst_same) {
+            const XStatus from_empty = empty.try_clone_into(*dst_same);
+            need(!from_empty && from_empty.code() == XErrc::invalid_state && !dst_same->has_root(),
+                 "try_clone_into from empty: " + describe(from_empty.error()));
+        }
+
+        // Destination capacity smaller than source used_end fails and resets dst.
+        auto small_dst = TypedXBuffer<NoExcRoot>::try_create(256, XBuffer::maximum_capacity(512));
+        need(bool(small_dst), "small_dst try_create");
+        if (small_dst) {
+            const XStatus too_big = src->try_clone_into(*small_dst);
+            need(!too_big && too_big.code() == XErrc::capacity_exceeded && !small_dst->has_root(),
+                 "try_clone_into exceeding dst max: " + describe(too_big.error()));
+        }
+    }
+}
+
 [[noreturn]] void print_fatal(XErrc code, const char* message) {
     std::printf("fatal %s: %s\n", to_string(code), message);
     std::fflush(stdout);
@@ -270,6 +376,7 @@ int main(int argc, char** argv) {
     }
     reload_rejections(reload_cases, good);
     direct_reload(good, corrupt);
+    create_and_clone_entries(good);
 
     // A loaded result of another root type is refused like load_verified.
     {

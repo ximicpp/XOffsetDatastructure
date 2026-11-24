@@ -24,4 +24,5 @@ set(XOFFSET_FULL_OWN_HEADERS
     xoffset_shared_delta.hpp
     xoffset_shared_publisher.hpp
     xoffset_proxy.hpp
+    xoffset_dump.hpp
 )
