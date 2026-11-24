@@ -20,6 +20,13 @@ section 3:
 | `daily` | Once a day, on the latest commit of `main` | tsan, the whole C++20/C++23 matrix, all client columns, wire-matrix (the parts the `pr` tier leaves out) |
 | `release` (= `--release`) | Release candidates | All steps |
 
+**Stacked PRs (susu 2026-11-24 04:39Z)**: in a chain of dependent PRs (each one based on the one below
+it), only the top PR runs the full `pr` tier, against `main` (on the merge result, as for any PR); that run
+covers the whole chain. Every PR of the chain, the top included, also runs
+`tools/local_validate.sh --steps "ir p2996-ir asm" --base <its parent>` (the PR below it, or `main` for the
+lowest), so each PR keeps its own Ir verdict and class. Once all of them pass, merge from the bottom up. When
+a PR of the chain changes, rerun these steps for every PR whose head or base changed, and the top's full tier.
+
 Failures found by `daily` get a fix PR the same day, and nothing is released until they are fixed.
 GitHub CI is off; `perf-gate.yml` is kept but the gate runs through the local validation script
 (section 6).
