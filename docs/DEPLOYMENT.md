@@ -117,7 +117,7 @@ Data sent by clients to the server, and any data from the network, is untrusted 
   not go out of bounds, and the structure matches the schema (truncation, out-of-bounds, overlap,
   incomplete tiling, invalid bools, unordered sets and schema mismatch are all rejected).
 - **What validation does not guarantee**: authenticity and integrity of the content. Data in which only
-  an integer field value was changed is accepted. The wire header (format 2.1) has no checksum field,
+  an integer field value was changed is accepted. The wire header (format 3.0) has no checksum field,
   no signature and no MAC.
 - **So these must be done outside the library**:
   - Source authentication and integrity: TLS or message signatures;
@@ -222,34 +222,51 @@ another client, which validates it again. There are four rules.
    section 2.1) must conclude `same`; otherwise reject. When relayed through a server, the server can
    convert data sent down to older clients per section 2.1. The demo forwards only to clients of the
    same version: A groups clients by their handshake version.
-4. **No-exception clients: leave headroom in `maximum_capacity`.** Modifying a received buffer makes
-   it grow. A compact wire has no slack, so inserting an element or making a short string longer must
-   grow it. When growth exceeds `maximum_capacity`, builds with exceptions throw `XBadAlloc`, which
-   can be caught to abandon the edit. Builds without exceptions (`-fno-exceptions`, `/EHs-c-`) can
-   only enter fatal error handling and the process terminates. So on no-exception clients, every
-   buffer that will be modified needs a limit of "largest valid message + the most one edit can add"
-   plus headroom, and the client should check sizes itself before modifying. The demo's snapshot
-   limit is 16 MiB; a view snapshot is about 15 KB and one edit adds less than 1 KB. Read-only buffers
-   do not grow and are not affected. `writeback` in `mapdemo_selftest` verified this with a buffer
-   whose limit is only 256 bytes larger than the wire: inserting throws `XBadAlloc`.
+4. **No-exception clients: use `try_*`, `edit()` / proxies, and leave headroom in `maximum_capacity`.**
+   Modifying a received buffer makes it grow. In builds without exceptions (`-fno-exceptions`,
+   MSVC `/EHs-c- /D_HAS_EXCEPTIONS=0`), use `try_create` / `try_clone` / `try_clone_into` /
+   `try_load_verified` / `try_reload_verified` / `XReceiver` for buffer lifecycle and receive, and
+   mutate only through `buf.edit(...)` or `buf.root()` proxies (not non-const `plain_root()`):
+   mutations inside `edit()` and proxies fail softly via `SoftFailScope`, leave the failing
+   operation without effect, and record the error in `buf.error()` instead of invoking the fatal
+   handler. Call `buf.make_room(bytes)` or pass `expected_growth` to `edit()` before multi-step
+   edits so a later step does not run after an earlier allocation fails, and register
+   `set_fatal_handler(...)` for diagnostics. Leave headroom in `maximum_capacity` ("largest valid
+   message + the most one edit can add") for buffers that will be modified. Read-only views
+   (`XReceiver::view`) do not grow and are not affected.
 
 ## 5. Capacity and resource limits
 
-`maximum_capacity` also determines the virtual address space each buffer reserves. The default is
-64 MiB (or the initial length, whichever is larger); the hard payload limit is `0x7ffffff8` (about
-2 GiB), which is not a recommended per-request budget.
+`maximum_capacity` also determines the virtual address space a VM-backed buffer reserves. The default
+is 64 MiB (or the initial length, whichever is larger); the hard payload limit is `0x7ffffff8` (about
+2 GiB), which is not a recommended per-request budget. Small buffers created with Explicit growth
+and initial size at most `SLOT_MAX` (256 KiB - 64 B) use slab slots rather than individual VM
+reservations.
 
 | Scenario | Recommendation | Basis |
 | --- | --- | --- |
 | Server receiving client data | Default `maximum_capacity` of **1 MiB**; check the length before reading a wire and drop it if larger | Client uplink messages are mostly KB-sized; adjust upward to 2x the largest valid business message |
 | Server to server | Set the limit to the largest valid size of that kind of state (one state block can reach hundreds of MB) | Data between servers counts as authenticated, but abnormal data must still not bring down the process |
-| Client receiving or building | Use a smaller `maximum_capacity` (2x the largest message sent down); when creating and destroying buffers often, reuse free reservations with `XBufferPool`; **on iOS keep the sum of `maximum_capacity` over all live buffers within 3 GiB** | Each live buffer reserves 64 MiB of address space by default; a pool only reuses free reservations and does not shrink those of live buffers. iPhone measurements below |
+| Client receiving or building | On **iOS production apps, enable Apple's Extended Virtual Addressing capability** (`com.apple.developer.kernel.extended-virtual-addressing`); for high-count buffers prefer slots (`<= SLOT_MAX`), `XBuffer::relocating(max)` or `XBufferPool` | Without the entitlement, an iPhone limits one process to ~3.4 GiB of virtual address space (~50 64 MiB VM buffers); enabling it expands virtual address space to tens of GiB at zero physical RAM cost |
 
-On an iPhone 15 Pro Max (iOS 26.6.2) one process can reserve about 3.4 GiB of address space: about
-50 buffers of the default 64 MiB. Clients that hold many buffers set small limits on each (the SLG
-stress test uses 2 MiB per player buffer). A limit of a multiple of 4 MiB minus 64 bytes (such as
-`64 MiB - 64`) avoids mapping one extra 4 MiB granule per VM buffer. Android and desktop systems have
-much larger address spaces.
+On an iPhone 15 Pro Max (iOS 26.6.2) **without** Extended Virtual Addressing, one process can
+reserve about 3.4 GiB of address space (~50 buffers of the default 64 MiB VM reservation). Production
+iOS builds signed with a paid Apple Developer Program team should add the
+`com.apple.developer.kernel.extended-virtual-addressing` entitlement (Xcode: *Signing & Capabilities*
+-> *Extended Virtual Addressing*; `tools/test_host/sign_ios_app.sh` supports `XO_IOS_EXTENDED_VA=1`).
+Keep three details in mind when enabling it:
+
+- It expands **virtual address space** (what uncommitted `PROT_NONE` reservations consume), not
+  physical RAM: Jetsam still enforces the device's physical memory limit, so call
+  `XBuffer::trim_slot_storage()` / `pool.clear()` on scene transitions or backgrounding.
+- Check any third-party library in the same process that assumes pointers fit in low address ranges
+  (e.g. legacy pointer-tagging runtimes); XOffset uses 32-bit arena-relative offsets and full 64-bit
+  host pointers and is unaffected.
+- Even with Extended Virtual Addressing enabled, avoid creating thousands of simultaneous
+  `Automatic + 64 MiB` VM buffers: use `XReceiver::view` for read-only receives, slots (`<= SLOT_MAX`)
+  for small messages, or `XBuffer::relocating(max)` for variable-size long-lived buffers. A limit of
+  a multiple of 4 MiB minus 64 bytes (such as `64 MiB - 64`) avoids mapping one extra 4 MiB granule
+  per VM buffer. Android and desktop systems already provide much larger virtual address spaces.
 
 Also limit the number of concurrent buffers, queue lengths, total memory and per-request processing
 time: one valid buffer does not bound total resources. The 1 MiB and "2x" above are starting points,

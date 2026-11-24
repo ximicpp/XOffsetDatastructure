@@ -4,6 +4,9 @@
 # ID signed in to Xcode (a free account is enough; its profiles last 7 days).
 #
 #   tools/test_host/sign_ios_app.sh APP OUT_APP DEVICE_UDID [TEAM_ID]
+#   XO_IOS_EXTENDED_VA=1 ...   add com.apple.developer.kernel.extended-virtual-addressing
+#                              (requires a paid Apple Developer Program team; expands the
+#                              iOS process virtual address space from ~3.4 GiB to tens of GiB)
 #
 # The provisioning profile comes from Xcode: a stub app with the same bundle identifier
 # is built once with automatic signing (xcodebuild -allowProvisioningUpdates registers
@@ -30,6 +33,21 @@ say "bundle $BUNDLE_ID, team $TEAM, device $UDID"
 # 1. stub app with automatic signing: Xcode makes (or reuses) the profile for this phone
 mkdir -p "$W/stub"
 cp "$APP/Info.plist" "$W/stub/Info.plist"
+ENT_PROP=""
+if [ "${XO_IOS_EXTENDED_VA:-0}" = "1" ]; then
+    cat > "$W/stub/extended_va.entitlements" <<'EENT'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.developer.kernel.extended-virtual-addressing</key>
+    <true/>
+</dict>
+</plist>
+EENT
+    ENT_PROP="XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS \"$W/stub/extended_va.entitlements\""
+    say "enabling com.apple.developer.kernel.extended-virtual-addressing (requires paid Apple Developer team)"
+fi
 cat > "$W/stub/CMakeLists.txt" <<EOF
 cmake_minimum_required(VERSION 3.20)
 project(xo_stub LANGUAGES CXX OBJCXX)
@@ -40,7 +58,8 @@ set_target_properties(xo_stub PROPERTIES
     XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "$TEAM"
     XCODE_ATTRIBUTE_CODE_SIGN_STYLE Automatic
     XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "Apple Development"
-    XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES)
+    XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES
+    $ENT_PROP)
 target_compile_features(xo_stub PRIVATE cxx_std_17)
 target_link_libraries(xo_stub PRIVATE "-framework UIKit" "-framework CoreGraphics" "-framework Foundation")
 EOF
