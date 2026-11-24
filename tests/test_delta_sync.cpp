@@ -12,7 +12,8 @@
 // locally (caught by the digest), capacity limits, rejected key deltas, the
 // xxHash64 digest against reference values, replicas fed on several threads
 // at once (and one at thread exit), baselines that record touches instead
-// of a copy (XDeltaRecord::touches), and a viewport-like model whose
+// of a copy (XDeltaRecord::touches), containers that move into holes below
+// the receiver's used size (touched_only), and a viewport-like model whose
 // delta sizes are reported. With exceptions on, the throwing entry must
 // report exactly what the try_ entry reports. No try/catch of its own: also
 // built as test_delta_sync_noexc.
@@ -37,10 +38,19 @@ struct View {
     std::uint32_t live{};
     xo::XVector<Unit> slots; // stable slots: a unit keeps its slot while it is in view
 };
+// Two vectors and a string that move into each other's holes.
+struct Moves {
+    std::uint32_t tick{};
+    xo::XVector<std::uint64_t> a;
+    xo::XVector<std::uint64_t> b;
+    xo::XString note;
+};
 } // namespace dz
 XOFFSET_RECORD(dz::Unit, id, owner, x, y, hp, state, name)
 XOFFSET_RECORD(dz::View, tick, live, slots)
+XOFFSET_RECORD(dz::Moves, tick, a, b, note)
 XOFFSET_REGISTER_SCHEMA_NAME(dz::View, "test.delta.view")
+XOFFSET_REGISTER_SCHEMA_NAME(dz::Moves, "test.delta.moves")
 
 namespace {
 void need(bool ok, const std::string& what) { if (!ok) fail(what); }
@@ -1453,6 +1463,77 @@ void touched_growth_case() {
     }
 }
 
+// A container that moves into a hole below the receiver's used size: there
+// the allocator records only its own writes (the free list's link word), and
+// only touched blocks are compared, so the moved contents go because
+// touch(container) marks the block where it is now (a touch of the head
+// alone, as in touched_growth_case, covers only a block past the used size).
+// Over the sizes of the new block (a hole taken whole or split), for a
+// vector and a string: the touched_only delta is the whole comparison's, and
+// the replicas of both baselines (a copy, touches) are the sender's.
+void touched_hole_move_case() {
+    const auto cap = xo::XBuffer::maximum_capacity(kLimit).with_growth(xo::XGrowPolicy::Automatic);
+    using Moves = xo::TypedXBuffer<dz::Moves>;
+    xo::XDeltaOptions touched;
+    touched.touched_only = true;
+    std::size_t into_hole = 0, cases = 0;
+    for (std::uint32_t n = 9; n <= 72; ++n, ++cases) {
+        const std::string where = "touched hole move, " + std::to_string(n) + " slots";
+        auto src = Moves::create(16 * 1024, cap);
+        src.plain_root().a.reserve(64);
+        for (std::uint64_t i = 0; i < 64; ++i) src.plain_root().a.push_back(i + 1);
+        src.plain_root().b.reserve(8);
+        for (std::uint64_t i = 0; i < 8; ++i) src.plain_root().b.push_back(1000 + i);
+        xo::XDeltaBaseline tb(n), wb(n), xb(xo::XDeltaRecord::touches);
+        Moves rt(4096, xo::XBuffer::maximum_capacity(kLimit)), rx(4096, xo::XBuffer::maximum_capacity(kLimit));
+        xo::XDeltaCursor ct, cx;
+        std::string dt, dw, dx;
+        const auto send = [&](const char* step) {
+            const std::string at = where + ", " + step;
+            const auto st = src.save_delta_into(dt, tb, touched);
+            const auto sw = src.save_delta_into(dw, wb);
+            need(dt == dw && st.empty == sw.empty, at + ": the touched_only delta differs from the whole comparison");
+            if (!st.empty) {
+                auto r = apply_entry(rt, dt, ct);
+                need(bool(r), at + ": touched_only delta rejected: " + (r ? std::string() : r.error().message));
+            }
+            const auto sx = src.save_delta_into(dx, xb);
+            if (!sx.empty) {
+                auto r = apply_entry(rx, dx, cx);
+                need(bool(r), at + ": touches delta rejected: " + (r ? std::string() : r.error().message));
+            }
+            need(payload_of(rt) == payload_of(src), at + ": the touched_only replica differs");
+            need(payload_of(rx) == payload_of(src), at + ": the touches replica differs");
+        };
+        const auto in_hole = [&](const void* p, std::uint32_t used) {
+            return std::uint64_t(static_cast<const char*>(p) - static_cast<const char*>(src.get_address())) < used;
+        };
+        send("key");
+        // a outgrows its block: the old block (512 bytes) becomes a hole.
+        src.plain_root().a.push_back(65);
+        src.touch(src.plain_root().a);
+        need(!holes_of(src).empty(), where + ": no hole after a moved");
+        send("a moved");
+        // b moves to a block of n slots, which the hole can hold.
+        std::uint32_t used = src.arena()->used_end;
+        src.plain_root().b.reserve(n);
+        src.plain_root().b.push_back(2000);
+        into_hole += in_hole(src.plain_root().b.data(), used);
+        src.touch(src.plain_root().b);
+        send("b moved");
+        // A heap string, then a longer one that moves (into a hole that fits).
+        src.plain_root().note = std::string(std::size_t(n) * 4, 'x');
+        src.touch(src.plain_root().note);
+        send("note");
+        used = src.arena()->used_end;
+        src.plain_root().note = std::string(std::size_t(n) * 8, 'y');
+        into_hole += in_hole(src.plain_root().note.data(), used);
+        src.touch(src.plain_root().note);
+        send("note moved");
+    }
+    need(into_hole * 2 > cases, "touched hole move: the moved blocks were rarely holes (" + std::to_string(into_hole) + ")");
+}
+
 // The cursors of a thread share its apply scratch: several threads at once
 // feed their replicas in turn, and a delta applied from a thread_local
 // destructor that runs after the thread's scratch is destroyed uses the
@@ -1560,6 +1641,7 @@ int main(int argc, char** argv) {
     view_sizes();
     touched_fixed_case();
     touched_growth_case();
+    touched_hole_move_case();
     touches_fixed_case();
     thread_scratch_case();
     for (int s = 0; s < streams; ++s) random_stream(20261102u + std::uint64_t(s), steps);

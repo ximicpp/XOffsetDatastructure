@@ -849,12 +849,20 @@ public:
             // Every change is touched after it is made, so the delta compares
             // the touched blocks only (XDeltaOptions::touched_only). A vector
             // that gains slots has its head touched; the new slots are filled
-            // and touched below.
+            // and touched below. One that outgrew its reserve moved to a new
+            // block, which may be a hole below the client's used size: that
+            // block is touched too (its records moved there).
             XBuffer& b = *n.buf;
             v.request_id = id; v.tick = w.tick_no();
             b.touch(v.request_id); b.touch(v.tick);
-            if (v.units.size() < n.uslot.size()) { v.units.resize(n.uslot.size()); b.touch(&v.units, sizeof(v.units)); }
-            if (v.marches.size() < n.mslot.size()) { v.marches.resize(n.mslot.size()); b.touch(&v.marches, sizeof(v.marches)); }
+            const auto grow = [&b](auto& vec, std::size_t size) {
+                const auto* const was = vec.data();
+                vec.resize(size);
+                b.touch(&vec, sizeof(vec));
+                if (vec.data() != was) [[unlikely]] b.touch(vec.data(), vec.capacity() * sizeof(*vec.data()));
+            };
+            if (v.units.size() < n.uslot.size()) grow(v.units, n.uslot.size());
+            if (v.marches.size() < n.mslot.size()) grow(v.marches, n.mslot.size());
             for (int32_t pos : np.urm) {
                 static const WorldUnit empty{};
                 auto& u = v.units[std::size_t(pos)];

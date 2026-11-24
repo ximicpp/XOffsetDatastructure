@@ -145,6 +145,7 @@ if(SLG_BUILD_REGRESSION_TESTS)
   slg_add_regression(uplink_frame)
   slg_add_regression(packed_marches)
   slg_add_regression(native_patch_copy)
+  slg_add_regression(view_resize_delta)
 endif()
 
 message(STATUS "slg_bench formats:xoffset=${SLG_WITH_XOFFSET} ir_count=${SLG_IR_COUNT} cereal=${CEREAL_INCLUDE} protobuf=${Protobuf_FOUND} flatbuffers=${FLATC} zpp_bits=${ZPP_BITS_INCLUDE} cista=${CISTA_INCLUDE} compression=${ZSTD_LIB}")

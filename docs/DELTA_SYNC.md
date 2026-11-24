@@ -103,7 +103,10 @@ skipped deltas still finds its blocks.
 `touch_set(field, value)` assigns and touches only when the value differs.
 
 The rule: **touch everything you change, after you change it** (a container
-that moved is marked where it is now). A change that is not touched is not
+that moved is marked where it is now). `touch(container)` marks its new block;
+a touch of its head alone (`touch(&v, sizeof v)`) does not cover a move, since
+the new block may be a hole below the receiver's used size, where only touched
+blocks are compared. A change that is not touched is not
 sent; send with `digest = true` while developing to have the receiver catch
 that (`digest_mismatch`). Everything is compared, as without the option, for a
 baseline's first delta from a buffer (a key delta from a buffer that already
