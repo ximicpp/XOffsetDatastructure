@@ -208,7 +208,8 @@ player.save_verified_into(out, XSaveOptions{.emission = XWireEmission::zero_runs
   running out of space while modifying, call the handler set with `set_fatal_handler` and then terminate
   ([user guide section 6.2](USER_GUIDE.md#62-no-exception-builds--fno-exceptions-msvc-ehs-c-)). All three
   use-case examples are also compiled without exceptions as `*_noexc` and run in CTest.
-- Apple deployment targets are at least macOS 14 and iOS 17; only 64-bit little-endian is supported
+- Only 64-bit little-endian is supported; Apple deployment targets below macOS 14 / iOS 17
+  automatically disable `std::pmr` (`XOFFSET_USE_PMR=0`) and use header-only `XMemoryResource`
   ([user guide section 5](USER_GUIDE.md#5-constraints-you-must-follow)).
 
 ## 8. Recommended pattern checklist

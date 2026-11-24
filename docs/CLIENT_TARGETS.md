@@ -34,8 +34,8 @@ for clang-cl.
 | Windows x64 | MSVC 19.44 (VS 2022 17.14), `/MT` | C++20, C++23 | `cmake/toolchains/msvc-wine-x86_64.cmake`, CTest under wine |
 | Windows x64 | clang-cl 19 with the same STL and SDK | C++20 | `cmake/toolchains/clang-cl-x86_64.cmake`, CTest under wine |
 | Windows x64 | MinGW-w64 GCC 13.2, `-static` | C++20 | CTest under wine |
-| macOS arm64 | Apple clang 21, deployment target macOS 14.0 | C++20, C++23 | Native on a Mac, `tools/native_targets.sh macos` |
-| iOS simulator | Apple clang 21, deployment target iOS 17.0 | C++20 | `ios-simulator.cmake`, CTest via `simctl spawn` |
+| macOS arm64 | Apple clang 21, deployment target macOS 12.0+ (`XOFFSET_USE_PMR=0` below 14.0) | C++20, C++23 | Native on a Mac, `tools/native_targets.sh macos` |
+| iOS simulator | Apple clang 21, deployment target iOS 14.0+ (`XOFFSET_USE_PMR=0` below 17.0) | C++20 | `ios-simulator.cmake`, CTest via `simctl spawn` |
 | Linux x86-64 | GCC 13 / 16, Clang 18, P2996 Clang | C++20, C++23 | Matrix and ASan columns of `tools/local_validate.sh` |
 
 On every target the full CTest passes (including the no-exception `*_noexc` programs) and the corpus
@@ -56,8 +56,10 @@ and macOS machines, and an iPhone 15 Pro Max passed CTest and the corpus; eviden
   differs from GCC/Clang and a pin fails. Sources build with `/utf-8`.
 - **MinGW GCC**: emulated TLS breaks the per-thread caches at thread exit, so they are off
   (`XOFFSET_THREAD_CACHES=0`).
-- **macOS / iOS**: the system libc++ has `std::pmr` only from macOS 14 / iOS 17, and lower targets would
-  fail only at load time, so lower deployment targets are a compile error.
+- **macOS / iOS**: Apple's system libc++ exports `std::pmr` only from macOS 14 / iOS 17. On lower
+  deployment targets (macOS 12+ / iOS 14+), `XOFFSET_USE_PMR` automatically defaults to `0` and uses
+  the header-only `XMemoryResource` backed by global `operator new/delete` with no `<memory_resource>`
+  dependency (setting `-DXOFFSET_USE_PMR=1` on older Apple targets remains a compile error).
 - **Windows checkouts**: set `core.autocrlf false` and `core.eol lf` before checkout, or the dependency
   lock check fails on CRLF files.
 

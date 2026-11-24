@@ -1,11 +1,11 @@
 # 4.1.0 compatibility and input boundaries
 
-(The file name dates from the alpha period.) This pre-release is aimed at early users who pin their
-compiler, dependencies and schemas and do their own acceptance testing. The core implementation is
-usable, but source API and ABI stability between pre-releases is not promised (the only stability
-promises are K0–K9, see `docs/STABILITY_TESTS.md`), nor is long-term wire compatibility across arbitrary
-combinations of compilers, standard libraries, schema evolution and layouts. This version uses wire format
-3.0 (`docs/WIRE_FORMAT.md`) and does not read older wires.
+(The file name dates from the alpha period.) This release targets teams that pin their compiler,
+schemas and wire format 3.0 (`docs/WIRE_FORMAT.md`) and run release acceptance tests for their
+target platforms. The core guarantees K0–K9 are defined in `docs/STABILITY_TESTS.md`; wire format
+3.0 is the current fixed wire contract (older 1.x / 2.0 / 2.1 wires are not read). Cross-version
+wire/ABI compatibility across arbitrary compilers, standard libraries, or unvalidated layouts is not
+claimed.
 
 ## Version and toolchain
 
@@ -24,18 +24,27 @@ Storage consumers use `COMPONENTS storage` and `XOffset::storage` instead. Numer
 range lookups are all rejected, so a pre-release is not taken for a compatible stable version. In source
 builds the full version variable is `XOFFSET_VERSION_FULL`.
 
-The full library requires 64-bit little-endian, P2996 Clang and a matching libc++; plain C++26 is not a
-substitute. The pinned recipes and dependency sources are in the source distribution's
-`docs/PACKAGING.md`, `toolchains/README.md` and `toolchains/vm-validation.json`; these recipes are not
-copied into the install prefix. Support verdicts are given per concrete profile; full compiler support
-cannot be inferred from an OS API being present. On Windows, MSVC only validates storage; the full
-library under MinGW-w64 GCC 16 is validated by CI (`docs/CLIENT_TARGETS.md`). Results from WSL and Docker
+All full-library targets require 64-bit little-endian and provide two build paths that write
+byte-identical wire format 3.0 outputs (`docs/CLIENT_TARGETS.md`):
+
+- **C++20 / C++23 field-list builds** (`-DXOFFSET_CXX_STANDARD=20|23`): require only a standard
+  C++20/C++23 native compiler (Windows MSVC 19.44+ with `/Zc:preprocessor`, clang-cl, MinGW-w64 GCC,
+  Android NDK Clang, Apple Clang on macOS 12+ / iOS 14+, Linux GCC 13+ / Clang 18+) and **zero
+  external submodules or third-party headers**. Each record declares one `XOFFSET_RECORD` field list.
+- **C++26 reflection builds** (`-DXOFFSET_CXX_STANDARD=26`): require GCC 16+ (`-freflection`,
+  `<meta>`) or the pinned P2996 Clang toolchain (`<experimental/meta>` and matching libc++). Ordinary
+  C++26 compilers without P2996 reflection are not substitutes for the reflection path.
+
+The pinned recipes and dependency sources (needed only for the C++26 reflection/signature tools) are
+in `docs/PACKAGING.md`, `toolchains/README.md` and `toolchains/vm-validation.json`; these recipes are
+not copied into the install prefix. Support verdicts are given per concrete profile; full compiler
+support cannot be inferred from an OS API being present. Results from WSL, QEMU, simulator and Docker
 must keep their actual virtualization/emulation category.
 
-Within one executable, use consistent production headers, TypeLayout/Boost contents, toolchain and
-compile options. Macros such as `XOFFSET_DEFAULT_MAXIMUM_CAPACITY` must be consistent across all
-translation units. The validated multi-translation-unit install and source consumption does not extend to
-ABI guarantees for shared libraries, dynamic plugins, crossing CRTs, mixed standard libraries or mixed
+Within one executable, use consistent production headers, toolchain and compile options. Macros such
+as `XOFFSET_DEFAULT_MAXIMUM_CAPACITY` and `XOFFSET_USE_PMR` must be consistent across all translation
+units. The validated multi-translation-unit install and source consumption does not extend to ABI
+guarantees for shared libraries, dynamic plugins, crossing CRTs, mixed standard libraries or mixed
 header versions.
 
 ## Admission and compatibility of wires
