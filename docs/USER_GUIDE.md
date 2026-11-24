@@ -111,6 +111,43 @@ only the types in the left column in a schema.
 | `char` for plain fields; `std::int8_t`, `std::uint8_t` or `XString` for set and map keys | Keys ordered by `char`: `XSet<char>`, `XMap<char, V>`, and arrays or record members containing `char` in a key, enums whose underlying type is `char` | `char` is signed on x86-64, Apple and Windows and unsigned on Linux and Android arm64, so the two sides order keys differently and reject each other's wire, while the schema hash is the same and the handshake cannot notice; rejected at compile time. `XString` compares as unsigned bytes on every platform and can be a key |
 | Enums with an explicit underlying type: `enum class E { ... }`, `enum E : std::uint32_t { ... }` | `enum E { ... }` without an underlying type | The compiler picks the underlying type: `int` on MSVC, `unsigned int` on GCC and Clang when there are no negative values, so the schemas differ; rejected at compile time |
 
+### 2.3 Same-version interoperability
+
+Two peers built from the same library version and the same schema source exchange any wire type
+byte for byte on every supported platform (64-bit little-endian: Linux x86-64 and arm64,
+Windows x64, Android arm64, iOS and macOS arm64), whichever compiler and flags each side uses and
+whether it builds with C++26 reflection or C++20/C++23 field lists. A schema that could break this
+does not compile; a peer whose layout still differs is rejected before its bytes are read.
+
+Checked at compile time, on both backends:
+
+- The platform: 64-bit pointers, `std::endian::native == std::endian::little`, 8-bit bytes, a
+  one-byte `bool`, IEEE 754 `float` and `double`, each fixed-width scalar aligned to its size.
+  There is no switch that turns these checks off.
+- The scalars: the left column of section 2.2 only. `long double`, `wchar_t`, `char8_t`,
+  `char16_t`, `char32_t`, pointers, references and unions are rejected; `long`, `long long` and
+  `std::size_t` compile only where they are the fixed-width type of the same width.
+- Keys and enums: no key ordered by plain `char`, no enum without a fixed underlying type.
+- The record layout: no base classes, no bit-fields, alignment at most 8, and the natural layout:
+  each member at the next offset its type's alignment allows, the size rounded up to the record's
+  alignment. `#pragma pack`, MSVC `/Zp`, GCC `-fpack-struct`, `alignas` on a member,
+  `[[no_unique_address]]` and unnamed bit-fields move members away from it, and compilers and
+  flags disagree about them, so such a record does not compile even when both sides would agree.
+  `alignas` on the record itself (up to 8) is standard and allowed. `std::array<E, 0>` (an empty
+  class in libstdc++ and libc++, one element in MSVC's library) is rejected.
+- These checks run for every type that reaches the wire: a root type with a schema name
+  (`XOFFSET_REGISTER_SCHEMA_NAME`, which every sending and receiving call requires) and everything
+  it contains.
+
+Checked when a wire arrives: the wire header holds the root type's fingerprint (schema name and
+the ABI signature: every record's size, alignment and member offsets and types, recursively).
+`load_verified`, `reload_verified`, the admit tier, delta apply and the schema handshake compare
+it with the receiver's and reject a mismatch (`XErrc::schema_mismatch`).
+
+Outside the guarantee: a root type without a schema name (a local buffer; it may use base classes
+and recursive types, and its image carries no fingerprint), and `load_unverified` with
+`unsafe_root<T>()` / `unsafe_handle<T>()`, which read raw bytes without the fingerprint check.
+
 ## 3. Building and modifying
 
 The recommended pattern (also used by the README and `examples/helloworld.cpp`):
@@ -703,7 +740,7 @@ if (world.relayout_advised()) (void)world.relayout();   // TypedXBuffer<World>
 | The buffer object outlives its `XHandle`s and borrowed spans | Dangling access |
 | All translation units in one executable use the same header version, compile options and toolchain | Inconsistent layout or schema identity |
 | Before receiving untrusted input, limit the wire length, `maximum_capacity` and the number of concurrent buffers | Even a single valid wire can use a lot of memory |
-| 64-bit little-endian platforms only (32-bit Android builds are not supported) | `#error` at compile time on other platforms |
+| 64-bit little-endian platforms only, with 8-bit bytes and IEEE 754 `float` and `double` (32-bit Android builds are not supported) | `static_assert` at compile time on other platforms (section 2.3) |
 | On Apple deployment targets below macOS 14 / iOS 17 (tvOS 17, watchOS 10), `XOFFSET_USE_PMR` automatically defaults to `0` (header-only `XMemoryResource` without `<memory_resource>`); forcing `-DXOFFSET_USE_PMR=1` on those older targets requires `std::pmr` symbols absent from the older system libc++ | `#error` at compile time if `-DXOFFSET_USE_PMR=1` is forced on older Apple deployment targets |
 
 ## 6. Error handling

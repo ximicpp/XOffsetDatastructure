@@ -5,6 +5,16 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- **Breaking:** same-version interoperability is checked at compile time
+  ([USER_GUIDE.md](docs/USER_GUIDE.md) section 2.3). A wire record must have the natural layout
+  (each member at the next offset its type's alignment allows, the size rounded up to the
+  record's alignment): `#pragma pack`, `/Zp`, `-fpack-struct`, `alignas` on a member,
+  `[[no_unique_address]]` and unnamed bit-fields no longer compile, where before a peer built
+  differently was only rejected on load by the fingerprint. `std::array<E, 0>` is rejected (its
+  layout differs between libstdc++/libc++ and MSVC). The platform check uses `std::endian`, adds
+  8-bit bytes, a one-byte `bool`, IEEE 754 `float` and `double` and size-aligned fixed-width
+  scalars, and can no longer be turned off (`XOFFSET_DISABLE_PLATFORM_CHECKS`, `XOFFSET_LITTLE_ENDIAN` and `XOFFSET_ARCH_64BIT`
+  are gone). Compile time only: no change to the wire or to the generated code.
 - **Breaking:** wire format 3.0 ([WIRE_FORMAT.md](docs/WIRE_FORMAT.md) section 6). A buffer's
   memory and its wire are the same bytes: one 40-byte header (magic and version, fingerprint,
   `used_bytes`, extent count, free directory, free bytes), the root at offset 40, and the free

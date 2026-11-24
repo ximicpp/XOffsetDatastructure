@@ -76,6 +76,45 @@ namespace XOffsetDatastructure {
             return reflected_members_wire_admitted_impl<T>();
         }
 
+        // Natural layout: each member at the first offset after the one before
+        // it that the member type's alignment allows, and the size the members'
+        // end rounded up to the record's alignment (an empty record: its
+        // alignment). Every 64-bit little-endian ABI the library supports
+        // (x86-64 System V and Windows, AArch64 Linux, Android and Apple) lays
+        // out such a record of admitted members the same way, so a wire type
+        // that compiles has one layout on every peer. #pragma pack, /Zp,
+        // -fpack-struct, alignas on a member, [[no_unique_address]] and an
+        // unnamed bit-field each move a member or change the size, and
+        // compilers or flags disagree about them, so a record with any of them
+        // is not admitted. alignas on the record itself (at most 8) is standard
+        // and is kept: it only raises the alignment and the rounded size.
+        template <typename T>
+        consteval bool natural_record_layout() {
+            return []<std::size_t... I>(std::index_sequence<I...>) {
+                const std::size_t offset[] = {schema::member_t<T, I>::offset..., 0};
+                const std::size_t size[] = {sizeof(schema::member_type_t<T, I>)..., 0};
+                const std::size_t align[] = {alignof(schema::member_type_t<T, I>)..., 1};
+                std::size_t end = 0;
+                std::size_t max_align = 1;
+                for (std::size_t i = 0; i < sizeof...(I); ++i) {
+                    const std::size_t at = (end + align[i] - 1) / align[i] * align[i];
+                    if (offset[i] != at) return false;
+                    end = at + size[i];
+                    if (align[i] > max_align) max_align = align[i];
+                }
+                constexpr std::size_t record_align = alignof(T);
+                return record_align >= max_align &&
+                       sizeof(T) == ((end == 0 ? 1 : end) + record_align - 1) / record_align * record_align;
+            }(std::make_index_sequence<schema::member_count_v<T>>{});
+        }
+
+        // std::array<E, 0> is an empty class in libstdc++ and libc++ and one
+        // element E in MSVC's library: not admitted.
+        template <typename T>
+        inline constexpr bool is_empty_std_array_v = false;
+        template <typename E>
+        inline constexpr bool is_empty_std_array_v<std::array<E, 0>> = true;
+
         // A function template rather than a lambda in the static member's
         // initializer: MSVC instantiates the discarded if-constexpr branches of
         // a non-generic lambda (C2825 on CleanT::key_type for CleanT = char).
@@ -106,12 +145,15 @@ namespace XOffsetDatastructure {
             } else if constexpr (is_fixed_vector_v<CleanT>) {
                 return std::is_same_v<CleanT, XVector<typename CleanT::value_type>> &&
                     is_wire_admitted_impl<typename CleanT::value_type>::value;
+            } else if constexpr (is_empty_std_array_v<CleanT>) {
+                return false;
             } else if constexpr (std::is_class_v<CleanT>) {
-                return alignof(CleanT) <= 8 &&
-                    std::is_standard_layout_v<CleanT> &&
-                    !std::is_polymorphic_v<CleanT> &&
-                    schema::base_count_v<CleanT> == 0 &&
-                    reflected_members_wire_admitted<CleanT>();
+                if constexpr (alignof(CleanT) > 8 || !std::is_standard_layout_v<CleanT> ||
+                              std::is_polymorphic_v<CleanT> || schema::base_count_v<CleanT> != 0) {
+                    return false;
+                } else {
+                    return reflected_members_wire_admitted<CleanT>() && natural_record_layout<CleanT>();
+                }
             } else {
                 return false;
             }
