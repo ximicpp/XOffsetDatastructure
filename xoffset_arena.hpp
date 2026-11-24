@@ -3322,19 +3322,22 @@ namespace XOffsetDatastructure {
         // relayout_advised's mark (XBuffer::relayout_advised): the used size
         // a relayout of this content gave, or would give. It belongs to the
         // epoch it was set in: a later epoch (new content, a move, a swap)
-        // measures again. The tag keeps the low 32 bits of the epoch + 1: a
-        // wrap after 2^32 epochs at most makes one answer stale.
-        bool relayout_mark_current() const noexcept { return relayout_epoch_ == static_cast<std::uint32_t>(m_epoch + 1u); }
+        // measures again. Bit 31 is always set in the 32-bit tag, so a wrap
+        // after 2^31 epochs never collides with the unset 0 tag (and never
+        // with the next epoch) and at most makes one answer stale.
+        static constexpr std::uint32_t relayout_epoch_tag(std::uint64_t epoch) noexcept {
+            return static_cast<std::uint32_t>(epoch) | 0x80000000u;
+        }
+        bool relayout_mark_current() const noexcept { return relayout_epoch_ == relayout_epoch_tag(m_epoch); }
         // The current mark, reached: used_end is at least twice the mark.
-        // Only with relayout_mark_current() (the content has a root, so an
-        // arena).
+        // Only with relayout_mark_current() and a verified root (so an arena).
         bool relayout_mark_reached() const noexcept {
             return arena_unchecked()->used_end >= 2u * std::uint64_t(relayout_mark_);
         }
         void set_relayout_mark(size_type mark) noexcept {
             relayout_mark_ = mark < (std::numeric_limits<std::uint32_t>::max)()
                 ? static_cast<std::uint32_t>(mark) : (std::numeric_limits<std::uint32_t>::max)();
-            relayout_epoch_ = static_cast<std::uint32_t>(m_epoch + 1u);
+            relayout_epoch_ = relayout_epoch_tag(m_epoch);
         }
 
     private:

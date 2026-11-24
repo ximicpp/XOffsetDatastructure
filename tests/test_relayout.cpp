@@ -460,6 +460,14 @@ void shapes() {
 }
 
 void hint() {
+    struct EpochTagProbe : xo::XBufferCore {
+        using xo::XBufferCore::relayout_epoch_tag;
+    };
+    static_assert(EpochTagProbe::relayout_epoch_tag(0) != 0);
+    static_assert(EpochTagProbe::relayout_epoch_tag(0xffffffffull) != 0);
+    static_assert(EpochTagProbe::relayout_epoch_tag(0x7fffffffull) != EpochTagProbe::relayout_epoch_tag(0x80000000ull));
+    static_assert(EpochTagProbe::relayout_epoch_tag(0xffffffffull) != EpochTagProbe::relayout_epoch_tag(0x100000000ull));
+
     auto s = make_state(1);
     xo::XBuffer& sx = s;
     need(!s.relayout_advised(), "advised on fresh content");
@@ -483,6 +491,9 @@ void hint() {
         need(++edits < 200000, "used_end never reached twice the compact size");
     }
     need(s.relayout_advised(), "advised stopped without a relayout");
+    // Even after the mark is cached and reached in this epoch, an untyped
+    // buffer must still report false for a different root type.
+    need(!sx.relayout_advised<rl::Other>(), "advised for another root type after mark reached");
     // A clone holds the same bytes: measured for itself, the same answer.
     auto copy = s.clone();
     need(copy.relayout_advised(), "clone of advised content not advised");
@@ -507,6 +518,29 @@ void hint() {
     // A reset: an empty root is never advised.
     (void)moved.reset();
     need(!moved.relayout_advised(), "advised after reset");
+    // Large already-compact buffer (> 256 KiB, forcing fresh scratch allocation):
+    // slack image would exceed used_end and is skipped without reserving/emitting
+    // a larger slack image; relayout returns ok with the image unchanged.
+    {
+        auto big = Buffer::create(512 * 1024, cap());
+        need(big.edit([&](Hero& r) {
+            r.trail.reserve(30000);
+            for (int i = 0; i < 30000; ++i) r.trail.push_back(rl::Position{float(i), 1.f, 2.f});
+        }), "big fresh build");
+        xo::XBuffer& bx = big;
+        const auto used_before = used_of(bx);
+        need(used_before > 300 * 1024, "big fresh buffer expected > 300 KiB");
+        const auto image_before = image_of(bx);
+        const auto st = big.relayout();
+        need(bool(st), "big fresh relayout failed");
+        need(used_of(bx) <= used_before, "big fresh relayout grew");
+        need(big.save_compact(kPlain) == Buffer::load(image_before, cap()).save_compact(kPlain),
+             "big fresh relayout altered values");
+        // Second call has nothing left to shed and keeps bytes identical.
+        const auto image_after = image_of(bx);
+        need(bool(big.relayout()), "big fresh second relayout failed");
+        need(image_of(bx) == image_after, "big fresh second relayout changed bytes");
+    }
 }
 
 } // namespace

@@ -685,7 +685,9 @@ if (world.relayout_advised()) (void)world.relayout();   // TypedXBuffer<World>
   refused, with nothing changed and nothing recorded, inside a pin scope (`borrowed`), on a buffer
   with a recorded failure (that `error()`), without a verified root of `T` (`no_root`), when the
   storage fails (`out_of_storage`) or the image's scratch cannot be allocated
-  (`host_allocation_failed`). The scratch is the thread's and is kept up to 256 KiB.
+  (`host_allocation_failed`; in no-exception builds, a failing host allocation for the `std::string`
+  scratch terminates as the standard library does, see section 6.2). The scratch is the thread's and
+  is kept up to 256 KiB.
 - Cost (Character fixture, GCC 16): 0.5 us for 8 KB of used bytes, 9.7 us for 129 KB. Under
   steady churn with relayouts as advised, the instructions per tick of a delta compare fall 13-26%
   and of a `touches` delta up to 35% (more for larger content), and the sender's and the replicas'
@@ -748,10 +750,10 @@ required.
 - The lifecycle, receive, emit and compaction paths (`try_create`, `try_clone`, `try_clone_into`,
   `try_load_verified`, `try_reload_verified`, `try_begin_verified_reload`, `try_save_verified*`,
   `try_save_compact*`, `try_save_delta*`, `XDeltaBaseline::try_key_delta*`, `XCompactor::try_compact`,
-  `XReceiver`, `make_room`, `grow`) return the first failure up the call chain without throwing or
-  calling the fatal handler. The same wire gives the same result and the same error text in builds
-  with and without exceptions (`tools/no_exceptions_differential.sh` compares 200,000 mutated wires
-  one by one).
+  `relayout`, `XReceiver`, `make_room`, `grow`) return the first failure up the call chain without
+  throwing or calling the fatal handler. The same wire gives the same result and the same error text
+  in builds with and without exceptions (`tools/no_exceptions_differential.sh` compares 200,000 mutated
+  wires one by one).
 - Mutations inside `buf.edit(...)` and `buf.root()` proxies run under `SoftFailScope`: arena
   allocation failures leave the failing operation without effect and record the code in `buf.error()`
   (`buf.ok() == false`) instead of aborting. `XCompactor::compact` / `try_compact` also retry across

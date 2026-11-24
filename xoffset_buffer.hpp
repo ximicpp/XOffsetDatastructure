@@ -1291,8 +1291,10 @@ namespace XOffsetDatastructure {
         /// recorded: inside a pin scope (borrowed), with a recorded failure
         /// (that error()), without a verified root of type T (no_root), on a
         /// storage failure (out_of_storage), when the scratch for the image
-        /// cannot be allocated (host_allocation_failed). The scratch is the
-        /// thread's, kept up to 256 KiB.
+        /// cannot be allocated (host_allocation_failed; in no-exception builds
+        /// a failing host allocation inside std::string terminates as the
+        /// standard library does). The scratch is the thread's, kept up to
+        /// 256 KiB.
         template <typename T>
         [[nodiscard]] XOFFSET_DETAIL_NOINLINE XStatus relayout() {
             using U = std::remove_cv_t<T>;
@@ -1321,8 +1323,10 @@ namespace XOffsetDatastructure {
         /// False without a verified root of type T.
         template <typename T>
         XOFFSET_DETAIL_INLINE bool relayout_advised() noexcept {
+            using U = std::remove_cv_t<T>;
+            if (!this->template root_is<U>()) [[unlikely]] return false;
             if (this->relayout_mark_current()) [[likely]] return this->relayout_mark_reached();
-            return relayout_advised_measure<std::remove_cv_t<T>>();
+            return relayout_advised_measure<U>();
         }
 
         MemoryStats stats() {
@@ -1357,17 +1361,19 @@ namespace XOffsetDatastructure {
         }
         // save_compact's image of the content (slack_div as XCompactOptions)
         // into `out`, which keeps its storage for the next relayout. False:
-        // the image exceeds the format's limit.
+        // the image exceeds the format's limit, or (when slack_div != 0) the
+        // measured image with slack would not shrink used_end.
         template <typename T>
         bool write_relayout_image(std::string& out, std::uint32_t slack_div) {
             if (detail::VerifiedPathsAccess::try_save_compact_into<T>(*this, out, slack_div)) [[likely]] return true;
             // The writer wants room for used_end bytes without slack (the plain
             // image is never larger) and for the measured image with it.
-            std::size_t bound = this->arena_unchecked()->used_end;
+            const std::size_t used = this->arena_unchecked()->used_end;
+            std::size_t bound = used;
             if (slack_div != 0) {
                 bound = detail::measure_compact(*detail::image_root<T>(*this),
                                                 (std::numeric_limits<std::uint32_t>::max)(), slack_div);
-                if (bound == 0) return false;
+                if (bound == 0 || bound >= used) return false;
             }
             out.reserve(bound + bound / 8);
             return detail::VerifiedPathsAccess::try_save_compact_into<T>(*this, out, slack_div);
