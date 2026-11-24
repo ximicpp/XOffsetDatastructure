@@ -1,6 +1,6 @@
 # Mac queue
 
-Updated 2026-11-24T10:33:45Z after 119-applemin2: done 1 2026-11-24T10:33:41Z
+Updated 2026-11-24T10:35:54Z after 120-applemin-iossim: running 2026-11-24T10:35:51Z
 
 ```
 runner: pid 36944 (version 2)
@@ -124,4 +124,5 @@ free: 41 GB on /Volumes/XOffsetCS, 41 GB on /Users/ximi
 117-simp                                 done 0 2026-11-18T19:09:03Z
 118-applemin                             done 1 2026-11-24T10:26:00Z
 119-applemin2                            done 1 2026-11-24T10:33:41Z
+120-applemin-iossim                      running 2026-11-24T10:35:51Z
 ```
