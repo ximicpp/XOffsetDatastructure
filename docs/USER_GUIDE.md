@@ -1,4 +1,4 @@
-# XOffsetDatastructure User Guide (4.1.0, wire format 2.1)
+# XOffsetDatastructure User Guide (4.1.0, wire format 3.0)
 
 This guide is for users of the library. It explains how to define types, build,
 modify, save and load them, and the constraints you must follow.
@@ -681,7 +681,9 @@ XStatus done = token ? token->try_finish() : XStatus(token.error());
 
 The entries take the wire as a `std::string`, a `std::string_view` or a byte span (`XByteView`),
 and an optional `upstream` memory resource for the validation bitmaps; there are also
-`TypedXBuffer<T>::try_load_verified / try_reload_verified`. `XResult::value()` throws when there is
+`TypedXBuffer<T>::try_load_verified / try_reload_verified`, and non-throwing lifecycle entries
+`XBuffer::try_create<T>` / `try_clone()` / `try_clone_into(dst)` (and their `TypedXBuffer<T>`
+counterparts). `XResult::value()` throws when there is
 no value (in no-exception builds it calls the fatal handler); `*r` / `r->` do not check.
 
 ### 6.2 No-exception builds (`-fno-exceptions`, MSVC `/EHs-c-`)
@@ -690,15 +692,19 @@ The whole library can be used with exceptions disabled, for client engines that 
 It detects `__cpp_exceptions` / `_CPPUNWIND`; `-DXOFFSET_NO_EXCEPTIONS=1` forces it. RTTI is not
 required.
 
-- The receive path (wire header, extent table, capacity checks, OS storage reservation and copy,
-  owner registration, graph validation, free-table loading) returns the first failure up the call
-  chain, and the `try_*` entry points above hand it to the caller. The same wire gives the same
-  result and the same error text in builds with and without exceptions
+- The lifecycle and receive paths (`try_create`, `try_clone`, `try_clone_into`, `try_load_verified`,
+  `try_reload_verified`, `try_begin_verified_reload`, `XReceiver`, `make_room`, `grow`) return the
+  first failure up the call chain without throwing or calling the fatal handler. The same wire gives
+  the same result and the same error text in builds with and without exceptions
   (`tools/no_exceptions_differential.sh` compares 200,000 mutated wires one by one).
-- Other failures (arena out of space while modifying, `root<T>()` with no root, exceeding the wire
-  limit when saving, a rejection in a throwing receive entry point, ...) have no caller to return to;
-  they call the fatal handler and then `abort()`. Engines plug in their own crash reporting with
-  `set_fatal_handler(fn)`; `fn(XErrc, const char*)` must not return.
+- Mutations inside `buf.edit(...)` and `buf.root()` proxies run under `SoftFailScope`: arena
+  allocation failures leave the failing operation without effect and record the code in `buf.error()`
+  (`buf.ok() == false`) instead of aborting. Call `buf.make_room(bytes)` or pass `expected_growth` to
+  `edit()` before multi-step mutations.
+- Other failures (bare `plain_root()` writes that run out of space, `root<T>()` with no root,
+  exceeding the wire limit when saving, a rejection in a throwing entry point, ...) have no caller
+  to return to; they call the fatal handler and then `abort()`. Engines plug in their own crash
+  reporting with `set_fatal_handler(fn)`; `fn(XErrc, const char*)` must not return.
 - A failing host `operator new` terminates as the standard library does without exceptions.
 - Two places that recover from `XBadAlloc` when exceptions are on are fatal when they are off: the
   whole-block copy in container copy assignment (with exceptions it falls back to element-by-element
@@ -707,6 +713,22 @@ required.
 - When an allocation fails during a library container modification, the original logical content is
   kept, but capacity and allocator accounting are not necessarily rolled back. Multi-step business
   operations are not transactions.
+
+### 6.3 JSON diagnostics (`xoffset_dump.hpp`)
+
+Include `xoffset_dump.hpp` for human-readable logging and offline wire inspection under both C++20
+field lists and C++26 reflection (also compatible with `-fno-exceptions`):
+
+```cpp
+#include "xoffset_dump.hpp"
+
+std::string json = to_json(profile, XDumpOptions{.indent = 2, .max_elements = 16});
+std::string hdr  = dump_wire_header_json(wire);   // safe 40-byte header summary without touching payload
+```
+
+`to_json` formats scalars, enums (underlying integer), `XString` (JSON-escaped), `XVector`, `XSet`,
+`XMap`, fixed arrays and nested/derived records; non-finite floats serialize as `null`. `dump_json_into`
+appends into a caller-owned `std::string`.
 
 ## 7. Schema changes
 
