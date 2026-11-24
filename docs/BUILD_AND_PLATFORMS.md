@@ -24,18 +24,22 @@ compilers produce byte-identical wires and accept each other's.
 Native Windows (MSVC, clang-cl) runs the full library only through the
 field-list backend; the reflection builds do not support it.
 
-The source archive includes the locked TypeLayout and ten Boost header modules.
-Full installed packages include the same dependency headers. Neither package
-includes a compiler, SDK or runtime. Fixed compiler/image, CMake and dependency
-recipes are in [toolchains/README.md](../toolchains/README.md),
+C++20 and C++23 field-list builds use only the C++ standard library and require
+no external submodules or third-party headers. C++26 reflection builds and the
+full source archive include the locked TypeLayout and ten Boost header modules
+that its signature tools and reflection tests use. Neither package includes a
+compiler, SDK or runtime. Fixed compiler/image, CMake and dependency recipes are
+in [toolchains/README.md](../toolchains/README.md),
 [toolchains/vm-validation.json](../toolchains/vm-validation.json), and the
 [package guide](PACKAGING.md#fixed-inputs).
 
 ## Build and consume
 
-Extract the versioned source archive; it already contains the required dependency
-headers. In a Git checkout, first initialize the exact submodules using the
-[LF-preserving recipe](PACKAGING.md#fixed-inputs).
+C++20/C++23 builds can configure directly from a plain Git checkout with no
+submodules initialized (`-DXOFFSET_CXX_STANDARD=20` or `23`). For C++26
+reflection builds from Git, first initialize the exact submodules using the
+[LF-preserving recipe](PACKAGING.md#fixed-inputs) (the versioned source archive
+already contains them).
 
 For a full source build with an already prepared P2996 toolchain:
 
