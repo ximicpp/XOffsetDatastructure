@@ -1,0 +1,52 @@
+== 10:27:30Z macos-c++20
+macos-c++20 rc=0
+| configure | passed | `native-logs/configure.log` |
+| build | passed | `native-logs/build.log` |
+| ctest summary | 100% tests passed out of 215 | |
+== 10:29:12Z macos-c++23
+macos-c++23 rc=0
+| configure | passed | `native-logs/configure.log` |
+| build | passed | `native-logs/build.log` |
+| ctest summary | 100% tests passed out of 215 | |
+== 10:30:37Z ios-sim-c++20
+ios-sim-c++20 rc=1
+| configure | passed | `native-logs/configure.log` |
+| build | passed | `native-logs/build.log` |
+| ctest summary | 9% tests passed, 196 tests failed out of 215 | |
+== 10:32:36Z ios-device-c++20 (build only)
+ios-device-c++20 configure+build rc=0 (178 build lines)
+# APPLEMIN checks, main 7d69d66e0f9b073cd0c1037d1dd80cae99870a91
+
+macos 12.0: USE_PMR PMR_AVAILABLE TO_CHARS_FLOAT = 0 0 0
+macos 14.0: USE_PMR PMR_AVAILABLE TO_CHARS_FLOAT = 1 1 1
+ios-sim 14.0: USE_PMR PMR_AVAILABLE TO_CHARS_FLOAT = 0 0 0
+ios 14.0: USE_PMR PMR_AVAILABLE TO_CHARS_FLOAT = 0 0 0
+
+== macos-c++20
+CMAKE_OSX_DEPLOYMENT_TARGET:STRING=12.0
+sample binary: /Volumes/XOffsetCS/applemin/build-macos-c++20/bin/Release/test_adaptive_reservation
+ platform 1
+    minos 12.0
+test binaries: 159; importing std::pmr symbols: 0
+minos count:  159 12.0
+== macos-c++23
+CMAKE_OSX_DEPLOYMENT_TARGET:STRING=12.0
+sample binary: /Volumes/XOffsetCS/applemin/build-macos-c++23/bin/Release/test_adaptive_reservation
+ platform 1
+    minos 12.0
+test binaries: 159; importing std::pmr symbols: 0
+minos count:  159 12.0
+== ios-sim-c++20
+CMAKE_OSX_DEPLOYMENT_TARGET:STRING=14.0
+sample binary: /Volumes/XOffsetCS/applemin/build-ios-sim-c++20/bin/Release/test_adaptive_reservation
+ platform 7
+    minos 14.0
+test binaries: 159; importing std::pmr symbols: 0
+minos count:  159 14.0
+== ios-device-c++20
+CMAKE_OSX_DEPLOYMENT_TARGET:STRING=14.0
+sample binary: /Volumes/XOffsetCS/applemin/build-ios-device-c++20/bin/Release/test_adaptive_reservation
+ platform 2
+    minos 14.0
+test binaries: 159; importing std::pmr symbols: 0
+minos count:  159 14.0

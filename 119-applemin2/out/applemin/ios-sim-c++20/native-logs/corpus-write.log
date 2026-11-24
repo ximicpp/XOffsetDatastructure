@@ -1,0 +1,5 @@
+2026-11-24 02:32:14.247 simctl[19707:12055563] Malformed bundle does not contain an identifier at /private/var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.1.434.0.oJSaNI/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.0.simruntime
+An error was encountered processing the command (domain=com.apple.CoreSimulator.SimError, code=405):
+Process spawn via launchd failed because device is not booted.
+Underlying error (domain=com.apple.SimLaunchHostService.RequestError, code=3):
+	Bad or unknown session: com.apple.CoreSimulator.SimDevice.BF939968-6A21-42F1-88EB-D44C85C3E0FC

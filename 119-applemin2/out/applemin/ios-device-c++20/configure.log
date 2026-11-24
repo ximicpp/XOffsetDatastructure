@@ -1,0 +1,2178 @@
+-- The CXX compiler identification is AppleClang 21.0.0.21000401
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Using C++20 with XOFFSET_RECORD field lists
+-- Full-library C++20 field-list compile/link probe passed
+-- Polymorphic positive control passed; expected rejection diagnostic verified
+-- CTest inventory: 184 test programs + 24 subprocess scenarios + 1 tooling checks = 209; 3 configure checks listed separately
+-- C++20 build: 30 C++26-only tests not built (listed in test-inventory.json)
+-- Test inventory: /Volumes/XOffsetCS/applemin/build-ios-device-c++20/test-inventory.json
+-- Configuring done (2.3s)
+CMake Warning (policy) in examples/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'server_to_client' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in examples/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'server_to_client_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in examples/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'client_uplink' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in examples/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'client_uplink_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in examples/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'server_to_server' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in examples/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'server_to_server_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tools/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'check_signature_matrix'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_virtual_memory_storage' contains empty list items.  Those empty items
+  are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_vm_pool' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_vm_storage_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_basic_types' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_vector' contains empty
+  list items.  Those empty items are being silently discarded to preserve
+  backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_map_set' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_nested' contains empty
+  list items.  Those empty items are being silently discarded to preserve
+  backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_compaction' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_modify' contains empty
+  list items.  Those empty items are being silently discarded to preserve
+  backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_xbuffer_api' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_assign_range' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_scalar_resize'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_validation_granules'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_string_replace'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_hot_path_constants'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_resize_growth'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_wire_admission'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_xstring_direct_assign'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_string_append'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_xhandle' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_schema_envelope'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_fixed_layout_containers' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_error_paths' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_memory_efficiency'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_complex_nesting'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_inheritance' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_adaptive_reservation'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_main_containers'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_runtime_regressions'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_mutation_failures'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_wire_validation'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_same_arena_move'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_shift_relocate'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_append_grow' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_staged_insert'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_assign_sorted'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_first_block' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_free_table_policy'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_lower_bound_index'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_stable_storage'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_slot_storage' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_relocating_storage'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_proxy_scopes' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_retire_discard'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_proxy_fuzz' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_ordinary_records'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_schema_describe'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_vm_lifecycle' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_vm_transport' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_owner_identity'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_owner_registry'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_owner_map' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_tail_expansion'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_regrow_used_range'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_storage_policies'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_allocator_model'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_allocator_failures'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_v2_golden' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_cross_compiler_wire'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_schema_pin' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_stability_contract'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_wire_hole_zeroing'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_implicit_padding'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_v2_fuzz' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_save_compact' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_save_composed'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_free_run_emission'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_automatic_emission'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_spare_watch' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_root_spare' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_wire_populate'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_reload_reset' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_reset_used_range'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_clone' contains empty
+  list items.  Those empty items are being silently discarded to preserve
+  backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_relayout' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_delta_sync' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_delta_small' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_delta_format' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_delta_capacity'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_shared_delta' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_shared_delta_sync'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_shared_delta_format'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_shared_delta_slots'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_shared_delta_publisher' contains empty list items.  Those empty items
+  are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_shared_delta_publisher_errors' contains empty list items.  Those
+  empty items are being silently discarded to preserve backward
+  compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_dump' contains empty
+  list items.  Those empty items are being silently discarded to preserve
+  backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_relocating_storage_step' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_schema_handshake'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_schema_snapshot'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_receiver' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_receiver_forced'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_receiver_view'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_receiver_uplink_unchecked' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_receiver_view_uplink_unchecked' contains empty list items.  Those
+  empty items are being silently discarded to preserve backward
+  compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_fixed_message'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_no_exceptions'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_no_exceptions_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_automatic_emission_noexc' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_spare_watch_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_root_spare_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_free_run_emission_noexc' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_hot_path_constants_noexc' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_implicit_padding_noexc' contains empty list items.  Those empty items
+  are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_inheritance_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_lower_bound_index_noexc' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_memory_efficiency_noexc' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_ordinary_records_noexc' contains empty list items.  Those empty items
+  are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_regrow_used_range_noexc' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_save_compact_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_schema_pin_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_shift_relocate_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_stability_contract_noexc' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_string_append_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_v2_fuzz_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_wire_populate_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_xhandle_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_xstring_direct_assign_noexc' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_schema_handshake_noexc' contains empty list items.  Those empty items
+  are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_delta_sync_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_delta_format_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_relayout_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_fixed_message_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_receiver_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_receiver_forced_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_receiver_view_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_shared_delta_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_shared_delta_sync_noexc' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_shared_delta_format_noexc' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_shared_delta_slots_noexc' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_shared_delta_publisher_noexc' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_relocating_storage_noexc' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_proxy_scopes_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_retire_discard_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_proxy_fuzz_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_dump_noexc' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_wire_hole_zeroing_hardened' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_implicit_padding_hardened' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_assign_range_hardened'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_proxy_scopes_hardened'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_runtime_regressions_hardened' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_resize_growth_hardened' contains empty list items.  Those empty items
+  are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_string_append_hardened' contains empty list items.  Those empty items
+  are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_xstring_direct_assign_hardened' contains empty list items.  Those
+  empty items are being silently discarded to preserve backward
+  compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_save_composed_hardened' contains empty list items.  Those empty items
+  are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_vector_hardened'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_map_set_hardened'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_main_containers_hardened' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_fixed_layout_containers_hardened' contains empty list items.  Those
+  empty items are being silently discarded to preserve backward
+  compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_shift_relocate_hardened' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_ordinary_records_hardened' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_reset_used_range_hardened' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_reload_reset_hardened'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'test_regrow_used_range_hardened' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_slot_storage_hardened'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_relayout_hardened'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_no_exceptions'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_no_exceptions_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'fuzz_v2_wire_replay'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'fuzz_v2_wire_replay'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'fuzz_v2_wire_replay'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'fuzz_wire_schemas_replay'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'fuzz_wire_schemas_replay'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'fuzz_wire_schemas_replay'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'fuzz_delta_sync_replay'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'fuzz_delta_sync_replay'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'fuzz_delta_sync_replay'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'fuzz_shared_delta_replay'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'fuzz_shared_delta_replay'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'fuzz_shared_delta_replay'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'fuzz_v2_wire_replay_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'fuzz_v2_wire_replay_noexc'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'fuzz_wire_schemas_replay_noexc' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target
+  'fuzz_wire_schemas_replay_noexc' contains empty list items.  Those empty
+  items are being silently discarded to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_v2_fuzz' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_v2_fuzz' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_vm_lifecycle' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_vm_lifecycle' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_vm_lifecycle' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_vm_lifecycle' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_vm_lifecycle' contains
+  empty list items.  Those empty items are being silently discarded to
+  preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_shift_relocate'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_shift_relocate'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_shift_relocate'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_owner_registry'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_owner_registry'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_verified_paths'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_stable_erase_if'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_locator_soundness'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+CMake Warning (policy) in tests/CMakeLists.txt:
+  The CROSSCOMPILING_EMULATOR property of target 'test_core_lifetime'
+  contains empty list items.  Those empty items are being silently discarded
+  to preserve backward compatibility.
+
+  Policy CMP0178 is not set: Test command lines preserve empty arguments.
+  Run "cmake --help-policy CMP0178" for policy details.  Use the cmake_policy
+  command to set the policy and suppress this warning.
+This warning is for project developers.  Use -Wno-author or -Wno-policy to
+suppress it.
+
+-- Generating done (0.1s)
+-- Build files have been written to: /Volumes/XOffsetCS/applemin/build-ios-device-c++20
