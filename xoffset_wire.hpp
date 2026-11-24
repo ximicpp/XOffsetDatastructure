@@ -1571,7 +1571,8 @@ namespace XOffsetDatastructure {
     inline constexpr std::uint8_t XWIRE_FORMAT_MINOR = XBufferCore::image_format_minor;
     inline constexpr std::uint32_t XWIRE_MAGIC = 0x4F58u | (std::uint32_t(XWIRE_FORMAT_MAJOR) << 16) |
                                                  (std::uint32_t(XWIRE_FORMAT_MINOR) << 24);
-    static_assert(XWIRE_MAGIC == 0x00034F58u && XWIRE_MAGIC == std::uint32_t(XBufferCore::image_magic));
+    static_assert(XWIRE_MAGIC == 0x00034F58u &&
+                  XWIRE_MAGIC == static_cast<std::uint32_t>(XBufferCore::image_magic & 0xFFFFFFFFu));
     // Payload offset of the root object, the first block: the header's size.
     inline constexpr std::size_t XWIRE_PAYLOAD_BEGIN = 40;
     static_assert(sizeof(XBufferCore::arena_header) == XWIRE_PAYLOAD_BEGIN &&

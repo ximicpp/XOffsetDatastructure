@@ -3761,7 +3761,7 @@ namespace XOffsetDatastructure {
                     });
                 }
                 if (used < old_used) std::memcpy(base + used, undo, old_used - used);
-                core.arena()->used_end = old_used;
+                core.arena()->used_end = static_cast<std::uint32_t>(old_used);
             }
 
             // Whether the delta writes a byte in no live block (one of a free
@@ -3841,7 +3841,7 @@ namespace XOffsetDatastructure {
                 } else {
                     patch(base, parsed);
                 }
-                core.arena()->used_end = used;
+                core.arena()->used_end = static_cast<std::uint32_t>(used);
 
                 XOFFSET_ROLLBACK_BEGIN
                     XOFFSET_VTRY(check_digest<T>(core, parsed, who));
@@ -3928,7 +3928,7 @@ namespace XOffsetDatastructure {
                     patch(base, parsed);
                 }
                 if (used < old_used) std::memset(base + used, 0, old_used - used);
-                core.arena()->used_end = used;
+                core.arena()->used_end = static_cast<std::uint32_t>(used);
                 if (keep_undo) {
                     XOFFSET_ROLLBACK_BEGIN
                         XOFFSET_VTRY(check_digest<T>(core, parsed, who));
