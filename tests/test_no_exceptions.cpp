@@ -290,6 +290,172 @@ void create_and_clone_entries(const std::string& good) {
     }
 }
 
+void save_delta_and_compact_entries(const std::string& good) {
+    // ref<T>() and edit<T>() on empty/unverified/wrong-type buffers must not abort.
+    {
+        auto empty = XBuffer::try_create<NoExcRoot>(4096, cap());
+        need(bool(empty), "empty setup");
+        if (empty) {
+            (void)empty->try_reload_verified<NoExcRoot>(std::string("bad"));
+            auto r = empty->ref<NoExcRoot>();
+            need(!r, "ref<T>() on buffer without root returns empty proxy");
+            const bool edited = empty->edit<NoExcRoot>([](NoExcRoot& x) { x.id = 1; });
+            need(!edited && empty->error() == XErrc::no_root, "edit<T>() without root records no_root");
+        }
+        auto other = TypedXBuffer<NoExcOther>::try_create(4096, cap());
+        need(bool(other), "other setup");
+        if (other) {
+            auto wrong_ref = other->XBuffer::ref<NoExcRoot>();
+            need(!wrong_ref, "ref<WrongT>() returns empty proxy");
+            const bool wrong_edit = other->XBuffer::edit<NoExcRoot>([](NoExcRoot& x) { x.id = 2; });
+            need(!wrong_edit && other->error() == XErrc::no_root, "edit<WrongT>() records no_root");
+        }
+    }
+
+    // try_save_verified / try_save_compact / try_save_delta happy paths and rejections.
+    {
+        auto buf = TypedXBuffer<NoExcRoot>::try_load_verified(good, cap());
+        need(bool(buf), "save/delta setup load");
+        if (buf) {
+            auto w1 = buf->try_save_verified();
+            need(bool(w1) && *w1 == good, "TypedXBuffer::try_save_verified roundtrip");
+
+            std::string w2;
+            const XStatus s2 = buf->try_save_verified_into(w2);
+            need(bool(s2) && w2 == good, "TypedXBuffer::try_save_verified_into roundtrip");
+
+            auto c1 = buf->try_save_compact();
+            need(bool(c1), "TypedXBuffer::try_save_compact ok");
+            if (c1) {
+                auto reloaded = TypedXBuffer<NoExcRoot>::try_load_verified(*c1, cap());
+                need(bool(reloaded) && holds(*reloaded, 7, 300), "compact wire reloads identically");
+            }
+
+            std::string c2;
+            const XStatus sc2 = buf->try_save_compact_into(c2);
+            need(bool(sc2) && c1 && c2 == *c1, "TypedXBuffer::try_save_compact_into matches");
+
+            // Composed try_save_compact_into: valid assignment and invalid out-of-root target.
+            std::uint64_t override_id = 99;
+            std::string composed;
+            const XStatus sc_ok = buf->try_save_compact_into(
+                composed, XCompactOptions{}, xassign(buf->plain_root().id, override_id));
+            need(bool(sc_ok), "composed try_save_compact_into ok");
+            if (sc_ok) {
+                auto reloaded = TypedXBuffer<NoExcRoot>::try_load_verified(composed, cap());
+                need(bool(reloaded) && holds(*reloaded, 99, 300), "composed wire carries override");
+            }
+            std::uint64_t foreign_target = 0;
+            std::string bad_composed = "stale";
+            const XStatus sc_bad = buf->try_save_compact_into(
+                bad_composed, XCompactOptions{}, xassign(foreign_target, override_id));
+            need(!sc_bad && sc_bad.code() == XErrc::invalid_argument && bad_composed.empty(),
+                 "composed bad target rejected cleanly: " + describe(sc_bad.error()));
+
+            // Wrong schema type rejection on try_save_verified / try_save_compact / try_save_delta.
+            auto wrong_save = buf->XBuffer::try_save_verified<NoExcOther>();
+            need(!wrong_save && wrong_save.code() == XErrc::schema_mismatch,
+                 "try_save_verified wrong type: " + describe(wrong_save.error()));
+            auto wrong_compact = buf->XBuffer::try_save_compact<NoExcOther>();
+            need(!wrong_compact && wrong_compact.code() == XErrc::schema_mismatch,
+                 "try_save_compact wrong type: " + describe(wrong_compact.error()));
+
+            // Delta sync non-throwing emit + key_delta + receiver apply.
+            XDeltaBaseline base;
+            auto empty_key = base.try_key_delta();
+            need(!empty_key && empty_key.code() == XErrc::invalid_state,
+                 "empty baseline try_key_delta: " + describe(empty_key.error()));
+
+            auto wrong_delta = buf->XBuffer::try_save_delta<NoExcOther>(base);
+            need(!wrong_delta && wrong_delta.code() == XErrc::schema_mismatch,
+                 "try_save_delta wrong type: " + describe(wrong_delta.error()));
+
+            std::string delta1;
+            auto ds1 = buf->try_save_delta_into(delta1, base);
+            need(bool(ds1) && ds1->key && !delta1.empty(), "try_save_delta_into key delta");
+
+            auto late_key = base.try_key_delta();
+            need(bool(late_key) && !late_key->empty(), "baseline try_key_delta after first delta");
+
+            auto rx = TypedXBuffer<NoExcRoot>::try_create(4096, cap());
+            need(bool(rx), "delta rx create");
+            XDeltaCursor cursor;
+            if (rx && ds1) {
+                need(bool(rx->try_apply_delta_verified(delta1, cursor)), "apply key delta");
+                need(holds(*rx, 7, 300), "rx holds initial state");
+                buf->edit([](NoExcRoot& r) { r.id = 123; });
+                std::vector<char> span_buf(4096);
+                auto dn = buf->try_save_delta_into(std::span<char>(span_buf), base);
+                need(bool(dn) && *dn > 0 && *dn <= span_buf.size(), "try_save_delta_into(span) incremental");
+                if (dn) {
+                    need(bool(rx->try_apply_delta_verified(
+                             std::span<const std::byte>(reinterpret_cast<const std::byte*>(span_buf.data()), *dn),
+                             cursor)),
+                         "apply incremental span delta");
+                    need(holds(*rx, 123, 300), "rx holds updated state");
+                }
+            }
+
+            // XCompactor::try_compact and compact (must not abort in -fno-exceptions builds).
+            // Fragment the buffer first by replacing string/vector repeatedly.
+            buf->edit([](NoExcRoot& r) {
+                for (int i = 0; i < 6; ++i) {
+                    r.name = std::string(120 + static_cast<std::size_t>(i * 17), 'x');
+                    r.values.push_back(static_cast<std::uint32_t>(i));
+                }
+            });
+            auto compacted = XCompactor::try_compact<NoExcRoot>(*buf);
+            need(bool(compacted), "XCompactor::try_compact ok");
+            if (compacted) {
+                auto cw = compacted->save_verified<NoExcRoot>();
+                auto loaded_c = TypedXBuffer<NoExcRoot>::try_load_verified(cw, cap());
+                need(bool(loaded_c) && loaded_c->plain_root().id == 123 &&
+                     loaded_c->plain_root().values.size() == 306,
+                     "compacted buffer preserves content");
+            }
+            // Empty buffer (no root) compacts to empty buffer without aborting.
+            auto no_root_buf = XBuffer::try_create<NoExcRoot>(4096, cap());
+            if (no_root_buf) {
+                (void)no_root_buf->try_reload_verified<NoExcRoot>(std::string("bad"));
+                auto empty_compacted = XCompactor::try_compact<NoExcRoot>(*no_root_buf);
+                need(bool(empty_compacted) && !empty_compacted->has_root<NoExcRoot>(),
+                     "XCompactor::try_compact on empty buffer");
+            }
+        }
+    }
+
+    // Unverified buffer and sticky-error buffer must be rejected cleanly by try_save_* / try_save_delta_*.
+    {
+        auto unverified = XBuffer::load_unverified(good, cap());
+        auto s1 = unverified.try_save_verified<NoExcRoot>();
+        need(!s1 && s1.code() == XErrc::no_root, "unverified try_save_verified: " + describe(s1.error()));
+        auto s2 = unverified.try_save_compact<NoExcRoot>();
+        need(!s2 && s2.code() == XErrc::no_root, "unverified try_save_compact: " + describe(s2.error()));
+        XDeltaBaseline b;
+        auto s3 = unverified.try_save_delta<NoExcRoot>(b);
+        need(!s3 && s3.code() == XErrc::no_root, "unverified try_save_delta: " + describe(s3.error()));
+
+        auto tight = TypedXBuffer<NoExcRoot>::try_create(256, XBuffer::maximum_capacity(512));
+        need(bool(tight), "tight try_create");
+        if (tight) {
+            const bool ok = tight->edit([](NoExcRoot& r) { r.values.resize(400); });
+            need(!ok && !tight->ok(), "tight edit records sticky failure");
+            std::string out = "keep";
+            const XStatus sv = tight->try_save_verified_into(out);
+            need(!sv && sv.code() == tight->error() && out.empty(),
+                 "sticky-error try_save_verified_into: " + describe(sv.error()));
+            out = "keep";
+            const XStatus sc = tight->try_save_compact_into(out);
+            need(!sc && sc.code() == tight->error() && out.empty(),
+                 "sticky-error try_save_compact_into: " + describe(sc.error()));
+            out = "keep";
+            auto sd = tight->try_save_delta_into(out, b);
+            need(!sd && sd.code() == tight->error() && out.empty(),
+                 "sticky-error try_save_delta_into: " + describe(sd.error()));
+        }
+    }
+}
+
 [[noreturn]] void print_fatal(XErrc code, const char* message) {
     std::printf("fatal %s: %s\n", to_string(code), message);
     std::fflush(stdout);
@@ -377,6 +543,7 @@ int main(int argc, char** argv) {
     reload_rejections(reload_cases, good);
     direct_reload(good, corrupt);
     create_and_clone_entries(good);
+    save_delta_and_compact_entries(good);
 
     // A loaded result of another root type is refused like load_verified.
     {

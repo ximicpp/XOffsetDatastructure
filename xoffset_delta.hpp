@@ -1530,6 +1530,14 @@ namespace XOffsetDatastructure {
             key_delta_into(out, options);
             return out;
         }
+        /// Non-throwing key_delta_into / key_delta (safe in -fno-exceptions builds).
+        XStatus try_key_delta_into(std::string& out, XDeltaOptions options = {}) const;
+        XResult<std::string> try_key_delta(XDeltaOptions options = {}) const {
+            std::string out;
+            XStatus status = try_key_delta_into(out, options);
+            if (!status) return std::move(status).error();
+            return XResult<std::string>(std::move(out));
+        }
         /// reset() and return the copy's memory, and the scratch the calling
         /// thread's baselines share.
         void release() noexcept {
@@ -1915,6 +1923,33 @@ namespace XOffsetDatastructure {
                 return std::uint32_t(o.digest) | std::uint32_t(o.touched_only) << 1 | std::uint32_t(o.whole_blocks) << 2;
             }
             template <typename T>
+            XOFFSET_DETAIL_NOINLINE static vstatus save_into_span_v(XBuffer& xbuf, std::span<char> out,
+                                                                    XDeltaBaseline& b, std::uint32_t word,
+                                                                    std::size_t& out_size) {
+                const XDeltaOptions options{(word & 1u) != 0, (word & 2u) != 0, (word & 4u) != 0};
+                std::string& delta = b.pending_;
+                if (delta.empty()) {
+                    XDeltaStats stats{};
+                    XOFFSET_VTRY(xbuf.template save_delta_into_general_v<T>(delta, b, options, stats));
+                    b.pending_stats_ = stats;
+                    if (delta.empty()) {
+                        out_size = 0;
+                        return vok();
+                    }
+                }
+                const std::size_t n = delta.size();
+                if (n <= out.size()) {
+                    std::memcpy(out.data(), delta.data(), n);
+                    delta.clear();
+                    b.pending_stats_ = XDeltaStats{};
+                } else {
+                    b.token_.v = 0;
+                }
+                out_size = n;
+                return vok();
+            }
+
+            template <typename T>
             XOFFSET_DETAIL_NOINLINE static std::size_t save_into_span(XBuffer& xbuf, std::span<char> out,
                                                                       XDeltaBaseline& b, std::uint32_t word) {
                 const XDeltaOptions options{(word & 1u) != 0, (word & 2u) != 0, (word & 4u) != 0};
@@ -2010,9 +2045,9 @@ namespace XOffsetDatastructure {
             // Writes a run frame: the header, with EXTENT the used size, with
             // DIGEST the digest of src's image [32, used), and the runs (by
             // offset, disjoint, inside [32, used)) with their bytes from src.
-            static void write_run_frame(std::string& out, std::uint32_t flags, std::uint64_t stream,
-                                        std::uint32_t version, std::size_t used, const char* src,
-                                        std::span<const DeltaTouchRun> runs, std::uint64_t bytes) {
+            static vstatus write_run_frame_v(std::string& out, std::uint32_t flags, std::uint64_t stream,
+                                             std::uint32_t version, std::size_t used, const char* src,
+                                             std::span<const DeltaTouchRun> runs, std::uint64_t bytes) {
                 std::size_t size = XDELTA_RUN_HEADER + bytes;
                 if (flags & XDELTA_FLAG_EXTENT)
                     size += delta_varint_size(static_cast<std::uint32_t>((used - payload_begin) / 8u));
@@ -2023,7 +2058,8 @@ namespace XOffsetDatastructure {
                     prev = std::size_t(r.at) + r.bytes;
                 }
                 if (size > out.max_size())
-                    XOFFSET_THROW(std::length_error("save_delta<T>(): output size exceeds string limit"));
+                    XOFFSET_VFAIL_STD(std::length_error, XErrc::length_error,
+                                      "save_delta<T>(): output size exceeds string limit");
                 const auto emit = [&](char* p) noexcept {
                     const std::uint32_t word = run_frame_word(flags);
                     std::memcpy(p, &word, 4);
@@ -2055,6 +2091,7 @@ namespace XOffsetDatastructure {
                 out.resize(size);
                 emit(out.data());
 #endif
+                return vok();
             }
 
             // The block ranges [first, last) of the runs listed in the log,
@@ -2087,14 +2124,18 @@ namespace XOffsetDatastructure {
             }
 
             template <typename T>
-            static XDeltaStats encode(XBuffer& xbuf, std::string& out, XDeltaBaseline& b, XDeltaOptions options) {
+            static vstatus encode_v(XBuffer& xbuf, std::string& out, XDeltaBaseline& b, XDeltaOptions options,
+                                    XDeltaStats& out_stats) {
                 XBufferCore& core = xbuf;
-                if (!b.pending_.empty()) [[unlikely]] return take_pending(b, out);
+                if (!b.pending_.empty()) [[unlikely]] {
+                    out_stats = take_pending(b, out);
+                    return vok();
+                }
                 const char* cur = static_cast<const char*>(core.get_address());
                 const auto* sm = core.arena();
-                const std::size_t used = static_cast<std::size_t>(sm->used_end);
-                if (used < payload_begin || used > XBufferCore::MAX_PAYLOAD || used > core.get_size())
-                    XOFFSET_THROW(XException(XErrc::invalid_state, "save_delta<T>(): payload extent out of range"));
+                const std::size_t used = sm ? static_cast<std::size_t>(sm->used_end) : 0u;
+                if (!sm || used < payload_begin || used > XBufferCore::MAX_PAYLOAD || used > core.get_size())
+                    XOFFSET_VFAIL(XException, XErrc::invalid_state, "save_delta<T>(): payload extent out of range");
 
                 if (b.stream_ == 0) b.stream_ = new_delta_stream();
                 if (b.version_ == UINT32_MAX) {
@@ -2157,10 +2198,11 @@ namespace XOffsetDatastructure {
                         drop.b = nullptr;
                         out.clear();
                         stats.empty = true;
-                        return stats;
+                        out_stats = stats;
+                        return vok();
                     }
                     flags |= XDELTA_FLAG_RUNS;
-                    write_run_frame(out, flags, b.stream_, version, used, cur, runs, bytes);
+                    XOFFSET_VTRY(write_run_frame_v(out, flags, b.stream_, version, used, cur, runs, bytes));
                     stats.blocks = static_cast<std::uint32_t>(runs.size());
                     stats.changed_bytes = bytes;
                 } else {
@@ -2229,7 +2271,8 @@ namespace XOffsetDatastructure {
                         drop.b = nullptr;
                         out.clear();
                         stats.empty = true;
-                        return stats;
+                        out_stats = stats;
+                        return vok();
                     }
                     // One changed block whose changed bytes are one run (a
                     // field set): a run frame, which the receiver copies
@@ -2244,8 +2287,8 @@ namespace XOffsetDatastructure {
                         const unsigned len = unsigned(std::countr_one(one >> lo));
                         const DeltaTouchRun run{blocks[0].offset + lo, len};
                         // flags is 0 here: no digest, the same used size.
-                        write_run_frame(out, XDELTA_FLAG_RUNS, b.stream_, version, used, cur,
-                                        std::span<const DeltaTouchRun>(&run, 1), len);
+                        XOFFSET_VTRY(write_run_frame_v(out, XDELTA_FLAG_RUNS, b.stream_, version, used, cur,
+                                                       std::span<const DeltaTouchRun>(&run, 1), len));
                         stats.blocks = 1;
                         stats.changed_bytes = len;
                     } else {
@@ -2255,7 +2298,7 @@ namespace XOffsetDatastructure {
                         header.version = version;
                         header.used_bytes = static_cast<std::uint32_t>(used);
                         header.block_count = static_cast<std::uint32_t>(blocks.size());
-                        write_delta(out, header, b.schema_hash_, b.root_type_id_, cur, blocks, totals);
+                        XOFFSET_VTRY(write_delta_v(out, header, b.schema_hash_, b.root_type_id_, cur, blocks, totals));
                         stats.blocks = header.block_count;
                         stats.changed_bytes = totals.changed;
                     }
@@ -2269,6 +2312,14 @@ namespace XOffsetDatastructure {
                 if (pair || (key && log)) pair_touch_log(core, b, type_mix<T>);
                 drop.b = nullptr;
                 stats.delta_bytes = out.size();
+                out_stats = stats;
+                return vok();
+            }
+
+            template <typename T>
+            static XDeltaStats encode(XBuffer& xbuf, std::string& out, XDeltaBaseline& b, XDeltaOptions options) {
+                XDeltaStats stats{};
+                XOFFSET_VREQUIRE(encode_v<T>(xbuf, out, b, options, stats));
                 return stats;
             }
 
@@ -2467,14 +2518,15 @@ namespace XOffsetDatastructure {
                 return delta_put_varint(p, h.block_count);
             }
 
-            static void write_delta(std::string& out, const DeltaHeader& header, std::uint64_t schema_hash,
-                                    std::uint64_t root_type_id, const char* src, const DeltaBlockBuffer& blocks,
-                                    DeltaBlockTotals totals) {
+            static vstatus write_delta_v(std::string& out, const DeltaHeader& header, std::uint64_t schema_hash,
+                                         std::uint64_t root_type_id, const char* src, const DeltaBlockBuffer& blocks,
+                                         DeltaBlockTotals totals) {
                 const bool key = (header.flags & XDELTA_FLAG_KEY) != 0;
                 const bool digest = (header.flags & XDELTA_FLAG_DIGEST) != 0;
                 const std::size_t size = header_size(header) + (key ? 16u : 0u) + (digest ? 8u : 0u) + totals.encoded;
                 if (size > out.max_size() - 8u)
-                    XOFFSET_THROW(std::length_error("save_delta<T>(): output size exceeds string limit"));
+                    XOFFSET_VFAIL_STD(std::length_error, XErrc::length_error,
+                                      "save_delta<T>(): output size exceeds string limit");
                 const auto emit = [&](char* p) noexcept {
                     p = put_header(p, header);
                     if (key) {
@@ -2517,11 +2569,12 @@ namespace XOffsetDatastructure {
                 emit(out.data());
                 out.resize(size);
 #endif
+                return vok();
             }
 
-            static void key_delta_into(const XDeltaBaseline& b, std::string& out, XDeltaOptions options) {
+            static vstatus key_delta_into_v(const XDeltaBaseline& b, std::string& out, XDeltaOptions options) {
                 if (b.used_ == 0 || b.version_ == 0 || b.record_ != XDeltaRecord::copy)
-                    XOFFSET_THROW(XException(XErrc::invalid_state, "XDeltaBaseline::key_delta_into(): no recorded state"));
+                    XOFFSET_VFAIL(XException, XErrc::invalid_state, "XDeltaBaseline::key_delta_into(): no recorded state");
                 const std::size_t used = b.payload_.size();
                 DeltaBlockBuffer blocks;
                 const DeltaBlockTotals totals =
@@ -2532,7 +2585,11 @@ namespace XOffsetDatastructure {
                 header.version = b.version_;
                 header.used_bytes = static_cast<std::uint32_t>(used);
                 header.block_count = static_cast<std::uint32_t>(blocks.size());
-                write_delta(out, header, b.schema_hash_, b.root_type_id_, b.payload_.data(), blocks, totals);
+                return write_delta_v(out, header, b.schema_hash_, b.root_type_id_, b.payload_.data(), blocks, totals);
+            }
+
+            static void key_delta_into(const XDeltaBaseline& b, std::string& out, XDeltaOptions options) {
+                XOFFSET_VREQUIRE(key_delta_into_v(b, out, options));
             }
 
             // ---- receiver -------------------------------------------------
@@ -4255,6 +4312,10 @@ namespace XOffsetDatastructure {
         detail::DeltaAccess::key_delta_into(*this, out, options);
     }
 
+    inline XStatus XDeltaBaseline::try_key_delta_into(std::string& out, XDeltaOptions options) const {
+        return detail::try_v([&] { return detail::DeltaAccess::key_delta_into_v(*this, out, options); });
+    }
+
     template <typename T>
     XOFFSET_DETAIL_INLINE XDeltaStats XBuffer::save_delta_into(std::string& out, XDeltaBaseline& baseline,
                                                                XDeltaOptions options) {
@@ -4272,6 +4333,29 @@ namespace XOffsetDatastructure {
                 return stats;
         }
         return save_delta_into_general<T>(out, baseline, options);
+    }
+
+    template <typename T>
+    XOFFSET_DETAIL_NOINLINE detail::vstatus XBuffer::save_delta_into_general_v(
+        std::string& out, XDeltaBaseline& baseline, XDeltaOptions options, XDeltaStats& out_stats) {
+        XOFFSET_VTRY(refuse_failed_emit_v(out));
+        if (detail::DeltaAccess::has_pending(baseline)) [[unlikely]] {
+            out_stats = detail::DeltaAccess::take_pending(baseline, out);
+            return detail::vok();
+        }
+        T* root_ptr;
+        if (this->template root_is<T>()) [[likely]] {
+            // The root key is T's: the checks below hold (root<T>()).
+            root_ptr = detail::image_root<T>(*this);
+        } else {
+            XOFFSET_VTRY(require_typed_root_access_v("save_delta<T>(): unverified payload cannot be relabeled as verified"));
+            XOFFSET_VTRY(require_schema_match_v<T>("save_delta<T>(): schema mismatch for requested root type"));
+            root_ptr = detail::find_root<T>(*this);
+            if (!root_ptr)
+                XOFFSET_VFAIL(XException, XErrc::no_root, "save_delta<T>(): no root object of requested type");
+        }
+        XOFFSET_VTRY(ensure_hole_table_v(*root_ptr));
+        return detail::DeltaAccess::encode_v<T>(*this, out, baseline, options, out_stats);
     }
 
     template <typename T>
@@ -4294,6 +4378,24 @@ namespace XOffsetDatastructure {
     }
 
     template <typename T>
+    XResult<XDeltaStats> XBuffer::try_save_delta_into(std::string& out, XDeltaBaseline& baseline,
+                                                      XDeltaOptions options) {
+        static_assert(is_wire_admitted_v<T>, "save_delta<T>() requires an admitted fixed-schema wire type.");
+#ifdef XOFFSET_REJECT_IMPLICIT_PADDING
+        static_assert(!has_implicit_padding_v<T>,
+            "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");
+#endif
+        XDeltaStats stats{};
+        return detail::try_v_into(stats, [&]() -> detail::vstatus {
+            if (!options.digest && !options.whole_blocks) [[likely]] {
+                if (detail::DeltaAccess::publish_touches<T>(*this, baseline, out, stats)) [[likely]]
+                    return detail::vok();
+            }
+            return save_delta_into_general_v<T>(out, baseline, options, stats);
+        });
+    }
+
+    template <typename T>
     XOFFSET_DETAIL_INLINE std::size_t XBuffer::save_delta_into(std::span<char> out, XDeltaBaseline& baseline,
                                                                XDeltaOptions options) {
         // (A recorded failure drops the touch log's token: the short path
@@ -4306,10 +4408,36 @@ namespace XOffsetDatastructure {
     }
 
     template <typename T>
+    XResult<std::size_t> XBuffer::try_save_delta_into(std::span<char> out, XDeltaBaseline& baseline,
+                                                      XDeltaOptions options) {
+        static_assert(is_wire_admitted_v<T>, "save_delta<T>() requires an admitted fixed-schema wire type.");
+#ifdef XOFFSET_REJECT_IMPLICIT_PADDING
+        static_assert(!has_implicit_padding_v<T>,
+            "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");
+#endif
+        std::size_t n = 0;
+        return detail::try_v_into(n, [&]() -> detail::vstatus {
+            if (!options.digest && !options.whole_blocks &&
+                detail::DeltaAccess::publish_touches<T>(*this, baseline, out.data(), out.size(), n)) [[likely]]
+                return detail::vok();
+            return detail::DeltaAccess::save_into_span_v<T>(
+                *this, out, baseline, detail::DeltaAccess::options_word(options), n);
+        });
+    }
+
+    template <typename T>
     std::string XBuffer::save_delta(XDeltaBaseline& baseline, XDeltaOptions options) {
         std::string out;
         (void)save_delta_into<T>(out, baseline, options);
         return out;
+    }
+
+    template <typename T>
+    XResult<std::string> XBuffer::try_save_delta(XDeltaBaseline& baseline, XDeltaOptions options) {
+        std::string out;
+        auto stats = try_save_delta_into<T>(out, baseline, options);
+        if (!stats) return std::move(stats).error();
+        return XResult<std::string>(std::move(out));
     }
 
     template <typename T>
