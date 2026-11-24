@@ -38,7 +38,7 @@ namespace XOffsetDatastructure {
         template <typename U, std::size_t I>
         consteval void append_member(std::string& out) {
             using member = schema::member_t<U, I>;
-            if (I != 0) out += ',';
+            if constexpr (I != 0) out += ',';
             out += member::name;
             out += ':';
             append_decimal(out, member::offset);

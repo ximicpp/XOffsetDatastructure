@@ -1407,7 +1407,7 @@ namespace XOffsetDatastructure {
             // check_reinit_payload), and so is the payload base.
             const std::uint64_t start = sm->used_end;
             if (start + bytes > buffer_.size()) [[unlikely]] return nullptr;
-            sm->used_end = start + bytes;
+            sm->used_end = static_cast<std::uint32_t>(start + bytes);
             return payload_byte_address(static_cast<size_type>(start));
         }
         // publish_first_block's bump: try_bump_first<false> from the payload
@@ -1438,7 +1438,7 @@ namespace XOffsetDatastructure {
             if (packed_.growth_policy == XGrowPolicy::Relocating) return false;
 #endif
             if (new_bytes > MAX_PAYLOAD - offset || !ensure_allocation_extent(offset + new_bytes)) return false;
-            arena()->used_end = offset + new_bytes;
+            arena()->used_end = static_cast<std::uint32_t>(offset + new_bytes);
             return true;
         }
 
@@ -1572,7 +1572,7 @@ namespace XOffsetDatastructure {
             const std::uint64_t start = sm->used_end;
             if (((reinterpret_cast<std::uintptr_t>(base) + start) & 7u) == 0 &&
                 start + bytes <= buffer_.size()) [[likely]] {
-                sm->used_end = start + bytes;
+                sm->used_end = static_cast<std::uint32_t>(start + bytes);
                 return base + start;
             }
             return nullptr;
@@ -1762,7 +1762,7 @@ namespace XOffsetDatastructure {
                     !buffer_.grow_to(extent_target(static_cast<size_type>(start + bytes), maximum)))
                     return 0;
             }
-            sm->used_end = start + bytes;
+            sm->used_end = static_cast<std::uint32_t>(start + bytes);
             return static_cast<std::uint32_t>(start);
         }
 
@@ -2181,7 +2181,7 @@ namespace XOffsetDatastructure {
             if (start > MAX_PAYLOAD || bytes > MAX_PAYLOAD - start) XOFFSET_THROW(XBadAlloc());
             if (!ensure_allocation_extent(start + bytes, allow_growth)) XOFFSET_THROW(XBadAlloc());
             // Publish the allocation before any host callback can observe it.
-            sm->used_end = start + bytes;
+            sm->used_end = static_cast<std::uint32_t>(start + bytes);
             void* result = payload_byte_address(start);
             // Alignment padding (alignment > 8 only) stays an exact free block
             // (recorded in the payload: no host callback runs).
