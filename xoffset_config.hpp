@@ -4,20 +4,9 @@
 // C++17; includes no other XOffset header.
 
 // ---- Platform ---------------------------------------------------------------
-// 64-bit little-endian only (xoffset_arena.hpp refuses anything else).
-#if defined(__LP64__) || defined(_WIN64) || (defined(__SIZEOF_POINTER__) && __SIZEOF_POINTER__ == 8)
-    #define XOFFSET_ARCH_64BIT 1
-#else
-    #define XOFFSET_ARCH_64BIT 0
-#endif
-
-#if defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__)
-    #define XOFFSET_LITTLE_ENDIAN (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
-#elif defined(_WIN32) || defined(_WIN64) || defined(__i386__) || defined(__x86_64__) || defined(_M_IX86) || defined(_M_X64)
-    #define XOFFSET_LITTLE_ENDIAN 1
-#else
-    #define XOFFSET_LITTLE_ENDIAN 0
-#endif
+// 64-bit little-endian only, with the scalar representation every supported ABI
+// shares: xoffset_arena.hpp refuses anything else at compile time, and there is no
+// switch that turns the check off.
 
 #if defined(_WIN32)
 // The lean <windows.h>, without min/max: no rpcndr.h (`small`, `hyper`), winsock.h or
