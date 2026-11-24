@@ -1912,9 +1912,11 @@ namespace XOffsetDatastructure {
             assign_range_regrow(src, n, bytes);
         }
 
-        // assign_bytes into a fresh block; out of line, so the in-capacity
-        // path above stays small enough to inline at the caller.
-        XOFFSET_DETAIL_NOINLINE void assign_range_regrow(const void* src, size_type count,
+        // assign_bytes into a fresh block. Inline in assign_bytes_slow, its
+        // only caller, which already keeps it off the inline path above: a
+        // second call level cost each regrowth ~7 instructions (formal.mutate,
+        // slg.A.apply).
+        XOFFSET_DETAIL_INLINE void assign_range_regrow(const void* src, size_type count,
                                                          std::uint32_t bytes) {
             const auto alloc = bound_binding();
             // A container that already has capacity regrows to
@@ -2117,10 +2119,15 @@ namespace XOffsetDatastructure {
         }
 
     protected:
+        // Only a full vector (or an unbound head) gets here, so insert_body
+        // directly: through insert_construct, Clang called insert_general from
+        // here, a second call level and the append and insert fast paths
+        // tested again on each growth (slg.A.simulate +2.3%, slg.C +0.5%).
         XOFFSET_DETAIL_NOINLINE T& emplace_back_general() {
-            return *insert_construct(size_, [&](T* dst) {
+            auto construct = [&](T* dst) {
                 fixed_detail::default_construct(dst, default_binding());
-            });
+            };
+            return *insert_body<false>(size_, construct);
         }
         struct Grown {
             std::int32_t data_delta;
@@ -2261,10 +2268,12 @@ namespace XOffsetDatastructure {
             size_ = n;
         }
 
-        // Appends (emplace_back, push_back_general) keep the general path in
-        // the same function: under Clang a call to it there costs more than
-        // it saves (slg.A). GCC and MSVC take insert_construct as before,
-        // except emplace_back(), which has its fast path at the caller.
+        // Appends (emplace_back with arguments, push_back_general) keep the
+        // general path in the same function: under Clang a call to it there
+        // costs more than it saves (slg.A). GCC and MSVC take insert_construct
+        // as before. emplace_back() without arguments differs on every
+        // compiler: its fast path is at the caller and a full vector grows in
+        // emplace_back_general.
         template <typename Construct>
 #if defined(__clang__)
         iterator append_construct(Construct&& construct) {
@@ -2672,24 +2681,36 @@ namespace XOffsetDatastructure {
             return false;
         }
 
-        // Only the public default resize of scalar T enters this path.
-        // T{} and destruction cannot run user code; fill/custom construction
-        // keeps the general transactional path below.
-        void resize_default_scalar(size_type count) requires std::is_scalar_v<T> {
-            if (count > max_size()) XOFFSET_THROW(XBadAlloc());
-            if (count <= size_) {
-                const auto old_size = size_;
-                size_ = count;
-                note_shrunk(old_size, count);
-                scrub(count, old_size);
+        // The default resize of scalar T (T{} and destruction run no user code;
+        // fill/custom construction keeps the general transactional path below).
+        // Within capacity it is inline at the caller: one compare, then shrink or
+        // value-fill. Growth is out of line and goes straight to the new block:
+        // its caller already knows count > capacity_ (a vector filled anew, as
+        // the formal harness's assign_sequence does, pays one compare and the
+        // call, not a second round of the size and capacity tests).
+        XOFFSET_DETAIL_INLINE void resize_default_scalar(std::size_t count) requires std::is_scalar_v<T> {
+            if (count > capacity_) [[unlikely]] {
+                resize_default_scalar_grow(count);
                 return;
             }
+            // count <= capacity_ <= max_size(): it fits size_type, and a count
+            // above size_ names a live block.
+            const auto n = static_cast<size_type>(count);
             const auto old_size = size_;
-            if (count <= capacity_) {
-                std::uninitialized_value_construct_n(data() + old_size, count - old_size);
-                size_ = count;
+            if (n <= old_size) {
+                size_ = n;
+                note_shrunk(old_size, n);
+                scrub(n, old_size);
                 return;
             }
+            std::uninitialized_value_construct_n(live_data() + old_size, n - old_size);
+            size_ = n;
+        }
+
+        XOFFSET_DETAIL_NOINLINE void resize_default_scalar_grow(std::size_t requested) requires std::is_scalar_v<T> {
+            XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::array_bytes<T>(std::max<std::size_t>(requested, 2u * capacity_)), );
+            const auto count = checked_count(requested);
+            const auto old_size = size_;
             const auto alloc = bound_binding();
             auto* old = data();
             const auto bytes = static_cast<std::uint32_t>(count * sizeof(T));
@@ -2888,7 +2909,12 @@ namespace XOffsetDatastructure {
 
         // POD: assign_range (in place when the capacity suffices, else one
         // exact block), then the M6 padding zeroing transfer_construct does.
-        void assign_trivial_copy(const XVectorCore& other) {
+        // Out of line under Clang: with assign_bytes inline in it, Clang
+        // inlined it into assign_general and then kept assign_general out of
+        // assign_general_out_of_line, whose empty-source path then paid the
+        // larger body's register saves (+4.4k instructions on slg.A.apply).
+        // GCC inlines both and is faster that way.
+        XOFFSET_DETAIL_NOINLINE_CLANG void assign_trivial_copy(const XVectorCore& other) {
             assign_range(std::span<const T>(other.data(), other.size_));
             auto* items = data();
             for (size_type i = 0; i < size_; ++i) detail::scrub_implicit_padding(items + i);
@@ -3421,22 +3447,22 @@ namespace XOffsetDatastructure {
         }
 
         XOFFSET_DETAIL_INLINE void resize(std::size_t count) {
-            if (Base::try_resize_trivial_in_place(count)) [[likely]] return;
-            resize_grow_or_general(count);
+            if constexpr (std::is_scalar_v<T>) {
+                Base::resize_default_scalar(count);
+            } else {
+                if (Base::try_resize_trivial_in_place(count)) [[likely]] return;
+                resize_grow_or_general(count);
+            }
         }
 
-        XOFFSET_DETAIL_NOINLINE void resize_grow_or_general(std::size_t count) {
+        XOFFSET_DETAIL_NOINLINE void resize_grow_or_general(std::size_t count) requires (!std::is_scalar_v<T>) {
             if (count > Base::capacity_)
                 XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::array_bytes<T>(std::max<std::size_t>(count, 2u * Base::capacity_)), );
             auto n = Base::checked_count(count);
-            if constexpr (std::is_scalar_v<T>) {
-                Base::resize_default_scalar(n);
-            } else {
-                const auto alloc = Base::element_binding();
-                Base::resize_construct(n, [&](T* dst) {
-                    fixed_detail::default_construct(dst, alloc);
-                });
-            }
+            const auto alloc = Base::element_binding();
+            Base::resize_construct(n, [&](T* dst) {
+                fixed_detail::default_construct(dst, alloc);
+            });
         }
 
         void resize(std::size_t count, const T& value) {
