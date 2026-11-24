@@ -589,9 +589,12 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
         "list every member once, in declaration order;fields<sdf::Neg>::field_a': 'struct' type redefinition")
 endif()
 
-# Wire schemas whose meaning differs between 64-bit little-endian platforms
-# fail the build: a set or map key ordered by plain char, an enum without a
-# fixed underlying type. The portable spellings must build.
+# Wire schemas whose meaning or layout differs between 64-bit little-endian
+# platforms fail the build: a set or map key ordered by plain char, an enum
+# without a fixed underlying type, a non-portable scalar (long double,
+# wchar_t), a record without the natural layout (#pragma pack, alignas on a
+# member, an unnamed bit-field) and std::array<E, 0>. The portable spellings
+# must build.
 foreach(entry
         "set_char|a set or map key orders by plain char"
         "map_char|a set or map key orders by plain char"
@@ -599,6 +602,12 @@ foreach(entry
         "record_member|a set or map key orders by plain char"
         "array_member|a set or map key orders by plain char"
         "unfixed_enum|an enum without a fixed underlying type has a compiler-chosen representation"
+        "long_double|encountered a non-admitted v1 type"
+        "wchar|encountered a non-admitted v1 type"
+        "pragma_pack|does not have the natural layout"
+        "member_alignas|does not have the natural layout"
+        "unnamed_bit_field|does not have the natural layout"
+        "empty_std_array|std::array<E, 0> is an empty class"
         "portable|")
     string(REGEX REPLACE "\\|.*$" "" case "${entry}")
     string(REGEX REPLACE "^[^|]*\\|" "" diagnostic "${entry}")

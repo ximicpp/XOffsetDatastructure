@@ -11,6 +11,7 @@
 #include "xoffset_admission.hpp"
 #include "xoffset_fixed_string.hpp"
 #include <cstddef>
+#include <climits>
 #include <cstdlib>
 #include <compare>
 #include <iterator>
@@ -50,14 +51,25 @@
 #endif
 #include "xoffset_virtual_memory.hpp"
 
-// Platform: 64-bit little-endian only.
+// Platform: 64-bit little-endian only, with the representation every supported
+// ABI shares (x86-64 System V and Windows, AArch64 Linux, Android and Apple):
+// 8-bit bytes, a one-byte bool, IEEE 754 float and double, and each fixed-width
+// scalar aligned to its size. On such platforms a wire type that compiles has the
+// same bytes everywhere (the scalar whitelist and the natural-layout rule of
+// xoffset_wire.hpp do the rest), so same-version peers exchange it byte for byte.
+// There is no switch that turns these checks off.
 // Type safety: K0 admission is XOffset's own (xoffset_admission.hpp, is_byte_copy_safe_v<T>).
-#ifndef XOFFSET_DISABLE_PLATFORM_CHECKS
 static_assert(sizeof(void*) == 8,
-    "XOffsetDatastructure requires 64-bit platform (sizeof(void*) must be 8)");
-static_assert(XOFFSET_LITTLE_ENDIAN,
-    "XOffsetDatastructure requires little-endian platform");
-#endif // XOFFSET_DISABLE_PLATFORM_CHECKS
+    "XOffsetDatastructure requires a 64-bit platform (sizeof(void*) must be 8)");
+static_assert(std::endian::native == std::endian::little,
+    "XOffsetDatastructure requires a little-endian platform");
+static_assert(CHAR_BIT == 8 && sizeof(bool) == 1,
+    "XOffsetDatastructure requires 8-bit bytes and a one-byte bool");
+static_assert(std::numeric_limits<float>::is_iec559 && std::numeric_limits<double>::is_iec559,
+    "XOffsetDatastructure requires IEEE 754 float and double");
+static_assert(alignof(std::int16_t) == 2 && alignof(std::int32_t) == 4 && alignof(std::int64_t) == 8 &&
+              alignof(float) == 4 && alignof(double) == 8,
+    "XOffsetDatastructure requires each fixed-width scalar aligned to its size");
 
 namespace XOffsetDatastructure {
 #if XOFFSET_USE_PMR
