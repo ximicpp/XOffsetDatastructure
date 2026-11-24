@@ -111,11 +111,15 @@ namespace XOffsetDatastructure {
             } else return false;
         }
 
-        // The first error found and where (a path of field names).
-        struct Walk {
+        // The first error found and where (a path of field names). This and
+        // the two text helpers below are templates, so a program that
+        // declares no family instantiates none of their string code: the
+        // header changes no generated code of such a program.
+        template <typename S = std::string>
+        struct WalkT {
             Error error = Error::none;
-            std::string where;
-            constexpr bool fail(Error e, const std::string& at) {
+            S where;
+            constexpr bool fail(Error e, const S& at) {
                 if (error == Error::none) {
                     error = e;
                     where = at;
@@ -124,21 +128,25 @@ namespace XOffsetDatastructure {
             }
         };
 
-        constexpr std::string join(const std::string& at, std::string_view name) {
-            std::string out = at;
+        using Walk = WalkT<>;
+
+        template <typename S = std::string>
+        constexpr S join(const S& at, std::string_view name) {
+            S out = at;
             if (!out.empty()) out += '.';
             out += name;
             return out;
         }
 
-        constexpr std::string offset_text(std::size_t offset) {
+        template <typename S = std::string>
+        constexpr S offset_text(std::size_t offset) {
             char digits[20];
             std::size_t n = 0;
             do {
                 digits[n++] = static_cast<char>('0' + offset % 10);
                 offset /= 10;
             } while (offset != 0);
-            std::string out = "byte ";
+            S out = "byte ";
             while (n != 0) out += digits[--n];
             return out;
         }
