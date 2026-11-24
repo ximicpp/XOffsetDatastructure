@@ -578,8 +578,15 @@ namespace XOffsetDatastructure::xsync {
                         } else if (len <= 64) {
                             std::memcpy(q, s, 32);
                             std::memcpy(q + len - 32, s + len - 32, 32);
+                        } else if (len > ChangeOp) [[unlikely]] {
+                            m.room(q, sec, (n - r) * kChangeRoom + len);
+                            std::memcpy(q, s, len);
+                        } else if (ChangeOp <= 256 || len <= 256) {
+                            // Inline, not a memcpy call: around a call this loop
+                            // spills and reloads its caller-saved registers on
+                            // every op (GCC, combat bodies of 96-160 bytes).
+                            sd_detail::copy_mid(q, s, len);
                         } else {
-                            if (len > ChangeOp) [[unlikely]] m.room(q, sec, (n - r) * kChangeRoom + len);
                             std::memcpy(q, s, len);
                         }
                     } else {
@@ -802,11 +809,8 @@ namespace XOffsetDatastructure::xsync {
             char* const q = m.q_;
             sd_detail::store<std::uint32_t>(q, sd_detail::section(n, K, XSyncKind::leave));
             const std::int32_t* const s = slot.data();
-            {
-                std::size_t i = 0;
-                XOFFSET_DETAIL_NOVECTOR
-                do { sd_detail::store<std::uint32_t>(q + 4 + 4 * i, std::uint32_t(s[i])); } while (++i < n);
-            }
+            XOFFSET_DETAIL_NOVECTOR
+            for (std::size_t i = 0; i < n; ++i) sd_detail::store<std::uint32_t>(q + 4 + 4 * i, std::uint32_t(s[i]));
             m.loff_.template at<J>() = std::uint32_t(q + 4 - m.out_->data());
             m.ln_.template at<J>() = std::uint32_t(n);
             m.q_ = q + 4 + 4 * n;
@@ -832,19 +836,21 @@ namespace XOffsetDatastructure::xsync {
             char* const sec = q;
             q += 4;
             const std::uint32_t tick = m.pub_->tick_;
-            const char* bodies = m.pub_->bodies_.data();
             Entry* es = e_.data();
             std::size_t mk = e_.size() - 1;
             std::uint32_t k = 0;
-            std::size_t r = 0;
-            do {
+            // The sections of this table keep few values live (bodies read per
+            // op, no list prefetch): they inline into the caller's send, and one
+            // more live value here moves the caller's own pointers to the stack
+            // (GCC: about 13 more loads and stores per message, peace delta).
+            for (std::size_t r = 0; r < n; ++r) {
                 const std::uint32_t rr = std::uint32_t(rf[r]);
-                Entry* e = find(es, mk, bodies, rr, tick, *m.pub_, src);
-                std::memcpy(q, bodies + e->off, kChangeOp);
+                Entry* e = find(es, mk, rr, tick, *m.pub_, src);
+                std::memcpy(q, m.bodies() + e->off, kChangeOp);
                 sd_detail::store<std::uint32_t>(q, std::uint32_t(sl[r]));
                 q += e->len;
                 k += e->len != 0;
-            } while (++r < n);
+            }
             sd_detail::store<std::uint32_t>(sec, sd_detail::section(k, K, XSyncKind::change));
             m.q_ = k ? q : sec;
         }
@@ -859,36 +865,18 @@ namespace XOffsetDatastructure::xsync {
             m.check_tick();
 #endif
             const std::int32_t* const ids = id.data();
-            Entry* es = e_.data();
-            {
-                std::size_t r = 0;
-                XOFFSET_DETAIL_NOVECTOR
-                do { XOFFSET_DETAIL_PREFETCH_WITH_MSVC(&es[std::uint32_t(ids[r])], 0); } while (++r < n);
-            }
             m.room(4 + n * kChangeRoom);
             char* q = m.q_;
             char* const sec = q;
             q += 4;
             const std::uint32_t tick = m.pub_->tick_;
-            const char* bodies = m.pub_->bodies_.data();
+            Entry* es = e_.data();
             std::size_t mk = e_.size() - 1;
             std::uint32_t k = 0;
-            std::size_t r = 0;
-            do {
-                const Entry* e = find(es, mk, bodies, std::uint32_t(ids[r]), tick, *m.pub_, src);
-                const std::uint32_t len = e->len;
-                if (len) {
-                    if constexpr (kChangeOp <= 32) {
-                        const char* const s = bodies + e->off;
-                        std::memcpy(q, s, 16);
-                        std::memcpy(q + 16, s + 16, 16);
-                    } else {
-                        sd_detail::copy_body(q, bodies + e->off, len);
-                    }
-                    q += len;
-                    ++k;
-                }
-            } while (++r < n);
+            for (std::size_t r = 0; r < n; ++r) {
+                const Entry* e = find(es, mk, std::uint32_t(ids[r]), tick, *m.pub_, src);
+                if (e->len) { sd_detail::copy_body(q, m.bodies() + e->off, e->len); q += e->len; ++k; }
+            }
             sd_detail::store<std::uint32_t>(sec, sd_detail::section(k, K, XSyncKind::change));
             m.q_ = k ? q : sec;
         }
@@ -914,8 +902,7 @@ namespace XOffsetDatastructure::xsync {
             const std::uint32_t tick = m.pub_->tick_;
             Entry* es = e_.data();
             std::size_t mk = e_.size() - 1;
-            std::size_t r = 0;
-            do {
+            for (std::size_t r = 0; r < n; ++r) {
                 const std::uint32_t rr = std::uint32_t(rf[r]);
                 const Entry* e = find(es, mk, rr, tick, *m.pub_, src);
                 const std::uint32_t s = take.take();
@@ -925,7 +912,7 @@ namespace XOffsetDatastructure::xsync {
                 out(r, s);
                 sd_detail::store<std::uint32_t>(q, s);
                 q = XRecordBody<T>::put_whole(q + 4, e->image);
-            } while (++r < n);
+            }
             take.done();
             m.q_ = q;
         }
@@ -981,27 +968,6 @@ namespace XOffsetDatastructure::xsync {
             } else {
                 Entry* e = &es[ref];
                 if (e->tick != tick) [[unlikely]] fill<sd_detail::src_arg<Src&>>(ref, ref, pub, src);
-                return e;
-            }
-        }
-        template <class Src>
-        XOFFSET_DETAIL_INLINE Entry* find(Entry*& es, std::size_t& mk, const char*& bodies, std::uint32_t ref, std::uint32_t tick, XSyncPublisher& pub, Src& src) {
-            if constexpr (kRing) {
-                const std::uint32_t id = std::uint32_t(src.id(ref));
-                Entry* e = &es[id & mk];
-                if (std::uint32_t(RI::get(e->image)) != id || e->tick != tick) [[unlikely]] {
-                    e = &fill<sd_detail::src_arg<Src&>>(ref, id, pub, src);
-                    es = e_.data();
-                    mk = e_.size() - 1;
-                    bodies = pub.bodies_.data();
-                }
-                return e;
-            } else {
-                Entry* e = &es[ref];
-                if (e->tick != tick) [[unlikely]] {
-                    fill<sd_detail::src_arg<Src&>>(ref, ref, pub, src);
-                    bodies = pub.bodies_.data();
-                }
                 return e;
             }
         }
