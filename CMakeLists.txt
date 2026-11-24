@@ -96,13 +96,14 @@ if(NOT XOFFSET_STORAGE_ONLY)
 
     # Build-tree convenience only. Installed consumers locate their toolchain
     # explicitly; these directories are never exported.
-    # Apple clang builds use the system libc++, whose std::pmr symbols exist from
-    # macOS 14; an older target links but fails at load. project() has already made
-    # CMAKE_OSX_DEPLOYMENT_TARGET an empty cache entry, so the default needs FORCE.
+    # Apple clang C++20/23 builds no longer depend on system libc++ std::pmr
+    # (XOFFSET_USE_PMR automatically falls back to header-only XMemoryResource
+    # below macOS 14 / iOS 17). Default to macOS 12.0 if unset so projects can
+    # freely target older macOS releases without hitting a std::pmr gate.
     # The C++26 build keeps the compiler's default (P2996 Clang ships its own libc++).
     if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND NOT CMAKE_OSX_DEPLOYMENT_TARGET
        AND NOT XOFFSET_CXX_STANDARD STREQUAL "26")
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "14.0" CACHE STRING "Minimum macOS deployment version" FORCE)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS deployment version" FORCE)
     endif()
     include(cmake/XOffsetDependencies.cmake)
     xoffset_validate_dependencies()

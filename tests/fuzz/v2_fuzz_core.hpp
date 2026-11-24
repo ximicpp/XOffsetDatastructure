@@ -57,7 +57,9 @@
 #include <filesystem>
 #include <iostream>
 #include <memory>
+#if XOFFSET_USE_PMR
 #include <memory_resource>
+#endif
 #include <optional>
 #include <random>
 #include <span>
@@ -1250,7 +1252,31 @@ Outcome check_case(const std::string& w, std::mt19937_64& rng, const std::string
         // resource over a small stack buffer, so large payloads spill), with
         // the same verdict, message and payload.
         alignas(std::max_align_t) unsigned char arena[2048];
+#if XOFFSET_USE_PMR
         std::pmr::monotonic_buffer_resource upstream(arena, sizeof arena);
+#else
+        struct StackFallbackResource final : xo::XMemoryResource {
+            unsigned char* buf;
+            std::size_t cap;
+            std::size_t pos = 0;
+            StackFallbackResource(unsigned char* b, std::size_t c) noexcept : buf(b), cap(c) {}
+            void* do_allocate(std::size_t bytes, std::size_t alignment) override {
+                std::size_t aligned = (pos + alignment - 1) & ~(alignment - 1);
+                if (aligned <= cap && bytes <= cap - aligned) {
+                    pos = aligned + bytes;
+                    return buf + aligned;
+                }
+                return xo::default_memory_resource()->allocate(bytes, alignment);
+            }
+            void do_deallocate(void* p, std::size_t bytes, std::size_t alignment) override {
+                const auto addr = reinterpret_cast<std::uintptr_t>(p);
+                const auto lo = reinterpret_cast<std::uintptr_t>(buf);
+                if (addr >= lo && addr < lo + cap) return;
+                xo::default_memory_resource()->deallocate(p, bytes, alignment);
+            }
+            bool do_is_equal(const xo::XMemoryResource& o) const noexcept override { return this == &o; }
+        } upstream(arena, sizeof arena);
+#endif
         auto viar = xo::XBuffer::try_load_verified<fz::Root>(
             std::span<const std::byte>(reinterpret_cast<const std::byte*>(w.data()), w.size()),
             xo::XBuffer::maximum_capacity(kLimit), &upstream);

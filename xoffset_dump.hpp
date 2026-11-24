@@ -107,7 +107,7 @@ inline void append_float(std::string& out, Float value) {
         return;
     }
     char buf[64];
-#if defined(__cpp_lib_to_chars) && __cpp_lib_to_chars >= 201611L
+#if XOFFSET_DETAIL_TO_CHARS_FLOAT && defined(__cpp_lib_to_chars) && __cpp_lib_to_chars >= 201611L
     auto [ptr, ec] = std::to_chars(buf, buf + sizeof(buf), value);
     if (ec == std::errc{}) {
         out.append(buf, static_cast<std::size_t>(ptr - buf));

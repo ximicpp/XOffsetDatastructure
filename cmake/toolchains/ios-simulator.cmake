@@ -8,13 +8,13 @@
 # XOFFSET_IOS_SIM_DEVICE (a UDID, or "booted" for the one already booted). With
 # -DXOFFSET_TEST_HOST=ON it runs them the way a phone does instead: inside the test
 # host app (tools/test_host), through xo_host_run.py --backend sim.
-# std::pmr lives in the system libc++ from iOS 17, hence the deployment floor.
+# Below iOS 17, XOFFSET_USE_PMR automatically falls back to header-only XMemoryResource.
 set(CMAKE_SYSTEM_NAME iOS)
 set(CMAKE_OSX_SYSROOT iphonesimulator)
 set(CMAKE_OSX_ARCHITECTURES arm64)
 # A cache entry: project() would otherwise create an empty one over a plain variable.
 if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET 17.0 CACHE STRING "Minimum iOS deployment version" FORCE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET 14.0 CACHE STRING "Minimum iOS deployment version" FORCE)
 endif()
 # Plain executables, not app bundles, so simctl spawn can run them.
 set(CMAKE_MACOSX_BUNDLE OFF)
