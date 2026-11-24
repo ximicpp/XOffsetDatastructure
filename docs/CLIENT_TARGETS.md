@@ -19,7 +19,7 @@ re-run before every release ([STABILITY_TESTS.md](STABILITY_TESTS.md)).
 `cmake/toolchains/`) runs the full Release CTest, then the wire corpus checks: read every reference wire
 and re-save it byte-identically, modify it with fixed steps and save it with `save_verified` and
 `save_compact` (both must equal the reference end's bytes), and `diff -r` the local corpus against the
-reference. The reference corpus (24 files: 8 cases and two modified copies each) is written by the
+reference. The reference corpus (27 files: 9 cases and two modified copies each) is written by the
 Linux x86-64 GCC 16 C++26 build of the same commit.
 
 `tools/local_validate.sh` has the client columns `msvc-c++20`, `msvc-c++23`, `clang-cl-c++20`,
@@ -44,13 +44,32 @@ and macOS machines, and an iPhone 15 Pro Max passed CTest and the corpus; eviden
 [validation/2026-10-28-rc1-platform](validation/2026-10-28-rc1-platform/README.md) and
 [DEVICE_TESTING.md](DEVICE_TESTING.md).
 
-**Lower Apple minimums (11c3c06).** Builds for macOS 12.0 and iOS 14.0 use `XOFFSET_USE_PMR=0`.
-Checked on 2026-11-24 on main 7d69d66 (Mac queue items 119 and 120 on the `mac-results` branch):
-`tools/native_targets.sh macos` at deployment target 12.0 (C++20 and C++23) and `ios-sim` at 14.0
-(C++20) passed the full CTest, 215/215 each; every test binary records minimum OS 12.0 / 14.0 and
-imports no `std::pmr` symbol. The binaries ran on macOS 27.2 and an iOS 27 simulator, not on macOS
-12-13 or iOS 14-16 themselves, and the corpus was written but not diffed against a reference. The
-iPhone build at iOS 14.0 (`ios-device.cmake`) configures and builds; it was not run on a device.
+**Lower Apple minimums (11c3c06) and real-device Wire 3.0 checks (2026-11-24).** Builds for macOS 12.0
+and iOS 14.0 automatically set `XOFFSET_USE_PMR=0` (header-only `XMemoryResource`, zero `std::pmr`
+imports):
+
+- **macOS 12.0 & iOS 14.0 simulator (main `7d69d66`)**: `tools/native_targets.sh macos` at deployment
+  target 12.0 (C++20 and C++23) and `ios-sim` at 14.0 (C++20) passed the full CTest, 215/215 each; every
+  test binary records minimum OS 12.0 / 14.0 and imports no `std::pmr` symbol.
+- **Physical Android 11 arm64-v8a & iPhone 15 Pro Max arm64 (main `4f544e29`)**:
+  - Xiaomi `M2102K1C` (Android 11 / API 30, 4 KB page size, NDK `27.0.12077973` Clang 18.0.1, zero
+    submodules): C++20 (`PMR=1`) full CTest **206/206** passed; C++23 (`XOFFSET_USE_PMR=0`) key suite
+    **9/9** passed; `xo_slg_bench --mode verify --scale S` passed; `xo_mem_probe` (`--single` 2047 MiB,
+    `--va 64 256` = 16 GiB VA, `--va 1024 64` = 64 GiB VA) passed; `test_v2_fuzz 10000 20261124` 0
+    inconsistencies.
+  - iPhone 15 Pro Max (`iPhone16,2`, iOS `26.6.2`, 16 KB page size, AppleClang 21, `ios-device.cmake`,
+    `minos 14.0`, automatic `XOFFSET_USE_PMR=0`, 0 `std::pmr` undefined symbols): resident test host full
+    CTest **207/207** passed; `xo_slg_bench --mode verify --scale S` passed; `test_v2_fuzz 10000 20261124`
+    0 inconsistencies; default-entitlement `xo_mem_probe` measured `--single` 2047 MiB, `--va 1024` 3
+    buffers (3.0 GiB VA), `--va 64` 56 buffers (3.5 GiB VA, clean refusal beyond budget).
+  - **Six-platform Wire 3.0 corpus identity**: all 27 reference `.xwire` files are SHA-256 byte-identical
+    across Linux x86-64 GCC 16.2 C++26, Windows x64 MSVC 19.44 C++23, macOS 12.0 arm64 Clang 21 C++20,
+    iOS 14.0 Simulator arm64 Clang 21 C++20, physical Android 11 arm64-v8a (C++20 `PMR=1` & C++23 `PMR=0`),
+    and physical iPhone 15 Pro Max arm64 (`minos 14.0`, `PMR=0`).
+- **Still uncovered on hardware**: running binaries directly on macOS 12–13 / iOS 14–16 OS images (above
+  runs executed `minos 12.0`/`14.0` binaries on newer macOS/iOS hosts), iOS paid-team
+  `com.apple.developer.kernel.extended-virtual-addressing` (`XO_IOS_EXTENDED_VA=1`) on a physical iPhone,
+  and Android 15+ 16 KB page / ARM64 MTE hardware.
 
 ### Notes per target
 
@@ -92,7 +111,8 @@ compares builds with and without exceptions on the same mutated wires.
 ## Scope
 
 64-bit little-endian only: Windows x64, Android arm64-v8a, iOS arm64 (device and simulator) and macOS
-arm64 clients; Linux x86-64 and arm64 servers. 32-bit and big-endian targets are out of scope.
+arm64 clients; Linux x86-64 and arm64 servers. 32-bit and big-endian targets are out of scope;
+big-endian support is deferred with a decided approach ([ROADMAP.md](ROADMAP.md)).
 
 ## Running on phones: the test host
 

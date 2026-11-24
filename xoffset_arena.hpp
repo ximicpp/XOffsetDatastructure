@@ -725,7 +725,7 @@ namespace XOffsetDatastructure {
         struct MaximumCapacity {
             size_type value;
             XGrowPolicy growth = XGrowPolicy::Explicit;
-            XBufferPool pool;
+            XBufferPool pool{};
             XStorage storage = XStorage::Auto;
             // Relocating only: the first reservation in bytes, the 64-byte
             // host header included (0: sized from the first content, see

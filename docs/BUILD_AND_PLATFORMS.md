@@ -58,21 +58,23 @@ cmake --build build/alpha-storage --config Release --parallel 2
 ctest --test-dir build/alpha-storage --output-on-failure -C Release
 ```
 
-To install a full package, use a new build directory and your chosen prefix:
+To install a full package (C++20/C++23 zero-dependency, or C++26 reflection with
+`-DCMAKE_CXX_COMPILER=...` and `-DXOFFSET_CXX_STANDARD=26`), use a new build
+directory and your chosen prefix:
 
 ```sh
-cmake -S . -B build/alpha-install \
-  -DCMAKE_CXX_COMPILER=/path/to/p2996/bin/clang++ \
+cmake -S . -B build/xoffset-install \
+  -DXOFFSET_CXX_STANDARD=20 \
   -DCMAKE_INSTALL_PREFIX=/path/to/xoffset-prefix \
   -DXOFFSET_BUILD_TESTS=OFF -DXOFFSET_BUILD_TOOLS=OFF -DXOFFSET_BUILD_EXAMPLES=OFF
-cmake --build build/alpha-install --config Release
-cmake --install build/alpha-install --config Release
+cmake --build build/xoffset-install --config Release
+cmake --install build/xoffset-install --config Release
 ```
 
 An installed full-library consumer uses:
 
 ```cmake
-cmake_minimum_required(VERSION 3.30)
+cmake_minimum_required(VERSION 3.20)   # 3.30+ for C++26 reflection installs
 project(MyConsumer LANGUAGES CXX)
 find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
 if(NOT XOffsetDatastructure_VERSION STREQUAL "4.1.0")
@@ -82,16 +84,33 @@ add_executable(my_app main.cpp)
 target_link_libraries(my_app PRIVATE XOffset::xoffset)
 ```
 
-Configure the consumer with `-DCMAKE_PREFIX_PATH=/path/to/xoffset-prefix` and the
-same compatible P2996 toolchain. For storage, request `COMPONENTS storage`, link
-`XOffset::storage`, and use CMake 3.13+. Packages reject numeric, `EXACT` and
-range version requests (no release promises compatibility with another one);
-check the complete version string as above.
+Configure the consumer with `-DCMAKE_PREFIX_PATH=/path/to/xoffset-prefix` and a
+matching C++20/C++23 compiler (or the matching P2996/GCC 16 toolchain for C++26
+installs). For storage, request `COMPONENTS storage`, link `XOffset::storage`,
+and use CMake 3.13+. Packages reject numeric, `EXACT` and range version requests
+(no release promises compatibility with another one); check the complete version
+string as above.
 
-For embedded source consumption, use `add_subdirectory(path/to/XOffsetDatastructure)`
-and link the same target. Subprojects default tests, tools, examples and install
-rules to OFF. Set `XOFFSET_STORAGE_ONLY=ON` before adding the subdirectory when
-only storage is needed.
+For embedded source consumption, use `FetchContent` or
+`add_subdirectory(path/to/XOffsetDatastructure)` and link `XOffset::xoffset`:
+
+```cmake
+include(FetchContent)
+FetchContent_Declare(
+    xoffsetdatastructure
+    GIT_REPOSITORY https://github.com/ximicpp/XOffsetDatastructure.git
+    GIT_TAG        v4.1.0   # pin a release tag or commit SHA
+)
+set(XOFFSET_CXX_STANDARD 20 CACHE STRING "" FORCE)
+FetchContent_MakeAvailable(xoffsetdatastructure)
+
+add_executable(my_app main.cpp)
+target_link_libraries(my_app PRIVATE XOffset::xoffset)
+```
+
+Subprojects default tests, tools, examples and install rules to OFF. Set
+`XOFFSET_STORAGE_ONLY=ON` before adding the subdirectory when only storage is
+needed.
 
 ## Validation scope
 
@@ -138,14 +157,15 @@ corpus byte for byte; none of them is a timing result.
   capacities and allocator bookkeeping need not roll back. User operation
   sequences and external constructor effects are not transactions.
 - Arena memory allocated by hand (for example `XBuffer::allocator<T>()`) and not
-  reachable from the root must be released before `save_verified`; the V2 exact
+  reachable from the root must be released before `save_verified`; the exact
   coverage check rejects unreachable regions.
 - Bound wire size, per-buffer capacity and aggregate in-flight work before
   accepting untrusted input. Verified validation is not cryptographic
   authentication; see the [compatibility contract](ALPHA_COMPATIBILITY.md).
 
-Both public headers are required for full consumers. Keep header versions,
-compile-time options and toolchain settings consistent across translation units.
+All library headers installed by CMake (`xoffset*.hpp`) are required for full
+consumers. Keep header versions, compile-time options and toolchain settings
+consistent across translation units.
 A release does not promise stable source API, ABI or arbitrary cross-toolchain
 wire compatibility; the core guarantees K0–K9 and the three receive check tiers
 are in [user guide section 8](USER_GUIDE.md#8-core-guarantees-and-api-stability).

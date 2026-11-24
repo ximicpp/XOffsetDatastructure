@@ -185,9 +185,12 @@ processes; [method and all rows](bench/cppcon2024/README.md)):
 \* The read/write rows of zpp::bits are std containers.
 
 - Send + receive is XOffset's best case when the buffer was filled once: its
-  wire is the buffer. After the read/write loop has churned it, the wire grows
-  from 3,064 to 7,928 bytes and send + receive takes 181 ns, 0.57 of
-  zpp::bits (trusted tier) or 1.04, a tie (full validation tier).
+  wire is the buffer. In the 2026-11-17 4.1.0 baseline (before `automatic`
+  emission became the default), a churned buffer grew from 3,064 to 7,928 bytes
+  and took 181 ns (0.57 of zpp::bits trusted, 1.04 full validation). On current
+  `main` (`XWireEmission::automatic` default), the churned buffer automatically
+  emits its compact 3,552-byte image (measured 2026-11-24, 7 pinned runs on
+  Xeon Skylake, GCC 16.2: 0.43 of zpp::bits trusted, 0.68 full validation).
 - Read/write is the fastest of the scored rows on the 2024 layout. On the
   tuned layout it ties cista: 0.90–0.98 in the published processes, 1.00
   [0.78, 1.25] in a rerun of 21 processes on 4.1.0.
@@ -197,9 +200,9 @@ processes; [method and all rows](bench/cppcon2024/README.md)):
 - Across sizes and churn ([bench/premises](bench/premises/README.md), 68 bytes
   to 729 KB, five rivals): on a buffer as filled the trusted tier wins at every
   size, most at 3–12 KB (0.21–0.24 of the strongest rival); full validation
-  ties zpp::bits below about 120 bytes. A churned buffer sends about twice the
-  bytes and loses the lead from about 11 KB messages up (1.2–1.4 of zpp::bits
-  at 11.5 KB, 1.05–1.1 at 46 KB); `save_compact` brings it back (0.53–0.94).
+  ties zpp::bits below about 120 bytes. With `automatic` emission (and optional
+  in-place `relayout()` for long-lived delta senders, [user guide 4.7](docs/USER_GUIDE.md#47-a-sender-that-edits-in-place-for-a-long-time-relayout)),
+  churned buffers stay compact on the wire.
   [PERFORMANCE.md section 2](docs/PERFORMANCE.md#2-where-the-lead-holds).
 - Sizes after zstd-3: XOffset 2,986 bytes, zpp::bits 2,926, Protocol Buffers
   3,800. The wire header makes small messages about 100 bytes larger than
@@ -228,6 +231,21 @@ cmake --build build --config Release --target helloworld
 ```
 
 C++20 and C++23 builds use only the C++ standard library (no submodules needed).
+To integrate into an existing CMake project via `FetchContent`:
+
+```cmake
+include(FetchContent)
+FetchContent_Declare(
+    xoffsetdatastructure
+    GIT_REPOSITORY https://github.com/ximicpp/XOffsetDatastructure.git
+    GIT_TAG        v4.1.0   # pin a release tag or commit SHA
+)
+set(XOFFSET_CXX_STANDARD 20 CACHE STRING "" FORCE)
+FetchContent_MakeAvailable(xoffsetdatastructure)
+
+target_link_libraries(my_app PRIVATE XOffset::xoffset)
+```
+
 C++26 reflection builds (`-DXOFFSET_CXX_STANDARD=26`) also initialize the pinned
 `external/typelayout` and `external/boost` submodules (see
 [BUILD_AND_PLATFORMS.md](docs/BUILD_AND_PLATFORMS.md)).
@@ -240,7 +258,7 @@ through each use case with a runnable example.
 | Build | Compilers |
 | --- | --- |
 | Servers, C++26 reflection | GCC 16+ or the P2996 Clang ([toolchains](toolchains/README.md)); CMake 3.30+ |
-| Clients and any C++20/C++23 build | Platform compilers: MSVC 19.44 (`/Zc:preprocessor`), clang-cl, MinGW GCC, Android NDK Clang, Apple clang for iOS 17+ / macOS 14+; CMake 3.20+ |
+| Clients and any C++20/C++23 build | Platform compilers: MSVC 19.44 (`/Zc:preprocessor`), clang-cl, MinGW GCC, Android NDK Clang, Apple clang for iOS 14+ / macOS 12+ (automatic `XOFFSET_USE_PMR=0` below iOS 17 / macOS 14); CMake 3.20+ |
 | OS storage layer only | Any C++17 compiler; CMake 3.13+ |
 
 Installing, package consumption, the validated platform matrix and the
@@ -261,6 +279,8 @@ storage and ownership rules are in
 | [CLIENT_TARGETS.md](docs/CLIENT_TARGETS.md), [DEVICE_TESTING.md](docs/DEVICE_TESTING.md) | Client toolchains and real-device records |
 | [PERFORMANCE.md](docs/PERFORMANCE.md), [bench/cppcon2024](bench/cppcon2024/README.md) | Performance numbers and methods |
 | [CHANGELOG.md](CHANGELOG.md), [RELEASING.md](docs/RELEASING.md) | Releases |
+| [ROADMAP.md](docs/ROADMAP.md) | Decided future work that is not scheduled (big-endian hosts) |
+| [SECURITY.md](SECURITY.md) | Vulnerability reporting and security scope |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Building, testing and conventions for library development |
 
 ## License
