@@ -3,13 +3,18 @@ include("${CMAKE_CURRENT_LIST_DIR}/XOffsetDependencyLock.cmake")
 
 # Validate bytes rather than requiring .git metadata in a source archive. The
 # lock names the upstream revisions and fixes every distributed include tree.
-# TypeLayout serves only the C++26 build (reflection signatures and tools);
-# the C++20/C++23 builds neither need nor ship it.
+# TypeLayout and the Boost headers it uses serve only the C++26 reflection
+# build (reflection signatures and tools); C++20/C++23 builds use only the
+# standard library and need neither submodule.
 function(xoffset_validate_dependencies)
-    set(with_typelayout OFF)
-    if(XOFFSET_CXX_STANDARD STREQUAL "26")
-        set(with_typelayout ON)
+    if(NOT XOFFSET_CXX_STANDARD STREQUAL "26")
+        file(WRITE "${PROJECT_BINARY_DIR}/xoffset-third-party-manifest.txt"
+            "None (C++${XOFFSET_CXX_STANDARD} field-list build uses only the C++ standard library)\n")
+        set(BOOST_INCLUDE_DIRS "" PARENT_SCOPE)
+        set(TYPELAYOUT_INCLUDE_DIRS "" PARENT_SCOPE)
+        return()
     endif()
+    set(with_typelayout ON)
     set(dependency_manifest "Boost ${XOFFSET_BOOST_REVISION}\n")
     if(with_typelayout)
         string(APPEND dependency_manifest "TypeLayout ${XOFFSET_TYPELAYOUT_REVISION}\n")

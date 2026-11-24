@@ -222,12 +222,15 @@ on a 64-bit little-endian target:
 ```sh
 git clone https://github.com/ximicpp/xoffsetdatastructure.git
 cd xoffsetdatastructure
-git -c core.autocrlf=false -c core.eol=lf submodule update --init -- external/boost
-git -c core.autocrlf=false -c core.eol=lf -C external/boost submodule update --init -- libs/container libs/core libs/config libs/throw_exception libs/static_assert libs/container_hash libs/type_traits libs/winapi libs/intrusive libs/predef
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DXOFFSET_CXX_STANDARD=20
 cmake --build build --config Release --target helloworld
 ./build/bin/Release/helloworld        # Windows: build\bin\Release\helloworld.exe
 ```
+
+C++20 and C++23 builds use only the C++ standard library (no submodules needed).
+C++26 reflection builds (`-DXOFFSET_CXX_STANDARD=26`) also initialize the pinned
+`external/typelayout` and `external/boost` submodules (see
+[BUILD_AND_PLATFORMS.md](docs/BUILD_AND_PLATFORMS.md)).
 
 Without `-DXOFFSET_CXX_STANDARD`, configure picks C++26 when the toolchain has
 reflection (CMake 3.30+, GCC 16+ or the P2996 Clang) and otherwise builds
