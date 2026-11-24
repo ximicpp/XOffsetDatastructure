@@ -261,6 +261,8 @@ namespace XOffsetDatastructure {
                 return local_name<U>();
             } else if constexpr (std::is_same_v<U, XString>) return "XOffsetDatastructure::XString";
             else if constexpr (container<U>::known) return container<U>::spell(s);
+            else if constexpr (detail::is_spare_v<U>)
+                return "XOffsetDatastructure::XSpare<" + std::to_string(sizeof(U)) + ">";
             else if constexpr (detail::schema_names::is_std_array<U>::value) {
                 return "std::array<" + spell<typename U::value_type>(s) + ", " + std::to_string(std::tuple_size_v<U>) + ">";
             } else if constexpr (ev::kind_of<U>() == ev::Kind::record) {
