@@ -73,6 +73,13 @@ Release-gate rerun evidence to be finalized before tagging `v2.0.0`.
   rejects such a wire or delta. USER_GUIDE 3.3 and section 5, DELTA_SYNC, DEPLOYMENT,
   ALPHA_COMPATIBILITY and BUILD_AND_PLATFORMS no longer suggest that several threads may read one
   buffer at once; that is planned for a later version. Documentation only.
+- Stale bytes: V2_THREAT_MODEL (T5, P3, P4) and DEPLOYMENT section 4 no longer say that
+  `save_compact` never carries old bytes. It writes no holes and zeroes slack and string tails, but
+  copies the implicit padding of records as it is, so after `reset` a padded record or an
+  `XMap<std::int32_t, std::int64_t>` entry can carry bytes of the previous message even in a compact
+  wire. A send buffer shared by several receivers is clean with types without implicit padding
+  (`XOFFSET_REQUIRE_NO_PADDING`), with `XOFFSET_SCRUB_RESET=1`, or with one buffer per receiver.
+  Documentation and comments only.
 
 ## 4.3.0: add-only schema evolution
 

@@ -188,7 +188,9 @@
 // one, -DXOFFSET_HARDENED=1 for every one the build does not set itself.
 // They change inline functions: define them the same way in every
 // translation unit of a program.
-// save_compact never emits stale bytes, with or without them.
+// save_compact writes no holes and zeroes container slack and string tails,
+// with or without them; it copies the implicit padding of records as it is
+// (docs/V2_THREAT_MODEL.md, T5).
 //   XOFFSET_SCRUB_POPPED     M4: pop_back() zeroes the removed element.
 //   XOFFSET_SCRUB_ERASED     M4: clear(), a shrinking resize(), erase and a
 //                            shorter assignment zero the bytes they vacate.
