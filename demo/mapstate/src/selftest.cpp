@@ -875,9 +875,13 @@ void test_schema_versions() {
 
 // Write-back as the demo runs it (client --edits; A's Edit and Forward). A
 // snapshot loaded from a compact wire (no free space) is changed in place,
-// the client's save_verified wire is verified at the Edit limit with the
-// same content digest, and bytes the client hid in the units vector's
-// spare capacity pass that verification but not A's save_compact rebuild.
+// the client's wire is verified at the Edit limit with the same content
+// digest, and bytes the client hid in the units vector's spare capacity
+// pass that verification but not A's save_compact rebuild. The client
+// sends its image (XWireEmission::free_runs), which carries that spare
+// capacity: the default emission may pick the compact wire instead and
+// leave the hidden bytes behind, but whether it does depends on the
+// image, and A must not rely on it.
 // A buffer loaded without headroom refuses to grow (XBadAlloc); a client
 // built without exceptions would stop there instead (DEPLOYMENT.md 4.3).
 void test_writeback() {
@@ -911,8 +915,8 @@ void test_writeback() {
     s.units.reserve(s.units.size() + 4);
     static constexpr char kHidden[] = "HIDDEN-BY-CLIENT";
     std::memcpy(reinterpret_cast<char*>(s.units.data() + s.units.size()), kHidden, sizeof kHidden - 1);
-    const std::string up = c.save_verified<ViewSnapshot>();
-    ex(up.find(kHidden) != std::string::npos, "the hidden bytes are not in the client's wire");
+    const std::string up = c.save_verified<ViewSnapshot>(XSaveOptions{.emission = XWireEmission::free_runs});
+    ex(up.find(kHidden) != std::string::npos, "the hidden bytes are not in the client's image wire");
     ex(up.size() <= net::kEditLimit, "the client's wire exceeds the Edit limit");
 
     XB in = XB::load_verified<ViewSnapshot>(up, XB::maximum_capacity(net::kEditLimit));
@@ -941,7 +945,7 @@ void test_writeback() {
     ex(refused, "growth past maximum_capacity was not refused");
     record("writeback", ex.ok(),
            ex.ok() ? fmt("%zu units from a %zu B compact wire: changed in place (hp, -1, +1, short name -> long), "
-                         "client wire %zu B, A's rebuild %zu B without the hidden bytes, same digest; "
+                         "client image wire %zu B, A's rebuild %zu B without the hidden bytes, same digest; "
                          "no headroom -> XBadAlloc",
                          received, compact.size(), up.size(), fwd.size())
                    : ex.first);

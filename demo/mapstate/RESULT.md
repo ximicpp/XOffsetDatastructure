@@ -515,7 +515,10 @@ more than before, on every target. `mapdemo_selftest` `writeback` writes
 bytes into a vector's spare capacity after the edit: the upload passes
 `load_verified` (the bytes lie in slack, not in the object graph) and
 A's `save_compact` rebuild no longer contains them. That is why A forwards
-its rebuild and not the client's bytes.
+its rebuild and not the client's bytes. Since 4.2 the default `save_verified`
+may send the compact wire, which leaves spare capacity behind, so the test
+sends the client's image (`XWireEmission::free_runs`) to keep the hidden
+bytes in the upload.
 
 Cost (10000-unit tier, `reuse`, means; native Linux clients; times under
 wine and qemu are longer and are not device numbers):

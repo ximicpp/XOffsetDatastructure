@@ -5,6 +5,12 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- Map state demo: `mapdemo_selftest` `writeback` passes again. Its client sends the image
+  (`XWireEmission::free_runs`), so the bytes it hides in a vector's spare capacity reach A; since
+  4.2.0 the default `save_verified` may send the compact wire, which leaves them behind, and the test
+  failed. A's check is unchanged: its `save_compact` rebuild drops those bytes. Library and wire
+  unchanged.
+
 ## 4.3.0: add-only schema evolution
 
 A type can gain fields without conversion: a field added in reserved `XSpare<N>` bytes keeps the first
