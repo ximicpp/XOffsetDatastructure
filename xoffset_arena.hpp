@@ -232,7 +232,7 @@ namespace XOffsetDatastructure {
             if (!arena_) {
                 XOFFSET_THROW(XException(XErrc::invalid_state, "allocator has no arena"));
             }
-            if (n > 0x7ffffff8u / sizeof(T)) XOFFSET_THROW(XBadAlloc());
+            if (n > 0x7ffffff8u / sizeof(T)) detail::throw_capacity_exceeded();
             if (n == 0) return nullptr;
             return detail::begin_dynamic_array<T>(
                 arena_->allocate_aligned(
@@ -2227,8 +2227,13 @@ namespace XOffsetDatastructure {
             const auto align = std::max<std::size_t>(alignment, 8u);
             if (current_end > limit - base || align - 1u > limit - base - current_end) XOFFSET_THROW(XBadAlloc());
             const size_type start = align_up(base + current_end, align) - base;
-            if (start > MAX_PAYLOAD || bytes > MAX_PAYLOAD - start) XOFFSET_THROW(XBadAlloc());
-            if (!ensure_allocation_extent(start + bytes, allow_growth)) XOFFSET_THROW(XBadAlloc());
+            if (start > MAX_PAYLOAD || bytes > MAX_PAYLOAD - start) detail::throw_capacity_exceeded();
+            if (!ensure_allocation_extent(start + bytes, allow_growth)) [[unlikely]] {
+                // Past the maximum: capacity_exceeded, as reserve_in_place answers;
+                // otherwise the policy or the OS refused the storage.
+                if (!buffer_.empty() && start + bytes > buffer_.maximum_capacity()) detail::throw_capacity_exceeded();
+                XOFFSET_THROW(XBadAlloc());
+            }
             // Publish the allocation before any host callback can observe it.
             sm->used_end = static_cast<std::uint32_t>(start + bytes);
             void* result = payload_byte_address(start);
@@ -2704,7 +2709,7 @@ namespace XOffsetDatastructure {
         template <typename T, typename... Args>
         XOFFSET_DETAIL_INLINE T* construct_root_object(Args&&... args) {
             static_assert(alignof(T) <= 8, "the root object is at offset 40: its alignment is at most 8");
-            if constexpr (sizeof(T) > MAX_PAYLOAD) XOFFSET_THROW(XBadAlloc());
+            if constexpr (sizeof(T) > MAX_PAYLOAD) detail::throw_capacity_exceeded();
             if (arena()->used_end != root_at) {
                 XOFFSET_THROW(XException(XErrc::invalid_state, "XBufferCore: object slot already populated"));
             }

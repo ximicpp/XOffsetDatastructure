@@ -80,6 +80,33 @@ Release-gate rerun evidence to be finalized before tagging `v2.0.0`.
   wire. A send buffer shared by several receivers is clean with types without implicit padding
   (`XOFFSET_REQUIRE_NO_PADDING`), with `XOFFSET_SCRUB_RESET=1`, or with one buffer per receiver.
   Documentation and comments only.
+- Floating-point keys: `XSet<float>` / `XSet<double>` and `XMap<float, V>` / `XMap<double, V>`
+  refuse a NaN key, which compares false with every key and has no place in the sorted order.
+  Before, the insert succeeded, `find` could not see the key, and the receiver's full validation
+  rejected the wire (`set keys not strictly ordered`). Now `insert`, `emplace`, `try_emplace`,
+  `insert_or_assign` and `operator[]` insert nothing: plain references throw `XException` with
+  `invalid_argument`; proxies return false (batch `insert`: 0) and record `invalid_argument`; in
+  no-exception builds the soft-fail scope records it. -0.0 and +0.0 stay one key. Integer and
+  string keys compile to the same code as before. API-visible behaviour change; wire unchanged.
+- Error codes: a request past `maximum_capacity`, past the payload limit (2 GiB - 8) or past a
+  container's element limit now reports `capacity_exceeded` on every path. Before, plain references
+  and `edit()` scopes reported `out_of_storage` ("XOffset arena allocation failed") for it while
+  proxies reported `capacity_exceeded`. `out_of_storage` keeps its meaning: an Explicit buffer is
+  full, or the operating system refused the memory. API-visible behaviour change (the error code
+  and the message of these `XBadAlloc`s); wire unchanged.
+- Wire admission diagnostics: when `save_verified`, `load_verified`, the delta entries,
+  `XReceiver::view` or `schema_pin` get a type that cannot be a wire type, the compile error now
+  names the rule it breaks (alignment above 8, such as `alignas(16)` SIMD vectors; pointers and
+  references; unions; scalars without one size on every peer; base classes; virtual functions;
+  classes whose members cannot be listed; the natural layout) before the generic message. Which
+  types are admitted is unchanged.
+- USER_GUIDE section 5.1 lists the size and type limits in one table: the payload and
+  `maximum_capacity`, the element limit of one container, `push_back` growth reaching about half of
+  `maximum_capacity`, `XString` length and contents (raw bytes, no UTF-8 check), floating-point
+  keys, alignment, 256 members per field list, recursive types (not supported; section 2.3 said
+  local roots could use them), and about 32,700 live VM-backed buffers per process on Linux.
+  DEPLOYMENT section 4 states that string contents, enum values and floating-point values are not
+  validated.
 
 ## 4.3.0: add-only schema evolution
 

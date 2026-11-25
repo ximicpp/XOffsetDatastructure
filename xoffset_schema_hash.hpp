@@ -819,7 +819,7 @@ namespace XOffsetDatastructure {
 
     template <typename T>
     std::string schema_pin(std::string_view type_name) {
-        static_assert(is_wire_admitted_v<T>,
+        static_assert(::XOffsetDatastructure::detail::explain_wire_admission<std::remove_cvref_t<T>>(),
             "schema_pin<T>() requires an admitted fixed-schema wire type.");
         constexpr auto signature = wire_abi_signature<T>();
         std::string line = "XOFFSET_PIN_SCHEMA(";

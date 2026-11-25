@@ -287,10 +287,11 @@ namespace XOffsetDatastructure {
                 XOFFSET_THROW(XException(XErrc::invalid_state, "allocator binding has no arena"));
             }
             if (alignment == 0 || (alignment & (alignment - 1)) != 0 ||
-                alignment > XBufferCore::MAX_PAYLOAD ||
-                bytes > XBufferCore::MAX_PAYLOAD - std::max<std::size_t>(alignment, 8u)) {
+                alignment > XBufferCore::MAX_PAYLOAD) {
                 XOFFSET_THROW(XBadAlloc());
             }
+            if (bytes > XBufferCore::MAX_PAYLOAD - std::max<std::size_t>(alignment, 8u))
+                detail::throw_capacity_exceeded();
             return XBufferCore::owner_from_arena(arena).allocate_block(block_bytes_of(bytes), alignment);
         }
 
@@ -802,6 +803,39 @@ namespace XOffsetDatastructure {
             }
         }
 
+        // A NaN key of a set or map with floating-point keys: every
+        // comparison with it is false, so the flat array can neither place
+        // it, find it nor keep its strict order (a receiver's full check
+        // rejects such a wire). Tested on the bits, so -ffast-math cannot
+        // fold it away. Other key types never get here.
+        template <typename K, typename Arg>
+        XOFFSET_DETAIL_INLINE bool nan_key(const Arg& key) noexcept {
+            static_assert(std::is_floating_point_v<K>);
+            if constexpr (!std::is_arithmetic_v<std::remove_cvref_t<Arg>>) {
+                return false;
+            } else {
+                const K k = static_cast<K>(key);
+                if constexpr (sizeof(K) == 4) {
+                    return (std::bit_cast<std::uint32_t>(k) & 0x7fffffffu) > 0x7f800000u;
+                } else {
+                    static_assert(sizeof(K) == 8, "XSet/XMap: floating-point keys are float or double");
+                    return (std::bit_cast<std::uint64_t>(k) & 0x7fffffffffffffffull) > 0x7ff0000000000000ull;
+                }
+            }
+        }
+        // Refuses a NaN key: XException with invalid_argument, or in a
+        // fail-soft region of a build without exceptions (proxies, pin
+        // scopes) the recorded code, after which the insertion returns
+        // without effect.
+        XOFFSET_DETAIL_COLD inline void reject_nan_key() {
+#if XOFFSET_NO_EXCEPTIONS
+            if (detail::soft_fail(XErrc::invalid_argument)) return;
+#endif
+            XOFFSET_THROW(XException(XErrc::invalid_argument,
+                "XSet/XMap: a NaN key is refused (it compares false with every key, so it has no place "
+                "in the sorted order)"));
+        }
+
         template <typename L, typename R>
         bool ordered_equal(const L& lhs, const R& rhs) {
             if constexpr (ordered_string_like<L> && ordered_string_like<R>) {
@@ -1126,7 +1160,7 @@ namespace XOffsetDatastructure {
 
         void reserve(std::size_t requested) {
             XOFFSET_SOFT_PREFLIGHT(this, requested + 24u, );
-            if (requested >= XBufferCore::MAX_PAYLOAD) XOFFSET_THROW(XBadAlloc());
+            if (requested >= XBufferCore::MAX_PAYLOAD) detail::throw_capacity_exceeded();
             auto new_cap = static_cast<std::uint32_t>(requested);
             if (new_cap <= capacity()) return;
 
@@ -1198,7 +1232,7 @@ namespace XOffsetDatastructure {
         // assign()'s checks and copy inline.
         XOFFSET_DETAIL_NOINLINE void assign_general(std::string_view rhs) {
             if (rhs.size() > inline_max) XOFFSET_SOFT_PREFLIGHT(this, rhs.size() + 24u, );
-            if (rhs.size() >= XBufferCore::MAX_PAYLOAD) XOFFSET_THROW(XBadAlloc());
+            if (rhs.size() >= XBufferCore::MAX_PAYLOAD) detail::throw_capacity_exceeded();
             if (rhs.empty()) { clear(); return; }
             const auto new_size = static_cast<std::uint32_t>(rhs.size());
             if (is_inline() || data_delta == 0) {
@@ -1374,7 +1408,7 @@ namespace XOffsetDatastructure {
             if (rhs.empty()) return;
             const std::size_t old_size = size();
             XOFFSET_SOFT_PREFLIGHT(this, 2u * (old_size + rhs.size()) + 24u, );
-            if (rhs.size() >= XBufferCore::MAX_PAYLOAD - old_size) XOFFSET_THROW(XBadAlloc());
+            if (rhs.size() >= XBufferCore::MAX_PAYLOAD - old_size) detail::throw_capacity_exceeded();
             const auto new_size = static_cast<std::uint32_t>(old_size + rhs.size());
             if (new_size <= inline_max && (is_inline() || data_delta == 0)) {
                 char bytes[inline_max];
@@ -1802,7 +1836,7 @@ namespace XOffsetDatastructure {
         // reserve into a fresh block for relocatable T; out of line, so the
         // paths above keep their size at the caller.
         XOFFSET_DETAIL_NOINLINE void reserve_relocate(size_type new_cap, allocator_type alloc) {
-            if (new_cap > max_size()) XOFFSET_THROW(XBadAlloc());
+            if (new_cap > max_size()) detail::throw_capacity_exceeded();
             fixed_detail::regrow_dynamic_bytes(alloc, static_cast<std::uint32_t>(capacity_ * sizeof(T)),
                                                static_cast<std::uint32_t>(new_cap * sizeof(T)), alignof(T),
                                                [&](void* block) -> void* {
@@ -1855,7 +1889,7 @@ namespace XOffsetDatastructure {
                       std::is_trivially_destructible_v<T>) {
             const auto old_size = size_;
             const auto added = checked_count(values.size());
-            if (added > max_size() - old_size) XOFFSET_THROW(XBadAlloc());
+            if (added > max_size() - old_size) detail::throw_capacity_exceeded();
             const auto wanted = static_cast<size_type>(old_size + added);
             const auto new_capacity = std::max(wanted, grown_capacity());
             XOFFSET_SOFT_PREFLIGHT(this, fixed_detail::array_bytes<T>(new_capacity), );
@@ -2199,7 +2233,7 @@ namespace XOffsetDatastructure {
         }
 
         static size_type checked_count(std::size_t count) {
-            if (count > max_size()) XOFFSET_THROW(XBadAlloc());
+            if (count > max_size()) detail::throw_capacity_exceeded();
             return static_cast<size_type>(count);
         }
 
@@ -2208,7 +2242,7 @@ namespace XOffsetDatastructure {
         }
 
         size_type grown_capacity() const {
-            if (size_ == max_size()) XOFFSET_THROW(XBadAlloc());
+            if (size_ == max_size()) detail::throw_capacity_exceeded();
             return std::max(size_ + 1u, static_cast<size_type>(
                 std::min<std::uint64_t>(max_size(), capacity_ ? std::uint64_t(capacity_) * 2u
                                                                   : fixed_detail::first_capacity<T>())));
@@ -2225,7 +2259,7 @@ namespace XOffsetDatastructure {
         template <typename Construct>
         void rebuild(size_type count, size_type cap, Construct&& construct) {
             const auto alloc = bound_binding();
-            if (cap > max_size() || count > cap) XOFFSET_THROW(XBadAlloc());
+            if (cap > max_size() || count > cap) detail::throw_capacity_exceeded();
             if (cap == 0) { clear(); return; }
             auto bytes = static_cast<std::uint32_t>(cap * sizeof(T));
             auto* fresh = detail::begin_dynamic_array<T>(
@@ -2454,7 +2488,7 @@ namespace XOffsetDatastructure {
 
         template <bool GrowOutOfLine, typename Construct>
         XOFFSET_DETAIL_INLINE iterator insert_body(size_type index, Construct& construct) {
-            if (index > size_ || size_ == max_size()) XOFFSET_THROW(XBadAlloc());
+            if (index > size_ || size_ == max_size()) detail::throw_capacity_exceeded();
             if (index == size_ && append_grow(construct)) {
                 // Append into a full vector: built in place in the grown block.
             } else if constexpr (std::is_trivially_copyable_v<T>) {
@@ -2743,7 +2777,7 @@ namespace XOffsetDatastructure {
 
         template <typename Construct>
         void resize_construct(size_type count, Construct&& construct) {
-            if (count > max_size()) XOFFSET_THROW(XBadAlloc());
+            if (count > max_size()) detail::throw_capacity_exceeded();
             if (count <= size_) {
                 truncate(count);
             } else if (count <= capacity_) {
@@ -3064,6 +3098,11 @@ namespace XOffsetDatastructure {
         }
 
         XOFFSET_DETAIL_INLINE std::pair<iterator, bool> insert(const T& value) {
+            if constexpr (std::is_floating_point_v<T>)
+                if (fixed_detail::nan_key<T>(value)) [[unlikely]] {
+                    fixed_detail::reject_nan_key();
+                    return {Base::end(), false};
+                }
             XOFFSET_SOFT_PREFLIGHT_IF(Base::size_ >= Base::capacity_, this, fixed_detail::grow_bytes<T>(Base::capacity_) + fixed_detail::deep_bytes(value),
                                       std::pair<iterator, bool>{Base::end(), false});
             auto* items = Base::data();
@@ -3082,6 +3121,11 @@ namespace XOffsetDatastructure {
         template <typename Arg>
             requires alloc_aware_convertible<T, Arg>
         XOFFSET_DETAIL_INLINE std::pair<iterator, bool> insert(Arg&& arg) {
+            if constexpr (std::is_floating_point_v<T>)
+                if (fixed_detail::nan_key<T>(arg)) [[unlikely]] {
+                    fixed_detail::reject_nan_key();
+                    return {Base::end(), false};
+                }
             XOFFSET_SOFT_PREFLIGHT_IF(Base::size_ >= Base::capacity_, this, fixed_detail::grow_bytes<T>(Base::capacity_) + fixed_detail::deep_bytes(arg),
                                       std::pair<iterator, bool>{Base::end(), false});
             auto* items = Base::data();
@@ -3212,6 +3256,11 @@ namespace XOffsetDatastructure {
 
         template <typename KeyArg, typename... Args>
         XOFFSET_DETAIL_INLINE std::pair<iterator, bool> try_emplace(KeyArg&& key, Args&&... args) {
+            if constexpr (std::is_floating_point_v<K>)
+                if (fixed_detail::nan_key<K>(key)) [[unlikely]] {
+                    fixed_detail::reject_nan_key();
+                    return {value_base::end(), false};
+                }
             XOFFSET_SOFT_PREFLIGHT_IF(value_base::size_ >= value_base::capacity_, this, fixed_detail::grow_bytes<value_type>(value_base::capacity_) +
                                       fixed_detail::deep_bytes(key) +
                                       (std::size_t(0) + ... + fixed_detail::deep_bytes(args)),

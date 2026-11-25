@@ -15,6 +15,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <limits>
+#include <span>
 #include <string>
 #include <string_view>
 #include "../xoffsetdatastructure.hpp"
@@ -28,6 +30,14 @@ struct NoExcRoot {
 };
 XOFFSET_RECORD_DERIVED(NoExcRoot, (), id, name, values, labels)
 XOFFSET_REGISTER_SCHEMA_NAME(NoExcRoot, "test.NoExcRoot")
+
+// Floating-point keys and a vector for the limit checks (limit_entries).
+struct LimitRoot {
+    XSet<double> keys;
+    XMap<float, std::int32_t> table;
+    XVector<std::int64_t> values;
+};
+XOFFSET_RECORD_DERIVED(LimitRoot, (), keys, table, values)
 
 struct NoExcOther { std::uint32_t x{}; };
 XOFFSET_RECORD_DERIVED(NoExcOther, (), x)
@@ -482,6 +492,90 @@ int fatal_mode() {
 }
 } // namespace
 
+// USER_GUIDE section 5.1: a NaN key is refused with invalid_argument and
+// nothing is inserted; a request past maximum_capacity or a container's
+// max_size() reports capacity_exceeded; an Explicit buffer that is full below
+// maximum_capacity reports out_of_storage. Proxies and edit() scopes record the
+// same codes with exceptions on and off; with exceptions on, plain references
+// throw them.
+static void limit_entries() {
+    const double nan = std::numeric_limits<double>::quiet_NaN();
+    const float fnan = std::numeric_limits<float>::quiet_NaN();
+    auto tb = TypedXBuffer<LimitRoot>::create(
+        4096, XBuffer::maximum_capacity(1u << 16).with_growth(XGrowPolicy::Automatic));
+    auto p = tb.root();
+
+    need(!p.keys().insert(nan) && tb.error() == XErrc::invalid_argument && p.keys().size() == 0,
+         "proxy set insert NaN");
+    tb.clear_error();
+    const double batch[] = {1.0, nan, 2.0};
+    need(p.keys().insert(std::span<const double>(batch, 3)) == 0 && tb.error() == XErrc::invalid_argument &&
+             p.keys().size() == 0,
+         "proxy set batch insert with a NaN");
+    tb.clear_error();
+    need(!p.table().try_emplace(fnan, 1) && tb.error() == XErrc::invalid_argument && p.table().size() == 0,
+         "proxy map try_emplace NaN");
+    tb.clear_error();
+    need(!p.table().insert_or_assign(-fnan, 1) && tb.error() == XErrc::invalid_argument && p.table().size() == 0,
+         "proxy map insert_or_assign NaN");
+    tb.clear_error();
+    (void)p.table()[fnan];
+    need(tb.error() == XErrc::invalid_argument && p.table().size() == 0, "proxy map operator[] NaN");
+    tb.clear_error();
+    need(!tb.edit([&](LimitRoot& r) { r.keys.insert(nan); }) && tb.error() == XErrc::invalid_argument &&
+             tb.plain_root().keys.size() == 0,
+         "edit set insert NaN");
+    tb.clear_error();
+    need(!tb.edit([&](LimitRoot& r) { r.table.insert_or_assign(fnan, 1); }) &&
+             tb.error() == XErrc::invalid_argument && tb.plain_root().table.size() == 0,
+         "edit map insert_or_assign NaN");
+    tb.clear_error();
+    // -0.0 and +0.0 are one key; an infinity is an ordinary key.
+    need(p.keys().insert(0.0) && !p.keys().insert(-0.0) && p.keys().insert(std::numeric_limits<double>::infinity()) &&
+             p.keys().size() == 2 && tb.ok(),
+         "signed zeros are one key, infinity is a key");
+
+    need(!p.values().reserve(1u << 20) && tb.error() == XErrc::capacity_exceeded,
+         "proxy reserve past maximum_capacity: " + std::string(to_string(tb.error())));
+    tb.clear_error();
+    need(!tb.edit([](LimitRoot& r) { r.values.reserve(1u << 20); }) && tb.error() == XErrc::capacity_exceeded,
+         "edit reserve past maximum_capacity: " + std::string(to_string(tb.error())));
+    tb.clear_error();
+    need(!tb.edit([](LimitRoot& r) { r.values.reserve(std::size_t(XBufferCore::MAX_PAYLOAD) / sizeof(std::int64_t) + 1); }) &&
+             tb.error() == XErrc::capacity_exceeded,
+         "edit reserve past max_size: " + std::string(to_string(tb.error())));
+    tb.clear_error();
+    need(!tb.edit([](LimitRoot& r) {
+             for (std::int64_t i = 0; i < (1 << 14); ++i) r.values.push_back(i);
+         }) && tb.error() == XErrc::capacity_exceeded,
+         "edit push_back past maximum_capacity: " + std::string(to_string(tb.error())));
+    tb.clear_error();
+
+    auto ex = TypedXBuffer<LimitRoot>::create(
+        4096, XBuffer::maximum_capacity(1u << 16).with_growth(XGrowPolicy::Explicit));
+    need(!ex.edit([](LimitRoot& r) { r.values.reserve(4096); }) && ex.error() == XErrc::out_of_storage,
+         "Explicit buffer full below maximum_capacity: " + std::string(to_string(ex.error())));
+    ex.clear_error();
+
+#if !XOFFSET_NO_EXCEPTIONS
+    auto& r = tb.plain_root();
+    const auto set_nan = thrown_by([&] { r.keys.insert(nan); });
+    need(set_nan.code == XErrc::invalid_argument, "plain set insert NaN threw " + describe(set_nan));
+    const auto map_nan = thrown_by([&] { r.table[fnan] = 1; });
+    need(map_nan.code == XErrc::invalid_argument, "plain map operator[] NaN threw " + describe(map_nan));
+    const auto cap_past = thrown_by([&] { r.values.reserve(1u << 20); });
+    need(cap_past.code == XErrc::capacity_exceeded, "plain reserve past maximum_capacity threw " + describe(cap_past));
+    const auto size_past =
+        thrown_by([&] { r.values.reserve(std::size_t(XBufferCore::MAX_PAYLOAD) / sizeof(std::int64_t) + 1); });
+    need(size_past.code == XErrc::capacity_exceeded, "plain reserve past max_size threw " + describe(size_past));
+    auto& er = ex.plain_root();
+    const auto full = thrown_by([&] { er.values.reserve(4096); });
+    need(full.code == XErrc::out_of_storage, "plain reserve in a full Explicit buffer threw " + describe(full));
+#endif
+    need(tb.plain_root().keys.size() == 2 && tb.plain_root().table.size() == 0,
+         "nothing inserted by the refused calls");
+}
+
 int main(int argc, char** argv) {
     if (argc > 1 && std::string_view(argv[1]) == "--fatal") return fatal_mode();
     std::cout << "test_no_exceptions: exceptions " << (XOFFSET_NO_EXCEPTIONS ? "off" : "on") << "\n";
@@ -542,6 +636,7 @@ int main(int argc, char** argv) {
     }
     reload_rejections(reload_cases, good);
     direct_reload(good, corrupt);
+    limit_entries();
     create_and_clone_entries(good);
     save_delta_and_compact_entries(good);
 

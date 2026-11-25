@@ -123,10 +123,13 @@ Data sent by clients to the server, and any data from the network, is untrusted 
   incomplete tiling, invalid bools, unordered sets and schema mismatch are all rejected).
 - **What validation does not guarantee**: authenticity and integrity of the content. Data in which only
   an integer field value was changed is accepted. The wire header (format 3.0) has no checksum field,
-  no signature and no MAC.
+  no signature and no MAC. Values are not checked either: an `XString` holds any bytes (no UTF-8
+  check, NUL allowed), an enum field can hold a value that is none of its enumerators, and a
+  floating-point field can hold NaN or an infinity.
 - **So these must be done outside the library**:
   - Source authentication and integrity: TLS or message signatures;
-  - Business validity checks: field value ranges, permissions, rates, as for any business input;
+  - Business validity checks: field value ranges, enum values, string encoding, permissions, rates,
+    as for any business input;
   - Resource limits (section 5).
 
 ### 4.1 No stale data in the wires you send
@@ -276,6 +279,11 @@ lists it as uncovered). Keep three details in mind when enabling it:
   for small messages, or `XBuffer::relocating(max)` for variable-size long-lived buffers. A limit of
   a multiple of 4 MiB minus 64 bytes (such as `64 MiB - 64`) avoids mapping one extra 4 MiB granule
   per VM buffer. Android and desktop systems already provide much larger virtual address spaces.
+
+On Linux, one process can keep about 32,700 VM-backed buffers alive at once (each takes 2 of the
+default `vm.max_map_count` of 65,530 mappings); past that, creating a buffer fails with
+`out_of_storage`. Buffers on slots (small Explicit and small `XBuffer::relocating(max)` buffers) do
+not count. All size limits are in USER_GUIDE section 5.1.
 
 Also limit the number of concurrent buffers, queue lengths, total memory and per-request processing
 time: one valid buffer does not bound total resources. The 1 MiB and "2x" above are starting points,

@@ -2156,6 +2156,132 @@ namespace XOffsetDatastructure {
         }
     }
 
+    namespace detail {
+        template <typename>
+        inline constexpr bool wire_explain_false = false;
+
+        template <typename T>
+        consteval bool explain_wire_admission();
+
+        template <typename T, std::size_t... I>
+        consteval bool explain_wire_members(std::index_sequence<I...>) {
+            return (explain_wire_admission<schema::member_type_t<T, I>>() && ...);
+        }
+
+        // The compile-time diagnostic of the send and receive entry points:
+        // true for an admitted wire type; otherwise a static_assert naming the
+        // first rule of compute_wire_admitted that T (or a member, element,
+        // key or value, at any depth) breaks. The instantiation context names
+        // the type. Constant evaluation only: no code is emitted.
+        template <typename T>
+        consteval bool explain_wire_admission() {
+            using U = std::remove_cv_t<T>;
+            if constexpr (is_wire_admitted_impl<U>::value) {
+                return true;
+            } else if constexpr (std::is_reference_v<U> || std::is_pointer_v<U> || std::is_member_pointer_v<U>) {
+                static_assert(wire_explain_false<U>,
+                    "XOffset wire type: a pointer, member pointer or reference is not a wire value (an "
+                    "address means nothing on the peer). Store an index or an offset, or hold the data in "
+                    "an XVector, XString, XMap or XSet member.");
+                return false;
+            } else if constexpr (std::is_union_v<U>) {
+                static_assert(wire_explain_false<U>,
+                    "XOffset wire type: a union is not a wire type (the receiver cannot tell which member "
+                    "is live). Use separate members and a tag.");
+                return false;
+            } else if constexpr (std::is_array_v<U>) {
+                return explain_wire_admission<std::remove_extent_t<U>>();
+            } else if constexpr (std::is_arithmetic_v<U>) {
+                static_assert(wire_explain_false<U>,
+                    "XOffset wire type: this scalar does not have one size and representation on every "
+                    "peer. Use bool, char, std::byte, std::int8_t to std::uint64_t, float or double. "
+                    "wchar_t, char8_t, char16_t, char32_t and long double are not wire scalars; long, "
+                    "long long and std::size_t are only where they are the fixed-width type of the same "
+                    "width, so spell 64-bit integers std::int64_t or std::uint64_t.");
+                return false;
+            } else if constexpr (std::is_enum_v<U>) {
+                static_assert(wire_explain_false<U>,
+                    "XOffset wire type: an enum's underlying type must be a wire scalar; give it one, "
+                    "for example enum class E : std::uint8_t.");
+                return false;
+            } else if constexpr (is_fixed_string_v<U>) {
+                static_assert(wire_explain_false<U>, "XOffset wire type: use XString for a string member.");
+                return false;
+            } else if constexpr (is_fixed_flat_map_v<U>) {
+                static_assert(std::is_same_v<U, XMap<typename U::key_type, typename U::mapped_type>>,
+                    "XOffset wire type: use XMap<K, V> with its default parameters.");
+                return explain_wire_admission<typename U::key_type>() &&
+                    explain_wire_admission<typename U::mapped_type>();
+            } else if constexpr (is_fixed_flat_set_v<U>) {
+                static_assert(std::is_same_v<U, XSet<typename U::value_type>>,
+                    "XOffset wire type: use XSet<T> with its default parameters.");
+                return explain_wire_admission<typename U::value_type>();
+            } else if constexpr (is_fixed_vector_v<U>) {
+                static_assert(std::is_same_v<U, XVector<typename U::value_type>>,
+                    "XOffset wire type: use XVector<T> with its default parameters.");
+                return explain_wire_admission<typename U::value_type>();
+            } else if constexpr (is_empty_std_array_v<U>) {
+                static_assert(wire_explain_false<U>,
+                    "XOffset wire type: std::array<T, 0> is not a wire type (standard libraries give it "
+                    "different sizes). Remove the member.");
+                return false;
+            } else if constexpr (std::is_class_v<U>) {
+                if constexpr (std::is_polymorphic_v<U>) {
+                    static_assert(wire_explain_false<U>,
+                        "XOffset wire type: a class with virtual functions or virtual bases is not a wire "
+                        "type (a vtable pointer is an address).");
+                    return false;
+                } else if constexpr (schema::is_undescribable_v<U>) {
+                    static_assert(wire_explain_false<U>,
+                        "XOffset wire type: the members of this class cannot be listed (a union or a "
+                        "non-aggregate class, such as std::string, std::vector, std::optional or a class "
+                        "with constructors or private members). Use XString, XVector, XMap, XSet and "
+                        "aggregate records listed with XOFFSET_RECORD.");
+                    return false;
+                } else if constexpr (schema::base_count_v<U> != 0) {
+                    static_assert(wire_explain_false<U>,
+                        "XOffset wire type: a wire record has no base classes (ABIs lay out derived "
+                        "classes differently). Make the base a named member; a local root that is never "
+                        "sent may derive (XOFFSET_RECORD_DERIVED).");
+                    return false;
+                } else if constexpr (!explain_wire_members<U>(std::make_index_sequence<schema::member_count_v<U>>{})) {
+                    return false;
+                } else if constexpr (alignof(U) > 8) {
+                    static_assert(wire_explain_false<U>,
+                        "XOffset wire type: alignment above 8 (alignas(16), alignas(32) or a SIMD vector "
+                        "type) is not a wire type: the wire image and the arena align to 8. Use alignas(8) "
+                        "or a plain array member such as float v[4], and load it into a SIMD register after "
+                        "reading. Containers of a local root that is never sent may hold over-aligned "
+                        "elements.");
+                    return false;
+                } else if constexpr (!std::is_standard_layout_v<U>) {
+                    static_assert(wire_explain_false<U>,
+                        "XOffset wire type: a wire record is standard-layout (all non-static members have "
+                        "the same access control).");
+                    return false;
+                } else if constexpr (!natural_record_layout<U>()) {
+                    static_assert(wire_explain_false<U>,
+                        "XOffset wire schema: this record does not have the natural layout (each member "
+                        "at the next offset its type's alignment allows, the size rounded up to the "
+                        "record's alignment). #pragma pack, /Zp, -fpack-struct, alignas on a member, "
+                        "[[no_unique_address]] or an unnamed bit-field changed it, and another compiler "
+                        "or another flag lays the record out differently, so peers could not exchange "
+                        "it byte for byte. Remove it (alignas on the record itself, up to 8, is fine).");
+                    return false;
+                } else {
+                    static_assert(wire_explain_false<U>,
+                        "XOffset wire type: is_byte_copy_safe<T> is false for this record.");
+                    return false;
+                }
+            } else {
+                static_assert(wire_explain_false<U>,
+                    "XOffset wire type: not a value type that can be sent (void, a function type or "
+                    "std::nullptr_t).");
+                return false;
+            }
+        }
+    } // namespace detail
+
     // Type admission: is_byte_copy_safe_v (xoffset_admission.hpp); XOffset's
     // frozen containers are specialized in xoffset_registration.hpp.
 

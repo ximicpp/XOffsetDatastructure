@@ -389,7 +389,7 @@ public:
     template <typename T, XCheck C = default_view_check<L>>
     [[nodiscard]] XOFFSET_DETAIL_INLINE XResult<XView<T>> view(std::span<const std::byte> wire) const {
         check_view<C>();
-        static_assert(is_wire_admitted_v<T>, "XReceiver::view<T>() requires an admitted fixed-schema wire type.");
+        static_assert(::XOffsetDatastructure::detail::explain_wire_admission<std::remove_cvref_t<T>>(), "XReceiver::view<T>() requires an admitted fixed-schema wire type.");
         constexpr const char* who = C == XCheck::bounds ? "XReceiver::view<T, bounds>()" : "XReceiver::view<T, admit>()";
         constexpr auto image = detail::view_wire_image<T>();
         constexpr std::size_t head = sizeof(XWireHeader);

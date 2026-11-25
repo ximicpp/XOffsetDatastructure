@@ -98,6 +98,10 @@ private:
 
 namespace detail {
 inline constexpr const char* arena_failure_message = "XOffset arena allocation failed";
+// An allocation past the buffer's maximum_capacity, or a container, string
+// or block past the payload limit (XErrc::capacity_exceeded).
+inline constexpr const char* capacity_failure_message =
+    "XOffset allocation exceeds maximum_capacity or the payload limit of 2 GiB - 8 bytes";
 // A maximum capacity (or a payload) above XBufferCore::MAX_PAYLOAD.
 inline constexpr const char* payload_limit_message =
     "XOffset maximum capacity exceeds the payload limit of 2 GiB - 8 bytes "
@@ -621,5 +625,16 @@ XOFFSET_DETAIL_INLINE XErrc run_fail_soft(F&& f) {
 #  define XOFFSET_ROLLBACK_BEGIN try {
 #  define XOFFSET_ROLLBACK_END(...) } catch (...) { __VA_ARGS__; throw; }
 #endif
+
+namespace detail {
+// The cold throw of a request past maximum_capacity or the payload limit: a
+// container, string or block that cannot exist in any payload, or a payload
+// that would have to grow past its maximum. XBadAlloc with
+// capacity_exceeded, as the proxies and the fail-soft preflight report it;
+// out_of_storage stays for storage the policy or the OS cannot provide.
+[[noreturn]] XOFFSET_DETAIL_COLD inline void throw_capacity_exceeded() {
+    XOFFSET_THROW(XBadAlloc(XErrc::capacity_exceeded, capacity_failure_message));
+}
+} // namespace detail
 
 } // namespace XOffsetDatastructure

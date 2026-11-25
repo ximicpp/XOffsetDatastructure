@@ -804,7 +804,7 @@ namespace XOffsetDatastructure {
 
         template <typename T>
         std::string save_verified(XSaveOptions options = {}) {
-            static_assert(is_wire_admitted_v<T>,
+            static_assert(::XOffsetDatastructure::detail::explain_wire_admission<std::remove_cvref_t<T>>(),
                 "save_verified<T>() requires an admitted fixed-schema wire type.");
 #ifdef XOFFSET_REJECT_IMPLICIT_PADDING
             static_assert(!has_implicit_padding_v<T>,
@@ -1153,7 +1153,7 @@ namespace XOffsetDatastructure {
         template <typename T>
         detail::vstatus begin_verified_reload_v(std::size_t used_bytes, std::size_t extents,
                                                 std::byte*& table, std::size_t& clean_from) {
-            static_assert(is_wire_admitted_v<T>,
+            static_assert(::XOffsetDatastructure::detail::explain_wire_admission<std::remove_cvref_t<T>>(),
                 "begin_verified_reload<T>() requires an admitted fixed-schema wire type.");
             if (direct_reload_open_)
                 XOFFSET_VFAIL(XException, XErrc::invalid_state,
@@ -1430,7 +1430,7 @@ namespace XOffsetDatastructure {
         template <typename T>
         static detail::vstatus admit_wire_header(std::span<const std::byte> data, XWireHeader& header,
                                                  const char* who, detail::WireLayout& layout) {
-            static_assert(is_wire_admitted_v<T>,
+            static_assert(::XOffsetDatastructure::detail::explain_wire_admission<std::remove_cvref_t<T>>(),
                 "load_verified<T>() requires an admitted fixed-schema wire type.");
             XOFFSET_VTRY(detail::read_wire_header(data.data(), data.size_bytes(), who, header));
             if (header.root_type_id != detail::wire_root_type_id<T>()) {

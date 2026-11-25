@@ -4220,7 +4220,7 @@ namespace XOffsetDatastructure {
             // apply_key<T, true>); false is apply_delta_verified<T>.
             template <typename T, bool Admit = false>
             static vstatus apply(XBuffer& xbuf, std::span<const std::byte> data, XDeltaCursor& cursor) {
-                static_assert(is_wire_admitted_v<T>,
+                static_assert(::XOffsetDatastructure::detail::explain_wire_admission<std::remove_cvref_t<T>>(),
                               "apply_delta_verified<T>() requires an admitted fixed-schema wire type.");
                 if constexpr (Admit) {
                     if (data.size() >= 4u) {
@@ -4319,7 +4319,7 @@ namespace XOffsetDatastructure {
     template <typename T>
     XOFFSET_DETAIL_INLINE XDeltaStats XBuffer::save_delta_into(std::string& out, XDeltaBaseline& baseline,
                                                                XDeltaOptions options) {
-        static_assert(is_wire_admitted_v<T>, "save_delta<T>() requires an admitted fixed-schema wire type.");
+        static_assert(::XOffsetDatastructure::detail::explain_wire_admission<std::remove_cvref_t<T>>(), "save_delta<T>() requires an admitted fixed-schema wire type.");
 #ifdef XOFFSET_REJECT_IMPLICIT_PADDING
         static_assert(!has_implicit_padding_v<T>,
             "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");
@@ -4380,7 +4380,7 @@ namespace XOffsetDatastructure {
     template <typename T>
     XResult<XDeltaStats> XBuffer::try_save_delta_into(std::string& out, XDeltaBaseline& baseline,
                                                       XDeltaOptions options) {
-        static_assert(is_wire_admitted_v<T>, "save_delta<T>() requires an admitted fixed-schema wire type.");
+        static_assert(::XOffsetDatastructure::detail::explain_wire_admission<std::remove_cvref_t<T>>(), "save_delta<T>() requires an admitted fixed-schema wire type.");
 #ifdef XOFFSET_REJECT_IMPLICIT_PADDING
         static_assert(!has_implicit_padding_v<T>,
             "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");
@@ -4410,7 +4410,7 @@ namespace XOffsetDatastructure {
     template <typename T>
     XResult<std::size_t> XBuffer::try_save_delta_into(std::span<char> out, XDeltaBaseline& baseline,
                                                       XDeltaOptions options) {
-        static_assert(is_wire_admitted_v<T>, "save_delta<T>() requires an admitted fixed-schema wire type.");
+        static_assert(::XOffsetDatastructure::detail::explain_wire_admission<std::remove_cvref_t<T>>(), "save_delta<T>() requires an admitted fixed-schema wire type.");
 #ifdef XOFFSET_REJECT_IMPLICIT_PADDING
         static_assert(!has_implicit_padding_v<T>,
             "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");

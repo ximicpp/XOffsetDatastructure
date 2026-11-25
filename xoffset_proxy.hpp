@@ -1273,6 +1273,8 @@ public:
     // (error() tells).
     template <class Arg>
     bool insert(const Arg& value) noexcept {
+        if constexpr (std::is_floating_point_v<E>)
+            if (fixed_detail::nan_key<E>(value)) [[unlikely]] return refuse_nan();
         T* s = Base::get_ptr();
         if (!s) return missing();
         if constexpr (plain) {
@@ -1290,6 +1292,9 @@ public:
     // resolve and at most one regrow. The number inserted; on failure
     // nothing is inserted (error() tells).
     std::uint32_t insert(std::span<const E> values) noexcept requires plain {
+        if constexpr (std::is_floating_point_v<E>)
+            for (const E& v : values)
+                if (fixed_detail::nan_key<E>(v)) [[unlikely]] { (void)refuse_nan(); return 0; }
         std::vector<E> keep;
         const E* src = proxy_detail::outside_payload(Base::a, values.data(), values.size(), keep);
         if (!src && !values.empty()) return 0;
@@ -1326,6 +1331,11 @@ private:
     }
     XOFFSET_DETAIL_INLINE bool missing() const noexcept {
         Base::a.miss();
+        return false;
+    }
+    // A NaN key (floating-point sets): invalid_argument, nothing inserted.
+    XOFFSET_DETAIL_NOINLINE bool refuse_nan() noexcept {
+        if (Base::a.sync()) Base::a.fail(XErrc::invalid_argument);
         return false;
     }
 };
@@ -1382,6 +1392,8 @@ public:
     // register, as push_back).
     template <class Key, class... Args>
     XOFFSET_DETAIL_INLINE bool try_emplace(const Key& key, Args&&... args) noexcept {
+        if constexpr (std::is_floating_point_v<K>)
+            if (fixed_detail::nan_key<K>(key)) [[unlikely]] return refuse_nan();
         if constexpr (plain) {
             bool absent;
             T* const m = head_.find(Base::a, Base::path, absent);
@@ -1455,6 +1467,9 @@ public:
     template <class Pair>
     std::uint32_t insert(std::span<const Pair> entries) noexcept
         requires plain && requires(const Pair& e) { K(e.first); V(e.second); } {
+        if constexpr (std::is_floating_point_v<K>)
+            for (const Pair& e : entries)
+                if (fixed_detail::nan_key<K>(e.first)) [[unlikely]] { (void)refuse_nan(); return 0; }
         std::vector<Pair> keep;
         const Pair* src = proxy_detail::outside_payload(Base::a, entries.data(), entries.size(), keep);
         if (!src && !entries.empty()) return 0;
@@ -1530,6 +1545,11 @@ private:
     static XOFFSET_DETAIL_NOINLINE char32_t reload_size(const T* m) noexcept { return m->size_; }
     XOFFSET_DETAIL_INLINE bool missing() const noexcept {
         Base::a.miss();
+        return false;
+    }
+    // A NaN key (floating-point keys): invalid_argument, nothing inserted.
+    XOFFSET_DETAIL_NOINLINE bool refuse_nan() noexcept {
+        if (Base::a.sync()) Base::a.fail(XErrc::invalid_argument);
         return false;
     }
     struct Inserted {

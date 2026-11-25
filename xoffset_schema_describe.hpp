@@ -185,7 +185,9 @@ namespace XOffsetDatastructure {
 
 // ---- macros ------------------------------------------------------------------
 
-// Applies macro(T, x) to each x (up to 256), each result preceded by a comma.
+// Applies macro(T, x) to each x, each result preceded by a comma. A field
+// list holds at most 256 members: Clang stops at its fold-expression nesting
+// limit of 256 (GCC expands up to 342). USER_GUIDE section 5.1.
 #define XOFFSET_SCHEMA_DETAIL_PARENS ()
 #define XOFFSET_SCHEMA_DETAIL_EXPAND(...) XOFFSET_SCHEMA_DETAIL_EXPAND4(XOFFSET_SCHEMA_DETAIL_EXPAND4(XOFFSET_SCHEMA_DETAIL_EXPAND4(XOFFSET_SCHEMA_DETAIL_EXPAND4(__VA_ARGS__))))
 #define XOFFSET_SCHEMA_DETAIL_EXPAND4(...) XOFFSET_SCHEMA_DETAIL_EXPAND3(XOFFSET_SCHEMA_DETAIL_EXPAND3(XOFFSET_SCHEMA_DETAIL_EXPAND3(XOFFSET_SCHEMA_DETAIL_EXPAND3(__VA_ARGS__))))

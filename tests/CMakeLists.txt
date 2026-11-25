@@ -244,6 +244,28 @@ foreach(entry ${XOFFSET_FAMILY_FAIL_CASES})
         PASS_REGULAR_EXPRESSION "${expected}")
 endforeach()
 
+# A type that cannot be a wire type must fail the build with a diagnostic that
+# names the rule it breaks (xoffset_wire.hpp, explain_wire_admission).
+set(XOFFSET_WIRE_FAIL_CASES
+    "ALIGN|alignment above 8"
+    "POINTER|a pointer, member pointer or reference is not a wire value"
+    "BASE|a wire record has no base classes"
+)
+foreach(entry ${XOFFSET_WIRE_FAIL_CASES})
+    string(REPLACE "|" ";" parts "${entry}")
+    list(GET parts 0 variant)
+    list(GET parts 1 expected)
+    string(TOLOWER "${variant}" lower)
+    add_executable(wire_admission_${lower}_fail EXCLUDE_FROM_ALL wire_admission/explain_fail.cpp)
+    configure_xoffset_target(wire_admission_${lower}_fail)
+    target_compile_definitions(wire_admission_${lower}_fail PRIVATE WIRE_FAIL_${variant}=1)
+    add_test(NAME wire_admission_${lower}_fail
+        COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target wire_admission_${lower}_fail --config $<CONFIG>)
+    set_tests_properties(wire_admission_${lower}_fail PROPERTIES
+        LABELS schema
+        PASS_REGULAR_EXPRESSION "${expected}")
+endforeach()
+
 # Trust tiers by link type (xoffset_receiver.hpp): XReceiver admit against
 # the full check, the forced full check, and the client uplink refusing admit
 # at compile time. A build with XOFFSET_CHECK_UPLINK=0 gives a client link

@@ -144,8 +144,9 @@ the ABI signature: every record's size, alignment and member offsets and types, 
 `load_verified`, `reload_verified`, the admit tier, delta apply and the schema handshake compare
 it with the receiver's and reject a mismatch (`XErrc::schema_mismatch`).
 
-Outside the guarantee: a root type without a schema name (a local buffer; it may use base classes
-and recursive types, and its image carries no fingerprint), and `load_unverified` with
+Outside the guarantee: a root type without a schema name (a local buffer; it may use base classes,
+and its image carries no fingerprint; recursive types, such as a record holding an `XVector` of
+itself, are not supported in any buffer), and `load_unverified` with
 `unsafe_root<T>()` / `unsafe_handle<T>()`, which read raw bytes without the fingerprint check.
 
 ## 3. Building and modifying
@@ -417,7 +418,7 @@ world.edit([&](View& w) {                  // pinned scope: plain references, as
   reflection or exceptions, and work on MSVC and in no-exception builds.
 - **Failures do not throw or crash**: an allocating operation that cannot be done has no effect,
   returns false (or an empty proxy), and records the first error in the buffer (`error()`:
-  `capacity_exceeded`, `out_of_storage`, `borrowed`, `stale`, `out_of_range`); later allocating
+  `capacity_exceeded`, `out_of_storage`, `borrowed`, `stale`, `out_of_range`, `invalid_argument`); later allocating
   operations fail immediately and the buffer refuses to send until `clear_error()`.
 - **Pinned scope** `edit(f)` / `read(f)`: f gets plain references and runs as fast as a plain
   struct. The buffer does not move inside the scope (operations that would need to move fail and
@@ -779,12 +780,32 @@ if (world.relayout_advised()) (void)world.relayout();   // TypedXBuffer<World>
 | 64-bit little-endian platforms only, with 8-bit bytes and IEEE 754 `float` and `double` (32-bit Android builds are not supported) | `static_assert` at compile time on other platforms (section 2.3) |
 | On Apple deployment targets below macOS 14 / iOS 17 (tvOS 17, watchOS 10), `XOFFSET_USE_PMR` automatically defaults to `0` (header-only `XMemoryResource` without `<memory_resource>`); forcing `-DXOFFSET_USE_PMR=1` on those older targets requires `std::pmr` symbols absent from the older system libc++ | `#error` at compile time if `-DXOFFSET_USE_PMR=1` is forced on older Apple deployment targets |
 
+### 5.1 Limits
+
+| Limit | Value | When it is exceeded |
+| --- | --- | --- |
+| One payload (one buffer) | 2 GiB - 8 bytes (`XBufferCore::MAX_PAYLOAD`; offsets are 32-bit) | `XBadAlloc` with `capacity_exceeded` when the buffer is created or an allocation would pass it. Split larger data across several buffers |
+| `maximum_capacity` | Default 64 MiB (`XOFFSET_DEFAULT_MAXIMUM_CAPACITY`) or the initial length if larger; at most the payload limit | An allocation past it fails with `capacity_exceeded` (plain references throw `XBadAlloc`; proxies return false and record the code). A received wire that declares more is rejected before anything is reserved |
+| Elements in one `XVector`, `XSet` or `XMap` | `max_size()` = (2 GiB - 16 bytes) / `sizeof(T)`, and what fits in `maximum_capacity` | `capacity_exceeded` |
+| Growth by `push_back` / `insert` | Capacity doubles; when the doubled block does not fit, the operation fails rather than taking a smaller block. One container grown this way reaches about half of `maximum_capacity` (64 MiB: an `XVector<std::int64_t>` stops at 4,194,304 elements, 32 MiB) | `capacity_exceeded`. Call `reserve(n)` first to fill more of the buffer |
+| `XString` length | Less than 2 GiB - 8 bytes; up to 10 bytes are stored inside the 12-byte header | `capacity_exceeded` |
+| `XString` contents | Any bytes: there is no UTF-8 check and NUL bytes are allowed. Strings compare as unsigned bytes, so UTF-8 text sorts by code point | Not checked |
+| Floating-point keys (`XSet<float>`, `XMap<double, V>`, ...) | NaN is refused: it compares false with every key, so it has no place in the sorted order. -0.0 and +0.0 are the same key, as in `std::set`. Infinities are ordinary keys | Inserting NaN inserts nothing: plain references throw `XException` with `invalid_argument`; proxies return false (batch `insert`: 0) and record `invalid_argument` |
+| Alignment | Wire types and the root of every buffer: at most 8. Elements of containers in a local root that is never sent may be over-aligned | Compile error that names the rule (`alignas(16)` and SIMD vector members: use `alignas(8)` or a `float v[4]` array) |
+| Members in one field list | `XOFFSET_RECORD` / `XOFFSET_RECORD_DERIVED` list at most 256 members (Clang's fold-expression nesting limit; GCC accepts up to 342) | Compile error. Group members into nested records |
+| Recursive types | Not supported: a record cannot hold a container of itself, directly or through other records | Compile error when the record is used in a buffer |
+| VM-backed buffers alive at once, Linux | About 32,700 per process: each takes 2 of the default `vm.max_map_count` of 65,530 mappings | Creating one more fails with `out_of_storage`. Buffers on slots do not count (small Explicit buffers and small `XBuffer::relocating(max)` buffers, section 3.4); or raise `vm.max_map_count` |
+
 ## 6. Error handling
 
 - All library errors are `XException` (derived from `std::runtime_error`); running out of space is
   its subclass `XBadAlloc`. Every `XException` carries an error code: `e.code()` returns an `XErrc`
   (`xoffset_error.hpp`, for example `bad_magic`, `schema_mismatch`, `invalid_payload`,
   `capacity_exceeded`; `to_string(code)` gives the name).
+- Space: `capacity_exceeded` means the request passes `maximum_capacity`, the payload limit or a
+  container's `max_size()`, and growing the buffer cannot help (section 5.1). `out_of_storage` means
+  the space is below those limits but was not available: an Explicit buffer is full (create it
+  larger or use Automatic growth), or the operating system refused the memory.
 
 ### 6.1 Non-throwing receive entry points
 
