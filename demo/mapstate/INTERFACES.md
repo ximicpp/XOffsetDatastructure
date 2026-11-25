@@ -8,17 +8,17 @@ requirements win.
 
 ## 1. Branch and file ownership
 
-All threads work on branch `claude/map-demo-20261022` (from next_cpp26 f0a8c3a),
+All threads work on branch `claude/map-demo-20261022` (from next_cpp26 970abed),
 touch only the files they own, `git pull --rebase` before every push, never
 force-push. The skeleton builds at every commit: replace stubs, do not delete them.
 
 Review iteration (10-24, branch `claude/demo-review-20261024` from next_cpp26
-d58781e, one thread): adds `--buffers reuse|fresh` to every process, step wire
+ee806e0, one thread): adds `--buffers reuse|fresh` to every process, step wire
 digests in `a_steps.csv`, `net::PeerClosed`, payload recycling in `net::Conn`,
 a fourth `--evil` case and cross-run digest comparison.
 
 End-to-end iteration (10-27, branch `claude/mapdemo-e2e-20261027` from
-next_cpp26 83c21b9, one thread): Linux A and B serve clients built for other
+next_cpp26 395108b, one thread): Linux A and B serve clients built for other
 platforms. The schema drops its filler fields for the V2.1 wire and is
 declared with `XOFFSET_RECORD` field lists, so the client builds as C++20
 (MinGW, MSVC, Android NDK, iOS Simulator) while A and B keep C++26
@@ -28,7 +28,7 @@ and `--replay`; `tools/run_e2e.sh` runs every client target. The sections
 below describe the result.
 
 No-exceptions iteration (10-28, branch `claude/mapdemo-noexc-20261028` from
-next_cpp26 92404a2, one thread, after the library's non-throwing receive
+next_cpp26 93ea3d5, one thread, after the library's non-throwing receive
 entries, #148): the client side never throws. `result.hpp` adds `Error`,
 `Result<T>` and `Status`; every `net` call gets a non-throwing `try_*` form
 (the throwing forms remain for A, B and the self-test, in builds with
@@ -39,7 +39,7 @@ sources without exceptions, and `e2e_report.py` requires the same
 self-check outcomes and texts on every target.
 
 Small-message iteration (10-28, branch `claude/small-msg-dict-20261028` from
-next_cpp26 af601ea, one thread, agreed with the demo thread): an optional
+next_cpp26 e97c681, one thread, agreed with the demo thread): an optional
 event stream. A client that subscribes gets the rules' unit events (every
 20 ticks, the units with id % 100 == 0) as `UnitEvent` wires, raw, zstd,
 zstd with a dictionary, or batched in one dictionary frame. The dictionary

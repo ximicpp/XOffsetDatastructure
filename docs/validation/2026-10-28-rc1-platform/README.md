@@ -1,9 +1,9 @@
 # 3.2.0-rc.1 cross-platform functional test record (2026-10-28)
 
 **Source identity**: `v3.2.0-rc.1` (annotated tag object `6bced0b6a493a50f078916b74f64df747b5e893c`) →
-commit `39de6364563d89f0ef745a23d1937c7f212f9a3c`. The results on this page belong to this commit only.
-When this page was written, `next_cpp26` had already merged #166 (59012329), #163 (964b2bc0), #167
-(32ab499d) and others after 39de636; those commits did not go through this round of tests and cannot
+commit `5d9f63d705be1385a6c8e34a818021407bc73a53`. The results on this page belong to this commit only.
+When this page was written, `next_cpp26` had already merged #166 (76255836), #163 (4e642c1f), #167
+(395fb38d) and others after 5d9f63d; those commits did not go through this round of tests and cannot
 reuse the conclusions here.
 
 Functionality only, no timing: no performance conclusions, no iPhone, no bare-metal Linux (see section 5).
@@ -41,11 +41,11 @@ Verification on the Mac on 2026-10-28 (read only; the scripts in the package wer
   byte-identical".
 - The summary line of each `ctest.log` matches the table below; the 8 `test-inventory.json` files split
   into two groups by standard, identical within each group.
-- The source copy compared with `git archive 39de636`: no differences except `.xo-commit` (whose content is
-  39de636), `tools/__pycache__` and submodules; `external/typelayout` matches the content of submodule
+- The source copy compared with `git archive 5d9f63d`: no differences except `.xo-commit` (whose content is
+  5d9f63d), `tools/__pycache__` and submodules; `external/typelayout` matches the content of submodule
   commit fe295929. The Boost subset was not checked file by file.
 - `android_device.sh`, `native_targets.sh` and `platform_matrix.sh` in the package are byte-identical to
-  the files of the same names at 39de636.
+  the files of the same names at 5d9f63d.
 
 ## 2. Results
 
@@ -137,4 +137,4 @@ copying the source; the source identity is in section 1.
 | A Windows host (WSL2 + Windows adb) is not a host `android_device.sh` supports | This round worked around it with the adb wrapper in the package; whether to support it formally is undecided, and `docs/DEVICE_TESTING.md` states this for now |
 | The hardware information in the tester's report has no raw record | See section 5; later result pages carry a `machine` line |
 
-All of these changes came after 39de636 and only count as validated after a rerun on the next rc.
+All of these changes came after 5d9f63d and only count as validated after a rerun on the next rc.

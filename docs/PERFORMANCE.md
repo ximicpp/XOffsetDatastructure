@@ -21,7 +21,7 @@ Each cell times only data writing, sending and receiving.
 | Item | Setting |
 | --- | --- |
 | Host | Cloud Intel Xeon (Skylake, IBRS), 8 cores, pinned to CPU 2, GCC 16.2 `-O3`, libstdc++; quiet machine (load average ~1.0) |
-| Tree | `3aa1da12` (release candidate; `bb89c81c` verified identical machine code under `--asm-strict`) |
+| Tree | `eb9bab9a` (release candidate; `610206ce` verified identical machine code under `--asm-strict`) |
 | Command | `tools/perf_gate/repro_scorecard.sh` (`ZSTD=1`, [RELEASING.md](RELEASING.md) section 2b) |
 | Samples | M scale, one process per format, 8 interleaved batches × 21 cycles, seed 20261021, geometric mean over batches |
 | Trust model | XOffset `xoffset_trusted` row; rivals zpp_bits (`v4.7.6`) and `cista_unchecked` (`v0.16`, plus zpp_bits's shared-encoding approach for the D cells); no rival runs a separate verification pass |
@@ -61,7 +61,7 @@ receiver runs full validation. These notes change no verdict.
 - **UL.recv and UL.send mostly time the clock.** Two `steady_clock` reads per message cost about 30 ns
   on cloud Xeon hosts, which pulls small-order ratios toward 1. In 4.2.0 UL.recv is 0.866 [0.78–0.93]
   (win) and UL.send is 0.681 [0.64–0.70] (report only).
-- **The Mac run is against zpp_bits only.** After PR #290 (158d0754) the Mac mini scored 18 wins,
+- **The Mac run is against zpp_bits only.** After PR #290 (d13ef15b) the Mac mini scored 18 wins,
   1 tie, 0 losses with zpp_bits as the only rival. cista_unchecked, the strongest cloud rival of six
   cells (B, S, SD, EBW.recv, UPW.recv, UCW.recv), was not run there, so it is not the same measure.
 - **zpp_bits always checks bounds.** Receive cells against it compare a checked decoder with XOffset's
