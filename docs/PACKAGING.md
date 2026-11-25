@@ -293,7 +293,7 @@ tools/client_size/measure.sh android-arm64 OUT [--std 20|23]   # needs ANDROID_N
 tools/client_size/measure.sh ios-device OUT                      # Mac, Xcode
 ```
 
-Android arm64-v8a, NDK r29 Clang 21.0.0, API 28, `c++_static`, C++20 field-list build, commit af601ea
+Android arm64-v8a, NDK r29 Clang 21.0.0, API 28, `c++_static`, C++20 field-list build, commit e97c681
 (bytes):
 
 | Exceptions | Baseline (no XOffset) | 1 schema | Library itself (1 schema minus baseline) | 2 | 4 | 8 | Per additional schema |
@@ -319,7 +319,7 @@ validation):
   including the schemas in every file.
 
 iOS arm64 (`ios-device`), Apple Clang 21.0.0 from Xcode 27.1 (clang-2100.3.34.2), `-dead_strip`,
-`strip -x`, C++20 field-list build, commit eb171ab (library headers identical to af601ea except that on
+`strip -x`, C++20 field-list build, commit cdfe3a8 (library headers identical to e97c681 except that on
 Mach-O the 64 MiB owner table is put in a zero-fill section) (bytes):
 
 | Exceptions | Baseline (no XOffset) | 1 schema | Library itself (1 schema minus baseline) | 2 | 4 | 8 | Per additional schema |

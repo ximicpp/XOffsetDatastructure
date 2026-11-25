@@ -44,14 +44,14 @@ and macOS machines, and an iPhone 15 Pro Max passed CTest and the corpus; eviden
 [validation/2026-10-28-rc1-platform](validation/2026-10-28-rc1-platform/README.md) and
 [DEVICE_TESTING.md](DEVICE_TESTING.md).
 
-**Lower Apple minimums (11c3c06) and real-device Wire 3.0 checks (2026-11-24).** Builds for macOS 12.0
+**Lower Apple minimums (fec8450) and real-device Wire 3.0 checks (2026-11-24).** Builds for macOS 12.0
 and iOS 14.0 automatically set `XOFFSET_USE_PMR=0` (header-only `XMemoryResource`, zero `std::pmr`
 imports):
 
-- **macOS 12.0 & iOS 14.0 simulator (main `7d69d66`)**: `tools/native_targets.sh macos` at deployment
+- **macOS 12.0 & iOS 14.0 simulator (main `91df69a`)**: `tools/native_targets.sh macos` at deployment
   target 12.0 (C++20 and C++23) and `ios-sim` at 14.0 (C++20) passed the full CTest, 215/215 each; every
   test binary records minimum OS 12.0 / 14.0 and imports no `std::pmr` symbol.
-- **Physical Android 11 arm64-v8a & iPhone 15 Pro Max arm64 (main `4f544e29`)**:
+- **Physical Android 11 arm64-v8a & iPhone 15 Pro Max arm64 (main `c304e1f7`)**:
   - Xiaomi `M2102K1C` (Android 11 / API 30, 4 KB page size, NDK `27.0.12077973` Clang 18.0.1, zero
     submodules): C++20 (`PMR=1`) full CTest **206/206** passed; C++23 (`XOFFSET_USE_PMR=0`) key suite
     **9/9** passed; `xo_slg_bench --mode verify --scale S` passed; `xo_mem_probe` (`--single` 2047 MiB,

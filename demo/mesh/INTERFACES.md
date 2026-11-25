@@ -17,7 +17,7 @@ replays every job and checks that each device sent byte-identical data.
 ## 1. Branch, ownership and rules
 
 All threads work on branch `claude/xmesh-demo-20261028` (from next_cpp26
-f7ea833). `git pull --rebase` before every push, never force-push, touch
+8232e8a). `git pull --rebase` before every push, never force-push, touch
 only the files you own, and keep the build green at every commit (replace
 stubs, do not delete them). Merge class 0 (demo and docs only); no GitHub CI.
 

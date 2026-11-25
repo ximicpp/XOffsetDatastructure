@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BASELINE_COMMIT="${BASELINE_COMMIT:-6d033a77}"
+BASELINE_COMMIT="${BASELINE_COMMIT:-1d52bee5}"
 if [[ -f "$ROOT_DIR/build/CMakeCache.txt" ]]; then
     CLANG_CXX="$(grep '^CMAKE_CXX_COMPILER:' "$ROOT_DIR/build/CMakeCache.txt" | head -n 1 | cut -d= -f2-)"
     CLANG_C="$(grep '^CMAKE_C_COMPILER:' "$ROOT_DIR/build/CMakeCache.txt" | head -n 1 | cut -d= -f2-)"
