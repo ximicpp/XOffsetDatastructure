@@ -12,17 +12,6 @@ It is built for game backends: Linux servers that hand state to each other and
 push it to Windows, iOS and Android clients, all from one C++ header that both
 sides include.
 
-## Core features
-
-| | What you get |
-| --- | --- |
-| **No serialize step** | Objects live in the arena and point to each other by relative offsets. Sending is one copy of the arena; receiving is a check plus one copy. Nothing is encoded or decoded per field. |
-| **Mutate in place** | Read and write fields, append, insert and erase directly in the buffer, including variable-length changes; freed space is reused. A received buffer is a normal working buffer: change it and send it on. |
-| **Send the bytes to any 64-bit LE device** | The same bytes are valid on Linux x86-64/arm64, Windows x64, macOS, iOS and Android. C++26 reflection builds (servers) and C++20 builds with the platform compiler (clients: one `XOFFSET_RECORD` line per type, `-fno-exceptions` works) write identical bytes, and `XOFFSET_PIN_SCHEMA` makes a compiler that would lay a type out differently fail to build. |
-| **Delta sync** | Once the peer holds a copy, send only the bytes that changed: per-client deltas, and shared deltas (one encoding per changed entity) for a viewport onto a shared world. |
-| **Add-only schema evolution** | Reserve `XSpare<N>` bytes in a type's first release; a later version that only adds fields in them talks to the old one in both directions with no conversion. The schema handshake refuses any other mismatch. |
-| **Checks chosen per link** | Between your own servers and from server to client, the trusted tier checks the header and bounds only; a client uplink is bounds-checked or fully validated before it is kept. |
-
 It is not cross-language, it does not compress (put zstd or similar on top),
 and its checks are structural, not authentication (use TLS across untrusted
 networks). A short example and the arena layout:
@@ -30,19 +19,10 @@ networks). A short example and the arena layout:
 
 ## Performance
 
-XOffset time ÷ rival time on cloud x86-64 Linux (Xeon, GCC 16 `-O3`, pinned
-core, medians over many processes): **below 1 means XOffset is faster**, and
-0.95–1.05 is a tie. Compression is not timed.
-
-| Workload | XOffset against the rivals |
-| --- | --- |
-| **SLG game server** (`bench/slg`): login state, per-client and shared viewport deltas, client orders, server hand-offs; trusted tier against the strongest unchecked rival per cell (zpp::bits, cista) | **19 cells: 17 wins, 2 ties, 0 losses** |
-| **Message size**, 68 bytes to 729 KB ([bench/premises](bench/premises/README.md)), five rivals | Trusted tier wins at every size, most at 1–12 KB (0.16–0.21 of the strongest rival); full validation loses narrowly only below about 80 bytes (1.07 at 68 bytes) |
-| **Churned sender buffer** (edits, containers grown and shrunk back) | Goes out compact by default: from 3 KB up 0.32–0.60 of zpp::bits's time trusted, 0.51–0.76 fully validated |
-| **Bytes after zstd-3** (report only) | 1.00–1.03x zpp::bits from 2.9 KB up, 1.45x at 68 bytes (the 40-byte header weighs most there); SLG messages 1.11–1.37x |
-
-CppCon 2024 `Character` (64-item map, waypoints, attributes, 8 pieces of
-equipment; same sorted flat map and rules for every library):
+CppCon 2024 `Character` benchmark ([bench/cppcon2024](bench/cppcon2024/README.md);
+64-item map, waypoints, attributes, 8 pieces of equipment; same sorted flat map
+and rules for every library), cloud x86-64 Linux, GCC 16 `-O3`, medians over
+many processes, compression not timed:
 
 | ns per operation | XOffset | zpp::bits\* | cista raw | FlatBuffers | Protocol Buffers |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -52,10 +32,7 @@ equipment; same sorted flat map and rules for every library):
 
 \* The read/write rows of zpp::bits are std containers.
 
-Measured on 4.3.0; in these programs 2.0.0 changes machine code only in growth
-paths that can report a capacity error, and instruction counts stay within 0.1%
-of 4.3.0. The numbers hold for these workloads, adapters and hosts: method,
-every cell and the limits are in [PERFORMANCE.md](docs/PERFORMANCE.md).
+Full method, every cell and the limits: [PERFORMANCE.md](docs/PERFORMANCE.md).
 
 ## Quick start (C++20)
 
