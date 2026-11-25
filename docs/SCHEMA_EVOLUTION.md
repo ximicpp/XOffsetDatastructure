@@ -54,9 +54,9 @@ and `std::uint8_t[8]` are different layouts.
 Put the spare member last, where it also fills the tail padding of the record, and size it for the fields
 you expect: 8 bytes per frequently repeated element record and 16 at the root are a common choice. The
 bytes cost in every image and on the wire: in the SLG example (8 bytes per hero, 16 at the root) the image
-grows by 6.3%, by 3.0% after zstd level 3. Zero bytes compress well, and `XWireEmission::zero_runs` does
-not send long runs of them. A list a later version will need is reserved as `XVector<XSpare<16>>` (an empty
-vector costs its 12-byte head). A type without spare bytes can only change by a new generation.
+grows by 6.3%, by 3.0% after zstd level 3: zero bytes compress well. A list a later version will need
+is reserved as `XVector<XSpare<16>>` (an empty vector costs its 12-byte head). A type without spare
+bytes can only change by a new generation.
 
 **Handshake on every connection.** Each side first says which version of each root type it works in;
 only then come ordinary messages. The frame format is up to the application;

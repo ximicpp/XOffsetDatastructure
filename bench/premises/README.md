@@ -54,7 +54,22 @@ in N.
 
 ## Results
 
-Library v4.1.0, cloud x86-64 Xeon @ 2.10 GHz with 48 KiB L1d and 2 MiB L2 per core:
+Library v4.3.0 (tree `5a54d9d1`, default `XWireEmission::automatic`), cloud x86-64 Xeon @ 2.10 GHz
+with 48 KiB L1d and 2 MiB L2 per core, 2026-11-25:
+
+- [`summary.md`](results/2026-11-25/summary.md): 31 processes, all 554 cells (churn at k = 1/4, 1, 2,
+  4 and 16).
+- [`slg_summary.md`](results/2026-11-25/slg_summary.md): the SLG demo cases with every rival, both
+  tiers, 8 batches.
+- [`cachegrind.md`](results/2026-11-25/cachegrind.md): instructions and simulated L1 data misses per
+  message for selected cells.
+- [`memory.md`](results/2026-11-25/memory.md): RSS, peak and page tables of the SLG demo cases, one
+  process per format.
+
+The raw output of every process is in the project files, `release-4.3.0/gap-fix/premises/`.
+
+Earlier: library v4.1.0, same host type, 2026-11-17 (before `automatic` emission was the default, so
+churned senders sent their image):
 
 - [`summary.md`](results/2026-11-17/summary.md): 31 processes of the first version of the bench (360
   cells: churn at k = 1/4, 1 and 16 only).

@@ -12,10 +12,15 @@
 //     save_compact(), so bytes the client left in holes and slack do not go
 //     on to the next hop (docs/DEPLOYMENT.md 4.2).
 //
+// The connection starts with the schema handshake (the client's hello, the
+// server's ack); a client of another generation is refused before it sends
+// an order (docs/SCHEMA_EVOLUTION.md).
+//
 // Client best practices: one send buffer reused for every order (reset()),
 // a dense wire (view() needs one; wires below 4 KiB always are), small
 // per-link limits on the server.
 #include "game_protocol.hpp"
+#include "../xoffset_handshake.hpp"
 #include "../xoffset_receiver.hpp"
 
 #include <cstddef>
@@ -101,6 +106,17 @@ int main() {
     Client alice{1001};
     Server server;
     int failures = 0;
+
+    // Connect: the client's first frame is the hello; the server answers and
+    // closes a refused connection; the client sends orders only after an ack
+    // that accepts it.
+    std::string ack;
+    const XSchemaHelloResult client = accept_schema_hello<MoveOrder>(make_schema_hello<MoveOrder>("client-1.0"), ack,
+                                                                     "server-1.0");
+    if (!client.accepted() || !read_schema_ack<MoveOrder>(ack)) {
+        std::printf("handshake failed\n");
+        return 1;
+    }
 
     failures += !server.on_order(1001, alice.order(1, 40, 60, 3));
 

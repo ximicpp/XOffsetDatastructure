@@ -17,7 +17,7 @@ section 3:
 | --- | --- | --- |
 | `pr` (default) | PRs that change the library (class S and L, and class 0 PRs that change library sources) | meta, gcc, asan, fuzz, diff, smoke, ir, p2996, p2996-ir, asm, plus diff-c++20 and one C++20 client column (client-c++20, MSVC first) |
 | `quick` | PRs that do not touch the library (only bench/, tools/, tests/, docs/) | meta, gcc, smoke, p2996; refuses to run when top-level sources, CMakeLists.txt or cmake/ differ from the base |
-| `daily` | Once a day, on the latest commit of `main` | tsan, the whole C++20/C++23 matrix, all client columns, wire-matrix (the parts the `pr` tier leaves out) |
+| `daily` | Once a day, on the latest commit of `main` | tsan, demo (the map state demo end to end), the whole C++20/C++23 matrix, all client columns, wire-matrix (the parts the `pr` tier leaves out) |
 | `release` (= `--release`) | Release candidates | All steps |
 
 **Stacked PRs**: in a chain of dependent PRs (each one based on the one below

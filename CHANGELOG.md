@@ -14,6 +14,31 @@ of this file and in the pull requests.
   - `XRecordBody::numbered_mask` now maps each member of a later family version to all overlapping
     first-version members instead of only its starting member, so a new field spanning adjacent
     `XSpare` members sends every byte in shared-delta change bodies.
+- Examples and getting started reserve bytes for later versions and handshake on connect. The shared
+  protocol header of the three use-case examples (`examples/game_protocol.hpp`) ends every record with
+  an `XSpare<N>` member (8 bytes in `Unit`, 20 in `WorldView` and `PlayerState`, 16 in `MoveOrder`;
+  pins regenerated), and `server_to_client`, `client_uplink` and `server_to_server` start with the
+  schema handshake (`make_schema_hello`, `accept_schema_hello`, `read_schema_ack`; between servers
+  `XSchemaRole::server`), also in their no-exception builds. GETTING_STARTED section 3, its checklist,
+  the README example and CLIENT_TARGETS say why: spare bytes can only be reserved in a type's first
+  release, and without them every later change is a new generation that servers and clients take
+  together. Library unchanged.
+- `tools/local_validate.sh` has a `demo` step, run by `--release` and `--tier daily` (not by the `pr`
+  tier): the map state demo built with GCC 16 and `demo/mapstate/tools/run_all_tiers.sh` with the
+  schema version-1 client beside the current one (self-test, schema lock check, 1 / 100 / 10000 units
+  x 500 steps in both buffer modes, failure inputs). The demo is the only run of the server to client
+  path between processes over TCP; its `writeback` self-test failed from 4.2.0 until the fix below
+  without any validation step noticing.
+- Performance documentation measured on 4.3.0. PERFORMANCE.md section 2 and the README come from a new
+  `bench/premises` run (2026-11-25, 31 processes, `results/2026-11-25/`): the churned-buffer losses of
+  the 4.1.0 run are gone under the default `automatic` emission (from 2.9 KB up, trusted 0.32–0.60
+  and full validation 0.51–0.76 of zpp::bits), and full validation loses narrowly only below about
+  80 bytes (1.07 at 68 bytes). The SLG demo cases against all five rivals: trusted tier 15 wins, 0
+  ties, 0 losses (4.1.0: 13 wins, 2 ties). Section 3 has the 4.3.0 memory run: RSS 538.3 MiB, 0.92x the
+  smallest rival, page tables 0.42%. The examples and guides no longer recommend
+  `XWireEmission::zero_runs` across machines: it always sends the churned image and took 0.99–9.5
+  times zpp::bits's time where the default took 0.32–0.60; `server_to_client` and `server_to_server`
+  send with the default. Library unchanged.
 - Map state demo: `mapdemo_selftest` `writeback` passes again. Its client sends the image
   (`XWireEmission::free_runs`), so the bytes it hides in a vector's spare capacity reach A; since
   4.2.0 the default `save_verified` may send the compact wire, which leaves them behind, and the test

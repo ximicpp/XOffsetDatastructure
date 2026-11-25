@@ -111,7 +111,10 @@ DC, DPTW, DCTW) with a geometric mean between **1.02 and 1.08** is layout-sensit
 tools/local_validate.sh --release --base <previous tag>
 ```
 
-`--release` adds GCC 16 TSan, the whole C++20/C++23 matrix and all client columns to the PR tier.
+`--release` adds GCC 16 TSan, the map state demo end to end (`demo`: servers A and B and the current
+and the schema version-1 clients over TCP, every tier in both buffer modes and the failure inputs;
+[demo/mapstate](../demo/mapstate/README.md)), the whole C++20/C++23 matrix and all client columns to
+the PR tier.
 Every step must pass; the Ir gates are judged per section 2. Client columns reported "not run" (no
 toolchain) are stated in the release PR. Paste `REPORT.md` into the release PR. Run it in parallel with
 section 3.1.
