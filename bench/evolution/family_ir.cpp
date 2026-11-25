@@ -5,10 +5,9 @@
 // family: v2 takes Hero::awaken and PlayerState::vip_exp from v1's XSpare
 // bytes. A server on v2 talks to a client on v2 (same) or on v1 (in_family):
 //
-//   send.same       XPeerSchemas::save_into after the handshake with a v2 client
+//   send.same       save_verified_into after the handshake with a v2 client
 //   send.in_family  the same after the handshake with a v1 client (verdict same:
-//                   one fingerprint, no conversion); without reflection (no
-//                   xoffset_evolution.hpp) both rows are save_verified_into
+//                   one fingerprint, the same bytes)
 //   recv.same       the v2 client's reload of the server's wire (trusted link, admit)
 //   recv.in_family  the v1 client's reload of the same wire
 //   delta.same      one tick of an image delta stream (touches baseline, one
@@ -25,9 +24,6 @@
 //                               inside them (valgrind --collect-atstart=no)
 #include "xoffset_receiver.hpp"
 #include "xoffset_handshake.hpp"
-#if XOFFSET_SCHEMA_REFLECTION
-#include "xoffset_evolution.hpp"
-#endif
 #include "slg/model_xoffset.hpp"
 
 #include <cstdint>
@@ -207,18 +203,6 @@ std::string hello_of_v1() { return make_schema_hello<V1>("client-v1"); }
 std::string hello_of_v2() { return make_schema_hello<V2>("client-v2"); }
 
 // The server's side of the handshake with a client, and its send to that client.
-#if XOFFSET_SCHEMA_REFLECTION
-struct Peer {
-    XPeerSchemas schemas;
-    explicit Peer(const std::string& hello) {
-        std::string ack;
-        schemas = XPeerSchemas::accept<V2>(hello, ack, "server");
-        if (!schemas.accepted() || !schemas.sends_working_version<V2>())
-            die("handshake: the client is not served the working version");
-    }
-    void save_into(TypedXBuffer<V2>& state, std::string& out) const { schemas.save_into(state, out); }
-};
-#else
 struct Peer {
     explicit Peer(const std::string& hello) {
         std::string ack;
@@ -228,7 +212,6 @@ struct Peer {
     }
     void save_into(TypedXBuffer<V2>& state, std::string& out) const { state.save_verified_into(out); }
 };
-#endif
 
 struct Fixture {
     TypedXBuffer<V2> state = make_state();

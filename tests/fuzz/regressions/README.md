@@ -8,7 +8,7 @@ the harness built without libFuzzer, with that job's compiler and sanitizers
 | --- | --- | --- |
 | `v2_wire/` | `fuzz_v2_wire.cpp` (one V2 wire per file) | `fuzz_v2_wire_replay` |
 | `wire_schemas/` | `fuzz_wire_schemas.cpp` (first byte picks the schema, the rest is the wire) | `fuzz_wire_schemas_replay` |
-| `schema_evolution/` | `fuzz_schema_evolution.cpp` (first byte picks receive, send or handshake) | `fuzz_schema_evolution_replay` |
+| `schema_evolution/` | `fuzz_schema_evolution.cpp` (first byte picks load, convert or handshake) | `fuzz_schema_evolution_replay` |
 | `delta_sync/` | `fuzz_delta_sync.cpp` (first byte picks schema and mode, second the replica's state) | `fuzz_delta_sync_replay` |
 | `shared_delta/` | `fuzz_shared_delta.cpp` (first byte picks the mode, second the replica's state) | `fuzz_shared_delta_replay` |
 | `schema_family/` | `fuzz_schema_family.cpp` (first byte picks the mode: a wire, a shared delta change body or a whole body, read by three versions of one family) | `fuzz_schema_family_replay` |

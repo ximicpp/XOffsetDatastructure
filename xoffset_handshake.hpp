@@ -2,13 +2,15 @@
 #define X_OFFSET_HANDSHAKE_HPP
 
 // Schema handshake (both ends; no evolution code). Usage, verdicts and
-// release rules: docs/SCHEMA_EVOLUTION.md section 3.
+// release rules: docs/SCHEMA_EVOLUTION.md.
 //
 // XSchemaHello and XSchemaHelloAck are ordinary wire 2.1 payloads of fixed
 // library types, checked by the same validator as every message; their schema
 // names ("xoffset.hello", "xoffset.hello.ack") never change. The library does
-// not frame them. accept_schema_hello accepts exact versions only;
-// XPeerSchemas::accept (xoffset_evolution.hpp) also converts older ones.
+// not frame them. Two programs talk when they work in one generation of each
+// root type: the same version, or versions of one add-only family
+// (XOFFSET_SCHEMA_FAMILY), which share one fingerprint. A peer of another
+// generation is refused; nothing converts messages per peer.
 
 #include "xoffsetdatastructure.hpp"
 #include "xoffset_schema_names.hpp"
@@ -98,10 +100,10 @@ namespace XOffsetDatastructure {
     };
 
     enum class XSchemaVerdict : std::uint32_t {
-        same = 0,             // the peer works in this version too
-        convert = 1,          // the acknowledging side converts both ways
-        reject_unknown = 2,   // no such root type or version
-        reject_names = 3,     // same layout, other field names
+        same = 0,             // the peer works in this version or another version of its family
+        convert = 1,          // retired: no longer written; read as a rejection
+        reject_unknown = 2,   // no such root type, or another generation of it
+        reject_names = 3,     // same fingerprint, field names of no version of the family
     };
 
     struct XSchemaAckEntry {                // 24 bytes
@@ -129,7 +131,7 @@ namespace XOffsetDatastructure {
     inline const char* to_string(XSchemaVerdict v) noexcept {
         switch (v) {
             case XSchemaVerdict::same: return "same";
-            case XSchemaVerdict::convert: return "convert";
+            case XSchemaVerdict::convert: return "convert (retired)";
             case XSchemaVerdict::reject_unknown: return "reject_unknown";
             case XSchemaVerdict::reject_names: return "reject_names";
         }
@@ -137,7 +139,7 @@ namespace XOffsetDatastructure {
     }
 
     inline constexpr bool accepted(XSchemaVerdict v) noexcept {
-        return v == XSchemaVerdict::same || v == XSchemaVerdict::convert;
+        return v == XSchemaVerdict::same;
     }
 
     template <typename T>
@@ -154,7 +156,7 @@ namespace XOffsetDatastructure {
 
     struct XSchemaAckResult {
         enum class Status : std::uint8_t {
-            ok,          // every root type: same or convert
+            ok,          // every root type: same
             malformed,   // not a valid XSchemaHelloAck (message says why)
             rejected,    // a root type was rejected (root_type_id, verdict)
             missing,     // the ack has no entry for a root type
@@ -226,7 +228,7 @@ namespace XOffsetDatastructure {
         std::string label;
         std::vector<XSchemaPeerEntry> entries;  // one per working entry of the hello
 
-        // Valid, and every root type the peer works in is same or convert.
+        // Valid, and every root type the peer works in is same.
         bool accepted() const noexcept {
             if (!valid) return false;
             for (const auto& e : entries)
@@ -293,8 +295,8 @@ namespace XOffsetDatastructure {
             return schema_family_has_digest<T>(e.name_digest) || hello_lists(hello, e, schema_name_digest_v<T>);
         }
 
-        // Without schema evolution: only the exact version (or another
-        // version of its add-only family) is accepted.
+        // Only the exact version or another version of its add-only family
+        // (one fingerprint) is accepted.
         template <typename T>
         XSchemaVerdict decide_exact(const XSchemaEntry& e, const XSchemaHello& hello) noexcept {
             if (e.schema_hash != wire_schema_hash_v<T>()) return XSchemaVerdict::reject_unknown;
@@ -302,13 +304,12 @@ namespace XOffsetDatastructure {
         }
     } // namespace detail::handshake
 
-    // Accepting side without schema evolution (xoffset_evolution.hpp has
-    // XPeerSchemas, which also accepts older versions): each root type the
-    // peer works in is `same` when its fingerprint and field-name digest equal
-    // this program's, or when it works in another version of the root's
-    // add-only family (XOFFSET_SCHEMA_FAMILY), else rejected. Writes the ack
-    // into `ack_out` (empty when the hello is not valid). Never throws, except
-    // std::bad_alloc.
+    // Accepting side: each root type the peer works in is `same` when its
+    // fingerprint and field-name digest equal this program's, or when it works
+    // in another version of the root's add-only family (XOFFSET_SCHEMA_FAMILY);
+    // otherwise it is rejected and the peer shows its update prompt. Writes
+    // the ack into `ack_out` (empty when the hello is not valid). Never throws,
+    // except std::bad_alloc.
     template <typename... Roots>
     XSchemaHelloResult accept_schema_hello(const void* data, std::size_t size, std::string& ack_out,
                                            std::string_view label = {}) {
@@ -355,8 +356,9 @@ namespace XOffsetDatastructure {
     }
 
     // Reads the peer's ack to a hello of make_schema_hello<Roots...>(): ok when
-    // every root type is same or convert. Never throws (except std::bad_alloc
-    // for the message text).
+    // every root type is same (an ack of release 4.2 or earlier may say
+    // convert, which is read as a rejection). Never throws (except
+    // std::bad_alloc for the message text).
     template <typename... Roots>
     XSchemaAckResult read_schema_ack(const void* data, std::size_t size) {
         XSchemaAckResult r;

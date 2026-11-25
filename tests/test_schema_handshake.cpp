@@ -103,8 +103,16 @@ void ack_outcomes() {
     const auto chat = wire_fingerprint_v<game::Chat>;
 
     auto r = read_schema_ack<game::Player, game::Chat>(
-        make_ack({{player, XSchemaVerdict::same}, {chat, XSchemaVerdict::convert}}));
+        make_ack({{player, XSchemaVerdict::same}, {chat, XSchemaVerdict::same}}));
     CHECK(r && r.status == S::ok && r.message.empty());
+
+    // `convert` (written by release 4.2 and earlier, when the acknowledging
+    // side converted messages per peer) is retired: a rejection.
+    CHECK(!accepted(XSchemaVerdict::convert));
+    r = read_schema_ack<game::Player, game::Chat>(
+        make_ack({{player, XSchemaVerdict::same}, {chat, XSchemaVerdict::convert}}));
+    CHECK(!r && r.status == S::rejected && r.root_type_id == chat.root_type_id &&
+          r.verdict == XSchemaVerdict::convert);
 
     r = read_schema_ack<game::Player, game::Chat>(
         make_ack({{player, XSchemaVerdict::same}, {chat, XSchemaVerdict::reject_names}}));
