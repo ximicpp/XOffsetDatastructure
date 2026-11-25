@@ -32,9 +32,9 @@
       "sha256": "f1f7f98c21afb92057a18d0917892d568ff5b4ede2586bbcac0bdfc97d523ba6"
     },
     "CHANGELOG.md": {
-      "bytes": 46597,
+      "bytes": 51755,
       "mode": 420,
-      "sha256": "fc1bc5cfd22023e50bfb89a5a492f859a95aba040cfc8346c471c17826c747f7"
+      "sha256": "2f44857bfd68d2f518d15613a88b353ec50cece75aeebeb74d7676fbf6e56ffb"
     },
     "CMakeLists.txt": {
       "bytes": 8503,
@@ -52,9 +52,9 @@
       "sha256": "0c16fbcd9aa84484e0767074f9473fdaf3fb90ea89c20d6441f4220c3ed55114"
     },
     "README.md": {
-      "bytes": 17246,
+      "bytes": 7079,
       "mode": 420,
-      "sha256": "78c2177f8a062fb5f400943b5085a1bff05847325757b7ee66b5ab922dc2467e"
+      "sha256": "ed257e1d33805ef4ab132a5c045ead57a52aa3024ee53bdd584579e51542276b"
     },
     "XOFFSET_VERSION": {
       "bytes": 6,
@@ -242,19 +242,19 @@
       "sha256": "ed65d8b3a3303d8f4f2b2dc2611986eafbb8d38e60b959e11045e009708ff861"
     },
     "docs/ALPHA_COMPATIBILITY.md": {
-      "bytes": 10512,
+      "bytes": 10652,
       "mode": 420,
-      "sha256": "c95c6869bbfa8e24fe98901075477585ec6d9219c4894c678ad6952c17cdbb96"
+      "sha256": "f2fa692f1aedd8334a0d58a9862e7768236edc565c3d08398ff020a11cc7410c"
     },
     "docs/BUILD_AND_PLATFORMS.md": {
-      "bytes": 11338,
+      "bytes": 11794,
       "mode": 420,
-      "sha256": "d95382b021e2acad665cea1df07763bfdfdb33ede527bb68dca91294b3057e55"
+      "sha256": "0aeeb832ffdeac243b7028f1f8bee75d08ab203906849991c391629a12e68aa8"
     },
     "docs/PACKAGING.md": {
-      "bytes": 22179,
+      "bytes": 22243,
       "mode": 420,
-      "sha256": "0cf10f579e93c7f7ebcb77d70722a7e3e479fd0a3b6ceea378abddfcf02fad60"
+      "sha256": "5c2fb6f3996321527c86169341d80f90b0189c492195b0109686090966091cbf"
     },
     "docs/VALIDATION_RUNNER.md": {
       "bytes": 10833,
@@ -4597,9 +4597,9 @@
       "sha256": "870137827d20ad4f9790eacb14bc96502c38e0b5581de74fca0713853feb3ed4"
     },
     "tests/CMakeLists.txt": {
-      "bytes": 30499,
+      "bytes": 31579,
       "mode": 420,
-      "sha256": "09b771cc495bb2b983a28c30dea6028b08da99eb28dd6a3852da94aa5cbfb610"
+      "sha256": "7adc2ccadddcfe5fb27b03eb09116dcd5ec3018506f9fe1c43f33647d940ac2b"
     },
     "tests/allocator_model_support.hpp": {
       "bytes": 11224,
@@ -5092,9 +5092,9 @@
       "sha256": "80bec06f85d9f4b9329f4717aad48a10eae180a0d461c7023e78901e4c738749"
     },
     "tests/test_no_exceptions.cpp": {
-      "bytes": 29568,
+      "bytes": 34762,
       "mode": 420,
-      "sha256": "5948465d39ffaf6837f97f35fb6434d8e0059c620f1d86594326698b6ae6006e"
+      "sha256": "019c955c926237e4910c85a8a37ef9100c70a397b3893008484dbc6b2de1b4c0"
     },
     "tests/test_ordinary_records.cpp": {
       "bytes": 8531,
@@ -5486,6 +5486,11 @@
       "mode": 420,
       "sha256": "f16018145d64b70950dd0767569ef38b97b2f81d5989156040eb6848f6296e86"
     },
+    "tests/wire_admission/explain_fail.cpp": {
+      "bytes": 1221,
+      "mode": 420,
+      "sha256": "9081bebe30cd29feaa0c73a7150bc0bd3260cbff03648a6fa0dfead04ff7508f"
+    },
     "tests/workload_prefix.inc": {
       "bytes": 13084,
       "mode": 420,
@@ -5642,14 +5647,14 @@
       "sha256": "ed31de25a51904f124e94c87946a6c2a556fda09767908ec4f86ca840969d736"
     },
     "xoffset_arena.hpp": {
-      "bytes": 188971,
+      "bytes": 189312,
       "mode": 420,
-      "sha256": "8bc0a34b3d037a7a100bfb6ee52b9e677d10ca18d3bf63709355a904dc50b7ee"
+      "sha256": "3bac038a380c81f022e87c3cd036b49fc9159d8f4929fc711d95c2352029e644"
     },
     "xoffset_buffer.hpp": {
-      "bytes": 97415,
+      "bytes": 97592,
       "mode": 420,
-      "sha256": "bf1177b9e1ca4215c581e7c0a474106514b7495d5a11b9a9ffcaeaf329032f8b"
+      "sha256": "f9fe6ceab0a79cd7b2658fb38e26aeca7f9d812550ad67e3a250363cc53a058c"
     },
     "xoffset_compactor.hpp": {
       "bytes": 12171,
@@ -5657,14 +5662,14 @@
       "sha256": "2bf8e64858d9c40929e55a48f5a70a00601eccc376faa94665d672b311e52f3e"
     },
     "xoffset_config.hpp": {
-      "bytes": 17341,
+      "bytes": 17465,
       "mode": 420,
-      "sha256": "a1a5cf31a04d67edfc4ef7533354eb48b314d0dc8d593d711d5bc8f0a588a0cd"
+      "sha256": "285367064e3d0eadb1b278ed5cad2fbdd574a5b2b462cd64800e4eb4f91ec31f"
     },
     "xoffset_containers.hpp": {
-      "bytes": 182636,
+      "bytes": 185224,
       "mode": 420,
-      "sha256": "ab1a97bb7f34faa83a53240c88aa8c50b357b2f3aaedcb244e841b5b8e9a46c4"
+      "sha256": "c79c59b4150ecd0b4bb67619bfdd68144066ed715ac13fd78c80466450e771d4"
     },
     "xoffset_core_lifetime.hpp": {
       "bytes": 39986,
@@ -5672,9 +5677,9 @@
       "sha256": "2df605a1d3e08c14c6e21b43a997b38e7e4d909f72e1972c5b86f6cf71dd8322"
     },
     "xoffset_delta.hpp": {
-      "bytes": 256563,
+      "bytes": 256799,
       "mode": 420,
-      "sha256": "eb5dff979b098848560fecd36a220c33a7b8b02126aaa1007aa992d68f9bad20"
+      "sha256": "a699e316af909230af02ce3f53c63056eece1392e01b4cdd78fc44584bca56d0"
     },
     "xoffset_dump.hpp": {
       "bytes": 15374,
@@ -5682,9 +5687,9 @@
       "sha256": "03b1accf4b66fdd33b5b095260b9644d3e9e4975423e34151871ec1a5115fd9e"
     },
     "xoffset_error.hpp": {
-      "bytes": 26461,
+      "bytes": 27309,
       "mode": 420,
-      "sha256": "cdebcdd1877877dc08fcec8369dd16266cfbcbbff87ef5c2928a9950163a1772"
+      "sha256": "8a4404e8d6b4f7685efa1b1227200be8e7f20f90e50be2bbd7f2eb63efa33b9a"
     },
     "xoffset_evolution.hpp": {
       "bytes": 46957,
@@ -5707,14 +5712,14 @@
       "sha256": "68b0433870ddb3e2b92670c7359446bbc11bcb7084ed86ed64bf11de9c8fdc4d"
     },
     "xoffset_proxy.hpp": {
-      "bytes": 67853,
+      "bytes": 68955,
       "mode": 420,
-      "sha256": "42c02ef02bafdddbc098a86a79b02aa15b8ffde03ffd71510e0e0041a0d2d5c0"
+      "sha256": "787dc195c48641919fddd4281dcb55aaee2e1cff1d013f3df7582e254cf9473f"
     },
     "xoffset_receiver.hpp": {
-      "bytes": 25839,
+      "bytes": 25898,
       "mode": 420,
-      "sha256": "c4d6c0e2f1aeb8323781808374e0fb94ed9256b1df793f49495efcc047547f04"
+      "sha256": "bad23689f595f1b9d01134e2e8638d28637ea5dff97391688a6b6f87aeb18381"
     },
     "xoffset_registration.hpp": {
       "bytes": 6840,
@@ -5727,9 +5732,9 @@
       "sha256": "21132c4ce4a7f4076007703db925176acd2c5201514cec57ee80e8c3a72f230d"
     },
     "xoffset_schema_describe.hpp": {
-      "bytes": 21687,
+      "bytes": 21826,
       "mode": 420,
-      "sha256": "3fa12f3c61b822db27e8eb2ffcc43b08c67c20a7bbc2bb008aea566f527f0d62"
+      "sha256": "a2d70c3b27f34e3da6e011adcd36d9c4ea898b9ccbab4d64daeb094701f6deb4"
     },
     "xoffset_schema_family.hpp": {
       "bytes": 22765,
@@ -5742,9 +5747,9 @@
       "sha256": "d838433314bf17f65a6384c7e2c34d490b09feb8a5a1e9afb9c32abc3a47f883"
     },
     "xoffset_schema_hash.hpp": {
-      "bytes": 39824,
+      "bytes": 39883,
       "mode": 420,
-      "sha256": "984887efbdf4c8a440a936adde4a003a73b7f6d0c23453a4950f736c33a3d16c"
+      "sha256": "a2b1d76b2913092b66cb859f18fdd7a9f1d96de3b4e741eb70670564caea273a"
     },
     "xoffset_schema_names.hpp": {
       "bytes": 6198,
@@ -5782,9 +5787,9 @@
       "sha256": "421af0ea3e6d32eb22eceb3f08c1e739b090861b3cda7bdca96c5296859e8f22"
     },
     "xoffset_wire.hpp": {
-      "bytes": 119672,
+      "bytes": 127801,
       "mode": 420,
-      "sha256": "126f7b6bcfe6d8ff749094ab3fd23c34af98e0a437cbe458446d9f0616a13f94"
+      "sha256": "ee845b84a08dd34eb20b4ec7b2914e858a1f628b36b1822f2620bd8cc2fbf35d"
     },
     "xoffsetdatastructure.hpp": {
       "bytes": 716,

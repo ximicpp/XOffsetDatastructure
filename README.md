@@ -52,9 +52,10 @@ equipment; same sorted flat map and rules for every library):
 
 \* The read/write rows of zpp::bits are std containers.
 
-Measured on 4.3.0; 2.0.0 runs the same machine code. The numbers hold for
-these workloads, adapters and hosts: method, every cell and the limits are in
-[PERFORMANCE.md](docs/PERFORMANCE.md).
+Measured on 4.3.0; in these programs 2.0.0 changes machine code only in growth
+paths that can report a capacity error, and instruction counts stay within 0.1%
+of 4.3.0. The numbers hold for these workloads, adapters and hosts: method,
+every cell and the limits are in [PERFORMANCE.md](docs/PERFORMANCE.md).
 
 ## Quick start (C++20)
 

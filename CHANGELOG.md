@@ -13,7 +13,16 @@ pre-public internal V2 iterations succeeding the legacy `v1.0.0` and `v2.0-*` pr
 `2.0.0` onward, incompatible wire, delta or public API changes come only in a new major version, and
 every `2.x` release interoperates on Wire 3.0 and Delta 2.0. Stable installs now support CMake
 `SameMajorVersion` `find_package` version matching (prereleases remain `exact-full-version-only`).
-Release-gate rerun evidence to be finalized before tagging `v2.0.0`.
+Release evidence on the candidate `75122b23` (the release commit changes only documentation and
+`SOURCE_MANIFEST.json`): pre-release K4 fuzz (`--budget hour`) with 0 findings (GCC 16 ASan+UBSan
+differential, 4 × 550,195 cases + replay; P2996 libFuzzer, 6 reflection and 5 field-list targets
+including `schema_family`; 3-way outcome-diff identical across reflection, field-list and
+no-exceptions builds); `--release` validation 28/28: Linux C++26 `gcc`/`asan`/`tsan`/`p2996` 287/287,
+8-column C++20/23 matrix 252/252, MSVC C++20/C++23, clang-cl and MinGW under Wine and Android NDK
+r29/r30 under QEMU 252/252 each plus 52 no-exceptions tests, wire matrix 8 builds × 64 reads with the
+same bytes, map state demo 202 verdicts. Ir gate against v4.3.0 on GCC 16 and P2996: every total
+0.9990–1.0001 and every stage 0.9954–1.0004; the benchmark programs differ from v4.3.0 only in
+growth paths that can report a capacity error, so the performance numbers measured on 4.3.0 stand.
 
 - CMake packaging (`cmake/XOffsetVersion.cmake`, `XOffsetDatastructureConfig.cmake.in`,
   `XOffsetDatastructureConfigVersion.cmake.in`, `tools/prepare_release.py`,

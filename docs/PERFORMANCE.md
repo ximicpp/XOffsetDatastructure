@@ -2,7 +2,10 @@
 
 Current published numbers, how they were measured, and their limits. Ratios are XOffset ÷ rival:
 **below 1 means XOffset is faster**. Compression is never timed; sizes are after zstd level 3. Older
-per-release tables (3.0.0 to 3.6.0) are in the Git history of this file.
+per-release tables (3.0.0 to 3.6.0) are in the Git history of this file. The tables were measured on
+4.3.0; in the benchmark programs 2.0.0 changes machine code only in growth paths that can report a
+capacity error, and instruction counts stay within 0.1% of 4.3.0 per run and 0.5% per stage
+([PERF_GATE.md](PERF_GATE.md)).
 
 | Comparison | Where |
 | --- | --- |
