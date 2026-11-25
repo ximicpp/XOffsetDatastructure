@@ -17,8 +17,8 @@
 //     finds its fields;
 //   - handshake: earlier and later versions accept each other; two versions
 //     that add other fields to one version, and another family, are rejected;
-//   - with reflection and exceptions (the server side), XPeerSchemas
-//     (xoffset_evolution.hpp) and the freeze check accept the family too.
+//   - with reflection and exceptions (the server side), the freeze check
+//     accepts the family too.
 // Field lists, so every build runs it; no try/catch: also built without
 // exceptions (then without the server side, which needs them).
 #define XOFFSET_FORCE_FULL_CHECK 0
@@ -402,20 +402,8 @@ void handshake() {
 }
 
 #if TEST_SERVER_SIDE
-// The server side: XPeerSchemas and the freeze check.
+// The server side: the freeze check.
 void server_side() {
-    auto peer_verdict = [](const std::string& hello, auto root) {
-        using R = typename decltype(root)::type;
-        std::string ack;
-        const auto peer = XPeerSchemas::accept<R>(hello, ack);
-        const auto* e = peer.find(wire_root_type_id_v<R>());
-        return e ? e->verdict : XSchemaVerdict::reject_unknown;
-    };
-    CHECK(peer_verdict(make_schema_hello<V1>("v1"), std::type_identity<V3>{}) == XSchemaVerdict::same);
-    CHECK(peer_verdict(make_schema_hello<V3>("v3"), std::type_identity<V1>{}) == XSchemaVerdict::same);
-    CHECK(peer_verdict(make_schema_hello<V2b>("v2b"), std::type_identity<V3>{}) == XSchemaVerdict::reject_names);
-    CHECK(peer_verdict(make_schema_hello<V3>("v3"), std::type_identity<V2b>{}) == XSchemaVerdict::reject_names);
-
     namespace fz = detail::freeze;
     auto root = [](auto type, const char* version) {
         using R = typename decltype(type)::type;

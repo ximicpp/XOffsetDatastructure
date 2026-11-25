@@ -1,11 +1,18 @@
 #ifndef X_OFFSET_EVOLUTION_HPP
 #define X_OFFSET_EVOLUTION_HPP
 
-// Schema evolution, conversion core (server side): converts a verified object
-// of one version of a schema into another, built in a library buffer. Fields
-// correspond by name, level by level; an adjacent step's hook is a global
-// specialization of xevolve<Old, New> (upgrade, downgrade, and `handles`, the
-// fields the default copy leaves to it). Rules and examples:
+// Schema evolution across generations (server side or an offline tool): a
+// change that only adds fields from XSpare bytes keeps the fingerprint and
+// needs nothing here (xoffset_schema_family.hpp); any other change starts a new
+// generation. Peers of different generations do not talk (the handshake
+// refuses them); stored data of an older generation is upgraded once when it
+// is loaded, with evolve_load_verified and XOFFSET_SCHEMA_LINEAGE below.
+//
+// The conversion converts a verified object of one version of a schema into
+// another, built in a library buffer. Fields correspond by name, level by
+// level; XSpare bytes are never copied. An adjacent step's hook is a global
+// specialization of xevolve<Old, New> (upgrade, optionally downgrade, and
+// `handles`, the fields the default copy leaves to it). Rules and examples:
 // docs/SCHEMA_EVOLUTION.md. Every failure throws XException naming the field
 // path, with no partial result. The source is read through typed const
 // references only: run it on objects that passed load_verified.
@@ -155,12 +162,13 @@ namespace XOffsetDatastructure {
     };
 
     namespace detail::evolve {
-        enum class Kind { scalar, enumeration, array, string, vector, set, map, record, other };
+        enum class Kind { scalar, enumeration, array, string, vector, set, map, record, spare, other };
 
         template <typename T>
         consteval Kind kind_of() {
             using U = std::remove_cv_t<T>;
-            if constexpr (fixed_size_scalar<U>) return Kind::scalar;
+            if constexpr (is_spare_v<U>) return Kind::spare;
+            else if constexpr (fixed_size_scalar<U>) return Kind::scalar;
             else if constexpr (std::is_enum_v<U>) return Kind::enumeration;
             else if constexpr (std::is_array_v<U>) return Kind::array;
             else if constexpr (is_fixed_string_v<U>) return Kind::string;
@@ -303,13 +311,14 @@ namespace XOffsetDatastructure {
         // Whether a value of type From converts into To by the default rules.
         // Records always do at this level: their fields are checked when the
         // record conversion is instantiated, so the error names the field.
+        // XSpare bytes on either side are never copied, so they always do.
         template <typename From, typename To>
         consteval bool convertible() {
             using F = std::remove_cv_t<From>;
             using T = std::remove_cv_t<To>;
             constexpr Kind kf = kind_of<F>();
             constexpr Kind kt = kind_of<T>();
-            if constexpr (std::is_same_v<F, T>) {
+            if constexpr (std::is_same_v<F, T> || kf == Kind::spare || kt == Kind::spare) {
                 return true;
             } else if constexpr (kf != kt) {
                 return false;
@@ -332,13 +341,15 @@ namespace XOffsetDatastructure {
             }
         }
 
-        // Same bytes, same names, nothing to rebind: one memcpy converts.
+        // Same bytes, same names, nothing to rebind: one memcpy converts. A
+        // record that did not change between the versions is copied whole,
+        // XSpare members included; XSpare bytes on their own are not.
         template <typename From, typename To>
         consteval bool block_copy() {
             using F = std::remove_cv_t<From>;
             using T = std::remove_cv_t<To>;
             if constexpr (!std::is_trivially_copyable_v<F> || !std::is_trivially_copyable_v<T> ||
-                          sizeof(F) != sizeof(T)) {
+                          sizeof(F) != sizeof(T) || kind_of<F>() == Kind::spare || kind_of<T>() == Kind::spare) {
                 return false;
             } else if constexpr (kind_of<F>() != Kind::record && kind_of<F>() != Kind::array) {
                 return std::is_same_v<F, T>;
@@ -531,7 +542,11 @@ namespace XOffsetDatastructure {
             using F = std::remove_cv_t<From>;
             using T = std::remove_cv_t<To>;
             constexpr Kind kind = kind_of<T>();
-            if constexpr (block_copy<F, T>() && !hook_for<F, T>::present) {
+            if constexpr (kind == Kind::spare || kind_of<F>() == Kind::spare) {
+                // Reserved bytes carry nothing: the target keeps the zeros
+                // make<To>() wrote, so a later version of To finds its new
+                // fields there unset.
+            } else if constexpr (block_copy<F, T>() && !hook_for<F, T>::present) {
                 std::memcpy(static_cast<void*>(&to), static_cast<const void*>(&from), sizeof(T));
             } else if constexpr (kind == Kind::scalar) {
                 to = from;
@@ -564,6 +579,7 @@ namespace XOffsetDatastructure {
             using T = std::remove_cv_t<To>;
             if constexpr (block_copy<F, T>() && !hook_for<F, T>::present) return false;
             else if constexpr (kind_of<T>() == Kind::record) return true;
+            else if constexpr (kind_of<T>() == Kind::spare || kind_of<F>() == Kind::spare) return true;
             else if constexpr (kind_of<T>() == Kind::array)
                 return needs_walk<std::remove_extent_t<F>, std::remove_extent_t<T>>();
             else if constexpr (kind_of<T>() == Kind::vector)
@@ -617,9 +633,13 @@ namespace XOffsetDatastructure {
                     out += ": ";
                     if constexpr (Hook::handles(name)) {
                         out += "hook\n";
+                    } else if constexpr (kind_of<field_t<To, I>>() == Kind::spare) {
+                        out += "spare (not copied)\n";
                     } else {
                         constexpr std::size_t J = find_field<From>(name);
                         if constexpr (J == npos) {
+                            out += "init (added)\n";
+                        } else if constexpr (kind_of<field_t<From, J>>() == Kind::spare) {
                             out += "init (added)\n";
                         } else {
                             using FF = field_t<From, J>;
@@ -729,29 +749,24 @@ namespace XOffsetDatastructure {
 
 
     // ========================================================================
-    // Version lineage, receive/send with a peer, broadcast, snapshots.
+    // Lineage: stored data of older generations.
     // ========================================================================
     //
-    // XOFFSET_SCHEMA_LINEAGE(Working, V1, V2, ...) lists the versions of one
-    // root type in release order, oldest first; Working, the version this
-    // program works in, is last unless it is listed (a server that already
-    // knows a newer version but still works in the older one lists both).
-    // Every version registers the same schema name; their schema_hash values
-    // differ pairwise, checked at compile time: two versions with the same
-    // layout and different field names would otherwise read each other's
-    // bytes under the wrong names. Adjacent versions convert with
-    // evolve<>() and their xevolve hooks; versions k apart take k steps.
+    // XOFFSET_SCHEMA_LINEAGE(Working, G1, G2, ...) lists the generations of one
+    // root type whose stored data this program still loads, oldest first; each
+    // entry is the last version of that generation's add-only family (it names
+    // every field the generation ever had). Working, the version this program
+    // works in, is last unless it is listed. Every entry registers the same
+    // schema name and their fingerprints differ pairwise, checked at compile
+    // time: two versions of one fingerprint are one generation (one family,
+    // or the same layout under other field names). Adjacent generations
+    // convert with evolve<>() and their xevolve hooks; generations k apart
+    // take k steps. Peers of an older generation are not served: the
+    // handshake (xoffset_handshake.hpp) refuses them.
 
     template <typename Working>
     struct xschema_lineage {
         static constexpr bool xoffset_no_lineage = true;
-    };
-
-    // Extra field-name digests a version also accepts in a handshake: a field
-    // renamed without changing what its bytes mean keeps the old builds.
-    template <typename T>
-    struct xschema_name_aliases {
-        static constexpr std::array<std::uint64_t, 0> values{};
     };
 
     namespace detail::evolve {
@@ -802,25 +817,6 @@ namespace XOffsetDatastructure {
             for (std::size_t i = 0; i < version_count<W>; ++i)
                 if (version_hashes<W>[i] == schema_hash) return i;
             return npos;
-        }
-
-        // T's field names, an alias of them, or those of an earlier version
-        // of T's add-only family (XOFFSET_SCHEMA_FAMILY).
-        template <typename T>
-        constexpr bool name_digest_matches(std::uint64_t digest) noexcept {
-            if (schema_family_has_digest<T>(digest)) return true;
-            for (const std::uint64_t alias : xschema_name_aliases<T>::values)
-                if (alias == digest) return true;
-            return false;
-        }
-
-        template <typename W>
-        constexpr bool version_names_match(std::size_t index, std::uint64_t digest) noexcept {
-            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-                bool ok = false;
-                ((index == Is ? (void)(ok = name_digest_matches<version_t<W, Is>>(digest)) : (void)0), ...);
-                return ok;
-            }(std::make_index_sequence<version_count<W>>{});
         }
 
         // Calls fn(std::integral_constant<std::size_t, I>{}) for I == index < N.
@@ -887,8 +883,9 @@ namespace XOffsetDatastructure {
                                                                                : std::string_view{};
             constexpr std::string_view why =
                 bad_name != npos ? " registers another schema name; every version registers the same one"
-                : pair[0] != npos ? " have the same schema_hash (same layout): a version must change the layout; "
-                                    "a pure rename is the same version (XOFFSET_SCHEMA_NAME_ALIAS)"
+                : pair[0] != npos ? " have the same schema_hash: they are one generation (versions of one add-only "
+                                    "family, or the same layout under other field names); list only the last "
+                                    "version of each generation"
                                   : "has no working version";
             constexpr std::string_view colon = ": ";
             Message<head.size() + w.size() + colon.size() + a.size() + and_.size() + b.size() + why.size()> m;
@@ -913,9 +910,10 @@ namespace XOffsetDatastructure {
             }
         }
 
-        // Loads a wire of any version of W's lineage and upgrades it to W. A
-        // wire of no version goes to load_verified<W>, which rejects it with
-        // its usual message.
+        // Loads an image of any generation of W's lineage and upgrades it to W.
+        // An image of W's own generation (W's add-only family included) and an
+        // image of no listed generation go to load_verified<W>, which rejects
+        // the latter with its usual message.
         template <typename W, typename Bytes>
         TypedXBuffer<W> load_any_version(const Bytes& wire, std::optional<XBuffer::MaximumCapacity> cap,
                                          const XEvolveOptions& options) {
@@ -935,21 +933,11 @@ namespace XOffsetDatastructure {
                 }
             });
         }
-
-        template <typename W>
-        void save_version(TypedXBuffer<W>& object, std::size_t index, std::string& out, XCompactOptions compact) {
-            with_index<version_count<W>>(index, [&](auto I) {
-                if constexpr (I() == working_index<W>) {
-                    object.save_verified_into(out);
-                } else {
-                    auto converted = chain<W, working_index<W>, I()>(object, XEvolveOptions{});
-                    converted.save_compact_into(out, compact);
-                }
-            });
-        }
     } // namespace detail::evolve
 
-    // Snapshot read: any version of W's lineage, upgraded to W.
+    // Stored data: an image of any generation of W's lineage, each verified as
+    // its own generation, upgraded to W. One-way: keep a backup of the old
+    // image until the upgraded one is saved.
     template <typename W>
     TypedXBuffer<W> evolve_load_verified(std::span<const std::byte> wire,
                                          std::optional<XBuffer::MaximumCapacity> cap = std::nullopt,
@@ -964,204 +952,12 @@ namespace XOffsetDatastructure {
         return detail::evolve::load_any_version<W>(wire, cap, options);
     }
 
-    // Hello of a server: the working version of each root type plus every
-    // other version of its lineage (kind = known).
-    template <typename... Roots>
-    std::string make_server_schema_hello(std::string_view label) {
-        return detail::handshake::write<XSchemaHello>([&](XSchemaHello& h) {
-            h.wire_format = XSCHEMA_HELLO_WIRE_FORMAT;
-            h.role = static_cast<std::uint32_t>(XSchemaRole::server);
-            auto add = [&]<typename W>() {
-                h.entries.push_back(schema_entry<W>());
-                [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-                    ((Is != detail::evolve::working_index<W>
-                          ? (void)h.entries.push_back(schema_entry<detail::evolve::version_t<W, Is>>(XSchemaEntryKind::known))
-                          : (void)0), ...);
-                }(std::make_index_sequence<detail::evolve::version_count<W>>{});
-            };
-            (add.template operator()<Roots>(), ...);
-            h.label.assign(detail::handshake::clip_label(label));
-        });
-    }
-
-    // What one connection's peer works in, per root type, and the conversions
-    // that follows from it. Receive accepts every version of the lineage (each
-    // fully verified as its own version); send uses the peer's working version
-    // when the lineage has it, else this program's.
-    class XPeerSchemas {
-    public:
-        using Entry = XSchemaPeerEntry;
-
-        XPeerSchemas() = default;
-
-        // Accepting side of the handshake: verifies the peer's hello, decides
-        // each root type the peer works in (same; convert when it is another
-        // version of the lineage; reject_unknown; reject_names) and writes the
-        // ack into `ack_out`. Throws XException when `hello` is not a valid
-        // handshake message (ack_out is then empty).
-        template <typename... Roots>
-        static XPeerSchemas accept(std::span<const std::byte> hello, std::string& ack_out,
-                                   std::string_view label = {}) {
-            return accept_impl<Roots...>(hello.data(), hello.size(), ack_out, label);
-        }
-
-        template <typename... Roots>
-        static XPeerSchemas accept(std::string_view hello, std::string& ack_out, std::string_view label = {}) {
-            return accept_impl<Roots...>(hello.data(), hello.size(), ack_out, label);
-        }
-
-        // Without a handshake (an application whose login message already
-        // carries versions): the peer's working fingerprints.
-        static XPeerSchemas from_fingerprints(std::span<const XWireFingerprint> working) {
-            XPeerSchemas p;
-            for (const auto& f : working) p.learn(f);
-            return p;
-        }
-
-        // Records the peer's working version of a root type, e.g. from the
-        // header of a message it sent (peek_wire_fingerprint), when no
-        // handshake told it.
-        void learn(XWireFingerprint working) {
-            for (Entry& e : result_.entries)
-                if (e.root_type_id == working.root_type_id) {
-                    e.schema_hash = working.schema_hash;
-                    return;
-                }
-            result_.valid = true;
-            result_.entries.push_back({working.root_type_id, working.schema_hash, XSchemaVerdict::convert});
-        }
-
-        // Every root type the peer works in is same or convert.
-        bool accepted() const noexcept { return result_.accepted(); }
-        const Entry* find(std::uint64_t root_type_id) const noexcept { return result_.find(root_type_id); }
-        std::span<const Entry> entries() const noexcept { return result_.entries; }
-        XSchemaRole role() const noexcept { return result_.role; }
-        const std::string& label() const noexcept { return result_.label; }
-
-        // Index in W's lineage of the version sent to this peer: the peer's
-        // working version when the lineage has it, else W.
-        template <typename W>
-        std::size_t send_index() const noexcept {
-            const Entry* e = find(wire_root_type_id_v<W>());
-            const std::size_t i = e ? detail::evolve::find_version<W>(e->schema_hash) : detail::evolve::npos;
-            return i == detail::evolve::npos ? detail::evolve::working_index<W> : i;
-        }
-
-        template <typename W>
-        bool sends_working_version() const noexcept {
-            return send_index<W>() == detail::evolve::working_index<W>;
-        }
-
-        // Receives a W message of any version of the lineage, each verified
-        // as its own version, upgraded to W.
-        template <typename W>
-        TypedXBuffer<W> load_verified(std::span<const std::byte> wire,
-                                      std::optional<XBuffer::MaximumCapacity> cap = std::nullopt) const {
-            return detail::evolve::load_any_version<W>(wire, cap, {});
-        }
-
-        template <typename W>
-        TypedXBuffer<W> load_verified(const std::string& wire,
-                                      std::optional<XBuffer::MaximumCapacity> cap = std::nullopt) const {
-            return detail::evolve::load_any_version<W>(wire, cap, {});
-        }
-
-        // The wire of `object` in the peer's version: save_verified when it is
-        // W, else converted and written with save_compact.
-        template <typename W>
-        void save_into(TypedXBuffer<W>& object, std::string& out, XCompactOptions compact = {}) const {
-            detail::evolve::save_version<W>(object, send_index<W>(), out, compact);
-        }
-
-        template <typename W>
-        std::string save(TypedXBuffer<W>& object, XCompactOptions compact = {}) const {
-            std::string out;
-            save_into(object, out, compact);
-            return out;
-        }
-
-    private:
-        template <typename W>
-        static XSchemaVerdict decide(const XSchemaEntry& e, const XSchemaHello& hello) noexcept {
-            const std::size_t i = detail::evolve::find_version<W>(e.schema_hash);
-            if (i == detail::evolve::npos) {
-                // A newer server that lists this program's working version as
-                // one it knows converts both ways itself.
-                for (const XSchemaEntry& k : hello.entries)
-                    if (k.root_type_id == e.root_type_id && k.schema_hash == wire_schema_hash_v<W>() &&
-                        k.kind == static_cast<std::uint32_t>(XSchemaEntryKind::known))
-                        return detail::evolve::name_digest_matches<W>(k.name_digest) ? XSchemaVerdict::convert
-                                                                                    : XSchemaVerdict::reject_names;
-                return XSchemaVerdict::reject_unknown;
-            }
-            if (!detail::evolve::version_names_match<W>(i, e.name_digest) &&
-                !version_listed<W>(i, e, hello))
-                return XSchemaVerdict::reject_names;
-            return i == detail::evolve::working_index<W> ? XSchemaVerdict::same : XSchemaVerdict::convert;
-        }
-
-        // A peer that works in a later version of the add-only family of
-        // version i lists version i's field-name digest in its hello.
-        template <typename W>
-        static bool version_listed(std::size_t i, const XSchemaEntry& e, const XSchemaHello& hello) noexcept {
-            return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-                bool listed = false;
-                ((i == Is ? (void)(listed = detail::handshake::hello_lists(
-                                       hello, e, schema_name_digest_v<detail::evolve::version_t<W, Is>>))
-                          : (void)0), ...);
-                return listed;
-            }(std::make_index_sequence<detail::evolve::version_count<W>>{});
-        }
-
-        template <typename... Roots>
-        static XPeerSchemas accept_impl(const void* data, std::size_t size, std::string& ack_out,
-                                        std::string_view label) {
-            XPeerSchemas peer;
-            peer.result_ = detail::handshake::accept(data, size, ack_out, label,
-                [](const XSchemaEntry& e, const XSchemaHello& hello) {
-                    XSchemaVerdict v = XSchemaVerdict::reject_unknown;
-                    ((e.root_type_id == wire_root_type_id_v<Roots>() ? (void)(v = decide<Roots>(e, hello)) : (void)0),
-                     ...);
-                    return v;
-                });
-            if (!peer.result_.valid) throw XException("schema hello: " + peer.result_.message);
-            return peer;
-        }
-
-        XSchemaHelloResult result_;
-    };
-
-    // One message to many peers: each version's wire is written once.
-    template <typename W>
-    class XBroadcast {
-    public:
-        explicit XBroadcast(TypedXBuffer<W>& object, XCompactOptions compact = {})
-            : object_(&object), compact_(compact) {}
-
-        const std::string& wire_for(const XPeerSchemas& peer) { return wire_at(peer.template send_index<W>()); }
-
-        // The wire of version `index` of W's lineage.
-        const std::string& wire_at(std::size_t index) {
-            auto& slot = wires_[index];
-            if (!slot) {
-                std::string out;
-                detail::evolve::save_version<W>(*object_, index, out, compact_);
-                slot.emplace(std::move(out));
-            }
-            return *slot;
-        }
-
-    private:
-        TypedXBuffer<W>* object_;
-        XCompactOptions compact_;
-        std::array<std::optional<std::string>, detail::evolve::version_count<W>> wires_{};
-    };
-
 } // namespace XOffsetDatastructure
 
-// XOFFSET_SCHEMA_LINEAGE(Working, V1, V2, ...): the versions of Working's root
-// type in release order (see xschema_lineage). Global scope; use an alias for
-// a type name containing commas.
+// XOFFSET_SCHEMA_LINEAGE(Working, G1, G2, ...): the older generations of
+// Working's root type whose stored data loads, oldest first, each named by the
+// last version of its family (see xschema_lineage). Global scope; use an alias
+// for a type name containing commas.
 #define XOFFSET_SCHEMA_LINEAGE(Working, ...)                                      \
     XOFFSET_CHECK_GLOBAL_NAMESPACE_("XOFFSET_SCHEMA_LINEAGE")                     \
     template <> struct XOffsetDatastructure::xschema_lineage<Working> {           \
@@ -1171,12 +967,5 @@ namespace XOffsetDatastructure {
     static_assert(::XOffsetDatastructure::detail::evolve::lineage_ok<Working>(),  \
                   ::XOffsetDatastructure::detail::evolve::lineage_message<Working>());
 
-// XOFFSET_SCHEMA_NAME_ALIAS(Type, digest, ...): field-name digests Type also
-// accepts in a handshake (a rename that keeps the bytes' meaning).
-#define XOFFSET_SCHEMA_NAME_ALIAS(Type, ...)                                      \
-    XOFFSET_CHECK_GLOBAL_NAMESPACE_("XOFFSET_SCHEMA_NAME_ALIAS")                  \
-    template <> struct XOffsetDatastructure::xschema_name_aliases<Type> {         \
-        static constexpr std::uint64_t values[] = {__VA_ARGS__};                  \
-    };
 
 #endif // X_OFFSET_EVOLUTION_HPP
