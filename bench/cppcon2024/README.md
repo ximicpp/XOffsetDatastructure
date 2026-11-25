@@ -90,7 +90,7 @@ part of the read/write loop, to see where the time goes.
 
 ## Results
 
-Library e36cf44 (main after PR #298), cloud x86-64, GCC 16.2, median of 15 processes; ratios between
+Library 5954409 (main after PR #298), cloud x86-64, GCC 16.2, median of 15 processes; ratios between
 0.95 and 1.05 count as a tie. Full tables and the raw output of every process:
 [`results/2026-11-17-first-block/summary.md`](results/2026-11-17-first-block/summary.md) (the library
 before PR #298 on the same machine: [`before.md`](results/2026-11-17-first-block/before.md)).
@@ -131,7 +131,7 @@ nothing.
 The scored rows send a buffer that was filled once: XOffset's best case, since its wire is the buffer and
 carries spare capacity and freed blocks. The report-only rows `sr_reuse_after_rw` send the buffer the
 read/write loop has just run on (same state, after heavy churn). A separate run of 15 processes
-(library b25e0cfc, [`results/2026-11-17-modified-buffer/summary.md`](results/2026-11-17-modified-buffer/summary.md)):
+(library 6efd9e24, [`results/2026-11-17-modified-buffer/summary.md`](results/2026-11-17-modified-buffer/summary.md)):
 
 | XOffset, 2024 layout | Wire bytes | zstd-3 | ns | ÷ zpp::bits | ÷ cista raw |
 | --- | ---: | ---: | ---: | ---: | ---: |

@@ -54,7 +54,7 @@ build takes 8 min 23 s; an aarch64 control under the same QEMU flow passes all 2
 2 min 14 s. The C++26 reflection backend needs a GCC 16 s390x cross compiler. Big-endian timings
 need real s390x or POWER hardware; QEMU timings are not meaningful.
 
-### Baseline (main 9b3edc0, 2026-11-24)
+### Baseline (main 8dc2efb, 2026-11-24)
 
 With the platform check bypassed, 169 of 215 tests fail on s390x (GCC 14.2, qemu-user 8.2): images
 fail their own host's magic check (the magic is written as an integer and checked as bytes),

@@ -2,8 +2,8 @@
 
 ## 1. Types and self-test (types thread)
 
-Commit 23db369c on `claude/xmesh-demo-20261028` (Linux columns built from
-338c483d; the only difference is a local variable renamed for the Windows
+Commit b0273630 on `claude/xmesh-demo-20261028` (Linux columns built from
+3dffb970; the only difference is a local variable renamed for the Windows
 headers). Every column builds `xmesh_selftest` and `xmesh_selftest_noexc`
 (no exceptions: `-fno-exceptions`, MSVC `/EHs-c-`) and runs both with
 `--corpus-check demo/mesh/corpus`: 60 checks each, among them the section 3
@@ -84,7 +84,7 @@ self-test checks the refusal.
 ## 2. Cloud mesh: hub and devices (network thread)
 
 Run `cloud-full1`, 10-28 16:08Z: `demo/mesh/tools/run_mesh.sh` on one cloud
-host, built from 00be24c (types code 23db369). One hub (g++-13, C++20 field
+host, built from dc75015 (types code b027363). One hub (g++-13, C++20 field
 lists) and 16 devices, every column with exceptions and without
 (`xo_peer_noexc`), all on loopback through the hub (pure relay): Linux
 x86-64 g++-13 and clang++-18, Linux arm64 g++-13 static under
@@ -235,7 +235,7 @@ missing report fails it as `no report from <device>`.
 
 Run `mac-20261029-0129`, 10-29 01:24-01:29Z: `tools/run_mesh_mac.sh live`
 on the Mac (Apple M4, 16 GB, macOS 27.2, Xcode 27.1), pack
-`mesh_mac_pack_331f5e9.tar.gz` (sha256 `ab72685a...`, source 331f5e9).
+`mesh_mac_pack_331f5e9.tar.gz` (sha256 `ab72685a...`, source 8421fa7).
 EMULATOR AND SIMULATOR NUMBERS, not phone numbers. One hub (GCC 16.2,
 Linux arm64 in colima 0.10.2, C++20 field lists) and 8 devices, each with
 exceptions and without: macOS arm64 Apple clang 21 (native), iOS Simulator
@@ -278,7 +278,7 @@ SIGTERM during the mesh each end with RESULT.md and nothing left running).
 
 ## 5. Cross-site mailbox: cloud and Mac (phase 4, network thread)
 
-The plan of section 3 (2,054 jobs, label `cross-331f5e9`, plan sha256
+The plan of section 3 (2,054 jobs, label `cross-8421fa7`, plan sha256
 `9ded5022...`) with the Mac's real devices, in two Mac batches, then
 `run_mailbox.sh post` in the cloud on both outputs (10-29 03:1xZ).
 EMULATOR AND SIMULATOR NUMBERS, not phone numbers.

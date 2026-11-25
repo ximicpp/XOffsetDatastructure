@@ -70,7 +70,7 @@ the chain.
 
 ## 3. Build consistency
 
-Toolchains verified for 3.1.0 (local platform matrix, 3.1.0 RC e913d22; GitHub CI has been off since
+Toolchains verified for 3.1.0 (local platform matrix, 3.1.0 RC 1a1b210; GitHub CI has been off since
 2026-10-23):
 
 | Use | Platform | Compiler and standard library |
