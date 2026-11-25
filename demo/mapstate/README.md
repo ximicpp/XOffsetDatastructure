@@ -22,8 +22,9 @@ XOffset paths with real processes and real TCP:
    throws, so the same sources also build without exceptions
    (`mapdemo_client_noexc`, `-fno-exceptions` / MSVC `/EHs-c-`), as engine
    clients are usually built. Clients that have not updated keep working:
-   `mapdemo_client_v1` is built against the frozen version-1 schema, and A
-   converts every snapshot for it after the handshake (below).
+   `mapdemo_client_v1` is built against the frozen version-1 schema, of
+   which version 2 only added a field in reserved bytes, so it reads the
+   same wires as any client (below).
 
 Every process takes `--buffers reuse|fresh`. `reuse` (the default) keeps one
 buffer per role and refills it in place (`reload_verified`, `reset`,
@@ -44,11 +45,11 @@ folder (`slg-demo-20261022/MAP_DEMO_DESIGN_20261022.md`). Results:
 
 | Path | Contents |
 | --- | --- |
-| `include/mapdemo/schema.hpp` | XOffset types (`UnitStateBatch`, `ViewSnapshot`, `MapCatalog`, ...), receive caps, no-padding asserts; schema version 2 |
+| `include/mapdemo/schema.hpp` | XOffset types (`UnitStateBatch`, `ViewSnapshot`, `MapCatalog`, ...), receive caps, no-padding asserts; schema version 2, declared the next version of version 1 (`XOFFSET_SCHEMA_FAMILY`) |
 | `include/mapdemo/schema_v1.hpp`, `schema.lock` | schema version 1 as frozen by `mapdemo_schema_freeze` (namespace `mapdemo_v1`; generated, never edited) and the lock the check compares against |
 | `include_v1/mapdemo/schema.hpp` | the version-1 schema header for `mapdemo_client_v1`: the frozen types under their usual names, version 1's constants |
-| `include/mapdemo/schema_lineage.hpp`, `include/mapdemo/handshake.hpp` | A's lineage (version 1 of `ViewSnapshot`, servers only); the client's Hello and ack reading, on both ends |
-| `include/mapdemo/schema_probes.hpp` | types for the evil handshake cases: a renamed field, a version A does not know |
+| `include/mapdemo/handshake.hpp` | the client's Hello and ack reading, on both ends |
+| `include/mapdemo/schema_probes.hpp` | types for the evil handshake cases: a renamed field, another generation |
 | `include/mapdemo/std_model.hpp` | the same fields in std types; reference model for checks only |
 | `include/mapdemo/rules.hpp`, `rules_impl.hpp` | deterministic generation and step rules, one template for both models |
 | `include/mapdemo/net.hpp`, `src/net.cpp` | 24-byte frame header, per-type length caps checked before allocation, handshake, payload recycling; POSIX sockets and Winsock |
@@ -314,17 +315,22 @@ clients holding the old id are refused at Subscribe.
 ### Schema versions: the old-version client
 
 Version 1 of the schema is frozen in `include/mapdemo/schema_v1.hpp` and
-`schema.lock`; version 2 (`schema.hpp`) adds `scene_units` to
-`ViewSnapshot`, which the window client shows as "visible N of M". Every
-client starts with the library's handshake: its Hello lists its root
-types, and A answers per type with `same`, `convert`, `reject_names` or
-`reject_unknown` (INTERFACES.md section 4). `mapdemo_client_v1` gets
-`convert`: A builds the version-2 snapshot, converts it into a version-1
-buffer (`evolve_into`; `evolve<mapdemo_v1::ViewSnapshot>` with `--buffers
-fresh`) and sends that one, so the old client
-needs no change and does no conversion itself. A client with the same
-layout under other field names, or a version A does not know, is refused
-in the ack and disconnected; the evil run covers both.
+`schema.lock`; its `ViewSnapshot` ends in reserved bytes (`XSpare<8>`).
+Version 2 (`schema.hpp`) takes `scene_units` from them, which the window
+client shows as "visible N of M", and keeps `XSpare<4>` for later. It
+declares itself the next version of version 1
+(`XOFFSET_SCHEMA_FAMILY(mapdemo::ViewSnapshot, mapdemo_v1::ViewSnapshot)`),
+which the compiler checks: the same size, every version-1 field in place,
+the new one inside the reserved bytes. So both versions have one
+fingerprint and the same bytes. Every client starts with the library's
+handshake: its Hello lists its root types, and A answers per type with
+`same`, `reject_names` or `reject_unknown` (INTERFACES.md section 4).
+`mapdemo_client_v1` gets `same` and the wires A sends any client, deltas
+included; neither end converts anything, and edits are forwarded between
+clients of both versions (a version-1 client leaves `scene_units`, bytes it
+does not know, as A sent them). A client with a known layout under other
+field names, or of another generation (a layout A's family does not have),
+is refused in the ack and disconnected; the evil run covers both.
 
 Both versions against one A at the same time:
 
@@ -335,9 +341,8 @@ MAPDEMO_CLIENT=BIN/mapdemo_client_v1 MAPDEMO_CLIENT2=BIN/mapdemo_client \
 
 and per client platform with `run_e2e.sh` and
 `MAPDEMO_CLIENT2_OF="NAME=<that platform's version-2 client>"`. The summary
-checks that each client got its own version (`a_snapshots.csv` column
-`schema`); A's `--check` loads every converted wire back as version 1 and
-compares its digest with the version-2 snapshot's.
+checks that every client read A's snapshots, and compares each client's
+digests with A's.
 
 A release that changes a root type: freeze the released schema first, from
 `demo/mapstate/include`,
@@ -346,10 +351,13 @@ A release that changes a root type: freeze the released schema first, from
 mapdemo_schema_freeze freeze v2 mapdemo_v2 mapdemo/schema_v2.hpp ../schema.lock
 ```
 
-then change `schema.hpp`, add `mapdemo_v2::ViewSnapshot` to the lineage
-in `schema_lineage.hpp` and add an `include_v2/` client. `run_all_tiers.sh`
-runs `mapdemo_schema_freeze check` and fails when a root type changed
-without that.
+then add the new fields in the reserved bytes of `schema.hpp`, declare
+`XOFFSET_SCHEMA_FAMILY(mapdemo::ViewSnapshot, mapdemo_v2::ViewSnapshot)`
+and add an `include_v2/` client. `run_all_tiers.sh` runs
+`mapdemo_schema_freeze check` and fails when a root type changed its
+fingerprint without such a declaration. A change that does not fit in the
+reserved bytes is a new generation: clients of the old one are refused
+until they update (docs/SCHEMA_EVOLUTION.md).
 
 ## Deterministic generation (design section 3)
 

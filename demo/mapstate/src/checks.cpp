@@ -153,7 +153,6 @@ Result compare_snapshot(const ViewSnapshot& snapshot, const ViewRequest& request
 #if MAPDEMO_SCHEMA_VERSION >= 2
     if (snapshot.scene_units != in_scene)
         return fail("scene_units " + std::to_string(snapshot.scene_units) + ", reference " + std::to_string(in_scene));
-    if (snapshot.reserved0 != 0) return fail("reserved0 " + std::to_string(snapshot.reserved0) + ", expected 0");
 #else
     (void)in_scene;
 #endif
@@ -185,7 +184,6 @@ Result snapshot_sanity(const ViewSnapshot& snapshot, std::uint64_t request_id, c
     if (snapshot.units.size() > snapshot.scene_units)
         return fail("visible " + std::to_string(snapshot.units.size()) + " > scene_units " +
                     std::to_string(snapshot.scene_units));
-    if (snapshot.reserved0 != 0) return fail("reserved0 " + std::to_string(snapshot.reserved0) + ", expected 0");
 #endif
     std::vector<std::uint32_t> ids;
     ids.reserve(snapshot.units.size());

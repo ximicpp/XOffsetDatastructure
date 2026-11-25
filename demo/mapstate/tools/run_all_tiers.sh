@@ -51,8 +51,9 @@ if [ "${MAPDEMO_SKIP_SELFTEST:-0}" != 1 ]; then
     echo "selftest: exit $RC"
     [ "$RC" = 0 ] || FAILED=1
 
-    # The root types still match demo/mapstate/schema.lock, or changed with
-    # a lineage entry for the last frozen version (schema_freeze.cpp).
+    # The root types still match demo/mapstate/schema.lock: the same
+    # fingerprint as the last frozen version, under field names of its
+    # add-only family (schema_freeze.cpp).
     echo "== schema lock check"
     mkdir -p "$OUT_ROOT/schema_check"
     rm -f "$OUT_ROOT/schema_check"/*

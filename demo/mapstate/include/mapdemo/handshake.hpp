@@ -3,9 +3,11 @@
 // the frozen headers (10-28); OWNER: common-library thread.
 //
 // The client's Hello lists the version it works in of every root type it
-// sends or receives; A answers with a HelloAck: same, convert (A converts for
-// this client) or a rejection, after which A closes the connection. A's Hello
-// to B lists UnitStateBatch only; B accepts its own version and nothing else.
+// sends or receives; A answers with a HelloAck: same (the client works in A's
+// version or another version of its add-only family, such as version 1 of
+// ViewSnapshot) or a rejection, after which A closes the connection. A's
+// Hello to B lists UnitStateBatch only; B accepts its own family and nothing
+// else.
 // The C++20 client builds compile this header too (it needs no reflection).
 #pragma once
 #include <string>

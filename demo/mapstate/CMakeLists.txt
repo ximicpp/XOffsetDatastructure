@@ -14,8 +14,9 @@
 # come from the same sources, which report failures as values (result.hpp).
 #
 # mapdemo_client_v1 is the client of the previous release, schema version 1:
-# the same sources built against include_v1/ (the frozen snapshot that A
-# lists in its lineage), so A has an old-version client to convert for.
+# the same sources built against include_v1/ (the frozen snapshot of version
+# 1, of which version 2 only added a field in reserved bytes), so A serves an
+# old-version client the same wires as any other.
 
 option(MAPDEMO_CLIENT_ONLY "Build only the clients (mapdemo_client, _noexc, _v1)" OFF)
 option(MAPDEMO_NOEXC_CLIENT "Also build mapdemo_client_noexc, the client without exceptions" ON)

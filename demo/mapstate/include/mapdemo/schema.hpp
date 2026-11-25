@@ -3,15 +3,20 @@
 // here changes every wire; coordinate with all demo threads first.
 //
 // This is version 2 of the schema. Version 1 is frozen in schema_v1.hpp
-// (tools: src/schema_freeze.cpp, lock file ../../schema.lock); A still serves
-// version-1 clients (schema_lineage.hpp), and mapdemo_client_v1 is such a
-// client, built from that snapshot (include_v1/mapdemo/schema.hpp). A change
-// to a root type's layout needs a new frozen version and a lineage entry;
-// `mapdemo_schema_freeze check` fails without them.
+// (tools: src/schema_freeze.cpp, lock file ../../schema.lock), and
+// mapdemo_client_v1 is a client built from that snapshot
+// (include_v1/mapdemo/schema.hpp). Version 2 only added a field, in bytes
+// version 1 reserved (ViewSnapshot::scene_units, from XSpare): the two
+// versions are one add-only family (XOFFSET_SCHEMA_FAMILY at the end of this
+// file), with one fingerprint and the same bytes, so A sends a version-1
+// client the very wire it sends any other, deltas included. Any other change
+// to a root type's layout starts a new generation, which A refuses at the
+// handshake; `mapdemo_schema_freeze check` fails on one that is not declared.
 #pragma once
 #include <cstddef>
 #include <cstdint>
 #include "xoffsetdatastructure.hpp"
+#include "mapdemo/schema_v1.hpp"
 
 // The schema version these headers describe; code the version-1 client
 // does not have is under #if MAPDEMO_SCHEMA_VERSION >= 2.
@@ -85,8 +90,8 @@ struct ViewSnapshot {
     std::uint32_t scene_id{};
     Rect rect;
     XVector<VisibleUnit> units;
-    std::uint32_t scene_units{};    // units in the scene at this tick (version 2)
-    std::uint32_t reserved0{};      // 0; fills the 8-byte record alignment
+    std::uint32_t scene_units{};    // units in the scene at this tick (version 2, from version 1's spare bytes)
+    XSpare<4> spare;                // reserved for later versions (zero)
 };
 
 // A unit right after one of its events (rules: every kEventPeriodTicks ticks,
@@ -167,7 +172,7 @@ XOFFSET_RECORD(mapdemo::UnitState, id, scene_id, pos, speed, hp, behavior, next_
 XOFFSET_RECORD(mapdemo::UnitStateBatch, tick, reserved0, units)
 XOFFSET_RECORD(mapdemo::ViewRequest, request_id, scene_id, reserved0, rect)
 XOFFSET_RECORD(mapdemo::VisibleUnit, id, hp, pos, behavior, name)
-XOFFSET_RECORD(mapdemo::ViewSnapshot, request_id, tick, scene_id, rect, units, scene_units, reserved0)
+XOFFSET_RECORD(mapdemo::ViewSnapshot, request_id, tick, scene_id, rect, units, scene_units, spare)
 XOFFSET_RECORD(mapdemo::UnitEvent, tick, unit_id, hp, pos, behavior, next_waypoint, name, path)
 
 XOFFSET_REGISTER_SCHEMA_NAME(mapdemo::MapCatalog, "mapdemo.MapCatalog.v1")
@@ -192,3 +197,10 @@ static_assert(sizeof(mapdemo::UnitStateBatch) == 24);
 static_assert(sizeof(mapdemo::ViewRequest) == 32);
 static_assert(sizeof(mapdemo::UnitEvent) == 56);
 static_assert(XOffsetDatastructure::detail::shift_relocate_supported<mapdemo::UnitState>());
+
+// Version 2 of ViewSnapshot is the next version of the frozen version 1: the
+// same size, every version-1 field in place, scene_units inside version 1's
+// XSpare<8> (checked here, at compile time, on every backend). Both have
+// version 1's fingerprint, and the handshake knows the field names of both,
+// so a version-1 client and A (version 2) answer each other `same`.
+XOFFSET_SCHEMA_FAMILY(mapdemo::ViewSnapshot, mapdemo_v1::ViewSnapshot)
