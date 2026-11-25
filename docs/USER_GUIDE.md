@@ -325,10 +325,10 @@ Three things you cannot do; they are limits of this kind of data structure:
 
 1. **You cannot change the schema.** Adding, removing, reordering or changing any field makes old
    wires rejected (section 7). Update the type definition on both ends together.
-2. **One buffer has one writer at a time.** The library does not lock; writes must be mutually
-   exclusive with other reads and writes on that buffer, synchronized by the caller (section 5).
-   Several processes reading and writing one buffer through shared memory at the same time is not
-   supported.
+2. **One buffer is used by one thread at a time.** The library does not lock, and reading also
+   updates the buffer's own bookkeeping, so all use of one buffer, reads included, happens on one
+   thread at a time (section 3.6). Several processes reading and writing one buffer through shared
+   memory at the same time is not supported.
 3. **Ownership is a tree.** Each block belongs to exactly one container header: two containers
    cannot share child data, objects cannot reference each other, and there are no cycles. Raw
    pointers and references are rejected at compile time (section 2); to express a graph, store
@@ -423,12 +423,40 @@ world.edit([&](View& w) {                  // pinned scope: plain references, as
   struct. The buffer does not move inside the scope (operations that would need to move fail and
   record `borrowed`). Containers keep their own invalidation rules (table above, same as
   `std::vector`): after growth or erasure, earlier references must not be used, and reclaimed blocks
-  may be reused by another container right away. When compiled with `XOFFSET_PIN_QUARANTINE=1`,
-  reclaimed blocks are reused only after the scope ends, so invalidated references still read the
-  old content. f must not return a pointer, reference, `string_view` or `span` (checked at compile
-  time). Use it on hot paths and to hand data to existing code that takes `T&`.
+  may be reused by another container right away. When compiled with `XOFFSET_PIN_QUARANTINE=1`
+  (the default with `XOFFSET_HARDENED=1`), reclaimed blocks are reused only after the scope ends, so
+  invalidated references still read the old content; in those builds save and send after the scope
+  returns, not inside it (section 3.6). f must not return a pointer, reference, `string_view` or
+  `span` (checked at compile time). Use it on hot paths and to hand data to existing code that takes
+  `T&`.
 - `plain_root()` is the old `root()`: an unprotected plain reference that dangles when the buffer
   moves. Use it only on storage that never moves (pinned slot, VM, Pinned), or not at all.
+
+### 3.6 Threads: one thread per buffer
+
+In 2.0.0 a buffer is used by one thread at a time. The library does not lock, and reading is not
+free of side effects inside the buffer: a proxy creates the buffer's control block on first use, a
+`read()` or `edit()` scope counts its borrows, and `save_delta_into` with `touched_only` updates the
+touch log.
+
+- One buffer, together with its proxies (`XRef`), `XHandle`s, delta baselines and `edit()` /
+  `read()` scopes, is used by one thread at a time. Every call counts as use, reads included:
+  `root()`, `root<T>()`, `read()`, `edit()`, the `save_*` calls and `save_delta_into`.
+- Another thread can take a buffer over when the hand-over synchronizes (a mutex, a queue, a thread
+  join); after that the first thread no longer uses it.
+- To send one state to many connections, save it once and share the bytes: `save_verified` and
+  `save_verified_into` write a copy the caller owns, which any number of threads can read and send.
+  A shared-delta publisher (`XSharedPublisher`) and its tables are also used from one thread.
+- Different buffers can be used on different threads at the same time; the process-wide structures
+  behind them (slot storage, the owner lookup, the control-block pool) lock internally. One
+  `XBufferPool` and one `XReceiver` can be shared by several threads, each loading into its own
+  buffer.
+- With `XOFFSET_HARDENED=1` or `XOFFSET_PIN_QUARANTINE=1`, do not save or send inside an `edit()`
+  scope (`save_verified`, `save_compact`, `save_delta_into`): blocks freed inside the scope rejoin the
+  free directory only when it ends, and the receiver rejects that wire or delta. Save after the scope
+  returns. Default builds are not affected.
+
+Several threads reading one buffer at the same time is not supported in 2.0.0.
 
 ## 4. Saving and loading
 
@@ -742,7 +770,8 @@ if (world.relayout_advised()) (void)world.relayout();   // TypedXBuffer<World>
 | Constraint | Consequence if broken |
 | --- | --- |
 | Memory allocated by hand (for example `XBuffer::allocator<T>()`, `arena()->allocate_aligned`) that is not reachable from the root must be freed before `save_verified` | The saved wire fails validation on load (the tiling check fails) |
-| Writes to one buffer are synchronized by the caller | Data race, undefined behavior |
+| One buffer, with its proxies, handles, baselines and scopes, is used by one thread at a time, reads included (section 3.6) | Data race, undefined behavior: a buffer can stay pinned for good (later growth fails with `borrowed`), and a proxy can outlive its buffer |
+| With `XOFFSET_HARDENED=1` or `XOFFSET_PIN_QUARANTINE=1`, nothing is saved or sent inside an `edit()` scope (section 3.6) | The receiver rejects the wire or delta |
 | Never move-assign a container into a container in its own subtree (or the other way round, section 3.3) | Undefined behavior in Release builds |
 | The buffer object outlives its `XHandle`s and borrowed spans | Dangling access |
 | All translation units in one executable use the same header version, compile options and toolchain | Inconsistent layout or schema identity |

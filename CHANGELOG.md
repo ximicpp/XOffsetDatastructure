@@ -64,6 +64,15 @@ Release-gate rerun evidence to be finalized before tagging `v2.0.0`.
   example and the description of the arena moved to the new `docs/HOW_IT_WORKS.md`, the CppCon 2024
   `Character` notes to PERFORMANCE.md section 2, and the tested compiler floors and the default
   language standard to BUILD_AND_PLATFORMS.md. Documentation only.
+- Threads: 2.0.0 supports one thread per buffer. The new USER_GUIDE section 3.6 states the rule: a
+  buffer, with its proxies, `XHandle`s, delta baselines and `edit()`/`read()` scopes, is used by one
+  thread at a time, reads included (a proxy's first use, a `read()` scope and `save_delta_into` with
+  touches update the buffer's own bookkeeping); one state goes to many connections as one saved copy;
+  one `XBufferPool` or `XReceiver` can be shared by several threads; and with `XOFFSET_HARDENED=1` or
+  `XOFFSET_PIN_QUARANTINE=1` nothing is saved or sent inside an `edit()` scope, because the receiver
+  rejects such a wire or delta. USER_GUIDE 3.3 and section 5, DELTA_SYNC, DEPLOYMENT,
+  ALPHA_COMPATIBILITY and BUILD_AND_PLATFORMS no longer suggest that several threads may read one
+  buffer at once; that is planned for a later version. Documentation only.
 
 ## 4.3.0: add-only schema evolution
 

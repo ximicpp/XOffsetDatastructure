@@ -91,7 +91,10 @@ taken from or given back to a free list, the free directory, the header's
 free state), so a container that moved needs only its own touch: the block it
 left goes with the allocator's. Touches go to a log in the buffer, so one
 buffer can feed any number of baselines (a client, the storage process, a
-relay). While one baseline pairs with the buffer, the log is a short list of
+relay), one after another on the thread that uses the buffer (writing a delta
+updates the log;
+[user guide section 3.6](USER_GUIDE.md#36-threads-one-thread-per-buffer)).
+While one baseline pairs with the buffer, the log is a short list of
 the byte ranges touched since its last delta (up to 25 runs, adjacent ones
 merged; the baseline's lines of them are fetched into cache as they are
 touched). When the list is full, a run that starts less than a block past

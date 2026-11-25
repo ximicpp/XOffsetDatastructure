@@ -328,5 +328,6 @@ Dictionaries use `contrib/zstd_dict` (separate C++17 component, zstd 1.5.x; see 
 - [ ] Clients use a smaller `maximum_capacity` or `XBufferPool`
 - [ ] There is authentication outside the library (TLS or signatures) and business field checks
 - [ ] The number of concurrent buffers and the total memory budget are limited
+- [ ] Each buffer, with its proxies, handles and delta baselines, is used by one thread at a time, reads included; one state goes to many connections as one saved copy, and builds with `XOFFSET_HARDENED=1` save after an `edit()` scope, not inside it ([user guide section 3.6](USER_GUIDE.md#36-threads-one-thread-per-buffer))
 - [ ] Client links chose compression per section 6.1 (zstd-3 for large snapshots, dictionary or batching for small messages, lz4 when CPU is tight), with a limit on the decompressed length
 - [ ] When using dictionaries: both ends compare the dictionary id, the dictionary is bound to the schema, and it is retrained with a new id when the schema changes

@@ -125,8 +125,9 @@ owning copy.
 
 `XHandle<T>` follows the C++ buffer object and cannot extend its lifetime; the buffer object must be
 destroyed after the handle. move/swap/replacement and changes of type/verified state follow the handle
-checking rules; a handle cannot be used as shared ownership across owners. Writes need synchronization by
-the caller.
+checking rules; a handle cannot be used as shared ownership across owners. A buffer, with its handles,
+proxies, baselines and scopes, is used by one thread at a time, reads included
+([user guide section 3.6](USER_GUIDE.md#36-threads-one-thread-per-buffer)).
 
 The default Explicit growth can throw `XBadAlloc` when the current logical region is too small; Automatic
 is still bounded by the hard limit and OS failures. Library container changes keep the logical content

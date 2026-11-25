@@ -189,8 +189,9 @@ corpus byte for byte; none of them is a timing result.
   explicitly attempts page reclamation (a no-op on a slot). Freed slots stay in
   the process for reuse; `XBuffer::trim_slot_storage()` discards their pages.
 - Container mutation can move or destroy elements. Borrowed spans and handles do
-  not own the buffer; the C++ buffer object must outlive its handles. Synchronize
-  writes externally.
+  not own the buffer; the C++ buffer object must outlive its handles. Use a
+  buffer from one thread at a time, reads included
+  ([user guide section 3.6](USER_GUIDE.md#36-threads-one-thread-per-buffer)).
 - Library container mutations preserve logical contents on allocation failure;
   capacities and allocator bookkeeping need not roll back. User operation
   sequences and external constructor effects are not transactions.

@@ -91,7 +91,7 @@ CMake: [BUILD_AND_PLATFORMS.md](docs/BUILD_AND_PLATFORMS.md).
 | --- | --- |
 | [GETTING_STARTED.md](docs/GETTING_STARTED.md) | Use cases with one runnable example each |
 | [HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) | A short example; relative offsets, the in-arena allocator, the wire, checks per link |
-| [USER_GUIDE.md](docs/USER_GUIDE.md) | The API: types, mutation, save/load, storage, errors, core guarantees K0–K9 |
+| [USER_GUIDE.md](docs/USER_GUIDE.md) | The API: types, mutation, save/load, storage, threads, errors, core guarantees K0–K9 |
 | [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Limits, links and checklists for production |
 | [DELTA_SYNC.md](docs/DELTA_SYNC.md), [SHARED_DELTA.md](docs/SHARED_DELTA.md) | Per-client deltas and shared viewport deltas |
 | [SCHEMA_EVOLUTION.md](docs/SCHEMA_EVOLUTION.md), [SCHEMA_PINS.md](docs/SCHEMA_PINS.md) | Different schema versions on the two ends; pinned layouts |
