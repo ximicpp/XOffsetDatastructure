@@ -12,13 +12,13 @@
 #   quick    PRs that leave the library alone (bench/, tools/, tests/, docs/): meta gcc smoke
 #            p2996; refuses to run when a top-level source file, CMakeLists.txt or cmake/
 #            differs from the base
-#   daily    once a day on the head of main: tsan, the whole C++20/C++23 matrix, every
+#   daily    once a day on the head of main: tsan, demo, the whole C++20/C++23 matrix, every
 #            client column and wire-matrix (the steps the pr tier leaves out)
 #   full     the default before 2026-11-11: pr plus the C++20/C++23 matrix and wire-matrix
-#   release  the same as --release: every step, tsan and every client column included
+#   release  the same as --release: every step, tsan, demo and every client column included
 #
 # Steps, in this order (--steps LIST picks them by name; --clients adds every client column;
-# LIST may also name the groups "classic" = the steps up to asm, "matrix" = the C++20/C++23
+# LIST may also name the groups "classic" = the steps up to demo, "matrix" = the C++20/C++23
 # columns and "clients" = the client columns):
 #   meta      the library's own files (top-level *.hpp, *.cpp) use reflection (std::meta, ^^)
 #             only in xoffset_schema_reflect.hpp; every other walk goes through the schema
@@ -40,6 +40,13 @@
 #             benchmark programs have the same instructions per function and the same .text
 #             layout (MERGE_RULES_V2 class-0 evidence)? Reuses the Ir builds; a difference is
 #             reported in REPORT.md and fails the step only with --asm-strict
+#   demo      the map state demo (demo/mapstate), GCC 16 Release: servers A and B and the
+#             clients, then demo/mapstate/tools/run_all_tiers.sh: the self-test, the schema
+#             lock check, 1 / 100 / 10000 units x 500 steps in both buffer modes with the
+#             schema version-1 client (mapdemo_client_v1) beside the current one, and the
+#             --evil failure inputs. The only run of the server -> client path between
+#             processes over TCP (handshake, snapshots, deltas, write-backs); release and
+#             daily only
 # The C++20/C++23 build matrix (XOFFSET_CXX_STANDARD, XOFFSET_RECORD field lists), each
 # column a Release build + full CTest unless named -asan:
 #   gcc13-c++20          the host's GCC 13         gcc13-c++20-asan    same, Debug + ASan/UBSan
@@ -96,7 +103,7 @@ P2996_ROOT=${P2996_ROOT:-/opt/p2996-toolchain}
 P2996_TARBALL=${P2996_TARBALL:-/mnt/project-files/toolchains/p2996-d77eff1-linux-x86_64.tar.xz}
 CACHE=${XO_VALIDATE_CACHE:-$HOME/.cache/xo-validate}
 SANITIZE="-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer"
-CLASSIC_STEPS="meta gcc asan tsan fuzz diff smoke ir p2996 p2996-ir asm"
+CLASSIC_STEPS="meta gcc asan tsan fuzz diff smoke ir p2996 p2996-ir asm demo"
 ASM_STRICT=0
 CLIENT_STEPS="msvc-c++20 msvc-c++23 clang-cl-c++20 mingw-c++20 ndk29-c++20 ndk30-c++20"
 # client-c++20 picks the first of these the host can run.
@@ -108,9 +115,10 @@ RELEASE_STEPS="${ALL_STEPS/ client-c++20/}"
 FULL_STEPS="${RELEASE_STEPS/ tsan / }"
 for c in $CLIENT_STEPS; do FULL_STEPS=${FULL_STEPS/ $c / }; done
 FULL_STEPS="$FULL_STEPS client-c++20"
-PR_STEPS="${CLASSIC_STEPS/ tsan / } diff-c++20 client-c++20"
+PR_STEPS="${CLASSIC_STEPS/ tsan / }"
+PR_STEPS="${PR_STEPS% demo} diff-c++20 client-c++20"
 QUICK_STEPS="meta gcc smoke p2996"
-DAILY_STEPS="tsan $MATRIX_GROUP $CLIENT_STEPS wire-matrix"
+DAILY_STEPS="tsan demo $MATRIX_GROUP $CLIENT_STEPS wire-matrix"
 TIER=pr
 CLIENTS=0
 MSVC_ROOT=${XOFFSET_MSVC_ROOT:-/opt/msvc}
@@ -368,6 +376,23 @@ step_p2996() {
 
 step_p2996_ir() { perf_gate p2996; }
 
+# The map state demo, built and run in the GCC 16 image (its binaries need the image's
+# libstdc++). zstd 1.5.7 comes from the cache (CMake checks its SHA-256), fetched once.
+step_demo() {
+    local zstd="$CACHE/zstd-1.5.7.tar.gz"
+    if [[ ! -f $zstd ]]; then
+        curl -fsSL -o "$zstd.part" https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz &&
+            mv "$zstd.part" "$zstd" || return 1
+    fi
+    rm -rf "$WORK/demo-results"
+    in_gcc "cmake -S . -B '$WORK/demo' -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ \
+            -DXOFFSET_BUILD_DEMOS=ON -DXOFFSET_BUILD_TESTS=OFF -DXOFFSET_BUILD_TOOLS=OFF \
+            -DXOFFSET_BUILD_EXAMPLES=OFF '-DMAPDEMO_ZSTD_URL=$zstd' &&
+        cmake --build '$WORK/demo' --parallel $JOBS &&
+        MAPDEMO_CLIENT2='$WORK/demo/bin/Release/mapdemo_client_v1' MAPDEMO_LABEL='local_validate ${HEAD_SHA:0:12}' \
+            demo/mapstate/tools/run_all_tiers.sh '$WORK/demo/bin/Release' '$WORK/demo-results'"
+}
+
 # Class-0 evidence per compiler, on the Ir builds when those steps ran (else builds them).
 step_asm() {
     local c rc=0 r
@@ -544,6 +569,7 @@ print(f"{n} C++26-only tests/tools not built")' "$WORK/m-$s/test-inventory.json"
         diff) grep -E '^seed [0-9]+:' "$f" | paste -sd ';' ;;
         meta) tail -n 2 "$f" | paste -sd ';' ;;
         smoke) grep -E 'bench smoke passed|input wire' "$f" | tail -n 1 ;;
+        demo) grep -E '^summarize: |^(selftest|schema lock check|evil): ' "$f" | paste -sd ';' ;;
         asm) for c in gcc16 p2996; do [[ -f $WORK/asm-$c.json ]] && python3 -c 'import json, sys
 print(sys.argv[2] + ": " + json.load(open(sys.argv[1]))["verdict"])' "$WORK/asm-$c.json" "$c"; done | paste -sd ';' ;;
         ir|p2996-ir)

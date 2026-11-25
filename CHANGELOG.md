@@ -5,6 +5,21 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- Examples and getting started reserve bytes for later versions and handshake on connect. The shared
+  protocol header of the three use-case examples (`examples/game_protocol.hpp`) ends every record with
+  an `XSpare<N>` member (8 bytes in `Unit`, 20 in `WorldView` and `PlayerState`, 16 in `MoveOrder`;
+  pins regenerated), and `server_to_client`, `client_uplink` and `server_to_server` start with the
+  schema handshake (`make_schema_hello`, `accept_schema_hello`, `read_schema_ack`; between servers
+  `XSchemaRole::server`), also in their no-exception builds. GETTING_STARTED section 3, its checklist,
+  the README example and CLIENT_TARGETS say why: spare bytes can only be reserved in a type's first
+  release, and without them every later change is a new generation that servers and clients take
+  together. Library unchanged.
+- `tools/local_validate.sh` has a `demo` step, run by `--release` and `--tier daily` (not by the `pr`
+  tier): the map state demo built with GCC 16 and `demo/mapstate/tools/run_all_tiers.sh` with the
+  schema version-1 client beside the current one (self-test, schema lock check, 1 / 100 / 10000 units
+  x 500 steps in both buffer modes, failure inputs). The demo is the only run of the server to client
+  path between processes over TCP; its `writeback` self-test failed from 4.2.0 until the fix below
+  without any validation step noticing.
 - Map state demo: `mapdemo_selftest` `writeback` passes again. Its client sends the image
   (`XWireEmission::free_runs`), so the bytes it hides in a vector's spare capacity reach A; since
   4.2.0 the default `save_verified` may send the compact wire, which leaves them behind, and the test
