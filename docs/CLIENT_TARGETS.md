@@ -1,8 +1,10 @@
 # Client targets (K8)
 
 Servers are Linux; clients are Windows, iOS and Android; all are 64-bit little-endian. Server and
-clients use the same schema and are released together ([DEPLOYMENT.md](DEPLOYMENT.md) section 2). The
-library has two build paths that write byte-identical wires:
+clients build from one schema header. Versions that only add fields in reserved `XSpare` bytes talk with
+no conversion and update in any order; any other schema change is a new generation, released to servers
+and clients together ([DEPLOYMENT.md](DEPLOYMENT.md) section 2). The library has two build paths that
+write byte-identical wires:
 
 - **C++26** (servers): P2996 reflection describes each record. Needs GCC 16+ or the P2996 Clang.
 - **C++20 / C++23** (clients): each record has one `XOFFSET_RECORD` field list

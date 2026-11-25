@@ -50,16 +50,24 @@ struct Unit {
     std::uint32_t id;
     std::int32_t x, y, hp;
     XString name;
+    XSpare<8> spare{};                        // bytes a later version can add fields in
 };
-XOFFSET_RECORD(Unit, id, x, y, hp, name)      // global scope, right after the type
+XOFFSET_RECORD(Unit, id, x, y, hp, name, spare)   // global scope, right after the type
 
 struct WorldView {
     std::uint64_t tick;
     XVector<Unit> units;
+    XSpare<20> spare{};
 };
-XOFFSET_RECORD(WorldView, tick, units)
+XOFFSET_RECORD(WorldView, tick, units, spare)
 XOFFSET_REGISTER_SCHEMA_NAME(WorldView, "game.WorldView")   // one stable name per root type
 ```
+
+Reserve `XSpare` bytes in the first release: a later version that only adds
+fields in them talks to the old one with no conversion, in both directions
+([SCHEMA_EVOLUTION.md](docs/SCHEMA_EVOLUTION.md)). Every connection starts
+with the schema handshake (`xoffset_handshake.hpp`), which refuses a peer of
+another generation.
 
 The server builds and changes the state in place, then sends the arena bytes:
 
