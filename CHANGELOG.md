@@ -5,6 +5,17 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+## 4.3.0: add-only schema evolution
+
+A type can gain fields without conversion: a field added in reserved `XSpare<N>` bytes keeps the first
+version's fingerprint, so old and new programs exchange whole wires, image deltas and stored images
+both ways at the same cost, and any other change starts a new generation that the handshake refuses
+on the network and `evolve_load_verified` upgrades once on load for stored data. Per-peer conversion
+(`XPeerSchemas`, `XBroadcast`) is removed; Wire format 3.0 is unchanged, and types that declare no
+family keep their fingerprints and machine code. The client headers build after Unreal Engine and
+Apple assert macros (source renames below), and from 5.0.0 releases follow Semantic Versioning with
+the wire format in the contract. RELEASE_EVIDENCE_PLACEHOLDER
+
 - Compatibility policy ([RELEASING.md](docs/RELEASING.md) section 1.1, USER_GUIDE section 8,
   SECURITY.md): 4.x releases keep promising nothing between versions; from 5.0.0, the first release
   meant for outside projects, incompatible wire or API changes come only in a new major version, and

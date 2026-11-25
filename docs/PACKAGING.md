@@ -172,8 +172,8 @@ Minimal `CMakeLists.txt` consuming a full install:
 cmake_minimum_required(VERSION 3.20)   # 3.30+ for C++26 reflection installs
 project(MyConsumer LANGUAGES CXX)
 find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
-if(NOT XOffsetDatastructure_VERSION STREQUAL "4.2.0")
-    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 4.2.0")
+if(NOT XOffsetDatastructure_VERSION STREQUAL "4.3.0")
+    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 4.3.0")
 endif()
 add_executable(my_app main.cpp)
 target_link_libraries(my_app PRIVATE XOffset::xoffset)
@@ -199,7 +199,7 @@ include(FetchContent)
 FetchContent_Declare(
     xoffsetdatastructure
     # The release's source archive (about 3 MB): no Git history, no submodules.
-    URL https://github.com/ximicpp/XOffsetDatastructure/archive/refs/tags/v4.2.0.tar.gz
+    URL https://github.com/ximicpp/XOffsetDatastructure/archive/refs/tags/v4.3.0.tar.gz
 )
 set(XOFFSET_CXX_STANDARD 20 CACHE STRING "" FORCE)
 FetchContent_MakeAvailable(xoffsetdatastructure)
