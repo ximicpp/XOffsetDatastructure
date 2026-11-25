@@ -226,6 +226,8 @@ set(XOFFSET_FAMILY_FAIL_CASES
     "ELEMENT|a record or a container element changed its size"
     "SIZE|a record or a container element changed its size"
     "LIST|a new field taken from XSpare bytes holds a container"
+    "NESTED_PADDING|spare bytes of the previous version became padding"
+    "LIST_PADDING|spare bytes of the previous version became padding"
 )
 foreach(entry ${XOFFSET_FAMILY_FAIL_CASES})
     string(REPLACE "|" ";" parts "${entry}")

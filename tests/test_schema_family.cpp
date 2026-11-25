@@ -30,6 +30,7 @@
 #include "../xoffset_schema_freeze.hpp"
 #endif
 
+#include <array>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -56,6 +57,51 @@ struct Player { std::uint64_t uid{}; std::int32_t gold{}; std::int32_t gems{}; X
 } // namespace other
 XOFFSET_RECORD(other::Player, uid, gold, gems, nick)
 XOFFSET_REGISTER_SCHEMA_NAME(other::Player, "test.family.Player")
+
+// Nested / array / container-element padding inside XSpare bytes.
+namespace spare_pad {
+struct InternalPad { std::uint8_t tag{}; std::uint32_t val{}; };
+struct TailPad { std::uint32_t val{}; std::uint8_t tag{}; };
+struct CleanSub { std::uint8_t tag{}; XSpare<3> pad{}; std::uint32_t val{}; };
+
+struct Base8 { std::uint32_t id{}; XSpare<8> spare{}; };
+struct BadInternal { std::uint32_t id{}; InternalPad sub{}; };
+struct BadTail { std::uint32_t id{}; TailPad sub{}; };
+struct GoodClean { std::uint32_t id{}; CleanSub sub{}; };
+
+struct Base16 { std::uint32_t id{}; XSpare<16> spare{}; };
+struct BadArray { std::uint32_t id{}; std::array<InternalPad, 2> subs{}; };
+struct GoodArray { std::uint32_t id{}; std::array<CleanSub, 2> subs{}; };
+
+struct BaseList { std::uint32_t id{}; XVector<XSpare<8>> items; };
+struct BadList { std::uint32_t id{}; XVector<InternalPad> items; };
+struct GoodList { std::uint32_t id{}; XVector<CleanSub> items; };
+} // namespace spare_pad
+XOFFSET_RECORD(spare_pad::InternalPad, tag, val)
+XOFFSET_RECORD(spare_pad::TailPad, val, tag)
+XOFFSET_RECORD(spare_pad::CleanSub, tag, pad, val)
+XOFFSET_RECORD(spare_pad::Base8, id, spare)
+XOFFSET_RECORD(spare_pad::BadInternal, id, sub)
+XOFFSET_RECORD(spare_pad::BadTail, id, sub)
+XOFFSET_RECORD(spare_pad::GoodClean, id, sub)
+XOFFSET_RECORD(spare_pad::Base16, id, spare)
+XOFFSET_RECORD(spare_pad::BadArray, id, subs)
+XOFFSET_RECORD(spare_pad::GoodArray, id, subs)
+XOFFSET_RECORD(spare_pad::BaseList, id, items)
+XOFFSET_RECORD(spare_pad::BadList, id, items)
+XOFFSET_RECORD(spare_pad::GoodList, id, items)
+
+static_assert(!schema_family_successor_v<spare_pad::BadInternal, spare_pad::Base8>);
+static_assert(detail::family::error_v<spare_pad::Base8, spare_pad::BadInternal> == detail::family::Error::spare_to_padding);
+static_assert(!schema_family_successor_v<spare_pad::BadTail, spare_pad::Base8>);
+static_assert(detail::family::error_v<spare_pad::Base8, spare_pad::BadTail> == detail::family::Error::spare_to_padding);
+static_assert(schema_family_successor_v<spare_pad::GoodClean, spare_pad::Base8>);
+static_assert(!schema_family_successor_v<spare_pad::BadArray, spare_pad::Base16>);
+static_assert(detail::family::error_v<spare_pad::Base16, spare_pad::BadArray> == detail::family::Error::spare_to_padding);
+static_assert(schema_family_successor_v<spare_pad::GoodArray, spare_pad::Base16>);
+static_assert(!schema_family_successor_v<spare_pad::BadList, spare_pad::BaseList>);
+static_assert(detail::family::error_v<spare_pad::BaseList, spare_pad::BadList> == detail::family::Error::spare_to_padding);
+static_assert(schema_family_successor_v<spare_pad::GoodList, spare_pad::BaseList>);
 
 namespace {
 using V1 = fam::v1::Player;

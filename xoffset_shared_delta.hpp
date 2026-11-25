@@ -735,6 +735,16 @@ namespace XOffsetDatastructure::xsync {
         /// change_room, put_change and put_change_op or returned by changed()
         /// names T's own members (bit i: member i of T, declaration order).
         static constexpr bool in_family = !std::is_same_v<typename members::First, T>;
+        static_assert(!in_family || [] {
+            using F = sd_detail::Info<typename members::First>;
+            using C = sd_detail::Info<T>;
+            if constexpr (F::size != C::size || F::plain_bytes != C::plain_bytes) return false;
+            else {
+                for (std::size_t i = 0; i < C::size; ++i)
+                    if ((F::classes[i] != 0) != (C::classes[i] != 0)) return false;
+                return true;
+            }
+        }(), "xsync: family version changed plain-byte layout (spare bytes became padding)");
         /// The bits a mask of T may have: one per member of T.
         static constexpr std::size_t mask_bits = schema::member_count_v<T>;
         static_assert(mask_bits >= 1 && mask_bits <= 64, "xsync: a mask bit per member, at most 64 members");
@@ -908,18 +918,23 @@ namespace XOffsetDatastructure::xsync {
 
         // ---- a later version of a family: T's members to the first version's ----
 
-        // For member i of T, the member of the first version that holds it
-        // (the same field, or the spare region it was taken from).
-        static constexpr auto numbered_index = [] {
+        // For member i of T, the bitmask of first-version members overlapping it
+        // (one bit for a kept field or a field inside one spare member; several
+        // bits when a later field spans adjacent spare members of the first version).
+        static constexpr auto numbered_bits = [] {
             constexpr std::size_t own = mask_bits;
-            std::array<std::uint8_t, own> at{};
+            std::array<std::uint64_t, own> at{};
             [&]<std::size_t... I>(std::index_sequence<I...>) {
                 auto one = [&]<std::size_t Own>() {
                     constexpr std::size_t o = schema::member_t<T, Own>::offset;
-                    std::size_t k = members::N;
-                    for (std::size_t j = 0; j < members::N; ++j)
-                        if (members::offsets[j] <= o && o < members::offsets[j] + members::sizes[j]) k = j;
-                    at[Own] = std::uint8_t(k);
+                    constexpr std::size_t e = o + sizeof(typename schema::member_t<T, Own>::type);
+                    std::uint64_t bits = 0;
+                    for (std::size_t j = 0; j < members::N; ++j) {
+                        const std::size_t jo = members::offsets[j];
+                        const std::size_t je = jo + members::sizes[j];
+                        if (jo < e && o < je) bits |= std::uint64_t(1) << j;
+                    }
+                    at[Own] = bits;
                 };
                 (one.template operator()<I>(), ...);
             }(std::make_index_sequence<own>{});
@@ -927,13 +942,13 @@ namespace XOffsetDatastructure::xsync {
         }();
         XOFFSET_DETAIL_INLINE static std::uint64_t numbered_mask(std::uint64_t mask) noexcept {
             static_assert([] {
-                for (const std::uint8_t k : numbered_index)
-                    if (k >= members::N) return false;
+                for (const std::uint64_t bits : numbered_bits)
+                    if (bits == 0) return false;
                 return true;
             }(), "xsync: a member of a later version outside every member of the first (XOFFSET_SCHEMA_FAMILY admits none)");
             std::uint64_t m = 0;
             [&]<std::size_t... I>(std::index_sequence<I...>) XOFFSET_DETAIL_LAMBDA_INLINE {
-                ((m |= (mask >> I & 1u) << numbered_index[I]), ...);
+                ((m |= ((mask >> I) & 1u) ? numbered_bits[I] : 0), ...);
             }(std::make_index_sequence<schema::member_count_v<T>>{});
             return m;
         }

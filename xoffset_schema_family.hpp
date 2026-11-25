@@ -111,6 +111,36 @@ namespace XOffsetDatastructure {
             } else return false;
         }
 
+        // Marks every non-padding leaf byte of a plain type T at `base`.
+        // Internal or tail padding inside a nested record or array taken from
+        // XSpare bytes stays unmarked so spare_to_padding rejects it (and
+        // xsync Whole<T> keeps the same plain-byte layout across the family).
+        template <typename T>
+        constexpr void mark_plain_bytes(std::size_t base, std::vector<char>& taken) {
+            using U = std::remove_cv_t<T>;
+            constexpr Kind k = kind_of<U>();
+            if constexpr (k == Kind::scalar || k == Kind::enumeration || k == Kind::spare) {
+                for (std::size_t b = 0; b < sizeof(U); ++b) taken[base + b] = 1;
+            } else if constexpr (k == Kind::array) {
+                using E = std::remove_extent_t<U>;
+                for (std::size_t i = 0; i < std::extent_v<U>; ++i)
+                    mark_plain_bytes<E>(base + i * sizeof(E), taken);
+            } else if constexpr (k == Kind::record) {
+                [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                    (mark_plain_bytes<field_t<U, Is>>(base + schema::member_t<U, Is>::offset, taken), ...);
+                }(std::make_index_sequence<schema::member_count_v<U>>{});
+            }
+        }
+
+        template <typename T>
+        constexpr std::size_t first_padding_byte() {
+            std::vector<char> covered(sizeof(T), 0);
+            mark_plain_bytes<T>(0, covered);
+            for (std::size_t b = 0; b < covered.size(); ++b)
+                if (!covered[b]) return b;
+            return npos;
+        }
+
         // The first error found and where (a path of field names). This and
         // the two text helpers below are templates, so a program that
         // declares no family instantiates none of their string code: the
@@ -161,12 +191,16 @@ namespace XOffsetDatastructure {
         }
 
         // Elements and mapped types: the same size; a spare element may
-        // become any plain type.
+        // become any plain type with no internal or tail padding.
         template <typename P, typename N>
         constexpr bool element_related(Walk& w, const std::string& at) {
             if constexpr (sizeof(P) != sizeof(N)) return w.fail(Error::size_changed, at);
-            else if constexpr (is_spare_v<P>) return plain<N>() || w.fail(Error::container_from_spare, at);
-            else return related<P, N>(w, at);
+            else if constexpr (is_spare_v<P>) {
+                if constexpr (!plain<N>()) return w.fail(Error::container_from_spare, at);
+                const std::size_t pad = first_padding_byte<N>();
+                if (pad != npos) return w.fail(Error::spare_to_padding, join(at, offset_text(pad)));
+                return true;
+            } else return related<P, N>(w, at);
         }
 
         // Field J of P: in N under its name, not spare, at its offset, related.
@@ -204,9 +238,10 @@ namespace XOffsetDatastructure {
             constexpr std::size_t off = schema::member_t<N, I>::offset;
             for (std::size_t b = off; b < off + sizeof(F); ++b) {
                 if (b >= spare.size() || !spare[b] || taken[b]) return w.fail(Error::outside_spare, here);
-                taken[b] = 1;
             }
-            return plain<F>() || w.fail(Error::container_from_spare, here);
+            if constexpr (!plain<F>()) return w.fail(Error::container_from_spare, here);
+            mark_plain_bytes<F>(off, taken);
+            return true;
         }
 
         template <typename P, typename N>

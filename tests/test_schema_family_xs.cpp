@@ -85,6 +85,14 @@ struct Tile { std::int32_t owner{}; std::uint16_t kind{}; std::uint8_t level{}; 
 struct View { Head head; xo::XVector<Unit> units; xo::XVector<Tile> tiles; };
 } // namespace v2
 
+// A field in v2 that spans two adjacent XSpare members of v1, and a
+// zero-padding nested record carved out of XSpare.
+namespace span_spare {
+struct CleanSub { std::uint8_t tag{}; xo::XSpare<3> pad{}; std::uint32_t val{}; };
+struct V1 { std::uint64_t id{}; xo::XSpare<4> s1{}; xo::XSpare<4> s2{}; xo::XSpare<8> sub_spare{}; };
+struct V2 { std::uint64_t id{}; std::uint64_t big{}; CleanSub sub{}; };
+} // namespace span_spare
+
 namespace v3 {
 using v2::Head;
 using v2::Tile;
@@ -118,6 +126,12 @@ XOFFSET_RECORD(fxs::v2::View, head, units, tiles)
 XOFFSET_RECORD(fxs::v3::Pos, x, y, z, facing)
 XOFFSET_RECORD(fxs::v3::Unit, hp, on, kind, team, elite, pos, name, marks, shield, speed)
 XOFFSET_RECORD(fxs::v3::View, head, units, tiles)
+XOFFSET_RECORD(fxs::span_spare::CleanSub, tag, pad, val)
+XOFFSET_RECORD(fxs::span_spare::V1, id, s1, s2, sub_spare)
+XOFFSET_RECORD(fxs::span_spare::V2, id, big, sub)
+XOFFSET_REGISTER_SCHEMA_NAME(fxs::span_spare::V1, "test.fxs.SpanSpare")
+XOFFSET_REGISTER_SCHEMA_NAME(fxs::span_spare::V2, "test.fxs.SpanSpare")
+XOFFSET_SCHEMA_FAMILY(fxs::span_spare::V2, fxs::span_spare::V1)
 
 XOFFSET_REGISTER_SCHEMA_NAME(fxs::v1::View, "test.family_xs.View")
 XOFFSET_REGISTER_SCHEMA_NAME(fxs::v2::View, "test.family_xs.View")
@@ -580,6 +594,45 @@ void same_messages() {
     CHECK(a.delta == b.delta && b.delta == c.delta);
 }
 
+// A later field spanning adjacent XSpare members of the first version must set
+// every overlapped first-version member bit in change bodies; a zero-padding
+// nested record taken from XSpare keeps whole bodies identical across versions.
+void adjacent_spare_span() {
+    using V1 = fxs::span_spare::V1;
+    using V2 = fxs::span_spare::V2;
+    using B1 = xs::XRecordBody<V1>;
+    using B2 = xs::XRecordBody<V2>;
+
+    static_assert(B1::whole_body::I::plain_bytes == B2::whole_body::I::plain_bytes);
+    V2 src{7, 0x1122334455667788ULL, {0x5a, {}, 0xdeadbeefU}};
+    V2 dst{7, 0, {}};
+    const std::uint64_t mask = B2::changed(src, dst);
+    CHECK(mask == ((std::uint64_t(1) << 1) | (std::uint64_t(1) << 2)));
+
+    std::string chg(B2::change_room(src, mask), '\0');
+    char* cend = B2::put_change(chg.data(), src, mask);
+    chg.resize(static_cast<std::size_t>(cend - chg.data()));
+    CHECK(B1::check_change(chg.data(), chg.data() + chg.size()) == chg.data() + chg.size());
+    CHECK(B2::check_change(chg.data(), chg.data() + chg.size()) == chg.data() + chg.size());
+
+    // Round-trip through V1 (admit / apply_change -> whole_body -> V2) and direct V2 apply.
+    V1 mid{7, {}, {}, {}};
+    CHECK(B1::apply_change(chg.data(), mid) == chg.data() + chg.size());
+    std::string whole(B1::whole_room(mid), '\0');
+    char* wend = B1::put_whole(whole.data(), mid);
+    whole.resize(static_cast<std::size_t>(wend - whole.data()));
+    CHECK(B2::check_whole(whole.data(), whole.data() + whole.size()) == whole.data() + whole.size());
+
+    V2 via_v1{};
+    CHECK(B2::apply_whole(whole.data(), via_v1) == whole.data() + whole.size());
+    CHECK(via_v1.id == 7 && via_v1.big == 0x1122334455667788ULL &&
+          via_v1.sub.tag == 0x5a && via_v1.sub.val == 0xdeadbeefU);
+
+    CHECK(B2::apply_change(chg.data(), dst) == chg.data() + chg.size());
+    CHECK(dst.id == 7 && dst.big == 0x1122334455667788ULL &&
+          dst.sub.tag == 0x5a && dst.sub.val == 0xdeadbeefU);
+}
+
 } // namespace
 
 int main() {
@@ -601,6 +654,7 @@ int main() {
     messages_from<fxs::v2::View>();
     messages_from<fxs::v3::View>();
     same_messages();
+    adjacent_spare_span();
     if (failures) {
         std::fprintf(stderr, "test_schema_family_xs: %d failure(s)\n", failures);
         return 1;

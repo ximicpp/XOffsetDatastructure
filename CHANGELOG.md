@@ -5,6 +5,15 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- Fixed two edge cases in add-only schema families (`XOFFSET_SCHEMA_FAMILY`) and shared deltas:
+  - `XOFFSET_SCHEMA_FAMILY` now checks non-padding leaf bytes recursively inside new plain records,
+    arrays and container elements taken from `XSpare<N>` bytes, rejecting internal or tail padding
+    with `spare_to_padding` (before, a nested padded record taken from `XSpare` compiled and caused
+    `XRecordBody::Whole` plain-byte length mismatches across versions; `XRecordBody` now also
+    asserts identical plain-byte layouts across a family at compile time).
+  - `XRecordBody::numbered_mask` now maps each member of a later family version to all overlapping
+    first-version members instead of only its starting member, so a new field spanning adjacent
+    `XSpare` members sends every byte in shared-delta change bodies.
 - Map state demo: `mapdemo_selftest` `writeback` passes again. Its client sends the image
   (`XWireEmission::free_runs`), so the bytes it hides in a vector's spare capacity reach A; since
   4.2.0 the default `save_verified` may send the compact wire, which leaves them behind, and the test

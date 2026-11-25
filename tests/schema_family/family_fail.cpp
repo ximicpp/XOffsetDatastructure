@@ -88,6 +88,20 @@ struct Hero {
     std::int32_t id{}; std::int32_t level{}; XString name; XVector<Item> bag; XVector<Rune> later;
     std::uint8_t flag{}; std::int32_t power{}; XSpare<16> spare{};
 };
+#elif defined(FAMILY_FAIL_NESTED_PADDING) // a nested record taken from spare bytes has internal padding
+struct Item { std::int32_t id{}; std::int32_t count{}; };
+struct PaddedSub { std::uint8_t tag{}; std::uint32_t val{}; };
+struct Hero {
+    std::int32_t id{}; std::int32_t level{}; XString name; XVector<Item> bag; XVector<XSpare<16>> later;
+    std::uint8_t flag{}; std::int32_t power{}; PaddedSub sub{}; XSpare<8> spare{};
+};
+#elif defined(FAMILY_FAIL_LIST_PADDING)   // the kept list gets a plain record with internal padding
+struct Item { std::int32_t id{}; std::int32_t count{}; };
+struct PaddedRune { std::uint8_t tag{}; std::int64_t id{}; };
+struct Hero {
+    std::int32_t id{}; std::int32_t level{}; XString name; XVector<Item> bag; XVector<PaddedRune> later;
+    std::uint8_t flag{}; std::int32_t power{}; XSpare<16> spare{};
+};
 #else
 #error "define one FAMILY_FAIL_<CASE>"
 #endif
@@ -95,6 +109,10 @@ struct Hero {
 
 #if defined(FAMILY_FAIL_LIST)
 XOFFSET_RECORD(next::Rune, name, level)
+#elif defined(FAMILY_FAIL_NESTED_PADDING)
+XOFFSET_RECORD(next::PaddedSub, tag, val)
+#elif defined(FAMILY_FAIL_LIST_PADDING)
+XOFFSET_RECORD(next::PaddedRune, tag, id)
 #endif
 #if defined(FAMILY_FAIL_ELEMENT)
 XOFFSET_RECORD(next::Item, id, count, extra)
@@ -115,6 +133,8 @@ XOFFSET_RECORD(next::Hero, id, level, name, bag, later, flag, power, guild, mood
 XOFFSET_RECORD(next::Hero, level, id, name, bag, later, flag, power, spare)
 #elif defined(FAMILY_FAIL_SIZE)
 XOFFSET_RECORD(next::Hero, id, level, name, bag, later, flag, power, spare, extra)
+#elif defined(FAMILY_FAIL_NESTED_PADDING)
+XOFFSET_RECORD(next::Hero, id, level, name, bag, later, flag, power, sub, spare)
 #else
 XOFFSET_RECORD(next::Hero, id, level, name, bag, later, flag, power, spare)
 #endif
