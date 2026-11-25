@@ -500,16 +500,49 @@ namespace XOffsetDatastructure::xsync {
             }
         };
 
-        // ---- change bodies: T's members ------------------------------------------
+        // ---- change bodies: the members of T (of its first version in a family) ----
 
         enum : std::uint8_t { kMemberPlain = 0, kMemberStr = 1, kMemberVec = 2, kMemberWhole = 3 };
 
+        // Member K of F (the first version of T's add-only family) as T
+        // holds it: plain bytes (F's member type: its size; a spare region
+        // of F is one member, whatever fields T took from it), or T's
+        // member of the same name (a container, or a nested record that
+        // holds containers: the family keeps both at their place). For a
+        // type without a family, T's member K.
+        template <class T, class F, std::size_t K>
+        struct numbered_member {
+            using first_type = std::remove_cv_t<typename schema::member_t<F, K>::type>;
+            static constexpr bool bytes = !is_container<first_type>() && ContainersOf<first_type, 0>::type::size == 0;
+            static consteval std::size_t own_index() {
+                std::size_t found = schema::member_count_v<T>;
+                [&]<std::size_t... I>(std::index_sequence<I...>) consteval {
+                    ((schema::member_t<T, I>::name == schema::member_t<F, K>::name ? (void)(found = I) : (void)0), ...);
+                }(std::make_index_sequence<schema::member_count_v<T>>{});
+                return found;
+            }
+            template <bool Bytes, class = void> struct pick { using type = first_type; };
+            template <class Unused> struct pick<false, Unused> {
+                using type = std::remove_cv_t<typename schema::member_t<T, own_index()>::type>;
+            };
+            using type = typename pick<bytes>::type;
+        };
+        template <class T, std::size_t K>
+        struct numbered_member<T, T, K> {
+            using type = std::remove_cv_t<typename schema::member_t<T, K>::type>;
+        };
+
+        // The members of T a change body names: those of the first version
+        // of T's add-only family (docs/SCHEMA_EVOLUTION.md section 4), so the
+        // versions of a family read each other's change bodies; T's own for
+        // a type without a family.
         template <class T> struct Members {
-            static constexpr std::size_t N = schema::member_count_v<T>;
+            using First = std::conditional_t<in_schema_family_v<T>, schema_family_first_t<T>, T>;
+            static constexpr std::size_t N = schema::member_count_v<First>;
             static_assert(N >= 1 && N <= 64, "xsync: a record has 1 to 64 members (group more in nested records)");
             using Mask = mask_t<N>;
-            template <std::size_t K> using type = std::remove_cv_t<typename schema::member_t<T, K>::type>;
-            template <std::size_t K> static constexpr std::size_t offset = schema::member_t<T, K>::offset;
+            template <std::size_t K> using type = typename numbered_member<T, First, K>::type;
+            template <std::size_t K> static constexpr std::size_t offset = schema::member_t<First, K>::offset;
             template <std::size_t K> static constexpr std::uint8_t kind_of() {
                 using U = type<K>;
                 if constexpr (is_fixed_string_v<U>) return kMemberStr;
@@ -697,10 +730,20 @@ namespace XOffsetDatastructure::xsync {
         // ---- change bodies ----
 
         using members = sd_detail::Members<T>;
+        /// T is a later version of an add-only family: a change body names
+        /// the members of the first version (members), a mask passed to
+        /// change_room, put_change and put_change_op or returned by changed()
+        /// names T's own members (bit i: member i of T, declaration order).
+        static constexpr bool in_family = !std::is_same_v<typename members::First, T>;
+        /// The bits a mask of T may have: one per member of T.
+        static constexpr std::size_t mask_bits = schema::member_count_v<T>;
+        static_assert(mask_bits >= 1 && mask_bits <= 64, "xsync: a mask bit per member, at most 64 members");
+        static constexpr std::uint64_t mask_all = sd_detail::low_bits<mask_bits>;
 
         /// Bytes the change body of the members in mask of r takes at most.
         XOFFSET_DETAIL_INLINE static std::size_t change_room(const T& r, std::uint64_t mask) noexcept {
             using M = members;
+            if constexpr (in_family) mask = numbered_mask(mask);
             std::size_t n = sizeof(typename M::Mask);
             if constexpr (M::plain_max_bytes <= 256) {
                 // Upper bound for all plain members: avoids popcount/branches in room
@@ -740,6 +783,7 @@ namespace XOffsetDatastructure::xsync {
         /// returns its end.
         XOFFSET_DETAIL_INLINE static char* put_change(char* d, const T& r, std::uint64_t mask) noexcept {
             using M = members;
+            if constexpr (in_family) mask = numbered_mask(mask);
             mask &= M::all;
             sd_detail::store<typename M::Mask>(d, typename M::Mask(mask));
             d += sizeof(typename M::Mask);
@@ -769,15 +813,19 @@ namespace XOffsetDatastructure::xsync {
         /// The members of now that differ from prev (plain bytes compared as
         /// bytes, containers by content).
         static std::uint64_t changed(const T& now, const T& prev) noexcept {
-            using M = members;
-            std::uint64_t m = 0;
-            [&]<std::size_t... K>(std::index_sequence<K...>) {
-                ((m |= member_same<K>(now, prev) ? 0 : std::uint64_t(1) << K), ...);
-            }(std::make_index_sequence<M::N>{});
-            return m;
+            if constexpr (in_family) {
+                return own_changed(now, prev);
+            } else {
+                using M = members;
+                std::uint64_t m = 0;
+                [&]<std::size_t... K>(std::index_sequence<K...>) {
+                    ((m |= member_same<K>(now, prev) ? 0 : std::uint64_t(1) << K), ...);
+                }(std::make_index_sequence<M::N>{});
+                return m;
+            }
         }
         /// Records without containers: bytes put_diff writes at most.
-        static constexpr std::size_t diff_room = sizeof(sd_detail::mask_t<schema::member_count_v<T>>) + sizeof(T);
+        static constexpr std::size_t diff_room = sizeof(typename members::Mask) + sizeof(T);
         /// Records without containers: the change body of the members of now
         /// that differ from prev, written at d (diff_room bytes), and prev
         /// takes them. Returns the end, or nullptr when nothing differs (then
@@ -857,6 +905,58 @@ namespace XOffsetDatastructure::xsync {
     private:
         template <std::size_t K> using member_t = typename members::template type<K>;
         template <std::size_t K> static constexpr std::size_t member_off = members::template offset<K>;
+
+        // ---- a later version of a family: T's members to the first version's ----
+
+        // For member i of T, the member of the first version that holds it
+        // (the same field, or the spare region it was taken from).
+        static constexpr auto numbered_index = [] {
+            constexpr std::size_t own = mask_bits;
+            std::array<std::uint8_t, own> at{};
+            [&]<std::size_t... I>(std::index_sequence<I...>) {
+                auto one = [&]<std::size_t Own>() {
+                    constexpr std::size_t o = schema::member_t<T, Own>::offset;
+                    std::size_t k = members::N;
+                    for (std::size_t j = 0; j < members::N; ++j)
+                        if (members::offsets[j] <= o && o < members::offsets[j] + members::sizes[j]) k = j;
+                    at[Own] = std::uint8_t(k);
+                };
+                (one.template operator()<I>(), ...);
+            }(std::make_index_sequence<own>{});
+            return at;
+        }();
+        XOFFSET_DETAIL_INLINE static std::uint64_t numbered_mask(std::uint64_t mask) noexcept {
+            static_assert([] {
+                for (const std::uint8_t k : numbered_index)
+                    if (k >= members::N) return false;
+                return true;
+            }(), "xsync: a member of a later version outside every member of the first (XOFFSET_SCHEMA_FAMILY admits none)");
+            std::uint64_t m = 0;
+            [&]<std::size_t... I>(std::index_sequence<I...>) XOFFSET_DETAIL_LAMBDA_INLINE {
+                ((m |= (mask >> I & 1u) << numbered_index[I]), ...);
+            }(std::make_index_sequence<schema::member_count_v<T>>{});
+            return m;
+        }
+        // changed() of a later version: T's own members.
+        static std::uint64_t own_changed(const T& now, const T& prev) noexcept {
+            std::uint64_t m = 0;
+            [&]<std::size_t... I>(std::index_sequence<I...>) {
+                auto same = [&]<std::size_t Own>() -> bool {
+                    using F = std::remove_cv_t<typename schema::member_t<T, Own>::type>;
+                    constexpr std::size_t off = schema::member_t<T, Own>::offset;
+                    const auto& x = sd_detail::at<F, off>(now);
+                    const auto& y = sd_detail::at<F, off>(prev);
+                    if constexpr (sd_detail::is_fixed_string_v<F> || sd_detail::is_fixed_vector_v<F>)
+                        return sd_detail::same_container(x, y);
+                    else if constexpr (sd_detail::ContainersOf<F, 0>::type::size != 0)
+                        return sd_detail::Whole<F>::same(x, y);
+                    else
+                        return std::memcmp(&x, &y, sizeof x) == 0;
+                };
+                ((m |= same.template operator()<I>() ? 0 : std::uint64_t(1) << I), ...);
+            }(std::make_index_sequence<schema::member_count_v<T>>{});
+            return m;
+        }
 
         XOFFSET_DETAIL_INLINE static unsigned fast_popcount32(std::uint32_t x) noexcept {
 #if defined(__POPCNT__) || defined(__aarch64__) || defined(_M_ARM64)
@@ -1131,7 +1231,7 @@ namespace XOffsetDatastructure::xsync {
         /// A change op of the members in mask of r encoded here; nothing when
         /// mask is 0. Returns whether it wrote one.
         template <class R> XOFFSET_DETAIL_INLINE bool change(std::uint32_t id, const R& r, std::uint64_t mask) {
-            if (!(mask & XRecordBody<R>::members::all)) return false;
+            if (!(mask & XRecordBody<R>::mask_all)) return false;
             char* d = need(4 + XRecordBody<R>::change_room(r, mask) + kSyncSlack);
             sd_detail::store<std::uint32_t>(d, id);
             q_ = XRecordBody<R>::put_change(d + 4, r, mask);

@@ -46,12 +46,15 @@ both judged:
    compile it is marked "not comparable" and the job does not fail; before this PR merges, the PR body
    must explain it and attach a cache-sim comparison (section 5a), and the post-merge Mac review must
    cover it. `reloc_bench` is optional: when base or anchor cannot compile it, only the `reloc.*`
-   comparisons are missing (warning); when head cannot compile it, the build fails.
+   comparisons are missing (warning); when head cannot compile it, the build fails. `family_ir`
+   (`bench/evolution/family_ir.cpp`) is optional the same way: a base or anchor tree without `XSpare` and
+   `XOFFSET_SCHEMA_FAMILY` only loses `family.*`.
 3. Correctness is checked before counting: SLG `--mode verify --scale S` (xoffset agrees with cereal,
    once with the reuse protocol and once with the per-message protocol); the formal harness generates S
    and M input wires with its own `encode` and `validate`s S and M; `reloc_bench --mode verify` (each
-   side's result digest agrees per round, with the item names). If head fails any of them, the gate fails
-   right away with no numbers.
+   side's result digest agrees per round, with the item names); `family_ir --check` (both rows of each
+   pair give the same wire, the same reloaded state and the same replica). If head fails any of them, the
+   gate fails right away with no numbers.
 4. Count instructions (Ir) per stage under valgrind callgrind with `--collect-atstart=no`, turning
    collection on only inside the measured stage. One process per stage, `nproc` in parallel.
    - Every process carries
@@ -91,6 +94,7 @@ change when the code does not, and the push results already cover every merge.
 | Formal harness | M fixture (`bench/formal/model/reference.py --scale M`, default seed) | `formal.load`, `formal.query_before`, `formal.mutate`, `formal.emit_after`, `formal.retire`, `formal.reload`, `formal.query_after`, `formal.cleanup`; `formal.read_sum` = query_before + query_after; `formal.total` report only |
 | SLG demo case set, trusted tier (hole table items, 4.2.0) | S scale, seed 20261021, `SLG_REUSE=1 SLG_CASES=demo SLG_NATIVE_OFF=1 SLG_XOFFSET_CAP_MIB=16`, `--formats xoffset_trusted`; steady state: 15 cycles, collecting only S.store_recv in cycle 15 (by then a stored player carries about 27 holes); whole run: 21 cycles, every instruction of the process (`--collect-atstart=yes`: setup, timed and untimed stages) | `slgd.S.store_recv` (the steady-state receive of a stored player); `slgd.whole` (the whole run) |
 | Relocation tax (G9) | `bench/reloc`, one process per item: `--rounds 5 --warmup 1 --cases <item>`, `RELOC_IR_SKIP_ROUNDS=2`, collecting only XOffset's timed region (rounds 2–4) | Each item `reloc.<item>` (such as `reloc.vec.push_back`, `reloc.map.insert.fresh`), including the report-only `*.reused`, `.plain` and node container comparison items |
+| Add-only type evolution ([SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md) sections 1 to 4) | `bench/evolution/family_ir.cpp`: the SLG PlayerState with reserved bytes in two versions of one family, one process per row, `--row <row> 20` (20 measured calls after one warm-up, collecting only inside them) | `family.send.same`, `family.recv.same`, `family.delta.same` (a v2 server and a v2 client) and the `.in_family` row of each (the same server and a v1 client) |
 
 SLG builds only XOffset + cereal (cereal v1.3.2, `ebef1e92`, headers). M-scale SLG exceeds the address
 space under valgrind (512 × 256 MiB reservations), so S is used. The formal harness's M input wire is
@@ -116,6 +120,11 @@ stress item) is a scenario of its own and judged by the stage thresholds. Each `
 scenario of its own, judged by the stage thresholds (> 1.02 warning, > 1.05 failure); G9's own verdict
 (the UB of XOffset ÷ std ≤ 1.05) comes from the Mac batches, and the gate only catches instruction count
 regressions on the XOffset side.
+
+Each `family.*` row is a scenario of its own as well (stage thresholds against base and anchor). On top of
+that, in the head every `family.<op>.in_family` row must **equal** its `family.<op>.same` row, to the
+instruction: a send, receive or delta between two versions of one family is the same work as between two
+programs of one version. Any difference fails the gate, and the ledger cannot exempt it.
 
 ## 4. Ledger (intentional regressions)
 
@@ -268,6 +277,7 @@ The gate builds with compile commands directly (no CMake), and requires of `benc
 | `bench/formal/driver.cpp` | With `-DSC_IR_COUNT=1`, collects only the one stage named by `SC_IR_PHASE` (load, query_before, mutate, emit_after, retire, reload, query_after, cleanup); `-DSC_ADAPTER_HEADER="adapters/xoffset/adapter.hpp" -DSC_ADAPTER_TYPE=sc::XOffsetAdapter`, include directories `include` and the root |
 | `bench/formal/model/reference.py` | `--scale S|M --out DIR` generates the fixture (`input.canonical.bin`, `trace.bin`, `fixture.json`) |
 | `bench/reloc/reloc_bench.cpp` | Single-file entry point needing only the library include directory; with `-DRELOC_IR_COUNT=1`, collects only in XOffset's timed region of the items selected by `RELOC_IR_KEYS` (exact names or `*` prefixes), and with `RELOC_IR_SKIP_ROUNDS=N`, rounds 0…N−1 and the warm-up round are not collected; `--cases <item>` runs only that item; `--mode verify --out f.jsonl` verifies and writes `{"case","round",…}` per line, which the gate uses to discover item names |
+| `bench/evolution/family_ir.cpp` | Single-file entry point; include directories: the library, `external/typelayout/include` and `bench/slg/include`; `--list` prints the rows, `--check` verifies them, `--row <row> N` runs N measured calls after one warm-up, and with `-DFAMILY_IR_COUNT=1` collects only inside them |
 
 Exact matching is required: with prefix matching, `C.snapshot` would also count `C.snapshot2`.
 

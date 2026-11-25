@@ -59,6 +59,35 @@ add_test(NAME fuzz_wire_schemas_smoke
 set_tests_properties(fuzz_wire_schemas_smoke PROPERTIES
     LABELS "fuzz" FIXTURES_REQUIRED fuzz_wire_schemas_seeds)
 
+# Add-only type evolution, the in-place pair (docs/SCHEMA_EVOLUTION.md):
+# three versions of one family read the same wire or shared delta body and
+# must agree. Field lists: both backends.
+add_executable(fuzz_schema_family fuzz_schema_family.cpp)
+configure_xoffset_target(fuzz_schema_family)
+xoffset_enable_test_assertions(fuzz_schema_family)
+target_compile_options(fuzz_schema_family PRIVATE -fsanitize=fuzzer)
+target_link_options(fuzz_schema_family PRIVATE -fsanitize=fuzzer)
+target_link_libraries(fuzz_schema_family PRIVATE ${XOFFSET_FUZZER_LINK_LIBS})
+if(XOFFSET_FUZZ_INJECT_CRASH)
+    target_compile_definitions(fuzz_schema_family PRIVATE XOFFSET_FUZZ_INJECT_CRASH)
+endif()
+
+add_executable(fuzz_schema_family_seeds fuzz_schema_family.cpp)
+configure_xoffset_target(fuzz_schema_family_seeds)
+xoffset_enable_test_assertions(fuzz_schema_family_seeds)
+target_compile_definitions(fuzz_schema_family_seeds PRIVATE XOFFSET_FUZZ_SEED_MAIN)
+
+set(XOFFSET_FUZZ_FAMILY_SEEDS "${CMAKE_CURRENT_BINARY_DIR}/seeds/schema_family")
+add_test(NAME fuzz_schema_family_seeds
+    COMMAND $<TARGET_FILE:fuzz_schema_family_seeds> "${XOFFSET_FUZZ_FAMILY_SEEDS}")
+set_tests_properties(fuzz_schema_family_seeds PROPERTIES
+    LABELS "fuzz" FIXTURES_SETUP fuzz_schema_family_seeds)
+add_test(NAME fuzz_schema_family_smoke
+    COMMAND $<TARGET_FILE:fuzz_schema_family> -seed=1 -runs=20000 -max_len=65536
+            -rss_limit_mb=2048 -timeout=30 "${XOFFSET_FUZZ_FAMILY_SEEDS}")
+set_tests_properties(fuzz_schema_family_smoke PROPERTIES
+    LABELS "fuzz" FIXTURES_REQUIRED fuzz_schema_family_seeds)
+
 # Delta sync receiver (xoffset_delta.hpp): try_apply_delta_verified against
 # the full verification of a cloned replica; the first byte picks schema and
 # mode. Seeds come from the replay build (--write-seeds).

@@ -1,13 +1,16 @@
 // Map state demo: schema version 1, for the old-version client
 // (mapdemo_client_v1). FROZEN: this is the release before ViewSnapshot
-// gained scene_units, and stays as it was released.
+// took scene_units from its reserved bytes, and stays as it was released.
 //
-// The record types are the frozen snapshot that A lists in its lineage
+// The record types are the frozen snapshot of version 1
 // (mapdemo/schema_v1.hpp, written by src/schema_freeze.cpp, with field lists
 // and pins), used under the names the client sources expect; the constants
-// below are those of that release. The mapdemo_client_v1 targets put this
-// directory before include/, so `#include "mapdemo/schema.hpp"` in the
-// common and client sources finds this file; everything else is shared.
+// below are those of that release. Version 2 is the next version of the same
+// add-only family (include/mapdemo/schema.hpp): the same bytes, so this
+// client reads A's wires, deltas included, and A reads its write-backs. The
+// mapdemo_client_v1 targets put this directory before include/, so
+// `#include "mapdemo/schema.hpp"` in the common and client sources finds
+// this file; everything else is shared.
 #pragma once
 #include <cstddef>
 #include <cstdint>
@@ -76,4 +79,4 @@ inline XBuffer::MaximumCapacity cap_event() {
 
 } // namespace mapdemo
 
-static_assert(sizeof(mapdemo::ViewSnapshot) == 48);
+static_assert(sizeof(mapdemo::ViewSnapshot) == 56);

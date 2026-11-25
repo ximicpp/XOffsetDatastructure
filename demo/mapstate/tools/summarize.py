@@ -50,7 +50,8 @@ lines (one per evil case A refuses: 6 requests, 3 subscriptions, 3
 handshakes, 3 write-backs) and every row of the evil client's
 client_checks.csv passes.
 Schema lock (schema_check/, run_all_tiers.sh): mapdemo_schema_freeze check
-exited 0, so no root type changed without a lineage entry.
+exited 0, so every root type keeps the fingerprint of the last frozen
+version, under field names of its add-only family.
 Client offline runs (run_e2e.sh), when present: selfcheck/ (client
 --self-check) and replay/ (client --replay of a corpus) exited 0 with every
 client_checks.csv row "pass".
@@ -94,7 +95,6 @@ VIEW_METRICS = (
     ("a.snap_bytes", "snapshot wire (A)"),
     ("a.snap_net_bytes", "snapshot frame payload (A; zstd: compressed)"),
     ("a.snap_compress_us", "A snapshot zstd compress"),
-    ("a.snap_convert_us", "A snapshot conversion to version 1 (old-version clients only)"),
     ("a.visible_count", "visible units (A)"),
     ("c.view_rtt_us", "client view round trip (ViewReq sent -> snapshot complete)"),
     ("c.load_us", "client verify snapshot (load / reload)"),
@@ -118,9 +118,8 @@ EVIL_MIN_REJECTED = 15
 # INTERFACES.md section 6; the headless client has no draw / present, and
 # with --buffers reuse nothing is destroyed per message.
 HEADLESS_OPTIONAL = ("c.draw_us", "c.present_us")
-# Recorded only when a snapshot was zstd-compressed (checked per encoding),
-# or converted for a version-1 client (checked per client).
-ENCODING_OPTIONAL = ("a.snap_compress_us", "c.decompress_us", "a.snap_convert_us")
+# Recorded only when a snapshot was zstd-compressed (checked per encoding).
+ENCODING_OPTIONAL = ("a.snap_compress_us", "c.decompress_us")
 ENCODINGS = ("dense", "compact", "zstd")            # whole wires: what --encoding cycle covers
 VIEW_ENCODINGS = ENCODINGS + ("delta",)            # per-encoding stats; delta: --encoding delta
 EVENT_ENCODINGS = ("raw", "zstd", "zdict", "batch")
@@ -550,26 +549,18 @@ def summarize_tier(root, name, min_steps):
         v.add(scope, side + " snapshot check_ok all 1", rows and bad == 0,
               "{} rows, {} with check_ok != 1".format(len(rows), bad))
 
-    # Each client got snapshots of its own schema version (A converts for
-    # an older client after the handshake).
+    # Every client read the wires A sends any client, whatever the schema
+    # version of its build (versions of one add-only family: the same bytes).
     schema_clients = []
-    if a_snap and "schema" in a_snap[0]:
-        wrong = []
+    if a_snap:
         for cname, cdir, _, rows in clients:
-            want = build_words(os.path.join(cdir, "client_build.txt")).get("schema_version", "")
-            got = [a_by[r["request_id"]].get("schema") for r in rows if r["request_id"] in a_by]
-            bad = sum(1 for g in got if g != want)
-            converted = [num(a_by[r["request_id"]].get("convert_us")) for r in rows
-                         if r["request_id"] in a_by and a_by[r["request_id"]].get("convert_us")]
-            schema_clients.append({"client": cname, "schema_version": want or "-", "rows": len(got),
-                                   "wrong": bad, "a.convert_us": stats(converted)})
-            if bad or not want:
-                wrong.append(cname)
-        v.add(scope, "A sent each client its schema version", not wrong and all(c["rows"] for c in schema_clients),
-              "; ".join("{} v{}: {} rows, {} other version{}".format(
-                  c["client"], c["schema_version"], c["rows"], c["wrong"],
-                  ", {} converted".format(c["a.convert_us"]["count"]) if c["a.convert_us"]["count"] else "")
-                  for c in schema_clients))
+            version = build_words(os.path.join(cdir, "client_build.txt")).get("schema_version", "")
+            served = sum(1 for r in rows if r["request_id"] in a_by)
+            schema_clients.append({"client": cname, "schema_version": version or "-", "rows": served})
+        v.add(scope, "every client read A's snapshots, whatever its schema version",
+              all(c["rows"] for c in schema_clients),
+              "; ".join("{} v{}: {} snapshots".format(c["client"], c["schema_version"], c["rows"])
+                        for c in schema_clients))
 
     per_enc = {}
     for enc in VIEW_ENCODINGS:
@@ -698,13 +689,10 @@ def render_tier(lines, t):
         ti.get("steps", "-"), ti.get("first_tick", "-"), ti.get("last_tick", "-"),
         fmt(num(tps.get("mean"))) if tps else "missing"))
     lines.append("- exit codes: " + ", ".join("{}={}".format(k, v) for k, v in t["exit_codes"].items()))
-    if len(t.get("schema_clients") or []) > 1 or any(c["a.convert_us"]["count"] for c in t.get("schema_clients") or []):
+    if len(t.get("schema_clients") or []) > 1:
         lines.append("- clients at the same time: " + "; ".join(
-            "{} schema version {}, {} snapshots{}".format(
-                c["client"], c["schema_version"], c["rows"],
-                " (A converted each: mean / p95 {} us)".format(mean_p95(c["a.convert_us"]))
-                if c["a.convert_us"]["count"] else "")
-            for c in t["schema_clients"]))
+            "{} schema version {}, {} snapshots".format(c["client"], c["schema_version"], c["rows"])
+            for c in t["schema_clients"]) + " (the same wires: one add-only family)")
     lines.append("- load average before / after: {} / {}".format(
         t["meta"].get("load_before", "-"), t["meta"].get("load_after", "-")))
     lines.append("")

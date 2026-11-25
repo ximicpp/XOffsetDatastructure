@@ -1,6 +1,6 @@
 #!/bin/bash
 # Builds bench/evolution/evolution_ir.cpp with the P2996 toolchain and prints
-# instructions per message for every scenario and operation (callgrind).
+# instructions per stored image for every scenario and operation (callgrind).
 # Record only; not a gate.
 #
 #   bench/evolution/run_ir.sh [--out DIR] [--iterations N]
@@ -22,14 +22,14 @@ BOOST=$(grep -o 'external/boost/libs/[^|]*' cmake/XOffsetDependencyLock.cmake | 
   bench/evolution/evolution_ir.cpp -o "$OUT/evolution_ir" \
   -L"$P2996_ROOT/lib" -Wl,-rpath,"$P2996_ROOT/lib" -Wl,-rpath,"$P2996_ROOT/lib/x86_64-unknown-linux-gnu"
 
-printf '%-9s %-10s %14s  %s\n' scenario op Ir/message info
+printf '%-9s %-12s %14s  %s\n' scenario op Ir/image info
 for S in A B D; do
-  for OP in recv_same load_old recv_old send_same send_old; do
+  for OP in load_same load_old load_upgrade; do
     F="$OUT/callgrind.$S.$OP"
     # Same glibc setting as tools/perf_gate (rep movsb/stosb counted per byte otherwise).
     INFO=$(GLIBC_TUNABLES=glibc.cpu.x86_rep_movsb_threshold=0x7fffffffffffffff:glibc.cpu.x86_rep_stosb_threshold=0x7fffffffffffffff valgrind --tool=callgrind --collect-atstart=no --callgrind-out-file="$F" \
       "$OUT/evolution_ir" "$S" "$OP" "$N" 2> "$F.log")
     IR=$(awk '/^summary:/ {print $2}' "$F")
-    printf '%-9s %-10s %14s  %s\n' "$S" "$OP" "$((IR / N))" "$INFO"
+    printf '%-9s %-12s %14s  %s\n' "$S" "$OP" "$((IR / N))" "$INFO"
   done
 done

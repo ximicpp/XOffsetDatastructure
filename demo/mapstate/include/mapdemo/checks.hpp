@@ -53,19 +53,18 @@ Result compare_snapshot(const ViewSnapshot& snapshot, const ViewRequest& request
 
 // Client: request id and rect echoed, every unit inside the rect, no duplicate
 // ids, finite positions, behavior in range; schema version 2: no more units
-// than scene_units, reserved0 == 0.
+// than scene_units.
 Result snapshot_sanity(const ViewSnapshot& snapshot, std::uint64_t request_id, const Rect& requested);
 
 // FNV-1a over request_id, tick, scene_id, rect bits and every unit's
 // id, hp, pos bits, behavior, name, in array order. A and the client log it
 // per request id; tools/summarize.py compares the two logs. These are the
 // fields of both schema versions (version 2 added scene_units, which is not
-// in the digest), so A's digest of a snapshot it converts for a version-1
-// client equals that client's digest of what it received.
+// in the digest), so a version-1 client's digest of A's wire equals A's.
 std::uint64_t snapshot_digest(const ViewSnapshot& snapshot);
 
-// The same digest of a ViewSnapshot of any schema version (A digests the
-// version-1 snapshots it converts with it; snapshot_digest calls it).
+// The same digest of a ViewSnapshot of either schema version
+// (snapshot_digest calls it).
 template <typename Snapshot>
 std::uint64_t snapshot_digest_of(const Snapshot& snapshot);
 
@@ -74,7 +73,7 @@ std::uint64_t snapshot_digest_of(const Snapshot& snapshot);
 // the field values A accepts from a client: scene kSceneId, a legal rect,
 // every unit inside it at a finite position, hp 50..100, behavior 0..2, a
 // name of 1..kMaxEditName bytes, no duplicate ids; schema version 2: no
-// more units than scene_units, reserved0 == 0.
+// more units than scene_units.
 inline constexpr std::size_t kMaxEditName = 64;
 template <typename Snapshot>
 Result edit_sanity_of(const Snapshot& snapshot);
@@ -149,7 +148,6 @@ Result edit_sanity_of(const Snapshot& snapshot) {
         if (snapshot.units.size() > snapshot.scene_units)
             return fail("units " + std::to_string(snapshot.units.size()) + " > scene_units " +
                         std::to_string(snapshot.scene_units));
-        if (snapshot.reserved0 != 0) return fail("reserved0 " + std::to_string(snapshot.reserved0));
     }
     std::vector<std::uint32_t> ids;
     ids.reserve(snapshot.units.size());

@@ -200,6 +200,9 @@ endif()
 # Schema handshake (xoffset_handshake.hpp) and schema evolution
 # (xoffset_evolution.hpp, server side).
 set(EVOLUTION_TESTS
+    test_xspare            # reserved bytes of later versions (every build)
+    test_schema_family     # add-only versions: one family, every pair both ways (every build)
+    test_schema_family_xs  # add-only versions: shared deltas in the first version's numbering (every build)
     test_schema_handshake
     test_schema_snapshot   # a frozen snapshot used by a client (every build)
     test_schema_evolution
@@ -207,6 +210,36 @@ set(EVOLUTION_TESTS
 )
 foreach(test_name ${EVOLUTION_TESTS})
     add_xoffset_test(${test_name} "reflection;evolution")
+endforeach()
+
+# XOFFSET_SCHEMA_FAMILY(New, Prev) where New is not an add-only successor
+# of Prev must fail the build, naming the rule (every build: the relation
+# asks the schema field interface only).
+set(XOFFSET_FAMILY_FAIL_CASES
+    "PADDING|a new field is not inside the previous version's XSpare bytes"
+    "REMOVED|a field of the previous version is missing"
+    "RENAMED|a field of the previous version is missing"
+    "TYPE|a field of the previous version changed its type"
+    "CONTAINER|a new field taken from XSpare bytes holds a container"
+    "SPARE_PADDING|spare bytes of the previous version became padding"
+    "MOVED|a field of the previous version moved to another offset"
+    "ELEMENT|a record or a container element changed its size"
+    "SIZE|a record or a container element changed its size"
+    "LIST|a new field taken from XSpare bytes holds a container"
+)
+foreach(entry ${XOFFSET_FAMILY_FAIL_CASES})
+    string(REPLACE "|" ";" parts "${entry}")
+    list(GET parts 0 variant)
+    list(GET parts 1 expected)
+    string(TOLOWER "${variant}" lower)
+    add_executable(schema_family_${lower}_fail EXCLUDE_FROM_ALL schema_family/family_fail.cpp)
+    configure_xoffset_target(schema_family_${lower}_fail)
+    target_compile_definitions(schema_family_${lower}_fail PRIVATE FAMILY_FAIL_${variant}=1)
+    add_test(NAME schema_family_${lower}_fail
+        COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target schema_family_${lower}_fail --config $<CONFIG>)
+    set_tests_properties(schema_family_${lower}_fail PROPERTIES
+        LABELS evolution
+        PASS_REGULAR_EXPRESSION "${expected}")
 endforeach()
 
 # Trust tiers by link type (xoffset_receiver.hpp): XReceiver admit against
@@ -343,6 +376,9 @@ set(NO_EXCEPTIONS_TESTS
     test_xhandle
     test_xstring_direct_assign
     test_schema_handshake
+    test_xspare
+    test_schema_family
+    test_schema_family_xs
     test_delta_sync
     test_delta_format
     test_relayout
@@ -431,7 +467,7 @@ set_tests_properties(test_no_exceptions_fatal test_no_exceptions_noexc_fatal PRO
 #   fuzz_<target>_replay_corpus   replays the harness's own seed corpus, written
 #                                 by fuzz_<target>_replay_seeds
 # Names start with the target name so tools/validate_vm.py --targets selects all three.
-set(XOFFSET_REPLAY_TARGETS v2_wire wire_schemas delta_sync shared_delta)
+set(XOFFSET_REPLAY_TARGETS v2_wire wire_schemas delta_sync shared_delta schema_family)
 if(XOFFSET_TESTS_REFLECTION)
     list(APPEND XOFFSET_REPLAY_TARGETS schema_evolution)  # server side, reflection only
 else()

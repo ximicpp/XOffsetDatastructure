@@ -37,7 +37,7 @@ std::string read_file(const std::filesystem::path& p) {
 }
 } // namespace
 
-// Release 3 in development: changed layout, both releases in its lineage.
+// Release 3 in development: a new generation, both releases in its lineage.
 namespace game3 {
 using namespace XOffsetDatastructure;
 struct Player {
@@ -51,7 +51,8 @@ struct Player {
     std::int32_t guild_id;
 };
 }
-// Changed layout, but release 2 is missing from the lineage.
+// A new fingerprint, but release 2 is neither in the lineage nor an earlier
+// version of its family.
 namespace game4 {
 using namespace XOffsetDatastructure;
 struct Player { XString name; std::int64_t level; std::int32_t extra; };
@@ -69,29 +70,13 @@ struct Player {
     XVector<std::byte> blob;
 };
 }
-// The same rename, declared as keeping the bytes' meaning.
-namespace game_aliased {
-using namespace XOffsetDatastructure;
-struct Player {
-    XString name;
-    std::int64_t rank;
-    std::int32_t slots[2][3];
-    XVector<game1::Item> items;
-    XMap<std::int32_t, XString> notes;
-    XSet<game1::Rarity> seen;
-    XVector<std::byte> blob;
-    // same layout as game_renamed::Player; distinct type for its own alias
-};
-}
 
 XOFFSET_REGISTER_SCHEMA_NAME(game3::Player, "test.freeze.Player")
 XOFFSET_REGISTER_SCHEMA_NAME(game4::Player, "test.freeze.Player")
 XOFFSET_REGISTER_SCHEMA_NAME(game_renamed::Player, "test.freeze.Player")
-XOFFSET_REGISTER_SCHEMA_NAME(game_aliased::Player, "test.freeze.Player")
 XOFFSET_SCHEMA_LINEAGE(game2::Player, game_v1::Player)
 XOFFSET_SCHEMA_LINEAGE(game3::Player, game_v1::Player, game_v2::Player)
 XOFFSET_SCHEMA_LINEAGE(game4::Player, game_v1::Player)
-XOFFSET_SCHEMA_NAME_ALIAS(game_aliased::Player, ::XOffsetDatastructure::schema_name_digest_v<game2::Player>)
 
 // The snapshots have the layouts of the releases they froze.
 static_assert(wire_schema_hash_v<game_v1::Player>() == wire_schema_hash_v<game1::Player>());
@@ -132,7 +117,22 @@ int main(int argc, char** argv) {
     CHECK(detail::freeze::check<game3::Player>(lock) == 0);        // next version, v2 in the lineage
     CHECK(detail::freeze::check<game4::Player>(lock) == 1);        // v2 not in the lineage
     CHECK(detail::freeze::check<game_renamed::Player>(lock) == 1); // same layout as v2, other names
-    CHECK(detail::freeze::check<game_aliased::Player>(lock) == 0); // ... unless aliased
+    {
+        // What each failure tells the developer to do.
+        detail::freeze::Lock parsed;
+        std::string error, report;
+        CHECK(detail::freeze::read_lock(lock, parsed, error));
+        CHECK(!detail::freeze::check_root<game4::Player>(parsed, report));
+        CHECK(report.find("XOFFSET_SCHEMA_FAMILY") != std::string::npos &&
+              report.find("XOFFSET_SCHEMA_LINEAGE") != std::string::npos &&
+              report.find("refused at the handshake") != std::string::npos);
+        report.clear();
+        CHECK(!detail::freeze::check_root<game_renamed::Player>(parsed, report));
+        CHECK(report.find("Revert the rename") != std::string::npos && report.find("ALIAS") == std::string::npos);
+        report.clear();
+        CHECK(detail::freeze::check_root<game3::Player>(parsed, report));
+        CHECK(report.find("new generation after v2") != std::string::npos);
+    }
     CHECK(detail::freeze::check<game2::Player>("does-not-exist.lock") == 0);  // nothing frozen yet
 
     // The command line.

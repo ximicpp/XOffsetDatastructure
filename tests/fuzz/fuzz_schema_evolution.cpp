@@ -1,19 +1,22 @@
-// libFuzzer target for schema evolution (xoffset_evolution.hpp, E5): a server
-// working in v3 of a message whose lineage is v1, v2, v3. The first input byte
-// picks the mode, the rest is its input:
+// libFuzzer target for schema evolution (xoffset_evolution.hpp, E5): a program
+// working in generation v3 of a message that still loads stored data of the
+// older generations v1 and v2 (its lineage). The first input byte picks the
+// mode, the rest is its input:
 //
-//   0  receive: the rest is a wire from a peer. evolve_load_verified<v3> must
-//      accept it exactly when load_verified of the version its header names
+//   0  load: the rest is a stored image. evolve_load_verified<v3> must accept
+//      it exactly when load_verified of the generation its header names
 //      accepts it and the upgrade succeeds; an accepted result must verify as
-//      v3 and re-save byte-identically, and downgrading it back to the sender's
-//      version must give the sender's object (compared in a canonical layout:
-//      both sides rebuilt by the conversion).
-//   1  send: the rest seeds a random v3 object. For every version the wire
-//      sent to a peer of that version (XPeerSchemas::save, XBroadcast) must
-//      load_verified as that version, or the conversion must fail with an
-//      XException; down, up, down again must give the same wire.
-//   2  handshake: the rest is a hello (or an ack). XPeerSchemas::accept throws
-//      XException or decides every entry; read_schema_ack never throws.
+//      v3 and re-save byte-identically, and converting it back down to the
+//      image's generation must give the image's object (compared in a
+//      canonical layout: both sides rebuilt by the conversion).
+//   1  convert: the rest seeds a random v3 object. Converted down to every
+//      generation with evolve (what a caller does that still writes an older
+//      image), it must load_verified as that generation, or the conversion
+//      must fail with an XException for a value that generation cannot hold;
+//      down, up, down again must give the same object.
+//   2  handshake: the rest is a hello (or an ack). accept_schema_hello never
+//      throws, answers every working entry, writes no retired verdict and
+//      never accepts another generation; read_schema_ack never throws.
 //
 // Built like fuzz_wire_schemas.cpp: as the fuzzer, with XOFFSET_FUZZ_SEED_MAIN
 // as fuzz_schema_evolution_seeds, and linked with replay_main.cpp as
@@ -202,25 +205,24 @@ xo::TypedXBuffer<W> random_player(std::mt19937_64& rng) {
     return b;
 }
 
-// A peer that works in version I.
+// The image of `object` in generation I: its own bytes for the working one,
+// else converted down and written with save_compact.
 template <std::size_t I>
-xo::XPeerSchemas peer_of() {
-    std::string ack;
-    auto p = xo::XPeerSchemas::accept<W>(xo::make_schema_hello<V<I>>("fuzz-client"), ack, "fuzz-server");
-    if (!p.accepted() || p.template send_index<W>() != I) fail("handshake of a lineage version not accepted");
-    return p;
+std::string image_in(xo::TypedXBuffer<W>& object) {
+    if constexpr (I == xe::working_index<W>) {
+        return object.save_verified();
+    } else {
+        auto down = xe::chain<W, xe::working_index<W>, I>(object, {});
+        return down.save_compact();
+    }
 }
 
-void check_send(std::mt19937_64& rng) {
+void check_convert(std::mt19937_64& rng) {
     auto object = random_player(rng);
-    xo::XBroadcast<W> broadcast(object);
     for_versions<0>([&](auto I) {
         using Peer = V<I()>;
-        static const xo::XPeerSchemas peer = peer_of<I()>();
         std::string wire, why;
-        const bool failed = throws_xexception([&] { wire = peer.save(object); }, &why);
-        const bool cast_failed = throws_xexception([&] { (void)broadcast.wire_at(I()); });
-        if (failed != cast_failed) fail("XBroadcast and XPeerSchemas::save disagree on a failure");
+        const bool failed = throws_xexception([&] { wire = image_in<I()>(object); }, &why);
         if (failed) {
             // Only a value an old version cannot hold fails: hp out of int32 or
             // an epic item for v1.
@@ -232,18 +234,15 @@ void check_send(std::mt19937_64& rng) {
             if (!lossy) fail("downgrade failed for a value the old version holds: " + why);
             return;
         }
-        if (broadcast.wire_at(I()) != wire) fail("XBroadcast wire differs from XPeerSchemas::save");
         auto received = typed_load<Peer>(wire);
-        if (!received) fail("the wire sent to an old peer does not verify as its version");
+        if (!received) fail("an image converted down does not verify as its generation");
         if (xo::peek_wire_fingerprint(wire).fingerprint != xo::wire_fingerprint_v<Peer>)
-            fail("the wire sent to a peer carries another version's fingerprint");
-        // The peer's object goes up and down again unchanged.
+            fail("an image converted down carries another generation's fingerprint");
+        // The old generation's object goes up and down again unchanged.
         auto back = xo::evolve_load_verified<W>(wire, xo::XBuffer::maximum_capacity(kLimit));
-        std::string again;
-        xe::save_version<W>(back, I(), again, {});
-        auto twice = typed_load<Peer>(again);
+        auto twice = typed_load<Peer>(image_in<I()>(back));
         if (!twice || canonical(*twice) != canonical(*received))
-            fail("down, up, down changed the old version's object");
+            fail("down, up, down changed the old generation's object");
     });
 }
 
@@ -251,17 +250,17 @@ void check_send(std::mt19937_64& rng) {
 
 void check_handshake(const std::string& bytes) {
     std::string ack;
-    std::optional<xo::XPeerSchemas> peer;
-    std::string why;
-    if (!throws_xexception([&] { peer.emplace(xo::XPeerSchemas::accept<W>(bytes, ack, "fuzz-server")); }, &why) ==
-        !peer)
-        fail("XPeerSchemas::accept neither returned nor threw XException");
-    if (peer) {
-        if (ack.empty()) fail("accepted hello without an ack");
-        // A version outside the lineage is sent the working version.
-        if (const auto* e = peer->find(xo::wire_root_type_id_v<W>());
-            e && xe::find_version<W>(e->schema_hash) == xe::npos && !peer->sends_working_version<W>())
-            fail("a peer of no lineage version is not sent the working version");
+    const xo::XSchemaHelloResult r = xo::accept_schema_hello<W>(bytes, ack, "fuzz-server");
+    if (!r.valid) {
+        if (!ack.empty()) fail("an invalid hello got an ack");
+    } else {
+        if (ack.empty()) fail("a valid hello without an ack");
+        for (const auto& e : r.entries) {
+            if (e.verdict == xo::XSchemaVerdict::convert) fail("the retired verdict convert was written");
+            if (e.verdict == xo::XSchemaVerdict::same &&
+                (e.root_type_id != xo::wire_root_type_id_v<W>() || e.schema_hash != xo::wire_schema_hash_v<W>()))
+                fail("a peer of another root type or generation was accepted");
+        }
         for_versions<0>([&](auto I) { (void)xo::read_schema_ack<V<I()>>(ack); });
     }
     for_versions<0>([&](auto I) { (void)xo::read_schema_ack<V<I()>>(bytes); });
@@ -274,9 +273,7 @@ std::string old_wire(std::mt19937_64& rng) {
     auto object = random_player(rng);
     object.plain_root().hp = std::int64_t(rng() % 1000);
     for (auto& it : object.plain_root().items) it.rarity = ev::v3::Rarity(rng() % 2);
-    std::string out;
-    xe::save_version<W>(object, I, out, {});
-    return out;
+    return image_in<I>(object);
 }
 
 int write_evolution_seeds(const std::string& dir) {
@@ -299,7 +296,7 @@ int write_evolution_seeds(const std::string& dir) {
     }
     put(2, xo::make_schema_hello<V<0>>("seed-v1"));
     put(2, xo::make_schema_hello<V<1>>("seed-v2"));
-    put(2, xo::make_server_schema_hello<W>("seed-server"));
+    put(2, xo::make_schema_hello<W>("seed-server", xo::XSchemaRole::server));
     return written;
 }
 
@@ -312,7 +309,7 @@ void run_one(const std::uint8_t* data, std::size_t size) {
         std::uint64_t h = 0xcbf29ce484222325ull;
         for (char c : rest) h = (h ^ std::uint8_t(c)) * 0x100000001b3ull;
         std::mt19937_64 rng(h);
-        check_send(rng);
+        check_convert(rng);
         break;
     }
     default: check_handshake(rest); break;

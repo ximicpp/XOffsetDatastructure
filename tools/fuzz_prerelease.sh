@@ -19,14 +19,15 @@
 #             no-exceptions builds; outcomes must be identical)
 #   verdict   reads the phases' needs.json files and writes VERDICT.md:
 #             PASS only when every expected job finished with no finding
-#   all       the four in order (about 4 h at the release budget; a cloud
+#   all       the four in order (about 4.5 h at the release budget; a cloud
 #             background task is stopped after 2 h, so there run the phases
 #             one per task: gcc, libfuzzer, client, then verdict)
 #
 # --budget release (default): gcc 2700 s, libFuzzer 1200 s per target per
-# backend (about 4 h). --budget hour: gcc 900 s, libFuzzer 300 s per target per
-# backend, about 1 h of fuzzing over all nine targets plus builds (susu
-# 2026-11-10: pre-release fuzz about 1 h); it counts for a release.
+# backend (about 4.5 h). --budget hour: gcc 900 s, libFuzzer 300 s per target per
+# backend, about 70 min of fuzzing over all eleven targets plus builds (susu
+# 2026-11-10: pre-release fuzz about 1 h; schema_family, the add-only
+# evolution pair, added 10 min on 2026-11-24); it counts for a release.
 # --budget quick: 300 s / 120 s, a dry run of the pipeline that does not
 # count for a release. The corpus store (default
 # /mnt/project-files/fuzz-nightly/corpus) is reused and updated, so each

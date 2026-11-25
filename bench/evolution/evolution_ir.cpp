@@ -1,24 +1,22 @@
-// Instruction counts of cross-version receive and send (schema evolution, E5),
-// on the SLG prototype's messages: A = BattleMsg (battle request), B =
-// PlayerState (season migration), D = Report (battle report). Record only; not
-// a gate. bench/evolution/run_ir.sh builds it and runs every case under
-// callgrind.
+// Instruction counts of loading stored data of an older generation (schema
+// evolution, E5), on the SLG prototype's messages: A = BattleMsg (battle
+// request), B = PlayerState (season migration), D = Report (battle report).
+// Record only; not a gate. bench/evolution/run_ir.sh builds it and runs every
+// case under callgrind.
 //
 // The working versions are the prototype's slg::xm types; each has one older
-// version in slg_old that a client still on the previous release would use:
+// generation in slg_old whose saved images the program still loads:
 //   Hero      without `star`       (A, B)
 //   Event     without `target`     (A, D)
 //   PlayerState without `items`    (B)
-// The older version only lacks fields, so no hooks are needed: an upgrade
-// fills the added fields with their initial values, a downgrade drops them.
+// The older generation only lacks fields, so no hooks are needed: the upgrade
+// fills the added fields with their initial values.
 //
 //   evolution_ir <A|B|D> <op> [iterations]
-//     op: recv_same   load_verified of the working version (baseline)
-//         recv_old    XPeerSchemas::load_verified of the old version's wire
-//                     (load_verified as the old version + upgrade)
-//         load_old    load_verified as the old version only
-//         send_same   save_verified of the working version (baseline)
-//         send_old    XPeerSchemas::save for an old peer (downgrade + save_compact)
+//     op: load_same     load_verified of the working version's image (baseline)
+//         load_old      load_verified of the old generation's image as that generation
+//         load_upgrade  evolve_load_verified of the old generation's image
+//                       (load_verified as the old generation + upgrade)
 // Collection is on only around the iterations (run under
 // valgrind --tool=callgrind --collect-atstart=no).
 #include <cstdio>
@@ -85,38 +83,23 @@ using namespace XOffsetDatastructure;
 constexpr std::size_t kCap = std::size_t(256) << 20;
 XBuffer::MaximumCapacity cap() { return XBuffer::maximum_capacity(kCap).with_growth(XGrowPolicy::Automatic); }
 
-template <typename Old>
-XPeerSchemas old_peer() {
-    std::string ack;
-    return XPeerSchemas::accept<slg::xm::BattleMsg, slg::xm::PlayerState, slg::xm::Report>(
-        make_schema_hello<Old>("old-client"), ack, "server");
-}
-
 template <typename W, typename Old>
 int run(const std::string& wire, std::string_view op, int iterations) {
-    const XPeerSchemas peer = old_peer<Old>();
-    if (!peer.accepted() || peer.template sends_working_version<W>()) {
-        std::fprintf(stderr, "old peer not accepted as a conversion\n");
-        return 1;
-    }
+    // The old generation's image of the same state (setup, not counted).
     auto object = TypedXBuffer<W>::load_verified(wire, cap());
-    const std::string old_wire = peer.save(object);
+    const std::string old_wire = evolve<Old>(object).save_compact();
     std::size_t sink = 0;
     auto measure = [&](auto&& body) {
         CALLGRIND_TOGGLE_COLLECT;
         for (int i = 0; i < iterations; ++i) body();
         CALLGRIND_TOGGLE_COLLECT;
     };
-    if (op == "recv_same") {
+    if (op == "load_same") {
         measure([&] { auto b = TypedXBuffer<W>::load_verified(wire, cap()); sink += memory_stats(b).used_size; });
-    } else if (op == "recv_old") {
-        measure([&] { auto b = peer.load_verified<W>(old_wire, cap()); sink += memory_stats(b).used_size; });
     } else if (op == "load_old") {
         measure([&] { auto b = TypedXBuffer<Old>::load_verified(old_wire, cap()); sink += memory_stats(b).used_size; });
-    } else if (op == "send_same") {
-        measure([&] { sink += object.save_verified().size(); });
-    } else if (op == "send_old") {
-        measure([&] { sink += peer.save(object).size(); });
+    } else if (op == "load_upgrade") {
+        measure([&] { auto b = evolve_load_verified<W>(old_wire, cap()); sink += memory_stats(b).used_size; });
     } else {
         std::fprintf(stderr, "unknown op %.*s\n", int(op.size()), op.data());
         return 2;
@@ -129,7 +112,7 @@ int run(const std::string& wire, std::string_view op, int iterations) {
 
 int main(int argc, char** argv) {
     if (argc < 3) {
-        std::fprintf(stderr, "usage: evolution_ir <A|B|D> <recv_same|recv_old|load_old|send_same|send_old> [iterations]\n");
+        std::fprintf(stderr, "usage: evolution_ir <A|B|D> <load_same|load_old|load_upgrade> [iterations]\n");
         return 2;
     }
     const std::string_view scenario = argv[1], op = argv[2];

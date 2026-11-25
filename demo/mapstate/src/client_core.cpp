@@ -1244,12 +1244,12 @@ Result<int> run_evil(const Options& opt) {
         expect_rejected(log, "evil_subscribe_encoding", "Subscribe asking for event encoding 7", c9);
     }
     // (10) to (12): the handshake. A build whose field names differ from the
-    // version they lay out, a version A does not know, and a Hello that is
-    // not a schema hello at all.
+    // version they lay out, a build of another generation (a layout A's
+    // family does not have), and a Hello that is not a schema hello at all.
     expect_hello_refused<probe::RenamedViewSnapshot>(log, "evil_hello_renamed",
                                                      "Hello: version-1 layout, renamed field (hp -> health)", opt,
                                                      XSchemaVerdict::reject_names);
-    expect_hello_refused<probe::FutureViewSnapshot>(log, "evil_hello_unknown", "Hello: a ViewSnapshot A does not know",
+    expect_hello_refused<probe::FutureViewSnapshot>(log, "evil_hello_unknown", "Hello: a ViewSnapshot of another generation",
                                                     opt, XSchemaVerdict::reject_unknown);
     {
         net::Conn c;

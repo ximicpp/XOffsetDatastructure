@@ -925,6 +925,18 @@ namespace XOffsetDatastructure {
         V second{};
     };
 
+    // N bytes a record keeps for fields of its later versions (type
+    // evolution: docs/SCHEMA_EVOLUTION.md). A program writes only
+    // zero into its own spare bytes (the default member initializer) and never
+    // reads them; a newer peer keeps fields there, so no check requires them
+    // to be zero. Alignment 1; its own token in the wire signature, so
+    // XSpare<8> and std::uint8_t[8] are different layouts.
+    template <std::size_t N>
+    struct XSpare {
+        static_assert(N > 0, "XSpare<N>: reserve at least one byte");
+        std::uint8_t bytes[N]{};
+    };
+
     // V2.1: a container head is {data_delta, size_, capacity_}, 12 bytes,
     // 4-aligned. It belongs to the payload it lies in: the owner is found from
     // the head's address (detail::OwnerMap), never stored in the head.
@@ -3556,6 +3568,17 @@ namespace XOffsetDatastructure::schema {
         : describe_detail::record<XKeyValue<K, V>, true, describe_detail::bases<>,
               typename describe_detail::key_value_fields<K, V>::field_first,
               typename describe_detail::key_value_fields<K, V>::field_second> {};
+
+    namespace describe_detail {
+        template <std::size_t N>
+        struct spare_fields {
+            using C = XSpare<N>;
+            XOFFSET_SCHEMA_DETAIL_NAMED_FIELD(C, bytes)
+        };
+    } // namespace describe_detail
+    template <std::size_t N> struct description<XSpare<N>>
+        : describe_detail::record<XSpare<N>, true, describe_detail::bases<>,
+              typename describe_detail::spare_fields<N>::field_bytes> {};
 
     // std::array<E, N>: its one member, under the standard library's name.
 #if defined(_LIBCPP_VERSION)

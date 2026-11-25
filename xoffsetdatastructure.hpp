@@ -13,6 +13,7 @@
 #include "xoffset_buffer.hpp"
 #include "xoffset_compactor.hpp"
 #include "xoffset_registration.hpp"
+#include "xoffset_schema_family.hpp"
 
 #include "xoffset_verified_paths.hpp"
 #include "xoffset_core_lifetime.hpp"

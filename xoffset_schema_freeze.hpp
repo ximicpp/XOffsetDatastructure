@@ -1,14 +1,15 @@
 #ifndef X_OFFSET_SCHEMA_FREEZE_HPP
 #define X_OFFSET_SCHEMA_FREEZE_HPP
 
-// Schema freeze tool and lock check (server side; docs/SCHEMA_EVOLUTION.md
-// section 5). A project links one program that calls
-// schema_freeze_main<Roots...>(argc, argv). `freeze` writes the current
-// version of every root as a snapshot header (an unchanged record or enum
-// refers to the previous snapshot, so a lineage never holds two copies of one
-// type) and appends it to the lock file; `check`, run in CTest, fails when a
-// layout equals a frozen one under other field names (without an alias), or
-// changed while the last frozen version is not in the root's lineage.
+// Schema freeze tool and lock check (server side; docs/SCHEMA_EVOLUTION.md).
+// A project links one program that calls schema_freeze_main<Roots...>(argc,
+// argv). `freeze` writes the current version of every root as a snapshot
+// header (an unchanged record or enum refers to the previous snapshot, so a
+// lineage never holds two copies of one type) and appends it to the lock file;
+// `check`, run in CTest, fails when a fingerprint equals a frozen one under
+// field names of no version of the root's add-only family (a rename), or when
+// the fingerprint changed while the last frozen version is not in the root's
+// lineage (neither a family member nor a declared older generation).
 
 #include "xoffset_evolution.hpp"
 
@@ -261,6 +262,8 @@ namespace XOffsetDatastructure {
                 return local_name<U>();
             } else if constexpr (std::is_same_v<U, XString>) return "XOffsetDatastructure::XString";
             else if constexpr (container<U>::known) return container<U>::spell(s);
+            else if constexpr (detail::is_spare_v<U>)
+                return "XOffsetDatastructure::XSpare<" + std::to_string(sizeof(U)) + ">";
             else if constexpr (detail::schema_names::is_std_array<U>::value) {
                 return "std::array<" + spell<typename U::value_type>(s) + ", " + std::to_string(std::tuple_size_v<U>) + ">";
             } else if constexpr (ev::kind_of<U>() == ev::Kind::record) {
@@ -373,12 +376,11 @@ namespace XOffsetDatastructure {
             for (const auto& r : lock.roots) {
                 if (r.schema_name != name) continue;
                 last = &r;
-                if (r.schema_hash == wire_schema_hash_v<W>() && !ev::name_digest_matches<W>(r.name_digest)) {
-                    report += "FAIL " + name + ": same layout as frozen " + r.type +
+                if (r.schema_hash == wire_schema_hash_v<W>() && !schema_family_has_digest<W>(r.name_digest)) {
+                    report += "FAIL " + name + ": same fingerprint as frozen " + r.type +
                               " but other field names (current " + schema_name_signature<W>() +
-                              "); a rename keeps the layout, so old peers would read the bytes under the new "
-                              "names. Revert the rename, or register XOFFSET_SCHEMA_NAME_ALIAS(Current, " +
-                              hex(r.name_digest) + ") when the bytes keep their meaning.\n";
+                              "); peers on it would read the bytes under the new names. Revert the rename: a "
+                              "later version only adds fields (XOFFSET_SCHEMA_FAMILY).\n";
                     ok = false;
                 }
             }
@@ -387,15 +389,20 @@ namespace XOffsetDatastructure {
                 return ok;
             }
             if (last->schema_hash != wire_schema_hash_v<W>() && ev::find_version<W>(last->schema_hash) == ev::npos) {
-                report += "FAIL " + name + ": the layout changed since " + last->version + " (" + last->type +
-                          "), which is not in XOFFSET_SCHEMA_LINEAGE of the current type; peers on " +
-                          last->version + " would be rejected.\n";
+                report += "FAIL " + name + ": the fingerprint changed since " + last->version + " (" + last->type +
+                          "). Declare XOFFSET_SCHEMA_FAMILY when the change only adds fields from XSpare bytes, "
+                          "or list it in XOFFSET_SCHEMA_LINEAGE to start a new generation (stored data of " +
+                          last->version + " then loads through evolve_load_verified; peers on it are refused "
+                          "at the handshake).\n";
                 ok = false;
             }
             if (ok) {
+                const bool same_hash = last->schema_hash == wire_schema_hash_v<W>();
                 report += "ok   " + name + ": " +
-                          (last->schema_hash == wire_schema_hash_v<W>() ? "equals " + last->version
-                                                                         : "next version after " + last->version) +
+                          (!same_hash ? "new generation after " + last->version
+                           : last->name_digest == schema_name_digest_v<W> ? "equals " + last->version
+                                                                           : "adds fields to " + last->version +
+                                                                                 " (XOFFSET_SCHEMA_FAMILY)") +
                           "\n";
             }
             return ok;

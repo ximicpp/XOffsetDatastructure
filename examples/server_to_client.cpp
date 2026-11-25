@@ -1,10 +1,9 @@
 // Use case 1: a server sends whole states to a client (docs/GETTING_STARTED.md).
 //
-// The whole-state path: what a client gets when it joins, after a reconnect,
-// or when the schema handshake answers `convert`. Once the client holds a
-// copy, the server sends only what changed: examples/delta_sync.cpp for a
-// state the client owns, examples/shared_delta.cpp for a viewport onto a
-// shared world.
+// The whole-state path: what a client gets when it joins or after a
+// reconnect. Once the client holds a copy, the server sends only what
+// changed: examples/delta_sync.cpp for a state the client owns,
+// examples/shared_delta.cpp for a viewport onto a shared world.
 //
 // Best practices shown here:
 //   server  - mutate the state in place (proxy, or edit() for loops), write
