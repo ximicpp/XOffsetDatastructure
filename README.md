@@ -145,10 +145,11 @@ server to client (`server_to_client.cpp`), deltas (`delta_sync.cpp`,
    the old block is reused by the next allocation.
 3. **The wire is the arena.** The arena starts with a 40-byte header (format
    version, schema fingerprint, root type, used size, free directory), and
-   `save_verified` writes the used part of the arena as it is. Large free runs
-   or zero runs can be skipped on the wire. The receiver copies the bytes into
-   its own buffer and carries on: one copy on each end, no encode or decode,
-   and the free space survives the hop.
+   `save_verified` writes the used part of the arena as it is; a buffer that
+   churn has left with much free space goes out compact instead (the same
+   contents laid out afresh, spare capacity kept). The receiver copies the
+   bytes into its own buffer and carries on: one copy on each end, no encode
+   or decode, and the receiver keeps editing in place.
 4. **The schema is the C++ type.** Each record's field list (written once with
    `XOFFSET_RECORD`, or derived by C++26 reflection) gives a layout signature
    and a 64-bit fingerprint. The wire carries the fingerprint, and the receiver
@@ -206,15 +207,20 @@ processes; [method and all rows](bench/cppcon2024/README.md)):
   then takes 77 ns on the 2024 layout (report only; the scored row frees them
   like every other library).
 - Across sizes and churn ([bench/premises](bench/premises/README.md), 68 bytes
-  to 729 KB, five rivals): on a buffer as filled the trusted tier wins at every
-  size, most at 3–12 KB (0.21–0.24 of the strongest rival); full validation
-  ties zpp::bits below about 120 bytes. With `automatic` emission (and optional
-  in-place `relayout()` for long-lived delta senders, [user guide 4.7](docs/USER_GUIDE.md#47-a-sender-that-edits-in-place-for-a-long-time-relayout)),
-  churned buffers stay compact on the wire.
+  to 729 KB, five rivals, 4.3.0): on a buffer as filled the trusted tier wins
+  at every size, most at 1–12 KB (0.16–0.21 of the strongest rival); full
+  validation loses narrowly to zpp::bits only below about 80 bytes (1.07 at 68
+  bytes). A churned sender buffer goes out compact by default, so after a
+  read/write pass, random edits or containers that grew and shrank back, from
+  3 KB up the trusted tier takes 0.32–0.60 and full validation 0.51–0.76 of
+  zpp::bits's time; an in-place `relayout()` ([user guide 4.7](docs/USER_GUIDE.md#47-a-sender-that-edits-in-place-for-a-long-time-relayout))
+  gives a long-lived sender its clean speed back. Keep the default emission:
+  `zero_runs` keeps the churned image and took up to 9.5 times zpp::bits's time.
   [PERFORMANCE.md section 2](docs/PERFORMANCE.md#2-where-the-lead-holds).
 - Sizes after zstd-3: XOffset 2,986 bytes, zpp::bits 2,926, Protocol Buffers
-  3,800. The wire header makes small messages about 100 bytes larger than
-  zpp::bits; this is by design.
+  3,800. The 40-byte wire header and container heads make the smallest
+  `Character` 84 bytes larger than zpp::bits (29 after zstd-3); this is by
+  design.
 
 **SLG game-server scorecard** (`bench/slg`: login state, per-client and shared
 viewport deltas, client orders, server hand-offs; XOffset trusted tier against
