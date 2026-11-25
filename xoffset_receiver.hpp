@@ -61,8 +61,8 @@ public:
     const T* operator->() const noexcept { return root_; }
     /// The wire the view reads.
     std::span<const std::byte> wire() const noexcept { return wire_; }
-    /// The check it passed (XCheck::admit or XCheck::bounds).
-    XCheck check() const noexcept { return check_; }
+    /// The check tier it passed (XCheck::admit or XCheck::bounds).
+    XCheck tier() const noexcept { return check_; }
 
 private:
     template <XLink> friend class XReceiver;

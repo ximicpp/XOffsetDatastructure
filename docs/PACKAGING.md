@@ -28,7 +28,7 @@ distribution.
 | Target | Minimum requirements |
 | --- | --- |
 | `XOffset::storage` | C++17, CMake 3.13+, Linux/macOS/Windows VM APIs, thread support |
-| `XOffset::xoffset` (C++20 / C++23 field-list) | GCC 12+, Clang 16+, Apple clang 15+ (macOS 12+ / iOS 14+, automatic `XOFFSET_USE_PMR=0` below macOS 14 / iOS 17), Android NDK Clang (API 28+ for tests), MSVC 19.44 (`/Zc:preprocessor`), clang-cl, or MinGW-w64 GCC; CMake 3.20+; 64-bit little-endian; zero external submodules |
+| `XOffset::xoffset` (C++20 / C++23 field-list) | GCC 13+, Clang 18+, Apple clang 21+ (macOS 12+ / iOS 14+, automatic `XOFFSET_USE_PMR=0` below macOS 14 / iOS 17), Android NDK Clang (API 28+ for tests), MSVC 19.44 (`/Zc:preprocessor`), clang-cl, or MinGW-w64 GCC; CMake 3.20+; 64-bit little-endian; zero external submodules |
 | `XOffset::xoffset` (C++26 reflection) | GCC 16+ (`-freflection`, libstdc++) or P2996 Clang (`-freflection -fexpansion-statements`, matching libc++); CMake 3.30+; 64-bit little-endian |
 | The maintained Python validation entry points and their tests | Python 3.10+; storage JUnit validation needs CMake/CTest 3.21+ and full C++26 needs 3.30+; the C++ library has no Python run-time dependency |
 
@@ -198,8 +198,8 @@ Source consumption via `FetchContent` (recommended for C++20/C++23 projects):
 include(FetchContent)
 FetchContent_Declare(
     xoffsetdatastructure
-    GIT_REPOSITORY https://github.com/ximicpp/XOffsetDatastructure.git
-    GIT_TAG        v4.2.0   # pin a release tag or commit SHA
+    # The release's source archive (about 3 MB): no Git history, no submodules.
+    URL https://github.com/ximicpp/XOffsetDatastructure/archive/refs/tags/v4.2.0.tar.gz
 )
 set(XOFFSET_CXX_STANDARD 20 CACHE STRING "" FORCE)
 FetchContent_MakeAvailable(xoffsetdatastructure)

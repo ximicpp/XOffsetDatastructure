@@ -274,7 +274,7 @@ namespace XOffsetDatastructure {
         }
 
         template <typename P, typename N>
-        constexpr Walk check() {
+        constexpr Walk walk() {
             Walk w;
             if constexpr (kind_of<P>() != Kind::record || kind_of<N>() != Kind::record) {
                 w.fail(Error::not_a_record, std::string());
@@ -285,7 +285,7 @@ namespace XOffsetDatastructure {
         }
 
         template <typename P, typename N>
-        inline constexpr Error error_v = check<P, N>().error;
+        inline constexpr Error error_v = walk<P, N>().error;
 
         // "XOFFSET_SCHEMA_FAMILY: <what> (at <field path>)", for a static_assert
         // that takes a computed message (C++26).
@@ -304,14 +304,14 @@ namespace XOffsetDatastructure {
 
         template <typename P, typename N>
         consteval auto message() {
-            constexpr std::size_t where = check<P, N>().where.size();
+            constexpr std::size_t where = walk<P, N>().where.size();
             constexpr std::string_view what = error_text[static_cast<std::size_t>(error_v<P, N>)];
             Message<message_head.size() + what.size() + where + 8> m;
             m.append(message_head);
             m.append(what);
             if constexpr (where != 0) {
                 m.append(" (at ");
-                const Walk w = check<P, N>();
+                const Walk w = walk<P, N>();
                 m.append(w.where);
                 m.append(")");
             }

@@ -119,7 +119,7 @@ int main() {
         std::vector<std::int32_t> c{1};
         s.units.publish(s.pub, c, s.w);
         { Msg m(s.pub, s.a, s.ac, s.out, Root{}); m.finish(); }   // connection a holds unit 1 and gets nothing
-        s.units.verify(s.pub);
+        s.units.verify_delivered(s.pub);
     });
     expect_throw("a holder missed a change body (next first use)", [](Setup& s) {
         s.next();
@@ -138,13 +138,13 @@ int main() {
         std::vector<std::int32_t> c{1};
         s.units.publish(s.pub, c, s.w);
         { Msg m(s.pub, s.a, s.ac, s.out, Root{}); s.units.changes(m, s.w, s.v({1}), s.v({1})); m.finish(); }
-        s.units.verify(s.pub);
+        s.units.verify_delivered(s.pub);
         s.next();
         s.w.now[2].hp = 5; s.w.bits[2] = 1;
         c = {2};
         s.units.publish(s.pub, c, s.w);
         { Msg m(s.pub, s.a, s.ac, s.out, Root{}); s.units.leaves(m, s.v({2}), s.v({2})); m.finish(); }
-        s.units.verify(s.pub);
+        s.units.verify_delivered(s.pub);
     }
     if (failures) return 1;
     std::puts("test_shared_delta_publisher_errors: ok");

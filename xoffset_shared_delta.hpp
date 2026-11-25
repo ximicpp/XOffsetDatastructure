@@ -467,7 +467,7 @@ namespace XOffsetDatastructure::xsync {
             // Where the body at p ends, or nullptr when it does not check:
             // cut by end, a bool not 0 or 1, a mask bit past the containers,
             // a container that does not fit.
-            static const char* check(const char* p, const char* end) noexcept {
+            static const char* checked_end(const char* p, const char* end) noexcept {
                 if (std::size_t(end - p) < fixed) return nullptr;
                 if constexpr (I::bool_count != 0) if (!bools_ok(p, I::packed_bools)) return nullptr;
                 p += I::plain_bytes;
@@ -725,7 +725,7 @@ namespace XOffsetDatastructure::xsync {
         /// (checked, or the sender's); returns the body's end.
         XOFFSET_DETAIL_INLINE static const char* apply_whole(const char* p, T& r) { return whole_body::apply(p, r); }
         /// Where the whole body at p ends, or nullptr when it does not check.
-        static const char* check_whole(const char* p, const char* end) noexcept { return whole_body::check(p, end); }
+        static const char* check_whole(const char* p, const char* end) noexcept { return whole_body::checked_end(p, end); }
 
         // ---- change bodies ----
 
@@ -1081,7 +1081,7 @@ namespace XOffsetDatastructure::xsync {
             return true;
         }
         template <std::size_t K> static const char* check_member(const char* p, const char* end) noexcept {
-            if constexpr (members::template kind<K> == sd_detail::kMemberWhole) return sd_detail::Whole<member_t<K>>::check(p, end);
+            if constexpr (members::template kind<K> == sd_detail::kMemberWhole) return sd_detail::Whole<member_t<K>>::checked_end(p, end);
             else if constexpr (members::template kind<K> != sd_detail::kMemberPlain) return sd_detail::check_container<member_t<K>>(p, end);
             else return p;
         }

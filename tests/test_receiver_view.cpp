@@ -191,12 +191,12 @@ void view_matches_full() {
             auto v = client.view<VwRoot, XCheck::bounds>(exact.span());
             need(v.has_value(), "bounds view of a valid wire");
             if (v) {
-                need(v->check() == XCheck::bounds, "bounds view reports its check");
+                need(v->tier() == XCheck::bounds, "bounds view reports its check");
                 need(dump(v->root()) == expect, "bounds view reads differ from reload_verified");
                 need(v->wire().data() == exact.span().data(), "the view reads the wire in place");
             }
             auto a = peer.view<VwRoot>(exact.span());
-            need(a.has_value() && a->check() == XCheck::admit, "admit view of a valid wire");
+            need(a.has_value() && a->tier() == XCheck::admit, "admit view of a valid wire");
             if (a) need(dump(**a) == expect, "admit view reads differ from reload_verified");
             auto b = peer.view<VwRoot, XCheck::bounds>(wire);
             need(b.has_value(), "bounds view on a trusted link, from a std::string");
@@ -425,10 +425,10 @@ void client_default() {
     const Exact exact(wire);
     auto v = rx.view<VwRoot>(exact.span());
     need(v.has_value(), "default view of a valid wire");
-    if (v) need(v->check() == (XOFFSET_CHECK_UPLINK ? XCheck::bounds : XCheck::admit), "default view reports its check");
+    if (v) need(v->tier() == (XOFFSET_CHECK_UPLINK ? XCheck::bounds : XCheck::admit), "default view reports its check");
 #if !XOFFSET_CHECK_UPLINK
     auto a = rx.view<VwRoot, XCheck::admit>(exact.span());
-    need(a.has_value() && a->check() == XCheck::admit, "named admit view on a client link");
+    need(a.has_value() && a->tier() == XCheck::admit, "named admit view on a client link");
 #endif
 }
 

@@ -371,7 +371,7 @@ template <class Conn> struct Server {
                 send(l, step);
             }
 #if XOFFSET_SYNC_CHECKS
-            units.verify(pub);
+            units.verify_delivered(pub);
 #endif
             for (std::size_t i = 0; i < nu; ++i) {   // hold counts = the connections holding the unit
                 std::int32_t h = 0;
