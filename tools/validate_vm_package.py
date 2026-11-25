@@ -40,25 +40,35 @@ def read_version(source: Path) -> dict[str, str]:
             "prerelease": ".".join(match.group(4, 5)) if match.group(4) else ""}
 
 
+def version_compatibility(version: dict[str, str]) -> str:
+    return "exact-full-version-only" if version["prerelease"] else "same-major-version"
+
+
+def render_version_config(template_text: str, version: dict[str, str]) -> str:
+    major = version["numeric"].split(".", 1)[0]
+    is_pre = "TRUE" if version["prerelease"] else "FALSE"
+    return (template_text
+            .replace("@XOFFSET_VERSION_FULL@", version["full"])
+            .replace("@XOFFSET_VERSION_NUMERIC@", version["numeric"])
+            .replace("@XOFFSET_VERSION_MAJOR@", major)
+            .replace("@XOFFSET_IS_PRERELEASE@", is_pre))
+
+
 def version_config_assertions(version: dict[str, str]) -> dict[str, str]:
     return {"XOffsetDatastructure_VERSION": '"' + version["full"] + '"',
             "XOffsetDatastructure_VERSION_NUMERIC": '"' + version["numeric"] + '"',
             "XOffsetDatastructure_VERSION_PRERELEASE": '"' + version["prerelease"] + '"',
             "XOffsetDatastructure_IS_PRERELEASE": "TRUE" if version["prerelease"] else "FALSE",
-            "XOffsetDatastructure_VERSION_COMPATIBILITY": '"exact-full-version-only"'}
+            "XOffsetDatastructure_VERSION_COMPATIBILITY": '"' + version_compatibility(version) + '"'}
 
 
 def version_probe_source(version: dict[str, str]) -> str:
-    """Configure-only checks; numeric requests fail before dependency loading."""
+    """Configure-only checks for version discovery and metadata consistency."""
     checks = "\n".join('if(NOT "${' + name + '}" STREQUAL ' + value + ')\n'
                        '  message(FATAL_ERROR "XOffset version metadata mismatch: ' + name + '")\nendif()'
                        for name, value in version_config_assertions(version).items())
     return ("cmake_minimum_required(VERSION 3.13)\n"
-            "if(XOFFSET_VERSION_REQUEST)\n"
-            "  project(XOffsetVersionRequest LANGUAGES NONE)\n"
-            "else()\n"
-            "  project(XOffsetVersionQuery LANGUAGES CXX)\n"
-            "endif()\n"
+            "project(XOffsetVersionQuery LANGUAGES CXX)\n"
             "find_package(XOffsetDatastructure ${XOFFSET_VERSION_REQUEST} CONFIG REQUIRED COMPONENTS ${XOFFSET_COMPONENT})\n"
             + checks + '\nmessage(STATUS "XOFFSET_FULL_VERSION=' + version["full"] + '")\n')
 
@@ -90,7 +100,7 @@ def audit_install(prefix: Path, source: Path, suite: str, forbidden: list[Path])
     configured = source.parent / "producer-build/XOffsetDatastructureConfig.cmake"
     expected[config_dir + configured.name] = digest(configured)
     template = source / "cmake/XOffsetDatastructureConfigVersion.cmake.in"
-    version_text = template.read_text(encoding="utf-8").replace("@XOFFSET_VERSION_FULL@", version["full"])
+    version_text = render_version_config(template.read_text(encoding="utf-8"), version)
     expected[config_dir + "XOffsetDatastructureConfigVersion.cmake"] = hashlib.sha256(version_text.encode("utf-8")).hexdigest()
     if suite == "full":
         for own_header in FULL_OWN_HEADERS:
@@ -280,9 +290,25 @@ def main(argv=None):
                          "-DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF", "-DCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY=OFF"]
         configure("version-unversioned-accepted", version_source, out / "version-unversioned-build", version_flags)
         numeric = record["version"]["numeric"]
+        major, minor, patch = (int(p) for p in numeric.split("."))
+        next_major = f"{major + 1}.0.0"
+        next_patch = f"{major}.{minor}.{patch + 1}"
+        record["version_request_acceptances"] = []
         record["version_request_rejections"] = []
-        for name, request in (("same-numeric", numeric), ("different-numeric", "999.0.0"),
-                              ("exact-numeric", numeric + ";EXACT"), ("range", numeric + "...<999.0.0")):
+        if record["version"]["prerelease"]:
+            reject_cases = (("same-numeric", numeric), ("different-numeric", "999.0.0"),
+                            ("exact-numeric", numeric + ";EXACT"), ("range", numeric + "...<999.0.0"))
+            accept_cases = ()
+        else:
+            accept_cases = (("same-major", str(major)), ("same-numeric", numeric),
+                            ("exact-numeric", numeric + ";EXACT"), ("range", f"{major}.0...<{next_major}"))
+            reject_cases = (("next-patch", next_patch), ("different-major", next_major),
+                            ("too-high-numeric", "999.0.0"), ("range-above", f"{next_patch}...<{next_major}"))
+        for name, request in accept_cases:
+            configure("version-" + name + "-accepted", version_source, out / ("version-" + name + "-build"),
+                      version_flags + ["-DXOFFSET_VERSION_REQUEST=" + request])
+            record["version_request_acceptances"].append(request)
+        for name, request in reject_cases:
             output = configure("version-" + name + "-rejected", version_source, out / ("version-" + name + "-build"),
                                version_flags + ["-DXOFFSET_VERSION_REQUEST=" + request], expected_failure=True)
             if "not accepted" not in output or record["version"]["full"] not in output:

@@ -53,7 +53,9 @@ class PackageAuditTests(unittest.TestCase):
                  "share/XOffsetDatastructure/ALPHA_COMPATIBILITY.md": (self.source / "docs/ALPHA_COMPATIBILITY.md").read_text(encoding="utf-8"),
                  "lib/cmake/XOffsetDatastructure/XOffsetDatastructureConfig.cmake": config,
                  "lib/cmake/XOffsetDatastructure/XOffsetDatastructureConfigVersion.cmake":
-                     (self.source / "cmake/XOffsetDatastructureConfigVersion.cmake.in").read_text(encoding="utf-8").replace("@XOFFSET_VERSION_FULL@", self.version["full"]),
+                     MODULE.render_version_config(
+                         (self.source / "cmake/XOffsetDatastructureConfigVersion.cmake.in").read_text(encoding="utf-8"),
+                         self.version),
                  "lib/cmake/XOffsetDatastructure/XOffsetTargets.cmake": 'INTERFACE_INCLUDE_DIRECTORIES "${_IMPORT_PREFIX}/include"'}
         for name, content in files.items():
             path = self.prefix / name
@@ -135,6 +137,54 @@ class PackageAuditTests(unittest.TestCase):
                 else:
                     self.assertEqual(run.returncode, 0, output)
                     self.assertIn("XOFFSET_FULL_VERSION=" + self.version["full"], output)
+
+    @unittest.skipUnless(shutil.which("cmake"), "CMake required for real package discovery semantics")
+    def test_cmake_stable_release_same_major_version_semantics(self):
+        for installed, accepted, rejected in (
+            ("2.0.0",
+             ("", "2", "2.0", "2.0.0", "2.0.0;EXACT", "2.0;EXACT", "2.0...<3.0", "2.0.0...2.0.0"),
+             ("1.0", "3.0", "2.0.1", "2.1.0", "2.0.1;EXACT", "2.1...<3.0", "1.0...<2.0", "2.0.0.1")),
+            ("2.1.0",
+             ("", "2", "2.0", "2.0.0", "2.1", "2.1.0", "2.1.0;EXACT", "2.0...<3.0", "2.0...2.1"),
+             ("1.0", "3.0", "2.0.0;EXACT", "2.0;EXACT", "2.1.1", "2.2.0", "2.0...<2.1", "2.2...<3.0")),
+        ):
+            with self.subTest(installed=installed):
+                (self.source / "XOFFSET_VERSION").write_text(installed + "\n", encoding="utf-8", newline="\n")
+                ver = MODULE.read_version(self.source)
+                package = self.root / ("stable-pkg-" + installed)
+                package.mkdir()
+                generation = self.root / ("generate-" + installed + ".cmake")
+                generation.write_text('include(CMakePackageConfigHelpers)\n'
+                    'include("' + (self.source / "cmake/XOffsetVersion.cmake").as_posix() + '")\n'
+                    'set(XOFFSET_HAS_FULL OFF)\n'
+                    'configure_package_config_file("' + (self.source / "cmake/XOffsetDatastructureConfig.cmake.in").as_posix() + '" "' + (package / "XOffsetDatastructureConfig.cmake").as_posix() + '" INSTALL_DESTINATION lib/cmake/XOffsetDatastructure)\n'
+                    'configure_file("' + (self.source / "cmake/XOffsetDatastructureConfigVersion.cmake.in").as_posix() + '" "' + (package / "XOffsetDatastructureConfigVersion.cmake").as_posix() + '" @ONLY NEWLINE_STYLE LF)\n', encoding="utf-8")
+                generated = subprocess.run(["cmake", "-P", str(generation)], capture_output=True, text=True)
+                self.assertEqual(generated.returncode, 0, generated.stdout + generated.stderr)
+                rendered = MODULE.render_version_config(
+                    (self.source / "cmake/XOffsetDatastructureConfigVersion.cmake.in").read_text(encoding="utf-8"), ver)
+                self.assertEqual((package / "XOffsetDatastructureConfigVersion.cmake").read_text(encoding="utf-8"), rendered)
+                (package / "XOffsetTargets.cmake").write_text("# No targets required for metadata lookup\n", encoding="utf-8")
+                consumer = self.root / ("stable-consumer-" + installed)
+                consumer.mkdir()
+                (consumer / "FindThreads.cmake").write_text("set(Threads_FOUND TRUE)\n", encoding="utf-8")
+                content = MODULE.version_probe_source(ver).replace("LANGUAGES CXX", "LANGUAGES NONE")
+                content = content.replace("find_package(XOffset", 'list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}")\nfind_package(XOffset')
+                (consumer / "CMakeLists.txt").write_text(content, encoding="utf-8")
+                for idx, req in enumerate(accepted):
+                    run = subprocess.run(["cmake", "-S", str(consumer), "-B", str(self.root / f"s-acc-{installed}-{idx}"),
+                        "-DXOFFSET_COMPONENT=storage", "-DXOffsetDatastructure_DIR=" + str(package),
+                        "-DXOFFSET_VERSION_REQUEST=" + req], capture_output=True, text=True)
+                    output = run.stdout + run.stderr
+                    self.assertEqual(run.returncode, 0, f"expected accept {installed} <- {req!r}:\n{output}")
+                    self.assertIn("XOFFSET_FULL_VERSION=" + installed, output)
+                for idx, req in enumerate(rejected):
+                    run = subprocess.run(["cmake", "-S", str(consumer), "-B", str(self.root / f"s-rej-{installed}-{idx}"),
+                        "-DXOFFSET_COMPONENT=storage", "-DXOffsetDatastructure_DIR=" + str(package),
+                        "-DXOFFSET_VERSION_REQUEST=" + req], capture_output=True, text=True)
+                    output = run.stdout + run.stderr
+                    self.assertNotEqual(run.returncode, 0, f"expected reject {installed} <- {req!r}:\n{output}")
+                    self.assertIn("not accepted", output)
 
     @unittest.skipUnless(shutil.which("cmake"), "CMake required for shared VERSION parser checks")
     def test_python_and_cmake_version_parsers_agree_and_reject_malformed_identifiers(self):

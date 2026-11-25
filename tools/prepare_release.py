@@ -476,7 +476,7 @@ def validate_install_payload(payload, component):
         "XOffsetDatastructure_VERSION_NUMERIC": '"' + VERSION_NUMERIC + '"',
         "XOffsetDatastructure_VERSION_PRERELEASE": '"' + VERSION_PRERELEASE + '"',
         "XOffsetDatastructure_IS_PRERELEASE": "TRUE" if VERSION_PRERELEASE else "FALSE",
-        "XOffsetDatastructure_VERSION_COMPATIBILITY": '"exact-full-version-only"',
+        "XOffsetDatastructure_VERSION_COMPATIBILITY": '"' + ("exact-full-version-only" if VERSION_PRERELEASE else "same-major-version") + '"',
         "XOffsetDatastructure_full_FOUND": "ON" if component == "full" else "OFF",
         "XOffsetDatastructure_storage_FOUND": "TRUE",
     }

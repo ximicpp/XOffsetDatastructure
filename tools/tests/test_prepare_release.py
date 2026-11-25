@@ -87,7 +87,7 @@ class ReleaseArchiveTests(unittest.TestCase):
             "XOffsetDatastructure_VERSION_NUMERIC": '"' + A.VERSION_NUMERIC + '"',
             "XOffsetDatastructure_VERSION_PRERELEASE": '"' + A.VERSION_PRERELEASE + '"',
             "XOffsetDatastructure_IS_PRERELEASE": "TRUE" if A.VERSION_PRERELEASE else "FALSE",
-            "XOffsetDatastructure_VERSION_COMPATIBILITY": '"exact-full-version-only"',
+            "XOffsetDatastructure_VERSION_COMPATIBILITY": '"' + ("exact-full-version-only" if A.VERSION_PRERELEASE else "same-major-version") + '"',
             "XOffsetDatastructure_full_FOUND": "ON" if component == "full" else "OFF",
             "XOffsetDatastructure_storage_FOUND": "TRUE",
             "XOffsetDatastructure_CXX_STANDARD": '"' + cxx_standard + '"',
