@@ -839,8 +839,12 @@ fails to compile.
 
 ## 8. Core guarantees and API stability
 
-Source API and ABI stability between versions are not promised. K0–K9 are the core guarantees; later
-versions must not regress them, and CHANGELOG names any renamed interface with its replacement. The
+Before 5.0.0, source API and wire compatibility between versions are not promised; from 5.0.0,
+incompatible wire or API changes come only in a new major version, and every release of one major
+version reads the wires of every other release of it
+([RELEASING.md section 1.1](RELEASING.md#11-compatibility-policy)). ABI stability (mixing versions in
+one executable) is never promised. K0–K9 are the core guarantees; later versions must not regress
+them, and CHANGELOG names any renamed interface with its replacement. The
 tests behind each are in [STABILITY_TESTS.md](STABILITY_TESTS.md).
 
 | # | Guarantee | Interface / mechanism |

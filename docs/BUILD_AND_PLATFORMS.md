@@ -88,8 +88,9 @@ Configure the consumer with `-DCMAKE_PREFIX_PATH=/path/to/xoffset-prefix` and a
 matching C++20/C++23 compiler (or the matching P2996/GCC 16 toolchain for C++26
 installs). For storage, request `COMPONENTS storage`, link `XOffset::storage`,
 and use CMake 3.13+. Packages reject numeric, `EXACT` and range version requests
-(no release promises compatibility with another one); check the complete version
-string as above.
+(no 4.x release promises compatibility with another one); check the complete version
+string as above. From 5.0.0 a request for any version of the same major version is
+accepted ([RELEASING.md](RELEASING.md) section 1.1).
 
 For embedded source consumption, use `FetchContent` or
 `add_subdirectory(path/to/XOffsetDatastructure)` and link `XOffset::xoffset`:

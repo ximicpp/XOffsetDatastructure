@@ -5,6 +5,11 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- Compatibility policy ([RELEASING.md](docs/RELEASING.md) section 1.1, USER_GUIDE section 8,
+  SECURITY.md): 4.x releases keep promising nothing between versions; from 5.0.0, the first release
+  meant for outside projects, incompatible wire or API changes come only in a new major version, and
+  every release of one major version reads every other one's wires and deltas.
+
 - The client headers build after engine macros: no library identifier is named `check`, `verify`
   or `require` and called, so Unreal Engine's `check`/`verify` and Apple `AssertMacros.h`'s
   `check`/`verify`/`require` no longer break the build. New test `test_engine_macros` (and
