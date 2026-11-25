@@ -12,6 +12,11 @@ Requirements, building, installing and consuming the library, and the storage ru
 | OS storage only, `XOffset::storage` | C++17 compiler; CMake 3.13+; Linux, macOS or Windows VM APIs and threads |
 | Maintained validation tools and their tests | Python 3.10+; CMake/CTest 3.21+ for storage, 3.30+ for full; the C++ library has no Python runtime dependency |
 
+The oldest compilers that ran the full CTest and the wire corpus for C++20/C++23 builds are GCC 13,
+Clang 18, Apple clang 21 (Xcode 26.4) and MSVC 19.44 (Visual Studio 2022 17.14). Without
+`-DXOFFSET_CXX_STANDARD`, configure picks C++26 when the toolchain has reflection (CMake 3.30+, GCC 16+
+or the P2996 Clang) and otherwise builds C++20 and says so.
+
 Ordinary C++26 support does not imply P2996 support. Clients (Windows, Android, iOS) build the same
 library with C++20/C++23 and a one-line field list per record
 ([user guide 2.1](USER_GUIDE.md#21-field-lists-xoffset_record)); servers keep

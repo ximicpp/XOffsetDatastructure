@@ -248,8 +248,9 @@ dynamic plugins, cross-CRT use, mixed toolchains or mixed header versions are no
 acceptance.
 
 Below are recorded baselines from the 0.1.0-alpha.1 (V1 format) era, not V2; V2 validation records are
-in README's Validation scope (GitHub CI has been off since 2026-10-23; since then the local validation of
-`tools/local_validate.sh` and `tools/platform_matrix.sh` is the record). Acceptance of an archive itself
+in the Validation scope of [BUILD_AND_PLATFORMS.md](BUILD_AND_PLATFORMS.md#validation-scope) (GitHub
+CI has been off since 2026-10-23; since then the local validation of `tools/local_validate.sh` and
+`tools/platform_matrix.sh` is the record). Acceptance of an archive itself
 is reported separately and is not inherited from the baselines:
 
 | Environment/configuration | Recorded result | Scope |

@@ -150,7 +150,7 @@ and recursive types, and its image carries no fingerprint), and `load_unverified
 
 ## 3. Building and modifying
 
-The recommended pattern (also used by the README and `examples/helloworld.cpp`):
+The recommended pattern (also used by [HOW_IT_WORKS.md](HOW_IT_WORKS.md) and `examples/helloworld.cpp`):
 
 ```cpp
 auto cap = XBuffer::maximum_capacity(32u << 20);   // hard limit

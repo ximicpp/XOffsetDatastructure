@@ -6,7 +6,7 @@ per-release tables (3.0.0 to 3.6.0) are in the Git history of this file.
 
 | Comparison | Where |
 | --- | --- |
-| CppCon 2024 `Character`: send + receive, read/write loop, modified buffers | [bench/cppcon2024](../bench/cppcon2024/README.md); summary in the [README](../README.md#performance) |
+| CppCon 2024 `Character`: send + receive, read/write loop, modified buffers | [bench/cppcon2024](../bench/cppcon2024/README.md); summary at the end of section 2 |
 | SLG game-server scorecard (release verdict) | Section 1 below |
 | Where the lead holds: message size, receiver checks, churned buffers, five rivals | Section 2 |
 | Memory, relocation tax, phone | Sections 3 and 4 |
@@ -154,6 +154,34 @@ is measured on the same final state; the strongest rival is zpp::bits in every c
   Buffers and cereal are never the strongest rival except FlatBuffers in UL.recv, and in SD on the
   checked tier. With every receiver checking (XOffset `reload_verified`, cista `DEEP_CHECK`, the
   FlatBuffers Verifier): 14 wins, 1 loss (UL.recv 1.26 against zpp::bits: small orders, see above).
+
+### The CppCon 2024 `Character` at its published size
+
+[bench/cppcon2024](../bench/cppcon2024/README.md): a 64-item map, waypoints, attributes and 8 pieces of
+equipment; the same sorted flat map and the same rules for every library; cloud x86-64 Linux (Xeon,
+GCC 16 `-O3`, pinned core), 15 processes, medians; 0.95–1.05 counts as a tie.
+
+| ns per operation | XOffset | zpp::bits\* | cista raw | FlatBuffers | Protocol Buffers |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Send + receive, buffer as filled | 83 | 340 | 637 | 614 | 8,789 |
+| Read/write loop, 2024 layout | 144 | 343 | 236 | | 592 |
+| Read/write loop, tuned layout | 60 | 83 | 66 | | 368 |
+
+\* The read/write rows of zpp::bits are std containers.
+
+- Send + receive is XOffset's best case when the buffer was filled once: its wire is the buffer. In
+  the 2026-11-17 4.1.0 baseline (before `automatic` emission became the default), a churned buffer
+  grew from 3,064 to 7,928 bytes and took 181 ns (0.57 of zpp::bits trusted, 1.04 full validation).
+  Since 4.2.0 (`XWireEmission::automatic` default), the churned buffer automatically emits its compact
+  3,552-byte image (measured 2026-11-24, 7 pinned runs on Xeon Skylake, GCC 16.2: 0.43 of zpp::bits
+  trusted, 0.68 full validation).
+- Read/write is the fastest of the scored rows on the 2024 layout. On the tuned layout it ties cista:
+  0.90–0.98 in the published processes, 1.00 [0.78, 1.25] in a rerun of 21 processes on 4.1.0.
+  Protocol Buffers' default `RemoveLast` keeps removed messages for reuse and then takes 77 ns on the
+  2024 layout (report only; the scored row frees them like every other library).
+- Sizes after zstd-3: XOffset 2,986 bytes, zpp::bits 2,926, Protocol Buffers 3,800. The 40-byte wire
+  header and container heads make the smallest `Character` 84 bytes larger than zpp::bits (29 after
+  zstd-3); this is by design.
 
 ## 3. Memory and relocation tax
 

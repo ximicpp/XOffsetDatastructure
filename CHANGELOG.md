@@ -36,7 +36,7 @@ Release-gate rerun evidence to be finalized before tagging `v2.0.0`.
   pins regenerated), and `server_to_client`, `client_uplink` and `server_to_server` start with the
   schema handshake (`make_schema_hello`, `accept_schema_hello`, `read_schema_ack`; between servers
   `XSchemaRole::server`), also in their no-exception builds. GETTING_STARTED section 3, its checklist,
-  the README example and CLIENT_TARGETS say why: spare bytes can only be reserved in a type's first
+  the short example (now in HOW_IT_WORKS) and CLIENT_TARGETS say why: spare bytes can only be reserved in a type's first
   release, and without them every later change is a new generation that servers and clients take
   together. Library unchanged.
 - `tools/local_validate.sh` has a `demo` step, run by `--release` and `--tier daily` (not by the `pr`
@@ -60,6 +60,10 @@ Release-gate rerun evidence to be finalized before tagging `v2.0.0`.
   4.2.0 the default `save_verified` may send the compact wire, which leaves them behind, and the test
   failed. A's check is unchanged: its `save_compact` rebuild drops those bytes. Library and wire
   unchanged.
+- README trimmed to the core features, the performance comparison and a quick start. The short
+  example and the description of the arena moved to the new `docs/HOW_IT_WORKS.md`, the CppCon 2024
+  `Character` notes to PERFORMANCE.md section 2, and the tested compiler floors and the default
+  language standard to BUILD_AND_PLATFORMS.md. Documentation only.
 
 ## 4.3.0: add-only schema evolution
 
