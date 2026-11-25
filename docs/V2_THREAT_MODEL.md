@@ -1,4 +1,4 @@
-# V2 threat model (4.1.0; "0.3.0-beta.1" in this text means the state since that version)
+# V2 threat model (4.2.0; "0.3.0-beta.1" in this text means the state since that version)
 
 This document describes what XOffset V2 protects against when receiving an **untrusted wire**, what it
 does not, and what callers must add outside the library. Format details are in
