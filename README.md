@@ -219,8 +219,8 @@ These numbers hold for these workloads, adapters and hosts.
 
 ## Quick start (C++20)
 
-Needs Git, CMake 3.20+ and GCC 12+, Clang 16+, Apple clang 15+ or MSVC 19.38+
-on a 64-bit little-endian target:
+Needs Git, CMake 3.20+ and GCC 13+, Clang 18+, Apple clang 21+ (Xcode 26.4+) or
+MSVC 19.44+ (Visual Studio 2022 17.14+) on a 64-bit little-endian target:
 
 ```sh
 git clone https://github.com/ximicpp/xoffsetdatastructure.git
@@ -237,8 +237,8 @@ To integrate into an existing CMake project via `FetchContent`:
 include(FetchContent)
 FetchContent_Declare(
     xoffsetdatastructure
-    GIT_REPOSITORY https://github.com/ximicpp/XOffsetDatastructure.git
-    GIT_TAG        v4.2.0   # pin a release tag or commit SHA
+    # The release's source archive (about 3 MB): no Git history, no submodules.
+    URL https://github.com/ximicpp/XOffsetDatastructure/archive/refs/tags/v4.2.0.tar.gz
 )
 set(XOFFSET_CXX_STANDARD 20 CACHE STRING "" FORCE)
 FetchContent_MakeAvailable(xoffsetdatastructure)
@@ -246,9 +246,14 @@ FetchContent_MakeAvailable(xoffsetdatastructure)
 target_link_libraries(my_app PRIVATE XOffset::xoffset)
 ```
 
-C++26 reflection builds (`-DXOFFSET_CXX_STANDARD=26`) also initialize the pinned
-`external/typelayout` and `external/boost` submodules (see
-[BUILD_AND_PLATFORMS.md](docs/BUILD_AND_PLATFORMS.md)).
+Use the archive rather than `GIT_REPOSITORY`: a Git clone of the repository fetches
+every branch and the recursive Boost submodule, about 2 GB and two minutes of
+configure time, none of which a C++20/C++23 build uses. C++26 reflection builds
+(`-DXOFFSET_CXX_STANDARD=26`) need the pinned `external/typelayout` and
+`external/boost` submodules, so they build from a Git checkout (see
+[BUILD_AND_PLATFORMS.md](docs/BUILD_AND_PLATFORMS.md)). Engines with their own
+build system add the repository root to the include path
+([BUILD_AND_PLATFORMS.md](docs/BUILD_AND_PLATFORMS.md#without-cmake-engine-build-systems)).
 
 Without `-DXOFFSET_CXX_STANDARD`, configure picks C++26 when the toolchain has
 reflection (CMake 3.30+, GCC 16+ or the P2996 Clang) and otherwise builds

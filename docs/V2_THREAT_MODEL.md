@@ -50,7 +50,7 @@ strength:
 `load_unverified` does not validate and is **not** an entry point for untrusted input.
 
 Receive checks have three tiers (decided 2026-11-04; the trusted and bounds tier interfaces were added
-in 3.4): the trusted tier checks only wire header admission and hole table bounds, and is for server to
+in 3.4): the trusted tier checks only wire header admission and the image bounds, and is for server to
 server, server to client and your own saved files; it is **not** an entry point for untrusted input
 (debug and sanitizer builds still validate fully). The trusted tier for whole-buffer receive and deltas
 is `XReceiver<XLink::server_peer / from_server>::reload / load / apply_delta` (`xoffset_receiver.hpp`);

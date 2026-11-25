@@ -88,8 +88,9 @@ Configure the consumer with `-DCMAKE_PREFIX_PATH=/path/to/xoffset-prefix` and a
 matching C++20/C++23 compiler (or the matching P2996/GCC 16 toolchain for C++26
 installs). For storage, request `COMPONENTS storage`, link `XOffset::storage`,
 and use CMake 3.13+. Packages reject numeric, `EXACT` and range version requests
-(no release promises compatibility with another one); check the complete version
-string as above.
+(no 4.x release promises compatibility with another one); check the complete version
+string as above. From 5.0.0 a request for any version of the same major version is
+accepted ([RELEASING.md](RELEASING.md) section 1.1).
 
 For embedded source consumption, use `FetchContent` or
 `add_subdirectory(path/to/XOffsetDatastructure)` and link `XOffset::xoffset`:
@@ -98,8 +99,8 @@ For embedded source consumption, use `FetchContent` or
 include(FetchContent)
 FetchContent_Declare(
     xoffsetdatastructure
-    GIT_REPOSITORY https://github.com/ximicpp/XOffsetDatastructure.git
-    GIT_TAG        v4.2.0   # pin a release tag or commit SHA
+    # The release's source archive (about 3 MB): no Git history, no submodules.
+    URL https://github.com/ximicpp/XOffsetDatastructure/archive/refs/tags/v4.2.0.tar.gz
 )
 set(XOFFSET_CXX_STANDARD 20 CACHE STRING "" FORCE)
 FetchContent_MakeAvailable(xoffsetdatastructure)
@@ -111,6 +112,40 @@ target_link_libraries(my_app PRIVATE XOffset::xoffset)
 Subprojects default tests, tools, examples and install rules to OFF. Set
 `XOFFSET_STORAGE_ONLY=ON` before adding the subdirectory when only storage is
 needed.
+
+Use the release archive (`URL`) rather than `GIT_REPOSITORY` for C++20/C++23
+builds: a Git clone fetches every branch and the recursive Boost submodule, about
+2 GB, and the field-list build needs none of it.
+
+## Without CMake (engine build systems)
+
+The library is header-only, so an engine's own build (Unreal Build Tool, Visual
+Studio, Xcode or Gradle projects) can use the headers directly. A C++20/C++23
+client build needs:
+
+- the repository root, or an install's `include/`, on the include path; nothing
+  to link except the platform's threads library;
+- C++20 or C++23;
+- with MSVC, `/Zc:preprocessor /Zc:__cplusplus /permissive-` (`XOFFSET_RECORD`
+  needs the conforming preprocessor, and the headers stop with an `#error`
+  without it); with clang-cl, `/Zc:__cplusplus /permissive-`;
+- the same `XOFFSET_*` settings (for example `XOFFSET_DEFAULT_MAXIMUM_CAPACITY`,
+  `XOFFSET_USE_PMR`, `XOFFSET_CHECK_UPLINK`, `XOFFSET_HARDENED`) in every
+  translation unit of one executable;
+- no RTTI. Exceptions are optional: `-fno-exceptions`, or MSVC `/EHs-c-` with
+  `_HAS_EXCEPTIONS=0` ([user guide 6.2](USER_GUIDE.md#62-no-exception-builds--fno-exceptions-msvc-ehs-c-)).
+
+Engines define function-like macros with common names before any third-party
+header: Unreal Engine's `check`, `checkf`, `verify`, `ensure`, `LIKELY`,
+`UNLIKELY` and `TEXT`, and Apple's `AssertMacros.h` `check`, `verify` and
+`require`. The library's client headers use none of these names; the
+`test_engine_macros` test defines them and then builds and runs the client
+headers in every CTest build, with and without exceptions. In an Unreal Engine
+module, include the headers between `THIRD_PARTY_INCLUDES_START` and
+`THIRD_PARTY_INCLUDES_END`, and on Windows also between
+`Windows/AllowWindowsPlatformTypes.h` and `Windows/HideWindowsPlatformTypes.h`,
+because the library includes `<windows.h>` (with `WIN32_LEAN_AND_MEAN` and
+`NOMINMAX`). No build inside an actual Unreal Engine project has been run yet.
 
 ## Validation scope
 

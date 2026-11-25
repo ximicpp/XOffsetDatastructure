@@ -2,8 +2,10 @@
 
 ## Supported Versions
 
-XOffsetDatastructure is under active pre-5.0 development and does not promise cross-version wire or ABI
-compatibility between releases. Security fixes are applied to `main` and shipped in the next release.
+Releases before 5.0.0 do not promise cross-version wire or API compatibility. From 5.0.0, incompatible
+changes come only in a new major version ([docs/RELEASING.md](docs/RELEASING.md) section 1.1), so a
+security fix ships in a patch release of the current major version. Before 5.0.0, security fixes are
+applied to `main` and shipped in the next release.
 
 | Branch / Release | Supported |
 | --- | --- |

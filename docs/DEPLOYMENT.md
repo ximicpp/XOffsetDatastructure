@@ -250,14 +250,17 @@ reservations.
 | --- | --- | --- |
 | Server receiving client data | Default `maximum_capacity` of **1 MiB**; check the length before reading a wire and drop it if larger | Client uplink messages are mostly KB-sized; adjust upward to 2x the largest valid business message |
 | Server to server | Set the limit to the largest valid size of that kind of state (one state block can reach hundreds of MB) | Data between servers counts as authenticated, but abnormal data must still not bring down the process |
-| Client receiving or building | On **iOS production apps, enable Apple's Extended Virtual Addressing capability** (`com.apple.developer.kernel.extended-virtual-addressing`); for high-count buffers prefer slots (`<= SLOT_MAX`), `XBuffer::relocating(max)` or `XBufferPool` | Without the entitlement, an iPhone limits one process to ~3.4 GiB of virtual address space (~50 64 MiB VM buffers); enabling it expands virtual address space to tens of GiB at zero physical RAM cost |
+| Client receiving or building | Set `maximum_capacity` to what the client needs instead of the 64 MiB default; keep small and many buffers on slots (`<= SLOT_MAX`), and use `XBuffer::relocating(max)` or `XBufferPool` for large long-lived ones. On iOS, Apple's Extended Virtual Addressing capability adds address space; it has not been run on a device by this project yet | Without the entitlement, an iPhone limits one process to ~3.4 GiB of virtual address space, shared with the rest of the app (~50 64 MiB VM buffers if nothing else used any) |
 
 On an iPhone 15 Pro Max (iOS 26.6.2) **without** Extended Virtual Addressing, one process can
-reserve about 3.4 GiB of address space (~50 buffers of the default 64 MiB VM reservation). Production
-iOS builds signed with a paid Apple Developer Program team should add the
+reserve about 3.4 GiB of address space (~50 buffers of the default 64 MiB VM reservation), and the
+engine, its assets and other libraries use the same budget. The measures that need nothing from Apple
+come first: limits sized to the data, slots for small messages, a pool or `relocating(max)` for large
+long-lived buffers. iOS builds signed with a paid Apple Developer Program team can also add the
 `com.apple.developer.kernel.extended-virtual-addressing` entitlement (Xcode: *Signing & Capabilities*
--> *Extended Virtual Addressing*; `tools/test_host/sign_ios_app.sh` supports `XO_IOS_EXTENDED_VA=1`).
-Keep three details in mind when enabling it:
+-> *Extended Virtual Addressing*; `tools/test_host/sign_ios_app.sh` supports `XO_IOS_EXTENDED_VA=1`);
+it has not been run on a physical iPhone by this project yet ([CLIENT_TARGETS.md](CLIENT_TARGETS.md)
+lists it as uncovered). Keep three details in mind when enabling it:
 
 - It expands **virtual address space** (what uncommitted `PROT_NONE` reservations consume), not
   physical RAM: Jetsam still enforces the device's physical memory limit, so call

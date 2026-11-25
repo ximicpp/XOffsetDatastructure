@@ -20,6 +20,21 @@ if(XOFFSET_CXX_STANDARD STREQUAL "26" AND NOT XOFFSET_SCHEMA_BACKEND STREQUAL "d
     configure_xoffset_target(xoffsetdatastructure_demo)
 endif()
 
+# The examples above run under CTest too, with assert() on, so an example that
+# no longer matches the library fails the test run instead of going unnoticed.
+if(XOFFSET_BUILD_TESTS)
+    set(xoffset_example_programs helloworld stable_storage schema_handshake
+        delta_sync_example shared_delta_example)
+    if(TARGET xoffsetdatastructure_demo)
+        list(APPEND xoffset_example_programs xoffsetdatastructure_demo)
+    endif()
+    foreach(example IN LISTS xoffset_example_programs)
+        xoffset_enable_test_assertions(${example})
+        add_test(NAME example_${example} COMMAND ${example})
+        set_tests_properties(example_${example} PROPERTIES LABELS "examples")
+    endforeach()
+endif()
+
 # Getting-started use cases (docs/GETTING_STARTED.md). Each is also built
 # without exceptions (-fno-exceptions, MSVC /EHs-c-), as client engines are,
 # and runs under CTest.
