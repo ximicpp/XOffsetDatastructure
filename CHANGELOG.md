@@ -5,6 +5,24 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+## 4.3.0: add-only schema evolution
+
+A type can gain fields without conversion: a field added in reserved `XSpare<N>` bytes keeps the first
+version's fingerprint, so old and new programs exchange whole wires, image deltas and stored images
+both ways at the same cost, and any other change starts a new generation that the handshake refuses
+on the network and `evolve_load_verified` upgrades once on load for stored data. Per-peer conversion
+(`XPeerSchemas`, `XBroadcast`) is removed; Wire format 3.0 is unchanged, and types that declare no
+family keep their fingerprints and machine code. The client headers build after Unreal Engine and
+Apple assert macros (source renames below), and from 5.0.0 releases follow Semantic Versioning with
+the wire format in the contract. Pre-release scorecard: 19 main cells, 17 wins, 2 ties, 0 losses
+([PERFORMANCE.md](docs/PERFORMANCE.md)); pre-release K4 fuzz (`--budget hour`) with 0 findings (GCC 16
+ASan+UBSan differential, 4 × 662,370 cases + replay; P2996 libFuzzer, 6 reflection and 5 field-list
+targets including `schema_family`; 3-way outcome-diff); `--release` validation 27/27: Linux C++26
+`gcc`/`asan`/`tsan`/`p2996` 282/282, 8-column C++20/23 matrix 247/247, MSVC C++20/C++23, clang-cl and
+MinGW under Wine and Android NDK r29/r30 under QEMU 247/247 each plus 52 no-exceptions tests, wire
+matrix 8 builds × 64 reads with the same bytes. Ir gate against v4.2.0: every total and stage 1.0000
+on GCC 16 and P2996, and the benchmark programs have the same machine code as v4.2.0.
+
 - Compatibility policy ([RELEASING.md](docs/RELEASING.md) section 1.1, USER_GUIDE section 8,
   SECURITY.md): 4.x releases keep promising nothing between versions; from 5.0.0, the first release
   meant for outside projects, incompatible wire or API changes come only in a new major version, and

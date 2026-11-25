@@ -1,5 +1,5 @@
 {
-  "archive_root": "xoffsetdatastructure-4.2.0",
+  "archive_root": "xoffsetdatastructure-4.3.0",
   "dependency_lock": {
     "include_trees": {
       "external/boost/libs/config/include": "1840c63a8e130b742d6f8148acaf9706a566ccf1791d2afd6eb9462465c2aaf8",
@@ -32,9 +32,9 @@
       "sha256": "f1f7f98c21afb92057a18d0917892d568ff5b4ede2586bbcac0bdfc97d523ba6"
     },
     "CHANGELOG.md": {
-      "bytes": 34661,
+      "bytes": 41813,
       "mode": 420,
-      "sha256": "cfa0841ad31f9d739a5a1c001a06a4009fafe11edd4c3bd2ee87134cb3c097d3"
+      "sha256": "0ca22df0923529b06f1cab874662c3fef8b1b8ff9ae878ae9616575107655c73"
     },
     "CMakeLists.txt": {
       "bytes": 8503,
@@ -52,14 +52,14 @@
       "sha256": "0c16fbcd9aa84484e0767074f9473fdaf3fb90ea89c20d6441f4220c3ed55114"
     },
     "README.md": {
-      "bytes": 15770,
+      "bytes": 16261,
       "mode": 420,
-      "sha256": "ab9567eaf5552eb657852852812bccd4e2f035c153c419c1dfe1690d51e2a7a9"
+      "sha256": "f59c9f96db6e30d4df1e7997ccea73dfb1f1d2fe1f8bc17976a31f71f6f7e394"
     },
     "XOFFSET_VERSION": {
       "bytes": 6,
       "mode": 420,
-      "sha256": "8fb33dadbe981cf5847df269c10c2a3fe107f2b269d5ccb6db37d1f61ffc3bba"
+      "sha256": "1e5302003691b6fdc7bddc0736eef7ce3adc870e97afdfcfb497dde2a78ed545"
     },
     "bench/slg/include/slg/cista_free.hpp": {
       "bytes": 1520,
@@ -122,9 +122,9 @@
       "sha256": "d388ee0e3f6b16169b3379ea72f8efacc69d5cd26b9eca8b25e7b71417a8463b"
     },
     "cmake/XOffsetBuildChecks.cmake": {
-      "bytes": 11509,
+      "bytes": 11498,
       "mode": 420,
-      "sha256": "f5ab24c89b624447b38827e81c4de6235f84884cefa0010345a684778e9a2034"
+      "sha256": "c9a6693d0ce84984567bcc812fdd017891ece14871d47146e51f62c67b66afb7"
     },
     "cmake/XOffsetDatastructureConfig.cmake.in": {
       "bytes": 2285,
@@ -152,9 +152,9 @@
       "sha256": "a4bf099ed5f34a1f5f0089b7a9287a4e8859aa9ab6adf20d6b4400e65e5798ab"
     },
     "cmake/XOffsetFourPathHeaders.cmake": {
-      "bytes": 731,
+      "bytes": 761,
       "mode": 420,
-      "sha256": "5ce342aaa5bae4634fc1e40603803712c3c1576fd2da3a1db0072043375e5bd7"
+      "sha256": "9af8ad0fe44d948663214ffeb4c2289596300f2ef8aaf4062e14d06080231e26"
     },
     "cmake/XOffsetFourPathTests.cmake": {
       "bytes": 473,
@@ -242,19 +242,19 @@
       "sha256": "ed65d8b3a3303d8f4f2b2dc2611986eafbb8d38e60b959e11045e009708ff861"
     },
     "docs/ALPHA_COMPATIBILITY.md": {
-      "bytes": 10061,
+      "bytes": 10070,
       "mode": 420,
-      "sha256": "55901c2625661d723d5ebaf11bf61417ca0cbefee15ab1b1dc3b3d1c65748eed"
+      "sha256": "53420de13f58a0d177887c2abcbd640476e19ff011e52bedfc0e77ff02341a61"
     },
     "docs/BUILD_AND_PLATFORMS.md": {
-      "bytes": 9290,
+      "bytes": 11427,
       "mode": 420,
-      "sha256": "8f1660646803ee6c376cc0740a9b7b8d2447b12de01004068028ad82c70f71a5"
+      "sha256": "5b187b17631c23e6d8aceb52cbddab3a51ba0591aface91adaca935c3013a049"
     },
     "docs/PACKAGING.md": {
-      "bytes": 22156,
+      "bytes": 22191,
       "mode": 420,
-      "sha256": "64d5148892c5984213d03c6cb5f95035bc11058847a5ca04f6b9136afb429250"
+      "sha256": "660c9659ad04c44d598976531ab2eba8b3dd1c7823312eb9015ca92ebf4e279a"
     },
     "docs/VALIDATION_RUNNER.md": {
       "bytes": 10833,
@@ -262,9 +262,9 @@
       "sha256": "a5c3072da04624075d129dc138a2b59d2edcdc3bf4655a500c7625ebd2c66a51"
     },
     "examples/CMakeLists.txt": {
-      "bytes": 1577,
+      "bytes": 2280,
       "mode": 420,
-      "sha256": "ffaa15fabbd5f67adb999d76f5a38be6636019475657cbbfd3d140eb24f364ff"
+      "sha256": "d59145a3857ad233165a2cd87a348dd7ffefebdf76b1ed4e5f9b57fd33374671"
     },
     "examples/client_uplink.cpp": {
       "bytes": 5569,
@@ -307,14 +307,14 @@
       "sha256": "d889850bd26e1422e92b71e9137641a512464a0dd007c731f5f68586838b3f63"
     },
     "examples/server_to_client.cpp": {
-      "bytes": 5768,
+      "bytes": 5721,
       "mode": 420,
-      "sha256": "ed45396ba48a9e5535501a6a91916bd2e4058cb98f6c60ab06a7219771750f04"
+      "sha256": "94b9fd8422740afe99d24a1210e6b431100dd65379cbdf0cc975ae780f57ca07"
     },
     "examples/server_to_server.cpp": {
-      "bytes": 4112,
+      "bytes": 4114,
       "mode": 420,
-      "sha256": "1d5bc5e344d1cbec43ed0dd48bcf3f4d5fa7d011b73cbba73b2744d33f4e5ce5"
+      "sha256": "3b6ad149f99eb9c7790c1ef9b629deabf60fdb85966f0a314106e437149f3062"
     },
     "examples/shared_delta.cpp": {
       "bytes": 11717,
@@ -322,9 +322,9 @@
       "sha256": "7c7dfde33af08c99960127650b9f20676c6d2845067290414899967b7ef84a5f"
     },
     "examples/stable_storage.cpp": {
-      "bytes": 2846,
+      "bytes": 3146,
       "mode": 420,
-      "sha256": "3fdb95b87274c9301e9980f0785ae1b327dd8d10265339a981d432d300af4edb"
+      "sha256": "099269e6be8a0e56b5e24cd0b651d2ca0b801103dfba4203cfa7092cf4089f3d"
     },
     "external/boost/LICENSE_1_0.txt": {
       "bytes": 1338,
@@ -4597,9 +4597,9 @@
       "sha256": "870137827d20ad4f9790eacb14bc96502c38e0b5581de74fca0713853feb3ed4"
     },
     "tests/CMakeLists.txt": {
-      "bytes": 28333,
+      "bytes": 30357,
       "mode": 420,
-      "sha256": "f1e2fdfe7820b283524d8f62f1a0e5b5c7e413d02d2ea8cab1ccfe0b47c4cb07"
+      "sha256": "8541f9fde4693dcb6a76c03b47cb70bb2b69dfef3eb2a7ad527387fa3cc03b38"
     },
     "tests/allocator_model_support.hpp": {
       "bytes": 11224,
@@ -4612,9 +4612,9 @@
       "sha256": "125c2fa708edb48e4dd3d89d7b714d0697928732d1eb6c69f4b2fa8f237aa78a"
     },
     "tests/fuzz/CMakeLists.txt": {
-      "bytes": 7645,
+      "bytes": 9218,
       "mode": 420,
-      "sha256": "f5468517f36da67ef07e9f9220a6f8ac65466673bedf0d259db7c53343de558e"
+      "sha256": "bf19ec5d522f60b829fb83aa6f941cfa297ad820fd7fcddfe7cd7609cd243659"
     },
     "tests/fuzz/fuzz_delta_sync.cpp": {
       "bytes": 29701,
@@ -4622,9 +4622,14 @@
       "sha256": "b0ce661c57f3ee4060e1ed3b0c875b27b2c9be2ee50708854c073a7d5e7e9cd8"
     },
     "tests/fuzz/fuzz_schema_evolution.cpp": {
-      "bytes": 14085,
+      "bytes": 13893,
       "mode": 420,
-      "sha256": "20612bec61ba2f5d7db9ff496591628aa5bcae5db809d44549a5bb133639ca89"
+      "sha256": "a274dbc0acf16dbda6f456e0e56dd6a173cd34b58a87d19a2ffe94969cd304c8"
+    },
+    "tests/fuzz/fuzz_schema_family.cpp": {
+      "bytes": 11851,
+      "mode": 420,
+      "sha256": "000eb0fbd82a5e3c1064985639910994fb72e0fbac5dd45b1569c6a513f92943"
     },
     "tests/fuzz/fuzz_shared_delta.cpp": {
       "bytes": 9452,
@@ -4642,9 +4647,9 @@
       "sha256": "4677ef86092c3a1d33778a6703a71ca5d4b57183b2174bddb1e1846c2fe66ddf"
     },
     "tests/fuzz/regressions/README.md": {
-      "bytes": 1957,
+      "bytes": 2153,
       "mode": 420,
-      "sha256": "11ecf313b2a110fe0538eac58e2a97bf1e3096caa88aa3b4257066102e121bc2"
+      "sha256": "7c9c0a221caaa188197d2a32fdac6900b5e3578278b3e3cb4178c19c8fe5e9a4"
     },
     "tests/fuzz/regressions/delta_sync/.gitkeep": {
       "bytes": 0,
@@ -4662,6 +4667,11 @@
       "sha256": "8e65e589c48bb4ee7628cda76da4f0a93b73711100d21efd67cae0a176bb1a73"
     },
     "tests/fuzz/regressions/schema_evolution/.gitkeep": {
+      "bytes": 0,
+      "mode": 420,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "tests/fuzz/regressions/schema_family/.gitkeep": {
       "bytes": 0,
       "mode": 420,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
@@ -4841,6 +4851,16 @@
       "mode": 420,
       "sha256": "2666607cab871999e886bc693b38340fa2e20540274613b646fd2cbc94f70d3a"
     },
+    "tests/schema_family/family_fail.cpp": {
+      "bytes": 5561,
+      "mode": 420,
+      "sha256": "dfc6ccbcdab472706f721bf373937b664499fbca412d865ec67a937a1ba4096a"
+    },
+    "tests/schema_family/player_versions.hpp": {
+      "bytes": 5276,
+      "mode": 420,
+      "sha256": "554cefb76385a40679e7fc2dfadf2ffa7b98ca155483e1492daba9d6dccfc763"
+    },
     "tests/schema_freeze/game_v1.hpp": {
       "bytes": 1602,
       "mode": 420,
@@ -4970,6 +4990,11 @@
       "bytes": 7101,
       "mode": 420,
       "sha256": "99ced6737fd02d5b4f16dfa423741a2dce3fbc56f85028e72f95116947d891c7"
+    },
+    "tests/test_engine_macros.cpp": {
+      "bytes": 5048,
+      "mode": 420,
+      "sha256": "178d3eb2f50e9ba58fbb5b3f0ee58fbea5c976035ba7a6e39213c55da76af208"
     },
     "tests/test_enum_support.cpp": {
       "bytes": 15233,
@@ -5122,9 +5147,9 @@
       "sha256": "df8ba9769845c0cdacaa7703a1dde654e95cd9e1e0fb266dc6eabc6ac9af4937"
     },
     "tests/test_receiver_view.cpp": {
-      "bytes": 21116,
+      "bytes": 21112,
       "mode": 420,
-      "sha256": "767ef5d787e2842abb95889a588ff4d5b0c5e663772afdd85b0ce104579a829b"
+      "sha256": "8b64cd1d888d9bec7d1257be4963c3a6a5c5f828915f71141f5e00d0eddba660"
     },
     "tests/test_reflection_advanced.cpp": {
       "bytes": 9167,
@@ -5216,10 +5241,20 @@
       "mode": 420,
       "sha256": "39bef9182532eb1912690d5e750e7f7be42c6079a3896893a39e275f9361d9e2"
     },
-    "tests/test_schema_freeze.cpp": {
-      "bytes": 6753,
+    "tests/test_schema_family.cpp": {
+      "bytes": 21602,
       "mode": 420,
-      "sha256": "28fc5d2ebe28e8a74c38d15a2461e0c5f3521f20a3990bafd5324ab4cb8bfd20"
+      "sha256": "d2feab9e3138fec21d8c0f9a29f91bfde19f5ae0fbd84c16ce44edb3e381b62f"
+    },
+    "tests/test_schema_family_xs.cpp": {
+      "bytes": 24975,
+      "mode": 420,
+      "sha256": "8c94a5adae73c077dd53c9d24cdf7cee6357f293819157aee2eed423eb97fb0d"
+    },
+    "tests/test_schema_freeze.cpp": {
+      "bytes": 7005,
+      "mode": 420,
+      "sha256": "532894c49cea7d69967cabede41f3d2b8bd26eceaf4a59278f2fc8d7f4b74604"
     },
     "tests/test_schema_guard_slg_values.cpp": {
       "bytes": 1660,
@@ -5227,14 +5262,14 @@
       "sha256": "31382be090a9aa98bba281e3064ef7ee04bdc6906f0d66f32e77d59e8a5099e0"
     },
     "tests/test_schema_handshake.cpp": {
-      "bytes": 10335,
+      "bytes": 10791,
       "mode": 420,
-      "sha256": "a2da3da3c56393560b92b6ff59797be804008a41b3748d6a123dacfb527edb6a"
+      "sha256": "a1e7805130b70b9ad76be457434155fc3d7e4d8e248a7ccf6da5881407fc5ace"
     },
     "tests/test_schema_lineage.cpp": {
-      "bytes": 14275,
+      "bytes": 12090,
       "mode": 420,
-      "sha256": "53571d9da375734987e9c9ce20cd454d7d214a2a1387fb98035171ceb8d814bb"
+      "sha256": "21f9f3ad1357ffe33789ed732231140346020b7f30b2f10328c72922fbc7caa6"
     },
     "tests/test_schema_pin.cpp": {
       "bytes": 2688,
@@ -5257,14 +5292,14 @@
       "sha256": "68a4038a002ce98008b9c1f96be10dd9d72a3576009fee34a9ceea0811aa25e9"
     },
     "tests/test_shared_delta_publisher.cpp": {
-      "bytes": 24333,
+      "bytes": 24343,
       "mode": 420,
-      "sha256": "f374c303f2f25e2b48f5226e36e8970b58ba0c068250b2463f2a0c64afa0614d"
+      "sha256": "1d2bf31aa007290b3b452b4ead48d800a3ff411fe6654ca0da5f22ddc23e2575"
     },
     "tests/test_shared_delta_publisher_errors.cpp": {
-      "bytes": 5732,
+      "bytes": 5762,
       "mode": 420,
-      "sha256": "b8958e415c9137d6808131d6e0c586fec92e894230f228a95401ab2d60a08514"
+      "sha256": "34fffe51f9e13eeb533a0e1e4b44bd991f6c59e52f560a7a4f560d82bbf03fcb"
     },
     "tests/test_shared_delta_slots.cpp": {
       "bytes": 7431,
@@ -5431,6 +5466,11 @@
       "mode": 420,
       "sha256": "732a1d1eeeb9cc4811eb2332b1a9fca932014d337e169c6dee06492f61ad67f9"
     },
+    "tests/test_xspare.cpp": {
+      "bytes": 8929,
+      "mode": 420,
+      "sha256": "b2377b3c7731e6ad7528dc18fe7140bc47b61969e9d7649b3ade11df74082ff9"
+    },
     "tests/test_xstring_direct_assign.cpp": {
       "bytes": 18611,
       "mode": 420,
@@ -5459,7 +5499,7 @@
     "toolchains/vm-validation.json": {
       "bytes": 2989,
       "mode": 420,
-      "sha256": "a118ad089d309feed24d05c5ce709dca6e2d02140ff09440242152e7861ba3a7"
+      "sha256": "e25199cb740bc9f963f8707760a7708e2e7b23d63755e30c92e990fa8d568acc"
     },
     "tools/CMakeLists.txt": {
       "bytes": 5905,
@@ -5502,9 +5542,9 @@
       "sha256": "5c388ffc659c59e649ae3a4f7ca8aab690301af9d1025e238e821ed5b4c4b02f"
     },
     "tools/describe_dump.hpp": {
-      "bytes": 9067,
+      "bytes": 9158,
       "mode": 420,
-      "sha256": "138397df997a1045d259c23881ab2362baa4221fa5b12b510c6045ed2da7ebd3"
+      "sha256": "c42fe758ad022e7104a54a855524f3055d8f13d73fe75b2a046b909ed28fdd4c"
     },
     "tools/export_signatures.cpp": {
       "bytes": 7219,
@@ -5512,9 +5552,9 @@
       "sha256": "187b0d17a6d44a8a4777e81f8cfa8a37baf824d713fa6c83fe0427cc5844d3b3"
     },
     "tools/prepare_release.py": {
-      "bytes": 35895,
+      "bytes": 35924,
       "mode": 493,
-      "sha256": "e6788cf69d8bc7d89c84dc1de9b935a429a3553d0ced15cd18b744d08d45bc72"
+      "sha256": "0f30f6013563b6d1293d85126b3a106e86ad5d98f710f59da0fc7101d176eba3"
     },
     "tools/prepare_vm_cmake.py": {
       "bytes": 2823,
@@ -5592,9 +5632,9 @@
       "sha256": "22a1a8ee8efe4a17c7dfcd0e0f7aa5f7d39340accabd91e3040b69432cdb1b8b"
     },
     "tools/validate_vm_package.py": {
-      "bytes": 19526,
+      "bytes": 19555,
       "mode": 493,
-      "sha256": "93cfa4233927bcf6a376eca41e9d2e263b64e720854aaba04b22a84ed12d8a65"
+      "sha256": "15b2712ad6fd3ca9678bc695c1d3ebbb6ec8ba7384b7510c90d1f5807734f6a9"
     },
     "xoffset_admission.hpp": {
       "bytes": 3759,
@@ -5622,14 +5662,14 @@
       "sha256": "a1a5cf31a04d67edfc4ef7533354eb48b314d0dc8d593d711d5bc8f0a588a0cd"
     },
     "xoffset_containers.hpp": {
-      "bytes": 181609,
+      "bytes": 182636,
       "mode": 420,
-      "sha256": "ecb26694b809a07aefefeb89de02b525ae5e03c01e9e59b5d57b4179c253392a"
+      "sha256": "ab1a97bb7f34faa83a53240c88aa8c50b357b2f3aaedcb244e841b5b8e9a46c4"
     },
     "xoffset_core_lifetime.hpp": {
-      "bytes": 39869,
+      "bytes": 39986,
       "mode": 420,
-      "sha256": "6b0621d1f26cac33df094e38b583a3f02eb2140ce07c6c7bf5ed80efb94ab0d2"
+      "sha256": "2df605a1d3e08c14c6e21b43a997b38e7e4d909f72e1972c5b86f6cf71dd8322"
     },
     "xoffset_delta.hpp": {
       "bytes": 256563,
@@ -5642,14 +5682,14 @@
       "sha256": "03b1accf4b66fdd33b5b095260b9644d3e9e4975423e34151871ec1a5115fd9e"
     },
     "xoffset_error.hpp": {
-      "bytes": 26437,
+      "bytes": 26461,
       "mode": 420,
-      "sha256": "b9ede9d93e1b52201035e1bfa215d485f2cd3c50bcfd17687e1b3a7de2360ff1"
+      "sha256": "cdebcdd1877877dc08fcec8369dd16266cfbcbbff87ef5c2928a9950163a1772"
     },
     "xoffset_evolution.hpp": {
-      "bytes": 55665,
+      "bytes": 46957,
       "mode": 420,
-      "sha256": "2f44a9e67b35fe2f9a54d4a9eb6989519bbdd6b10e91f8126de5c46ebfcd87ca"
+      "sha256": "88bfe9f788dc36615e2010ef4ac1b82fd7e3a1eba62bec772090fa4350f171a4"
     },
     "xoffset_fixed_message.hpp": {
       "bytes": 10575,
@@ -5662,9 +5702,9 @@
       "sha256": "1abaf8d1833aaa794aca799048f00cd95b15809ffbcc7e57ab4ff32ed58f7afd"
     },
     "xoffset_handshake.hpp": {
-      "bytes": 17960,
+      "bytes": 20258,
       "mode": 420,
-      "sha256": "7e3519231633b7f8402163a9353526c021598f776c65900b1afc36d56fd30d57"
+      "sha256": "68b0433870ddb3e2b92670c7359446bbc11bcb7084ed86ed64bf11de9c8fdc4d"
     },
     "xoffset_proxy.hpp": {
       "bytes": 67853,
@@ -5672,9 +5712,9 @@
       "sha256": "42c02ef02bafdddbc098a86a79b02aa15b8ffde03ffd71510e0e0041a0d2d5c0"
     },
     "xoffset_receiver.hpp": {
-      "bytes": 25835,
+      "bytes": 25839,
       "mode": 420,
-      "sha256": "ea3e3c27f45836566e1b099b33fede9014ac81a98050b4a807f21c0376fd8764"
+      "sha256": "c4d6c0e2f1aeb8323781808374e0fb94ed9256b1df793f49495efcc047547f04"
     },
     "xoffset_registration.hpp": {
       "bytes": 6840,
@@ -5691,20 +5731,25 @@
       "mode": 420,
       "sha256": "3fa12f3c61b822db27e8eb2ffcc43b08c67c20a7bbc2bb008aea566f527f0d62"
     },
-    "xoffset_schema_freeze.hpp": {
-      "bytes": 21608,
+    "xoffset_schema_family.hpp": {
+      "bytes": 20874,
       "mode": 420,
-      "sha256": "bb2249c18a196e15b97eb17e410211706ff276c2bc993c7c2299080b6dda9b24"
+      "sha256": "a64bc912e4e0994808ed6611af4bf824dd085a6927c91827ee7940293a822269"
+    },
+    "xoffset_schema_freeze.hpp": {
+      "bytes": 22250,
+      "mode": 420,
+      "sha256": "d838433314bf17f65a6384c7e2c34d490b09feb8a5a1e9afb9c32abc3a47f883"
     },
     "xoffset_schema_hash.hpp": {
-      "bytes": 37727,
+      "bytes": 39824,
       "mode": 420,
-      "sha256": "4ca3bafa069f7fa9ed86404b0476c87df459124c1d8284e9b6413557118c8e08"
+      "sha256": "984887efbdf4c8a440a936adde4a003a73b7f6d0c23453a4950f736c33a3d16c"
     },
     "xoffset_schema_names.hpp": {
-      "bytes": 4809,
+      "bytes": 6198,
       "mode": 420,
-      "sha256": "cc110b1c5862f44912fab940747295c0018a2f618f28314e245c4b27f838a103"
+      "sha256": "f257ec37caeee28861b841c0022be4a210886876ebb883c63160e9f11a82ee0b"
     },
     "xoffset_schema_reflect.hpp": {
       "bytes": 8474,
@@ -5712,14 +5757,14 @@
       "sha256": "28717a7ff3c8854d2d912035ae1e7f26a682d8e19741ee6e087b87ab09638b9f"
     },
     "xoffset_shared_delta.hpp": {
-      "bytes": 96782,
+      "bytes": 102694,
       "mode": 420,
-      "sha256": "f7e89bb36e62d116b867510bc762cd6284c447c5ae1a8f2fa34aae33879f996a"
+      "sha256": "298a4073b3ba3cdecc12bf97ec4a7ac476989f90818187c8d6f85db34c2ed694"
     },
     "xoffset_shared_publisher.hpp": {
-      "bytes": 51831,
+      "bytes": 51840,
       "mode": 420,
-      "sha256": "3e067c883667581c89cd8eaac51cbf9813ba22bd6cf921106a3779cce8d5baf9"
+      "sha256": "e585781b3d1a31bae2545f94f5e188e5b1b015a544d45039311c7bdccd3c6c14"
     },
     "xoffset_slot_storage.hpp": {
       "bytes": 29224,
@@ -5737,14 +5782,14 @@
       "sha256": "421af0ea3e6d32eb22eceb3f08c1e739b090861b3cda7bdca96c5296859e8f22"
     },
     "xoffset_wire.hpp": {
-      "bytes": 119231,
+      "bytes": 119672,
       "mode": 420,
-      "sha256": "b063d61cc3b0fe22deb69c27a0b94d1e7a3b04e54bcc3f7100b3fbbaea7271a1"
+      "sha256": "126f7b6bcfe6d8ff749094ab3fd23c34af98e0a437cbe458446d9f0616a13f94"
     },
     "xoffsetdatastructure.hpp": {
-      "bytes": 679,
+      "bytes": 716,
       "mode": 420,
-      "sha256": "a9e25dce4fed8ccc542cca7c58d6a42344a897f2df47c2f216181ec0395b3169"
+      "sha256": "bc57be2bf263750844e3be9eaf1586002e0c48a6e88d8278726c7a52020808b6"
     }
   },
   "schema": "xoffset-source/v1",
@@ -5758,5 +5803,5 @@
     "offline_build": "full/storage CMake and package validation use bundled dependency bytes; caller provides compatible compiler, SDK, CMake and standard library",
     "validation_limits": "validate_vm.py native full/storage are supported entry points; historical wire bundles and full developer-test discovery are outside this distribution"
   },
-  "version": "4.2.0"
+  "version": "4.3.0"
 }

@@ -1,4 +1,4 @@
-# Performance numbers (4.2.0)
+# Performance numbers (4.3.0)
 
 Current published numbers, how they were measured, and their limits. Ratios are XOffset ÷ rival:
 **below 1 means XOffset is faster**. Compression is never timed; sizes are after zstd level 3. Older
@@ -12,7 +12,7 @@ per-release tables (3.0.0 to 3.6.0) are in the Git history of this file.
 | Memory, relocation tax, phone | Sections 3 and 4 |
 | Instruction-count regression gate (not a speed claim) | [PERF_GATE.md](PERF_GATE.md) |
 
-## 1. SLG scorecard (4.2.0)
+## 1. SLG scorecard (4.3.0)
 
 `bench/slg` (frozen tree, see its `MANIFEST`) models a strategy game server: whole state on login,
 per-client deltas, a shared map viewport, client orders going up, and players moving between servers.
@@ -20,31 +20,31 @@ Each cell times only data writing, sending and receiving.
 
 | Item | Setting |
 | --- | --- |
-| Host | Cloud Intel Xeon (Skylake, IBRS), 8 cores, pinned to CPU 2, GCC 16.2 `-O3`, libstdc++; quiet machine (load average ~1.0) |
-| Tree | `eb9bab9a` (release candidate; `610206ce` verified identical machine code under `--asm-strict`) |
+| Host | Cloud Intel Xeon @ 2.10 GHz, 4 cores, pinned to CPU 2, GCC 16.2 `-O3`, libstdc++; quiet machine (load average ~1.0) |
+| Tree | `c210e09e` (release candidate; the release commit changes only the version and documentation) |
 | Command | `tools/perf_gate/repro_scorecard.sh` (`ZSTD=1`, [RELEASING.md](RELEASING.md) section 2b) |
 | Samples | M scale, one process per format, 8 interleaved batches × 21 cycles, seed 20261021, geometric mean over batches |
 | Trust model | XOffset `xoffset_trusted` row; rivals zpp_bits (`v4.7.6`) and `cista_unchecked` (`v0.16`, plus zpp_bits's shared-encoding approach for the D cells); no rival runs a separate verification pass |
 | Verdict | Against the strongest rival of each cell: win < 0.95, tie 0.95–1.05, loss > 1.05 |
 
-**19 main cells: 17 wins, 2 ties, 0 losses.** The ties are DP (0.953 [0.81–1.20], vs `zpp_bits_dirty shared`)
-and UPW.recv (0.966 [0.87–1.08], vs `cista_unchecked`). All 9 report-only cells win, including UL.send
-(0.681 [0.64–0.70]). Against 4.1.0, DC (0.839 [0.63–0.99]) and UL.recv (0.866 [0.78–0.93]) moved from
-tie to win, while UPW.recv landed in the tie band on this Skylake host (consistent with the 4.1.0 host
-sensitivity note below).
+**19 main cells: 17 wins, 2 ties, 0 losses.** The ties are DP (1.001 [0.92–1.11]) and DC (0.965
+[0.90–1.08]), both against `zpp_bits_dirty shared`. Of the 9 report-only cells, 8 win and UL.send is
+0.964 [0.89–1.07]. The benchmark programs run the same machine code as in 4.2.0 (asm gate); against
+the 4.2.0 run on a Skylake host, DC moved from win to tie (0.839) and UPW.recv from tie to win
+(0.966), within the host and run variation described below.
 
 | Group | Main cell ratios (÷ strongest rival, batch min–max) |
 | --- | --- |
-| Server to server | A 0.393 [0.36–0.41], B 0.212 [0.20–0.22], S 0.200 [0.19–0.21], SD 0.301 [0.28–0.31] |
-| Server send | L.send 0.281 [0.24–0.31], EB.send 0.707 [0.68–0.74], LD.send 0.609 [0.56–0.65], UP.send 0.804 [0.76–0.86], UC.send 0.559 [0.52–0.62], DP **0.953** [0.81–1.20] (tie), DC 0.839 [0.63–0.99] |
-| Client receive | L.recv 0.279 [0.23–0.33], EBW.recv 0.816 [0.79–0.87], LDW.recv 0.493 [0.47–0.54], UPW.recv **0.966** [0.87–1.08] (tie), UCW.recv 0.608 [0.59–0.68], DPTW.recv 0.635 [0.61–0.69], DCTW.recv 0.523 [0.48–0.56] |
-| Uplink | UL.recv 0.866 [0.78–0.93]; report-only UL.send 0.681 [0.64–0.70] |
+| Server to server | A 0.396 [0.37–0.41], B 0.272 [0.27–0.29], S 0.251 [0.23–0.27], SD 0.270 [0.26–0.29] |
+| Server send | L.send 0.353 [0.33–0.41], EB.send 0.607 [0.58–0.65], LD.send 0.504 [0.47–0.54], UP.send 0.752 [0.72–0.79], UC.send 0.477 [0.45–0.50], DP **1.001** [0.92–1.11] (tie), DC **0.965** [0.90–1.08] (tie) |
+| Client receive | L.recv 0.369 [0.34–0.45], EBW.recv 0.782 [0.76–0.80], LDW.recv 0.658 [0.61–0.69], UPW.recv 0.913 [0.83–1.01], UCW.recv 0.715 [0.69–0.76], DPTW.recv 0.744 [0.67–0.83], DCTW.recv 0.596 [0.55–0.64] |
+| Uplink | UL.recv 0.842 [0.80–0.89]; report-only UL.send 0.964 [0.89–1.07] |
 
 Shared-delta borderline rule ([RELEASING.md](RELEASING.md) section 2c): cells landing in 1.02–1.08 are
-re-judged across three `-falign-functions` layouts. In 4.2.0 no D cell landed in 1.02–1.08 (DP 0.953,
-DC 0.839, DPTW.recv 0.635, DCTW.recv 0.523), so no alignment re-judge was required.
+re-judged across three `-falign-functions` layouts. In 4.3.0 no D cell landed in 1.02–1.08 (DP 1.001,
+DC 0.965, DPTW.recv 0.744, DCTW.recv 0.596), so no alignment re-judge was required.
 
-### Reading the scorecard (review of 2026-11-17, updated for 4.2.0)
+### Reading the scorecard (review of 2026-11-17, updated for 4.3.0)
 
 The directions hold: XOffset leads where encoding and decoding are skipped and pays about 1.0–1.4x
 where containers are read and written through relative offsets. How far it leads depends on message
@@ -55,12 +55,12 @@ receiver runs full validation. These notes change no verdict.
 - **S and SD against zpp_bits include a decode the trusted tier does not need.** The storage process's
   `store_check` (`bench/slg/bench/runner.hpp`) decodes the whole player for a format without a
   stand-alone check, while trusted XOffset only copies the bytes. On the same basis the ratios against
-  zpp_bits (S 0.083, SD 0.212 in 4.2.0) are about 1.4–1.5x higher (review of 4.0.0: 0.24 instead of
-  0.171, 0.41 instead of 0.276). Their strongest rival is cista_unchecked (0.200 and 0.301), so both
+  zpp_bits (S 0.099, SD 0.184 in 4.3.0) are about 1.4–1.5x higher (review of 4.0.0: 0.24 instead of
+  0.171, 0.41 instead of 0.276). Their strongest rival is cista_unchecked (0.251 and 0.270), so both
   stay wins.
 - **UL.recv and UL.send mostly time the clock.** Two `steady_clock` reads per message cost about 30 ns
-  on cloud Xeon hosts, which pulls small-order ratios toward 1. In 4.2.0 UL.recv is 0.866 [0.78–0.93]
-  (win) and UL.send is 0.681 [0.64–0.70] (report only).
+  on cloud Xeon hosts, which pulls small-order ratios toward 1. In 4.3.0 UL.recv is 0.842 [0.80–0.89]
+  (win) and UL.send is 0.964 [0.89–1.07] (report only; 0.681 on the 4.2.0 Skylake host).
 - **The Mac run is against zpp_bits only.** After PR #290 (d13ef15b) the Mac mini scored 18 wins,
   1 tie, 0 losses with zpp_bits as the only rival. cista_unchecked, the strongest cloud rival of six
   cells (B, S, SD, EBW.recv, UPW.recv, UCW.recv), was not run there, so it is not the same measure.
@@ -68,13 +68,13 @@ receiver runs full validation. These notes change no verdict.
   unchecked trusted tier, as the trust model intends. Equal-check figures: UL.recv (bounds tier), the
   full-validation rows of [bench/cppcon2024](../bench/cppcon2024/README.md) and section 2.
 - **UPW.recv depends on the host.** On 4.1.0 it scored 0.900 on a 2.3 GHz cloud Xeon and 0.976
-  [0.941, 1.012] (tie) on a 2.1 GHz Xeon with 48 KiB L1d; on the 4.2.0 Skylake host it scores 0.966
-  [0.87–1.08] (tie).
+  [0.941, 1.012] (tie) on a 2.1 GHz Xeon with 48 KiB L1d; on the 4.2.0 Skylake host it scored 0.966
+  [0.87–1.08] (tie) and on the 4.3.0 host (2.1 GHz Xeon, 4 cores) 0.913 [0.83–1.01] (win).
 - **Bytes.** XOffset's wire carries spare capacity and free blocks: 1.11–1.37x zpp_bits after zstd-3
   (shared deltas DP 0.68x / 1.04x vs `zpp_bits_dirty shared`, DC 0.38x / 1.01x vs
   `zpp_bits_dirty shared`), 1.34–1.54x uncompressed between servers (`A`/`B`/`S`/`SD`). Bytes are report
   only; the wire format is not tuned for them.
-- **Defaults.** Measured with the 4.2.0 defaults: Wire 3.0 one-image format, `XWireEmission::automatic`
+- **Defaults.** Measured with the 4.3.0 defaults (the same as 4.2.0): Wire 3.0 one-image format, `XWireEmission::automatic`
   for churned buffers, hardening switches off, client uplink bounds check on.
 
 ## 2. Where the lead holds
