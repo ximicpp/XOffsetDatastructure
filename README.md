@@ -1,6 +1,6 @@
 # XOffsetDatastructure
 
-**4.3.0** · C++20 / C++26 · header-only · 64-bit little-endian
+**2.0.0** · C++20 / C++26 · header-only · 64-bit little-endian
 
 XOffsetDatastructure keeps C++ objects, strings, vectors, sets and maps in one
 contiguous, position-independent arena. The arena bytes are the message: you
@@ -219,7 +219,7 @@ processes; [method and all rows](bench/cppcon2024/README.md)):
 **SLG game-server scorecard** (`bench/slg`: login state, per-client and shared
 viewport deltas, client orders, server hand-offs; XOffset trusted tier against
 the strongest unchecked rival per cell): **19 cells, 17 wins, 2 ties, 0
-losses** on 4.3.0. XOffset messages are 1.11–1.37x zpp_bits after zstd-3.
+losses** (measured on 4.3.0; 2.0.0 runs identical machine code). XOffset messages are 1.11–1.37x zpp_bits after zstd-3.
 
 These numbers hold for these workloads, adapters and hosts.
 [PERFORMANCE.md](docs/PERFORMANCE.md) has the method, the reading notes of the
@@ -231,8 +231,8 @@ Needs Git, CMake 3.20+ and GCC 13+, Clang 18+, Apple clang 21+ (Xcode 26.4+) or
 MSVC 19.44+ (Visual Studio 2022 17.14+) on a 64-bit little-endian target:
 
 ```sh
-git clone https://github.com/ximicpp/xoffsetdatastructure.git
-cd xoffsetdatastructure
+git clone --depth 1 --branch v2.0.0 https://github.com/ximicpp/XOffsetDatastructure.git
+cd XOffsetDatastructure
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DXOFFSET_CXX_STANDARD=20
 cmake --build build --config Release --target helloworld
 ./build/bin/Release/helloworld        # Windows: build\bin\Release\helloworld.exe
@@ -246,7 +246,7 @@ include(FetchContent)
 FetchContent_Declare(
     xoffsetdatastructure
     # The release's source archive (about 3 MB): no Git history, no submodules.
-    URL https://github.com/ximicpp/XOffsetDatastructure/archive/refs/tags/v4.3.0.tar.gz
+    URL https://github.com/ximicpp/XOffsetDatastructure/archive/refs/tags/v2.0.0.tar.gz
 )
 set(XOFFSET_CXX_STANDARD 20 CACHE STRING "" FORCE)
 FetchContent_MakeAvailable(xoffsetdatastructure)

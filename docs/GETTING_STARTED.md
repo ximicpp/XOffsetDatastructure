@@ -1,4 +1,4 @@
-# Getting started: core use cases and recommended patterns (4.3.0)
+# Getting started: core use cases and recommended patterns (2.0.0)
 
 This document walks new users through the use cases: server to server, server to client, and client
 uplink. Each use case has a runnable example, and the example is the recommended pattern. First get

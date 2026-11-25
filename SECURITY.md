@@ -2,10 +2,10 @@
 
 ## Supported Versions
 
-Releases before 5.0.0 do not promise cross-version wire or API compatibility. From 5.0.0, incompatible
-changes come only in a new major version ([docs/RELEASING.md](docs/RELEASING.md) section 1.1), so a
-security fix ships in a patch release of the current major version. Before 5.0.0, security fixes are
-applied to `main` and shipped in the next release.
+Historical pre-public releases (`3.x` and `4.x` internal V2 iterations) did not promise cross-version
+wire or API compatibility. Starting with **2.0.0** (the first public stable release of XOffset V2),
+incompatible changes come only in a new major version ([docs/RELEASING.md](docs/RELEASING.md)
+section 1.1), so security fixes ship in patch releases of the current major version.
 
 | Branch / Release | Supported |
 | --- | --- |

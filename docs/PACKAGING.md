@@ -171,10 +171,7 @@ Minimal `CMakeLists.txt` consuming a full install:
 ```cmake
 cmake_minimum_required(VERSION 3.20)   # 3.30+ for C++26 reflection installs
 project(MyConsumer LANGUAGES CXX)
-find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
-if(NOT XOffsetDatastructure_VERSION STREQUAL "4.3.0")
-    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 4.3.0")
-endif()
+find_package(XOffsetDatastructure 2.0 CONFIG REQUIRED COMPONENTS full)
 add_executable(my_app main.cpp)
 target_link_libraries(my_app PRIVATE XOffset::xoffset)
 ```
@@ -187,10 +184,11 @@ cmake --build build/consumer --config Release
 
 Storage uses `COMPONENTS storage`, `XOffset::storage` and CMake 3.13+. With no component specified,
 full is requested. The install config exposes `XOffsetDatastructure_VERSION` (from `XOFFSET_VERSION`),
-`XOffsetDatastructure_VERSION_NUMERIC` and `XOffsetDatastructure_VERSION_PRERELEASE`.
-**Any numeric, EXACT or range version request is conservatively rejected**, so that CMake does not
-silently accept an incompatible wire/API version. Find without a numeric version argument and check
-`XOffsetDatastructure_VERSION` explicitly as above.
+`XOffsetDatastructure_VERSION_NUMERIC`, `XOffsetDatastructure_VERSION_PRERELEASE` and
+`XOffsetDatastructure_VERSION_COMPATIBILITY`. Stable releases (`2.0.0` and later) use
+`SameMajorVersion` matching (`same-major-version`); **prereleases conservatively reject numeric,
+`EXACT` and range requests** (`exact-full-version-only`) so CMake never takes a prerelease for a
+stable version (find unversioned and compare `XOffsetDatastructure_VERSION` with `STREQUAL`).
 
 Source consumption via `FetchContent` (recommended for C++20/C++23 projects):
 
@@ -199,7 +197,7 @@ include(FetchContent)
 FetchContent_Declare(
     xoffsetdatastructure
     # The release's source archive (about 3 MB): no Git history, no submodules.
-    URL https://github.com/ximicpp/XOffsetDatastructure/archive/refs/tags/v4.3.0.tar.gz
+    URL https://github.com/ximicpp/XOffsetDatastructure/archive/refs/tags/v2.0.0.tar.gz
 )
 set(XOFFSET_CXX_STANDARD 20 CACHE STRING "" FORCE)
 FetchContent_MakeAvailable(xoffsetdatastructure)
@@ -212,7 +210,7 @@ Or via `add_subdirectory(path/to/XOffsetDatastructure)` followed by
 
 ## Install contents and licenses
 
-- A **C++20 / C++23 full install** installs all 30 `xoffset*.hpp` headers under `include/`, CMake config
+- A **C++20 / C++23 full install** installs all 31 `xoffset*.hpp` headers under `include/`, CMake config
   files under `lib/cmake/XOffsetDatastructure/`, `share/XOffsetDatastructure/xoffset-third-party-manifest.txt`
   recording zero third-party dependencies, and the project MIT license under
   `share/XOffsetDatastructure/licenses/LICENSE`. `tools/prepare_release.py pack-prefix --component full`

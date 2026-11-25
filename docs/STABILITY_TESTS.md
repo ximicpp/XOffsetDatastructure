@@ -104,11 +104,11 @@ contract and slot check).
 - Long-run tools for K4 (threat model F4): `tools/fuzz_nightly.sh` runs GCC 16 ASan+UBSan differential
   fuzz (`test_v2_fuzz`, 4 seeds, about 45 minutes) and regression corpus replay on a cloud Docker host;
   on a crash, `tools/fuzz_report.py` opens a `fuzz-crash` issue per signature and pushes a
-  `fuzz-crash/<signature>` branch. Results are not in CTest; they are recorded in the project files under
+  `fuzz-crash/<signature>` branch. Results are not in CTest; they are kept in the release fuzz archive under
   `fuzz-nightly/`. From 2026-10-27, the same night then runs `tools/fuzz_libfuzzer.sh`: it builds the two
   libFuzzer targets natively with the cloud P2996 toolchain (which ships the libFuzzer runtime)
-  (ASan+UBSan, `-fork=4`, about 20 minutes per target); corpora persist across nights in the project
-  files under `fuzz-nightly/corpus/`, and findings go through the same `fuzz_report.py`.
+  (ASan+UBSan, `-fork=4`, about 20 minutes per target); corpora persist across nights under
+  `fuzz-nightly/corpus/`, and findings go through the same `fuzz_report.py`.
   `fuzz_schema_evolution` was added on the night of 2026-10-27. From 2026-10-28 two more steps cover the
   client builds: `tools/fuzz_libfuzzer.sh --backend fieldlist` runs `v2_wire` and `wire_schemas` on the
   C++20 field-list build (corpora saved separately as `fieldlist-<target>.tar.gz`);

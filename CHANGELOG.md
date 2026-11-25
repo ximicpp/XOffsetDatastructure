@@ -5,6 +5,22 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+## 2.0.0: first public SemVer release (XOffset V2)
+
+First public stable release of the XOffset V2 architecture and the start of Semantic Versioning
+([RELEASING.md](docs/RELEASING.md) section 1.1). Historical `3.0.0`–`4.3.0` tags below were
+pre-public internal V2 iterations succeeding the legacy `v1.0.0` and `v2.0-*` prototypes; from
+`2.0.0` onward, incompatible wire, delta or public API changes come only in a new major version, and
+every `2.x` release interoperates on Wire 3.0 and Delta 2.0. Stable installs now support CMake
+`SameMajorVersion` `find_package` version matching (prereleases remain `exact-full-version-only`).
+Release-gate rerun evidence to be finalized before tagging `v2.0.0`.
+
+- CMake packaging (`cmake/XOffsetVersion.cmake`, `XOffsetDatastructureConfig.cmake.in`,
+  `XOffsetDatastructureConfigVersion.cmake.in`, `tools/prepare_release.py`,
+  `tools/validate_vm_package.py`): stable releases now use `same-major-version` compatibility in
+  `find_package(XOffsetDatastructure 2.0 CONFIG REQUIRED ...)` (accepting same-major numeric,
+  `EXACT` and range requests at or below the installed numeric version, rejecting cross-major or
+  newer requests); prereleases keep `exact-full-version-only` conservative rejection.
 - Fixed two edge cases in add-only schema families (`XOFFSET_SCHEMA_FAMILY`) and shared deltas:
   - `XOFFSET_SCHEMA_FAMILY` now checks non-padding leaf bytes recursively inside new plain records,
     arrays and container elements taken from `XSpare<N>` bytes, rejecting internal or tail padding

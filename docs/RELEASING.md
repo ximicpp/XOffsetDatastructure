@@ -9,38 +9,41 @@ maintainer after validation and the release PR pass (pushing tags from automated
 - `XOFFSET_VERSION` at the repository root is the only version source: `MAJOR.MINOR.PATCH`, plus
   `-(alpha|beta|rc).N` for prereleases, no leading zeros. CMake and the packaging tools fail on a
   malformed value.
-- The tag is `v` plus the version, annotated, on the merge commit of the release PR. `v1.0.0` and
-  `v2.0-*` belong to older implementations; check `git ls-remote --tags origin` for collisions.
-- The install package accepts only the full version string in `find_package`
+- The tag is `v` plus the version, annotated, on the merge commit of the release PR. Legacy
+  `v1.0.0` and `v2.0-*` tags belong to older prototype implementations, and `v3.0.0`–`v4.3.0` were
+  pre-public internal V2 iterations before the public `2.0.0` SemVer reset; check
+  `git ls-remote --tags origin` for collisions.
+- Stable install packages support CMake `SameMajorVersion` matching in `find_package`; prereleases
+  accept only unversioned discovery plus exact `STREQUAL` checks
   ([BUILD_AND_PLATFORMS.md](BUILD_AND_PLATFORMS.md)).
 
 ### 1.1 Compatibility policy
 
-**Before 5.0.0 (the 4.x releases) no API or wire compatibility is promised between versions**: a 4.x
-minor release may change the wire format or rename public API (4.2.0 did both), and both ends of a
-link upgrade together.
+**Pre-public internal iterations (`3.x` and `4.x`) did not promise API or wire compatibility between
+versions**: a minor release could change the wire format or rename public API (`4.2.0` did both),
+and both ends of a link upgraded together.
 
-**From 5.0.0, the first release meant for adoption by outside projects**, versions follow Semantic
-Versioning, with the wire format part of the contract:
+**From 2.0.0, the first public stable release of XOffset V2 meant for adoption by outside projects**,
+versions follow Semantic Versioning, with the wire format part of the contract:
 
 - **Major** (`X.0.0`): the only releases that may make an incompatible change: a wire or delta format
   that a reader of the previous major version rejects or reads differently, a change to how existing
   wires are read, or a source-incompatible change to the public API (a removed or renamed public name,
   a changed signature, a changed default that changes results). CHANGELOG lists each one with what
   to do.
-- **Minor** (`5.Y.0`): compatible additions only: new API and options, new optional behaviour,
+- **Minor** (`2.Y.0`): compatible additions only: new API and options, new optional behaviour,
   performance work. Within one major version, every release reads every wire and delta that any other
   release of that major version writes, older or newer, with the same meaning, so servers and clients
   on different minor or patch releases interoperate. The schemas (the user's types) must still match,
   as K6 requires.
-- **Patch** (`5.Y.Z`): fixes only. A fix may reject an input that a check should always have rejected
+- **Patch** (`2.Y.Z`): fixes only. A fix may reject an input that a check should always have rejected
   (a malformed wire, a security fix); it does not reject a wire a correct writer produces.
 - Not covered: ABI (the library is header-only; one executable or process uses one version), names in
   `detail` namespaces, interfaces marked experimental in [USER_GUIDE.md](USER_GUIDE.md) (such as
   `XBufferPool`), performance numbers, the text of error messages and diagnostic output, and the
   minimum compiler and platform versions, which a minor release may raise.
-- 5.0.0 also lets the CMake package accept a `find_package` request for any version of the same major
-  version.
+- Stable releases (`2.0.0` and later) accept CMake `find_package` requests for any compatible version
+  of the same major version (`SameMajorVersion`); prereleases remain `exact-full-version-only`.
 
 ## 2. Before release: Ir gates
 
@@ -197,4 +200,4 @@ release. Changes that did not pass stay under `## Unreleased`.
   `bench/perf/ledger_archive.json` ([PERF_GATE.md](PERF_GATE.md) section 4).
 - Mac stage review (head = tag, anchor = previous tag), report only, in the first free Mac slot; a
   regression gets a fix in the next patch release.
-- Record the tag, commit, `REPORT.md` and the Mac review path in the project files.
+- Record the tag, commit, `REPORT.md` and the Mac review path in the release records.

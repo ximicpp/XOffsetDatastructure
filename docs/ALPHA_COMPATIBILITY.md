@@ -1,28 +1,37 @@
-# 4.3.0 compatibility and input boundaries
+# 2.0.0 compatibility and input boundaries
 
-(The file name dates from the alpha period.) This release targets teams that pin their compiler,
+(The file name dates from the alpha period and is kept for link stability.) This release is the first
+public stable release of XOffset V2 under Semantic Versioning (`docs/RELEASING.md` section 1.1;
+historical `3.x` and `4.x` tags were pre-public internal iterations). Teams pin their compiler,
 schemas and wire format 3.0 (`docs/WIRE_FORMAT.md`) and run release acceptance tests for their
 target platforms. The core guarantees K0–K9 are defined in `docs/STABILITY_TESTS.md`; wire format
 3.0 is the current fixed wire contract (older 1.x / 2.0 / 2.1 wires are not read). Cross-version
-wire/ABI compatibility across arbitrary compilers, standard libraries, or unvalidated layouts is not
+ABI compatibility across arbitrary compilers, standard libraries, or unvalidated layouts is not
 claimed.
 
 ## Version and toolchain
 
 `XOFFSET_VERSION` at the source root (`share/XOffsetDatastructure/VERSION` after install) is the single
-text source of the full version `4.3.0`; the CMake project's numeric version is `4.3.0`. Installed
-consumers look the package up without a version and then check the full string:
+text source of the full version `2.0.0`; the CMake project's numeric version is `2.0.0`. Installed
+consumers of stable releases can request any compatible version of the same major version:
+
+```cmake
+find_package(XOffsetDatastructure 2.0 CONFIG REQUIRED COMPONENTS full)
+```
+
+Or discover unversioned and assert an exact identifier (required for prereleases):
 
 ```cmake
 find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
-if(NOT XOffsetDatastructure_VERSION STREQUAL "4.3.0")
-    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 4.3.0")
+if(NOT XOffsetDatastructure_VERSION STREQUAL "2.0.0")
+    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 2.0.0")
 endif()
 ```
 
-Storage consumers use `COMPONENTS storage` and `XOffset::storage` instead. Numeric, EXACT and version
-range lookups are all rejected, so a pre-release is not taken for a compatible stable version. In source
-builds the full version variable is `XOFFSET_VERSION_FULL`.
+Storage consumers use `COMPONENTS storage` and `XOffset::storage` instead. Stable releases use
+`SameMajorVersion` compatibility; prereleases (`-(alpha|beta|rc).N`) reject numeric, `EXACT` and
+version-range lookups so a prerelease is never taken for a stable version. In source builds the full
+version variable is `XOFFSET_VERSION_FULL`.
 
 All full-library targets require 64-bit little-endian and provide two build paths that write
 byte-identical wire format 3.0 outputs (`docs/CLIENT_TARGETS.md`):

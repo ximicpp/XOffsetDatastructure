@@ -1,4 +1,4 @@
-# V2 threat model (4.3.0; "0.3.0-beta.1" in this text means the state since that version)
+# V2 threat model (2.0.0; "0.3.0-beta.1" in this text means the state since that version)
 
 This document describes what XOffset V2 protects against when receiving an **untrusted wire**, what it
 does not, and what callers must add outside the library. Format details are in
@@ -298,13 +298,13 @@ are kept but do not run. The daily long runs moved to a cloud Docker host runnin
   pushes the input to a `fuzz-crash/<signature>` branch as
   `tests/fuzz/regressions/<target>/<signature>`. The fix PR carries this input and the fix closes the
   issue. Runs that fail without a finding are recorded on a single `fuzz-infra` issue. Results are also
-  written to the project files.
+  kept in the fuzz archive.
 - libFuzzer coverage-guided fuzzing (F1, F2, since 2026-10-27): the same night `tools/fuzz_libfuzzer.sh`
   runs next, building `fuzz_v2_wire` and `fuzz_wire_schemas` (ASan+UBSan) natively on the host with the
   P2996 toolchain built in the cloud (clang-p2996 d77eff1, with compiler-rt's libFuzzer runtime), with
   the same steps as the libfuzzer job of `fuzz.yml`: first replay the existing corpus and seeds in a
   single process, then run `-fork=4` for about 20 minutes, then merge the corpus and reproduce and
-  minimize findings. The corpus is kept across nights as a tarball in the project files; paths in the
+  minimize findings. The corpus is kept across nights as a persistent tarball; paths in the
   debug info are mapped to `/workspace`, and signatures match the Docker job. The first night found
   #130 (the harness was too strict about inputs shorter than the header; fixed, and the input went into
   the regression directory).

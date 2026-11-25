@@ -1,4 +1,4 @@
-# Performance numbers (4.3.0)
+# Performance numbers (2.0.0)
 
 Current published numbers, how they were measured, and their limits. Ratios are XOffset ÷ rival:
 **below 1 means XOffset is faster**. Compression is never timed; sizes are after zstd level 3. Older

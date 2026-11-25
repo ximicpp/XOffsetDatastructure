@@ -1,4 +1,4 @@
-# XOffsetDatastructure User Guide (4.3.0, wire format 3.0)
+# XOffsetDatastructure User Guide (2.0.0, wire format 3.0)
 
 This guide is for users of the library. It explains how to define types, build,
 modify, save and load them, and the constraints you must follow.
@@ -842,9 +842,10 @@ fails to compile.
 
 ## 8. Core guarantees and API stability
 
-Before 5.0.0, source API and wire compatibility between versions are not promised; from 5.0.0,
-incompatible wire or API changes come only in a new major version, and every release of one major
-version reads the wires of every other release of it
+Pre-public internal iterations (`3.x` and `4.x`) did not promise cross-version source API or wire
+compatibility; from **2.0.0** (the first public stable release of XOffset V2), incompatible wire or
+API changes come only in a new major version, and every release of one major version reads the wires
+of every other release of it
 ([RELEASING.md section 1.1](RELEASING.md#11-compatibility-policy)). ABI stability (mixing versions in
 one executable) is never promised. K0–K9 are the core guarantees; later versions must not regress
 them, and CHANGELOG names any renamed interface with its replacement. The
