@@ -1,6 +1,6 @@
 # XOffsetDatastructure
 
-**4.1.0** · C++20 / C++26 · header-only · 64-bit little-endian
+**4.2.0** · C++20 / C++26 · header-only · 64-bit little-endian
 
 XOffsetDatastructure keeps C++ objects, strings, vectors, sets and maps in one
 contiguous, position-independent arena. The arena bytes are the message: you
@@ -148,8 +148,8 @@ server to client (`server_to_client.cpp`), deltas (`delta_sync.cpp`,
    layout text in the shared header so a client compiler that would lay a type
    out differently fails to compile. Types with raw pointers, references or
    virtual functions are rejected at compile time.
-5. **Checks per link.** A trusted link checks the wire header and the hole
-   table bounds and does not walk the object graph. A bounds check walks the
+5. **Checks per link.** A trusted link checks the wire header and image
+   bounds and does not walk the object graph. A bounds check walks the
    container heads so that every read stays inside the message and gives a
    read-only view. A full check validates the whole graph (no overlap, exact
    coverage, sorted keys, valid values) before the buffer may be modified. No
@@ -187,8 +187,8 @@ processes; [method and all rows](bench/cppcon2024/README.md)):
 - Send + receive is XOffset's best case when the buffer was filled once: its
   wire is the buffer. In the 2026-11-17 4.1.0 baseline (before `automatic`
   emission became the default), a churned buffer grew from 3,064 to 7,928 bytes
-  and took 181 ns (0.57 of zpp::bits trusted, 1.04 full validation). On current
-  `main` (`XWireEmission::automatic` default), the churned buffer automatically
+  and took 181 ns (0.57 of zpp::bits trusted, 1.04 full validation). Since
+  4.2.0 (`XWireEmission::automatic` default), the churned buffer automatically
   emits its compact 3,552-byte image (measured 2026-11-24, 7 pinned runs on
   Xeon Skylake, GCC 16.2: 0.43 of zpp::bits trusted, 0.68 full validation).
 - Read/write is the fastest of the scored rows on the 2024 layout. On the
@@ -210,8 +210,8 @@ processes; [method and all rows](bench/cppcon2024/README.md)):
 
 **SLG game-server scorecard** (`bench/slg`: login state, per-client and shared
 viewport deltas, client orders, server hand-offs; XOffset trusted tier against
-the strongest unchecked rival per cell): **19 cells, 16 wins, 3 ties, 0
-losses** on 4.1.0. XOffset messages are 1.11–1.46x zpp_bits after zstd-3.
+the strongest unchecked rival per cell): **19 cells, 17 wins, 2 ties, 0
+losses** on 4.2.0. XOffset messages are 1.11–1.37x zpp_bits after zstd-3.
 
 These numbers hold for these workloads, adapters and hosts.
 [PERFORMANCE.md](docs/PERFORMANCE.md) has the method, the reading notes of the
@@ -238,7 +238,7 @@ include(FetchContent)
 FetchContent_Declare(
     xoffsetdatastructure
     GIT_REPOSITORY https://github.com/ximicpp/XOffsetDatastructure.git
-    GIT_TAG        v4.1.0   # pin a release tag or commit SHA
+    GIT_TAG        v4.2.0   # pin a release tag or commit SHA
 )
 set(XOFFSET_CXX_STANDARD 20 CACHE STRING "" FORCE)
 FetchContent_MakeAvailable(xoffsetdatastructure)
