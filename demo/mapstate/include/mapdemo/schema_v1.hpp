@@ -68,6 +68,7 @@ struct alignas(8) ViewSnapshot {
     std::uint32_t scene_id;
     Rect rect;
     XOffsetDatastructure::XVector<VisibleUnit> units;
+    XOffsetDatastructure::XSpare<8> spare;
 };
 struct alignas(8) UnitEvent {
     std::uint64_t tick;
@@ -90,7 +91,7 @@ XOFFSET_RECORD(mapdemo_v1::UnitState, id, scene_id, pos, speed, hp, behavior, ne
 XOFFSET_RECORD(mapdemo_v1::UnitStateBatch, tick, reserved0, units)
 XOFFSET_RECORD(mapdemo_v1::ViewRequest, request_id, scene_id, reserved0, rect)
 XOFFSET_RECORD(mapdemo_v1::VisibleUnit, id, hp, pos, behavior, name)
-XOFFSET_RECORD(mapdemo_v1::ViewSnapshot, request_id, tick, scene_id, rect, units)
+XOFFSET_RECORD(mapdemo_v1::ViewSnapshot, request_id, tick, scene_id, rect, units, spare)
 XOFFSET_RECORD(mapdemo_v1::UnitEvent, tick, unit_id, hp, pos, behavior, next_waypoint, name, path)
 
 XOFFSET_REGISTER_SCHEMA_NAME(mapdemo_v1::MapCatalog, "mapdemo.MapCatalog.v1")
@@ -100,7 +101,7 @@ XOFFSET_PIN_SCHEMA(mapdemo_v1::UnitStateBatch, "record[s:24,a:8]{@0:u64,@8:u32,@
 XOFFSET_REGISTER_SCHEMA_NAME(mapdemo_v1::ViewRequest, "mapdemo.ViewRequest.v1")
 XOFFSET_PIN_SCHEMA(mapdemo_v1::ViewRequest, "record[s:32,a:8]{@0:u64,@8:u32,@12:u32,@16:record[s:16,a:4]{@0:record[s:8,a:4]{@0:f32,@4:f32},@8:record[s:8,a:4]{@0:f32,@4:f32}}}");
 XOFFSET_REGISTER_SCHEMA_NAME(mapdemo_v1::ViewSnapshot, "mapdemo.ViewSnapshot.v1")
-XOFFSET_PIN_SCHEMA(mapdemo_v1::ViewSnapshot, "record[s:48,a:8]{@0:u64,@8:u64,@16:u32,@20:record[s:16,a:4]{@0:record[s:8,a:4]{@0:f32,@4:f32},@8:record[s:8,a:4]{@0:f32,@4:f32}},@36:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:32,a:4]{@0:u32,@4:i32,@8:record[s:8,a:4]{@0:f32,@4:f32},@16:enum<u32>,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}>}");
+XOFFSET_PIN_SCHEMA(mapdemo_v1::ViewSnapshot, "record[s:56,a:8]{@0:u64,@8:u64,@16:u32,@20:record[s:16,a:4]{@0:record[s:8,a:4]{@0:f32,@4:f32},@8:record[s:8,a:4]{@0:f32,@4:f32}},@36:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:32,a:4]{@0:u32,@4:i32,@8:record[s:8,a:4]{@0:f32,@4:f32},@16:enum<u32>,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}>,@48:spare[8]}");
 XOFFSET_REGISTER_SCHEMA_NAME(mapdemo_v1::UnitEvent, "mapdemo.UnitEvent.v1")
 XOFFSET_PIN_SCHEMA(mapdemo_v1::UnitEvent, "record[s:56,a:8]{@0:u64,@8:u32,@12:i32,@16:record[s:8,a:4]{@0:f32,@4:f32},@24:enum<u32>,@28:u32,@32:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10},@44:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:8,a:4]{@0:f32,@4:f32}>}");
 

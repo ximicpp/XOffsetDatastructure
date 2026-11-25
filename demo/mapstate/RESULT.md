@@ -413,6 +413,16 @@ were trained and measured on, `slg-d/` for the SLG measurements; sha256 in
 
 3.2 plan M2 item 7 (SC-3, SC-13): a client that has not been updated keeps
 working after the servers' schema changed, next to updated clients.
+
+Since 11-25 the two versions are one add-only family, and nothing below
+about conversion holds any more: version 1 was frozen again with reserved
+bytes at the end of `ViewSnapshot` (`XSpare<8>`), version 2 takes
+`scene_units` from them (`XOFFSET_SCHEMA_FAMILY`), so both have one
+fingerprint and the same bytes. A answers a version-1 client `same` and
+sends it the wires it sends any client, deltas included; the library no
+longer converts per peer (docs/SCHEMA_EVOLUTION.md). The conversion cost
+measured on 10-28 is removed; the runs below were not repeated. The text
+from here on describes the 10-28 design.
 Version 1 is the schema as merged with the event stream (#166), frozen by
 `mapdemo_schema_freeze` into `include/mapdemo/schema_v1.hpp` and
 `schema.lock` (#163 added the field lists a C++20 client needs to compile the
@@ -444,17 +454,6 @@ lines (six requests, three subscriptions, three handshakes), on every
 target, old and new. `run_all_tiers.sh` also runs `mapdemo_schema_freeze
 check`: it passes, reporting `ViewSnapshot` as the next version after v1
 and the other four roots equal to v1.
-
-Cost on A (GCC 16, 10000-unit tier, p50, `reuse`): converting a viewport
-snapshot (about 480 units) takes 9.4 us next to 11.7 us to build it; a full
-scene of 10000 units takes 168 us next to 165 us; the empty request right
-after a full scene takes 39 us (its buffer just held 10000 units). In
-`reuse` A converts with `evolve_into` into one kept buffer. The first
-version used `evolve<>`, which makes a new buffer per snapshot: about 55 us
-per snapshot whatever its size (`fresh` still does that; 40 us p50 in a
-200-step 10000-unit check). A version-1 snapshot is 8 bytes shorter
-(viewport 15,168 against 15,176 bytes dense; full scene 321,155 against
-321,163).
 
 Not rerun for this iteration: macOS, Android emulator and iOS Simulator; a
 Mac batch can add the old-version client. Output in the project folder

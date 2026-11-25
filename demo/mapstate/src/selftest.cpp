@@ -30,7 +30,6 @@
 #include "mapdemo/metrics.hpp"
 #include "mapdemo/net.hpp"
 #include "mapdemo/rules.hpp"
-#include "mapdemo/schema_lineage.hpp"
 #include "mapdemo/schema_probes.hpp"
 #include "mapdemo/std_model.hpp"
 
@@ -744,7 +743,7 @@ void test_net_two_process() {
     std::string detail;
     try {
         net::Conn c(fds[0]);
-        c.send(net::MsgType::Hello, 0, make_server_schema_hello<UnitStateBatch>("selftest-a"));
+        c.send(net::MsgType::Hello, 0, make_schema_hello<UnitStateBatch>("selftest-a", XSchemaRole::server));
         if (!read_schema_ack<UnitStateBatch>(c.recv({net::MsgType::HelloAck}).payload)) ex(false, "B refused the hello");
         XB cur = XB::create<UnitStateBatch>(4096, cap_batch());
         rules::init_batch(cur.root<UnitStateBatch>(), units, kDefaultSeed);
@@ -783,15 +782,15 @@ void test_net_two_process() {
     record("net_two_process", ex.ok(), ex.ok() ? detail : ex.first + " | " + detail);
 }
 
-// ---- 9. schema versions: handshake verdicts, conversion to version 1 ----------
+// ---- 9. schema versions: one add-only family, handshake verdicts -------------
 
 // A's verdict on the ViewSnapshot entry of a client Hello that works in
 // Snapshot (and in this build's other root types); `ack` gets A's answer.
 template <typename Snapshot>
 XSchemaVerdict snapshot_verdict(std::string& ack) {
     const std::string hello = make_schema_hello<MapCatalog, ViewRequest, Snapshot, UnitEvent>("selftest-client");
-    const XPeerSchemas peer =
-        XPeerSchemas::accept<MapCatalog, ViewRequest, ViewSnapshot, UnitEvent>(hello, ack, "selftest-a");
+    const XSchemaHelloResult peer =
+        accept_schema_hello<MapCatalog, ViewRequest, ViewSnapshot, UnitEvent>(hello, ack, "selftest-a");
     const XSchemaPeerEntry* e = peer.find(wire_root_type_id_v<ViewSnapshot>());
     return e != nullptr ? e->verdict : XSchemaVerdict::reject_unknown;
 }
@@ -801,45 +800,76 @@ void test_schema_versions() {
     std::string ack;
     ex(snapshot_verdict<ViewSnapshot>(ack) == XSchemaVerdict::same, "version-2 Hello is not same");
     ex(bool(handshake::read_client_ack(ack)), "a version-2 client refuses A's ack");
-    ex(snapshot_verdict<mapdemo_v1::ViewSnapshot>(ack) == XSchemaVerdict::convert, "version-1 Hello is not convert");
+    ex(snapshot_verdict<mapdemo_v1::ViewSnapshot>(ack) == XSchemaVerdict::same, "version-1 Hello is not same");
     ex(bool(read_schema_ack<mapdemo_v1::MapCatalog, mapdemo_v1::ViewRequest, mapdemo_v1::ViewSnapshot,
                             mapdemo_v1::UnitEvent>(ack)),
        "a version-1 client refuses A's ack");
+    {   // The other way round: an A still at version 1 takes a version-2 client.
+        std::string ack1;
+        const XSchemaHelloResult r =
+            accept_schema_hello<mapdemo_v1::MapCatalog, mapdemo_v1::ViewRequest, mapdemo_v1::ViewSnapshot,
+                                mapdemo_v1::UnitEvent>(handshake::client_hello("selftest-client"), ack1, "selftest-a1");
+        ex(r.accepted() && bool(handshake::read_client_ack(ack1)), "a version-1 A refuses a version-2 client");
+    }
     ex(snapshot_verdict<probe::RenamedViewSnapshot>(ack) == XSchemaVerdict::reject_names,
        "renamed fields are not reject_names");
     const XSchemaAckResult renamed = read_schema_ack<MapCatalog, ViewRequest, probe::RenamedViewSnapshot, UnitEvent>(ack);
     ex(!renamed && renamed.verdict == XSchemaVerdict::reject_names, "the renamed build does not read reject_names");
     ex(snapshot_verdict<probe::FutureViewSnapshot>(ack) == XSchemaVerdict::reject_unknown,
-       "an unknown version is not reject_unknown");
-    {   // A and B: UnitStateBatch, exact version.
+       "another generation is not reject_unknown");
+    {   // A and B: UnitStateBatch, one version.
         std::string b_ack;
-        const XSchemaHelloResult r =
-            accept_schema_hello<UnitStateBatch>(make_server_schema_hello<UnitStateBatch>("selftest-a"), b_ack, "b");
-        ex(r.accepted() && read_schema_ack<UnitStateBatch>(b_ack), "the A/B handshake was refused");
+        const XSchemaHelloResult r = accept_schema_hello<UnitStateBatch>(
+            make_schema_hello<UnitStateBatch>("selftest-a", XSchemaRole::server), b_ack, "b");
+        ex(r.accepted() && r.role == XSchemaRole::server && read_schema_ack<UnitStateBatch>(b_ack),
+           "the A/B handshake was refused");
     }
 
-    // A version-2 snapshot converted to version 1 keeps every field version 1 has.
+    // One family, one wire: a version-1 program reads A's snapshot as it is.
     XB bb = XB::load_verified<UnitStateBatch>(batch_wire(100), cap_batch());
     const std::string w2 = snapshot_wire(bb.root<UnitStateBatch>(), 9, scene_bounds());
     TypedXBuffer<ViewSnapshot> s2(XB::load_verified<ViewSnapshot>(w2, cap_snapshot()));
-    TypedXBuffer<mapdemo_v1::ViewSnapshot> s1 = evolve<mapdemo_v1::ViewSnapshot>(s2);
-    const std::string w1 = s1.save_compact(XCompactOptions{0});
-    XB back = XB::load_verified<mapdemo_v1::ViewSnapshot>(w1, cap_snapshot());
-    ex(checks::snapshot_digest_of(back.root<mapdemo_v1::ViewSnapshot>()) == checks::snapshot_digest(s2.plain_root()),
-       "the conversion changed the content");
-    ex(back.root<mapdemo_v1::ViewSnapshot>().units.size() == 100, "the conversion lost units");
-    ex(peek_wire_fingerprint(w1).fingerprint == wire_fingerprint_v<mapdemo_v1::ViewSnapshot>,
-       "the converted wire is not version 1");
-    ex(!XB::try_load_verified<mapdemo_v1::ViewSnapshot>(w2, cap_snapshot()), "a version-1 load took a version-2 wire");
-    ex(!XB::try_load_verified<ViewSnapshot>(w1, cap_snapshot()), "a version-2 load took a version-1 wire");
-    const std::string plan = evolve_plan<ViewSnapshot, mapdemo_v1::ViewSnapshot>();
-    ex(plan.find("scene_units: drop (removed)") != std::string::npos &&
-           plan.find("reserved0: drop (removed)") != std::string::npos,
-       "evolve_plan does not drop exactly the version-2 fields: " + plan);
+    ex(peek_wire_fingerprint(w2).fingerprint == wire_fingerprint_v<mapdemo_v1::ViewSnapshot>,
+       "A's wire does not carry version 1's fingerprint");
+    XResult<XB> r1 = XB::try_load_verified<mapdemo_v1::ViewSnapshot>(w2, cap_snapshot());
+    ex(bool(r1), "a version-1 load refused A's wire");
+    std::size_t edit_bytes = 0;
+    if (r1) {
+        mapdemo_v1::ViewSnapshot& v1 = r1->root<mapdemo_v1::ViewSnapshot>();
+        ex(checks::snapshot_digest_of(v1) == checks::snapshot_digest(s2.plain_root()), "version 1 reads other content");
+        ex(v1.units.size() == 100, "version 1 reads another unit count");
+        // A version-1 client writes back: it changes the snapshot in place and
+        // saves it; scene_units, in bytes version 1 does not know, stays.
+        v1.units[0].hp = v1.units[0].hp >= 100 ? 50 : v1.units[0].hp + 1;
+        const std::uint64_t edited = checks::snapshot_digest_of(v1);
+        const std::string e1 = r1->save_compact<mapdemo_v1::ViewSnapshot>(XCompactOptions{0});
+        edit_bytes = e1.size();
+        XResult<XB> at_a = XB::try_load_verified<ViewSnapshot>(e1, cap_snapshot());
+        ex(bool(at_a), "A refused a version-1 write-back");
+        if (at_a) {
+            const ViewSnapshot& back = at_a->root<ViewSnapshot>();
+            ex(checks::snapshot_digest(back) == edited, "A reads other content in a version-1 write-back");
+            ex(back.scene_units == 100, "a version-1 write-back lost scene_units");
+            ex(checks::edit_sanity_of(back).ok, "a version-1 write-back fails A's rules");
+        }
+    }
+    {   // Deltas too: A's stream patches a version-1 copy byte for byte.
+        XDeltaBaseline base;
+        XDeltaCursor cursor;
+        auto rx = TypedXBuffer<mapdemo_v1::ViewSnapshot>::create(4096, cap_snapshot());
+        std::string d;
+        for (int round = 0; round < 3; ++round) {
+            if (round) s2.plain_root().units[std::size_t(round)].hp ^= 1;
+            (void)s2.save_delta_into(d, base);
+            ex(bool(rx.try_apply_delta_verified(d, cursor)), "a version-1 copy refused A's delta");
+            ex(checks::snapshot_digest_of(rx.plain_root()) == checks::snapshot_digest(s2.plain_root()),
+               "the patched version-1 copy differs");
+        }
+    }
     record("schema_versions", ex.ok(),
-           ex.ok() ? fmt("same, convert, reject_names, reject_unknown; 100 units: v2 dense wire %zu B, converted v1 "
-                             "compact wire %zu B, same content",
-                         w2.size(), w1.size())
+           ex.ok() ? fmt("same for versions 1 and 2 both ways, reject_names, reject_unknown; 100 units: one %zu B "
+                         "wire read by both versions, a %zu B version-1 write-back read by A, deltas patch both",
+                         w2.size(), edit_bytes)
                    : ex.first);
 }
 
