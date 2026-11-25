@@ -333,7 +333,7 @@ namespace XOffsetDatastructure {
             return r;
         }
         const XSchemaHelloAck& ack = buffer.plain_root();
-        auto check = [&](const XWireFingerprint fp) -> bool {
+        auto check_root = [&](const XWireFingerprint fp) -> bool {
             for (const XSchemaAckEntry& e : ack.entries) {
                 if (e.root_type_id != fp.root_type_id || e.schema_hash != fp.schema_hash) continue;
                 const auto v = static_cast<XSchemaVerdict>(e.verdict);
@@ -349,7 +349,7 @@ namespace XOffsetDatastructure {
             r.message = "peer's ack has no entry for a root type";
             return false;
         };
-        if (!(check(wire_fingerprint_v<Roots>) && ...)) return r;
+        if (!(check_root(wire_fingerprint_v<Roots>) && ...)) return r;
         r.status = XSchemaAckResult::Status::ok;
         r.message.clear();
         return r;

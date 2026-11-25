@@ -516,7 +516,8 @@ mapping, which costs microseconds per message; such senders and receivers should
 destroyed mapping is reused by the next message:
 
 ```cpp
-XBufferPool pool({16, 16 * cap_bytes, 64u << 20});   // caches at most 16 free mappings
+// At most 16 free mappings; each reserves cap_bytes rounded up to whole pages.
+XBufferPool pool({16, 16 * (cap_bytes + (64u << 10)), 64u << 20});
 const auto cap = XBuffer::maximum_capacity(cap_bytes).with_pool(pool);
 
 XBuffer in = XBuffer::load_verified<Msg>(wire, cap);  // still fully validated
@@ -528,7 +529,9 @@ XBuffer in = XBuffer::load_verified<Msg>(wire, cap);  // still fully validated
 - The pool matches on the exact `maximum_capacity`; use the same limit for the same kind of message.
 - Free mappings in the pool still hold virtual address space and touched pages; the three `Limits`
   (block count, reserved bytes, accessible bytes) cap how much is kept; `pool.clear()` releases
-  everything immediately.
+  everything immediately. A mapping reserves its maximum capacity rounded up to whole pages
+  (`reserved_bytes()` of a buffer with that limit), so a reserved-bytes limit of exactly
+  n x `cap_bytes` keeps only n - 1 mappings.
 - `XBufferPool` is currently an experimental interface (see section 8).
 
 ### 4.2 Whole-buffer copies in one process: `clone()` / `clone_into()`
@@ -847,7 +850,7 @@ tests behind each are in [STABILITY_TESTS.md](STABILITY_TESTS.md).
 | K2 | Objects are built and modified in place in the arena, including variable-length changes, with free-block reuse | `create`, `root`, container members, `maximum_capacity`, `XGrowPolicy` |
 | K3 | What is sent is a copy owned by the caller; the sender keeps modifying | `save_verified<T>` |
 | K4 | Receive checks in three tiers (below); the full tier rejects truncation, out-of-bounds, overlap, incomplete tiling, invalid values and schema mismatch, deltas included; one ASan fuzz round with no findings before every release | `XReceiver`, `load_verified<T>`, delta apply |
-| K5 | A received buffer is modified and sent again; free space travels with the hole table | Same as K3, K4 |
+| K5 | A received buffer is modified and sent again; free space travels in the image (the free directory and the free blocks) | Same as K3, K4 |
 | K6 | Schema fingerprints must match exactly; different versions use the evolution handshake (E0) | Wire header `schema_hash` |
 | K7 | The same object representation on every verified compiler and platform | `XOFFSET_PIN_SCHEMA`; library signature baselines in `tools/sigs/`; the cross-compiler wire corpus |
 | K8 | Clients (Windows, iOS, Android) build as C++20 with their native compilers and use the same library and wire as servers ([CLIENT_TARGETS.md](CLIENT_TARGETS.md)) | Field-list backend; `tools/native_targets.sh` |
@@ -860,7 +863,7 @@ Receive checks have three tiers, chosen by the link a `XReceiver` serves (`xoffs
 
 | Tier | Default for | What it checks | What you can do after receiving |
 | --- | --- | --- | --- |
-| Trusted | Server to server, server to client, your own saved files | Wire header admission (fingerprint, limit, root offset) and hole-table bounds; skips the graph walk and delta check-table maintenance | Read and write directly |
+| Trusted | Server to server, server to client, your own saved files | Wire header admission (fingerprint, limit, root offset) and the image bounds (extent table, total length); skips the graph walk and delta check-table maintenance | Read and write directly |
 | Bounds | Client to server (`view`) | Wire header admission as above; one walk of the container headers from the root: every block inside the payload and aligned, size not above capacity, heap strings NUL-terminated, inline strings at most 10 bytes, bools only 0 or 1, total element bytes walked not above the payload size. Does not check block overlap, tiling, set/map key order or padding bytes | Read-only in place (`XView<T>`, const access only), no copy |
 | Full | When modifying data sent by clients in place; can be turned on explicitly on any link | Full graph structure validation | Read and write in place, send again |
 

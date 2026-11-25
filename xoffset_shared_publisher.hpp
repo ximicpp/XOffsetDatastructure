@@ -676,7 +676,7 @@ namespace XOffsetDatastructure::xsync {
 #if XOFFSET_SYNC_CHECKS
         /// Checks contract 2 over every entry whose change body is of tick:
         /// each holder got it (call at the end of a tick, after its messages).
-        void verify(const XSyncPublisher& pub) const {
+        void verify_delivered(const XSyncPublisher& pub) const {
             for (const Entry& e : e_) if (e.tick == pub.tick_) check_sent(e);
         }
 #endif

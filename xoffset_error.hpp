@@ -374,9 +374,9 @@ public:
 
     XOFFSET_DETAIL_INLINE bool has_value() const noexcept { return this->has_value_; }
     XOFFSET_DETAIL_INLINE explicit operator bool() const noexcept { return this->has_value_; }
-    T& value() & { require(); return this->value_; }
-    const T& value() const& { require(); return this->value_; }
-    T&& value() && { require(); return std::move(this->value_); }
+    T& value() & { require_value(); return this->value_; }
+    const T& value() const& { require_value(); return this->value_; }
+    T&& value() && { require_value(); return std::move(this->value_); }
     XOFFSET_DETAIL_INLINE T& operator*() & noexcept { return this->value_; }
     XOFFSET_DETAIL_INLINE const T& operator*() const& noexcept { return this->value_; }
     XOFFSET_DETAIL_INLINE T&& operator*() && noexcept { return std::move(this->value_); }
@@ -395,7 +395,7 @@ private:
         throw XException(this->error_.code, this->error_.message);
 #endif
     }
-    XOFFSET_DETAIL_INLINE void require() const {
+    XOFFSET_DETAIL_INLINE void require_value() const {
         if (!this->has_value_) XOFFSET_DETAIL_UNLIKELY fail_require();
     }
 };

@@ -12,7 +12,7 @@
 //             when the wire crosses machines;
 //   link    - frame each wire with its length and cap the frame size;
 //   client  - one XReceiver<XLink::from_server> per link (trusted tier: the
-//             header and hole table are checked, the graph is not walked),
+//             header and image bounds are checked, the graph is not walked),
 //             one held buffer reloaded for every wire (no new mapping per
 //             message), XStatus instead of exceptions (the client may be
 //             built with -fno-exceptions or MSVC /EHs-c-), read in place.
