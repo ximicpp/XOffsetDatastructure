@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare a frozen 07d6499 vector header with a frozen local VM header.
+"""Compare a frozen a050bdb vector header with a frozen local VM header.
 
 Each sample is a fresh process. Runs are strictly sequential, and the order of
 the two variants alternates within every case. Only harness timers are reported
@@ -20,7 +20,7 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-BASELINE = "07d649909d7f43ca0d11b85accb6d9dab991e284"
+BASELINE = "a050bdb0807e4bbba8793801496c518afd96e918"
 MIB = 1024 * 1024
 VARIANTS = ("vector_07d6499", "stable_vm")
 BOOST_LIBS = ("container", "core", "config", "throw_exception", "static_assert",

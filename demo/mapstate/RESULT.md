@@ -14,27 +14,27 @@ it. Both run the same validator and send the same bytes.
 
 | Run | Where | Status |
 | --- | --- | --- |
-| Functional + smoke numbers | cloud x86-64 VM, GCC 16.2 (Docker `gcc:16`), Release, both modes | all 135 verdicts pass (commit `7dc7f58`) |
-| Sanitizers | same, Debug, ASan+UBSan: self-test, 100-unit tier and evil in both modes | all 53 verdicts pass (commit `7dc7f58`) |
+| Functional + smoke numbers | cloud x86-64 VM, GCC 16.2 (Docker `gcc:16`), Release, both modes | all 135 verdicts pass (commit `f94c5c6`) |
+| Sanitizers | same, Debug, ASan+UBSan: self-test, 100-unit tier and evil in both modes | all 53 verdicts pass (commit `f94c5c6`) |
 | Mixed modes | Release: B `fresh`, A `reuse`, client `fresh`, 100 units x 500 steps | all exit 0; step wires equal those of the all-`fresh` tier at 500 / 500 ticks |
-| Same bytes as before the iteration | self-test chain, 100 units x 300 ticks and 10000 x 200, against the same chain built from d58781e's schema | last result digests `ad708058dafcb733` and `6b38b6eb73627adc` in both |
-| Library, local validation (the project does not use GitHub CI) | GCC 16.2 Docker: full CTest Debug, full CTest ASan+UBSan, validation differential d58781e vs `7dc7f58` (200,000 cases, seeds 1 and 2) | Debug 88 / 88, ASan+UBSan 88 / 88, differential identical outcomes (no library file changes) |
-| Window client, headless display | cloud Xvfb, GCC 16, 10000 units, `--auto-drag --check` (commit `d8328f1`, before the iteration) | screenshots at frames 60 / 180 / 420 show units moving, the event-driven name changes and another area after the drag; `direct_read` 69 / 69 snapshots (32,441 records and names in the live buffer). The reuse-mode window client is only syntax-checked in the cloud (no X11 / GL headers); it is built and run on the Mac |
+| Same bytes as before the iteration | self-test chain, 100 units x 300 ticks and 10000 x 200, against the same chain built from ee806e0's schema | last result digests `ad708058dafcb733` and `6b38b6eb73627adc` in both |
+| Library, local validation (the project does not use GitHub CI) | GCC 16.2 Docker: full CTest Debug, full CTest ASan+UBSan, validation differential ee806e0 vs `f94c5c6` (200,000 cases, seeds 1 and 2) | Debug 88 / 88, ASan+UBSan 88 / 88, differential identical outcomes (no library file changes) |
+| Window client, headless display | cloud Xvfb, GCC 16, 10000 units, `--auto-drag --check` (commit `279325a`, before the iteration) | screenshots at frames 60 / 180 / 420 show units moving, the event-driven name changes and another area after the drag; `direct_read` 69 / 69 snapshots (32,441 records and names in the live buffer). The reuse-mode window client is only syntax-checked in the cloud (no X11 / GL headers); it is built and run on the Mac |
 | Same bytes across compiler and platform | Apple M4 Mac, clang-p2996 d77eff1, arm64, against the cloud GCC 16 x86-64 run (`MAPDEMO_COMPARE`) | deferred (Mac queue, 10-26): Mac step file `slg-demo-20261022/review-20261024/MAC_STEPS_DEMO_REVIEW.md`, not yet queued |
 | Formal timing + window client | Apple M4 Mac, clang-p2996 d77eff1, Release, both modes, two rounds | deferred (Mac queue, 10-26): same Mac step file |
-| Earlier: GitHub CI | job `mapdemo-gcc16` (GCC 16 + P2996 Clang three tiers + ASan) | green on PR #34 (`e6d72bc`); GitHub CI is no longer used, the job stays in `ci.yml` unrun |
+| Earlier: GitHub CI | job `mapdemo-gcc16` (GCC 16 + P2996 Clang three tiers + ASan) | green on PR #34 (`2a0b029`); GitHub CI is no longer used, the job stays in `ci.yml` unrun |
 | End to end, cloud (10-27) | Linux A/B GCC 16 C++26; clients Linux C++26 and C++20, Windows MinGW, MSVC 19.44 and clang-cl 19 under wine, Android arm64 under qemu; 1 / 100 / 10000 x 500 steps, `--encoding cycle` | all six targets PASS (section 5) |
 | End to end, sanitizers (10-27) | same, GCC 16 Debug ASan+UBSan, both buffer modes | PASS: self-check 23 / 23, replay 60 / 60, 151 / 151 verdicts (with step wires equal to `full1`), no sanitizer report |
-| Final local validation (10-27) | rebased on next_cpp26 5af77d3 (field-list backend #149): `full3` (six targets) and `asan2` | both PASS; corpus of `full1` replayed 60 / 60 on every target, step wires equal to `full1` at 500 / 500 ticks in every tier and mode |
+| Final local validation (10-27) | rebased on next_cpp26 3964260 (field-list backend #149): `full3` (six targets) and `asan2` | both PASS; corpus of `full1` replayed 60 / 60 on every target, step wires equal to `full1` at 500 / 500 ticks in every tier and mode |
 | End to end, macOS client (10-27) | Mac M4: Apple clang 21 C++20 client; A/B GCC 16 C++26 in a Linux arm64 VM (colima) on the same Mac | PASS: self-check 23 / 23, replay 60 / 60, 74 / 74 verdicts; step wires equal to the cloud x86-64 run at 500 / 500 ticks in every tier |
 | Window client, cloud (10-27) | Xvfb, GCC 13 C++20 client with raylib 5.5, 10000 units, `--auto-drag --check --encoding cycle` | screenshots at frames 60 / 180 / 420 (`e2e-20261027/shots-cloud-xvfb/`), `direct_read` 69 / 69, all three encodings |
-| End to end, Android emulator (10-28) | Mac M4: Android 15 emulator (API 35, google_apis arm64-v8a, 16 KB pages), NDK r29 C++20 client; A/B GCC 16 C++26 in a Linux arm64 VM (colima) on the same Mac; next_cpp26 00b5d35 | PASS: self-check 23 / 23, replay 60 / 60, 74 / 74 verdicts; step wires equal to the cloud x86-64 run at 500 / 500 ticks in every tier; library CTest 91 / 91 on the emulator. Emulator numbers, not device numbers |
-| End to end, clients without exceptions (10-28) | cloud, next_cpp26 c928334 with #155: A/B GCC 16 C++26; the six client builds of `full3`, each also built without exceptions (`mapdemo_client_noexc`), 12 targets against the corpus and step wires of `full1` (`noexc3`); ASan+UBSan run of both C++26 clients in both buffer modes; window client under Xvfb | PASS: self-check 23 / 23, replay 60 / 60, tiers + evil on all 12 targets, with the same self-check and evil outcomes and refusal texts on all of them; step wires equal to `full1` at 500 / 500 ticks; sanitizers 151 / 151 and 149 / 149 verdicts, no report. Verification is 1.08x to 1.29x slower without exceptions (section 5) |
-| Window client, macOS (10-28) | Mac M4, macOS 27.2: Apple clang 21 C++20 client with raylib 5.5, 10000 units, `--auto-drag --check`; A/B GCC 16 C++26 in a Linux arm64 VM (colima); next_cpp26 00b5d35 | client exit 0, screenshots at frames 60 / 180 / 420, `direct_read` 71 / 71, 59 fps |
-| End to end, iOS Simulator (10-28) | Mac M4: iOS 27.0 Simulator (iPhone 17, Xcode 27.1), Apple clang 21 C++20 clients with and without exceptions; A/B GCC 16 C++26 in a Linux arm64 VM (colima) on the same Mac; next_cpp26 af601ea plus #160 (tests only) | PASS, both clients: self-check 23 / 23, replay 60 / 60, 74 / 74 and 75 / 75 verdicts, the same self-check and evil outcomes; step wires equal to the cloud x86-64 run at 500 / 500 ticks in every tier; library CTest 129 / 129 in the simulator, corpus identical. Simulator numbers, not device numbers |
-| Event stream, small messages (10-28) | cloud, branch `claude/small-msg-dict-20261028` on next_cpp26 6ee9e6d: the 12 client targets of `noexc3`, run twice against the corpus and step wires of `full1` (`events_off`, then `events_cycle` with `--events cycle`); ASan+UBSan with events in both buffer modes | PASS: self-check 48 / 48 on all 12 (23 old + 25 event cases, same outcomes and texts), replay 60 / 60, step wires equal to `full1`; `events_off` has exactly the verdict counts of `noexc3`; `events_cycle` adds the event verdicts on every target and the same event frames and digests on all 12; sanitizers 165 / 165 twice, no report (section 6). macOS, Android emulator and iOS Simulator were not rerun |
-| Old-version client (10-28) | cloud, branch `claude/mapdemo-old-client-20261028` on next_cpp26 964b2bc: A/B GCC 16 C++26 on schema version 2; `mapdemo_client_v1` (frozen version 1) on the six client builds, each tier with the same build's version-2 client on the same A at the same time; the 12 version-2 targets again with a new corpus; ASan+UBSan of both clients in both buffer modes | PASS: old client self-check 48 / 48, replay of the `full1` corpus 60 / 60, three tiers with both clients passing, evil (renamed fields refused with `reject_names`); version-2 targets 12 / 12; step wires equal to `full1` at 500 / 500 ticks everywhere; sanitizers 178 / 178, no report (section 7). macOS, Android emulator and iOS Simulator not rerun |
-| Write-back (10-28) | cloud, branch `claude/mapdemo-writeback-20261028` on next_cpp26 ed04500: A/B GCC 16 C++26; every tier with two writing clients (`--edits 10`): the 12 client targets, each with a client of another platform as the second (`wb12b`); the six old-version targets with the version-2 client (`v1wb`); ASan+UBSan of both C++26 clients in both buffer modes; Mac M4: macOS, Android emulator and iOS Simulator clients, each platform's two clients writing back to each other | PASS: `wb12b` 12 / 12 (self-check 49 / 49, replay 60 / 60, the same self-check and evil texts everywhere, step wires equal to `full1`; every edit A accepted equals its sender's, 1,384 `Forward` frames all with A's rebuilt bytes and the sender's content; three bad write-backs refused); `v1wb` 6 / 6; sanitizers 220 / 220, no report; Mac: every client verdict passes in all three columns, step wires equal to the cloud run (section 8). Emulator and simulator numbers, not device numbers |
+| End to end, Android emulator (10-28) | Mac M4: Android 15 emulator (API 35, google_apis arm64-v8a, 16 KB pages), NDK r29 C++20 client; A/B GCC 16 C++26 in a Linux arm64 VM (colima) on the same Mac; next_cpp26 b7cb911 | PASS: self-check 23 / 23, replay 60 / 60, 74 / 74 verdicts; step wires equal to the cloud x86-64 run at 500 / 500 ticks in every tier; library CTest 91 / 91 on the emulator. Emulator numbers, not device numbers |
+| End to end, clients without exceptions (10-28) | cloud, next_cpp26 93a4dfa with #155: A/B GCC 16 C++26; the six client builds of `full3`, each also built without exceptions (`mapdemo_client_noexc`), 12 targets against the corpus and step wires of `full1` (`noexc3`); ASan+UBSan run of both C++26 clients in both buffer modes; window client under Xvfb | PASS: self-check 23 / 23, replay 60 / 60, tiers + evil on all 12 targets, with the same self-check and evil outcomes and refusal texts on all of them; step wires equal to `full1` at 500 / 500 ticks; sanitizers 151 / 151 and 149 / 149 verdicts, no report. Verification is 1.08x to 1.29x slower without exceptions (section 5) |
+| Window client, macOS (10-28) | Mac M4, macOS 27.2: Apple clang 21 C++20 client with raylib 5.5, 10000 units, `--auto-drag --check`; A/B GCC 16 C++26 in a Linux arm64 VM (colima); next_cpp26 b7cb911 | client exit 0, screenshots at frames 60 / 180 / 420, `direct_read` 71 / 71, 59 fps |
+| End to end, iOS Simulator (10-28) | Mac M4: iOS 27.0 Simulator (iPhone 17, Xcode 27.1), Apple clang 21 C++20 clients with and without exceptions; A/B GCC 16 C++26 in a Linux arm64 VM (colima) on the same Mac; next_cpp26 e97c681 plus #160 (tests only) | PASS, both clients: self-check 23 / 23, replay 60 / 60, 74 / 74 and 75 / 75 verdicts, the same self-check and evil outcomes; step wires equal to the cloud x86-64 run at 500 / 500 ticks in every tier; library CTest 129 / 129 in the simulator, corpus identical. Simulator numbers, not device numbers |
+| Event stream, small messages (10-28) | cloud, branch `claude/small-msg-dict-20261028` on next_cpp26 0671ef3: the 12 client targets of `noexc3`, run twice against the corpus and step wires of `full1` (`events_off`, then `events_cycle` with `--events cycle`); ASan+UBSan with events in both buffer modes | PASS: self-check 48 / 48 on all 12 (23 old + 25 event cases, same outcomes and texts), replay 60 / 60, step wires equal to `full1`; `events_off` has exactly the verdict counts of `noexc3`; `events_cycle` adds the event verdicts on every target and the same event frames and digests on all 12; sanitizers 165 / 165 twice, no report (section 6). macOS, Android emulator and iOS Simulator were not rerun |
+| Old-version client (10-28) | cloud, branch `claude/mapdemo-old-client-20261028` on next_cpp26 4e642c1: A/B GCC 16 C++26 on schema version 2; `mapdemo_client_v1` (frozen version 1) on the six client builds, each tier with the same build's version-2 client on the same A at the same time; the 12 version-2 targets again with a new corpus; ASan+UBSan of both clients in both buffer modes | PASS: old client self-check 48 / 48, replay of the `full1` corpus 60 / 60, three tiers with both clients passing, evil (renamed fields refused with `reject_names`); version-2 targets 12 / 12; step wires equal to `full1` at 500 / 500 ticks everywhere; sanitizers 178 / 178, no report (section 7). macOS, Android emulator and iOS Simulator not rerun |
+| Write-back (10-28) | cloud, branch `claude/mapdemo-writeback-20261028` on next_cpp26 a7993db: A/B GCC 16 C++26; every tier with two writing clients (`--edits 10`): the 12 client targets, each with a client of another platform as the second (`wb12b`); the six old-version targets with the version-2 client (`v1wb`); ASan+UBSan of both C++26 clients in both buffer modes; Mac M4: macOS, Android emulator and iOS Simulator clients, each platform's two clients writing back to each other | PASS: `wb12b` 12 / 12 (self-check 49 / 49, replay 60 / 60, the same self-check and evil texts everywhere, step wires equal to `full1`; every edit A accepted equals its sender's, 1,384 `Forward` frames all with A's rebuilt bytes and the sender's content; three bad write-backs refused); `v1wb` 6 / 6; sanitizers 220 / 220, no report; Mac: every client verdict passes in all three columns, step wires equal to the cloud run (section 8). Emulator and simulator numbers, not device numbers |
 
 Sections 1 to 4 were recorded before 10-27. The 10-27 schema change (V2.1
 wire, filler fields removed) changes the step and snapshot bytes, so their
@@ -178,11 +178,11 @@ Branch `claude/mapdemo-e2e-20261027`, `tools/run_e2e.sh`. A and B: GCC
 16.2, C++26 reflection, statically linked so they run on the VM next to the
 clients. Each client target ran `--self-check`, `--replay` of one corpus,
 the three tiers with `--encoding cycle` (`reuse`) and `--evil`. Two runs:
-`full1` (four targets, on the field-list branch 83c21b9) wrote the corpus;
-`full2` (six targets, rebased on c8fc851 with the MSVC toolchains and
-next_cpp26 431a7ee) replayed that corpus and compared its step wires with
+`full1` (four targets, on the field-list branch 395108b) wrote the corpus;
+`full2` (six targets, rebased on 2c23371 with the MSVC toolchains and
+next_cpp26 1e7ec14) replayed that corpus and compared its step wires with
 `full1`: 500 / 500 ticks equal in every tier, so the rebase changed no byte.
-`full3` and `asan2` repeat this on next_cpp26 5af77d3 with the same result
+`full3` and `asan2` repeat this on next_cpp26 3964260 with the same result
 (the table below is `full3`). Output in the project folder
 `slg-demo-20261022/e2e-20261027/` (`mapdemo_e2e_cloud_full{1,2,3}.tgz`,
 `mapdemo_e2e_cloud_asan{1,2}.tgz`, `E2E_RESULT_cloud_full{1,2,3}.md`).
@@ -199,7 +199,7 @@ next_cpp26 431a7ee) replayed that corpus and compared its step wires with
 | android (Mac M4, separate run, 10-28) | Android 15 emulator, arm64-v8a; A/B in colima, Linux arm64 | NDK r29 Clang 21, API 28, C++20, field lists | 23 / 23 | 60 / 60 | 74 / 74 | 3 / 3 equal to the cloud x86-64 run |
 | ios (Mac M4, separate run, 10-28) | iOS 27.0 Simulator (iPhone 17), arm64; A/B in colima, Linux arm64 | Apple clang 21, iPhoneSimulator 27.1 SDK, C++20, field lists | 23 / 23 | 60 / 60 | 74 / 74 | 3 / 3 equal to the cloud x86-64 run |
 | ios-noexc (same run) | same | same, without exceptions | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 equal to the cloud x86-64 run |
-| android (Xiaomi M2102K1C, separate run, 10-28, v3.2.0-rc.1 39de636) | Android 11 phone (API 30), arm64-v8a, USB `adb reverse`; A/B in WSL2 Docker, Linux x86-64 | NDK r29 Clang 21, API 28, C++20, field lists | 23 / 23 | 60 / 60 | 74 / 74 | - |
+| android (Xiaomi M2102K1C, separate run, 10-28, v3.2.0-rc.1 5d9f63d) | Android 11 phone (API 30), arm64-v8a, USB `adb reverse`; A/B in WSL2 Docker, Linux x86-64 | NDK r29 Clang 21, API 28, C++20, field lists | 23 / 23 | 60 / 60 | 74 / 74 | - |
 | android-noexc (same run) | same | same, without exceptions | 23 / 23 | 60 / 60 | 75 / 75 | 3 / 3 equal to the reference host of that run |
 
 What this shows:
@@ -233,7 +233,7 @@ on), both buffer modes: self-check 23 / 23, replay 60 / 60, three tiers x two
 modes + evil x two, no sanitizer report (`asan1` 145 / 145 verdicts;
 `asan2` on next_cpp26 151 / 151, step wires equal to `full1`).
 
-Android emulator (10-28, next_cpp26 00b5d35): the client built with NDK r29
+Android emulator (10-28, next_cpp26 b7cb911): the client built with NDK r29
 ran inside the Android 15 emulator (API 35, google_apis arm64-v8a image
 with 16 KB pages) on the Mac M4 and reached A in colima through the
 emulator's host address 10.0.2.2. It passed self-check, the replay of the cloud corpus
@@ -247,7 +247,7 @@ zstd, decoded in 463 us and verified in 34 us. Output:
 `dfa319384cc2b82b2152560a4c67f2c2ca0b9b5cd70ee8bafab20614ac17f3ff`), result
 table `out-android/android/demo/E2E_RESULT.md`.
 
-Android phone (10-28, v3.2.0-rc.1, commit 39de636 only): a Xiaomi
+Android phone (10-28, v3.2.0-rc.1, commit 5d9f63d only): a Xiaomi
 M2102K1C on Android 11 ran both clients against A/B built by GCC 16.2 (C++26
 reflection) in WSL2 Docker, through Windows adb with `adb reverse`; on the
 same phone the library's CTest passed 114 / 114 and the 15 compile-failure
@@ -265,7 +265,7 @@ clang-cl `/EHs-c- /D_HAS_EXCEPTIONS=0`). Its failures are values
 (`include/mapdemo/result.hpp`), and snapshots go through `try_load_verified` /
 `try_reload_verified` (SC-8, #148). Each run covered the six targets of
 `full3`, each with and without exceptions, against the corpus and step wires
-of `full1`. The final run `noexc3` (next_cpp26 c928334 with the MinGW fix
+of `full1`. The final run `noexc3` (next_cpp26 93a4dfa with the MinGW fix
 #155, and A's close below) passed on all 12 targets: self-check 23 / 23,
 replay 60 / 60, the three tiers and evil, and step wires equal at 500 / 500
 ticks. `e2e_report.py` found the same self-check outcomes and refusal texts,
@@ -274,7 +274,7 @@ and the same evil outcomes, on all 12 targets. Further runs on the same tree:
   151 / 151 and 149 / 149 verdicts, no sanitizer report.
 - The window client without exceptions under Xvfb: 10000 units, all three
   encodings, `direct_read` 68 / 68.
-- `noexc1` (next_cpp26 579ca44 with the same MinGW fix) also passed on all 12
+- `noexc1` (next_cpp26 fd66220 with the same MinGW fix) also passed on all 12
   targets.
 
 The Linux client without exceptions references none of `__cxa_throw`,
@@ -321,7 +321,7 @@ files, with sha256 in `SHA256SUMS`.
 The macOS window run first crashed in raylib 5.5's InitWindow (no monitor:
 the Mac's screen was asleep); the client now exits 2 with "cannot open a
 window" instead (checked without a display and under Xvfb). With the screen
-awake (10-28, next_cpp26 00b5d35) the window client ran on the Mac M4 against
+awake (10-28, next_cpp26 b7cb911) the window client ran on the Mac M4 against
 A and B in colima: exit 0, three screenshots, `direct_read` 71 / 71. The frame
 420 status bar reads tick 270, 474 units visible, a 15,376 B snapshot sent as
 6,666 B of zstd, view round trip 17 ms (frame-paced), `reload_verified` 8.0
@@ -329,7 +329,7 @@ us, 59 fps. Output: `mobile_sim_macos_window_out.tar.gz` in the project folder
 (sha256 `0f71e100757c95f10ed2b62e04cb956763c75ec3cf208ce0a2e4e9af7dc87043`),
 screenshots under `out-macos-window/macos/shots/`.
 
-iOS Simulator (10-28): the pack was next_cpp26 af601ea plus #160, which
+iOS Simulator (10-28): the pack was next_cpp26 e97c681 plus #160, which
 changes only tests. The clients built with and without exceptions (Apple
 clang 21, iPhoneSimulator 27.1 SDK) ran in the iOS 27.0 Simulator (iPhone 17)
 on the Mac M4 against A and B in colima. Both passed self-check, the replay of
@@ -416,7 +416,7 @@ working after the servers' schema changed, next to updated clients.
 Version 1 is the schema as merged with the event stream (#166), frozen by
 `mapdemo_schema_freeze` into `include/mapdemo/schema_v1.hpp` and
 `schema.lock` (#163 added the field lists a C++20 client needs to compile the
-snapshot). Freezing again on next_cpp26 964b2bc gives both files byte for
+snapshot). Freezing again on next_cpp26 4e642c1 gives both files byte for
 byte. Version 2 adds `scene_units` and `reserved0` to `ViewSnapshot` (48 to
 56 bytes; every snapshot wire grows by 8 bytes); the other four roots, the
 step wires and the event stream are unchanged. `mapdemo_client_v1` is the
@@ -531,7 +531,7 @@ wine and qemu are longer and are not device numbers):
 | `Edit` -> `EditAck` | client | 0.27 to 0.37 ms; 0.47 to 0.61 ms when the other client on A runs under wine |
 | verify a `Forward` | the other client | p50 6.8 to 8.1 us; mean 16 to 28 us, since the first two of a run take 100 to 200 us |
 
-Mac M4 (10-28, pack of next_cpp26 c804992, demo only: no library change,
+Mac M4 (10-28, pack of next_cpp26 84635d6, demo only: no library change,
 so no library CTest on the emulator or simulator): A/B GCC 16 C++26 in a
 Linux arm64 VM (colima) on the Mac; in each column the platform's client
 with exceptions and the one without run on the same A and write back to

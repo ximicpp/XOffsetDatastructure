@@ -61,7 +61,7 @@ receiver runs full validation. These notes change no verdict.
 - **UL.recv and UL.send mostly time the clock.** Two `steady_clock` reads per message cost about 30 ns
   on cloud Xeon hosts, which pulls small-order ratios toward 1. In 4.2.0 UL.recv is 0.866 [0.78–0.93]
   (win) and UL.send is 0.681 [0.64–0.70] (report only).
-- **The Mac run is against zpp_bits only.** After PR #290 (158d0754) the Mac mini scored 18 wins,
+- **The Mac run is against zpp_bits only.** After PR #290 (d13ef15b) the Mac mini scored 18 wins,
   1 tie, 0 losses with zpp_bits as the only rival. cista_unchecked, the strongest cloud rival of six
   cells (B, S, SD, EBW.recv, UPW.recv, UCW.recv), was not run there, so it is not the same measure.
 - **zpp_bits always checks bounds.** Receive cells against it compare a checked decoder with XOffset's
