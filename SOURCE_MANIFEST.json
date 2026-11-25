@@ -32,9 +32,9 @@
       "sha256": "f1f7f98c21afb92057a18d0917892d568ff5b4ede2586bbcac0bdfc97d523ba6"
     },
     "CHANGELOG.md": {
-      "bytes": 51755,
+      "bytes": 51828,
       "mode": 420,
-      "sha256": "2f44857bfd68d2f518d15613a88b353ec50cece75aeebeb74d7676fbf6e56ffb"
+      "sha256": "5ed58c62295237d3e6ace8890b3f7629059d116073966144f17e3f17de72fee2"
     },
     "CMakeLists.txt": {
       "bytes": 8503,
@@ -52,9 +52,9 @@
       "sha256": "0c16fbcd9aa84484e0767074f9473fdaf3fb90ea89c20d6441f4220c3ed55114"
     },
     "README.md": {
-      "bytes": 7079,
+      "bytes": 4339,
       "mode": 420,
-      "sha256": "ed257e1d33805ef4ab132a5c045ead57a52aa3024ee53bdd584579e51542276b"
+      "sha256": "fe5555b99b0e7555e4e5fabed21fa18192272f817dfe4b9aeee56425f196f521"
     },
     "XOFFSET_VERSION": {
       "bytes": 6,
@@ -252,9 +252,9 @@
       "sha256": "0aeeb832ffdeac243b7028f1f8bee75d08ab203906849991c391629a12e68aa8"
     },
     "docs/PACKAGING.md": {
-      "bytes": 22243,
+      "bytes": 22381,
       "mode": 420,
-      "sha256": "5c2fb6f3996321527c86169341d80f90b0189c492195b0109686090966091cbf"
+      "sha256": "b7b0244afe461ce9bf63a18f6ca96a36f9850816bbf6e285714663982a21ed3c"
     },
     "docs/VALIDATION_RUNNER.md": {
       "bytes": 10833,

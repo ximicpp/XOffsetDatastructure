@@ -54,7 +54,7 @@ growth paths that can report a capacity error, so the performance numbers measur
   x 500 steps in both buffer modes, failure inputs). The demo is the only run of the server to client
   path between processes over TCP; its `writeback` self-test failed from 4.2.0 until the fix below
   without any validation step noticing.
-- Performance documentation measured on 4.3.0. PERFORMANCE.md section 2 and the README come from a new
+- Performance documentation measured on 4.3.0. PERFORMANCE.md section 2 comes from a new
   `bench/premises` run (2026-11-25, 31 processes, `results/2026-11-25/`): the churned-buffer losses of
   the 4.1.0 run are gone under the default `automatic` emission (from 2.9 KB up, trusted 0.32–0.60
   and full validation 0.51–0.76 of zpp::bits), and full validation loses narrowly only below about
@@ -69,10 +69,11 @@ growth paths that can report a capacity error, so the performance numbers measur
   4.2.0 the default `save_verified` may send the compact wire, which leaves them behind, and the test
   failed. A's check is unchanged: its `save_compact` rebuild drops those bytes. Library and wire
   unchanged.
-- README trimmed to the core features, the performance comparison and a quick start. The short
-  example and the description of the arena moved to the new `docs/HOW_IT_WORKS.md`, the CppCon 2024
-  `Character` notes to PERFORMANCE.md section 2, and the tested compiler floors and the default
-  language standard to BUILD_AND_PLATFORMS.md. Documentation only.
+- README trimmed to a short description, the CppCon 2024 `Character` benchmark and a quick start. The
+  SLG scorecard and the other comparisons are in PERFORMANCE.md only; the short example and the
+  description of the arena moved to the new `docs/HOW_IT_WORKS.md`, the CppCon 2024 `Character` notes
+  to PERFORMANCE.md section 2, and the tested compiler floors and the default language standard to
+  BUILD_AND_PLATFORMS.md. Documentation only.
 - Threads: 2.0.0 supports one thread per buffer. The new USER_GUIDE section 3.6 states the rule: a
   buffer, with its proxies, `XHandle`s, delta baselines and `edit()`/`read()` scopes, is used by one
   thread at a time, reads included (a proxy's first use, a `read()` scope and `save_delta_into` with

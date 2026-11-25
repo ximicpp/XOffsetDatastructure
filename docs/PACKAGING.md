@@ -3,8 +3,10 @@
 This library supports two build paths that produce byte-identical wires: **C++20 / C++23 field-list
 builds** (standard platform compilers, zero external dependencies or submodules) and **C++26 reflection
 builds** (GCC 16+ or P2996 Clang, with pinned TypeLayout/Boost headers for reflection signature tools).
-Source API, ABI and long-term wire compatibility across versions are not promised without an explicit
-release compatibility commitment. Read [compatibility and input boundary](ALPHA_COMPATIBILITY.md) first.
+From 2.0.0 releases follow Semantic Versioning: incompatible wire, delta or public API changes come only
+in a new major version, and every `2.x` release reads the wires and deltas of every other `2.x` release;
+ABI is not promised ([RELEASING.md](RELEASING.md) section 1.1). Read
+[compatibility and input boundary](ALPHA_COMPATIBILITY.md) first.
 This version uses Wire Format 3.0 ([WIRE_FORMAT.md](WIRE_FORMAT.md)) and does not read Wire 2.1 or V1
 wires; save/load copy bytes into a working buffer rather than borrowing unaligned external memory directly.
 
