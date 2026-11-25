@@ -926,7 +926,7 @@ namespace XOffsetDatastructure {
     };
 
     // N bytes a record keeps for fields of its later versions (type
-    // evolution: docs/SCHEMA_EVOLUTION.md section 9). A program writes only
+    // evolution: docs/SCHEMA_EVOLUTION.md). A program writes only
     // zero into its own spare bytes (the default member initializer) and never
     // reads them; a newer peer keeps fields there, so no check requires them
     // to be zero. Alignment 1; its own token in the wire signature, so

@@ -1,5 +1,5 @@
 // In-family send, receive and delta against the same-version ones: the Ir
-// rows of the add-only type evolution (docs/SCHEMA_EVOLUTION.md section 9,
+// rows of the add-only type evolution (docs/SCHEMA_EVOLUTION.md,
 // docs/PERF_GATE.md "family.*"). The type is the SLG PlayerState with
 // reserved bytes (8 per Hero, 16 at the root), in two versions of one
 // family: v2 takes Hero::awaken and PlayerState::vip_exp from v1's XSpare

@@ -9,7 +9,7 @@
 #include "xoffset_wire.hpp"
 
 namespace XOffsetDatastructure {
-    // Add-only type evolution (docs/SCHEMA_EVOLUTION.md section 9):
+    // Add-only type evolution (docs/SCHEMA_EVOLUTION.md):
     // XOFFSET_SCHEMA_FAMILY(New, Prev) (xoffset_schema_family.hpp) names Prev
     // the version New adds fields to. The versions of one family have the
     // same image bytes and carry the fingerprint of the first one.

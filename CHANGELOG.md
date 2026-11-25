@@ -32,7 +32,7 @@ of this file and in the pull requests.
   from `reserved_bytes()`. `helloworld`, `stable_storage`, `schema_handshake`, `delta_sync` and
   `shared_delta` (and the C++26 `demo`) now run under CTest with `assert` on.
 - Add-only type versions without conversion ([SCHEMA_EVOLUTION.md](docs/SCHEMA_EVOLUTION.md)
-  section 9). `XSpare<N>` reserves N opaque zero bytes; `XOFFSET_SCHEMA_FAMILY(New, Prev)` declares that
+  sections 1 to 5). `XSpare<N>` reserves N opaque zero bytes; `XOFFSET_SCHEMA_FAMILY(New, Prev)` declares that
   `New` only takes fields from `Prev`'s spare bytes (or turns an `XSpare<N>` element into a record of N
   bytes), and the build fails with the rule and the field when it does anything else. Every version
   of a family has the first version's fingerprint, so old and new programs exchange whole wires, image
@@ -42,6 +42,32 @@ of this file and in the pull requests.
   declare no family keep their fingerprints and their code (the same machine code on GCC 16 and P2996);
   the Ir gate's new `family.*` rows require a send, receive and delta between versions to cost exactly
   what they cost within one version. New test `fuzz_schema_family` (pre-release fuzz now about 4.5 hours).
+- One evolution model ([SCHEMA_EVOLUTION.md](docs/SCHEMA_EVOLUTION.md), rewritten): a field added in
+  reserved bytes keeps the fingerprint (above); any other change starts a new generation. Programs of
+  different generations do not talk (the handshake refuses them), and stored data of an older
+  generation is upgraded once on load (`evolve_load_verified` with `XOFFSET_SCHEMA_LINEAGE`, each entry
+  the last version of a generation). Nothing converts messages per peer any more.
+  **Breaking (source):** removed from `xoffset_evolution.hpp`, with what to use instead:
+  - `XPeerSchemas` (`accept`, `load_verified`, `save`, `save_into`, `sends_working_version`, ...):
+    `accept_schema_hello<Roots...>` (`xoffset_handshake.hpp`) answers the hello; afterwards the peer
+    works in this program's generation, so the plain `load_verified` and `save_*` calls apply. A server
+    that must still serve a peer of an older generation converts each message itself with
+    `evolve<Old>(buffer)` and `save_compact`.
+  - `XBroadcast<W>`: send the same wire to every peer (one generation, one encoding).
+  - `make_server_schema_hello<Roots...>(label)`: `make_schema_hello<Roots...>(label, XSchemaRole::server)`.
+  - `XOFFSET_SCHEMA_NAME_ALIAS` (a rename under the same layout): renames are not compatible changes;
+    keep the released names, or start a new generation.
+  - `XPeerSchemas::load_verified` for stored data: `evolve_load_verified<W>`.
+  **Behaviour change:** the handshake verdict `convert` (value 1) is retired: nothing writes it, and
+  `accepted()` and `read_schema_ack` read an ack that has it (from 4.2 or earlier) as a rejection. The
+  hello and ack formats, pins and field-name digests do not change.
+- `evolve` never copies `XSpare` bytes: a spare member of the target stays zero, a field taken from the
+  source's spare bytes starts at its initial value, and `evolve_plan` prints `spare (not copied)`.
+  Before, generations with spare members of different sizes did not compile, and equal sizes copied
+  the old spare bytes into the new type.
+- Map-state demo: version 1 of `ViewSnapshot` is frozen again with reserved bytes and version 2 takes
+  `scene_units` from them, so A sends a version-1 client the same wires as any client, deltas included,
+  and forwards write-backs between both versions (it converted every snapshot for it before).
 
 ## 4.2.0: one-image Wire 3.0 and in-place relayout
 

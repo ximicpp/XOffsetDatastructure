@@ -99,9 +99,10 @@ Linux x86-64 (GCC 16 and P2996). GitHub CI is off; these runs are the record.
 
 ## Handshake and no-exception builds
 
-When client and server schema versions differ, the server converts
-([SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)). The client only sends `make_schema_hello<...>()` and reads
-`read_schema_ack<...>()`; neither throws, and the client has no conversion code.
+Client and server agree on the schema at connect time ([SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)):
+versions of one add-only family read each other's bytes as they are, and a peer of another generation is
+refused. The client only sends `make_schema_hello<...>()` and reads `read_schema_ack<...>()`; neither
+throws, and the client has no conversion code.
 
 Engines without exceptions (`-fno-exceptions`, MSVC `/EHs-c- /D_HAS_EXCEPTIONS=0`) receive with
 `try_load_verified` / `try_reload_verified` / `try_begin_verified_reload` and route other failures to

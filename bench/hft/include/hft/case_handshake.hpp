@@ -75,7 +75,7 @@ namespace hft {
 inline const char* verdict_name(std::uint32_t v) {
     switch (XSchemaVerdict(v)) {
     case XSchemaVerdict::same: return "same";
-    case XSchemaVerdict::convert: return "convert";
+    case XSchemaVerdict::convert: return "convert (retired)";
     case XSchemaVerdict::reject_unknown: return "reject_unknown";
     case XSchemaVerdict::reject_names: return "reject_names";
     }

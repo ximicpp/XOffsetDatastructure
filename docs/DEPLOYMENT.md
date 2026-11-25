@@ -34,8 +34,8 @@ in 4.2.0 (details in [CLIENT_TARGETS.md](CLIENT_TARGETS.md)):
 ## 2. Same-version releases
 
 - The schema fingerprint in the wire header must match the receiver's type exactly (core guarantee
-  K6); otherwise the wire is rejected. Without the evolution support of section 2.1, schemas cannot
-  evolve.
+  K6); otherwise the wire is rejected. Section 2.1 describes the one kind of change that keeps the
+  fingerprint.
 - All programs that exchange data (every server, every platform's clients) must be built from **the
   same schema definitions** and released together.
 - **Any server update that changes the schema must ship together with the clients.** Mobile game
@@ -46,27 +46,29 @@ in 4.2.0 (details in [CLIENT_TARGETS.md](CLIENT_TARGETS.md)):
 - During rolling upgrades between servers, old and new versions must not mix the same kind of data.
   Switch in batches (only servers of the same version talk to each other at any time), or export with
   the old program and import with the new one during the switch.
-- Schema evolution (interop between old and new versions) is available since 3.2.0; see section 2.1.
+- Old and new versions can talk without releasing together when the new one only adds fields in
+  reserved bytes; see section 2.1.
 
-### 2.1 Since 3.2: version chains and three release rules
+### 2.1 Add-only versions and generations
 
-A 3.2 server can exchange data with peers on several versions at once
-([SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)): on connect the client sends an `XSchemaHello`, the
-server judges it with `XPeerSchemas` and acks, and afterwards sends and receives in the peer's
-version. With it, "server and clients release together" above is replaced by three rules:
+[SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md) has the rule. In short:
 
-1. **Servers release before clients.** All conversion happens on the server; clients only know their
-   own version.
-2. **The server's version chain covers every client version still in use.** How many to keep is a
-   business decision; versions removed from the chain get `reject_unknown` at handshake, and the
-   client can prompt for an update.
-3. **Release in two steps when the server must be able to roll back.** First release a server that
-   knows the new version but still works in the old one, then switch the working version in the next
-   release. A rollback to the previous server then still knows the already upgraded clients.
+1. **Reserve bytes in every release** (`XSpare<N>` at the end of the records that will grow). A later
+   version that only takes new fields from them and declares `XOFFSET_SCHEMA_FAMILY` keeps the
+   fingerprint and the bytes: servers and clients of every version of the family talk with no
+   conversion, deltas included, and update in any order. "Server and clients release together" above
+   does not apply to such a change.
+2. **Any other change is a new generation**: the handshake (`XSchemaHello` on connect,
+   `accept_schema_hello` on the server) refuses a peer of another generation with `reject_unknown`, the
+   client prompts for an update, and the connection closes. Release such a change with the clients, or
+   run the old and the new service side by side until the old clients are gone. Nothing converts
+   messages per peer.
+3. **Stored data of an older generation** loads once through `XOFFSET_SCHEMA_LINEAGE` and
+   `evolve_load_verified` and is saved in the new generation; keep a backup of the old images until then.
 
 At release, freeze the current version with `schema_freeze freeze` and put `schema_freeze check` in
-CTest, to catch renaming fields without a layout change or forgetting to add the previous version to
-the chain.
+CTest, to catch renaming fields without a layout change, or a fingerprint change declared neither as an
+added field nor as a new generation.
 
 ## 3. Build consistency
 
@@ -219,11 +221,10 @@ another client, which validates it again. There are four rules.
    `load_verified` and then `save_verified` directly. The demo self-test (`writeback` in
    `mapdemo_selftest`) measured it: bytes a client wrote into container slack are accepted by
    `load_verified` and gone after a `save_compact` rebuild.
-3. **Direct client-to-client links only for the same version.** When two clients exchange data
-   directly with no server in between, nobody converts versions, so the handshake (`XSchemaHello`,
-   section 2.1) must conclude `same`; otherwise reject. When relayed through a server, the server can
-   convert data sent down to older clients per section 2.1. The demo forwards only to clients of the
-   same version: A groups clients by their handshake version.
+3. **Links only within one generation.** Whether two clients exchange data directly or through a
+   server, the handshake (`XSchemaHello`, section 2.1) must conclude `same`: the same version, or
+   versions of one add-only family, which have the same bytes; otherwise reject. The demo forwards
+   write-backs between clients of both versions of its family.
 4. **No-exception clients: use `try_*`, `edit()` / proxies, and leave headroom in `maximum_capacity`.**
    Modifying a received buffer makes it grow. In builds without exceptions (`-fno-exceptions`,
    MSVC `/EHs-c- /D_HAS_EXCEPTIONS=0`), use `try_create` / `try_clone` / `try_clone_into` /
@@ -312,8 +313,8 @@ Dictionaries use `contrib/zstd_dict` (separate C++17 component, zstd 1.5.x; see 
 
 ## 7. Integration checklist
 
-- [ ] All senders and receivers use the same schema; when the schema changes, server and clients release together (since 3.2 the version chain and three rules of section 2.1 can be used instead)
-- [ ] Versions or schema fingerprints are compared at handshake (since 3.2 with `XSchemaHello` / `XPeerSchemas`)
+- [ ] All senders and receivers work in one generation: the same schema, or versions of one add-only family (section 2.1); a change of generation releases server and clients together
+- [ ] Versions or schema fingerprints are compared at handshake (`XSchemaHello`, `accept_schema_hello`, `read_schema_ack`)
 - [ ] Every platform builds with a verified toolchain from the table in section 3, targeting only 64-bit little-endian platforms
 - [ ] Every root type sent or received is pinned with `XOFFSET_PIN_SCHEMA`, and the pin file is in the server's and every client's build
 - [ ] Network input only goes through `load_verified` paths, with `maximum_capacity` set

@@ -1,5 +1,5 @@
 // Three versions of one type tree for the add-only family tests
-// (docs/SCHEMA_EVOLUTION.md section 9). v2 takes fields from v1's XSpare
+// (docs/SCHEMA_EVOLUTION.md). v2 takes fields from v1's XSpare
 // bytes and gives the list v1 kept for later a record type; v3 takes more
 // fields from what v2 left spare. Every version registers the same schema
 // name and declares the one before it, so all three have one fingerprint.

@@ -36,7 +36,7 @@ build, `ctest --test-dir build -C Release -L examples` runs all six.
 
 | Use case | Sender → receiver | Receiver (link) | Default check tier | Example |
 | --- | --- | --- | --- | --- |
-| Whole state: join, reconnect, handshake answers `convert` | Server → client | `XReceiver<XLink::from_server>` | Trusted | [`server_to_client.cpp`](../examples/server_to_client.cpp) |
+| Whole state: join, reconnect | Server → client | `XReceiver<XLink::from_server>` | Trusted | [`server_to_client.cpp`](../examples/server_to_client.cpp) |
 | Deltas: the client holds its own player and unit data | Server → client | `XReceiver<XLink::from_server>::apply_delta` | Trusted | [`delta_sync.cpp`](../examples/delta_sync.cpp) |
 | Viewport: each client sees part of a shared world | Server → client | `XReceiver<XLink::from_server>::apply_sync` | Trusted | [`shared_delta.cpp`](../examples/shared_delta.cpp) |
 | Uplink commands | Client → server | `XReceiver<XLink::from_client>::view` | Bounds (read-only) | [`client_uplink.cpp`](../examples/client_uplink.cpp) |
@@ -98,8 +98,7 @@ XOFFSET_PIN_SCHEMA(WorldView, "record[s:24,a:8]{...}");     // pinned layout, se
 
 ### 4.1 Whole state (`server_to_client.cpp`)
 
-When a client has just joined or reconnected, or the handshake answers `convert` (the two ends have
-different schema versions), the server sends the whole state.
+When a client has just joined or reconnected, the server sends the whole state.
 
 ```cpp
 // Server: modify in place, write into a reused string.
@@ -139,9 +138,9 @@ Once the client has a copy, the server stops sending the whole state:
   `rx.apply_sync(msg, cursor, target)`. See [SHARED_DELTA.md](SHARED_DELTA.md) and
   [user guide section 4.6](USER_GUIDE.md#46-shared-deltas-viewport-sync).
 
-Both kinds of delta require the same schema on both ends: send deltas only when the handshake answers
-`same`, and send the whole state when it answers `convert` (4.1). The copy the client receives is
-read-only; to send changes back, the client uses its own buffer and goes through uplink (section 5).
+Both kinds of delta require one generation on both ends: the handshake answers `same` (the same
+version, or versions of one add-only family) before anything is sent, and refuses a client of another
+generation. The copy the client receives is read-only; to send changes back, the client uses its own buffer and goes through uplink (section 5).
 
 ## 5. Client uplink (`client_uplink.cpp`)
 
@@ -221,7 +220,7 @@ player.save_verified_into(out, XSaveOptions{.emission = XWireEmission::zero_runs
 | Set `maximum_capacity` on every buffer and receiver; reject overlong messages by length first | Receive without a limit (even a single valid wire can fill memory) |
 | `reload` into a long-lived buffer again and again, `save_verified_into` the same send string again and again | `load` a new buffer for every message on hot paths |
 | Use the `root()` proxy for scattered fields and `edit()` / `read()` for loops and bulk changes | Hold `plain_root()` references long-term (they dangle when the buffer moves) |
-| Once the peer has a copy, send deltas or shared deltas; send whole state only on join, reconnect and `convert` | Send the whole state to every client every tick |
+| Once the peer has a copy, send deltas or shared deltas; send whole state only on join and reconnect | Send the whole state to every client every tick |
 | Use `view` read-only for client uplink and check content against the server's state | Treat structural checks as content checks |
 | Keeping or forwarding client data: full-tier `reload`, and `save_compact` before forwarding | `save_verified` received client data and pass it on unchanged |
 | Clients use the `XStatus` / `XResult` entry points, so no-exception builds compile and run as well | Rely on exception handling for receive failures on clients |
@@ -234,5 +233,5 @@ player.save_verified_into(out, XSaveOptions{.emission = XWireEmission::zero_runs
   and compression, and the integration checklist.
 - [DELTA_SYNC.md](DELTA_SYNC.md), [SHARED_DELTA.md](SHARED_DELTA.md): format, checks and guarantees of
   the two kinds of delta.
-- [SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md): the handshake and conversion when the two ends have
-  different schema versions.
+- [SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md): the handshake, adding fields in reserved bytes so old and
+  new versions keep talking, and loading stored data of an older generation.

@@ -1,5 +1,5 @@
 // Shared deltas (XS) between the versions of an add-only family
-// (docs/SCHEMA_EVOLUTION.md section 9). A change body names the members of
+// (docs/SCHEMA_EVOLUTION.md). A change body names the members of
 // the family's first version, so every version writes and reads the same
 // bytes: a later version's new fields travel inside the spare member they
 // were taken from. Pinned here, for three versions of a unit record with
