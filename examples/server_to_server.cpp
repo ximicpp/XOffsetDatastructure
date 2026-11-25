@@ -9,7 +9,7 @@
 //
 // Best practices shown here:
 //   - XReceiver<XLink::server_peer> between servers of the same build: the
-//     trusted tier (header and hole table checked, graph walk skipped). It
+//     trusted tier (header and image bounds checked, graph walk skipped). It
 //     assumes a link the servers control (TLS / mTLS or an internal network);
 //     never use it for client data. Debug and sanitizer builds run the full
 //     check anyway.

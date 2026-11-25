@@ -43,7 +43,11 @@ int main() {
               << ", reserved=" << buffer.reserved_bytes()
               << "; snapshot copied " << snapshot.size() << " bytes\n";
 
-    XBufferPool pool({2, 2 * limit, 2 * limit});
+    // A mapping reserves its maximum capacity rounded up to whole pages, a
+    // little more than `limit` (reserved_bytes() of a buffer with the same
+    // limit), so size the pool's byte limits from that, not from `limit`.
+    const std::size_t per_mapping = buffer.reserved_bytes();
+    XBufferPool pool({2, 2 * per_mapping, 2 * per_mapping});
     const auto options = XBuffer::maximum_capacity(limit)
         .with_growth(XGrowPolicy::Automatic).with_pool(pool);
     {

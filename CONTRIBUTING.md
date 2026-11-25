@@ -8,8 +8,8 @@ library, the platform matrix and storage rules are in
 
 ### C++20 / C++23 field-list build (zero submodules)
 
-Any modern 64-bit little-endian C++20/C++23 compiler (GCC 12+, Clang 16+, Apple
-clang 15+ for macOS 12+ / iOS 14+, Android NDK Clang, MSVC 19.44, clang-cl) can
+Any modern 64-bit little-endian C++20/C++23 compiler (GCC 13+, Clang 18+, Apple
+clang 21+ for macOS 12+ / iOS 14+, Android NDK r27+ Clang, MSVC 19.44+, clang-cl) can
 build and run the full test suite with no submodules initialized:
 
 ```bash

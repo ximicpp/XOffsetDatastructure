@@ -11,13 +11,13 @@ function(xoffset_enable_test_assertions target_name)
     endif()
 endfunction()
 
-# Oldest compilers the C++20/C++23 builds accept. They are the planned floor
-# (design: GCC 12, Clang 16, Apple clang 15, MSVC 19.38); the default
-# constant-evaluation limits measured on GCC 12/13 and Clang 16/18 decide it.
-set(XOFFSET_FIELD_LIST_MIN_GNU 12)
-set(XOFFSET_FIELD_LIST_MIN_CLANG 16)
-set(XOFFSET_FIELD_LIST_MIN_APPLECLANG 15)
-set(XOFFSET_FIELD_LIST_MIN_MSVC 19.38)
+# Oldest compilers the C++20/C++23 builds accept: the oldest version of each
+# that has run the full CTest and the wire corpus (docs/CLIENT_TARGETS.md).
+# Lower a floor only after a validation run on that version.
+set(XOFFSET_FIELD_LIST_MIN_GNU 13)
+set(XOFFSET_FIELD_LIST_MIN_CLANG 18)
+set(XOFFSET_FIELD_LIST_MIN_APPLECLANG 21)
+set(XOFFSET_FIELD_LIST_MIN_MSVC 19.44)
 
 function(xoffset_check_full_toolchain)
     if(NOT XOFFSET_CXX_STANDARD MATCHES "^(20|23|26)$")

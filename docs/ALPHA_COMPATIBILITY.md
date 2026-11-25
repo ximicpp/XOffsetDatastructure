@@ -29,7 +29,7 @@ byte-identical wire format 3.0 outputs (`docs/CLIENT_TARGETS.md`):
 
 - **C++20 / C++23 field-list builds** (`-DXOFFSET_CXX_STANDARD=20|23`): require only a standard
   C++20/C++23 native compiler (Windows MSVC 19.44+ with `/Zc:preprocessor`, clang-cl, MinGW-w64 GCC,
-  Android NDK Clang, Apple Clang on macOS 12+ / iOS 14+, Linux GCC 13+ / Clang 18+) and **zero
+  Android NDK Clang 18+, Apple clang 21+ for macOS 12+ / iOS 14+, Linux GCC 13+ / Clang 18+) and **zero
   external submodules or third-party headers**. Each record declares one `XOFFSET_RECORD` field list.
 - **C++26 reflection builds** (`-DXOFFSET_CXX_STANDARD=26`): require GCC 16+ (`-freflection`,
   `<meta>`) or the pinned P2996 Clang toolchain (`<experimental/meta>` and matching libc++). Ordinary

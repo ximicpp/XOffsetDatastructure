@@ -5,6 +5,32 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- Compatibility policy ([RELEASING.md](docs/RELEASING.md) section 1.1, USER_GUIDE section 8,
+  SECURITY.md): 4.x releases keep promising nothing between versions; from 5.0.0, the first release
+  meant for outside projects, incompatible wire or API changes come only in a new major version, and
+  every release of one major version reads every other one's wires and deltas.
+
+- The client headers build after engine macros: no library identifier is named `check`, `verify`
+  or `require` and called, so Unreal Engine's `check`/`verify` and Apple `AssertMacros.h`'s
+  `check`/`verify`/`require` no longer break the build. New test `test_engine_macros` (and
+  `_noexc`) defines those macros first and builds and runs the client headers.
+  **Breaking (source):** `XView::check()` is now `XView::tier()`, and the
+  `XOFFSET_SYNC_CHECKS` helper `XSyncDirtyTable::verify(pub)` is now `verify_delivered(pub)`.
+  Renames only: no change to the wire or to the generated code.
+- The C++20/C++23 compiler floors are the oldest versions that ran the full CTest and the wire
+  corpus: GCC 13, Clang 18, Apple clang 21 and MSVC 19.44 (were GCC 12, Clang 16, Apple clang 15
+  and MSVC 19.38, never run).
+- Docs: `FetchContent` takes the release archive (`URL .../archive/refs/tags/vX.Y.Z.tar.gz`, about
+  3 MB) instead of a Git clone (about 2 GB with every branch and the recursive Boost submodule);
+  a section on using the headers without CMake (engine build systems, Unreal Engine); the iOS
+  address-space advice puts limits, slots and pools before the Extended Virtual Addressing
+  entitlement, which has not run on a device; the K5 guarantee and the trusted tier no longer
+  mention the hole table that wire format 3.0 removed; `XBufferPool` byte limits must allow for
+  page rounding.
+- Examples: `stable_storage` sized its pool from the maximum capacity, so the second mapping did
+  not fit the reserved-bytes limit and an `assert` failed in Debug builds; it now sizes the pool
+  from `reserved_bytes()`. `helloworld`, `stable_storage`, `schema_handshake`, `delta_sync` and
+  `shared_delta` (and the C++26 `demo`) now run under CTest with `assert` on.
 - Add-only type versions without conversion ([SCHEMA_EVOLUTION.md](docs/SCHEMA_EVOLUTION.md)
   section 9). `XSpare<N>` reserves N opaque zero bytes; `XOFFSET_SCHEMA_FAMILY(New, Prev)` declares that
   `New` only takes fields from `Prev`'s spare bytes (or turns an `XSpare<N>` element into a record of N
