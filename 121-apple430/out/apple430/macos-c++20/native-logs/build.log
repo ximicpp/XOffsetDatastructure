@@ -1,0 +1,871 @@
+[1/382] Building CXX object examples/CMakeFiles/shared_delta_example.dir/shared_delta.cpp.o
+[2/382] Building CXX object examples/CMakeFiles/helloworld.dir/helloworld.cpp.o
+[3/382] Building CXX object examples/CMakeFiles/stable_storage.dir/stable_storage.cpp.o
+[4/382] Building CXX object examples/CMakeFiles/client_uplink_noexc.dir/client_uplink.cpp.o
+In file included from /Volumes/XOffsetCS/apple430/src/examples/client_uplink.cpp:18:
+/Volumes/XOffsetCS/apple430/src/examples/game_protocol.hpp:72:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   72 | XOFFSET_PIN_SCHEMA(WorldView, "record[s:24,a:8]{@0:u64,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:32,a:4]{@0:u32,@4:u32,@8:i32,@12:i32,@16:i32,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}>}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/examples/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/examples/client_uplink.cpp:18:
+/Volumes/XOffsetCS/apple430/src/examples/game_protocol.hpp:73:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   73 | XOFFSET_PIN_SCHEMA(MoveOrder, "record[s:32,a:8]{@0:u64,@8:u32,@12:i32,@16:i32,@20:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<i32>}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/examples/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/examples/client_uplink.cpp:18:
+/Volumes/XOffsetCS/apple430/src/examples/game_protocol.hpp:74:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   74 | XOFFSET_PIN_SCHEMA(PlayerState, "record[s:64,a:8]{@0:u64,@8:i32,@16:i64,@24:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10},@36:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<u32>,@48:xflatmap[s:12,a:4]{data:rel32,size:u32,capacity:u32}<u32,i32>}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/examples/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+3 warnings generated.
+[5/382] Building CXX object examples/CMakeFiles/client_uplink.dir/client_uplink.cpp.o
+In file included from /Volumes/XOffsetCS/apple430/src/examples/client_uplink.cpp:18:
+/Volumes/XOffsetCS/apple430/src/examples/game_protocol.hpp:72:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   72 | XOFFSET_PIN_SCHEMA(WorldView, "record[s:24,a:8]{@0:u64,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:32,a:4]{@0:u32,@4:u32,@8:i32,@12:i32,@16:i32,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}>}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/examples/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/examples/client_uplink.cpp:18:
+/Volumes/XOffsetCS/apple430/src/examples/game_protocol.hpp:73:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   73 | XOFFSET_PIN_SCHEMA(MoveOrder, "record[s:32,a:8]{@0:u64,@8:u32,@12:i32,@16:i32,@20:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<i32>}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/examples/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/examples/client_uplink.cpp:18:
+/Volumes/XOffsetCS/apple430/src/examples/game_protocol.hpp:74:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   74 | XOFFSET_PIN_SCHEMA(PlayerState, "record[s:64,a:8]{@0:u64,@8:i32,@16:i64,@24:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10},@36:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<u32>,@48:xflatmap[s:12,a:4]{data:rel32,size:u32,capacity:u32}<u32,i32>}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/examples/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+3 warnings generated.
+[6/382] Building CXX object examples/CMakeFiles/server_to_client_noexc.dir/server_to_client.cpp.o
+In file included from /Volumes/XOffsetCS/apple430/src/examples/server_to_client.cpp:18:
+/Volumes/XOffsetCS/apple430/src/examples/game_protocol.hpp:72:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   72 | XOFFSET_PIN_SCHEMA(WorldView, "record[s:24,a:8]{@0:u64,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:32,a:4]{@0:u32,@4:u32,@8:i32,@12:i32,@16:i32,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}>}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/examples/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/examples/server_to_client.cpp:18:
+/Volumes/XOffsetCS/apple430/src/examples/game_protocol.hpp:73:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   73 | XOFFSET_PIN_SCHEMA(MoveOrder, "record[s:32,a:8]{@0:u64,@8:u32,@12:i32,@16:i32,@20:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<i32>}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/examples/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/examples/server_to_client.cpp:18:
+/Volumes/XOffsetCS/apple430/src/examples/game_protocol.hpp:74:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   74 | XOFFSET_PIN_SCHEMA(PlayerState, "record[s:64,a:8]{@0:u64,@8:i32,@16:i64,@24:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10},@36:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<u32>,@48:xflatmap[s:12,a:4]{data:rel32,size:u32,capacity:u32}<u32,i32>}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/examples/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+3 warnings generated.
+[7/382] Building CXX object examples/CMakeFiles/server_to_client.dir/server_to_client.cpp.o
+In file included from /Volumes/XOffsetCS/apple430/src/examples/server_to_client.cpp:18:
+/Volumes/XOffsetCS/apple430/src/examples/game_protocol.hpp:72:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   72 | XOFFSET_PIN_SCHEMA(WorldView, "record[s:24,a:8]{@0:u64,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:32,a:4]{@0:u32,@4:u32,@8:i32,@12:i32,@16:i32,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}>}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/examples/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/examples/server_to_client.cpp:18:
+/Volumes/XOffsetCS/apple430/src/examples/game_protocol.hpp:73:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   73 | XOFFSET_PIN_SCHEMA(MoveOrder, "record[s:32,a:8]{@0:u64,@8:u32,@12:i32,@16:i32,@20:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<i32>}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/examples/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/examples/server_to_client.cpp:18:
+/Volumes/XOffsetCS/apple430/src/examples/game_protocol.hpp:74:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   74 | XOFFSET_PIN_SCHEMA(PlayerState, "record[s:64,a:8]{@0:u64,@8:i32,@16:i64,@24:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10},@36:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<u32>,@48:xflatmap[s:12,a:4]{data:rel32,size:u32,capacity:u32}<u32,i32>}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/examples/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+3 warnings generated.
+[8/382] Building CXX object examples/CMakeFiles/server_to_server.dir/server_to_server.cpp.o
+In file included from /Volumes/XOffsetCS/apple430/src/examples/server_to_server.cpp:21:
+/Volumes/XOffsetCS/apple430/src/examples/game_protocol.hpp:72:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   72 | XOFFSET_PIN_SCHEMA(WorldView, "record[s:24,a:8]{@0:u64,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:32,a:4]{@0:u32,@4:u32,@8:i32,@12:i32,@16:i32,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}>}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/examples/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/examples/server_to_server.cpp:21:
+/Volumes/XOffsetCS/apple430/src/examples/game_protocol.hpp:73:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   73 | XOFFSET_PIN_SCHEMA(MoveOrder, "record[s:32,a:8]{@0:u64,@8:u32,@12:i32,@16:i32,@20:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<i32>}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/examples/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/examples/server_to_server.cpp:21:
+/Volumes/XOffsetCS/apple430/src/examples/game_protocol.hpp:74:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   74 | XOFFSET_PIN_SCHEMA(PlayerState, "record[s:64,a:8]{@0:u64,@8:i32,@16:i64,@24:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10},@36:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<u32>,@48:xflatmap[s:12,a:4]{data:rel32,size:u32,capacity:u32}<u32,i32>}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/examples/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+3 warnings generated.
+[9/382] Building CXX object tests/CMakeFiles/test_vm_storage_noexc.dir/test_vm_storage_noexc_tu2.cpp.o
+[10/382] Building CXX object tests/CMakeFiles/test_vm_storage_noexc.dir/test_vm_storage_noexc.cpp.o
+[11/382] Building CXX object examples/CMakeFiles/delta_sync_example.dir/delta_sync.cpp.o
+[12/382] Building CXX object tools/CMakeFiles/check_signature_matrix.dir/check_signature_matrix.cpp.o
+[13/382] Building CXX object examples/CMakeFiles/schema_handshake.dir/schema_handshake.cpp.o
+In file included from /Volumes/XOffsetCS/apple430/src/examples/schema_handshake.cpp:9:
+/Volumes/XOffsetCS/apple430/src/examples/../xoffset_handshake.hpp:411:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+  411 | XOFFSET_PIN_SCHEMA(XOffsetDatastructure::XSchemaHello, "record[s:32,a:4]{@0:u32,@4:u32,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:32,a:8]{@0:u64,@8:u64,@16:u64,@24:u32,@28:u32}>,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/examples/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/examples/schema_handshake.cpp:9:
+/Volumes/XOffsetCS/apple430/src/examples/../xoffset_handshake.hpp:412:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+  412 | XOFFSET_PIN_SCHEMA(XOffsetDatastructure::XSchemaHelloAck, "record[s:32,a:4]{@0:u32,@4:u32,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:24,a:8]{@0:u64,@8:u64,@16:u32,@20:u32}>,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/examples/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+2 warnings generated.
+[14/382] Building CXX object tests/CMakeFiles/test_vm_pool.dir/test_vm_pool.cpp.o
+[15/382] Building CXX object tests/CMakeFiles/test_virtual_memory_storage.dir/test_virtual_memory_storage.cpp.o
+[16/382] Building CXX object tests/CMakeFiles/test_basic_types.dir/test_basic_types.cpp.o
+[17/382] Building CXX object examples/CMakeFiles/server_to_server_noexc.dir/server_to_server.cpp.o
+In file included from /Volumes/XOffsetCS/apple430/src/examples/server_to_server.cpp:21:
+/Volumes/XOffsetCS/apple430/src/examples/game_protocol.hpp:72:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   72 | XOFFSET_PIN_SCHEMA(WorldView, "record[s:24,a:8]{@0:u64,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:32,a:4]{@0:u32,@4:u32,@8:i32,@12:i32,@16:i32,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}>}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/examples/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/examples/server_to_server.cpp:21:
+/Volumes/XOffsetCS/apple430/src/examples/game_protocol.hpp:73:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   73 | XOFFSET_PIN_SCHEMA(MoveOrder, "record[s:32,a:8]{@0:u64,@8:u32,@12:i32,@16:i32,@20:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<i32>}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/examples/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/examples/server_to_server.cpp:21:
+/Volumes/XOffsetCS/apple430/src/examples/game_protocol.hpp:74:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   74 | XOFFSET_PIN_SCHEMA(PlayerState, "record[s:64,a:8]{@0:u64,@8:i32,@16:i64,@24:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10},@36:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<u32>,@48:xflatmap[s:12,a:4]{data:rel32,size:u32,capacity:u32}<u32,i32>}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/examples/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+3 warnings generated.
+[18/382] Building CXX object tools/CMakeFiles/bench_compare.dir/bench_compare.cpp.o
+[19/382] Building CXX object tests/CMakeFiles/test_nested.dir/test_nested.cpp.o
+[20/382] Building CXX object tests/CMakeFiles/test_compaction.dir/test_compaction.cpp.o
+[21/382] Building CXX object tests/CMakeFiles/test_vector.dir/test_vector.cpp.o
+[22/382] Building CXX object tests/CMakeFiles/test_map_set.dir/test_map_set.cpp.o
+[23/382] Building CXX object tests/CMakeFiles/test_modify.dir/test_modify.cpp.o
+[24/382] Building CXX object tests/CMakeFiles/test_xbuffer_api.dir/test_xbuffer_api.cpp.o
+[25/382] Building CXX object tests/CMakeFiles/test_assign_range.dir/test_assign_range.cpp.o
+[26/382] Building CXX object tests/CMakeFiles/test_hot_path_constants.dir/test_hot_path_constants.cpp.o
+[27/382] Building CXX object tests/CMakeFiles/test_scalar_resize.dir/test_scalar_resize.cpp.o
+[28/382] Building CXX object tests/CMakeFiles/test_xstring_direct_assign.dir/test_xstring_direct_assign.cpp.o
+[29/382] Building CXX object tests/CMakeFiles/test_string_replace.dir/test_string_replace.cpp.o
+[30/382] Building CXX object tests/CMakeFiles/test_xhandle.dir/test_xhandle.cpp.o
+[31/382] Building CXX object tests/CMakeFiles/test_string_append.dir/test_string_append.cpp.o
+[32/382] Building CXX object tests/CMakeFiles/test_wire_admission.dir/test_wire_admission.cpp.o
+[33/382] Building CXX object tests/CMakeFiles/test_resize_growth.dir/test_resize_growth.cpp.o
+[34/382] Building CXX object tests/CMakeFiles/test_validation_granules.dir/test_validation_granules.cpp.o
+[35/382] Building CXX object tests/CMakeFiles/test_error_paths.dir/test_error_paths.cpp.o
+[36/382] Building CXX object tests/CMakeFiles/test_schema_envelope.dir/test_schema_envelope.cpp.o
+[37/382] Building CXX object tests/CMakeFiles/test_adaptive_reservation.dir/test_adaptive_reservation.cpp.o
+[38/382] Building CXX object tests/CMakeFiles/test_inheritance.dir/test_inheritance.cpp.o
+[39/382] Building CXX object tests/CMakeFiles/test_memory_efficiency.dir/test_memory_efficiency.cpp.o
+[40/382] Building CXX object tests/CMakeFiles/test_complex_nesting.dir/test_complex_nesting.cpp.o
+[41/382] Building CXX object tests/CMakeFiles/test_fixed_layout_containers.dir/test_fixed_layout_containers.cpp.o
+[42/382] Building CXX object tests/CMakeFiles/test_runtime_regressions.dir/test_runtime_regressions.cpp.o
+[43/382] Building CXX object tests/CMakeFiles/test_mutation_failures.dir/test_mutation_failures.cpp.o
+[44/382] Building CXX object tests/CMakeFiles/test_wire_validation.dir/test_wire_validation.cpp.o
+[45/382] Building CXX object tests/CMakeFiles/test_staged_insert.dir/test_staged_insert.cpp.o
+[46/382] Building CXX object tests/CMakeFiles/test_same_arena_move.dir/test_same_arena_move.cpp.o
+[47/382] Building CXX object tests/CMakeFiles/test_main_containers.dir/test_main_containers.cpp.o
+[48/382] Building CXX object tests/CMakeFiles/test_append_grow.dir/test_append_grow.cpp.o
+[49/382] Building CXX object tests/CMakeFiles/test_assign_sorted.dir/test_assign_sorted.cpp.o
+[50/382] Building CXX object tests/CMakeFiles/test_shift_relocate.dir/test_shift_relocate.cpp.o
+[51/382] Building CXX object tests/CMakeFiles/test_first_block.dir/test_first_block.cpp.o
+[52/382] Building CXX object tests/CMakeFiles/test_free_table_policy.dir/test_free_table_policy.cpp.o
+[53/382] Building CXX object tests/CMakeFiles/test_relocating_storage.dir/test_relocating_storage.cpp.o
+[54/382] Building CXX object tests/CMakeFiles/test_stable_storage.dir/test_stable_storage.cpp.o
+[55/382] Building CXX object tests/CMakeFiles/test_slot_storage.dir/test_slot_storage.cpp.o
+[56/382] Building CXX object tests/CMakeFiles/test_retire_discard.dir/test_retire_discard.cpp.o
+[57/382] Building CXX object tests/CMakeFiles/test_lower_bound_index.dir/test_lower_bound_index.cpp.o
+[58/382] Building CXX object tests/CMakeFiles/test_vm_lifecycle.dir/test_vm_lifecycle.cpp.o
+[59/382] Building CXX object tests/CMakeFiles/test_schema_describe.dir/test_schema_describe.cpp.o
+/Volumes/XOffsetCS/apple430/src/tests/test_schema_describe.cpp:62:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   62 | XOFFSET_PIN_SCHEMA(sd::Vec3, "record[s:12,a:4]{@0:f32,@4:f32,@8:f32}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+/Volumes/XOffsetCS/apple430/src/tests/test_schema_describe.cpp:63:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   63 | XOFFSET_PIN_SCHEMA(sd::Item,
+      | ^
+/Volumes/XOffsetCS/apple430/src/xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+/Volumes/XOffsetCS/apple430/src/tests/test_schema_describe.cpp:67:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   67 | XOFFSET_PIN_SCHEMA(sd::Bag,
+      | ^
+/Volumes/XOffsetCS/apple430/src/xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+3 warnings generated.
+[60/382] Building CXX object tests/CMakeFiles/test_ordinary_records.dir/test_ordinary_records.cpp.o
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_ordinary_records.cpp:6:
+In file included from /Volumes/XOffsetCS/apple430/src/xoffsetdatastructure.hpp:11:
+/Volumes/XOffsetCS/apple430/src/xoffset_wire.hpp:1477:29: warning: first argument in call to 'memcpy' is a pointer to non-trivially copyable type 'orec::Hero' [-Wnontrivial-memcall]
+ 1477 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+/Volumes/XOffsetCS/apple430/src/xoffset_containers.hpp:2062:39: note: in instantiation of function template specialization 'XOffsetDatastructure::fixed_detail::stable_erase_relocate<orec::Hero>' requested here
+ 2062 |                         fixed_detail::stable_erase_relocate(items + write, items[read]);
+      |                                       ^
+/Volumes/XOffsetCS/apple430/src/tests/test_ordinary_records.cpp:144:24: note: in instantiation of function template specialization 'XOffsetDatastructure::XVectorCore<orec::Hero>::stable_erase_if<(lambda at /Volumes/XOffsetCS/apple430/src/tests/test_ordinary_records.cpp:144:40)>' requested here
+  144 |                 heroes.stable_erase_if([&](const auto& h) { return h.level < cut; });
+      |                        ^
+/Volumes/XOffsetCS/apple430/src/tests/test_ordinary_records.cpp:176:27: note: in instantiation of function template specialization '(anonymous namespace)::run<orec::Root>' requested here
+  176 |     const auto declared = run<orec::Root>();
+      |                           ^
+/Volumes/XOffsetCS/apple430/src/xoffset_wire.hpp:1477:29: note: explicitly cast the pointer to silence this warning
+ 1477 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+      |                             (void*)
+/Volumes/XOffsetCS/apple430/src/xoffset_wire.hpp:1477:29: warning: first argument in call to 'memcpy' is a pointer to non-trivially copyable type 'orec::PlainHero' [-Wnontrivial-memcall]
+ 1477 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+/Volumes/XOffsetCS/apple430/src/xoffset_containers.hpp:2062:39: note: in instantiation of function template specialization 'XOffsetDatastructure::fixed_detail::stable_erase_relocate<orec::PlainHero>' requested here
+ 2062 |                         fixed_detail::stable_erase_relocate(items + write, items[read]);
+      |                                       ^
+/Volumes/XOffsetCS/apple430/src/tests/test_ordinary_records.cpp:144:24: note: in instantiation of function template specialization 'XOffsetDatastructure::XVectorCore<orec::PlainHero>::stable_erase_if<(lambda at /Volumes/XOffsetCS/apple430/src/tests/test_ordinary_records.cpp:144:40)>' requested here
+  144 |                 heroes.stable_erase_if([&](const auto& h) { return h.level < cut; });
+      |                        ^
+/Volumes/XOffsetCS/apple430/src/tests/test_ordinary_records.cpp:177:24: note: in instantiation of function template specialization '(anonymous namespace)::run<orec::PlainRoot>' requested here
+  177 |     const auto plain = run<orec::PlainRoot>();
+      |                        ^
+/Volumes/XOffsetCS/apple430/src/xoffset_wire.hpp:1477:29: note: explicitly cast the pointer to silence this warning
+ 1477 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+      |                             (void*)
+2 warnings generated.
+[61/382] Building CXX object tests/CMakeFiles/test_owner_map.dir/test_owner_map.cpp.o
+[62/382] Building CXX object tests/CMakeFiles/test_proxy_scopes.dir/test_proxy_scopes.cpp.o
+[63/382] Building CXX object tests/CMakeFiles/test_owner_registry.dir/test_owner_registry.cpp.o
+[64/382] Building CXX object tests/CMakeFiles/test_vm_transport.dir/test_vm_transport.cpp.o
+[65/382] Building CXX object tests/CMakeFiles/test_owner_identity.dir/test_owner_identity.cpp.o
+[66/382] Building CXX object tests/CMakeFiles/test_regrow_used_range.dir/test_regrow_used_range.cpp.o
+[67/382] Building CXX object tests/CMakeFiles/test_proxy_fuzz.dir/test_proxy_fuzz.cpp.o
+[68/382] Building CXX object tests/CMakeFiles/test_tail_expansion.dir/test_tail_expansion.cpp.o
+[69/382] Building CXX object tests/CMakeFiles/test_storage_policies.dir/test_storage_policies.cpp.o
+[70/382] Building CXX object tests/CMakeFiles/test_allocator_failures.dir/test_allocator_failures.cpp.o
+[71/382] Building CXX object tests/CMakeFiles/test_allocator_model.dir/test_allocator_model.cpp.o
+[72/382] Building CXX object tests/CMakeFiles/test_schema_pin.dir/test_schema_pin.cpp.o
+/Volumes/XOffsetCS/apple430/src/tests/test_schema_pin.cpp:16:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   16 | XOFFSET_PIN_SCHEMA(pin::Inner, "record[s:20,a:4]{@0:u32,@4:bool,@8:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+/Volumes/XOffsetCS/apple430/src/tests/test_schema_pin.cpp:17:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   17 | XOFFSET_PIN_SCHEMA(pin::Root,
+      | ^
+/Volumes/XOffsetCS/apple430/src/xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+/Volumes/XOffsetCS/apple430/src/tests/test_schema_pin.cpp:29:5: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   29 |     XOFFSET_PIN_SCHEMA(pin::Inner, "record[s:20,a:4]{@0:u32,@4:bool,@8:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      |     ^
+/Volumes/XOffsetCS/apple430/src/xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+3 warnings generated.
+[73/382] Building CXX object tests/CMakeFiles/test_v2_golden.dir/test_v2_golden.cpp.o
+[74/382] Building CXX object tests/CMakeFiles/test_stability_contract.dir/test_stability_contract.cpp.o
+[75/382] Building CXX object tests/CMakeFiles/test_implicit_padding.dir/test_implicit_padding.cpp.o
+[76/382] Building CXX object tests/CMakeFiles/test_wire_hole_zeroing.dir/test_wire_hole_zeroing.cpp.o
+[77/382] Building CXX object tests/CMakeFiles/test_cross_compiler_wire.dir/test_cross_compiler_wire.cpp.o
+[78/382] Building CXX object tests/CMakeFiles/test_free_run_emission.dir/test_free_run_emission.cpp.o
+[79/382] Building CXX object tests/CMakeFiles/test_wire_populate.dir/test_wire_populate.cpp.o
+[80/382] Building CXX object tests/CMakeFiles/test_automatic_emission.dir/test_automatic_emission.cpp.o
+[81/382] Building CXX object tests/CMakeFiles/test_spare_watch.dir/test_spare_watch.cpp.o
+[82/382] Building CXX object tests/CMakeFiles/test_save_compact.dir/test_save_compact.cpp.o
+[83/382] Building CXX object tests/CMakeFiles/test_reload_reset.dir/test_reload_reset.cpp.o
+[84/382] Building CXX object tests/CMakeFiles/test_v2_fuzz.dir/test_v2_fuzz.cpp.o
+[85/382] Building CXX object tests/CMakeFiles/test_reset_used_range.dir/test_reset_used_range.cpp.o
+[86/382] Building CXX object tests/CMakeFiles/test_save_composed.dir/test_save_composed.cpp.o
+[87/382] Building CXX object tests/CMakeFiles/test_clone.dir/test_clone.cpp.o
+[88/382] Building CXX object tests/CMakeFiles/test_delta_format.dir/test_delta_format.cpp.o
+[89/382] Building CXX object tests/CMakeFiles/test_delta_capacity.dir/test_delta_capacity.cpp.o
+[90/382] Building CXX object tests/CMakeFiles/test_shared_delta_format.dir/test_shared_delta_format.cpp.o
+[91/382] Building CXX object tests/CMakeFiles/test_shared_delta_slots.dir/test_shared_delta_slots.cpp.o
+[92/382] Building CXX object tests/CMakeFiles/test_shared_delta.dir/test_shared_delta.cpp.o
+[93/382] Building CXX object tests/CMakeFiles/test_relayout.dir/test_relayout.cpp.o
+[94/382] Building CXX object tests/CMakeFiles/test_root_spare.dir/test_root_spare.cpp.o
+[95/382] Building CXX object tests/CMakeFiles/test_shared_delta_sync.dir/test_shared_delta_sync.cpp.o
+[96/382] Building CXX object tests/CMakeFiles/test_delta_small.dir/test_delta_small.cpp.o
+[97/382] Building CXX object tests/CMakeFiles/test_shared_delta_publisher_errors.dir/test_shared_delta_publisher_errors.cpp.o
+[98/382] Building CXX object tests/CMakeFiles/test_engine_macros.dir/test_engine_macros.cpp.o
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_engine_macros.cpp:97:
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_handshake.hpp:411:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+  411 | XOFFSET_PIN_SCHEMA(XOffsetDatastructure::XSchemaHello, "record[s:32,a:4]{@0:u32,@4:u32,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:32,a:8]{@0:u64,@8:u64,@16:u64,@24:u32,@28:u32}>,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_engine_macros.cpp:97:
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_handshake.hpp:412:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+  412 | XOFFSET_PIN_SCHEMA(XOffsetDatastructure::XSchemaHelloAck, "record[s:32,a:4]{@0:u32,@4:u32,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:24,a:8]{@0:u64,@8:u64,@16:u32,@20:u32}>,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+2 warnings generated.
+[99/382] Building CXX object tests/CMakeFiles/test_xspare.dir/test_xspare.cpp.o
+/Volumes/XOffsetCS/apple430/src/tests/test_xspare.cpp:80:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   80 | XOFFSET_PIN_SCHEMA(sp::Item, "record[s:8,a:4]{@0:i32,@4:bool,@5:u8char,@6:spare[2]}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+1 warning generated.
+[100/382] Building CXX object tests/CMakeFiles/test_relocating_storage_step.dir/test_relocating_storage.cpp.o
+[101/382] Building CXX object tests/CMakeFiles/test_dump.dir/test_dump.cpp.o
+[102/382] Building CXX object tests/CMakeFiles/test_shared_delta_publisher.dir/test_shared_delta_publisher.cpp.o
+[103/382] Building CXX object tests/CMakeFiles/test_schema_handshake.dir/test_schema_handshake.cpp.o
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_schema_handshake.cpp:5:
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_handshake.hpp:411:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+  411 | XOFFSET_PIN_SCHEMA(XOffsetDatastructure::XSchemaHello, "record[s:32,a:4]{@0:u32,@4:u32,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:32,a:8]{@0:u64,@8:u64,@16:u64,@24:u32,@28:u32}>,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_schema_handshake.cpp:5:
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_handshake.hpp:412:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+  412 | XOFFSET_PIN_SCHEMA(XOffsetDatastructure::XSchemaHelloAck, "record[s:32,a:4]{@0:u32,@4:u32,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:24,a:8]{@0:u64,@8:u64,@16:u32,@20:u32}>,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+2 warnings generated.
+[104/382] Building CXX object tests/CMakeFiles/test_schema_snapshot.dir/test_schema_snapshot.cpp.o
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_schema_snapshot.cpp:6:
+In file included from /Volumes/XOffsetCS/apple430/src/tests/schema_freeze/game_v2.hpp:7:
+/Volumes/XOffsetCS/apple430/src/tests/schema_freeze/game_v1.hpp:33:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   33 | XOFFSET_PIN_SCHEMA(game_v1::Player, "record[s:76,a:4]{@0:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10},@12:i32,@16:array[2]<array[3]<i32>>,@40:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:20,a:4]{@0:i32,@4:enum<u8char>,@5:array[3]<u8char>,@8:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}>,@52:xflatmap[s:12,a:4]{data:rel32,size:u32,capacity:u32}<i32,xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}>,@64:xflatset[s:12,a:4]{data:rel32,size:u32,capacity:u32}<enum<u8char>>}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_schema_snapshot.cpp:6:
+/Volumes/XOffsetCS/apple430/src/tests/schema_freeze/game_v2.hpp:29:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   29 | XOFFSET_PIN_SCHEMA(game_v2::Player, "record[s:96,a:8]{@0:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10},@16:i64,@24:array[2]<array[3]<i32>>,@48:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:20,a:4]{@0:i32,@4:enum<u8char>,@5:array[3]<u8char>,@8:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}>,@60:xflatmap[s:12,a:4]{data:rel32,size:u32,capacity:u32}<i32,xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}>,@72:xflatset[s:12,a:4]{data:rel32,size:u32,capacity:u32}<enum<u8char>>,@84:xblob[s:12,a:4]{data:rel32,size:u32,capacity:u32}}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_schema_snapshot.cpp:7:
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_handshake.hpp:411:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+  411 | XOFFSET_PIN_SCHEMA(XOffsetDatastructure::XSchemaHello, "record[s:32,a:4]{@0:u32,@4:u32,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:32,a:8]{@0:u64,@8:u64,@16:u64,@24:u32,@28:u32}>,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_schema_snapshot.cpp:7:
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_handshake.hpp:412:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+  412 | XOFFSET_PIN_SCHEMA(XOffsetDatastructure::XSchemaHelloAck, "record[s:32,a:4]{@0:u32,@4:u32,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:24,a:8]{@0:u64,@8:u64,@16:u32,@20:u32}>,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+4 warnings generated.
+[105/382] Building CXX object tests/CMakeFiles/test_receiver_forced.dir/test_receiver_forced.cpp.o
+[106/382] Building CXX object tests/CMakeFiles/test_schema_family_xs.dir/test_schema_family_xs.cpp.o
+[107/382] Building CXX object tests/CMakeFiles/test_delta_sync.dir/test_delta_sync.cpp.o
+[108/382] Building CXX object tests/CMakeFiles/test_receiver_view.dir/test_receiver_view.cpp.o
+[109/382] Building CXX object tests/CMakeFiles/test_fixed_message.dir/test_fixed_message.cpp.o
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_fixed_message.cpp:7:
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_handshake.hpp:411:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+  411 | XOFFSET_PIN_SCHEMA(XOffsetDatastructure::XSchemaHello, "record[s:32,a:4]{@0:u32,@4:u32,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:32,a:8]{@0:u64,@8:u64,@16:u64,@24:u32,@28:u32}>,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_fixed_message.cpp:7:
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_handshake.hpp:412:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+  412 | XOFFSET_PIN_SCHEMA(XOffsetDatastructure::XSchemaHelloAck, "record[s:32,a:4]{@0:u32,@4:u32,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:24,a:8]{@0:u64,@8:u64,@16:u32,@20:u32}>,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+2 warnings generated.
+[110/382] Building CXX object tests/CMakeFiles/test_receiver_view_uplink_unchecked.dir/test_receiver_view.cpp.o
+[111/382] Building CXX object tests/CMakeFiles/test_receiver.dir/test_receiver.cpp.o
+[112/382] Building CXX object tests/CMakeFiles/test_receiver_uplink_unchecked.dir/test_receiver.cpp.o
+[113/382] Building CXX object tests/CMakeFiles/test_automatic_emission_noexc.dir/test_automatic_emission.cpp.o
+[114/382] Building CXX object tests/CMakeFiles/test_no_exceptions.dir/test_no_exceptions.cpp.o
+[115/382] Building CXX object tests/CMakeFiles/test_spare_watch_noexc.dir/test_spare_watch.cpp.o
+[116/382] Building CXX object tests/CMakeFiles/test_hot_path_constants_noexc.dir/test_hot_path_constants.cpp.o
+[117/382] Building CXX object tests/CMakeFiles/test_free_run_emission_noexc.dir/test_free_run_emission.cpp.o
+[118/382] Building CXX object tests/CMakeFiles/test_implicit_padding_noexc.dir/test_implicit_padding.cpp.o
+[119/382] Building CXX object tests/CMakeFiles/test_inheritance_noexc.dir/test_inheritance.cpp.o
+[120/382] Building CXX object tests/CMakeFiles/test_schema_family.dir/test_schema_family.cpp.o
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_schema_family.cpp:26:
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_handshake.hpp:411:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+  411 | XOFFSET_PIN_SCHEMA(XOffsetDatastructure::XSchemaHello, "record[s:32,a:4]{@0:u32,@4:u32,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:32,a:8]{@0:u64,@8:u64,@16:u64,@24:u32,@28:u32}>,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/tests/schema_family/../../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_schema_family.cpp:26:
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_handshake.hpp:412:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+  412 | XOFFSET_PIN_SCHEMA(XOffsetDatastructure::XSchemaHelloAck, "record[s:32,a:4]{@0:u32,@4:u32,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:24,a:8]{@0:u64,@8:u64,@16:u32,@20:u32}>,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/tests/schema_family/../../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+2 warnings generated.
+[121/382] Building CXX object tests/CMakeFiles/test_no_exceptions_noexc.dir/test_no_exceptions.cpp.o
+[122/382] Building CXX object tests/CMakeFiles/test_lower_bound_index_noexc.dir/test_lower_bound_index.cpp.o
+[123/382] Building CXX object tests/CMakeFiles/test_regrow_used_range_noexc.dir/test_regrow_used_range.cpp.o
+[124/382] Building CXX object tests/CMakeFiles/test_memory_efficiency_noexc.dir/test_memory_efficiency.cpp.o
+[125/382] Building CXX object tests/CMakeFiles/test_schema_pin_noexc.dir/test_schema_pin.cpp.o
+/Volumes/XOffsetCS/apple430/src/tests/test_schema_pin.cpp:16:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   16 | XOFFSET_PIN_SCHEMA(pin::Inner, "record[s:20,a:4]{@0:u32,@4:bool,@8:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+/Volumes/XOffsetCS/apple430/src/tests/test_schema_pin.cpp:17:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   17 | XOFFSET_PIN_SCHEMA(pin::Root,
+      | ^
+/Volumes/XOffsetCS/apple430/src/xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+/Volumes/XOffsetCS/apple430/src/tests/test_schema_pin.cpp:29:5: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   29 |     XOFFSET_PIN_SCHEMA(pin::Inner, "record[s:20,a:4]{@0:u32,@4:bool,@8:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      |     ^
+/Volumes/XOffsetCS/apple430/src/xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+3 warnings generated.
+[126/382] Building CXX object tests/CMakeFiles/test_string_append_noexc.dir/test_string_append.cpp.o
+[127/382] Building CXX object tests/CMakeFiles/test_ordinary_records_noexc.dir/test_ordinary_records.cpp.o
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_ordinary_records.cpp:6:
+In file included from /Volumes/XOffsetCS/apple430/src/xoffsetdatastructure.hpp:11:
+/Volumes/XOffsetCS/apple430/src/xoffset_wire.hpp:1477:29: warning: first argument in call to 'memcpy' is a pointer to non-trivially copyable type 'orec::Hero' [-Wnontrivial-memcall]
+ 1477 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+/Volumes/XOffsetCS/apple430/src/xoffset_containers.hpp:2062:39: note: in instantiation of function template specialization 'XOffsetDatastructure::fixed_detail::stable_erase_relocate<orec::Hero>' requested here
+ 2062 |                         fixed_detail::stable_erase_relocate(items + write, items[read]);
+      |                                       ^
+/Volumes/XOffsetCS/apple430/src/tests/test_ordinary_records.cpp:144:24: note: in instantiation of function template specialization 'XOffsetDatastructure::XVectorCore<orec::Hero>::stable_erase_if<(lambda at /Volumes/XOffsetCS/apple430/src/tests/test_ordinary_records.cpp:144:40)>' requested here
+  144 |                 heroes.stable_erase_if([&](const auto& h) { return h.level < cut; });
+      |                        ^
+/Volumes/XOffsetCS/apple430/src/tests/test_ordinary_records.cpp:176:27: note: in instantiation of function template specialization '(anonymous namespace)::run<orec::Root>' requested here
+  176 |     const auto declared = run<orec::Root>();
+      |                           ^
+/Volumes/XOffsetCS/apple430/src/xoffset_wire.hpp:1477:29: note: explicitly cast the pointer to silence this warning
+ 1477 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+      |                             (void*)
+/Volumes/XOffsetCS/apple430/src/xoffset_wire.hpp:1477:29: warning: first argument in call to 'memcpy' is a pointer to non-trivially copyable type 'orec::PlainHero' [-Wnontrivial-memcall]
+ 1477 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+/Volumes/XOffsetCS/apple430/src/xoffset_containers.hpp:2062:39: note: in instantiation of function template specialization 'XOffsetDatastructure::fixed_detail::stable_erase_relocate<orec::PlainHero>' requested here
+ 2062 |                         fixed_detail::stable_erase_relocate(items + write, items[read]);
+      |                                       ^
+/Volumes/XOffsetCS/apple430/src/tests/test_ordinary_records.cpp:144:24: note: in instantiation of function template specialization 'XOffsetDatastructure::XVectorCore<orec::PlainHero>::stable_erase_if<(lambda at /Volumes/XOffsetCS/apple430/src/tests/test_ordinary_records.cpp:144:40)>' requested here
+  144 |                 heroes.stable_erase_if([&](const auto& h) { return h.level < cut; });
+      |                        ^
+/Volumes/XOffsetCS/apple430/src/tests/test_ordinary_records.cpp:177:24: note: in instantiation of function template specialization '(anonymous namespace)::run<orec::PlainRoot>' requested here
+  177 |     const auto plain = run<orec::PlainRoot>();
+      |                        ^
+/Volumes/XOffsetCS/apple430/src/xoffset_wire.hpp:1477:29: note: explicitly cast the pointer to silence this warning
+ 1477 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+      |                             (void*)
+2 warnings generated.
+[128/382] Building CXX object tests/CMakeFiles/test_stability_contract_noexc.dir/test_stability_contract.cpp.o
+[129/382] Building CXX object tests/CMakeFiles/test_wire_populate_noexc.dir/test_wire_populate.cpp.o
+[130/382] Building CXX object tests/CMakeFiles/test_xhandle_noexc.dir/test_xhandle.cpp.o
+[131/382] Building CXX object tests/CMakeFiles/test_shift_relocate_noexc.dir/test_shift_relocate.cpp.o
+[132/382] Building CXX object tests/CMakeFiles/test_xstring_direct_assign_noexc.dir/test_xstring_direct_assign.cpp.o
+[133/382] Building CXX object tests/CMakeFiles/test_save_compact_noexc.dir/test_save_compact.cpp.o
+[134/382] Building CXX object tests/CMakeFiles/test_root_spare_noexc.dir/test_root_spare.cpp.o
+[135/382] Building CXX object tests/CMakeFiles/test_xspare_noexc.dir/test_xspare.cpp.o
+/Volumes/XOffsetCS/apple430/src/tests/test_xspare.cpp:80:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+   80 | XOFFSET_PIN_SCHEMA(sp::Item, "record[s:8,a:4]{@0:i32,@4:bool,@5:u8char,@6:spare[2]}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+1 warning generated.
+[136/382] Building CXX object tests/CMakeFiles/test_schema_handshake_noexc.dir/test_schema_handshake.cpp.o
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_schema_handshake.cpp:5:
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_handshake.hpp:411:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+  411 | XOFFSET_PIN_SCHEMA(XOffsetDatastructure::XSchemaHello, "record[s:32,a:4]{@0:u32,@4:u32,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:32,a:8]{@0:u64,@8:u64,@16:u64,@24:u32,@28:u32}>,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_schema_handshake.cpp:5:
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_handshake.hpp:412:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+  412 | XOFFSET_PIN_SCHEMA(XOffsetDatastructure::XSchemaHelloAck, "record[s:32,a:4]{@0:u32,@4:u32,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:24,a:8]{@0:u64,@8:u64,@16:u32,@20:u32}>,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+2 warnings generated.
+[137/382] Building CXX object tests/CMakeFiles/test_delta_format_noexc.dir/test_delta_format.cpp.o
+[138/382] Building CXX object tests/CMakeFiles/test_fixed_message_noexc.dir/test_fixed_message.cpp.o
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_fixed_message.cpp:7:
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_handshake.hpp:411:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+  411 | XOFFSET_PIN_SCHEMA(XOffsetDatastructure::XSchemaHello, "record[s:32,a:4]{@0:u32,@4:u32,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:32,a:8]{@0:u64,@8:u64,@16:u64,@24:u32,@28:u32}>,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_fixed_message.cpp:7:
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_handshake.hpp:412:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+  412 | XOFFSET_PIN_SCHEMA(XOffsetDatastructure::XSchemaHelloAck, "record[s:32,a:4]{@0:u32,@4:u32,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:24,a:8]{@0:u64,@8:u64,@16:u32,@20:u32}>,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+2 warnings generated.
+[139/382] Building CXX object tests/CMakeFiles/test_v2_fuzz_noexc.dir/test_v2_fuzz.cpp.o
+[140/382] Building CXX object tests/CMakeFiles/test_receiver_forced_noexc.dir/test_receiver_forced.cpp.o
+[141/382] Building CXX object tests/CMakeFiles/test_relayout_noexc.dir/test_relayout.cpp.o
+[142/382] Building CXX object tests/CMakeFiles/test_receiver_noexc.dir/test_receiver.cpp.o
+[143/382] Building CXX object tests/CMakeFiles/test_receiver_view_noexc.dir/test_receiver_view.cpp.o
+[144/382] Building CXX object tests/CMakeFiles/test_shared_delta_format_noexc.dir/test_shared_delta_format.cpp.o
+[145/382] Building CXX object tests/CMakeFiles/test_shared_delta_slots_noexc.dir/test_shared_delta_slots.cpp.o
+[146/382] Building CXX object tests/CMakeFiles/test_schema_family_xs_noexc.dir/test_schema_family_xs.cpp.o
+[147/382] Building CXX object tests/CMakeFiles/test_shared_delta_noexc.dir/test_shared_delta.cpp.o
+[148/382] Building CXX object tests/CMakeFiles/test_shared_delta_sync_noexc.dir/test_shared_delta_sync.cpp.o
+[149/382] Building CXX object tests/CMakeFiles/test_retire_discard_noexc.dir/test_retire_discard.cpp.o
+[150/382] Building CXX object tests/CMakeFiles/test_relocating_storage_noexc.dir/test_relocating_storage.cpp.o
+[151/382] Building CXX object tests/CMakeFiles/test_engine_macros_noexc.dir/test_engine_macros.cpp.o
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_engine_macros.cpp:97:
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_handshake.hpp:411:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+  411 | XOFFSET_PIN_SCHEMA(XOffsetDatastructure::XSchemaHello, "record[s:32,a:4]{@0:u32,@4:u32,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:32,a:8]{@0:u64,@8:u64,@16:u64,@24:u32,@28:u32}>,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_engine_macros.cpp:97:
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_handshake.hpp:412:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+  412 | XOFFSET_PIN_SCHEMA(XOffsetDatastructure::XSchemaHelloAck, "record[s:32,a:4]{@0:u32,@4:u32,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:24,a:8]{@0:u64,@8:u64,@16:u32,@20:u32}>,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+2 warnings generated.
+[152/382] Building CXX object tests/CMakeFiles/test_schema_family_noexc.dir/test_schema_family.cpp.o
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_schema_family.cpp:26:
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_handshake.hpp:411:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+  411 | XOFFSET_PIN_SCHEMA(XOffsetDatastructure::XSchemaHello, "record[s:32,a:4]{@0:u32,@4:u32,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:32,a:8]{@0:u64,@8:u64,@16:u64,@24:u32,@28:u32}>,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/tests/schema_family/../../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_schema_family.cpp:26:
+/Volumes/XOffsetCS/apple430/src/tests/../xoffset_handshake.hpp:412:1: warning: 'static_assert' with a user-generated message is a C++26 extension [-Wc++26-extensions]
+  412 | XOFFSET_PIN_SCHEMA(XOffsetDatastructure::XSchemaHelloAck, "record[s:32,a:4]{@0:u32,@4:u32,@8:xvector[s:12,a:4]{data:rel32,size:u32,capacity:u32}<record[s:24,a:8]{@0:u64,@8:u64,@16:u32,@20:u32}>,@20:xstring[s:12,a:4]{data:rel32,size:u32,capacity:u32}{inline:10}}");
+      | ^
+/Volumes/XOffsetCS/apple430/src/tests/schema_family/../../xoffset_registration.hpp:60:9: note: expanded from macro 'XOFFSET_PIN_SCHEMA'
+   60 |         ::XOffsetDatastructure::detail::schema_pin_message<Type>())
+      |         ^
+2 warnings generated.
+[153/382] Building CXX object tests/CMakeFiles/test_dump_noexc.dir/test_dump.cpp.o
+[154/382] Building CXX object tests/CMakeFiles/test_shared_delta_publisher_noexc.dir/test_shared_delta_publisher.cpp.o
+[155/382] Building CXX object tests/CMakeFiles/test_proxy_fuzz_noexc.dir/test_proxy_fuzz.cpp.o
+[156/382] Building CXX object tests/CMakeFiles/test_wire_hole_zeroing_hardened.dir/test_wire_hole_zeroing.cpp.o
+[157/382] Building CXX object tests/CMakeFiles/test_delta_sync_noexc.dir/test_delta_sync.cpp.o
+[158/382] Building CXX object tests/CMakeFiles/test_proxy_scopes_noexc.dir/test_proxy_scopes.cpp.o
+[159/382] Building CXX object tests/CMakeFiles/test_implicit_padding_hardened.dir/test_implicit_padding.cpp.o
+[160/382] Building CXX object tests/CMakeFiles/test_assign_range_hardened.dir/test_assign_range.cpp.o
+[161/382] Building CXX object tests/CMakeFiles/test_string_append_hardened.dir/test_string_append.cpp.o
+[162/382] Building CXX object tests/CMakeFiles/test_xstring_direct_assign_hardened.dir/test_xstring_direct_assign.cpp.o
+[163/382] Building CXX object tests/CMakeFiles/test_vector_hardened.dir/test_vector.cpp.o
+[164/382] Building CXX object tests/CMakeFiles/test_runtime_regressions_hardened.dir/test_runtime_regressions.cpp.o
+[165/382] Building CXX object tests/CMakeFiles/test_map_set_hardened.dir/test_map_set.cpp.o
+[166/382] Building CXX object tests/CMakeFiles/test_resize_growth_hardened.dir/test_resize_growth.cpp.o
+[167/382] Building CXX object tests/CMakeFiles/test_proxy_scopes_hardened.dir/test_proxy_scopes.cpp.o
+[168/382] Building CXX object tests/CMakeFiles/test_reset_used_range_hardened.dir/test_reset_used_range.cpp.o
+[169/382] Building CXX object tests/CMakeFiles/test_regrow_used_range_hardened.dir/test_regrow_used_range.cpp.o
+[170/382] Building CXX object tests/CMakeFiles/test_main_containers_hardened.dir/test_main_containers.cpp.o
+[171/382] Building CXX object tests/CMakeFiles/test_ordinary_records_hardened.dir/test_ordinary_records.cpp.o
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_ordinary_records.cpp:6:
+In file included from /Volumes/XOffsetCS/apple430/src/xoffsetdatastructure.hpp:11:
+/Volumes/XOffsetCS/apple430/src/xoffset_wire.hpp:1477:29: warning: first argument in call to 'memcpy' is a pointer to non-trivially copyable type 'orec::Hero' [-Wnontrivial-memcall]
+ 1477 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+/Volumes/XOffsetCS/apple430/src/xoffset_containers.hpp:2062:39: note: in instantiation of function template specialization 'XOffsetDatastructure::fixed_detail::stable_erase_relocate<orec::Hero>' requested here
+ 2062 |                         fixed_detail::stable_erase_relocate(items + write, items[read]);
+      |                                       ^
+/Volumes/XOffsetCS/apple430/src/tests/test_ordinary_records.cpp:144:24: note: in instantiation of function template specialization 'XOffsetDatastructure::XVectorCore<orec::Hero>::stable_erase_if<(lambda at /Volumes/XOffsetCS/apple430/src/tests/test_ordinary_records.cpp:144:40)>' requested here
+  144 |                 heroes.stable_erase_if([&](const auto& h) { return h.level < cut; });
+      |                        ^
+/Volumes/XOffsetCS/apple430/src/tests/test_ordinary_records.cpp:176:27: note: in instantiation of function template specialization '(anonymous namespace)::run<orec::Root>' requested here
+  176 |     const auto declared = run<orec::Root>();
+      |                           ^
+/Volumes/XOffsetCS/apple430/src/xoffset_wire.hpp:1477:29: note: explicitly cast the pointer to silence this warning
+ 1477 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+      |                             (void*)
+/Volumes/XOffsetCS/apple430/src/xoffset_wire.hpp:1477:29: warning: first argument in call to 'memcpy' is a pointer to non-trivially copyable type 'orec::PlainHero' [-Wnontrivial-memcall]
+ 1477 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+/Volumes/XOffsetCS/apple430/src/xoffset_containers.hpp:2062:39: note: in instantiation of function template specialization 'XOffsetDatastructure::fixed_detail::stable_erase_relocate<orec::PlainHero>' requested here
+ 2062 |                         fixed_detail::stable_erase_relocate(items + write, items[read]);
+      |                                       ^
+/Volumes/XOffsetCS/apple430/src/tests/test_ordinary_records.cpp:144:24: note: in instantiation of function template specialization 'XOffsetDatastructure::XVectorCore<orec::PlainHero>::stable_erase_if<(lambda at /Volumes/XOffsetCS/apple430/src/tests/test_ordinary_records.cpp:144:40)>' requested here
+  144 |                 heroes.stable_erase_if([&](const auto& h) { return h.level < cut; });
+      |                        ^
+/Volumes/XOffsetCS/apple430/src/tests/test_ordinary_records.cpp:177:24: note: in instantiation of function template specialization '(anonymous namespace)::run<orec::PlainRoot>' requested here
+  177 |     const auto plain = run<orec::PlainRoot>();
+      |                        ^
+/Volumes/XOffsetCS/apple430/src/xoffset_wire.hpp:1477:29: note: explicitly cast the pointer to silence this warning
+ 1477 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+      |                             (void*)
+2 warnings generated.
+[172/382] Building CXX object tests/CMakeFiles/test_fixed_layout_containers_hardened.dir/test_fixed_layout_containers.cpp.o
+[173/382] Building CXX object tests/CMakeFiles/test_shift_relocate_hardened.dir/test_shift_relocate.cpp.o
+[174/382] Building CXX object tests/CMakeFiles/test_reload_reset_hardened.dir/test_reload_reset.cpp.o
+[175/382] Building CXX object tests/CMakeFiles/test_save_composed_hardened.dir/test_save_composed.cpp.o
+[176/382] Building CXX object tests/CMakeFiles/fuzz_v2_wire_replay.dir/fuzz/replay_main.cpp.o
+[177/382] Building CXX object tests/CMakeFiles/test_slot_storage_hardened.dir/test_slot_storage.cpp.o
+[178/382] Building CXX object tests/CMakeFiles/fuzz_wire_schemas_replay.dir/fuzz/replay_main.cpp.o
+[179/382] Building CXX object tests/CMakeFiles/fuzz_delta_sync_replay.dir/fuzz/replay_main.cpp.o
+[180/382] Building CXX object tests/CMakeFiles/fuzz_shared_delta_replay.dir/fuzz/replay_main.cpp.o
+[181/382] Building CXX object tests/CMakeFiles/fuzz_schema_family_replay.dir/fuzz/replay_main.cpp.o
+[182/382] Building CXX object tests/CMakeFiles/fuzz_v2_wire_replay_noexc.dir/fuzz/replay_main.cpp.o
+[183/382] Building CXX object tests/CMakeFiles/fuzz_wire_schemas_replay_noexc.dir/fuzz/replay_main.cpp.o
+[184/382] Building CXX object tests/CMakeFiles/fuzz_shared_delta_replay.dir/fuzz/fuzz_shared_delta.cpp.o
+[185/382] Building CXX object tests/CMakeFiles/test_relayout_hardened.dir/test_relayout.cpp.o
+[186/382] Building CXX object tests/CMakeFiles/fuzz_wire_schemas_replay.dir/fuzz/fuzz_wire_schemas.cpp.o
+[187/382] Building CXX object tests/CMakeFiles/test_verified_paths.dir/test_verified_paths.cpp.o
+[188/382] Linking CXX executable bin/Release/helloworld
+[189/382] Linking CXX executable bin/Release/stable_storage
+[190/382] Linking CXX executable bin/Release/schema_handshake
+[191/382] Linking CXX executable bin/Release/delta_sync_example
+[192/382] Linking CXX executable bin/Release/shared_delta_example
+[193/382] Building CXX object tests/CMakeFiles/fuzz_v2_wire_replay.dir/fuzz/fuzz_v2_wire.cpp.o
+[194/382] Linking CXX executable bin/Release/server_to_client
+[195/382] Linking CXX executable bin/Release/server_to_client_noexc
+[196/382] Linking CXX executable bin/Release/client_uplink
+[197/382] Linking CXX executable bin/Release/client_uplink_noexc
+[198/382] Linking CXX executable bin/Release/server_to_server
+[199/382] Linking CXX executable bin/Release/server_to_server_noexc
+[200/382] Linking CXX executable bin/Release/bench_compare
+[201/382] Linking CXX executable bin/Release/check_signature_matrix
+[202/382] Linking CXX executable bin/Release/test_virtual_memory_storage
+[203/382] Linking CXX executable bin/Release/test_vm_pool
+[204/382] Linking CXX executable bin/Release/test_vm_storage_noexc
+[205/382] Linking CXX executable bin/Release/test_basic_types
+[206/382] Linking CXX executable bin/Release/test_vector
+[207/382] Linking CXX executable bin/Release/test_map_set
+[208/382] Linking CXX executable bin/Release/test_nested
+[209/382] Linking CXX executable bin/Release/test_compaction
+[210/382] Linking CXX executable bin/Release/test_xbuffer_api
+[211/382] Linking CXX executable bin/Release/test_assign_range
+[212/382] Linking CXX executable bin/Release/test_modify
+[213/382] Linking CXX executable bin/Release/test_scalar_resize
+[214/382] Linking CXX executable bin/Release/test_string_replace
+[215/382] Linking CXX executable bin/Release/test_validation_granules
+[216/382] Linking CXX executable bin/Release/test_hot_path_constants
+[217/382] Linking CXX executable bin/Release/test_wire_admission
+[218/382] Linking CXX executable bin/Release/test_resize_growth
+[219/382] Linking CXX executable bin/Release/test_xstring_direct_assign
+[220/382] Linking CXX executable bin/Release/test_string_append
+[221/382] Linking CXX executable bin/Release/test_xhandle
+[222/382] Linking CXX executable bin/Release/test_schema_envelope
+[223/382] Linking CXX executable bin/Release/test_fixed_layout_containers
+[224/382] Linking CXX executable bin/Release/test_error_paths
+[225/382] Building CXX object tests/CMakeFiles/test_stable_erase_if.dir/test_stable_erase_if.cpp.o
+In file included from /Volumes/XOffsetCS/apple430/src/tests/test_stable_erase_if.cpp:2:
+In file included from /Volumes/XOffsetCS/apple430/src/xoffsetdatastructure.hpp:11:
+/Volumes/XOffsetCS/apple430/src/xoffset_wire.hpp:1477:29: warning: first argument in call to 'memcpy' is a pointer to non-trivially copyable type 'ImplicitRecord' [-Wnontrivial-memcall]
+ 1477 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+/Volumes/XOffsetCS/apple430/src/xoffset_containers.hpp:2062:39: note: in instantiation of function template specialization 'XOffsetDatastructure::fixed_detail::stable_erase_relocate<ImplicitRecord>' requested here
+ 2062 |                         fixed_detail::stable_erase_relocate(items + write, items[read]);
+      |                                       ^
+/Volumes/XOffsetCS/apple430/src/tests/test_stable_erase_if.cpp:310:17: note: in instantiation of function template specialization 'XOffsetDatastructure::XVectorCore<ImplicitRecord>::stable_erase_if<(lambda at /Volumes/XOffsetCS/apple430/src/tests/test_stable_erase_if.cpp:310:33)>' requested here
+  310 |     need(values.stable_erase_if([](const ImplicitRecord& r){return r.id%3==0;})==4,"implicit aggregate erase count");
+      |                 ^
+/Volumes/XOffsetCS/apple430/src/xoffset_wire.hpp:1477:29: note: explicitly cast the pointer to silence this warning
+ 1477 |                 std::memcpy(destination, &source, sizeof(T));
+      |                             ^
+      |                             (void*)
+1 warning generated.
+[226/382] Linking CXX executable bin/Release/test_memory_efficiency
+[227/382] Linking CXX executable bin/Release/test_complex_nesting
+[228/382] Linking CXX executable bin/Release/test_inheritance
+[229/382] Linking CXX executable bin/Release/test_adaptive_reservation
+[230/382] Linking CXX executable bin/Release/test_main_containers
+[231/382] Linking CXX executable bin/Release/test_runtime_regressions
+[232/382] Linking CXX executable bin/Release/test_mutation_failures
+[233/382] Linking CXX executable bin/Release/test_wire_validation
+[234/382] Linking CXX executable bin/Release/test_same_arena_move
+[235/382] Linking CXX executable bin/Release/test_append_grow
+[236/382] Linking CXX executable bin/Release/test_staged_insert
+[237/382] Linking CXX executable bin/Release/test_shift_relocate
+[238/382] Building CXX object tests/CMakeFiles/test_locator_soundness.dir/test_locator_soundness.cpp.o
+[239/382] Linking CXX executable bin/Release/test_assign_sorted
+[240/382] Linking CXX executable bin/Release/test_free_table_policy
+[241/382] Linking CXX executable bin/Release/test_lower_bound_index
+[242/382] Linking CXX executable bin/Release/test_first_block
+[243/382] Linking CXX executable bin/Release/test_stable_storage
+[244/382] Linking CXX executable bin/Release/test_slot_storage
+[245/382] Linking CXX executable bin/Release/test_relocating_storage
+[246/382] Linking CXX executable bin/Release/test_proxy_scopes
+[247/382] Linking CXX executable bin/Release/test_proxy_fuzz
+[248/382] Linking CXX executable bin/Release/test_retire_discard
+[249/382] Linking CXX executable bin/Release/test_ordinary_records
+[250/382] Linking CXX executable bin/Release/test_schema_describe
+[251/382] Linking CXX executable bin/Release/test_vm_lifecycle
+[252/382] Linking CXX executable bin/Release/test_vm_transport
+[253/382] Linking CXX executable bin/Release/test_owner_identity
+[254/382] Linking CXX executable bin/Release/test_owner_registry
+[255/382] Linking CXX executable bin/Release/test_owner_map
+[256/382] Linking CXX executable bin/Release/test_tail_expansion
+[257/382] Linking CXX executable bin/Release/test_regrow_used_range
+[258/382] Linking CXX executable bin/Release/test_storage_policies
+[259/382] Linking CXX executable bin/Release/test_allocator_model
+[260/382] Linking CXX executable bin/Release/test_allocator_failures
+[261/382] Linking CXX executable bin/Release/test_v2_golden
+[262/382] Linking CXX executable bin/Release/test_schema_pin
+[263/382] Linking CXX executable bin/Release/test_cross_compiler_wire
+[264/382] Linking CXX executable bin/Release/test_stability_contract
+[265/382] Linking CXX executable bin/Release/test_wire_hole_zeroing
+[266/382] Linking CXX executable bin/Release/test_implicit_padding
+[267/382] Linking CXX executable bin/Release/test_save_compact
+[268/382] Linking CXX executable bin/Release/test_v2_fuzz
+[269/382] Linking CXX executable bin/Release/test_save_composed
+[270/382] Linking CXX executable bin/Release/test_free_run_emission
+[271/382] Linking CXX executable bin/Release/test_automatic_emission
+[272/382] Linking CXX executable bin/Release/test_spare_watch
+[273/382] Linking CXX executable bin/Release/test_root_spare
+[274/382] Linking CXX executable bin/Release/test_wire_populate
+[275/382] Building CXX object tests/CMakeFiles/fuzz_wire_schemas_replay_noexc.dir/fuzz/fuzz_wire_schemas.cpp.o
+[276/382] Linking CXX executable bin/Release/test_reload_reset
+[277/382] Linking CXX executable bin/Release/test_relayout
+[278/382] Linking CXX executable bin/Release/test_reset_used_range
+[279/382] Linking CXX executable bin/Release/test_clone
+[280/382] Linking CXX executable bin/Release/test_delta_sync
+[281/382] Linking CXX executable bin/Release/test_delta_format
+[282/382] Linking CXX executable bin/Release/test_delta_small
+[283/382] Linking CXX executable bin/Release/test_shared_delta
+[284/382] Linking CXX executable bin/Release/test_shared_delta_sync
+[285/382] Linking CXX executable bin/Release/test_delta_capacity
+[286/382] Linking CXX executable bin/Release/test_shared_delta_format
+[287/382] Linking CXX executable bin/Release/test_shared_delta_publisher
+[288/382] Linking CXX executable bin/Release/test_shared_delta_slots
+[289/382] Linking CXX executable bin/Release/test_shared_delta_publisher_errors
+[290/382] Linking CXX executable bin/Release/test_dump
+[291/382] Linking CXX executable bin/Release/test_engine_macros
+[292/382] Linking CXX executable bin/Release/test_relocating_storage_step
+[293/382] Linking CXX executable bin/Release/test_schema_family_xs
+[294/382] Linking CXX executable bin/Release/test_xspare
+[295/382] Linking CXX executable bin/Release/test_schema_family
+[296/382] Linking CXX executable bin/Release/test_schema_snapshot
+[297/382] Linking CXX executable bin/Release/test_schema_handshake
+[298/382] Linking CXX executable bin/Release/test_receiver
+[299/382] Linking CXX executable bin/Release/test_receiver_uplink_unchecked
+[300/382] Linking CXX executable bin/Release/test_receiver_view
+[301/382] Linking CXX executable bin/Release/test_receiver_view_uplink_unchecked
+[302/382] Linking CXX executable bin/Release/test_receiver_forced
+[303/382] Linking CXX executable bin/Release/test_fixed_message
+[304/382] Linking CXX executable bin/Release/test_no_exceptions
+[305/382] Linking CXX executable bin/Release/test_automatic_emission_noexc
+[306/382] Linking CXX executable bin/Release/test_no_exceptions_noexc
+[307/382] Linking CXX executable bin/Release/test_spare_watch_noexc
+[308/382] Linking CXX executable bin/Release/test_root_spare_noexc
+[309/382] Linking CXX executable bin/Release/test_free_run_emission_noexc
+[310/382] Linking CXX executable bin/Release/test_hot_path_constants_noexc
+[311/382] Linking CXX executable bin/Release/test_inheritance_noexc
+[312/382] Linking CXX executable bin/Release/test_implicit_padding_noexc
+[313/382] Linking CXX executable bin/Release/test_memory_efficiency_noexc
+[314/382] Linking CXX executable bin/Release/test_ordinary_records_noexc
+[315/382] Linking CXX executable bin/Release/test_lower_bound_index_noexc
+[316/382] Linking CXX executable bin/Release/test_save_compact_noexc
+[317/382] Linking CXX executable bin/Release/test_schema_pin_noexc
+[318/382] Linking CXX executable bin/Release/test_shift_relocate_noexc
+[319/382] Linking CXX executable bin/Release/test_string_append_noexc
+[320/382] Linking CXX executable bin/Release/test_regrow_used_range_noexc
+[321/382] Linking CXX executable bin/Release/test_stability_contract_noexc
+[322/382] Linking CXX executable bin/Release/test_xhandle_noexc
+[323/382] Linking CXX executable bin/Release/test_v2_fuzz_noexc
+[324/382] Linking CXX executable bin/Release/test_wire_populate_noexc
+[325/382] Linking CXX executable bin/Release/test_xstring_direct_assign_noexc
+[326/382] Linking CXX executable bin/Release/test_schema_handshake_noexc
+[327/382] Linking CXX executable bin/Release/test_xspare_noexc
+[328/382] Linking CXX executable bin/Release/test_schema_family_noexc
+[329/382] Linking CXX executable bin/Release/test_delta_format_noexc
+[330/382] Linking CXX executable bin/Release/test_delta_sync_noexc
+[331/382] Linking CXX executable bin/Release/test_relayout_noexc
+[332/382] Linking CXX executable bin/Release/test_schema_family_xs_noexc
+[333/382] Linking CXX executable bin/Release/test_fixed_message_noexc
+[334/382] Linking CXX executable bin/Release/test_receiver_forced_noexc
+[335/382] Linking CXX executable bin/Release/test_receiver_noexc
+[336/382] Linking CXX executable bin/Release/test_shared_delta_sync_noexc
+[337/382] Linking CXX executable bin/Release/test_shared_delta_format_noexc
+[338/382] Linking CXX executable bin/Release/test_shared_delta_noexc
+[339/382] Linking CXX executable bin/Release/test_receiver_view_noexc
+[340/382] Linking CXX executable bin/Release/test_shared_delta_slots_noexc
+[341/382] Linking CXX executable bin/Release/test_shared_delta_publisher_noexc
+[342/382] Linking CXX executable bin/Release/test_relocating_storage_noexc
+[343/382] Linking CXX executable bin/Release/test_proxy_fuzz_noexc
+[344/382] Linking CXX executable bin/Release/test_proxy_scopes_noexc
+[345/382] Linking CXX executable bin/Release/test_retire_discard_noexc
+[346/382] Linking CXX executable bin/Release/test_engine_macros_noexc
+[347/382] Linking CXX executable bin/Release/test_dump_noexc
+[348/382] Linking CXX executable bin/Release/test_implicit_padding_hardened
+[349/382] Linking CXX executable bin/Release/test_assign_range_hardened
+[350/382] Linking CXX executable bin/Release/test_proxy_scopes_hardened
+[351/382] Linking CXX executable bin/Release/test_wire_hole_zeroing_hardened
+[352/382] Linking CXX executable bin/Release/test_runtime_regressions_hardened
+[353/382] Linking CXX executable bin/Release/test_xstring_direct_assign_hardened
+[354/382] Linking CXX executable bin/Release/test_resize_growth_hardened
+[355/382] Linking CXX executable bin/Release/test_save_composed_hardened
+[356/382] Linking CXX executable bin/Release/test_string_append_hardened
+[357/382] Linking CXX executable bin/Release/test_vector_hardened
+[358/382] Linking CXX executable bin/Release/test_map_set_hardened
+[359/382] Linking CXX executable bin/Release/test_fixed_layout_containers_hardened
+[360/382] Linking CXX executable bin/Release/test_main_containers_hardened
+[361/382] Linking CXX executable bin/Release/test_shift_relocate_hardened
+[362/382] Linking CXX executable bin/Release/test_ordinary_records_hardened
+[363/382] Linking CXX executable bin/Release/test_reset_used_range_hardened
+[364/382] Linking CXX executable bin/Release/test_reload_reset_hardened
+[365/382] Linking CXX executable bin/Release/test_slot_storage_hardened
+[366/382] Linking CXX executable bin/Release/test_regrow_used_range_hardened
+[367/382] Linking CXX executable bin/Release/test_relayout_hardened
+[368/382] Linking CXX executable bin/Release/fuzz_v2_wire_replay
+[369/382] Linking CXX executable bin/Release/fuzz_wire_schemas_replay
+[370/382] Linking CXX executable bin/Release/fuzz_shared_delta_replay
+[371/382] Linking CXX executable bin/Release/test_verified_paths
+[372/382] Linking CXX executable bin/Release/test_stable_erase_if
+[373/382] Linking CXX executable bin/Release/test_locator_soundness
+[374/382] Linking CXX executable bin/Release/fuzz_wire_schemas_replay_noexc
+[375/382] Building CXX object tests/CMakeFiles/fuzz_v2_wire_replay_noexc.dir/fuzz/fuzz_v2_wire.cpp.o
+[376/382] Linking CXX executable bin/Release/fuzz_v2_wire_replay_noexc
+[377/382] Building CXX object tests/CMakeFiles/test_core_lifetime.dir/test_core_lifetime.cpp.o
+[378/382] Building CXX object tests/CMakeFiles/fuzz_schema_family_replay.dir/fuzz/fuzz_schema_family.cpp.o
+[379/382] Linking CXX executable bin/Release/test_core_lifetime
+[380/382] Linking CXX executable bin/Release/fuzz_schema_family_replay
+[381/382] Building CXX object tests/CMakeFiles/fuzz_delta_sync_replay.dir/fuzz/fuzz_delta_sync.cpp.o
+[382/382] Linking CXX executable bin/Release/fuzz_delta_sync_replay
