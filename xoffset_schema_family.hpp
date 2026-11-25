@@ -1,7 +1,7 @@
 #ifndef X_OFFSET_SCHEMA_FAMILY_HPP
 #define X_OFFSET_SCHEMA_FAMILY_HPP
 
-// Add-only type evolution (docs/SCHEMA_EVOLUTION.md section 9). A later
+// Add-only type evolution (docs/SCHEMA_EVOLUTION.md). A later
 // version of a type only adds fields, and only in bytes the previous version
 // reserved with XSpare<N>. Such versions have the same image bytes, so they
 // form one family under the fingerprint of the first version, and a program

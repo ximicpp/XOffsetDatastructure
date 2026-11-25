@@ -59,8 +59,8 @@ add_test(NAME fuzz_wire_schemas_smoke
 set_tests_properties(fuzz_wire_schemas_smoke PROPERTIES
     LABELS "fuzz" FIXTURES_REQUIRED fuzz_wire_schemas_seeds)
 
-# Add-only type evolution, the in-place pair (docs/SCHEMA_EVOLUTION.md section
-# 9): three versions of one family read the same wire or shared delta body and
+# Add-only type evolution, the in-place pair (docs/SCHEMA_EVOLUTION.md):
+# three versions of one family read the same wire or shared delta body and
 # must agree. Field lists: both backends.
 add_executable(fuzz_schema_family fuzz_schema_family.cpp)
 configure_xoffset_target(fuzz_schema_family)

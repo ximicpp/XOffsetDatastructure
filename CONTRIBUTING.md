@@ -90,7 +90,7 @@ minimum and stay C++17. Do not apply full-library settings globally.
 - Library namespace `XOffsetDatastructure`; TypeLayout APIs live in
   `boost::typelayout`.
 - `XOFFSET_RECORD`, `XOFFSET_REGISTER_SCHEMA_NAME`, `XOFFSET_ORDINARY_RECORDS`,
-  `XOFFSET_SCHEMA_LINEAGE` and `XOFFSET_SCHEMA_NAME_ALIAS` must be used at
+  `XOFFSET_SCHEMA_FAMILY` and `XOFFSET_SCHEMA_LINEAGE` must be used at
   global scope; inside a namespace they fail a `static_assert`.
 - English only: documents, comments, strings and tool output. No CJK
   characters in tracked text files (they get garbled under other code pages);

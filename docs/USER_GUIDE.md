@@ -669,8 +669,8 @@ if (XStatus r = rx.apply_delta<View>(held, d, cursor); !r) ask_for_key_delta();
 - A delta that does not match the copy's version (loss, reordering, restart) returns
   `delta_base_mismatch` and changes nothing; the sender calls `base.reset()` and sends a key delta.
 - The copy is read-only; to send changes back, use deltas in the other direction.
-- Send deltas only when the handshake answers `same` for the root type; on `convert` send converted
-  whole buffers (section 7).
+- Both ends work in one generation (the handshake answered `same` for the root type): the same
+  version, or versions of one add-only family, which take the same deltas (section 7).
 
 ### 4.6 Shared deltas: viewport sync
 
@@ -831,9 +831,12 @@ appends into a caller-owned `std::string`.
 ## 7. Schema changes
 
 The wire header carries the schema identity, and a reader rejects a wire whose identity differs from
-its type: adding, removing, reordering or changing any field needs both ends updated together. When
-ends run different versions, the server converts with the version chain of
-[SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md) and the client only adds a handshake. Pin shared types with
+its type. One change keeps the identity: a field added in bytes the previous version reserved with
+`XSpare<N>`, declared with `XOFFSET_SCHEMA_FAMILY`; old and new programs then read each other's data as
+it is, in both directions. Any other change (removing, reordering, renaming or retyping a field, a
+field outside reserved bytes) is a new generation and needs both ends updated together: the handshake
+refuses a peer of another generation, and stored data of an older one loads through a lineage
+([SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)). Pin shared types with
 `XOFFSET_PIN_SCHEMA` ([SCHEMA_PINS.md](SCHEMA_PINS.md)) so a compiler that lays one out differently
 fails to compile.
 
@@ -855,7 +858,7 @@ tests behind each are in [STABILITY_TESTS.md](STABILITY_TESTS.md).
 | K3 | What is sent is a copy owned by the caller; the sender keeps modifying | `save_verified<T>` |
 | K4 | Receive checks in three tiers (below); the full tier rejects truncation, out-of-bounds, overlap, incomplete tiling, invalid values and schema mismatch, deltas included; one ASan fuzz round with no findings before every release | `XReceiver`, `load_verified<T>`, delta apply |
 | K5 | A received buffer is modified and sent again; free space travels in the image (the free directory and the free blocks) | Same as K3, K4 |
-| K6 | Schema fingerprints must match exactly; different versions use the evolution handshake (E0) | Wire header `schema_hash` |
+| K6 | Schema fingerprints must match exactly; versions of one add-only family share one fingerprint (E0) | Wire header `schema_hash` |
 | K7 | The same object representation on every verified compiler and platform | `XOFFSET_PIN_SCHEMA`; library signature baselines in `tools/sigs/`; the cross-compiler wire corpus |
 | K8 | Clients (Windows, iOS, Android) build as C++20 with their native compilers and use the same library and wire as servers ([CLIENT_TARGETS.md](CLIENT_TARGETS.md)) | Field-list backend; `tools/native_targets.sh` |
 | K9 | Native delta sync: whole-state deltas (format 2.0) and shared viewport deltas (XS 2.0), checked at the link's tier and fuzzed before release | `apply_delta`, `apply_sync` ([DELTA_SYNC.md](DELTA_SYNC.md), [SHARED_DELTA.md](SHARED_DELTA.md)) |
@@ -926,7 +929,7 @@ The following interfaces are provided but optional or experimental and may chang
 
 | # | Interface | Notes |
 | --- | --- | --- |
-| E0 | Schema evolution: `xoffset_evolution.hpp` (version chain, `evolve_load_verified`, `XPeerSchemas` handshake), freeze tool | Interop between ends on different versions (since 3.2.0, [SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)); conversion runs on the server, clients contain no conversion code |
+| E0 | Schema evolution: `XSpare` / `XOFFSET_SCHEMA_FAMILY` (add-only versions), the handshake (`xoffset_handshake.hpp`), stored data of older generations (`xoffset_evolution.hpp`: lineage, `evolve_load_verified`), freeze tool | Add-only versions interoperate with no conversion; another generation is refused at the handshake; stored data converts once on load ([SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)) |
 | E2 | `save_verified_into`, `TypedXBuffer<T>` | `TypedXBuffer<T>` is the recommended pattern of section 3; the shape of both may still change |
 | E3 | `XBufferPool`, reservation and growth policy details, `XStorage` / `storage_kind()`, `SLOT_MAX`, `trim_slot_storage` | High-frequency small buffers |
 | E4 | `load_unverified` | Only for data the caller already trusts |

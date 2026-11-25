@@ -1,5 +1,5 @@
 // Map state demo: the schema freeze tool for the demo's root types
-// (xoffset_schema_freeze.hpp, docs/SCHEMA_EVOLUTION.md section 5). Built with
+// (xoffset_schema_freeze.hpp, docs/SCHEMA_EVOLUTION.md section 7). Built with
 // the servers (C++26 reflection); OWNER: integration thread.
 //
 // At a release, from demo/mapstate/include (the snapshot's #include lines

@@ -406,16 +406,16 @@ without `NDEBUG` and under ASan or TSan) makes admit the full check.
   To send edits back, the receiver keeps its own buffer and baseline and
   sends deltas the other way.
 - **Touch what you change** (only with `touched_only`): section 1.
-- **Same schema on both ends.** Deltas carry no schema conversion. The
+- **Same fingerprint on both ends.** Deltas carry no schema conversion. The
   fingerprint is checked on the key delta (`schema_mismatch`,
-  `root_type_mismatch`). Decide at connect time: when the schema handshake
-  (`xoffset_handshake.hpp`, `examples/schema_handshake.cpp`) answers `same`
-  for the root type, send deltas; when it answers `convert`, send whole wires
-  converted for that client ([SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)), or
-  keep a sender-side buffer in the client's version with its own baseline.
-  A client that gets `schema_mismatch` on a key delta has the wrong verdict
-  and reconnects with a new handshake; asking for another key delta would not
-  help.
+  `root_type_mismatch`). The schema handshake (`xoffset_handshake.hpp`,
+  `examples/schema_handshake.cpp`) answers `same` only when both ends work in
+  one generation: the same version, or versions of one add-only family, which
+  have the same bytes and take the same deltas
+  ([SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md) section 4). A peer of another
+  generation is refused, so there is nothing to send it. A client that gets
+  `schema_mismatch` on a key delta skipped the handshake and reconnects with
+  one; asking for another key delta would not help.
 - **Stable positions.** The comparison is positional. Data whose elements
   stay where they are (slots that are cleared and reused, fields assigned in
   place) gives small deltas. An erase from the middle of an `XVector`, or an

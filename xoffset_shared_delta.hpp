@@ -533,7 +533,7 @@ namespace XOffsetDatastructure::xsync {
         };
 
         // The members of T a change body names: those of the first version
-        // of T's add-only family (docs/SCHEMA_EVOLUTION.md section 9), so the
+        // of T's add-only family (docs/SCHEMA_EVOLUTION.md section 4), so the
         // versions of a family read each other's change bodies; T's own for
         // a type without a family.
         template <class T> struct Members {

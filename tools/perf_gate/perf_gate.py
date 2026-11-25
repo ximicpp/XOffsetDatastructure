@@ -66,7 +66,7 @@ SLGD_STEADY_KEYS = ("S.store_recv",)
 SLGD_WHOLE = "whole"
 FORMAL_PHASES = ("load", "query_before", "mutate", "emit_after", "retire", "reload", "query_after", "cleanup")
 RELOC_ROUNDS, RELOC_WARMUP, RELOC_SKIP_ROUNDS = "5", "1", "2"   # collect rounds 2-4 of each case
-# Add-only type evolution (docs/SCHEMA_EVOLUTION.md section 9): every family.<op>.in_family row must
+# Add-only type evolution (docs/SCHEMA_EVOLUTION.md section 4): every family.<op>.in_family row must
 # equal its family.<op>.same row in the head (a send, receive or delta between two versions of one
 # family is the same work as between two programs of one version). FAMILY_CALLS measured calls per row.
 FAMILY_CALLS = "20"
