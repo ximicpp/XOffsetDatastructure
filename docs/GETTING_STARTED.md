@@ -118,7 +118,7 @@ When a client has just joined or reconnected, the server sends the whole state.
 ```cpp
 // Server: modify in place, write into a reused string.
 world.edit([&](WorldView& v) { v.tick = t; for (Unit& u : v.units) u.y += 1; });
-world.save_verified_into(wire, XSaveOptions{.emission = XWireEmission::zero_runs});
+world.save_verified_into(wire);
 
 // Client: one receiver per link, one long-lived buffer reloaded again and again.
 XReceiver<XLink::from_server> rx{XBuffer::maximum_capacity(kViewLimit)};
@@ -128,9 +128,11 @@ held.read([](const WorldView& v) { draw(v); });       // read plain members in p
 
 - The server modifies data: scattered fields through the `root()` proxy (still valid after the buffer
   moves), loops and bulk changes with `edit()` (plain references while pinned, as fast as a plain struct).
-- Sending: `save_verified_into` reuses the same string and stops allocating once it is large enough;
-  add `zero_runs` when sending across machines, so zero runs in container slack take no bytes on the
-  wire.
+- Sending: `save_verified_into` reuses the same string and stops allocating once it is large enough.
+  Keep the default emission: a buffer that churn has left with much free space or spare capacity goes
+  out compact, any other buffer as its image. `XWireEmission::zero_runs` keeps the churned image and
+  scans it, so on a churned buffer it is slower than the default
+  ([PERFORMANCE.md section 2](PERFORMANCE.md#2-where-the-lead-holds)).
 - Each message gets its own length frame, and frames that are too long are rejected by the limit before
   copying (the library does not define a frame format).
 - Client: `reload` reuses `held`'s mapping, so no new mapping per message; on failure `held` becomes
@@ -200,15 +202,17 @@ player.edit([](PlayerState& p) {                       // a batch of allocating 
     for (std::uint32_t item = 20; item < 40; ++item) p.items.push_back(item);
     p.quests[100u] = 4;
 }, 1024);                                              // expected_growth: reserves space so it cannot fail midway
-player.save_verified_into(out, XSaveOptions{.emission = XWireEmission::zero_runs});
+player.save_verified_into(out);
 ```
 
 - `server_peer` is only for servers you control, never for client data.
 - Buffers that grow in place use `XGrowPolicy::Automatic` and an explicit `maximum_capacity`.
 - When making allocating bulk changes in `edit()`, pass `expected_growth` and check `ok()` afterwards;
   without it the buffer cannot move while pinned, and running out of space stops the changes midway.
-- When the two servers run different build versions (rolling updates), do the schema handshake first
-  (`schema_handshake.cpp`, [SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)).
+- Do the schema handshake first on every server link (`make_schema_hello<...>(label,
+  XSchemaRole::server)`): during a rolling update, servers of one add-only family keep exchanging
+  state and servers of another generation are refused (`server_to_server.cpp`,
+  [SCHEMA_EVOLUTION.md](SCHEMA_EVOLUTION.md)).
 
 ## 7. Client builds: C++20, native compilers, no exceptions
 

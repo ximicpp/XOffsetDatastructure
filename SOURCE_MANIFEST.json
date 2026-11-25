@@ -32,9 +32,9 @@
       "sha256": "f1f7f98c21afb92057a18d0917892d568ff5b4ede2586bbcac0bdfc97d523ba6"
     },
     "CHANGELOG.md": {
-      "bytes": 45658,
+      "bytes": 46597,
       "mode": 420,
-      "sha256": "57a4296e6d53f486642244bb8ed8889a15677e888d25f350452adfd6a92bd200"
+      "sha256": "fc1bc5cfd22023e50bfb89a5a492f859a95aba040cfc8346c471c17826c747f7"
     },
     "CMakeLists.txt": {
       "bytes": 8503,
@@ -52,9 +52,9 @@
       "sha256": "0c16fbcd9aa84484e0767074f9473fdaf3fb90ea89c20d6441f4220c3ed55114"
     },
     "README.md": {
-      "bytes": 16781,
+      "bytes": 17246,
       "mode": 420,
-      "sha256": "90e9aeff6b637a8793ce39e04033a60a138f25d4768890062bd7251c11c9362c"
+      "sha256": "78c2177f8a062fb5f400943b5085a1bff05847325757b7ee66b5ab922dc2467e"
     },
     "XOFFSET_VERSION": {
       "bytes": 6,
@@ -307,14 +307,14 @@
       "sha256": "31561391b8e29ad9df0726b6ac684836e1f0142add7ececa5e58c9edd2aab7db"
     },
     "examples/server_to_client.cpp": {
-      "bytes": 6810,
+      "bytes": 6780,
       "mode": 420,
-      "sha256": "6ad9ef46e1d539089bbc87eb177728a0e2923fa440aa9efe4dfbdbc29d44ac18"
+      "sha256": "48f74649d012007435fb5bb88a894d27740c580af93a42370154e3afe8ffb087"
     },
     "examples/server_to_server.cpp": {
-      "bytes": 4745,
+      "bytes": 4799,
       "mode": 420,
-      "sha256": "5a94ff5a5fe15f654148f9a94e47eb8db949438c23f90120cfed8b271f24a9ad"
+      "sha256": "0829de72484a73119e36bc56441f99d9cc7c903ec4b3eb63002d5b8e1bfd9439"
     },
     "examples/shared_delta.cpp": {
       "bytes": 11717,

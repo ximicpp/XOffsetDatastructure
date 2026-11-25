@@ -48,9 +48,10 @@ DC 0.965, DPTW.recv 0.744, DCTW.recv 0.596), so no alignment re-judge was requir
 
 The directions hold: XOffset leads where encoding and decoding are skipped and pays about 1.0–1.4x
 where containers are read and written through relative offsets. How far it leads depends on message
-size, on the checks the receiver runs and above all on how churned the sender's buffer is (section 2):
-the lead is largest at 3–12 KB, not for the largest messages, and small messages tie only when the
-receiver runs full validation. These notes change no verdict.
+size and on the checks the receiver runs (section 2): the lead is largest at 1–12 KB, not for the
+largest messages, and only full validation of messages below about 80 bytes loses, narrowly. Since
+4.2.0 a churned sender buffer no longer costs the lead (it goes out compact). These notes change no
+verdict.
 
 - **S and SD against zpp_bits include a decode the trusted tier does not need.** The storage process's
   `store_check` (`bench/slg/bench/runner.hpp`) decodes the whole player for a format without a
@@ -79,65 +80,91 @@ receiver runs full validation. These notes change no verdict.
 
 ## 2. Where the lead holds
 
-[`bench/premises`](../bench/premises/README.md) (2026-11-17, library 4.1.0) sends the 2024 `Character`
-with every container count scaled, from 68 bytes to 729 KB in zpp::bits, on both receive tiers, from
-clean and churned sender buffers, against zpp::bits, cista, FlatBuffers, Protocol Buffers and cereal
-with the published adapters. Cloud Xeon 2.1 GHz (48 KiB L1d, 2 MiB L2 per core), 31 processes, each
-cell paired within a process; ratios against the strongest rival of the tier, medians;
-[results](../bench/premises/results/2026-11-17/summary.md) with every interval.
+[`bench/premises`](../bench/premises/README.md) (2026-11-25, library 4.3.0, tree `5a54d9d1`) sends the
+2024 `Character` with every container count scaled, from 68 bytes to 729 KB in zpp::bits, on both
+receive tiers, from clean and churned sender buffers, against zpp::bits, cista, FlatBuffers, Protocol
+Buffers and cereal with the published adapters. Cloud Xeon 2.1 GHz (48 KiB L1d, 2 MiB L2 per core),
+GCC 16.2 `-O3`, 31 processes pinned to one core, each cell paired within a process; ratios against the
+strongest rival of the tier, medians; [results](../bench/premises/results/2026-11-25/summary.md) with
+every interval. XOffset runs with its defaults (`XWireEmission::automatic`).
 
 Buffer as filled:
 
 | zpp::bits bytes | 68 | 100 | 276 | 780 | 2,916 | 11,460 | 45,636 | 729,156 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Trusted tier | 0.79 | 0.71 | 0.47 | 0.30 | 0.24 | 0.21 | 0.47 | 0.57 |
-| Full validation (`reload_verified`) | 1.07 | 1.01 | 0.73 | 0.51 | 0.59 | 0.54 | 0.69 | 0.86 |
+| Trusted tier | 0.74 | 0.39 | 0.26 | 0.19 | 0.21 | 0.16 | 0.44 | 0.57 |
+| Full validation (`reload_verified`) | **1.07** | 0.72 | 0.55 | 0.42 | 0.57 | 0.47 | 0.67 | 0.81 |
 
 Churned sender buffer (a read/write pass leaves the state unchanged; after random edits every rival
 is measured on the same final state; the strongest rival is zpp::bits in every cell):
 
 | zpp::bits bytes | 780 | 2,916 | 5,764 | 11,460 | 45,636 |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Wire sent, filled → after one read/write pass | 1,000 → 2,272 | 3,064 → 7,928 | 5,976 → 12,176 | 11,952 → 24,288 | 47,296 → 91,384 |
-| Trusted tier, after one read/write pass | 0.67 | 0.57 | 0.71 | **1.39** | 1.05 |
-| Trusted tier, after 100,000 random edits | 0.90 | 0.60 | 0.58 | **1.18** | **1.09** |
-| Full validation, after one read/write pass | **1.19** | 1.00 | **1.11** | **1.77** | **1.35** |
-| `save_compact` then trusted, after one pass | 0.91 | 0.76 | 0.61 | 0.55 | 0.77 |
+| Wire sent, filled → after one read/write pass | 1,000 → 992 | 3,160 → 3,552 | 6,136 → 6,872 | 11,896 → 13,488 | 46,840 → 53,184 |
+| Trusted tier, after one read/write pass | 0.44 | 0.40 | 0.34 | 0.34 | 0.59 |
+| Trusted tier, after 100,000 random edits | 0.46 | 0.43 | 0.35 | 0.35 | 0.59 |
+| Full validation, after one read/write pass | 0.70 | 0.63 | 0.58 | 0.54 | 0.73 |
+| Full validation, after 100,000 random edits | 0.71 | 0.63 | 0.58 | 0.57 | 0.75 |
+| Trusted tier, after 100,000 random edits and one `relayout()` | 0.18 | 0.21 | 0.17 | 0.17 | 0.48 |
 
-- **Trusted tier, buffer as filled: a win at every size against every rival**, 0.79 at 68 bytes
-  (cista with offsets) and 0.76 of zpp::bits. The other rivals are further behind (FlatBuffers
-  0.11–0.33, cista 0.09–0.73, Protocol Buffers and cereal below 0.2).
+- **Trusted tier, buffer as filled: a win at every size against every rival**, 0.74 at 68 bytes
+  (cista with offsets; 0.70 of zpp::bits) and 0.16–0.21 from 780 bytes to 11 KB. The other rivals are
+  further behind (FlatBuffers 0.08–0.32, cista 0.07–0.70, Protocol Buffers and cereal below 0.2).
 - **The lead does not grow with size.** Sending and receiving on the trusted tier is two copies of the
-  wire plus about 400–1,300 instructions, whatever the fields (cachegrind). Up to about 12 KB of wire
-  the sender's buffer, the wire and the receiver's buffer fit the 48 KiB L1 data cache and the copies
-  run at 40–53 bytes per ns; from about 16 KB every line misses L1 (3,038 simulated misses per 47 KB
-  message) and they run at 17–20. The rivals spend most of their time per field, so the misses slow
+  wire plus a few hundred instructions, whatever the fields (cachegrind: 157 instructions per message
+  at 68 bytes and 755 at 2.9 KB, against zpp::bits's 680 and 6,264;
+  [cachegrind.md](../bench/premises/results/2026-11-25/cachegrind.md)). Up to about 12 KB of wire the
+  sender's buffer, the wire and the receiver's buffer fit the 48 KiB L1 data cache and the copies run
+  at 36–65 bytes per ns; past 16 KB they slow down, and from about 47 KB every line misses L1 (2,958
+  simulated misses per 47 KB message) and they run at 13–21. The rivals spend most of their time per field, so the misses slow
   them proportionally less.
-- **Small messages tie only with full validation.** At 68 bytes the trusted tier executes 387
-  instructions against zpp::bits's 672; full validation walks the message and reaches 655. Against zpp::bits,
-  full validation crosses 0.95 at 123 bytes [105, 146]. UL.recv (bounds tier, a tie) receives orders
-  of about 76 bytes in zpp::bits.
-- **Churn decides more than the checks do.** One pass of the read/write loop leaves the same wire as
-  100,000 passes; random edits and containers that grew to 2x and shrank back leave about the same
-  (wire about 2–2.7x `save_compact` without slack). XOffset's time follows the bytes it sends, the rivals'
-  the logical state, so a churned buffer roughly doubles XOffset's cost, and more where the wire leaves
-  L1: the trusted tier flips between 5.8 and 11.5 KB messages (228 ns → 1.51 µs at 11.5 KB). With full
-  validation a churned buffer ties at best. `save_compact` brings the lead back at every churn level
-  measured (0.53–0.94); on a buffer as filled it costs 1.5–3.2x a plain send. After zstd-3 a churned
-  wire is 1.00–1.09x the same state sent clean from 3 KB up (1.09–1.24x at 780 bytes). Since 4.2.0,
-  `XWireEmission::automatic` is the default for `save_verified` / `save_verified_into` and emits
-  churned or high-spare images compact automatically (see [CHANGELOG.md](../CHANGELOG.md) and the
-  [README](../README.md#performance)).
-- **SLG demo cases with all five rivals** (8 batches, M scale, the scorecard's seed, D cells not run,
-  2.1 GHz host): trusted tier 13 wins, 2 ties (UPW.recv 0.999, UL.recv 1.02), 0 losses; FlatBuffers,
-  Protocol Buffers and cereal are never the strongest rival except FlatBuffers in UL.recv. With every
-  receiver checking (XOffset `reload_verified`, cista `DEEP_CHECK`, the FlatBuffers Verifier): 14
-  wins, 1 loss (UL.recv 1.43 against zpp::bits: small orders, see above).
+- **Only full validation of very small messages loses, narrowly.** At 68 bytes full validation takes
+  1.07 [1.03–1.12] of zpp::bits's time (489 instructions against 680) and crosses 0.95 at 78 bytes
+  [75–80] (123 bytes in 4.1.0). UL.recv (bounds tier) receives orders of about 76 bytes in zpp::bits
+  and wins in the 4.3.0 scorecard (0.842).
+- **Churn no longer costs the lead.** The default emission sends a buffer that churn has left with
+  much free space or spare capacity as its compact wire, with spare kept (a vector of at least 8
+  elements keeps size / 8 + 1). After one read/write pass, 100,000 passes, 100,000 random edits or
+  containers grown by 0.25 to 8 times their size and shrunk back, the wire is 1.13–1.16x
+  `save_compact` without slack, so from 2.9 KB up every churned cell wins on both tiers: trusted
+  0.32–0.60 and full validation 0.51–0.76 of zpp::bits (4.1.0 sent the churned image, 1.7–2.2 times
+  as many bytes, and scored up to 1.39 trusted and 1.77 full). The compact walk costs time: a churned
+  sender takes about twice as long as the same state sent clean (138 ns against 71 ns at 2.9 KB), and
+  an in-place `relayout()` ([USER_GUIDE.md 4.7](USER_GUIDE.md#47-a-sender-that-edits-in-place-for-a-long-time-relayout))
+  gives a long-lived sender its clean time back (0.17–0.50 of zpp::bits).
+- **One small churned case ties with full validation.** Below 16 KiB the image copy is faster than the
+  compact walk, so a small buffer goes compact only when its free bytes (and remembered shrinks) pass
+  the default's threshold ([USER_GUIDE.md section 4](USER_GUIDE.md#4-saving-and-loading)). At 780
+  bytes, containers grown by 0.25 to 1 times their size and shrunk back leave a 2.2 KB image
+  (2.45–2.48x compact) that is sent as it is: full validation ties there (0.94–1.00), the trusted
+  tier wins (0.40–0.42).
+- **`XWireEmission::zero_runs` is the slow choice on churned buffers.** It always sends the image and
+  scans it for zero runs, so from 2.9 KB up a churned sender took 0.99–9.5 times zpp::bits's time on the
+  trusted tier, where the default took 0.32–0.60 (6,727 instructions against the default's 2,119 at
+  2.9 KB after one pass), and after growth and shrinking its wire was up to 8 times the default's. Keep
+  the default between machines.
+- **Bytes after zstd-3** (report only): 1.45x zpp::bits at 68 bytes (the 40-byte header weighs most
+  there), 1.09x at 780 bytes, 1.00–1.03x from 2.9 KB up. A churned buffer goes out compact,
+  so after zstd it is the same size as the state sent clean (1.02–1.06x zpp::bits after random edits
+  from 2.9 KB up).
+- **SLG demo cases with all five rivals**
+  ([slg_summary.md](../bench/premises/results/2026-11-25/slg_summary.md); 8 batches, M scale, the
+  scorecard's seed, D cells not run, the same host): trusted tier 15 wins, 0 ties, 0 losses (closest
+  UL.recv 0.859 against FlatBuffers without the Verifier and UPW.recv 0.894); FlatBuffers, Protocol
+  Buffers and cereal are never the strongest rival except FlatBuffers in UL.recv, and in SD on the
+  checked tier. With every receiver checking (XOffset `reload_verified`, cista `DEEP_CHECK`, the
+  FlatBuffers Verifier): 14 wins, 1 loss (UL.recv 1.26 against zpp::bits: small orders, see above).
 
 ## 3. Memory and relocation tax
 
-- **Memory** (3.6.0, SLG demo M, one process per format, `slg_bench --mode proc`): xoffset_trusted RSS
-  663.5 MiB, 0.98x the most frugal rival (protobuf); page tables 2.89 MiB, 0.44% of RSS.
+- **Memory** (4.3.0, tree `5a54d9d1`, SLG demo cases at M scale, one process per format,
+  `slg_bench --mode proc`, built with every rival as in section 2): xoffset_trusted RSS 538.3 MiB
+  (peak the same), 0.92x the most frugal rival (Protocol Buffers 583.9 MiB; zpp::bits 595.8,
+  FlatBuffers 595.9, cereal 597.6, cista 698.5); page tables 2.25 MiB, 0.42% of RSS. Both memory gates
+  hold (RSS at most 1.10x the best rival, page tables at most 1% of RSS);
+  [memory.md](../bench/premises/results/2026-11-25/memory.md). 4.3.0 and 3.6.0 built the same way
+  on one host measured 536.3 and 542.8 MiB; the 663.5 MiB published for 3.6.0 came from another host
+  and build, so compare RSS within one host only.
 - **Relocation tax** (`bench/reloc`, XOffset container ÷ the std container with the same function,
   Mac M4, last measured for 3.3.0): 17 of 19 items within 1.05. The two above are `vec.push_back`
   (each stored element recomputes the data pointer) and `set.erase.fresh` against `flat_set` (bounds

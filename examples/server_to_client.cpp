@@ -10,8 +10,8 @@
 //             another generation is refused and asked to update, versions of
 //             one add-only family are accepted (docs/SCHEMA_EVOLUTION.md);
 //   server  - mutate the state in place (proxy, or edit() for loops), write
-//             the wire into a reused string (save_verified_into), zero_runs
-//             when the wire crosses machines;
+//             the wire into a reused string (save_verified_into) with the
+//             default emission, which sends a churned buffer compact;
 //   link    - frame each wire with its length and cap the frame size;
 //   client  - one XReceiver<XLink::from_server> per link (trusted tier: the
 //             header and image bounds are checked, the graph is not walked),
@@ -64,7 +64,7 @@ struct Server {
 
     // The arena bytes are the message; nothing is encoded per field.
     const std::string& snapshot() {
-        world.save_verified_into(wire, XSaveOptions{.emission = XWireEmission::zero_runs});
+        world.save_verified_into(wire);
         return wire;
     }
 };

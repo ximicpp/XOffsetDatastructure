@@ -3,9 +3,10 @@
 // A player moves from zone server A to zone server B; when the player leaves
 // B, B sends the changed state to the storage server. Every hop is the same
 // three steps: save the arena bytes, receive them into a held buffer, change
-// them in place. Nothing is encoded or decoded per field, and the free space
-// a hop leaves travels with the wire, so the next hop keeps changing the
-// state without it degrading.
+// them in place. Nothing is encoded or decoded per field. The default
+// emission sends a buffer that churn has left with much free space compact
+// (containers keep some spare capacity) and any other buffer as its image, so
+// the next hop keeps changing the state without it degrading.
 //
 // Best practices shown here:
 //   - The schema handshake first on every server link
@@ -66,7 +67,7 @@ struct ZoneServer {
     }
 
     const std::string& leave() {
-        player.save_verified_into(out, XSaveOptions{.emission = XWireEmission::zero_runs});
+        player.save_verified_into(out);
         return out;
     }
 };

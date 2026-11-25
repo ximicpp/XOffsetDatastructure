@@ -460,15 +460,19 @@ in.read([](const Profile& r) { print(r.name.view()); });   // read plain members
   is copied in one go.
   `XSaveOptions{.emission = XWireEmission::free_runs}` always sends the image, and
   `XSaveOptions{.emission = XWireEmission::dense}` forces a full copy of it.
-- When sending across machines you can turn on zero-run omission:
-  `save_verified<Profile>(XSaveOptions{.emission = XWireEmission::zero_runs})`
-  (`save_verified_into` takes the same option). It skips all-zero runs of at least 64 bytes
+- Zero-run omission, `save_verified<Profile>(XSaveOptions{.emission = XWireEmission::zero_runs})`
+  (`save_verified_into` takes the same option), skips all-zero runs of at least 64 bytes
   (container slack, holes, zero fields); the receiver fills zeros at the original offsets, the
-  loaded payload is byte-identical to a dense wire, and slack is kept, so further edits are not
-  slower. The cost is one extra scan of the payload when sending; when the payload is under 4 KiB
-  or the saving is less than max(256 B, 1/16 of the payload) it falls back to dense. Keep the
-  default for same-machine shared memory or in-process transfer. The receiver needs no setting and
-  accepts every wire kind.
+  loaded payload is byte-identical to a dense wire, and slack is kept. The cost is one extra scan
+  of the payload when sending; when the payload is under 4 KiB or the saving is less than
+  max(256 B, 1/16 of the payload) it falls back to dense. It always sends the image, so it never
+  compacts a churned buffer: with the 2024 `Character` from 3 KB up, after a read/write pass,
+  random edits or containers that grew and shrank back, send plus trusted receive took 1.0–9.5
+  times zpp::bits's time where the default took 0.32–0.60, and after growth and shrinking its wire
+  was up to 8 times the default's ([PERFORMANCE.md section 2](PERFORMANCE.md#2-where-the-lead-holds)).
+  Keep the default for whole states between machines; `zero_runs` is for an uncompressed link where
+  a buffer as filled holds much zeroed spare and bytes matter more than time. The receiver needs no
+  setting and accepts every wire kind.
 - To make the wire smaller, use `save_compact<Profile>()` (or `save_compact_into<Profile>(out)`):
   it walks the object graph in validation order and writes a compact wire (no holes) directly,
   without a temporary buffer, and leaves the source buffer unchanged. By default containers
@@ -594,9 +598,9 @@ elements and zero the newly exposed part; every new message starts over.
 - When sending to a receiver that edits, use the default slack of `save_compact` (`slack_div = 8`:
   containers (except strings) with at least 8 elements get size/8+1), so the receiver's first insert
   does not move; read-only or archiving receivers use `slack_div = 0` for the smallest wire.
-- When sending state with slack across machines, use `XWireEmission::zero_runs` (section 4): zero
-  runs of at least 64 bytes in the slack take no bytes on the wire, and the slack is still there
-  after the receiver loads it.
+- When sending state across machines, keep the default emission (section 4): a churned buffer goes
+  out compact with slack kept for the receiver's edits. `XWireEmission::zero_runs` keeps the
+  churned image and is slower there.
 - When the receiver reuses buffers, after `reload_verified` growth within the previously used range
   is 4 KiB at a time (section 3), with zeroing done on demand.
 
