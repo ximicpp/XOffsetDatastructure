@@ -19,8 +19,9 @@ struct Player {
     XString name;
     std::int32_t level;
     XVector<std::int32_t> items;
+    XSpare<16> spare{};  // bytes a later version can add fields in (docs/SCHEMA_EVOLUTION.md)
 };
-XOFFSET_RECORD(Player, name, level, items)
+XOFFSET_RECORD(Player, name, level, items, spare)
 XOFFSET_REGISTER_SCHEMA_NAME(Player, "example.Player")
 
 namespace {

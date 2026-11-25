@@ -6,6 +6,9 @@
 // examples/shared_delta.cpp for a viewport onto a shared world.
 //
 // Best practices shown here:
+//   connect - the schema handshake is the first frame each way; a client of
+//             another generation is refused and asked to update, versions of
+//             one add-only family are accepted (docs/SCHEMA_EVOLUTION.md);
 //   server  - mutate the state in place (proxy, or edit() for loops), write
 //             the wire into a reused string (save_verified_into), zero_runs
 //             when the wire crosses machines;
@@ -16,6 +19,7 @@
 //             message), XStatus instead of exceptions (the client may be
 //             built with -fno-exceptions or MSVC /EHs-c-), read in place.
 #include "game_protocol.hpp"
+#include "../xoffset_handshake.hpp"
 #include "../xoffset_receiver.hpp"
 
 #include <cstddef>
@@ -121,6 +125,21 @@ struct Client {
 int main() {
     Server server;
     Client client;
+
+    // Connect. The server answers every valid hello, a refusal included (the
+    // ack names the refused root types), and closes a refused connection; the
+    // client sends nothing else before an ack that accepts it. Neither side
+    // throws, so the client builds without exceptions.
+    std::string hello, ack, ack_in;
+    if (!unframe(frame(make_schema_hello<WorldView>("client-1.0")), hello)) return 1;
+    const XSchemaHelloResult peer = accept_schema_hello<WorldView>(hello, ack, "server-1.0");
+    if (!peer.accepted()) return 1;
+    if (!unframe(frame(ack), ack_in)) return 1;
+    if (XSchemaAckResult r = read_schema_ack<WorldView>(ack_in); !r) {
+        std::printf("client: update needed: %s\n", r.message.c_str());
+        return 1;
+    }
+    std::printf("handshake: %s accepted\n", peer.label.c_str());
 
     for (std::uint64_t t = 1; t <= 3; ++t) {
         server.tick(t);
