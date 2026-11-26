@@ -22,20 +22,73 @@ networks). A short example and the arena layout:
 
 ## Performance
 
-CppCon 2024 `Character` benchmark ([bench/cppcon2024](bench/cppcon2024/README.md);
-64-item map, waypoints, attributes, 8 pieces of equipment; same sorted flat map
-and rules for every library), cloud x86-64 Linux, GCC 16 `-O3`, medians over
-many processes, compression not timed:
+All 8 libraries from the CppCon 2024 comparison under the same sorted flat map,
+field-by-field checksum verification and rules ([bench/cppcon2024](bench/cppcon2024/README.md));
+cloud x86-64 Linux (Intel Xeon Skylake @ 2.19 GHz, GCC 16.2 `-O3`, pinned to CPU 2,
+medians over 9 processes, compression not timed).
 
-| ns per operation | XOffset | zpp::bits\* | cista raw | FlatBuffers | Protocol Buffers |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Send + receive, buffer as filled | 83 | 340 | 637 | 614 | 8,789 |
-| Read/write loop, 2024 layout | 144 | 343 | 236 | | 592 |
-| Read/write loop, tuned layout | 60 | 83 | 66 | | 368 |
+### Realistic nested RPG character (`RichCharacter`, ~12 KB, depth 4, 373 containers/strings > SSO)
 
-\* The read/write rows of zpp::bits are std containers.
+16 distinct player shapes cycled through a steady-state worker (`Varied RPC`), new
+buffers and live session objects per player (`Fresh session`), cross-server handoff
+(`Receive -> Gameplay Mutate -> Send`, 16 varied players), strict equal-check
+validation where every receiver validates the full graph, and in-place gameplay edits:
 
-Full method, every cell and the limits: [PERFORMANCE.md](docs/PERFORMANCE.md).
+| Library | Varied RPC (ns) | Fresh session (ns) | Hop: recv→edit→send (ns) | Equal-check varied / fresh (ns) | In-place edit (ns) | Wire, raw / zstd-3 (B) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| XOffset | **942** (`1,027`†) | **1,157** (`1,328`†) | **1,818**† (`2,227`‡) | **3,201**† / **3,418**† (`4,668` / `4,715`) | **509** | 16,256 / 10,850 |
+| cista offset | 11,250 | 11,223 | 13,451 | 46,404 / 44,202 | 836 | 18,450 / 11,218 |
+| cista raw | 12,045 | 11,610 | 13,790 | 41,808 / 38,627 | 721 | 18,450 / 11,190 |
+| zpp::bits | 14,143 | 36,971 | 15,429 | 14,143 / 36,971 | 657\* | 11,860 / 9,834 |
+| Cap'n Proto | 33,191 | 62,310 | 35,113 | 33,191 / 62,310 | 657\* | 16,384 / 10,777 |
+| FlatBuffers | 36,135 | 57,780 | 37,633 | 45,277 / 66,847 | 657\* | 16,416 / 11,544 |
+| MessagePack | 55,891 | 76,421 | 60,636 | 55,891 / 76,421 | 657\* | 12,515 / 11,036 |
+| Protocol Buffers | 108,441 | 150,721 | 103,785 | 108,441 / 150,721 | 606 | 13,889 / 12,247 |
+
+- Trusted tier (`Varied RPC`, `Fresh session`, `Hop`): XOffset uses
+  `XReceiver<XLink::server_peer>`, cista uses `UNCHECKED`/`CAST`, FlatBuffers omits
+  its Verifier; `zpp::bits`, Cap'n Proto, MessagePack and Protocol Buffers always
+  check while decoding.
+- Equal-check tier (`Equal-check varied / fresh`): every receiver validates
+  (XOffset `reload_verified` / `load_verified`, cista `DEEP_CHECK`, FlatBuffers
+  `Verifier`). XOffset leads `zpp::bits` by **4.4x** (varied) and **10.8x** (fresh),
+  `cista` by **11–14x**, and `FlatBuffers` by **14–20x**. Equal-check `Hop`:
+  XOffset **3,923 ns**† vs `zpp::bits` 15,429 ns (3.9x) and `FlatBuffers` 46,594 ns (11.9x).
+- Read-only zero-copy `view` (send + view without unpack): XOffset **249 ns**
+  (trusted) / **1,591 ns** (bounds-checked) vs Cap'n Proto 10,178 ns, cista
+  10,017–10,143 ns / 38,280–43,395 ns, FlatBuffers 22,654 ns / 33,640 ns.
+- † XOffset steady-state compact wire (`save_compact()` / `relayout()`, default
+  `slack_div = 8`, which keeps spare slots so the next hop mutates without reallocating
+  the item map; raw/zstd-3: 17,224 / 10,969 B). ‡ Organic unreserved `push_back`
+  buffer (no manual `reserve()`). Exact `reserve(n)` with zero headroom is fastest for
+  forwarding (`942` / `1,157` ns) and takes `6,325` ns on a mutating hop when `items`
+  doubles and triggers `XWireEmission::automatic` compaction.
+- \* Shared `std` container model (FlatBuffers and Cap'n Proto cannot grow or shrink
+  in place, so a mutating receiver must unpack and rebuild).
+
+### Classic CppCon 2024 `Character` (~3 KB flat POD-heavy baseline)
+
+Same host and 9 processes, original 2024 schema (64-item POD map, waypoints,
+attributes, 8 equips; 14 containers total, ~80% flat POD vectors, depth 2):
+
+| Library | Send + receive, reuse / fresh (ns) | Read/write, 2024 / tuned (ns) | Wire, raw / zstd-3 (B) |
+| --- | ---: | ---: | ---: |
+| XOffset | **121** / **231** | **310** / **123** | 3,160 / 3,023 |
+| zpp::bits | 775 / 2,166 | 675\* / 171\* | 2,916 / 2,926 |
+| FlatBuffers | 1,311 / 2,518 | 675\* / — | 3,680 / 3,128 |
+| cista offset | 1,377 / 1,647 | 597 / 136 | 3,216 / 2,992 |
+| cista raw | 1,392 / 1,672 | 541 / 122 | 3,216 / 2,992 |
+| Cap'n Proto | 5,202 / 6,007 | 675\* / — | 3,656 / 3,131 |
+| MessagePack | 12,335 / 13,374 | 675\* / — | 3,542 / 3,391 |
+| Protocol Buffers | 18,840 / 29,132 | 1,100 / 697 | 4,095 / 3,805 |
+
+XOffset full validation on the 2024 shape: 386 ns reuse / 508 ns fresh. An L1d-resident
+iso-byte control (`Flat-3KB` -> `Rich-3KB`, 107 nested containers) confirms the widening
+lead is structural rather than cache-driven (`zpp::bits` moves from 5.8x to 12.0x
+same-shape, 16.9x varied, 39.3x fresh; `FlatBuffers` from 11.3x to 45.7x–57.0x).
+
+Full method, iso-byte breakdown, SLG scorecard and limits:
+[PERFORMANCE.md](docs/PERFORMANCE.md).
 
 ## Quick start (C++20)
 

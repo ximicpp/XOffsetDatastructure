@@ -158,33 +158,101 @@ is measured on the same final state; the strongest rival is zpp::bits in every c
   checked tier. With every receiver checking (XOffset `reload_verified`, cista `DEEP_CHECK`, the
   FlatBuffers Verifier): 14 wins, 1 loss (UL.recv 1.26 against zpp::bits: small orders, see above).
 
-### The CppCon 2024 `Character` at its published size
+### Realistic nested RPG character and the CppCon 2024 `Character` (all 8 libraries)
 
-[bench/cppcon2024](../bench/cppcon2024/README.md): a 64-item map, waypoints, attributes and 8 pieces of
-equipment; the same sorted flat map and the same rules for every library; cloud x86-64 Linux (Xeon,
-GCC 16 `-O3`, pinned core), 15 processes, medians; 0.95–1.05 counts as a tie.
+The original CppCon 2024 `Character` ([bench/cppcon2024](../bench/cppcon2024/README.md)) is
+unusually flat: ~80% of its 2,916 `zpp::bits` bytes live in four POD vectors (`items`,
+`path`, `attributes`, `skills`), there are only 14 dynamic containers/strings in total
+(`name` is an 8-byte SSO string), and the schema has depth 2. Repeating an identical flat
+object into pre-warmed `std` containers lets `zpp::bits`, FlatBuffers and cista approximate
+bulk `memcpy` with zero heap allocations.
 
-| ns per operation | XOffset | zpp::bits\* | cista raw | FlatBuffers | Protocol Buffers |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Send + receive, buffer as filled | 83 | 340 | 637 | 614 | 8,789 |
-| Read/write loop, 2024 layout | 144 | 343 | 236 | | 592 |
-| Read/write loop, tuned layout | 60 | 83 | 66 | | 368 |
+`bench/cppcon2024/complexity_bench.cpp` pairs that baseline with a realistic depth-4 RPG
+`RichCharacter` across all 8 original libraries (strings > SSO everywhere, items with
+name + affixes + flags, equips with name + creator + attributes + gems + bonuses, skills
+with name + effects + tags, quests with title + objectives + descriptions), adding an
+L1d-resident iso-byte control (`Flat-3KB` vs `Rich-3KB`), 16-shape `varied_reuse` (fits in
+L2), fresh session allocation (`fresh_trusted` and equal-check `fresh_checked`), a
+cross-server handoff (`Receive -> Gameplay Mutate -> Send` over 16 varied players), an
+in-place nested gameplay tick (`rw_rich`), and read-only zero-copy views.
 
-\* The read/write rows of zpp::bits are std containers.
+Host: cloud x86-64 Linux (Intel Xeon Skylake @ 2.19 GHz, 32 KiB L1d / 4 MiB L2 per core),
+GCC 16.2 `-std=c++26 -freflection -O3 -DNDEBUG`, pinned to CPU 2, medians over 9
+independent processes with randomized library order, compression not timed; includes the
+post-`2.0.0-preview.2` fast paths for `save_verified`, `XReceiver::load` (`try_v_emplace`
+NRVO + direct `SlotSlab` copy), `load_verified` / `TypedXBuffer::load`, and inline
+single-word granule validation. Full tables:
+[`bench/cppcon2024/results/2026-11-26-realistic/summary.md`](../bench/cppcon2024/results/2026-11-26-realistic/summary.md)
+and [`classic_summary.md`](../bench/cppcon2024/results/2026-11-26-realistic/classic_summary.md).
 
-- Send + receive is XOffset's best case when the buffer was filled once: its wire is the buffer. In
-  the 2026-11-17 internal-4.1.0 baseline (before `automatic` emission became the default), a churned buffer
-  grew from 3,064 to 7,928 bytes and took 181 ns (0.57 of zpp::bits trusted, 1.04 full validation).
-  Since internal-4.2.0 (`XWireEmission::automatic` default), the churned buffer automatically emits its compact
-  3,552-byte image (measured 2026-11-24, 7 pinned runs on Xeon Skylake, GCC 16.2: 0.43 of zpp::bits
-  trusted, 0.68 full validation).
-- Read/write is the fastest of the scored rows on the 2024 layout. On the tuned layout it ties cista:
-  0.90–0.98 in the published processes, 1.00 [0.78, 1.25] in a rerun of 21 processes on internal-4.1.0.
-  Protocol Buffers' default `RemoveLast` keeps removed messages for reuse and then takes 77 ns on the
-  2024 layout (report only; the scored row frees them like every other library).
-- Sizes after zstd-3: XOffset 2,986 bytes, zpp::bits 2,926, Protocol Buffers 3,800. The 40-byte wire
-  header and container heads make the smallest `Character` 84 bytes larger than zpp::bits (29 after
-  zstd-3); this is by design.
+**Realistic commercial character (`Rich-12KB`, 373 containers/strings, depth 4, ns):**
+
+| Library | Varied RPC (trusted) | Fresh session (trusted) | Hop: recv→edit→send (trusted) | Equal-check varied / fresh | Hop (equal-check) | In-place `rw_rich` | Wire, raw / zstd-3 (B) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| XOffset (reserved) | **942** | **1,157** | 6,325 | 4,668 / 4,715 | 10,385 | **509** | 16,256 / 10,850 |
+| XOffset (compacted†) | 1,027 | 1,328 | **1,818** | **3,201** / **3,418** | **3,923** | 509 | 17,224 / 10,969 |
+| XOffset (unreserved) | 1,559 | 1,642 | 2,227 | 5,369 / 5,419 | 6,041 | 509 | 20,872 / 11,407 |
+| cista offset | 11,250 | 11,223 | 13,451 | 46,404 / 44,202 | 49,372 | 836 | 18,450 / 11,218 |
+| cista raw | 12,045 | 11,610 | 13,790 | 41,808 / 38,627 | 43,045 | 721 | 18,450 / 11,190 |
+| zpp::bits | 14,143 | 36,971 | 15,429 | 14,143 / 36,971 | 15,429 | 657\* | 11,860 / 9,834 |
+| Cap'n Proto | 33,191 | 62,310 | 35,113 | 33,191 / 62,310 | 35,113 | 657\* | 16,384 / 10,777 |
+| FlatBuffers | 36,135 | 57,780 | 37,633 | 45,277 / 66,847 | 46,594 | 657\* | 16,416 / 11,544 |
+| MessagePack | 55,891 | 76,421 | 60,636 | 55,891 / 76,421 | 60,636 | 657\* | 12,515 / 11,036 |
+| Protocol Buffers | 108,441 | 150,721 | 103,785 | 108,441 / 150,721 | 103,785 | 606 | 13,889 / 12,247 |
+
+† `XOffset (compacted)` is the default `save_compact()` / `relayout()` layout (`slack_div = 8`,
+keeping `size / 8 + 1` spare slots per vector >= 8 elements and canonical preorder blocks).
+Exact `reserve(size)` leaves zero headroom in `items`, so inserting a looted item during `Hop`
+doubles the 48-element item map and triggers `XWireEmission::automatic` compaction (`6,325` ns
+vs `1,818` ns with `slack_div = 8` and `2,227` ns on an organic unreserved buffer). \* Shared
+`std` container model.
+
+- **Iso-byte L1d-resident control (`Flat-3KB` → `Rich-3KB`, both fit in 32 KiB L1d)**: XOffset
+  scales only with wire bytes (`124 → 165` ns, 1.34x for 3,160 → 4,384 B). `zpp::bits` widens
+  from 5.8x to **12.0x** same-shape (`1,986` ns), **16.9x** on 16 varied shapes (`3,290` ns),
+  and **39.3x** fresh (`11,343` ns); `cista raw/offset` from 10.8–10.9x to **18.2–18.4x**;
+  `FlatBuffers` from 11.3x to **45.7x** (`50.5x` varied, `57.0x` fresh).
+- **Strict equal-check tier (`Rich-12KB`, every receiver validates)**: XOffset `reload_verified`
+  / `load_verified` leads `zpp::bits` by **3.0–4.4x** on varied reuse (`4,668` / `3,201` ns vs
+  `14,143` ns) and **7.8–10.8x** on fresh loads (`4,715` / `3,418` ns vs `36,971` ns),
+  `cista DEEP_CHECK` by **8.2–14.5x**, `FlatBuffers + Verifier` by **9.7–19.6x**, and
+  `Protocol Buffers` by **23.2–44.1x**.
+- **Read-only zero-copy `view` (`Rich-12KB`, send + view without unpack)**: XOffset **249 ns**
+  (`view_admit`) / **1,591 ns** (`view_bounds`) vs `Cap'n Proto` 10,178 ns, `cista`
+  10,017–10,143 ns / 38,280–43,395 ns, and `FlatBuffers` 22,654 ns / 33,640 ns (nested table
+  construction dominates the sender).
+- **Post-`2.0.0-preview.2` fast-path A/B** (same Skylake host, 7 interleaved pairs vs `v2.0.0`):
+  `sr_fresh` improved **1.69x** on `Flat-3KB` (`369 → 218` ns; `rx.load` **2.03x**, `212 → 104`
+  ns) and **1.59x** on `Rich-3KB` (`416 → 262` ns); `load_verified` improved **1.42–1.55x** on
+  `Flat-3KB` and **1.20–1.39x** on `Rich-3KB/12KB`; `verify_only` improved **1.17–1.26x** across
+  compact and non-canonical graphs.
+
+**Classic CppCon 2024 `Character` (~3 KB flat baseline, same host and 9 processes):**
+
+| Library | Send + receive, reuse / fresh (ns) | Read/write, 2024 / tuned (ns) | Wire, raw / zstd-3 (B) |
+| --- | ---: | ---: | ---: |
+| XOffset | **121** / **231** | **310** / **123** | 3,160 / 3,023 |
+| zpp::bits | 775 / 2,166 | 675\* / 171\* | 2,916 / 2,926 |
+| FlatBuffers | 1,311 / 2,518 | 675\* / — | 3,680 / 3,128 |
+| cista offset | 1,377 / 1,647 | 597 / 136 | 3,216 / 2,992 |
+| cista raw | 1,392 / 1,672 | 541 / 122 | 3,216 / 2,992 |
+| Cap'n Proto | 5,202 / 6,007 | 675\* / — | 3,656 / 3,131 |
+| MessagePack | 12,335 / 13,374 | 675\* / — | 3,542 / 3,391 |
+| Protocol Buffers | 18,840 / 29,132 | 1,100 / 697 | 4,095 / 3,805 |
+
+\* Shared `std` container model (`—`: fixed IDL or 2024 layout only). Full validation on the
+2024 shape: 386 ns reuse (0.50 of `zpp::bits`) and 508 ns fresh (0.23 of `zpp::bits`). After
+the read/write churn loop, `XWireEmission::automatic` emits a 3,552-byte compact wire in
+333 ns trusted (0.43 of `zpp::bits`) and 476 ns full validation (0.62 of `zpp::bits`).
+On the earlier 2026-11-17 Xeon host (48 KiB L1d, 15 processes,
+[`results/2026-11-17-first-block/summary.md`](../bench/cppcon2024/results/2026-11-17-first-block/summary.md)),
+the same 2024 benchmark measured 83 ns vs `zpp::bits` 340 ns, `FlatBuffers` 614 ns, `cista`
+637–639 ns, and `Protocol Buffers` 8,789 ns; read/write was 144 / 60 ns vs `std` 343 / 83 ns
+and `cista` 236–259 / 66–67 ns. Protocol Buffers' default `RemoveLast` reuse takes 157 ns on
+the Skylake host (77 ns on the 2026-11-17 host), report only; the scored row frees removed
+messages with `DeleteSubrange` like every other library. The 40-byte wire header and container
+heads make the smallest `Character` 84 bytes larger than `zpp::bits` (29 after zstd-3); this
+is by design.
 
 ## 3. Memory and relocation tax
 
@@ -209,10 +277,12 @@ Method: [DEVICE_TESTING.md](DEVICE_TESTING.md).
 
 ## 5. Limits
 
-- One workload (SLG) and one benchmark shape (`Character`, scaled from 68 bytes to 729 KB in section
-  2), with one adapter style per rival; a different workload or adapter changes the numbers.
-- x86-64 numbers come from non-quiet cloud hosts; Mac numbers from one M4. Other cores may differ.
-- Only buffer reuse was measured, with caches warm between messages; a new buffer per message, or a
-  server whose other work evicts the buffers between messages, is not covered. The L1 effects of
-  section 2 move with the core's cache sizes.
+- Two game workloads (SLG and RPG `Character` / `RichCharacter`, scaled from 68 bytes to 729 KB in
+  section 2), with one adapter style per rival; a different workload or adapter changes the numbers.
+- x86-64 numbers come from non-quiet cloud hosts (and absolute ns vary across Xeon SKUs, e.g., 32 KiB
+  vs 48 KiB L1d); Mac numbers come from one M4. Compare numbers measured on the same host.
+- `bench/premises` and the SLG scorecard measure reused buffers with warm caches; `bench/cppcon2024`
+  (`complexity_bench.cpp`) adds 16-shape varied reuse (L2-resident), fresh per-message allocations,
+  and mutating server-to-server hops, but does not model multi-GB cold-RAM server working sets. The
+  L1 effects of section 2 move with the core's cache sizes.
 - A ratio far below 1 says XOffset leads on this workload, not that the margin holds elsewhere.

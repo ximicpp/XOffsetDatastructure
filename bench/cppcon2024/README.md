@@ -149,6 +149,65 @@ read/write loop has just run on (same state, after heavy churn). A separate run 
 - In this run the tuned read/write loop against cista raw was 0.98 (faster in 9 of 15 processes): read
   that margin as a tie to a small win.
 
+### Realistic RPG character & iso-byte structural complexity (`complexity_bench.cpp`)
+
+The original 2024 `Character` is unusually flat: ~80% of its 2,916 `zpp::bits` bytes live in four
+flat vectors of fixed-size POD records (`items`, `path`, `attributes`, `skills`), there are only
+14 dynamic containers/strings in total (`name` is an 8-byte SSO string), and the schema has depth 2.
+Replaying an identical flat object into reused containers lets `zpp::bits`, FlatBuffers (inline
+`struct` arrays), and cista approximate bulk `memcpy` with zero heap allocations.
+
+`complexity_bench.cpp` (`bench/cppcon2024/run_complexity.sh <out-dir>`) benchmarks all 8 original
+libraries on both the 2024 flat shape and a realistic depth-4 RPG `RichCharacter`
+(`schema/rich_character.{fbs,capnp,proto}`: >SSO strings everywhere, items with name + affixes +
+flags, equips with name + creator + attributes + gems + bonuses, skills with name + effects + tags,
+quests with title + objectives + descriptions), verified field-by-field before timing and smoke-checked
+under ASan + UBSan + LSan:
+
+- **2x2 iso-byte control**: `Flat-3KB` (14 containers) vs `Rich-3KB` (107 containers, depth 4) both
+  stay inside a 32 KiB L1d cache; `Flat-12KB` (38 containers) vs `Rich-12KB` (373 containers, depth 4)
+  match commercial RPG character state.
+- **Realistic server scenarios**: 16-shape `varied_reuse` (fits in L2 so `std` decoders cannot skip
+  container reallocations), `fresh_trusted` and equal-check `fresh_checked` (new wire + new live
+  session object per player), `hop_trusted` and `hop_checked` (`Receive -> Gameplay Mutate -> Send`
+  over 16 varied players: update scalars/pos, >SSO title/quest desc, equip/gem, loot a new `RichItem`
+  with affixes/flags, erase an item), in-place gameplay tick `rw_rich`, and read-only zero-copy
+  `view_admit` / `view_bounds`.
+
+Cloud Intel Xeon Skylake @ 2.19 GHz (32 KiB L1d, GCC 16.2 `-std=c++26 -freflection -O3 -DNDEBUG`,
+pinned to CPU 2, 9 independent processes with randomized library order, medians; full tables:
+[`results/2026-11-26-realistic/summary.md`](results/2026-11-26-realistic/summary.md) and refreshed
+classic 2024 run [`results/2026-11-26-realistic/classic_summary.md`](results/2026-11-26-realistic/classic_summary.md)):
+
+| Library | Rich-12KB varied RPC (ns) | Fresh trusted / checked (ns) | Hop trusted / checked (ns) | Equal-check varied (ns) | In-place `rw_rich` (ns) | Wire, raw / zstd-3 (B) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| XOffset (reserved) | **942** | **1,157** / 4,715 | 6,325 / 10,385 | 4,668 | **509** | 16,256 / 10,850 |
+| XOffset (compacted†) | 1,027 | 1,328 / **3,418** | **1,818** / **3,923** | **3,201** | 509 | 17,224 / 10,969 |
+| XOffset (unreserved) | 1,559 | 1,642 / 5,419 | 2,227 / 6,041 | 5,369 | 509 | 20,872 / 11,407 |
+| cista offset | 11,250 | 11,223 / 44,202 | 13,451 / 49,372 | 46,404 | 836 | 18,450 / 11,218 |
+| cista raw | 12,045 | 11,610 / 38,627 | 13,790 / 43,045 | 41,808 | 721 | 18,450 / 11,190 |
+| zpp::bits | 14,143 | 36,971 / 36,971 | 15,429 / 15,429 | 14,143 | 657\* | 11,860 / 9,834 |
+| Cap'n Proto | 33,191 | 62,310 / 62,310 | 35,113 / 35,113 | 33,191 | 657\* | 16,384 / 10,777 |
+| FlatBuffers | 36,135 | 57,780 / 66,847 | 37,633 / 46,594 | 45,277 | 657\* | 16,416 / 11,544 |
+| MessagePack | 55,891 | 76,421 / 76,421 | 60,636 / 60,636 | 55,891 | 657\* | 12,515 / 11,036 |
+| Protocol Buffers | 108,441 | 150,721 / 150,721 | 103,785 / 103,785 | 108,441 | 606 | 13,889 / 12,247 |
+
+- † `XOffset (compacted)` is the default `save_compact()` / `relayout()` wire (`slack_div = 8`,
+  keeping `size / 8 + 1` spare slots in vectors >= 8 elements and canonical preorder layout). Exact
+  `reserve(size)` leaves zero headroom in `items`, so inserting a looted item during `Hop` doubles
+  the 48-element item map and triggers `XWireEmission::automatic` compaction (`6,325` ns vs `1,818`
+  ns compacted and `2,227` ns organic unreserved). \* Shared `std` container model.
+- **L1d-resident iso-byte (`Flat-3KB` → `Rich-3KB`)**: XOffset scales only with wire bytes
+  (`124 → 165` ns, 1.34x). `zpp::bits` moves from 5.8x to 12.0x same-shape (`16.9x` varied,
+  `39.3x` fresh); `cista` from 10.8–10.9x to 18.2–18.4x; `FlatBuffers` from 11.3x to 45.7x–57.0x.
+- **Read-only zero-copy `view` (`Rich-12KB`)**: XOffset **249 ns** (`view_admit`) / **1,591 ns**
+  (`view_bounds`) vs `Cap'n Proto` 10,178 ns, `cista` 10,017–10,143 ns / 38,280–43,395 ns, and
+  `FlatBuffers` 22,654 ns / 33,640 ns.
+- **Refreshed classic 2024 `Character` on the same Skylake host (9 processes)**: XOffset **121 ns**
+  reuse / **231 ns** fresh (full validation: 386 / 508 ns) vs `zpp::bits` 775 / 2,166 ns,
+  `FlatBuffers` 1,311 / 2,518 ns, `cista` 1,377–1,392 / 1,647–1,672 ns, `Cap'n Proto` 5,202 /
+  6,007 ns, `MessagePack` 12,335 / 13,374 ns, `Protocol Buffers` 18,840 / 29,132 ns.
+
 ## The 2024 demo
 
 The other 2024 demo (`demo/xdemo.cpp`: one platform writes `data.bin`, another reads it and keeps

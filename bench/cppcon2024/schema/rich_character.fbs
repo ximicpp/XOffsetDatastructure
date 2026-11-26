@@ -1,0 +1,101 @@
+namespace flatbuffers_rich;
+
+struct Position {
+    x: float;
+    y: float;
+    z: float;
+}
+
+struct Affix {
+    attr_id: uint32;
+    value: float;
+}
+
+table Gem {
+    id: uint32;
+    tier: uint32;
+    name: string;
+    bonuses: [Affix];
+}
+
+table RichItem {
+    id: uint32;
+    uuid: ulong;
+    number: uint32;
+    timestamp: ulong;
+    name: string;
+    affixes: [Affix];
+    flags: [uint32];
+}
+
+table RichItemEntry {
+    key: ulong;
+    value: RichItem;
+}
+
+table RichEquip {
+    id: uint32;
+    uuid: ulong;
+    number: uint32;
+    timestamp: ulong;
+    level: uint32;
+    name: string;
+    creator: string;
+    attributes: [float];
+    gems: [Gem];
+}
+
+table SkillEffect {
+    effect_id: uint32;
+    magnitude: float;
+    duration: float;
+    tag: string;
+}
+
+table RichSkill {
+    id: uint32;
+    level: uint32;
+    cooldown_ms: uint32;
+    name: string;
+    effects: [SkillEffect];
+}
+
+table QuestObjective {
+    target_id: uint32;
+    current: uint32;
+    required: uint32;
+    desc: string;
+}
+
+table Quest {
+    quest_id: uint32;
+    status: uint32;
+    accepted_at: ulong;
+    title: string;
+    objectives: [QuestObjective];
+}
+
+table QuestEntry {
+    key: uint32;
+    value: Quest;
+}
+
+table RichCharacter {
+    id: ulong;
+    name: string;
+    guild_name: string;
+    title: string;
+    level: uint32;
+    healthpoint: float;
+    manapoint: float;
+    speed: float;
+    pos: Position;
+    items: [RichItemEntry];
+    path: [Position];
+    attributes: [float];
+    equips: [RichEquip];
+    skills: [RichSkill];
+    quests: [QuestEntry];
+}
+
+root_type RichCharacter;

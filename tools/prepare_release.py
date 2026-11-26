@@ -68,6 +68,8 @@ DOC_FILES = tuple("docs/" + name + ".md" for name in (
     "bench/cppcon2024/results/2026-11-17-first-block/before.md",
     "bench/cppcon2024/results/2026-11-17-first-block/summary.md",
     "bench/cppcon2024/results/2026-11-17-modified-buffer/summary.md",
+    "bench/cppcon2024/results/2026-11-26-realistic/classic_summary.md",
+    "bench/cppcon2024/results/2026-11-26-realistic/summary.md",
     "bench/premises/README.md",
     "bench/premises/results/2026-11-17/cachegrind.md",
     "bench/premises/results/2026-11-17/slg_summary.md",
