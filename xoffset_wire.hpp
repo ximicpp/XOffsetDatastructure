@@ -2312,24 +2312,35 @@ namespace XOffsetDatastructure {
                                               explain_seen<Seen..., T>>::value) && ...);
             }
         };
+        // Dispatch by partial specialization rather than an if constexpr chain
+        // in a lambda: MSVC 19.44 instantiates the discarded record branch of
+        // such a lambda (member_count_v<int>) in a static member initializer.
+        enum class explain_step { done, array, record };
         template <typename T, typename... Seen>
-        struct explain_member_types<T, explain_seen<Seen...>> {
-            static constexpr bool value = [] {
-                if constexpr ((std::is_same_v<T, Seen> || ...))
-                    return true;
-                else if constexpr (schema::describe_detail::member_hint_v<T> != schema::describe_detail::member_hint::none)
-                    return true;   // reported at the member that holds it
-                else if constexpr (std::is_array_v<T>)
-                    return explain_member_types<std::remove_cv_t<std::remove_all_extents_t<T>>,
-                                                explain_seen<Seen...>>::value;
-                else if constexpr (std::is_class_v<T> && std::is_aggregate_v<T> && schema::is_described_v<T> &&
-                                   !std::is_base_of_v<XString, T>)
-                    return explain_member_types_of<T, explain_seen<Seen...>>::walk(
-                        std::make_index_sequence<schema::member_count_v<T>>{});
-                else
-                    return true;
-            }();
+        inline constexpr explain_step explain_step_v =
+            ((std::is_same_v<T, Seen> || ...) ||
+             schema::describe_detail::member_hint_v<T> != schema::describe_detail::member_hint::none)
+                ? explain_step::done   // on the path, or reported at the member that holds it
+            : std::is_array_v<T> ? explain_step::array
+            : (std::is_class_v<T> && std::is_aggregate_v<T> && schema::is_described_v<T> &&
+               !std::is_base_of_v<XString, T>)
+                ? explain_step::record
+                : explain_step::done;
+        template <explain_step Step, typename T, typename SeenList>
+        struct explain_member_types_step {
+            static constexpr bool value = true;
         };
+        template <typename T, typename... Seen>
+        struct explain_member_types_step<explain_step::array, T, explain_seen<Seen...>>
+            : explain_member_types<std::remove_cv_t<std::remove_all_extents_t<T>>, explain_seen<Seen...>> {};
+        template <typename T, typename... Seen>
+        struct explain_member_types_step<explain_step::record, T, explain_seen<Seen...>> {
+            static constexpr bool value = explain_member_types_of<T, explain_seen<Seen...>>::walk(
+                std::make_index_sequence<schema::member_count_v<T>>{});
+        };
+        template <typename T, typename... Seen>
+        struct explain_member_types<T, explain_seen<Seen...>>
+            : explain_member_types_step<explain_step_v<T, Seen...>, T, explain_seen<Seen...>> {};
         template <typename E, typename... Seen>
         struct explain_member_types<XVector<E>, explain_seen<Seen...>>
             : explain_member_types<std::remove_cv_t<E>, explain_seen<Seen...>> {};
