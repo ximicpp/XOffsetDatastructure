@@ -430,25 +430,30 @@ inline constexpr bool check_sorted = XOFFSET_CHECK_SORTED != 0;
 // values: when two disagree, the linker keeps one copy of each inline function
 // and the other unit silently runs code built for the other configuration (a
 // scrub it asked for skipped, a slot freed to the wrong class). A program whose
-// units disagree on any of these does not link:
-//   ELF (Linux, Android) and Mach-O (Apple): each unit instantiates
-//     config_guard<values...>, which defines the hidden symbol
-//     XOFFSET_CONFIG_MISMATCH__define_XOFFSET_switches_identically_in_every_translation_unit.
-//     Units that agree share one instantiation (one definition, the linker
-//     keeps one); units that disagree bring two, and the linker reports a
-//     duplicate symbol (with LTO: the assembler reports it already defined).
-//     The values are template arguments, so 262144u and (256u * 1024u) agree.
-//   MSVC and clang-cl: #pragma detect_mismatch, linker error LNK2038 naming
-//     the setting. It compares the macro text, so spell a value the same way
-//     in every unit.
-// The check is per linked image (the symbol is hidden): a shared library may
-// use a configuration of its own as long as no XOffset object crosses its
-// boundary. NDEBUG-only checks (XOFFSET_CHECK_SORTED, XOFFSET_SYNC_CHECKS,
-// XOFFSET_MOVE_OWNERSHIP_CHECKS, XOFFSET_FORCE_FULL_CHECK) are not part of it,
-// so a debug unit may link with release units. Nothing here runs: the cost is
-// a one-instruction function and a pointer to it per program.
-// -DXOFFSET_NO_CONFIG_CHECK=1 leaves it out (GCC on MinGW and Cygwin always
-// does).
+// units disagree on any of these is refused:
+//   ELF (Linux, Android), GCC and Clang: it does not link. Each unit
+//     instantiates config_guard<values...>, which defines the hidden symbol
+//     XOFFSET_CONFIG_MISMATCH__define_XOFFSET_switches_identically_in_every_translation_unit
+//     inside the instantiation's COMDAT group. Units that agree share one
+//     group (the linker keeps one); units that disagree bring two, and the
+//     linker reports a duplicate symbol (with LTO: the assembler reports it
+//     already defined). The values are template arguments, so 262144u and
+//     (256u * 1024u) agree. Costs a one-instruction function and a pointer.
+//   MSVC and clang-cl: it does not link. #pragma detect_mismatch, linker
+//     error LNK2038 naming the setting. It compares the macro text, so spell
+//     a value the same way in every unit. Costs nothing.
+//   Mach-O (Apple), whose linker has no COMDAT groups: it stops at startup.
+//     Each unit runs one static initializer that compares the address of
+//     config_tag<values...>::id with the first unit's and, when they differ,
+//     writes "XOffset configuration mismatch" to stderr and aborts before
+//     main.
+// Nothing on any data path changes. The check is per linked image (hidden
+// symbols): a shared library may use a configuration of its own as long as no
+// XOffset object crosses its boundary. NDEBUG-only checks
+// (XOFFSET_CHECK_SORTED, XOFFSET_SYNC_CHECKS, XOFFSET_MOVE_OWNERSHIP_CHECKS,
+// XOFFSET_FORCE_FULL_CHECK) are not part of it, so a debug unit may link with
+// release units. -DXOFFSET_NO_CONFIG_CHECK=1 leaves it out (GCC on MinGW and
+// Cygwin always does).
 #define XOFFSET_DETAIL_STR2(...) #__VA_ARGS__
 #define XOFFSET_DETAIL_STR(x) XOFFSET_DETAIL_STR2(x)
 #if !defined(XOFFSET_NO_CONFIG_CHECK)
@@ -458,6 +463,12 @@ inline constexpr bool check_sorted = XOFFSET_CHECK_SORTED != 0;
 #    define XOFFSET_NO_CONFIG_CHECK 0
 #  endif
 #endif
+#define XOFFSET_DETAIL_CONFIG_VALUES                                                         \
+    XOFFSET_SCRUB_POPPED != 0, XOFFSET_SCRUB_ERASED != 0, XOFFSET_SCRUB_PADDING != 0,        \
+    XOFFSET_PIN_QUARANTINE != 0, XOFFSET_SAVE_SELF_CHECK != 0, XOFFSET_SCRUB_RESET != 0,     \
+    XOFFSET_CHECK_UPLINK != 0, XOFFSET_USE_PMR != 0, XOFFSET_NO_EXCEPTIONS != 0,             \
+    XOFFSET_THREAD_CACHES != 0, XOFFSET_SLOT_MAX_BYTES, XOFFSET_RELOCATING_RESERVE_BYTES,    \
+    XOFFSET_RELOCATE_STEP_BYTES, XOFFSET_SLOT_RETAIN_BYTES, XOFFSET_RETIRE_DISCARD_BYTES
 #if !XOFFSET_NO_CONFIG_CHECK
 #  if defined(_MSC_VER)
 #    pragma detect_mismatch("XOFFSET_SCRUB_POPPED", XOFFSET_DETAIL_STR(XOFFSET_SCRUB_POPPED))
@@ -475,27 +486,40 @@ inline constexpr bool check_sorted = XOFFSET_CHECK_SORTED != 0;
 #    pragma detect_mismatch("XOFFSET_RELOCATE_STEP_BYTES", XOFFSET_DETAIL_STR(XOFFSET_RELOCATE_STEP_BYTES))
 #    pragma detect_mismatch("XOFFSET_SLOT_RETAIN_BYTES", XOFFSET_DETAIL_STR(XOFFSET_SLOT_RETAIN_BYTES))
 #    pragma detect_mismatch("XOFFSET_RETIRE_DISCARD_BYTES", XOFFSET_DETAIL_STR(XOFFSET_RETIRE_DISCARD_BYTES))
+#  elif defined(__APPLE__) && (defined(__GNUC__) || defined(__clang__))
+#    include <cstdio>
+#    include <cstdlib>
+namespace XOffsetDatastructure::detail {
+template <unsigned long long... Values>
+struct [[gnu::visibility("hidden")]] config_tag {
+    static constexpr char id = 0;
+};
+[[gnu::visibility("hidden")]] inline const char* config_first = nullptr;
+struct config_check {
+    explicit config_check(const char* tag) noexcept {
+        if (config_first == nullptr) {
+            config_first = tag;
+        } else if (config_first != tag) {
+            std::fputs("XOffset configuration mismatch: translation units of this program set the "
+                       "XOFFSET_ switches or storage sizes differently (xoffset_config.hpp, "
+                       "\"Configuration check\")\n", stderr);
+            std::abort();
+        }
+    }
+};
+// One per translation unit (internal linkage), run before main.
+static const config_check config_check_instance{&config_tag<XOFFSET_DETAIL_CONFIG_VALUES>::id};
+} // namespace XOffsetDatastructure::detail
 #  elif defined(__GNUC__) || defined(__clang__)
-#    if defined(__APPLE__)
-#      define XOFFSET_DETAIL_CONFIG_SYMBOL_VISIBILITY ".private_extern "
-#    else
-#      define XOFFSET_DETAIL_CONFIG_SYMBOL_VISIBILITY ".hidden "
-#    endif
 namespace XOffsetDatastructure::detail {
 template <unsigned long long... Values>
 [[gnu::used, gnu::noinline]] inline void config_guard() noexcept {
     __asm__(".globl XOFFSET_CONFIG_MISMATCH__define_XOFFSET_switches_identically_in_every_translation_unit\n\t"
-            XOFFSET_DETAIL_CONFIG_SYMBOL_VISIBILITY
-            "XOFFSET_CONFIG_MISMATCH__define_XOFFSET_switches_identically_in_every_translation_unit\n"
+            ".hidden XOFFSET_CONFIG_MISMATCH__define_XOFFSET_switches_identically_in_every_translation_unit\n"
             "XOFFSET_CONFIG_MISMATCH__define_XOFFSET_switches_identically_in_every_translation_unit:");
 }
-[[gnu::used]] inline void (*const config_guard_instance)() noexcept = &config_guard<
-    XOFFSET_SCRUB_POPPED != 0, XOFFSET_SCRUB_ERASED != 0, XOFFSET_SCRUB_PADDING != 0,
-    XOFFSET_PIN_QUARANTINE != 0, XOFFSET_SAVE_SELF_CHECK != 0, XOFFSET_SCRUB_RESET != 0,
-    XOFFSET_CHECK_UPLINK != 0, XOFFSET_USE_PMR != 0, XOFFSET_NO_EXCEPTIONS != 0,
-    XOFFSET_THREAD_CACHES != 0, XOFFSET_SLOT_MAX_BYTES, XOFFSET_RELOCATING_RESERVE_BYTES,
-    XOFFSET_RELOCATE_STEP_BYTES, XOFFSET_SLOT_RETAIN_BYTES, XOFFSET_RETIRE_DISCARD_BYTES>;
+[[gnu::used]] inline void (*const config_guard_instance)() noexcept =
+    &config_guard<XOFFSET_DETAIL_CONFIG_VALUES>;
 } // namespace XOffsetDatastructure::detail
-#    undef XOFFSET_DETAIL_CONFIG_SYMBOL_VISIBILITY
 #  endif
 #endif

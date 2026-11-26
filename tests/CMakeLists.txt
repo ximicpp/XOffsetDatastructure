@@ -699,9 +699,11 @@ xoffset_write_test_inventory()
 
 # Configuration check (xoffset_config.hpp): two translation units that set a
 # hardening switch, the client uplink check or a storage size differently
-# must not link. config_check_same links the same two units configured
-# alike, one of them spelling a size differently (MSVC compares the macro
-# text, so there both spell it the same way).
+# are refused, at link time (ELF, MSVC: the build of the program fails) or,
+# on Apple, at startup (the program aborts before main). config_check_same
+# links the same two units configured alike, one of them spelling a size
+# differently (MSVC compares the macro text, so there both spell it the same
+# way).
 function(xoffset_config_check name save_definitions load_definitions)
     add_library(${name}_save OBJECT EXCLUDE_FROM_ALL config_check/save.cpp)
     configure_xoffset_target(${name}_save)
@@ -736,9 +738,17 @@ foreach(variant IN LISTS xoffset_config_check_variants)
         set(load_definitions XOFFSET_SLOT_MAX_BYTES=262144u)
     endif()
     xoffset_config_check(config_check_${variant}_fail "${save_definitions}" "${load_definitions}")
-    add_test(NAME config_check_${variant}_fail
-        COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target config_check_${variant}_fail --config $<CONFIG>)
+    if(APPLE)
+        set_target_properties(config_check_${variant}_fail config_check_${variant}_fail_save
+            PROPERTIES EXCLUDE_FROM_ALL OFF)
+        add_test(NAME config_check_${variant}_fail COMMAND config_check_${variant}_fail)
+        set(expected "XOffset configuration mismatch")
+    else()
+        add_test(NAME config_check_${variant}_fail
+            COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target config_check_${variant}_fail --config $<CONFIG>)
+        set(expected "XOFFSET_CONFIG_MISMATCH|LNK2038")
+    endif()
     set_tests_properties(config_check_${variant}_fail PROPERTIES
         LABELS "config_check"
-        PASS_REGULAR_EXPRESSION "XOFFSET_CONFIG_MISMATCH|LNK2038")
+        PASS_REGULAR_EXPRESSION "${expected}")
 endforeach()
