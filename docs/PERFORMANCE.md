@@ -221,7 +221,7 @@ vs `1,818` ns with `slack_div = 8` and `2,227` ns on an organic unreserved buffe
   (`view_admit`) / **1,591 ns** (`view_bounds`) vs `Cap'n Proto` 10,178 ns, `cista`
   10,017–10,143 ns / 38,280–43,395 ns, and `FlatBuffers` 22,654 ns / 33,640 ns (nested table
   construction dominates the sender).
-- **`2.0.0-preview.3` fast-path A/B** (same Skylake host, 7 interleaved pairs vs `v2.0.0`):
+- **`2.0.0-preview.3` fast-path A/B** (same Skylake host, 7 interleaved pairs vs `v2.0.0-preview.2`, the parent of these changes):
   `sr_fresh` improved **1.69x** on `Flat-3KB` (`369 → 218` ns; `rx.load` **2.03x**, `212 → 104`
   ns) and **1.59x** on `Rich-3KB` (`416 → 262` ns); `load_verified` improved **1.42–1.55x** on
   `Flat-3KB` and **1.20–1.39x** on `Rich-3KB/12KB`; `verify_only` improved **1.17–1.26x** across
