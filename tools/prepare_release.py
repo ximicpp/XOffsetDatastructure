@@ -54,8 +54,32 @@ EXPECTED_REVISIONS = {"boost": "da041154c6bac1a4aa98254a7d6819059e8ac0b0",
 FULL_OWN_HEADERS = ('xoffsetdatastructure.hpp', 'xoffset_arena.hpp', 'xoffset_containers.hpp', 'xoffset_wire.hpp', 'xoffset_schema_hash.hpp', 'xoffset_buffer.hpp', 'xoffset_compactor.hpp', 'xoffset_registration.hpp', 'xoffset_schema_family.hpp', 'xoffset_admission.hpp', 'xoffset_core_lifetime.hpp', 'xoffset_fixed_string.hpp', 'xoffset_schema.hpp', 'xoffset_schema_describe.hpp', 'xoffset_schema_reflect.hpp', 'xoffset_verified_paths.hpp', 'xoffset_schema_names.hpp', 'xoffset_handshake.hpp', 'xoffset_evolution.hpp', 'xoffset_schema_freeze.hpp', 'xoffset_fixed_message.hpp', 'xoffset_delta.hpp', 'xoffset_receiver.hpp', 'xoffset_shared_delta.hpp', 'xoffset_shared_publisher.hpp', 'xoffset_proxy.hpp', 'xoffset_dump.hpp')
 ROOT_FILES = ("CMakeLists.txt", "README.md", "XOFFSET_VERSION", "CHANGELOG.md", "LICENSE",
               "build.sh", "xoffsetdatastructure.hpp", "xoffset_virtual_memory.hpp", "xoffset_slot_storage.hpp",
-              "xoffset_error.hpp", "xoffset_config.hpp", "Dockerfile", "docker-compose.yml", ".dockerignore")
-DOC_FILES = ("docs/ALPHA_COMPATIBILITY.md", "docs/BUILD_AND_PLATFORMS.md", "docs/PACKAGING.md", "docs/VALIDATION_RUNNER.md")
+              "xoffset_error.hpp", "xoffset_config.hpp", "Dockerfile", "docker-compose.yml", ".dockerignore",
+              "SECURITY.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md")
+# Every current document, and the reports outside docs/ that they link to; check_markdown_link_closure
+# fails the archive when a shipped Markdown file links to a file that is not in it.
+DOC_FILES = tuple("docs/" + name + ".md" for name in (
+    "ALPHA_COMPATIBILITY", "ARCHIVED_EVIDENCE", "BUFFER_REUSE", "BUILD_AND_PLATFORMS", "CLIENT_TARGETS",
+    "DELTA_SYNC", "DEPLOYMENT", "DEVICE_TESTING", "GETTING_STARTED", "HOW_IT_WORKS", "PACKAGING",
+    "PERFORMANCE", "PERF_GATE", "RELEASING", "ROADMAP", "SCHEMA_EVOLUTION", "SCHEMA_PINS", "SHARED_DELTA",
+    "STABILITY_TESTS", "USER_GUIDE", "V2_THREAT_MODEL", "VALIDATION_RUNNER", "WIRE_FORMAT")) + (
+    "docs/validation/2026-10-28-rc1-platform/README.md",
+    "bench/cppcon2024/README.md",
+    "bench/cppcon2024/results/2026-11-17-first-block/before.md",
+    "bench/cppcon2024/results/2026-11-17-first-block/summary.md",
+    "bench/cppcon2024/results/2026-11-17-modified-buffer/summary.md",
+    "bench/premises/README.md",
+    "bench/premises/results/2026-11-17/cachegrind.md",
+    "bench/premises/results/2026-11-17/slg_summary.md",
+    "bench/premises/results/2026-11-17/summary.md",
+    "bench/premises/results/2026-11-17/summary_dirt_k2_k4.md",
+    "bench/premises/results/2026-11-25/cachegrind.md",
+    "bench/premises/results/2026-11-25/memory.md",
+    "bench/premises/results/2026-11-25/slg_summary.md",
+    "bench/premises/results/2026-11-25/summary.md",
+    "demo/mapstate/INTERFACES.md",
+    "demo/mapstate/README.md",
+    "demo/mapstate/RESULT.md")
 TOOLCHAIN_FILES = ("toolchains/README.md", "toolchains/vm-validation.json")
 TOOL_FILES = ("tools/CMakeLists.txt", "tools/bench_compare.cpp", "tools/export_signatures.cpp",
               "tools/check_compat.cpp", "tools/check_compat_baselines.hpp.in",
@@ -76,6 +100,8 @@ OPTIONAL_TREES = ("include", "bench/slg/include")
 OPTIONAL_FILES = ("toolchains/build_tools.cmake",)
 ROOT_FILES = ROOT_FILES + tuple(h for h in FULL_OWN_HEADERS if h not in ROOT_FILES)
 REQUIRED_FILES = ROOT_FILES + DOC_FILES + TOOLCHAIN_FILES + TOOL_FILES + SIGNATURE_FILES + TOOL_TESTS
+MARKDOWN_LINK = re.compile(r'\[[^\]\n]*\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"\n]*")?\s*\)')
+MARKDOWN_FENCE = re.compile(r"^[ \t]*```.*?^[ \t]*```", re.MULTILINE | re.DOTALL)
 FORBIDDEN_PARTS = {".git", ".svn", "build", "dist", "__pycache__", ".pytest_cache"}
 GENERATED_HEADERS = {"check_compat_baselines.hpp"}
 # Developer-only subdirectories behind options that default to OFF (XOFFSET_BUILD_DEMOS,
@@ -84,6 +110,7 @@ UNDISTRIBUTED_SUBDIRECTORIES = {"demo/mapstate", "demo/mesh", "tools/test_host"}
 SCOPE = {
     "offline_build": "full/storage CMake and package validation use bundled dependency bytes; caller provides compatible compiler, SDK, CMake and standard library",
     "included_python_tests": list(TOOL_TESTS),
+    "documentation": "every current document and the reports it links to; every relative Markdown link resolves inside the archive",
     "excluded": "Git metadata, build outputs, private toolchains/runtimes, experiments, historical research/evidence and fixture-dependent developer tests",
     "validation_limits": "validate_vm.py native full/storage are supported entry points; historical wire bundles and full developer-test discovery are outside this distribution",
 }
@@ -257,6 +284,23 @@ def check_cpp_and_cmake_closure(payload):
                     raise ValueError("CMake source missing: " + name + " -> " + source)
 
 
+def check_markdown_link_closure(payload):
+    """Every relative link in a shipped Markdown file must reach a file or directory of the archive."""
+    directories = {"/".join(name.split("/")[:length]) for name in payload
+                   for length in range(1, name.count("/") + 1)}
+    for name, data in payload.items():
+        if name.startswith("external/") or not name.endswith(".md"):
+            continue
+        text = MARKDOWN_FENCE.sub("", data.decode("utf-8", errors="replace"))
+        for target in MARKDOWN_LINK.findall(text):
+            if target.startswith("#") or re.match(r"[A-Za-z][A-Za-z0-9+.-]*:", target):
+                continue
+            path = target.split("#", 1)[0].split("?", 1)[0]
+            resolved = posixpath.normpath(posixpath.join(posixpath.dirname(name), path))
+            if resolved not in payload and resolved not in directories:
+                raise ValueError("documentation link target missing from source closure: " + name + " -> " + target)
+
+
 def validate_payload(payload):
     if len(payload) > MAX_MEMBERS or sum(len(data) for data in payload.values()) > MAX_TOTAL_BYTES:
         raise ValueError("source payload exceeds distribution limits")
@@ -272,6 +316,7 @@ def validate_payload(payload):
     if payload["XOFFSET_VERSION"].decode("utf-8").strip() != VERSION:
         raise ValueError("XOFFSET_VERSION differs from " + VERSION)
     check_cpp_and_cmake_closure(payload)
+    check_markdown_link_closure(payload)
     return dependency_lock(payload)
 
 

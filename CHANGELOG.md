@@ -13,9 +13,9 @@ pre-public internal V2 iterations succeeding the legacy `v1.0.0` and `v2.0-*` pr
 `2.0.0` onward, incompatible wire, delta or public API changes come only in a new major version, and
 every `2.x` release interoperates on Wire 3.0 and Delta 2.0. Stable installs now support CMake
 `SameMajorVersion` `find_package` version matching (prereleases remain `exact-full-version-only`).
-Release evidence on the candidate `75122b23` (the release commit changes only documentation and
-`SOURCE_MANIFEST.json`): pre-release K4 fuzz (`--budget hour`) with 0 findings (GCC 16 ASan+UBSan
-differential, 4 × 550,195 cases + replay; P2996 libFuzzer, 6 reflection and 5 field-list targets
+Release evidence on the candidate `75122b23` (the release commit changes only documentation, the
+source-archive tool and `SOURCE_MANIFEST.json`): pre-release K4 fuzz (`--budget hour`) with 0
+findings (GCC 16 ASan+UBSan differential, 4 × 550,195 cases + replay; P2996 libFuzzer, 6 reflection and 5 field-list targets
 including `schema_family`; 3-way outcome-diff identical across reflection, field-list and
 no-exceptions builds); `--release` validation 28/28: Linux C++26 `gcc`/`asan`/`tsan`/`p2996` 287/287,
 8-column C++20/23 matrix 252/252, MSVC C++20/C++23, clang-cl and MinGW under Wine and Android NDK
@@ -117,6 +117,11 @@ growth paths that can report a capacity error, so the performance numbers measur
   local roots could use them), and about 32,700 live VM-backed buffers per process on Linux.
   DEPLOYMENT section 4 states that string contents, enum values and floating-point values are not
   validated.
+- Source archive (`xoffsetdatastructure-2.0.0.tar.gz`): ships every current document (`docs/*.md`,
+  `SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`) and the benchmark and map state demo reports
+  they link to. Before, it shipped four documents, and most links of its README had no target in the
+  archive. `tools/prepare_release.py` now refuses to create or audit an archive in which a relative
+  Markdown link has no target. Library and wire unchanged.
 
 ## 4.3.0: add-only schema evolution
 

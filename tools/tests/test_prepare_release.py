@@ -134,7 +134,9 @@ class ReleaseArchiveTests(unittest.TestCase):
         self.assertEqual((first / "SHA256SUMS").read_bytes(), (second / "SHA256SUMS").read_bytes())
         _, payload, manifest_data = A.read_archive(archive)
         self.assertEqual(payload["xoffsetdatastructure.hpp"], b"// current uncommitted working bytes\n")
-        self.assertFalse(any(name.startswith((".git/", "build/", "docs/validation/")) for name in payload))
+        self.assertFalse(any(name.startswith((".git/", "build/", "docs/validation/")) for name in payload
+                             if name not in A.REQUIRED_FILES))
+        self.assertNotIn("docs/validation/history.tar.gz", payload)
         self.assertEqual(A.parse_json(manifest_data)["version"], A.VERSION)
 
     def test_real_extract_without_original_source_or_git_and_repackage(self):
@@ -180,7 +182,8 @@ class ReleaseArchiveTests(unittest.TestCase):
                 ("XOFFSET_VERSION", b"0.1.0\n", "VERSION differs"),
                 (A.DEPENDENCY_TREES[0] + "/boost/typelayout/fixture.hpp", b"changed", "content mismatch"),
                 (A.DEPENDENCY_LICENSES[0], b"changed", "license mismatch"),
-                ("tests/missing.cpp", b'#include "absent.hpp"\n', "include missing")):
+                ("tests/missing.cpp", b'#include "absent.hpp"\n', "include missing"),
+                ("docs/USER_GUIDE.md", b"See [the guide](MISSING.md).\n", "link target missing")):
             path = self.source / name
             original = path.read_bytes() if path.exists() else None
             self.write(name, data)
@@ -191,6 +194,19 @@ class ReleaseArchiveTests(unittest.TestCase):
                 path.unlink()
             else:
                 path.write_bytes(original)
+
+    def test_markdown_links_resolve_inside_the_archive(self):
+        self.write("docs/USER_GUIDE.md", (
+            "[top](#start) [web](https://example.com/a.md) [mail](mailto:a@example.com)\n"
+            "[file](PACKAGING.md#section) [titled](../README.md \"README\") [dir](../examples/)\n"
+            "```md\n[inside a fence](not-shipped.md)\n```\n").encode())
+        _, archive = self.create()
+        self.assertTrue(archive.exists())
+        for target in ("../../outside.md", "../demo/absent/", "PACKAGING.md/extra"):
+            self.write("docs/USER_GUIDE.md", ("[x](" + target + ")\n").encode())
+            with self.subTest(target=target), self.assertRaisesRegex(ValueError, "link target missing"):
+                A.create(self.source, self.root / "never-created")
+            self.assertFalse((self.root / "never-created").exists())
 
     def test_source_mutation_is_not_published(self):
         first = A.collect_source(self.source)

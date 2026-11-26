@@ -14,12 +14,13 @@ wires; save/load copy bytes into a working buffer rather than borrowing unaligne
 
 | Deliverable | Contents | Environment inputs not included |
 | --- | --- | --- |
-| `xoffsetdatastructure-<VERSION>.tar.gz` source archive | All 30 `xoffset*.hpp` library headers, CMake, tests/examples, required tools and user documentation, plus the 851 pinned Boost/TypeLayout headers and their licenses for C++26 reflection builds | Compiler, libc++/system runtime, SDK, build outputs, experiment directories and large historical evidence |
+| `xoffsetdatastructure-<VERSION>.tar.gz` source archive | All 30 `xoffset*.hpp` library headers, CMake, tests/examples, required tools, every current document (`docs/*.md`, `SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`) and the benchmark and demo reports they link to, plus the 851 pinned Boost/TypeLayout headers and their licenses for C++26 reflection builds | Compiler, libc++/system runtime, SDK, build outputs, experiment directories and large historical evidence |
 | `xoffsetdatastructure-<VERSION>-full.tar.gz` install archive | All 30 `xoffset*.hpp` headers, `XOffset::xoffset` and `XOffset::storage`, CMake config, version/compatibility documents and licenses (C++20/C++23 installs have zero third-party headers; C++26 installs also include the 851 private dependency headers under `include/xoffset-deps/`) | Compiler, SDK, runtime, native program binaries |
 | `xoffsetdatastructure-<VERSION>-storage.tar.gz` install archive | The OS storage headers (`xoffset_virtual_memory.hpp`, `xoffset_slot_storage.hpp`, `xoffset_error.hpp`, `xoffset_config.hpp`), `XOffset::storage`, CMake config, version/compatibility documents and the project license | Full XBuffer/container headers, Boost, TypeLayout, compiler, SDK, runtime |
 
 The source archive's dependency closure can be checked by content lock in an extracted directory with
-no `.git`. It is not a complete Boost distribution, nor an offline research archive containing all
+no `.git`. Every relative link in a Markdown file of the archive resolves inside it: `prepare_release.py`
+refuses to create or audit an archive with a link that has no target. It is not a complete Boost distribution, nor an offline research archive containing all
 historical raw evidence. `VALIDATION_RUNNER.md` in the source archive keeps some historical entry-point
 notes; the run entry points included in this archive are native full/storage and package validation;
 historical wire fixtures, date-specific Windows/network runners and experiment tools are outside the
