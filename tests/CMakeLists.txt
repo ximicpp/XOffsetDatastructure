@@ -275,6 +275,8 @@ endforeach()
 # they hold in a build that turns it off globally).
 add_xoffset_test(test_receiver reflection)
 add_xoffset_test(test_receiver_forced reflection)
+# 2.0.0-preview.3 fast fresh load / save paths against the general paths.
+add_xoffset_test(test_fresh_fast_paths reflection)
 add_executable(receiver_from_client_admit_fail EXCLUDE_FROM_ALL receiver/from_client_admit_fail.cpp)
 configure_xoffset_target(receiver_from_client_admit_fail)
 target_compile_definitions(receiver_from_client_admit_fail PRIVATE XOFFSET_CHECK_UPLINK=1)
@@ -409,6 +411,7 @@ set(NO_EXCEPTIONS_TESTS
     test_fixed_message
     test_receiver
     test_receiver_forced
+    test_fresh_fast_paths
     test_receiver_view
     test_shared_delta
     test_shared_delta_sync

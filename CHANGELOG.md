@@ -5,6 +5,17 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- Without exceptions, a record element of a vector or array is checked in the element loop again
+  (`validate_wire_element`, `xoffset_wire.hpp`). 2.0.0-preview.3 left it a call per element with
+  P2996 Clang: the full check of the demo's `ViewSnapshot` took 1.2x to 1.45x the instructions of
+  2.0.0-preview.2 (callgrind, 200 and 2,000 units); now within 2% of it. GCC 16 and builds with
+  exceptions are unchanged.
+- Builds without `NDEBUG` check that a root key always comes with typed root access (the verified
+  save paths and the root lookups rely on it).
+- Tests: `test_fresh_fast_paths` (and `_noexc`) compares the 2.0.0-preview.3 fast fresh load and
+  `save_verified` paths with the general paths, including injected storage failures, verification
+  failures after the slot copy, and every state change of typed root access.
+
 ## 2.0.0-preview.3: fast fresh load/save, faster wire validation, and realistic 8-library benchmark
 
 Third preview of 2.0.0: the API, the wire format and the delta format may still change until the
@@ -25,7 +36,7 @@ suite.
   - `XBuffer::save_verified<T>()` adds an inline dense fast path for clean buffers below the
     automatic compaction threshold, keeping `emit_failed()`, `auto_compact`, `save_self_check`, and
     `XOFFSET_REJECT_IMPLICIT_PADDING` unchanged.
-  - On Skylake 2.19 GHz (GCC 16.2 `-O3`, 7 interleaved pairs vs `v2.0.0`): `Flat-3KB` `sr_fresh`
+  - On Skylake 2.19 GHz (GCC 16.2 `-O3`, 7 interleaved pairs vs `v2.0.0-preview.2`, the parent of these changes): `Flat-3KB` `sr_fresh`
     improves 1.69x (`369 -> 218` ns; `rx.load` 2.03x, `212 -> 104` ns), `Rich-3KB` `sr_fresh` 1.59x,
     and `load_verified` 1.20–1.55x across flat and nested graphs.
 - Full wire graph validation (`xoffset_wire.hpp`, `xoffset_buffer.hpp`):

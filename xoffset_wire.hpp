@@ -848,6 +848,9 @@ namespace XOffsetDatastructure {
 
         template <typename T>
         vstatus validate_wire_value(const T& value, WireValidationContext& ctx);
+        template <typename T, std::size_t... Bs, std::size_t... Ms>
+        vstatus validate_record(const T& value, WireValidationContext& ctx,
+                                std::index_sequence<Bs...>, std::index_sequence<Ms...>);
         // True means that visiting a value can reject wire bytes or validate a
         // binding/range. False is permitted only for an admitted representation
         // whose old recursive validator has no observable checks at all.
@@ -966,10 +969,26 @@ namespace XOffsetDatastructure {
             return vok();
         }
 
-        // A member, array element or vector element.
+        // A member, array element or vector element. Without exceptions the
+        // reject paths return a status instead of ending in a noreturn call,
+        // and Clang then kept a record element's check out of the element
+        // loop (a call per element: P2996 Clang, the demo's ViewSnapshot,
+        // 1.2x to 1.45x the instructions of a full check). There a record
+        // element's members are checked in the loop (validate_record, forced
+        // inline; a vector member is still a call, so a record that holds a
+        // vector of itself ends the inlining).
         template <typename T>
         XOFFSET_DETAIL_INLINE vstatus validate_wire_element(const T& value, WireValidationContext& ctx) {
-            return validate_wire_value(value, ctx);
+#if XOFFSET_NO_EXCEPTIONS
+            using CleanT = std::remove_cv_t<T>;
+            if constexpr (std::is_class_v<CleanT> && !std::is_array_v<CleanT> && !is_fixed_string_v<CleanT> &&
+                          !is_fixed_flat_set_v<CleanT> && !is_fixed_flat_map_v<CleanT> &&
+                          !is_fixed_vector_v<CleanT> && wire_value_needs_validation_v<CleanT>)
+                return validate_record(value, ctx, std::make_index_sequence<schema::base_count_v<CleanT>>{},
+                                       std::make_index_sequence<schema::member_count_v<CleanT>>{});
+            else
+#endif
+                return validate_wire_value(value, ctx);
         }
 
         template <typename T>

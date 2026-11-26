@@ -1352,8 +1352,22 @@ namespace XOffsetDatastructure {
         }
 
         // root_key_ (see there) is T's.
+        // A root key of T implies typed root access (see root_key_): the
+        // verified save and root lookups skip the access check on it. Builds
+        // without NDEBUG check that every state change kept it.
         template <typename T>
-        bool root_is() const noexcept { return root_key_ == root_key_of<T>(); }
+        bool root_is() const noexcept {
+            const bool is = root_key_ == root_key_of<T>();
+#if !defined(NDEBUG)
+            if (is && !typed_root_access_allowed_) [[unlikely]] root_key_without_access();
+#endif
+            return is;
+        }
+#if !defined(NDEBUG)
+        [[noreturn]] XOFFSET_DETAIL_COLD static void root_key_without_access() noexcept {
+            detail::fatal(XErrc::invalid_state, "XBufferCore: a root key is set without typed root access");
+        }
+#endif
         bool root_bound() const noexcept { return root_key_ != nullptr; }
         // The bound root type has a schema name.
         bool root_named() const noexcept { return root_key_ && root_key_->named; }
