@@ -1,4 +1,4 @@
-# XOffsetDatastructure User Guide (2.0.0, wire format 3.0)
+# XOffsetDatastructure User Guide (2.0.0-preview.1, wire format 3.0)
 
 This guide is for users of the library. It explains how to define types, build,
 modify, save and load them, and the constraints you must follow.
@@ -435,7 +435,7 @@ world.edit([&](View& w) {                  // pinned scope: plain references, as
 
 ### 3.6 Threads: one thread per buffer
 
-In 2.0.0 a buffer is used by one thread at a time. The library does not lock, and reading is not
+In 2.0.0-preview.1 a buffer is used by one thread at a time. The library does not lock, and reading is not
 free of side effects inside the buffer: a proxy creates the buffer's control block on first use, a
 `read()` or `edit()` scope counts its borrows, and `save_delta_into` with `touched_only` updates the
 touch log.
@@ -457,7 +457,7 @@ touch log.
   free directory only when it ends, and the receiver rejects that wire or delta. Save after the scope
   returns. Default builds are not affected.
 
-Several threads reading one buffer at the same time is not supported in 2.0.0.
+Several threads reading one buffer at the same time is not supported in 2.0.0-preview.1.
 
 ## 4. Saving and loading
 
@@ -897,8 +897,9 @@ fails to compile.
 
 ## 8. Core guarantees and API stability
 
-Pre-public internal iterations (`3.x` and `4.x`) did not promise cross-version source API or wire
-compatibility; from **2.0.0** (the first public stable release of XOffset V2), incompatible wire or
+Pre-public internal iterations (`internal-3.x` and `internal-4.x`) and the 2.0.0 previews do not promise
+cross-version source API or wire compatibility; from the final **2.0.0** (the first public stable
+release of XOffset V2), incompatible wire or
 API changes come only in a new major version, and every release of one major version reads the wires
 of every other release of it
 ([RELEASING.md section 1.1](RELEASING.md#11-compatibility-policy)). ABI stability (mixing versions in

@@ -2,7 +2,7 @@
 # One command from a git ref to the SLG scorecard (4.0 W4, docs/RELEASING.md section 2b).
 #
 # usage: tools/perf_gate/repro_scorecard.sh <ref> <outdir> [batches] [cycles]
-#   e.g. tools/perf_gate/repro_scorecard.sh v3.6.0 /tmp/sc-v3.6.0
+#   e.g. tools/perf_gate/repro_scorecard.sh internal-3.6.0 /tmp/sc-3.6.0
 #
 # Needs git, python3, a running docker daemon and network access (image and
 # dependency fetches). Everything that decides the numbers is pinned here:
@@ -35,7 +35,7 @@
 #     ZSTD=1          also build with SLG_WITH_COMPRESSION=1 and run ZBATCHES (default 1)
 #                     batch(es) of it for zstd-3 bytes; 0 skips it (bytes then raw)
 #     BASELINE=FILE   scorecard.json to diff against (tools/perf_gate/scorecard_v3.6.0.json
-#                     is the v3.6.0 reproduction this script was accepted on)
+#                     is the internal-3.6.0 reproduction this script was accepted on)
 #     REPO=DIR        git repository to read <ref> from (default: this checkout)
 #     JOBS=N          make -j for zstd/lz4 (default 4)
 #     XPORT=1         also run one SLG_XPORT=1 process per format and batch (tag x, raw/x_*)

@@ -39,7 +39,7 @@ found at build time, rather than at run time when `load_verified` rejects a diff
   give it an alias with `using` first.
 - Each build is evaluated by its own compiler, which when cross-compiling is the target platform's
   compiler, so Windows (MinGW) client builds are bound by it too. Android and iOS clients use the C++20
-  field-list build (since 3.2.0), see [CLIENT_TARGETS.md](CLIENT_TARGETS.md).
+  field-list build (since internal-3.2.0), see [CLIENT_TARGETS.md](CLIENT_TARGETS.md).
 - This is a build-time check and does not replace run-time validation: `load_verified` still fully
   validates every wire.
 - The `schema_pin_mismatch` test in CTest confirms that a mismatch really fails to compile.

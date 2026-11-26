@@ -1,10 +1,10 @@
-# Performance numbers (2.0.0)
+# Performance numbers (2.0.0-preview.1)
 
 Current published numbers, how they were measured, and their limits. Ratios are XOffset ÷ rival:
 **below 1 means XOffset is faster**. Compression is never timed; sizes are after zstd level 3. Older
-per-release tables (3.0.0 to 3.6.0) are in the Git history of this file. The tables were measured on
-4.3.0; in the benchmark programs 2.0.0 changes machine code only in growth paths that can report a
-capacity error, and instruction counts stay within 0.1% of 4.3.0 per run and 0.5% per stage
+per-release tables (internal-3.0.0 to internal-3.6.0) are in the Git history of this file. The tables were measured on
+internal-4.3.0; in the benchmark programs 2.0.0-preview.1 changes machine code only in growth paths that can report a
+capacity error, and instruction counts stay within 0.1% of internal-4.3.0 per run and 0.5% per stage
 ([PERF_GATE.md](PERF_GATE.md)).
 
 | Comparison | Where |
@@ -15,7 +15,7 @@ capacity error, and instruction counts stay within 0.1% of 4.3.0 per run and 0.5
 | Memory, relocation tax, phone | Sections 3 and 4 |
 | Instruction-count regression gate (not a speed claim) | [PERF_GATE.md](PERF_GATE.md) |
 
-## 1. SLG scorecard (4.3.0)
+## 1. SLG scorecard (internal-4.3.0)
 
 `bench/slg` (frozen tree, see its `MANIFEST`) models a strategy game server: whole state on login,
 per-client deltas, a shared map viewport, client orders going up, and players moving between servers.
@@ -32,8 +32,8 @@ Each cell times only data writing, sending and receiving.
 
 **19 main cells: 17 wins, 2 ties, 0 losses.** The ties are DP (1.001 [0.92–1.11]) and DC (0.965
 [0.90–1.08]), both against `zpp_bits_dirty shared`. Of the 9 report-only cells, 8 win and UL.send is
-0.964 [0.89–1.07]. The benchmark programs run the same machine code as in 4.2.0 (asm gate); against
-the 4.2.0 run on a Skylake host, DC moved from win to tie (0.839) and UPW.recv from tie to win
+0.964 [0.89–1.07]. The benchmark programs run the same machine code as in internal-4.2.0 (asm gate); against
+the internal-4.2.0 run on a Skylake host, DC moved from win to tie (0.839) and UPW.recv from tie to win
 (0.966), within the host and run variation described below.
 
 | Group | Main cell ratios (÷ strongest rival, batch min–max) |
@@ -44,46 +44,46 @@ the 4.2.0 run on a Skylake host, DC moved from win to tie (0.839) and UPW.recv f
 | Uplink | UL.recv 0.842 [0.80–0.89]; report-only UL.send 0.964 [0.89–1.07] |
 
 Shared-delta borderline rule ([RELEASING.md](RELEASING.md) section 2c): cells landing in 1.02–1.08 are
-re-judged across three `-falign-functions` layouts. In 4.3.0 no D cell landed in 1.02–1.08 (DP 1.001,
+re-judged across three `-falign-functions` layouts. In internal-4.3.0 no D cell landed in 1.02–1.08 (DP 1.001,
 DC 0.965, DPTW.recv 0.744, DCTW.recv 0.596), so no alignment re-judge was required.
 
-### Reading the scorecard (review of 2026-11-17, updated for 4.3.0)
+### Reading the scorecard (review of 2026-11-17, updated for internal-4.3.0)
 
 The directions hold: XOffset leads where encoding and decoding are skipped and pays about 1.0–1.4x
 where containers are read and written through relative offsets. How far it leads depends on message
 size and on the checks the receiver runs (section 2): the lead is largest at 1–12 KB, not for the
 largest messages, and only full validation of messages below about 80 bytes loses, narrowly. Since
-4.2.0 a churned sender buffer no longer costs the lead (it goes out compact). These notes change no
+internal-4.2.0 a churned sender buffer no longer costs the lead (it goes out compact). These notes change no
 verdict.
 
 - **S and SD against zpp_bits include a decode the trusted tier does not need.** The storage process's
   `store_check` (`bench/slg/bench/runner.hpp`) decodes the whole player for a format without a
   stand-alone check, while trusted XOffset only copies the bytes. On the same basis the ratios against
-  zpp_bits (S 0.099, SD 0.184 in 4.3.0) are about 1.4–1.5x higher (review of 4.0.0: 0.24 instead of
+  zpp_bits (S 0.099, SD 0.184 in internal-4.3.0) are about 1.4–1.5x higher (review of internal-4.0.0: 0.24 instead of
   0.171, 0.41 instead of 0.276). Their strongest rival is cista_unchecked (0.251 and 0.270), so both
   stay wins.
 - **UL.recv and UL.send mostly time the clock.** Two `steady_clock` reads per message cost about 30 ns
-  on cloud Xeon hosts, which pulls small-order ratios toward 1. In 4.3.0 UL.recv is 0.842 [0.80–0.89]
-  (win) and UL.send is 0.964 [0.89–1.07] (report only; 0.681 on the 4.2.0 Skylake host).
+  on cloud Xeon hosts, which pulls small-order ratios toward 1. In internal-4.3.0 UL.recv is 0.842 [0.80–0.89]
+  (win) and UL.send is 0.964 [0.89–1.07] (report only; 0.681 on the internal-4.2.0 Skylake host).
 - **The Mac run is against zpp_bits only.** After PR #290 (d13ef15b) the Mac mini scored 18 wins,
   1 tie, 0 losses with zpp_bits as the only rival. cista_unchecked, the strongest cloud rival of six
   cells (B, S, SD, EBW.recv, UPW.recv, UCW.recv), was not run there, so it is not the same measure.
 - **zpp_bits always checks bounds.** Receive cells against it compare a checked decoder with XOffset's
   unchecked trusted tier, as the trust model intends. Equal-check figures: UL.recv (bounds tier), the
   full-validation rows of [bench/cppcon2024](../bench/cppcon2024/README.md) and section 2.
-- **UPW.recv depends on the host.** On 4.1.0 it scored 0.900 on a 2.3 GHz cloud Xeon and 0.976
-  [0.941, 1.012] (tie) on a 2.1 GHz Xeon with 48 KiB L1d; on the 4.2.0 Skylake host it scored 0.966
-  [0.87–1.08] (tie) and on the 4.3.0 host (2.1 GHz Xeon, 4 cores) 0.913 [0.83–1.01] (win).
+- **UPW.recv depends on the host.** On internal-4.1.0 it scored 0.900 on a 2.3 GHz cloud Xeon and 0.976
+  [0.941, 1.012] (tie) on a 2.1 GHz Xeon with 48 KiB L1d; on the internal-4.2.0 Skylake host it scored 0.966
+  [0.87–1.08] (tie) and on the internal-4.3.0 host (2.1 GHz Xeon, 4 cores) 0.913 [0.83–1.01] (win).
 - **Bytes.** XOffset's wire carries spare capacity and free blocks: 1.11–1.37x zpp_bits after zstd-3
   (shared deltas DP 0.68x / 1.04x vs `zpp_bits_dirty shared`, DC 0.38x / 1.01x vs
   `zpp_bits_dirty shared`), 1.34–1.54x uncompressed between servers (`A`/`B`/`S`/`SD`). Bytes are report
   only; the wire format is not tuned for them.
-- **Defaults.** Measured with the 4.3.0 defaults (the same as 4.2.0): Wire 3.0 one-image format, `XWireEmission::automatic`
+- **Defaults.** Measured with the internal-4.3.0 defaults (the same as internal-4.2.0): Wire 3.0 one-image format, `XWireEmission::automatic`
   for churned buffers, hardening switches off, client uplink bounds check on.
 
 ## 2. Where the lead holds
 
-[`bench/premises`](../bench/premises/README.md) (2026-11-25, library 4.3.0, tree `5a54d9d1`) sends the
+[`bench/premises`](../bench/premises/README.md) (2026-11-25, library internal-4.3.0, tree `5a54d9d1`) sends the
 2024 `Character` with every container count scaled, from 68 bytes to 729 KB in zpp::bits, on both
 receive tiers, from clean and churned sender buffers, against zpp::bits, cista, FlatBuffers, Protocol
 Buffers and cereal with the published adapters. Cloud Xeon 2.1 GHz (48 KiB L1d, 2 MiB L2 per core),
@@ -123,14 +123,14 @@ is measured on the same final state; the strongest rival is zpp::bits in every c
   them proportionally less.
 - **Only full validation of very small messages loses, narrowly.** At 68 bytes full validation takes
   1.07 [1.03–1.12] of zpp::bits's time (489 instructions against 680) and crosses 0.95 at 78 bytes
-  [75–80] (123 bytes in 4.1.0). UL.recv (bounds tier) receives orders of about 76 bytes in zpp::bits
-  and wins in the 4.3.0 scorecard (0.842).
+  [75–80] (123 bytes in internal-4.1.0). UL.recv (bounds tier) receives orders of about 76 bytes in zpp::bits
+  and wins in the internal-4.3.0 scorecard (0.842).
 - **Churn no longer costs the lead.** The default emission sends a buffer that churn has left with
   much free space or spare capacity as its compact wire, with spare kept (a vector of at least 8
   elements keeps size / 8 + 1). After one read/write pass, 100,000 passes, 100,000 random edits or
   containers grown by 0.25 to 8 times their size and shrunk back, the wire is 1.13–1.16x
   `save_compact` without slack, so from 2.9 KB up every churned cell wins on both tiers: trusted
-  0.32–0.60 and full validation 0.51–0.76 of zpp::bits (4.1.0 sent the churned image, 1.7–2.2 times
+  0.32–0.60 and full validation 0.51–0.76 of zpp::bits (internal-4.1.0 sent the churned image, 1.7–2.2 times
   as many bytes, and scored up to 1.39 trusted and 1.77 full). The compact walk costs time: a churned
   sender takes about twice as long as the same state sent clean (138 ns against 71 ns at 2.9 KB), and
   an in-place `relayout()` ([USER_GUIDE.md 4.7](USER_GUIDE.md#47-a-sender-that-edits-in-place-for-a-long-time-relayout))
@@ -173,13 +173,13 @@ GCC 16 `-O3`, pinned core), 15 processes, medians; 0.95–1.05 counts as a tie.
 \* The read/write rows of zpp::bits are std containers.
 
 - Send + receive is XOffset's best case when the buffer was filled once: its wire is the buffer. In
-  the 2026-11-17 4.1.0 baseline (before `automatic` emission became the default), a churned buffer
+  the 2026-11-17 internal-4.1.0 baseline (before `automatic` emission became the default), a churned buffer
   grew from 3,064 to 7,928 bytes and took 181 ns (0.57 of zpp::bits trusted, 1.04 full validation).
-  Since 4.2.0 (`XWireEmission::automatic` default), the churned buffer automatically emits its compact
+  Since internal-4.2.0 (`XWireEmission::automatic` default), the churned buffer automatically emits its compact
   3,552-byte image (measured 2026-11-24, 7 pinned runs on Xeon Skylake, GCC 16.2: 0.43 of zpp::bits
   trusted, 0.68 full validation).
 - Read/write is the fastest of the scored rows on the 2024 layout. On the tuned layout it ties cista:
-  0.90–0.98 in the published processes, 1.00 [0.78, 1.25] in a rerun of 21 processes on 4.1.0.
+  0.90–0.98 in the published processes, 1.00 [0.78, 1.25] in a rerun of 21 processes on internal-4.1.0.
   Protocol Buffers' default `RemoveLast` keeps removed messages for reuse and then takes 77 ns on the
   2024 layout (report only; the scored row frees them like every other library).
 - Sizes after zstd-3: XOffset 2,986 bytes, zpp::bits 2,926, Protocol Buffers 3,800. The 40-byte wire
@@ -188,16 +188,16 @@ GCC 16 `-O3`, pinned core), 15 processes, medians; 0.95–1.05 counts as a tie.
 
 ## 3. Memory and relocation tax
 
-- **Memory** (4.3.0, tree `5a54d9d1`, SLG demo cases at M scale, one process per format,
+- **Memory** (internal-4.3.0, tree `5a54d9d1`, SLG demo cases at M scale, one process per format,
   `slg_bench --mode proc`, built with every rival as in section 2): xoffset_trusted RSS 538.3 MiB
   (peak the same), 0.92x the most frugal rival (Protocol Buffers 583.9 MiB; zpp::bits 595.8,
   FlatBuffers 595.9, cereal 597.6, cista 698.5); page tables 2.25 MiB, 0.42% of RSS. Both memory gates
   hold (RSS at most 1.10x the best rival, page tables at most 1% of RSS);
-  [memory.md](../bench/premises/results/2026-11-25/memory.md). 4.3.0 and 3.6.0 built the same way
-  on one host measured 536.3 and 542.8 MiB; the 663.5 MiB published for 3.6.0 came from another host
+  [memory.md](../bench/premises/results/2026-11-25/memory.md). internal-4.3.0 and internal-3.6.0 built the same way
+  on one host measured 536.3 and 542.8 MiB; the 663.5 MiB published for internal-3.6.0 came from another host
   and build, so compare RSS within one host only.
 - **Relocation tax** (`bench/reloc`, XOffset container ÷ the std container with the same function,
-  Mac M4, last measured for 3.3.0): 17 of 19 items within 1.05. The two above are `vec.push_back`
+  Mac M4, last measured for internal-3.3.0): 17 of 19 items within 1.05. The two above are `vec.push_back`
   (each stored element recomputes the data pointer) and `set.erase.fresh` against `flat_set` (bounds
   re-check and slot clearing), both about 1.09–1.12.
 

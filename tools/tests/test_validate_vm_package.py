@@ -199,6 +199,12 @@ class PackageAuditTests(unittest.TestCase):
         release = subprocess.run(["cmake", "-P", str(script)], capture_output=True, text=True)
         self.assertEqual(release.returncode, 0, release.stdout + release.stderr)
         self.assertIn("1.0.0|1.0.0|\n", release.stdout + "\n")
+        (self.source / "XOFFSET_VERSION").write_text("2.0.0-preview.1\n", encoding="utf-8")
+        self.assertEqual(MODULE.read_version(self.source),
+                         {"full": "2.0.0-preview.1", "numeric": "2.0.0", "prerelease": "preview.1"})
+        preview = subprocess.run(["cmake", "-P", str(script)], capture_output=True, text=True)
+        self.assertEqual(preview.returncode, 0, preview.stdout + preview.stderr)
+        self.assertIn("2.0.0-preview.1|2.0.0|preview.1", preview.stdout)
         for version in ("1.0", "1.0.0-", "1.0.0-gamma.1", "0.1.0-alpha", "00.1.0-alpha.1", "0.1.0-alpha.01",
                         "0.1.0-alpha.1\n0.1.0-alpha.2"):
             with self.subTest(version=version):

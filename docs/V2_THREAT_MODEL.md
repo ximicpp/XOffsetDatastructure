@@ -1,4 +1,4 @@
-# V2 threat model (2.0.0; "0.3.0-beta.1" in this text means the state since that version)
+# V2 threat model (2.0.0-preview.1; "0.3.0-beta.1" in this text means the state since that version)
 
 This document describes what XOffset V2 protects against when receiving an **untrusted wire**, what it
 does not, and what callers must add outside the library. Format details are in
@@ -81,7 +81,7 @@ in section 5.
 | T2 | Tampering with field values (A3) | **Not protected** | A wire that only changes scalar values passes validation; the wire header has no checksum (format 2.1 removed the always-zero `crc32c`) and no MAC. TLS or message signatures must be used outside the library |
 | T3 | Forging schema identity | No privilege gained | The schema fingerprint (64-bit FNV-1a) is a consistency check, not authentication: an attacker copying the fingerprint can only make the receiver fully validate against **the receiver's own type** |
 | T4 | Resource exhaustion | **Bounded by default** (M1: 64 MiB default when no limit is passed) | See 3.1; servers receiving client data should still set a smaller limit (DEPLOYMENT section 5) |
-| T5 | Old bytes of deleted data sent with the wire (A4) | **Partly protected** (since 2026-11-16, performance first); essentially protected with `XOFFSET_HARDENED=1`, or with `save_compact` for types without implicit padding | Freed blocks are still zeroed (P1, M3). The default build does not zero bytes vacated by containers (P2) or padding bytes (P3), and `save_verified` and delta sync send them as they are; since 2026-11-17 `reset` does not zero either, so a reused buffer carries bytes of its previous content into the slack and padding of the next (P4). `XOFFSET_HARDENED=1` turns on M4 and M6 (the default behavior in 4.0.0 and earlier); `save_compact` never carries old bytes from holes, container slack or string tails in any build, but copies the implicit padding of records as it is (P3, P4). See 3.2 and 4.1 |
+| T5 | Old bytes of deleted data sent with the wire (A4) | **Partly protected** (since 2026-11-16, performance first); essentially protected with `XOFFSET_HARDENED=1`, or with `save_compact` for types without implicit padding | Freed blocks are still zeroed (P1, M3). The default build does not zero bytes vacated by containers (P2) or padding bytes (P3), and `save_verified` and delta sync send them as they are; since 2026-11-17 `reset` does not zero either, so a reused buffer carries bytes of its previous content into the slack and padding of the next (P4). `XOFFSET_HARDENED=1` turns on M4 and M6 (the default behavior in internal-4.0.0 and earlier); `save_compact` never carries old bytes from holes, container slack or string tails in any build, but copies the implicit padding of records as it is (P3, P4). See 3.2 and 4.1 |
 | T6 | Different compilers interpret the same wire differently | One case found and fixed | When an enum key defines only `operator<=>`, Clang and GCC order sets oppositely and reject each other's wires; the fix and the CI cross-read job are in the GCC 16 port PR |
 | T7 | Invalid business values (negative gold and the like) | **Not protected** | Not part of structural validation; check them as ordinary business input |
 | T8 | Amplifying cost with old-generation images (schema evolution) | **Bounded** | Only stored data converts (`evolve_load_verified`); no message from a peer does. An image of the oldest generation of a lineage costs one more full validation plus one conversion per step; the converted object can be larger than the image (new fields, wider types). The conversion target buffer's limit defaults to the `maximum_capacity` passed to the load, and exceeding it fails. Estimate the amplification from the lineage length and shorten it if needed. `fuzz_schema_evolution` covers this entry point |
@@ -152,7 +152,7 @@ fields and so on), and P3 could also leak data from the server's stack.
 **Status (since 2026-11-16):** performance comes first by default, so zeroing for P2 and P3 became
 compile switches, **off by default**; since 2026-11-17 so is the zeroing on reset (P4 below).
 `XOFFSET_HARDENED=1` turns them all on (the default behavior in
-4.0.0 and earlier), or each can be turned on separately (section 4.1). In the default build, bytes sent
+internal-4.0.0 and earlier), or each can be turned on separately (section 4.1). In the default build, bytes sent
 by `save_verified` and delta sync may contain elements already erased from
 containers, and content the buffer held before it was reset. `save_compact` writes no holes and rewrites slack and string tails as 0, but copies the implicit
 padding of records as it is, so for types with implicit padding it carries the bytes of P3 and P4.
@@ -186,7 +186,7 @@ padding of records as it is, so for types with implicit padding it carries the b
   padding of records) still hold the previous content. So **one send buffer that builds messages for
   different receivers in turn carries content of the previous receiver's message inside the next
   wire** (measured 2026-11-16: one buffer building 40 messages in turn, 3 carried content of the
-  message before). With `XOFFSET_SCRUB_RESET=1`, `reset` zeroes all used bytes (the behavior in 4.0.0
+  message before). With `XOFFSET_SCRUB_RESET=1`, `reset` zeroes all used bytes (the behavior in internal-4.0.0
   and earlier). `save_compact` drops the slack and string tails in any build, but copies the implicit
   padding of records as it is, so with types that have implicit padding it still carries bytes of the
   previous content (measured 2026-11-25: a 1552-byte compact wire built after `reset` carried 140 to
