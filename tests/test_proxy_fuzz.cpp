@@ -841,8 +841,10 @@ private:
         auto ints = b.ref<Root>().field<&Root::ints>();
         std::string wire;
 #if XOFFSET_NO_EXCEPTIONS
-        b.save_verified_into<Root>(wire);
-        REQUIRE(wire.empty());
+        // save_verified_into would call the fatal handler; the XStatus
+        // entry reports the failure.
+        const XStatus tried = b.try_save_verified_into<Root>(wire);
+        REQUIRE(!tried && tried.code() == b.error() && wire.empty());
 #else
         bool refused = false;
         try {
