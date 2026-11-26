@@ -699,7 +699,8 @@ xoffset_write_test_inventory()
 
 # Configuration check (xoffset_config.hpp): two translation units that set a
 # hardening switch, the client uplink check or a storage size differently
-# are refused, at link time (ELF, MSVC: the build of the program fails) or,
+# are refused, at link time (ELF, MSVC: the build of the program fails;
+# lld-link says /failifmismatch instead of LNK2038) or,
 # on Apple, at startup (the program aborts before main). config_check_same
 # links the same two units configured alike, one of them spelling a size
 # differently (MSVC compares the macro text, so there both spell it the same
@@ -755,7 +756,7 @@ foreach(variant IN LISTS xoffset_config_check_variants)
     else()
         add_test(NAME config_check_${variant}_fail
             COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target config_check_${variant}_fail --config $<CONFIG>)
-        set(expected "XOFFSET_CONFIG_MISMATCH|LNK2038")
+        set(expected "XOFFSET_CONFIG_MISMATCH|LNK2038|failifmismatch")
     endif()
     set_tests_properties(config_check_${variant}_fail PROPERTIES
         LABELS "config_check"
