@@ -7,11 +7,13 @@ maintainer after validation and the release PR pass (pushing tags from automated
 ## 1. Version numbers
 
 - `XOFFSET_VERSION` at the repository root is the only version source: `MAJOR.MINOR.PATCH`, plus
-  `-(alpha|beta|rc).N` for prereleases, no leading zeros. CMake and the packaging tools fail on a
+  `-(alpha|beta|preview|rc).N` for prereleases, no leading zeros. CMake and the packaging tools fail on a
   malformed value.
 - The tag is `v` plus the version, annotated, on the merge commit of the release PR. Legacy
-  `v1.0.0` and `v2.0-*` tags belong to older prototype implementations, and `v3.0.0`–`v4.3.0` were
-  pre-public internal V2 iterations before the public `2.0.0` SemVer reset; check
+  `v1.0.0` and `v2.0-*` tags belong to older prototype implementations. The pre-public internal V2
+  iterations are tagged `internal-3.0.0` to `internal-4.3.0` (named `v3.0.0`–`v4.3.0` until 2026-11-26,
+  renamed so they are not taken for releases newer than 2.0.0; the GitHub releases of
+  `internal-4.2.0` and `internal-4.3.0` are marked pre-release); check
   `git ls-remote --tags origin` for collisions.
 - Stable install packages support CMake `SameMajorVersion` matching in `find_package`; prereleases
   accept only unversioned discovery plus exact `STREQUAL` checks
@@ -19,11 +21,16 @@ maintainer after validation and the release PR pass (pushing tags from automated
 
 ### 1.1 Compatibility policy
 
-**Pre-public internal iterations (`3.x` and `4.x`) did not promise API or wire compatibility between
-versions**: a minor release could change the wire format or rename public API (`4.2.0` did both),
+**Pre-public internal iterations (`internal-3.x` and `internal-4.x`) did not promise API or wire compatibility between
+versions**: a minor release could change the wire format or rename public API (`internal-4.2.0` did both),
 and both ends of a link upgraded together.
 
-**From 2.0.0, the first public stable release of XOffset V2 meant for adoption by outside projects**,
+**2.0.0 previews** (`2.0.0-preview.N`; the first one was published on 2026-11-25) come before the
+final 2.0.0. They are for evaluation: the public API, the wire format and the delta format may change
+between previews and in the final 2.0.0, so both ends of a link use the same preview. Each preview
+installs with `exact-full-version-only` matching.
+
+**From the final 2.0.0, the first public stable release of XOffset V2 meant for adoption by outside projects**,
 versions follow Semantic Versioning, with the wire format part of the contract:
 
 - **Major** (`X.0.0`): the only releases that may make an incompatible change: a wire or delta format
@@ -42,7 +49,7 @@ versions follow Semantic Versioning, with the wire format part of the contract:
   `detail` namespaces, interfaces marked experimental in [USER_GUIDE.md](USER_GUIDE.md) (such as
   `XBufferPool`), performance numbers, the text of error messages and diagnostic output, and the
   minimum compiler and platform versions, which a minor release may raise.
-- Stable releases (`2.0.0` and later) accept CMake `find_package` requests for any compatible version
+- Stable releases (the final `2.0.0` and later) accept CMake `find_package` requests for any compatible version
   of the same major version (`SameMajorVersion`); prereleases remain `exact-full-version-only`.
 
 ## 2. Before release: Ir gates

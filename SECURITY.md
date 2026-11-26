@@ -2,8 +2,9 @@
 
 ## Supported Versions
 
-Historical pre-public releases (`3.x` and `4.x` internal V2 iterations) did not promise cross-version
-wire or API compatibility. Starting with **2.0.0** (the first public stable release of XOffset V2),
+The pre-public internal builds (`internal-3.0.0` to `internal-4.3.0`) and the 2.0.0 previews
+(`2.0.0-preview.N`) do not promise cross-version wire or API compatibility. Starting with the final
+**2.0.0** (the first public stable release of XOffset V2),
 incompatible changes come only in a new major version ([docs/RELEASING.md](docs/RELEASING.md)
 section 1.1), so security fixes ship in patch releases of the current major version.
 

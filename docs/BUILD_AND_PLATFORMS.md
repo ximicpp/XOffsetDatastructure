@@ -81,7 +81,8 @@ An installed full-library consumer uses:
 ```cmake
 cmake_minimum_required(VERSION 3.20)   # 3.30+ for C++26 reflection installs
 project(MyConsumer LANGUAGES CXX)
-find_package(XOffsetDatastructure 2.0 CONFIG REQUIRED COMPONENTS full)
+# A stable release also accepts a version: find_package(XOffsetDatastructure 2.0 ...).
+find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
 add_executable(my_app main.cpp)
 target_link_libraries(my_app PRIVATE XOffset::xoffset)
 ```
@@ -89,9 +90,9 @@ target_link_libraries(my_app PRIVATE XOffset::xoffset)
 Configure the consumer with `-DCMAKE_PREFIX_PATH=/path/to/xoffset-prefix` and a
 matching C++20/C++23 compiler (or the matching P2996/GCC 16 toolchain for C++26
 installs). For storage, request `COMPONENTS storage`, link `XOffset::storage`,
-and use CMake 3.13+. From 2.0.0, stable packages accept any `find_package`
+and use CMake 3.13+. From the final 2.0.0, stable packages accept any `find_package`
 request for a compatible version of the same major version (`SameMajorVersion`,
-[RELEASING.md](RELEASING.md) section 1.1); prereleases continue to reject
+[RELEASING.md](RELEASING.md) section 1.1); prereleases such as 2.0.0-preview.1 reject
 numeric, `EXACT` and range requests (discover unversioned and compare
 `XOffsetDatastructure_VERSION` with `STREQUAL`).
 
@@ -103,7 +104,7 @@ include(FetchContent)
 FetchContent_Declare(
     xoffsetdatastructure
     # The release's source archive (about 3 MB): no Git history, no submodules.
-    URL https://github.com/ximicpp/XOffsetDatastructure/archive/refs/tags/v2.0.0.tar.gz
+    URL https://github.com/ximicpp/XOffsetDatastructure/archive/refs/tags/v2.0.0-preview.1.tar.gz
 )
 set(XOFFSET_CXX_STANDARD 20 CACHE STRING "" FORCE)
 FetchContent_MakeAvailable(xoffsetdatastructure)

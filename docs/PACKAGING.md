@@ -3,9 +3,10 @@
 This library supports two build paths that produce byte-identical wires: **C++20 / C++23 field-list
 builds** (standard platform compilers, zero external dependencies or submodules) and **C++26 reflection
 builds** (GCC 16+ or P2996 Clang, with pinned TypeLayout/Boost headers for reflection signature tools).
-From 2.0.0 releases follow Semantic Versioning: incompatible wire, delta or public API changes come only
-in a new major version, and every `2.x` release reads the wires and deltas of every other `2.x` release;
-ABI is not promised ([RELEASING.md](RELEASING.md) section 1.1). Read
+From the final 2.0.0 releases follow Semantic Versioning: incompatible wire, delta or public API changes
+come only in a new major version, and every `2.x` release reads the wires and deltas of every other
+`2.x` release; ABI is not promised ([RELEASING.md](RELEASING.md) section 1.1). The 2.0.0 previews
+(`2.0.0-preview.N`) may still change the API and the wire format. Read
 [compatibility and input boundary](ALPHA_COMPATIBILITY.md) first.
 This version uses Wire Format 3.0 ([WIRE_FORMAT.md](WIRE_FORMAT.md)) and does not read Wire 2.1 or V1
 wires; save/load copy bytes into a working buffer rather than borrowing unaligned external memory directly.
@@ -174,7 +175,8 @@ Minimal `CMakeLists.txt` consuming a full install:
 ```cmake
 cmake_minimum_required(VERSION 3.20)   # 3.30+ for C++26 reflection installs
 project(MyConsumer LANGUAGES CXX)
-find_package(XOffsetDatastructure 2.0 CONFIG REQUIRED COMPONENTS full)
+# A stable release also accepts a version: find_package(XOffsetDatastructure 2.0 ...).
+find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
 add_executable(my_app main.cpp)
 target_link_libraries(my_app PRIVATE XOffset::xoffset)
 ```
@@ -188,7 +190,7 @@ cmake --build build/consumer --config Release
 Storage uses `COMPONENTS storage`, `XOffset::storage` and CMake 3.13+. With no component specified,
 full is requested. The install config exposes `XOffsetDatastructure_VERSION` (from `XOFFSET_VERSION`),
 `XOffsetDatastructure_VERSION_NUMERIC`, `XOffsetDatastructure_VERSION_PRERELEASE` and
-`XOffsetDatastructure_VERSION_COMPATIBILITY`. Stable releases (`2.0.0` and later) use
+`XOffsetDatastructure_VERSION_COMPATIBILITY`. Stable releases (the final `2.0.0` and later) use
 `SameMajorVersion` matching (`same-major-version`); **prereleases conservatively reject numeric,
 `EXACT` and range requests** (`exact-full-version-only`) so CMake never takes a prerelease for a
 stable version (find unversioned and compare `XOffsetDatastructure_VERSION` with `STREQUAL`).
@@ -200,7 +202,7 @@ include(FetchContent)
 FetchContent_Declare(
     xoffsetdatastructure
     # The release's source archive (about 3 MB): no Git history, no submodules.
-    URL https://github.com/ximicpp/XOffsetDatastructure/archive/refs/tags/v2.0.0.tar.gz
+    URL https://github.com/ximicpp/XOffsetDatastructure/archive/refs/tags/v2.0.0-preview.1.tar.gz
 )
 set(XOFFSET_CXX_STANDARD 20 CACHE STRING "" FORCE)
 FetchContent_MakeAvailable(xoffsetdatastructure)

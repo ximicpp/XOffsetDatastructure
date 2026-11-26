@@ -20,7 +20,7 @@ import stat
 import tarfile
 import zlib
 
-VERSION_PATTERN = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(alpha|beta|rc)\.(0|[1-9][0-9]*))?")
+VERSION_PATTERN = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(alpha|beta|preview|rc)\.(0|[1-9][0-9]*))?")
 
 
 def read_version(source):

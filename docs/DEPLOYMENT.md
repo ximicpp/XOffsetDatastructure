@@ -1,4 +1,4 @@
-# XOffsetDatastructure Deployment Guide (2.0.0)
+# XOffsetDatastructure Deployment Guide (2.0.0-preview.1)
 
 This guide is for engineers integrating XOffset into servers and clients. It covers the
 prerequisites for releases, security and networking. API usage is in [USER_GUIDE.md](USER_GUIDE.md),
@@ -11,20 +11,20 @@ and between servers and clients. Compilers and platforms may differ; the schema 
 It is not a cross-language protocol and not a long-term storage format.
 
 Server to client is a core use case, next to server to server ([README](../README.md)). Client status
-in 4.2.0 (details in [CLIENT_TARGETS.md](CLIENT_TARGETS.md)):
+in internal-4.2.0 (details in [CLIENT_TARGETS.md](CLIENT_TARGETS.md)):
 
 - Clients build with the C++20/C++23 field lists (`XOFFSET_RECORD`, each platform's native
-  compiler, zero submodules) and servers with C++26 reflection; the wire is byte-identical. On 4.2.0,
+  compiler, zero submodules) and servers with C++26 reflection; the wire is byte-identical. On internal-4.2.0,
   Windows x64 (native MSVC 19.44 C++20 and C++23, 214/214 each), macOS 12.0 arm64 (Apple clang 21
   C++20 and C++23, 214/214 each) and the iOS 14.0 simulator (Apple clang 21 C++20, 214/214) pass the
   full tests, read the 27-file Wire 3.0 reference corpus written by the server, and after editing save
   the same bytes as the server; on 2026-11-24 physical Android 11 arm64-v8a (NDK 27 Clang 18, 206/206)
   and iPhone 15 Pro Max arm64 (`minos 14.0`, `XOFFSET_USE_PMR=0`, 207/207) also verified full CTest and
-  27/27 Wire 3.0 corpus identity. On 4.3.0 the cloud Wine/QEMU columns (MSVC 19.44 C++20 and C++23, clang-cl 19,
+  27/27 Wire 3.0 corpus identity. On internal-4.3.0 the cloud Wine/QEMU columns (MSVC 19.44 C++20 and C++23, clang-cl 19,
   MinGW GCC 16, Android NDK r29/r30) pass 247/247 each plus 52 no-exceptions tests, with the same
   corpus bytes as the server.
 - End-to-end demo (`demo/mapstate`): a Linux server to Windows, Android emulator, iOS simulator and
-  macOS clients all run. Real devices: 3.2.0-rc.1 passed every functional check on one Android 11
+  macOS clients all run. Real devices: internal-3.2.0-rc.1 passed every functional check on one Android 11
   phone (record in [validation/2026-10-28-rc1-platform](validation/2026-10-28-rc1-platform/README.md)),
   and on an iPhone 15 Pro Max (iOS 26.6.2) CTest, the reference corpus and both demo clients all
   passed; steps in [DEVICE_TESTING.md](DEVICE_TESTING.md).
@@ -73,14 +73,14 @@ added field nor as a new generation.
 
 ## 3. Build consistency
 
-Toolchains verified for 3.1.0 (local platform matrix, 3.1.0 RC 1a1b210; GitHub CI has been off since
+Toolchains verified for internal-3.1.0 (local platform matrix, internal-3.1.0 RC 1a1b210; GitHub CI has been off since
 2026-10-23):
 
 | Use | Platform | Compiler and standard library |
 | --- | --- | --- |
 | Server | Linux x86-64, Linux arm64 | GCC 16.2 (libstdc++), or clang-p2996 `d77eff1` (with its libc++). Both produce byte-identical wires and can be mixed |
 | Client | Windows x64 | MinGW-w64 GCC 16.2 (`tools/build_mingw_toolchain.sh`, `cmake/toolchains/mingw-w64-x86_64.cmake`). GCC's MinGW TLS is emulated, so per-thread caches are off on this target (`XOFFSET_THREAD_CACHES=0`) |
-| Client | Android, iOS, macOS, Windows (MSVC, clang-cl) | No usable toolchain for 3.1.0; since 3.2.0 they use the C++20/C++23 field-list build: Windows MSVC 19.44 (C++20 and C++23 214/214 each on 4.2.0), Apple clang 21 for iOS (simulator `minos 14.0` 214/214 on 4.2.0; physical iPhone 15 Pro Max 207/207) and macOS (`minos 12.0`, C++20 and C++23 214/214 each on 4.2.0), physical Android 11 arm64-v8a (NDK 27, 206/206), plus cloud Android NDK r29/r30, clang-cl 19 and MinGW GCC 16 (247/247 each on 4.3.0); see [CLIENT_TARGETS.md](CLIENT_TARGETS.md) |
+| Client | Android, iOS, macOS, Windows (MSVC, clang-cl) | No usable toolchain for internal-3.1.0; since internal-3.2.0 they use the C++20/C++23 field-list build: Windows MSVC 19.44 (C++20 and C++23 214/214 each on internal-4.2.0), Apple clang 21 for iOS (simulator `minos 14.0` 214/214 on internal-4.2.0; physical iPhone 15 Pro Max 207/207) and macOS (`minos 12.0`, C++20 and C++23 214/214 each on internal-4.2.0), physical Android 11 arm64-v8a (NDK 27, 206/206), plus cloud Android NDK r29/r30, clang-cl 19 and MinGW GCC 16 (247/247 each on internal-4.3.0); see [CLIENT_TARGETS.md](CLIENT_TARGETS.md) |
 
 - Pinned compiler sources: clang-p2996 in `toolchains/README.md`, the GCC 16 image digest in
   `tools/local_validate.sh`, and the MinGW toolchain recipe in `tools/build_mingw_toolchain.sh`.
