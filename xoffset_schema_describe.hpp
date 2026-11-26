@@ -54,11 +54,20 @@
 // enum used in raw receive must have a fixed underlying type
 // (enum class, or enum E : std::uint8_t {...}).
 
+#include <array>
 #include <cstddef>
+#include <map>
+#include <memory>
+#include <optional>
+#include <span>
+#include <string>
 #include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <utility>
+#include <unordered_map>
+#include <variant>
+#include <vector>
 
 namespace XOffsetDatastructure::schema {
     // description<T>: specialized by XOFFSET_RECORD, XOFFSET_RECORD_DERIVED and
@@ -74,6 +83,48 @@ namespace XOffsetDatastructure::schema {
     template <class T> struct fields;
 
     namespace describe_detail {
+        // Member types a new user often writes that cannot be in an arena,
+        // named in XOFFSET_RECORD's first error with what to use instead.
+        enum class member_hint { none, pointer, string, sequence, map, optional, variant };
+        template <class M> struct member_hint_of {
+            static constexpr member_hint value =
+                std::is_pointer_v<M> || std::is_member_pointer_v<M> ? member_hint::pointer : member_hint::none;
+        };
+        template <class E, std::size_t N> struct member_hint_of<E[N]> : member_hint_of<E> {};
+        template <class E, std::size_t N> struct member_hint_of<std::array<E, N>> : member_hint_of<E> {};
+        template <class... A> struct member_hint_of<std::basic_string<A...>> {
+            static constexpr member_hint value = member_hint::string;
+        };
+        template <class... A> struct member_hint_of<std::basic_string_view<A...>> {
+            static constexpr member_hint value = member_hint::string;
+        };
+        template <class... A> struct member_hint_of<std::vector<A...>> {
+            static constexpr member_hint value = member_hint::sequence;
+        };
+        template <class E, std::size_t N> struct member_hint_of<std::span<E, N>> {
+            static constexpr member_hint value = member_hint::sequence;
+        };
+        template <class... A> struct member_hint_of<std::map<A...>> {
+            static constexpr member_hint value = member_hint::map;
+        };
+        template <class... A> struct member_hint_of<std::unordered_map<A...>> {
+            static constexpr member_hint value = member_hint::map;
+        };
+        template <class... A> struct member_hint_of<std::optional<A...>> {
+            static constexpr member_hint value = member_hint::optional;
+        };
+        template <class... A> struct member_hint_of<std::variant<A...>> {
+            static constexpr member_hint value = member_hint::variant;
+        };
+        template <class... A> struct member_hint_of<std::unique_ptr<A...>> {
+            static constexpr member_hint value = member_hint::pointer;
+        };
+        template <class... A> struct member_hint_of<std::shared_ptr<A...>> {
+            static constexpr member_hint value = member_hint::pointer;
+        };
+        template <class M>
+        inline constexpr member_hint member_hint_v = member_hint_of<std::remove_cv_t<M>>::value;
+
         template <class> struct member_pointer_traits;
         template <class C, class M> struct member_pointer_traits<M C::*> {
             using class_type = C;
@@ -127,6 +178,41 @@ namespace XOffsetDatastructure::schema {
         consteval std::size_t expected_clauses() {
             return []<std::size_t... I>(std::index_sequence<I...>) {
                 return D::base_count + (init_clauses<typename D::template member<I>::type>() + ... + 0);
+            }(std::make_index_sequence<D::member_count>{});
+        }
+
+        // One readable error per member of a type that cannot be in an
+        // arena; the compiler names the member in the instantiation context
+        // (fields<Record>::field_<member>).
+        template <class Field, member_hint H>
+        struct member_type_check {
+            static_assert(H != member_hint::pointer,
+                "XOFFSET_RECORD: the member named in fields<Record>::field_<member> above holds a "
+                "pointer or smart pointer; an arena holds no addresses: store an index or id");
+            static_assert(H != member_hint::string,
+                "XOFFSET_RECORD: the member named in fields<Record>::field_<member> above is a "
+                "std::string or std::string_view: use XString");
+            static_assert(H != member_hint::sequence,
+                "XOFFSET_RECORD: the member named in fields<Record>::field_<member> above is a "
+                "std::vector or std::span; use XVector");
+            static_assert(H != member_hint::map,
+                "XOFFSET_RECORD: the member named in fields<Record>::field_<member> above is a "
+                "std::map or std::unordered_map; use XMap (or XSet)");
+            static_assert(H != member_hint::optional,
+                "XOFFSET_RECORD: the member named in fields<Record>::field_<member> above is a "
+                "std::optional, which is not supported; use a presence flag next to the value");
+            static_assert(H != member_hint::variant,
+                "XOFFSET_RECORD: the member named in fields<Record>::field_<member> above is a "
+                "std::variant, which is not supported; use a kind tag and one member per alternative");
+            static constexpr bool value = H == member_hint::none;
+        };
+
+        template <class T>
+        consteval bool member_types_supported() {
+            using D = description<T>;
+            return []<std::size_t... I>(std::index_sequence<I...>) {
+                return (member_type_check<typename D::template member<I>,
+                                          member_hint_v<typename D::template member<I>::type>>::value && ...);
             }(std::make_index_sequence<D::member_count>{});
         }
 
@@ -274,6 +360,8 @@ namespace XOffsetDatastructure {
     XOFFSET_SCHEMA_DETAIL_ACCESSORS(T, __VA_ARGS__)
 
 #define XOFFSET_SCHEMA_DETAIL_COMPLETE(macro, T)                               \
+    static_assert(::XOffsetDatastructure::schema::describe_detail::member_types_supported<T>(), \
+        macro "(" #T ", ...): a member type cannot be in an arena (see the error above)"); \
     static_assert(::std::is_class_v<T> && !::std::is_union_v<T>,              \
         macro "(" #T ", ...): " #T " must be a class type, not a union");      \
     static_assert(::std::is_aggregate_v<T>,                                    \

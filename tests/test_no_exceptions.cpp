@@ -10,6 +10,11 @@
 //        test_no_exceptions --fatal    typed access without a root: exceptions
 //                                      on, it throws; off, the fatal handler
 //                                      runs (prints "fatal no_root: ...")
+//        test_no_exceptions --fatal-save    save_verified_into of a failed
+//                                      buffer: throws, or the handler runs
+//        test_no_exceptions --fatal-default no handler: the failure is
+//                                      printed to stderr before the abort
+#include <csignal>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -576,14 +581,50 @@ static void limit_entries() {
          "nothing inserted by the refused calls");
 }
 
+// A buffer with a recorded failure refuses save_verified_into: exceptions
+// on, it throws; off, the fatal handler runs (no silent empty wire).
+int fatal_save_mode() {
+    set_fatal_handler(&print_fatal);
+    auto tight = TypedXBuffer<NoExcRoot>::create(256, XBuffer::maximum_capacity(512));
+    (void)tight.edit([](NoExcRoot& r) { r.values.resize(400); });
+    std::string out = "keep";
+#if XOFFSET_NO_EXCEPTIONS
+    tight.save_verified_into(out); // the handler ends the process
+    std::puts("save_verified_into returned on a failed buffer");
+    return 1;
+#else
+    try {
+        tight.save_verified_into(out);
+    } catch (const XException& e) {
+        std::printf("fatal %s: %s\n", to_string(e.code()), e.what());
+        return 0;
+    }
+    return 1;
+#endif
+}
+
+void exit_on_abort(int) { std::_Exit(0); }
+
+// Without a handler the failure is printed to stderr before the abort.
+int fatal_default_mode() {
+    std::signal(SIGABRT, &exit_on_abort);
+    detail::fatal(XErrc::out_of_storage, "default handler message");
+}
+
 int main(int argc, char** argv) {
     if (argc > 1 && std::string_view(argv[1]) == "--fatal") return fatal_mode();
+    if (argc > 1 && std::string_view(argv[1]) == "--fatal-save") return fatal_save_mode();
+    if (argc > 1 && std::string_view(argv[1]) == "--fatal-default") return fatal_default_mode();
     std::cout << "test_no_exceptions: exceptions " << (XOFFSET_NO_EXCEPTIONS ? "off" : "on") << "\n";
 
     const auto good = make_wire(7, 300);
     {
         auto loaded = XBuffer::try_load_verified<NoExcRoot>(good, cap());
         need(bool(loaded) && loaded.code() == XErrc::ok, "try_load_verified of a good wire");
+        need(loaded.error().code == XErrc::ok && loaded.error().message.empty(),
+             "error() of a result with a value is the empty error");
+        need(std::move(loaded).error().code == XErrc::ok, "error() && of a result with a value");
+        loaded = XBuffer::try_load_verified<NoExcRoot>(good, cap());
         if (loaded) {
             need(holds(*loaded, 7, 300), "loaded content");
             need(loaded->save_verified<NoExcRoot>() == good, "loaded re-save");

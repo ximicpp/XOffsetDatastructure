@@ -96,6 +96,22 @@ namespace XOffsetDatastructure {
         // compilers or flags disagree about them, so a record with any of them
         // is not admitted. alignas on the record itself (at most 8) is standard
         // and is kept: it only raises the alignment and the rounded size.
+        // False only when T's field list does not name every member in
+        // order (XOFFSET_RECORD reports that; the layout check would then
+        // fail too and only repeat it with a misleading reason).
+        template <typename T>
+        consteval bool field_list_complete() {
+#if !XOFFSET_SCHEMA_REFLECTION
+            if constexpr (schema::is_described_v<T>)
+                return schema::describe_detail::offsets_ascending<T>() &&
+                       schema::describe_detail::covers_all_members<T>();
+            else
+                return true;
+#else
+            return true;
+#endif
+        }
+
         template <typename T>
         consteval bool natural_record_layout() {
             return []<std::size_t... I>(std::index_sequence<I...>) {
@@ -2260,7 +2276,7 @@ namespace XOffsetDatastructure {
                         "the same access control).");
                     return false;
                 } else if constexpr (!natural_record_layout<U>()) {
-                    static_assert(wire_explain_false<U>,
+                    static_assert(wire_explain_false<U> || !field_list_complete<U>(),
                         "XOffset wire schema: this record does not have the natural layout (each member "
                         "at the next offset its type's alignment allows, the size rounded up to the "
                         "record's alignment). #pragma pack, /Zp, -fpack-struct, alignas on a member, "

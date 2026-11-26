@@ -208,7 +208,7 @@ namespace XOffsetDatastructure {
 
         template <typename T>
         consteval void require_natural_layout() {
-            static_assert(natural_record_layout<T>(),
+            static_assert(natural_record_layout<T>() || !field_list_complete<T>(),
                 "XOffset wire schema: this record does not have the natural layout (each member "
                 "at the next offset its type's alignment allows, the size rounded up to the "
                 "record's alignment). #pragma pack, /Zp, -fpack-struct, alignas on a member, "
@@ -221,8 +221,11 @@ namespace XOffsetDatastructure {
         consteval auto wire_record_signature() {
             using U = std::remove_cv_t<T>;
             static_assert(schema::base_count_v<U> == 0,
-                "wire_abi_signature() does not support base classes in v1");
-            require_natural_layout<U>();
+                "XOffset wire schema: a wire type (a root with XOFFSET_REGISTER_SCHEMA_NAME and every "
+                "record it contains) cannot have base classes, because compilers lay out base classes "
+                "differently. Make the base a member instead; base classes are fine in local buffers "
+                "(no schema name).");
+            if constexpr (schema::base_count_v<U> == 0) require_natural_layout<U>();
             constexpr std::size_t field_count = schema::member_count_v<U>;
             return ft::FixedString{"record[s:"} +
                    ft::to_fixed_string<sizeof(U)>() +

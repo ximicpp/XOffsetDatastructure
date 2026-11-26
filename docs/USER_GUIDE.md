@@ -409,6 +409,8 @@ world.edit([&](View& w) {                  // pinned scope: plain references, as
   compares a version number on every access, and stays valid when the buffer moves (including when
   the `XBuffer` object itself is moved); after the buffer is destroyed or its content is replaced by
   `reset`/`reload` it becomes stale: reads give value-initialized results and writes return false.
+  A write through a stale proxy of a buffer that still exists also records `stale` in that buffer,
+  which then refuses to send until `clear_error()`. Take `root()` again after `reset`/`reload`.
 - **Field accessors**: `XOFFSET_RECORD` / `XOFFSET_RECORD_DERIVED` generate a member function of the
   same name for each listed field that returns the field's proxy; when the bases also have field
   lists, derived records get accessors for the base fields too. When a field name equals one of
@@ -833,7 +835,9 @@ non-throwing lifecycle entries `XBuffer::try_create<T>` / `try_clone()` / `try_c
 non-throwing emit entries `try_save_verified*` / `try_save_compact*` / `try_save_delta*` /
 `XDeltaBaseline::try_key_delta*`, and `XCompactor::try_compact<T>` (plus their `TypedXBuffer<T>`
 counterparts). `XResult::value()` throws when there is no value (in no-exception builds it calls the
-fatal handler); `*r` / `r->` do not check.
+fatal handler). `*r` / `r->` do not check in release builds; builds without `NDEBUG` (and
+`XOFFSET_HARDENED=1` builds) call the fatal handler when there is no value. `r.error()` on a result
+with a value is an empty `XError` (code `ok`, no message), so logging it unconditionally is safe.
 
 ### 6.2 No-exception builds (`-fno-exceptions`, MSVC `/EHs-c-`)
 
@@ -855,8 +859,12 @@ required.
   `buf.make_room(bytes)` or pass `expected_growth` to `edit()` before multi-step mutations.
 - Other failures (bare `plain_root()` writes that run out of space, `root<T>()` with no root,
   calling throwing `save_*` entries on invalid state, ...) have no caller to return to; they call
-  the fatal handler and then `abort()`. Engines plug in their own crash reporting with
-  `set_fatal_handler(fn)`; `fn(XErrc, const char*)` must not return.
+  the fatal handler and then `abort()`. That includes `save_verified_into`, `save_compact_into` and
+  `save_delta_into` on a buffer with a recorded failure (`!buf.ok()`): with exceptions they throw,
+  without them they call the fatal handler instead of writing an empty wire; clients send with the
+  `try_save_*` entries and check the `XStatus`. Engines plug in their own crash reporting with
+  `set_fatal_handler(fn)`; `fn(XErrc, const char*)` must not return. Without a handler the code and
+  the message are written to `stderr` before the abort.
 - A failing host `operator new` terminates as the standard library does without exceptions.
 - One internal fallback that recovers from `XBadAlloc` when exceptions are on remains fatal when they
   are off: the whole-block copy in container copy assignment (with exceptions it falls back to

@@ -36,12 +36,16 @@ struct is_byte_copy_safe<XOffsetDatastructure::XMap<K, V>>
 // Namespace sentinel -- detects accidental use inside a namespace block.
 struct _XOffset_NS_Sentinel {};
 
+// The macro declares the sentinel where it is expanded: at global scope that
+// is the one above, inside a namespace a new type, and the check fails.
 #define XOFFSET_CHECK_GLOBAL_NAMESPACE_(macro_name)                            \
+    struct _XOffset_NS_Sentinel;                                               \
     static_assert(                                                             \
         ::std::is_same_v<::_XOffset_NS_Sentinel, _XOffset_NS_Sentinel>,       \
         macro_name " must be used at global namespace scope, "                 \
-        "not inside any namespace { } block. "                                 \
-        "Move the macro call outside all namespace declarations.");
+        "not inside any namespace { } block. Move the macro call outside all " \
+        "namespace declarations; a type declared in a namespace is named "     \
+        "qualified there, for example " macro_name "(game::Unit, ...).");
 
 #define XOFFSET_REGISTER_SCHEMA_NAME(Type, literal)                            \
     XOFFSET_CHECK_GLOBAL_NAMESPACE_("XOFFSET_REGISTER_SCHEMA_NAME")            \

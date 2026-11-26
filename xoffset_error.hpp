@@ -5,6 +5,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <new>
 #include <optional>
@@ -146,8 +147,13 @@ inline XFatalHandler set_fatal_handler(XFatalHandler handler) noexcept {
 }
 
 namespace detail {
+// Without a handler the failure is written to stderr before the abort, so
+// a crash always says what went wrong.
 [[noreturn]] inline void fatal(XErrc code, const char* message) noexcept {
     if (auto* handler = fatal_handler_slot().load()) handler(code, message);
+    std::fprintf(stderr, "XOffset fatal error (%s): %s\n", to_string(code),
+                 message && *message ? message : "(no message)");
+    std::fflush(stderr);
     std::abort();
 }
 template <class E>
@@ -362,6 +368,14 @@ struct XResultCopyStorage<T, true> : XResultStorage<T> {
 };
 } // namespace detail
 
+namespace detail {
+// The error an XResult with a value reports.
+XOFFSET_DETAIL_COLD inline const XError& empty_error() noexcept {
+    static const XError empty{};
+    return empty;
+}
+} // namespace detail
+
 template <class T>
 class XResult : private detail::XResultCopyStorage<T> {
     using Base = detail::XResultCopyStorage<T>;
@@ -381,14 +395,17 @@ public:
     T& value() & { require_value(); return this->value_; }
     const T& value() const& { require_value(); return this->value_; }
     T&& value() && { require_value(); return std::move(this->value_); }
-    XOFFSET_DETAIL_INLINE T& operator*() & noexcept { return this->value_; }
-    XOFFSET_DETAIL_INLINE const T& operator*() const& noexcept { return this->value_; }
-    XOFFSET_DETAIL_INLINE T&& operator*() && noexcept { return std::move(this->value_); }
-    XOFFSET_DETAIL_INLINE T* operator->() noexcept { return &this->value_; }
-    XOFFSET_DETAIL_INLINE const T* operator->() const noexcept { return &this->value_; }
-    // Valid only without a value.
-    const XError& error() const& noexcept { return this->error_; }
-    XError&& error() && noexcept { return std::move(this->error_); }
+    // Unchecked access, like std::optional and std::expected: only with a
+    // value. Builds without NDEBUG (and XOFFSET_HARDENED=1 builds) check it
+    // and fail as value() does.
+    XOFFSET_DETAIL_INLINE T& operator*() & noexcept { debug_require(); return this->value_; }
+    XOFFSET_DETAIL_INLINE const T& operator*() const& noexcept { debug_require(); return this->value_; }
+    XOFFSET_DETAIL_INLINE T&& operator*() && noexcept { debug_require(); return std::move(this->value_); }
+    XOFFSET_DETAIL_INLINE T* operator->() noexcept { debug_require(); return &this->value_; }
+    XOFFSET_DETAIL_INLINE const T* operator->() const noexcept { debug_require(); return &this->value_; }
+    // The error; an empty XError (code ok, no message) when there is a value.
+    const XError& error() const& noexcept { return this->has_value_ ? detail::empty_error() : this->error_; }
+    XError error() && noexcept { return this->has_value_ ? XError{} : std::move(this->error_); }
     XErrc code() const noexcept { return this->has_value_ ? XErrc::ok : this->error_.code; }
 
 private:
@@ -401,6 +418,12 @@ private:
     }
     XOFFSET_DETAIL_INLINE void require_value() const {
         if (!this->has_value_) XOFFSET_DETAIL_UNLIKELY fail_require();
+    }
+    XOFFSET_DETAIL_INLINE void debug_require() const noexcept {
+#if !defined(NDEBUG) || XOFFSET_HARDENED
+        if (!this->has_value_) XOFFSET_DETAIL_UNLIKELY detail::fatal(this->error_.code,
+            ("XResult: operator* or -> without a value: " + this->error_.message).c_str());
+#endif
     }
 };
 
@@ -436,9 +459,9 @@ public:
 
     XOFFSET_DETAIL_INLINE bool has_value() const noexcept { return !has_error_; }
     XOFFSET_DETAIL_INLINE explicit operator bool() const noexcept { return !has_error_; }
-    const XError& error() const& noexcept { return has_error_ ? error_ : ok_error(); }
-    // Valid only without a value.
-    XError&& error() && noexcept { return std::move(error_); }
+    const XError& error() const& noexcept { return has_error_ ? error_ : detail::empty_error(); }
+    // The error; an empty XError (code ok, no message) when there is none.
+    XError error() && noexcept { return has_error_ ? std::move(error_) : XError{}; }
     XOFFSET_DETAIL_INLINE XErrc code() const noexcept { return has_error_ ? error_.code : XErrc::ok; }
 
 private:
@@ -446,10 +469,6 @@ private:
         ::new (static_cast<void*>(&error_)) XError(std::move(error));
     }
     XOFFSET_DETAIL_COLD void destroy_error() noexcept { error_.~XError(); }
-    XOFFSET_DETAIL_COLD static const XError& ok_error() noexcept {
-        static const XError empty{};
-        return empty;
-    }
 
     union {
         char ok_;

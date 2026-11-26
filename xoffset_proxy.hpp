@@ -102,16 +102,31 @@ namespace proxy_detail {
         bool live() const noexcept { return live_at(ctl, version); }
         // Records a failure in the buffer (the first one stays).
         static XOFFSET_DETAIL_NOINLINE void fail_at(detail::XCtl* ctl, std::uint64_t version, XErrc code) noexcept {
-            if (live_at(ctl, version) && ctl->sticky == XErrc::ok) {
+            if (!live_at(ctl, version)) {
+                if (!stale_of_live(ctl, version)) return;
+                code = XErrc::stale;
+            }
+            if (ctl->sticky == XErrc::ok) {
                 ctl->sticky = code;
                 if (ctl->core) ctl->core->failure_recorded();
             }
         }
-        // A write through a proxy that names nothing: out_of_range, or
-        // stale (nothing recorded) when its buffer is gone.
+        // The proxy is of content its buffer has since replaced (reload,
+        // reset, clone_into), and that buffer is still alive.
+        static bool stale_of_live(const detail::XCtl* ctl, std::uint64_t version) noexcept {
+            return !(ctl->version & 1u) && ctl->base && version >= ctl->acquired && version < ctl->birth;
+        }
+        // A write through a proxy that names nothing: out_of_range; stale
+        // when the proxy is of the buffer's replaced content (so the
+        // dropped write is not silent: the buffer refuses to send until
+        // clear_error()); nothing recorded when its buffer is gone.
         static XOFFSET_DETAIL_NOINLINE void miss_at(detail::XCtl* ctl, std::uint64_t version) noexcept {
-            if (live_at(ctl, version) && ctl->sticky == XErrc::ok) {
-                ctl->sticky = XErrc::out_of_range;
+            XErrc code;
+            if (live_at(ctl, version)) code = XErrc::out_of_range;
+            else if (stale_of_live(ctl, version)) code = XErrc::stale;
+            else return;
+            if (ctl->sticky == XErrc::ok) {
+                ctl->sticky = code;
                 if (ctl->core) ctl->core->failure_recorded();
             }
         }
@@ -528,7 +543,11 @@ namespace proxy_detail {
 template <class T, class Path>
 class XRef<T, Path, proxy_detail::Kind::value> : public proxy_detail::RefBase<T, Path> {
     using Base = proxy_detail::RefBase<T, Path>;
-    static_assert(std::is_trivially_copyable_v<T>, "XRef: a value proxy needs a trivially copyable type");
+    static_assert(!std::is_class_v<T> || std::is_trivially_copyable_v<T>,
+        "XRef<T>: T is a struct with library containers (XString, XVector, ...) but no field "
+        "list: add XOFFSET_RECORD(T, members...) at global scope after its definition");
+    static_assert(std::is_class_v<T> || std::is_trivially_copyable_v<T>,
+        "XRef: a value proxy needs a trivially copyable type");
 
 public:
     using value_type = T;

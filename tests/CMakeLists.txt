@@ -483,6 +483,15 @@ add_test(NAME test_no_exceptions_noexc_fatal COMMAND test_no_exceptions_noexc --
 set_tests_properties(test_no_exceptions_fatal test_no_exceptions_noexc_fatal PROPERTIES
     LABELS "reflection;no-exceptions"
     PASS_REGULAR_EXPRESSION "fatal no_root: root<T>\\(\\): typed root access requires")
+add_test(NAME test_no_exceptions_fatal_save COMMAND test_no_exceptions --fatal-save)
+add_test(NAME test_no_exceptions_noexc_fatal_save COMMAND test_no_exceptions_noexc --fatal-save)
+set_tests_properties(test_no_exceptions_fatal_save test_no_exceptions_noexc_fatal_save PROPERTIES
+    LABELS "reflection;no-exceptions"
+    PASS_REGULAR_EXPRESSION "fatal capacity_exceeded: the buffer has a recorded failure \\(capacity_exceeded\\)")
+add_test(NAME test_no_exceptions_noexc_fatal_default COMMAND test_no_exceptions_noexc --fatal-default)
+set_tests_properties(test_no_exceptions_noexc_fatal_default PROPERTIES
+    LABELS "reflection;no-exceptions"
+    PASS_REGULAR_EXPRESSION "XOffset fatal error \\(out_of_storage\\): default handler message")
 
 # G5/F4: the libFuzzer harnesses linked with fuzz/replay_main.cpp instead of
 # libFuzzer, so every compiler builds them (independent of XOFFSET_BUILD_FUZZERS).
@@ -628,7 +637,11 @@ set(XOFFSET_SCHEMA_DESCRIBE_FAIL_TESTS
     "duplicate|list every member once, in declaration order"
     "array|the list does not name every non-static data member"
     "padding|the list does not name every non-static data member"
-    "undescribed|this record has no field list")
+    "undescribed|this record has no field list"
+    "namespace|XOFFSET_RECORD must be used at global namespace scope"
+    "std_string|is a std::string or std::string_view: use XString"
+    "pointer|holds a pointer or smart pointer"
+    "proxy_undescribed|but no field list: add XOFFSET_RECORD")
 if(NOT XOFFSET_SCHEMA_BACKEND STREQUAL "describe" AND
    (NOT DEFINED XOFFSET_CXX_STANDARD OR XOFFSET_CXX_STANDARD STREQUAL "26"))
     list(APPEND XOFFSET_SCHEMA_DESCRIBE_FAIL_TESTS
