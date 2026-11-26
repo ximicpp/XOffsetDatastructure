@@ -51,7 +51,12 @@ struct Client {
             path.push_back(x * i / (hops + 1));
             path.push_back(y * i / (hops + 1));
         }
-        out.save_verified_into(wire, XSaveOptions{.emission = XWireEmission::dense});
+        // The XStatus entry: also usable without exceptions. A failed order
+        // (out.error() says why) leaves nothing to send.
+        if (XStatus s = out.try_save_verified_into(wire, XSaveOptions{.emission = XWireEmission::dense}); !s) {
+            std::fprintf(stderr, "order not sent: %s\n", s.error().message.c_str());
+            wire.clear();
+        }
         return wire;
     }
 };

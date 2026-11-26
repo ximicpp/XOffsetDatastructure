@@ -325,8 +325,10 @@ void fixed_cases() {
     src.touch_set(r.epoch, r.epoch + 1);
     bool refused = false;
 #if XOFFSET_NO_EXCEPTIONS
-    st = src.save_delta_into(d, base);
-    refused = d.empty();
+    // save_delta_into would call the fatal handler; the XResult entry
+    // reports the failure.
+    const auto tried = src.try_save_delta_into(d, base);
+    refused = !tried && tried.code() == xo::XErrc::out_of_storage && d.empty();
 #else
     try {
         (void)src.save_delta_into(d, base);

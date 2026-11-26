@@ -19,6 +19,29 @@ of this file and in the pull requests.
   storage size defaults moved from `xoffset_slot_storage.hpp` to `xoffset_config.hpp` unchanged.
   Tests: `config_check_same`, `config_check_{scrub,uplink,slot}_fail`.
 
+Misuse fails loudly (new-user API review of 2.0.0):
+
+- No-exception builds: without a fatal handler, `detail::fatal` now writes the code and message to
+  `stderr` before `abort()`. `save_verified_into`, `save_compact_into` and `save_delta_into` on a
+  buffer with a recorded failure call the fatal handler instead of returning an empty wire (with
+  exceptions they throw, as before); `examples/client_uplink.cpp` sends with
+  `try_save_verified_into`.
+- A write through a proxy of replaced content (after `reset`, `reload`, `clone_into`) records
+  `XErrc::stale` in the buffer, so it refuses to send until `clear_error()` (before, the write was
+  dropped and `ok()` stayed true). A proxy of a destroyed buffer still records nothing.
+- `XResult<T>::error()` on a result with a value returns an empty `XError` (it read an inactive
+  union member); `error() &&` returns `XError` by value. `*r` / `r->` without a value call the fatal
+  handler in builds without `NDEBUG` and in `XOFFSET_HARDENED=1` builds.
+- Compile errors: the global-scope check of `XOFFSET_RECORD` and the other registration macros now
+  fires inside a namespace (it always passed) and shows the qualified spelling; a buffer, wire or
+  compaction of a record with a `std::string`, `std::vector`, `std::map`, `std::optional`,
+  `std::variant` or pointer member (directly or nested) fails first with an error that names the
+  member and the type to use; a proxy of a record without a field list asks for
+  `XOFFSET_RECORD`; the wire admission asserts and the base-class assert of wire types have readable
+  messages; an incomplete field list no longer also reports a misleading natural-layout error.
+
+## 2.0.0: first public SemVer release (XOffset V2)
+
 ## 2.0.0-preview.1: first public preview of XOffset V2
 
 First public preview of the XOffset V2 architecture, published on 2026-11-25 as `2.0.0` and renamed

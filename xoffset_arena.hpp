@@ -397,6 +397,10 @@ namespace XOffsetDatastructure {
             std::uint64_t version = 1;
             char* base = nullptr;
             std::uint64_t birth = 0;
+            // The version when this buffer took the block (acquire): proxies
+            // at or above it and below `birth` are of this buffer's earlier
+            // content (see stale_of_live).
+            std::uint64_t acquired = 0;
             XBufferCore* core = nullptr;
             std::uint32_t borrow = 0;      // open pin scopes (read/edit)
             XErrc sticky = XErrc::ok;      // the first failure (fail-soft)
@@ -419,6 +423,7 @@ namespace XOffsetDatastructure {
                 ctl->next_free = nullptr;
                 ctl->version = (ctl->version | 1u) + 1u;
                 ctl->birth = ctl->version;
+                ctl->acquired = ctl->version;
                 ctl->borrow = 0;
                 ctl->sticky = XErrc::ok;
                 return ctl;
@@ -974,7 +979,8 @@ namespace XOffsetDatastructure {
 
         // A buffer with a recorded failure emits nothing: `out` is cleared
         // and, with exceptions, XException(error()) is thrown; without them
-        // the entry returns (true here) and the caller sees an empty wire.
+        // the fatal handler is called, as for any other failure the entry
+        // cannot return (the try_* entries return the error instead).
         XOFFSET_DETAIL_INLINE bool refuse_failed_emit(std::string& out) {
             if (!emit_failed()) [[likely]] return false;
             return refuse_failed_emit_slow(out);
@@ -982,12 +988,12 @@ namespace XOffsetDatastructure {
         XOFFSET_DETAIL_INLINE bool emit_failed() const noexcept { return ctl_ && ctl_->sticky != XErrc::ok; }
         XOFFSET_DETAIL_NOINLINE bool refuse_failed_emit_slow(std::string& out) {
             out.clear();
+            const std::string message = std::string("the buffer has a recorded failure (") +
+                to_string(ctl_->sticky) + "); it emits no wire until clear_error()";
 #if XOFFSET_NO_EXCEPTIONS
-            return true;
+            detail::fatal(ctl_->sticky, message.c_str());
 #else
-            throw XException(ctl_->sticky,
-                std::string("the buffer has a recorded failure (") + to_string(ctl_->sticky) +
-                "); it emits no wire until clear_error()");
+            throw XException(ctl_->sticky, message);
 #endif
         }
         XOFFSET_DETAIL_INLINE detail::vstatus refuse_failed_emit_v(std::string& out) {

@@ -96,6 +96,22 @@ namespace XOffsetDatastructure {
         // compilers or flags disagree about them, so a record with any of them
         // is not admitted. alignas on the record itself (at most 8) is standard
         // and is kept: it only raises the alignment and the rounded size.
+        // False only when T's field list does not name every member in
+        // order (XOFFSET_RECORD reports that; the layout check would then
+        // fail too and only repeat it with a misleading reason).
+        template <typename T>
+        consteval bool field_list_complete() {
+#if !XOFFSET_SCHEMA_REFLECTION
+            if constexpr (schema::is_described_v<T>)
+                return schema::describe_detail::offsets_ascending<T>() &&
+                       schema::describe_detail::covers_all_members<T>();
+            else
+                return true;
+#else
+            return true;
+#endif
+        }
+
         template <typename T>
         consteval bool natural_record_layout() {
             return []<std::size_t... I>(std::index_sequence<I...>) {
@@ -2157,6 +2173,65 @@ namespace XOffsetDatastructure {
     }
 
     namespace detail {
+        // Walks the members (and container elements) of a type about to be
+        // put in an arena or on the wire, and fails at the first member of
+        // a std or pointer type with a message that names the replacement;
+        // the instantiation context names the member. ::value is true.
+        // Seen holds the records on the current path, so a recursive local
+        // type (a record holding an XVector of itself) ends the walk.
+        template <typename... Seen>
+        struct explain_seen {};
+        template <typename T, typename Seen>
+        struct explain_member_types;
+        template <typename T, typename Seen>
+        struct explain_member_types_of;
+        template <typename T, typename... Seen>
+        struct explain_member_types_of<T, explain_seen<Seen...>> {
+            template <std::size_t... I>
+            static constexpr bool walk(std::index_sequence<I...>) {
+                return ((schema::describe_detail::member_type_check<
+                             schema::member_t<T, I>,
+                             schema::describe_detail::member_hint_v<schema::member_type_t<T, I>>>::value &&
+                         explain_member_types<std::remove_cv_t<schema::member_type_t<T, I>>,
+                                              explain_seen<Seen..., T>>::value) && ...);
+            }
+        };
+        template <typename T, typename... Seen>
+        struct explain_member_types<T, explain_seen<Seen...>> {
+            static constexpr bool value = [] {
+                if constexpr ((std::is_same_v<T, Seen> || ...))
+                    return true;
+                else if constexpr (schema::describe_detail::member_hint_v<T> != schema::describe_detail::member_hint::none)
+                    return true;   // reported at the member that holds it
+                else if constexpr (std::is_array_v<T>)
+                    return explain_member_types<std::remove_cv_t<std::remove_all_extents_t<T>>,
+                                                explain_seen<Seen...>>::value;
+                else if constexpr (std::is_class_v<T> && std::is_aggregate_v<T> && schema::is_described_v<T> &&
+                                   !std::is_base_of_v<XString, T>)
+                    return explain_member_types_of<T, explain_seen<Seen...>>::walk(
+                        std::make_index_sequence<schema::member_count_v<T>>{});
+                else
+                    return true;
+            }();
+        };
+        template <typename E, typename... Seen>
+        struct explain_member_types<XVector<E>, explain_seen<Seen...>>
+            : explain_member_types<std::remove_cv_t<E>, explain_seen<Seen...>> {};
+        template <typename E, typename... Seen>
+        struct explain_member_types<XSet<E>, explain_seen<Seen...>>
+            : explain_member_types<std::remove_cv_t<E>, explain_seen<Seen...>> {};
+        template <typename K, typename V, typename... Seen>
+        struct explain_member_types<XMap<K, V>, explain_seen<Seen...>> {
+            static constexpr bool value = explain_member_types<K, explain_seen<Seen...>>::value &&
+                                          explain_member_types<V, explain_seen<Seen...>>::value;
+        };
+        // True, after the member walk above (checked before any other
+        // property of T, so a std or pointer member is the first error).
+        template <typename T>
+        inline constexpr bool member_types_explained_v = explain_member_types<std::remove_cv_t<T>, explain_seen<>>::value;
+    } // namespace detail
+
+    namespace detail {
         template <typename>
         inline constexpr bool wire_explain_false = false;
 
@@ -2260,7 +2335,7 @@ namespace XOffsetDatastructure {
                         "the same access control).");
                     return false;
                 } else if constexpr (!natural_record_layout<U>()) {
-                    static_assert(wire_explain_false<U>,
+                    static_assert(wire_explain_false<U> || !field_list_complete<U>(),
                         "XOffset wire schema: this record does not have the natural layout (each member "
                         "at the next offset its type's alignment allows, the size rounded up to the "
                         "record's alignment). #pragma pack, /Zp, -fpack-struct, alignas on a member, "

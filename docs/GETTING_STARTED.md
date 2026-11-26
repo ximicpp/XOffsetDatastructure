@@ -88,7 +88,8 @@ XOFFSET_PIN_SCHEMA(WorldView, "record[s:40,a:8]{...}");     // pinned layout, se
 - Plain aggregates, with the library's containers `XString`, `XVector`, `XSet`, `XMap`; no pointers or
   `std::` containers, and fixed-width scalar types
   ([user guide section 2.2](USER_GUIDE.md#22-portable-scalars)).
-- One `XOFFSET_RECORD` line per record, at global scope (it cannot go inside a namespace). C++20 builds
+- One `XOFFSET_RECORD` line per record, at global scope (it cannot go inside a namespace; for a type
+  declared in a namespace write the qualified name, `XOFFSET_RECORD(game::Unit, ...)`). C++20 builds
   get the fields from it and C++26 builds check it with reflection; both builds write the same bytes.
 - Register a schema name for each root type (the root of a message), then pin its layout with
   `XOFFSET_PIN_SCHEMA`: when any compiler computes a layout different from the pinned text, compilation
@@ -167,7 +168,7 @@ Data sent by clients is untrusted input.
 // Client: one send buffer, reused.
 auto o = out.reset();
 o.unit_id() = unit; o.to_x() = x; o.to_y() = y;
-out.save_verified_into(wire, XSaveOptions{.emission = XWireEmission::dense});
+if (!out.try_save_verified_into(wire, XSaveOptions{.emission = XWireEmission::dense})) return;  // out.error()
 
 // Server: bounds tier, read-only in place, no copy; then check the content against the game rules.
 XReceiver<XLink::from_client> up{XBuffer::maximum_capacity(4096)};

@@ -260,6 +260,18 @@ bool test_xbuffer_moves_and_lifetime() {
     t.reload_verified(wire);
     CHECK(!fresh.valid());
     CHECK(t.root().field<&Root::counter>().get() == 5);
+    CHECK(t.ok());
+    // A write through a proxy of replaced content is dropped and recorded
+    // as stale, so the buffer refuses to send until clear_error().
+    old = 6;
+    CHECK(!t.ok() && t.error() == XErrc::stale);
+    std::string refused = "keep";
+    CHECK(!t.try_save_verified_into(refused) && refused.empty());
+    t.clear_error();
+    CHECK(t.ok() && t.root().field<&Root::counter>().get() == 5);
+    // A proxy of a buffer that is gone records nothing in another buffer
+    // that took over its control block.
+    CHECK(!ints.push_back(4) && t.ok());
     return true;
 }
 
@@ -469,7 +481,10 @@ bool test_failed_buffer_refuses_to_emit() {
     // Allocating operations fail once a failure is recorded.
     CHECK(!r.field<&Root::ints>().push_back(1) || r.field<&Root::ints>().capacity() > 0);
 #if XOFFSET_NO_EXCEPTIONS
-    CHECK(b.save_verified<Root>().empty());
+    // save_verified would call the fatal handler (test_no_exceptions
+    // --fatal-save); the XStatus entry reports the failure.
+    auto refused = b.try_save_verified<Root>();
+    CHECK(!refused && refused.code() == XErrc::out_of_range);
 #else
     bool refused = false;
     try {
