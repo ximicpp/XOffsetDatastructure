@@ -46,7 +46,7 @@ namespace detail {
 
     template<class T>
     vstatus VerifiedPathsAccess::header_v(XBufferCore& source, XWireHeader& out_header) {
-        static_assert(is_wire_admitted_v<T>,
+        static_assert(member_types_explained_v<T> && is_wire_admitted_v<T>,
             "XOffset: T cannot be sent or received: it is not an admitted wire type. The other errors "
             "of this build say why (a member type, a base class, the layout, or a missing field list).");
 #ifdef XOFFSET_REJECT_IMPLICIT_PADDING
@@ -159,7 +159,7 @@ namespace detail {
     template<class T, bool Band>
     XOFFSET_DETAIL_INLINE bool VerifiedPathsAccess::save_small_into(XBufferCore& source, std::string& out,
                                                                         XWireEmission emission) {
-        static_assert(is_wire_admitted_v<T>,
+        static_assert(member_types_explained_v<T> && is_wire_admitted_v<T>,
             "XOffset: T cannot be sent or received: it is not an admitted wire type. The other errors "
             "of this build say why (a member type, a base class, the layout, or a missing field list).");
 #ifdef XOFFSET_REJECT_IMPLICIT_PADDING
@@ -1422,7 +1422,7 @@ namespace detail {
     template<class T, class... M>
     vstatus VerifiedPathsAccess::save_composed_into_v(XBufferCore& source, std::string& out, XCompactOptions options,
                                                       const XAssign<M>&... assigns) {
-        static_assert(is_wire_admitted_v<T>,
+        static_assert(member_types_explained_v<T> && is_wire_admitted_v<T>,
             "XOffset: T cannot be sent or received: it is not an admitted wire type. The other errors "
             "of this build say why (a member type, a base class, the layout, or a missing field list).");
 #ifdef XOFFSET_REJECT_IMPLICIT_PADDING

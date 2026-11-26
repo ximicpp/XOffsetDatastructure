@@ -19,9 +19,10 @@ Misuse fails loudly (new-user API review of 2.0.0):
   union member); `error() &&` returns `XError` by value. `*r` / `r->` without a value call the fatal
   handler in builds without `NDEBUG` and in `XOFFSET_HARDENED=1` builds.
 - Compile errors: the global-scope check of `XOFFSET_RECORD` and the other registration macros now
-  fires inside a namespace (it always passed) and shows the qualified spelling; `XOFFSET_RECORD`
-  names a `std::string`, `std::vector`, `std::map`, `std::optional`, `std::variant` or pointer member
-  in its first error with the type to use; a proxy of a record without a field list asks for
+  fires inside a namespace (it always passed) and shows the qualified spelling; a buffer, wire or
+  compaction of a record with a `std::string`, `std::vector`, `std::map`, `std::optional`,
+  `std::variant` or pointer member (directly or nested) fails first with an error that names the
+  member and the type to use; a proxy of a record without a field list asks for
   `XOFFSET_RECORD`; the wire admission asserts and the base-class assert of wire types have readable
   messages; an incomplete field list no longer also reports a misleading natural-layout error.
 

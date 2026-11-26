@@ -253,7 +253,7 @@ namespace XOffsetDatastructure {
     private:
         template <typename T>
         detail::vstatus make_v() {
-            static_assert(is_byte_copy_safe_v<T>,
+            static_assert(detail::member_types_explained_v<T> && is_byte_copy_safe_v<T>,
                 "Type is not byte-copy safe. "
                 "Allowed: primitives, XString, XVector<T>, XMap<K,V>, XSet<T>, "
                 "or structs composed of these.");
@@ -287,7 +287,7 @@ namespace XOffsetDatastructure {
         // make<T>()'s body; reset<T>() inlines it after its reset_arena.
         template<typename T>
         XOFFSET_DETAIL_INLINE T* make_inline() {
-            static_assert(is_byte_copy_safe_v<T>,
+            static_assert(detail::member_types_explained_v<T> && is_byte_copy_safe_v<T>,
                 "Type is not byte-copy safe. "
                 "Allowed: primitives, XString, XVector<T>, XMap<K,V>, XSet<T>, "
                 "or structs composed of these.");
@@ -649,7 +649,7 @@ namespace XOffsetDatastructure {
 
         template<typename T>
         XArenaAllocator<T> allocator() {
-            static_assert(is_byte_copy_safe_v<T>,
+            static_assert(detail::member_types_explained_v<T> && is_byte_copy_safe_v<T>,
                 "Type is not byte-copy safe.");
             return XArenaAllocator<T>(this->arena());
         }

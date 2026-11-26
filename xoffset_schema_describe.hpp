@@ -183,38 +183,31 @@ namespace XOffsetDatastructure::schema {
 
         // One readable error per member of a type that cannot be in an
         // arena; the compiler names the member in the instantiation context
-        // (fields<Record>::field_<member>).
+        // (fields<Record>::field_<member>). Checked where a type enters an
+        // arena or the wire (explain_member_types in xoffset_wire.hpp), not
+        // by XOFFSET_RECORD: a field list alone may describe any record.
         template <class Field, member_hint H>
         struct member_type_check {
             static_assert(H != member_hint::pointer,
-                "XOFFSET_RECORD: the member named in fields<Record>::field_<member> above holds a "
+                "XOffset: the member named in fields<Record>::field_<member> above holds a "
                 "pointer or smart pointer; an arena holds no addresses: store an index or id");
             static_assert(H != member_hint::string,
-                "XOFFSET_RECORD: the member named in fields<Record>::field_<member> above is a "
+                "XOffset: the member named in fields<Record>::field_<member> above is a "
                 "std::string or std::string_view: use XString");
             static_assert(H != member_hint::sequence,
-                "XOFFSET_RECORD: the member named in fields<Record>::field_<member> above is a "
+                "XOffset: the member named in fields<Record>::field_<member> above is a "
                 "std::vector or std::span; use XVector");
             static_assert(H != member_hint::map,
-                "XOFFSET_RECORD: the member named in fields<Record>::field_<member> above is a "
+                "XOffset: the member named in fields<Record>::field_<member> above is a "
                 "std::map or std::unordered_map; use XMap (or XSet)");
             static_assert(H != member_hint::optional,
-                "XOFFSET_RECORD: the member named in fields<Record>::field_<member> above is a "
+                "XOffset: the member named in fields<Record>::field_<member> above is a "
                 "std::optional, which is not supported; use a presence flag next to the value");
             static_assert(H != member_hint::variant,
-                "XOFFSET_RECORD: the member named in fields<Record>::field_<member> above is a "
+                "XOffset: the member named in fields<Record>::field_<member> above is a "
                 "std::variant, which is not supported; use a kind tag and one member per alternative");
             static constexpr bool value = H == member_hint::none;
         };
-
-        template <class T>
-        consteval bool member_types_supported() {
-            using D = description<T>;
-            return []<std::size_t... I>(std::index_sequence<I...>) {
-                return (member_type_check<typename D::template member<I>,
-                                          member_hint_v<typename D::template member<I>::type>>::value && ...);
-            }(std::make_index_sequence<D::member_count>{});
-        }
 
         template <class T>
         consteval bool fields_belong_to() {
@@ -360,8 +353,6 @@ namespace XOffsetDatastructure {
     XOFFSET_SCHEMA_DETAIL_ACCESSORS(T, __VA_ARGS__)
 
 #define XOFFSET_SCHEMA_DETAIL_COMPLETE(macro, T)                               \
-    static_assert(::XOffsetDatastructure::schema::describe_detail::member_types_supported<T>(), \
-        macro "(" #T ", ...): a member type cannot be in an arena (see the error above)"); \
     static_assert(::std::is_class_v<T> && !::std::is_union_v<T>,              \
         macro "(" #T ", ...): " #T " must be a class type, not a union");      \
     static_assert(::std::is_aggregate_v<T>,                                    \

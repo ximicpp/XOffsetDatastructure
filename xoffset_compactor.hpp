@@ -29,7 +29,7 @@ namespace XOffsetDatastructure {
         // 3x, 4x multipliers, retrying on out_of_storage without aborting.
         template<typename T>
         static XResult<XBuffer> try_compact(XBufferCore& old_xbuf) {
-            static_assert(is_byte_copy_safe_v<T>,
+            static_assert(detail::member_types_explained_v<T> && is_byte_copy_safe_v<T>,
                 "Type is not byte-copy safe.");
             const auto stats = memory_stats(old_xbuf);
             auto* old_obj = detail::find_root<T>(old_xbuf);

@@ -2173,6 +2173,51 @@ namespace XOffsetDatastructure {
     }
 
     namespace detail {
+        // Walks the members (and container elements) of a type about to be
+        // put in an arena or on the wire, and fails at the first member of
+        // a std or pointer type with a message that names the replacement;
+        // the instantiation context names the member. ::value is true.
+        template <typename T, typename = void>
+        struct explain_member_types;
+        template <typename T>
+        struct explain_member_types_of {
+            template <std::size_t... I>
+            static constexpr bool walk(std::index_sequence<I...>) {
+                return ((schema::describe_detail::member_type_check<
+                             schema::member_t<T, I>,
+                             schema::describe_detail::member_hint_v<schema::member_type_t<T, I>>>::value &&
+                         explain_member_types<std::remove_cv_t<schema::member_type_t<T, I>>>::value) && ...);
+            }
+        };
+        template <typename T, typename>
+        struct explain_member_types {
+            static constexpr bool value = [] {
+                if constexpr (schema::describe_detail::member_hint_v<T> != schema::describe_detail::member_hint::none)
+                    return true;   // reported at the member that holds it
+                else if constexpr (std::is_array_v<T>)
+                    return explain_member_types<std::remove_cv_t<std::remove_all_extents_t<T>>>::value;
+                else if constexpr (std::is_class_v<T> && std::is_aggregate_v<T> && schema::is_described_v<T> &&
+                                   !std::is_base_of_v<XString, T>)
+                    return explain_member_types_of<T>::walk(std::make_index_sequence<schema::member_count_v<T>>{});
+                else
+                    return true;
+            }();
+        };
+        template <typename E>
+        struct explain_member_types<XVector<E>> : explain_member_types<std::remove_cv_t<E>> {};
+        template <typename E>
+        struct explain_member_types<XSet<E>> : explain_member_types<std::remove_cv_t<E>> {};
+        template <typename K, typename V>
+        struct explain_member_types<XMap<K, V>> {
+            static constexpr bool value = explain_member_types<K>::value && explain_member_types<V>::value;
+        };
+        // True, after the member walk above (checked before any other
+        // property of T, so a std or pointer member is the first error).
+        template <typename T>
+        inline constexpr bool member_types_explained_v = explain_member_types<std::remove_cv_t<T>>::value;
+    } // namespace detail
+
+    namespace detail {
         template <typename>
         inline constexpr bool wire_explain_false = false;
 
