@@ -1,7 +1,7 @@
 # How it works: a short example and the arena
 
-A first look at the API and at what the bytes in the arena are. The [README](../README.md) lists the
-core features and the performance numbers; [GETTING_STARTED.md](GETTING_STARTED.md) has one runnable
+A first look at the API and at what the bytes in the arena are. The [README](../README.md) has the
+quick start and the performance numbers; [GETTING_STARTED.md](GETTING_STARTED.md) has one runnable
 example per use case, and [USER_GUIDE.md](USER_GUIDE.md) is the full reference.
 
 ## A short example

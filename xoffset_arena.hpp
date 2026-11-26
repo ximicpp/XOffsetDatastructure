@@ -2878,6 +2878,13 @@ namespace XOffsetDatastructure {
             return init_from_wire(wire, size, cap.value, cap.pool, cap.storage, cap.reserve);
         }
 
+        // Fast fresh load of an admitted dense image into slot storage on a
+        // default-constructed buffer (load_admit_v fast path).
+        XOFFSET_DETAIL_INLINE bool init_slot_image_direct(std::size_t cls, size_type max_reserved, bool movable,
+                                                          const char* image, size_type size) noexcept {
+            return buffer_.take_slot_copy(cls, max_reserved, movable, image, size, this);
+        }
+
         // In-place reload/reset (XBuffer::reload_verified / reset). The
         // mapping, the payload address and therefore the owner registration
         // are kept; every typed pointer into the old content is invalidated

@@ -420,6 +420,38 @@ public:
         return true;
     }
 
+    // Fresh dense load directly into a slot of class `cls` on an empty owner:
+    // combines take_slot + assign_bytes + owner publication without a temporary
+    // VirtualMemoryStorage or move. Checks both Reserve and Prepare injection.
+    XOFFSET_DETAIL_INLINE bool take_slot_copy(std::size_t cls, std::size_t maximum_capacity, bool movable,
+                                              const char* bytes, std::size_t length, void* host_owner) noexcept {
+        if (consume_vm_failure(VmOperation::Reserve)) [[unlikely]] return false;
+        SlotHeader* slot = SlotSlab::acquire(cls);
+        if (!slot) [[unlikely]] return false;
+        if (consume_vm_failure(VmOperation::Prepare)) [[unlikely]] {
+            SlotSlab::release(slot);
+            return false;
+        }
+        char* const payload = slot->payload();
+        const std::size_t accessible = SlotGeometry::payload_bytes(cls);
+        base_ = payload;
+        logical_bytes_ = length;
+        reserved_bytes_ = SlotGeometry::slot_bytes(cls);
+        maximum_capacity_ = maximum_capacity;
+        accessible_bytes_ = accessible;
+        zero_from_ = slot->dirty_end < length ? length : slot->dirty_end;
+        page_size_ = reservation_granularity_ = SlotSlab::page_size();
+        slot_class_ = static_cast<std::uint8_t>(cls);
+        movable_ = movable;
+        if (movable) {
+            const std::size_t reach = accessible < maximum_capacity ? accessible : maximum_capacity;
+            stay_end_ = static_cast<std::uint32_t>(reach / 2);
+        }
+        slot->owner = host_owner;
+        std::memcpy(payload, bytes, length);
+        return true;
+    }
+
     // The largest logical length this owner reaches without moving: a
     // slot's payload, or a VM owner's reservation (at most the maximum).
     std::size_t reservation_limit() const noexcept {
@@ -545,7 +577,16 @@ public:
         return vok();
     }
 
-    ~VirtualMemoryStorage() { release(); }
+    XOFFSET_DETAIL_INLINE ~VirtualMemoryStorage() {
+        if (is_slot()) [[likely]] {
+            auto* slot = SlotHeader::from_payload(base_);
+            slot->owner = nullptr;
+            slot->dirty_end = zero_from_ < accessible_bytes_ ? zero_from_ : accessible_bytes_;
+            SlotSlab::release(slot);
+            return;
+        }
+        if (base_ || pool_.state_) release();
+    }
 
     VirtualMemoryStorage(const VirtualMemoryStorage&) = delete;
     VirtualMemoryStorage& operator=(const VirtualMemoryStorage&) = delete;

@@ -803,13 +803,127 @@ namespace XOffsetDatastructure {
         }
 
         template <typename T>
-        std::string save_verified(XSaveOptions options = {}) {
+        XOFFSET_DETAIL_INLINE std::string save_verified(XSaveOptions options = {}) {
             static_assert(::XOffsetDatastructure::detail::explain_wire_admission<std::remove_cvref_t<T>>(),
                 "save_verified<T>() requires an admitted fixed-schema wire type.");
 #ifdef XOFFSET_REJECT_IMPLICIT_PADDING
             static_assert(!has_implicit_padding_v<T>,
                 "XOFFSET_REJECT_IMPLICIT_PADDING: the wire type has implicit padding (threat model T5/P3)");
 #endif
+            if (!this->emit_failed() && this->template root_is<T>() && this->send_flags_clear()) [[likely]] {
+                const auto* image = static_cast<const char*>(this->get_address());
+                const auto* arena = std::launder(reinterpret_cast<const arena_header*>(image));
+                const std::size_t used = arena->used_end;
+                constexpr std::size_t fast_max = std::size_t(1) << 20;
+                bool direct = used < fast_max;
+                if (direct) {
+                    if (options.emission == XWireEmission::automatic) {
+                        direct = arena->free_bytes < detail::wire_auto_compact_min_free;
+                        if (direct && used >= detail::wire_spare_scan_min) {
+                            if constexpr (detail::compact_direct_supported<T>()) {
+                                if (detail::VerifiedPathsAccess::auto_compact<T>(*this)) [[unlikely]] direct = false;
+                            }
+                        }
+                    } else if (options.emission == XWireEmission::free_runs) {
+                        direct = arena->free_bytes < detail::wire_auto_compact_min_free;
+                    } else if (options.emission == XWireEmission::zero_runs) {
+                        direct = used < detail::wire_zero_scan_min_payload;
+                    }
+                }
+                if (direct) [[likely]] {
+                    if constexpr (detail::save_self_check) {
+                        if (arena->magic != image_magic || used < root_at || used > this->get_size())
+                            XOFFSET_THROW(XException(XErrc::invalid_payload_header,
+                                                     "save_verified<T>(): payload header mismatch"));
+                    }
+                    return std::string(image, used);
+                }
+            }
+            return save_verified_general<T>(options);
+        }
+
+        static XBuffer load_unverified(XByteView bytes,
+                                       std::optional<MaximumCapacity> cap = std::nullopt) {
+            const std::span<const std::byte> data = bytes;
+            XBuffer xbuf = cap
+                ? XBuffer(reinterpret_cast<const char*>(data.data()), data.size_bytes(), *cap)
+                : XBuffer(reinterpret_cast<const char*>(data.data()), data.size_bytes());
+            xbuf.typed_root_access_allowed_ = false;
+            return xbuf;
+        }
+
+        static XBuffer load(XByteView data, std::optional<MaximumCapacity> cap = std::nullopt) {
+            return load_unverified(data, cap);
+        }
+
+        template <typename T>
+        static XBuffer load(XByteView data, std::optional<MaximumCapacity> cap = std::nullopt) {
+            return load_verified<T>(data, cap);
+        }
+
+        // `upstream` gives the validation bitmaps of a payload above 32 KiB
+        // (one block per call; a fresh context and bitmaps every call). It
+        // must be non-null and outlive this synchronous call.
+        template <typename T>
+        static XBuffer load_verified(XByteView data,
+                                     std::optional<MaximumCapacity> cap = std::nullopt,
+                                     XMemoryResource* upstream = default_memory_resource()) {
+            XBuffer xbuf;
+            XOFFSET_VREQUIRE(xbuf.load_verified_v<T>(data, cap, upstream));
+            return xbuf;
+        }
+
+        /// load_verified without exceptions: the buffer, or the code and
+        /// message load_verified would have thrown. Admission and
+        /// verification are exactly those of load_verified. Also available
+        /// in builds without exceptions (-fno-exceptions, /EHs-c-).
+        template <typename T>
+        static XResult<XBuffer> try_load_verified(XByteView data,
+                                                  std::optional<MaximumCapacity> cap = std::nullopt,
+                                                  XMemoryResource* upstream = default_memory_resource()) {
+            return detail::try_v_emplace<XBuffer>([&](XBuffer& xbuf) {
+                return xbuf.load_verified_v<T>(data, cap, upstream);
+            });
+        }
+
+        /// Verified load INTO this buffer, reusing its mapping, maximum
+        /// capacity and owner registration (no new reservation, pool round
+        /// trip or registry entry). Admission and verification are exactly
+        /// those of load_verified<T>(wire, this buffer's MaximumCapacity).
+        /// Every root reference, element pointer and borrowed span into the
+        /// previous content is invalidated; XHandles re-resolve. On any
+        /// failure the exception propagates and the buffer is left empty and
+        /// without typed root access (root<T>() throws) until a later
+        /// successful reload_verified or reset<T>(). Committed pages are kept
+        /// (see reclaim_tail_pages()).
+        /// Validation scratch for payloads above 32 KiB is retained by this
+        /// buffer (released with it or by release_reload_scratch()), so a
+        /// reload loop does not allocate host memory per message; smaller
+        /// payloads need none. A non-null `upstream` gives that scratch
+        /// instead, one block per call.
+        template <typename T>
+        void reload_verified(XByteView data, XMemoryResource* upstream = nullptr) {
+            XOFFSET_VREQUIRE(reload_into<T>(data, upstream));
+        }
+
+        /// reload_verified without exceptions: ok, or the code and message
+        /// reload_verified would have thrown. The buffer is left exactly as
+        /// reload_verified leaves it (empty, without typed root access, after
+        /// a failure).
+        template <typename T>
+        XStatus try_reload_verified(XByteView data, XMemoryResource* upstream = nullptr) {
+            return detail::try_v([&] { return reload_into<T>(data, upstream); });
+        }
+
+        /// Returns the retained reload scratch words to the host allocator.
+        void release_reload_scratch() noexcept {
+            // An open direct reload keeps its tables until it finishes.
+            if (reload_scratch_) reload_scratch_->release(!direct_reload_open_);
+        }
+
+    private:
+        template <typename T>
+        XOFFSET_DETAIL_NOINLINE std::string save_verified_general(XSaveOptions options) {
             {
                 std::string refused;
                 if (refuse_failed_emit(refused)) return refused;
@@ -852,85 +966,6 @@ namespace XOffsetDatastructure {
             return out;
         }
 
-        static XBuffer load_unverified(XByteView bytes,
-                                       std::optional<MaximumCapacity> cap = std::nullopt) {
-            const std::span<const std::byte> data = bytes;
-            XBuffer xbuf = cap
-                ? XBuffer(reinterpret_cast<const char*>(data.data()), data.size_bytes(), *cap)
-                : XBuffer(reinterpret_cast<const char*>(data.data()), data.size_bytes());
-            xbuf.typed_root_access_allowed_ = false;
-            return xbuf;
-        }
-
-        static XBuffer load(XByteView data, std::optional<MaximumCapacity> cap = std::nullopt) {
-            return load_unverified(data, cap);
-        }
-
-        template <typename T>
-        static XBuffer load(XByteView data, std::optional<MaximumCapacity> cap = std::nullopt) {
-            return load_verified<T>(data, cap);
-        }
-
-        // `upstream` gives the validation bitmaps of a payload above 32 KiB
-        // (one block per call; a fresh context and bitmaps every call). It
-        // must be non-null and outlive this synchronous call.
-        template <typename T>
-        static XBuffer load_verified(XByteView data,
-                                     std::optional<MaximumCapacity> cap = std::nullopt,
-                                     XMemoryResource* upstream = default_memory_resource()) {
-            XBuffer xbuf;
-            XOFFSET_VREQUIRE(xbuf.load_verified_v<T>(data, cap, upstream));
-            return xbuf;
-        }
-
-        /// load_verified without exceptions: the buffer, or the code and
-        /// message load_verified would have thrown. Admission and
-        /// verification are exactly those of load_verified. Also available
-        /// in builds without exceptions (-fno-exceptions, /EHs-c-).
-        template <typename T>
-        static XResult<XBuffer> try_load_verified(XByteView data,
-                                                  std::optional<MaximumCapacity> cap = std::nullopt,
-                                                  XMemoryResource* upstream = default_memory_resource()) {
-            XBuffer xbuf;
-            return detail::try_v_into(xbuf, [&] { return xbuf.load_verified_v<T>(data, cap, upstream); });
-        }
-
-        /// Verified load INTO this buffer, reusing its mapping, maximum
-        /// capacity and owner registration (no new reservation, pool round
-        /// trip or registry entry). Admission and verification are exactly
-        /// those of load_verified<T>(wire, this buffer's MaximumCapacity).
-        /// Every root reference, element pointer and borrowed span into the
-        /// previous content is invalidated; XHandles re-resolve. On any
-        /// failure the exception propagates and the buffer is left empty and
-        /// without typed root access (root<T>() throws) until a later
-        /// successful reload_verified or reset<T>(). Committed pages are kept
-        /// (see reclaim_tail_pages()).
-        /// Validation scratch for payloads above 32 KiB is retained by this
-        /// buffer (released with it or by release_reload_scratch()), so a
-        /// reload loop does not allocate host memory per message; smaller
-        /// payloads need none. A non-null `upstream` gives that scratch
-        /// instead, one block per call.
-        template <typename T>
-        void reload_verified(XByteView data, XMemoryResource* upstream = nullptr) {
-            XOFFSET_VREQUIRE(reload_into<T>(data, upstream));
-        }
-
-        /// reload_verified without exceptions: ok, or the code and message
-        /// reload_verified would have thrown. The buffer is left exactly as
-        /// reload_verified leaves it (empty, without typed root access, after
-        /// a failure).
-        template <typename T>
-        XStatus try_reload_verified(XByteView data, XMemoryResource* upstream = nullptr) {
-            return detail::try_v([&] { return reload_into<T>(data, upstream); });
-        }
-
-        /// Returns the retained reload scratch words to the host allocator.
-        void release_reload_scratch() noexcept {
-            // An open direct reload keeps its tables until it finishes.
-            if (reload_scratch_) reload_scratch_->release(!direct_reload_open_);
-        }
-
-    private:
         // save_compact_into past its reused-output path: the full checks,
         // then the general writer (measure, reserve, write).
         template <typename T>
@@ -974,8 +1009,11 @@ namespace XOffsetDatastructure {
                 if (!this->reload_image_in_place(reinterpret_cast<const char*>(data.data()), size)) [[unlikely]]
                     return reload_storage_failed();
                 XOFFSET_ROLLBACK_BEGIN
-                    XOFFSET_VTRY(finish_verified_load<T>(size, upstream ? upstream : detail::default_wire_upstream(),
-                                                         who, nullptr));
+                    auto* root_ptr = detail::image_root<T>(*this);
+                    XOFFSET_VTRY(detail::verify_loaded_image(*root_ptr, *this,
+                                                             upstream ? upstream : detail::default_wire_upstream(),
+                                                             nullptr, who));
+                    publish_loaded_root<T>(root_ptr);
                 XOFFSET_ROLLBACK_END(reset_arena(0))
                 return detail::vok();
             }
@@ -1002,12 +1040,41 @@ namespace XOffsetDatastructure {
         }
 
         // load_verified into this default-constructed buffer.
+        // Dense slot-sized images take the direct slot fast path + in-place
+        // graph verification; everything else falls through to
+        // load_verified_general.
         template <typename T>
-        detail::vstatus load_verified_v(std::span<const std::byte> data, std::optional<MaximumCapacity> cap,
-                                        XMemoryResource* upstream) {
+        XOFFSET_DETAIL_INLINE detail::vstatus load_verified_v(std::span<const std::byte> data,
+                                                              std::optional<MaximumCapacity> cap,
+                                                              XMemoryResource* upstream) {
             constexpr const char* who = "load_verified<T>()";
-            if (!upstream)
+            if (!upstream) [[unlikely]]
                 XOFFSET_VFAIL_STD(std::invalid_argument, XErrc::invalid_argument, "validation scratch: null upstream");
+            const std::size_t size = data.size_bytes();
+            const auto capacity = cap ? *cap : MaximumCapacity{DEFAULT_MAXIMUM_CAPACITY};
+            if (admit_image<T>(data) && size <= capacity.value && capacity.value <= MAX_PAYLOAD &&
+                capacity.growth == XGrowPolicy::Explicit && !capacity.pool.enabled() &&
+                capacity.storage != XStorage::Pinned && detail::SlotGeometry::enabled &&
+                size <= SLOT_MAX) [[likely]] {
+                const bool movable = capacity.value > detail::SlotGeometry::max_payload;
+                const std::size_t cls = detail::SlotGeometry::class_for(movable ? size : capacity.value);
+                if (!this->init_slot_image_direct(cls, capacity.value, movable,
+                                                  reinterpret_cast<const char*>(data.data()), size)) [[unlikely]] {
+                    XOFFSET_VFAIL(XBadAlloc, XErrc::out_of_storage, detail::arena_failure_message);
+                }
+                auto* root_ptr = detail::image_root<T>(*this);
+                XOFFSET_VTRY(detail::verify_loaded_image(*root_ptr, *this, upstream, nullptr, who));
+                publish_loaded_root<T>(root_ptr);
+                return detail::vok();
+            }
+            return load_verified_general<T>(data, cap, upstream);
+        }
+
+        template <typename T>
+        XOFFSET_DETAIL_NOINLINE detail::vstatus load_verified_general(std::span<const std::byte> data,
+                                                                      std::optional<MaximumCapacity> cap,
+                                                                      XMemoryResource* upstream) {
+            constexpr const char* who = "load_verified<T>()";
             XWireHeader header{};
             detail::WireLayout layout;
             XOFFSET_VTRY(admit_wire_header<T>(data, header, who, layout));
@@ -1029,6 +1096,7 @@ namespace XOffsetDatastructure {
 
         std::unique_ptr<detail::WireValidationScratch> reload_scratch_;
         // direct_reload_open_ is in XBufferCore's padding (see there).
+        template <typename> friend class TypedXBuffer;
         template <typename> friend class VerifiedReloadToken;
         friend class XCompactor;
         friend struct detail::DeltaAccess;
@@ -1526,8 +1594,30 @@ namespace XOffsetDatastructure {
         }
 
         // load_verified_v with the admit check: into this default-constructed buffer.
+        // Dense slot-sized images take the direct slot fast path (matching
+        // plan_storage + init_from_wire + finish_admitted_load); everything else
+        // falls through to load_admit_general.
         template <typename T>
-        detail::vstatus load_admit_v(std::span<const std::byte> data, MaximumCapacity cap) {
+        XOFFSET_DETAIL_INLINE detail::vstatus load_admit_v(std::span<const std::byte> data, MaximumCapacity cap) {
+            const std::size_t size = data.size_bytes();
+            if (admit_image<T>(data) && size <= cap.value && cap.value <= MAX_PAYLOAD &&
+                cap.growth == XGrowPolicy::Explicit && !cap.pool.enabled() &&
+                cap.storage != XStorage::Pinned && detail::SlotGeometry::enabled &&
+                size <= SLOT_MAX) [[likely]] {
+                const bool movable = cap.value > detail::SlotGeometry::max_payload;
+                const std::size_t cls = detail::SlotGeometry::class_for(movable ? size : cap.value);
+                if (!this->init_slot_image_direct(cls, cap.value, movable,
+                                                  reinterpret_cast<const char*>(data.data()), size)) [[unlikely]] {
+                    XOFFSET_VFAIL(XBadAlloc, XErrc::out_of_storage, detail::arena_failure_message);
+                }
+                publish_loaded_root<T>(detail::image_root<T>(*this));
+                return detail::vok();
+            }
+            return load_admit_general<T>(data, cap);
+        }
+
+        template <typename T>
+        XOFFSET_DETAIL_NOINLINE detail::vstatus load_admit_general(std::span<const std::byte> data, MaximumCapacity cap) {
             constexpr const char* who = "XReceiver::load<T, admit>()";
             XWireHeader header{};
             detail::WireLayout layout;
@@ -1702,6 +1792,7 @@ namespace XOffsetDatastructure {
     class TypedXBuffer : public XBuffer {
     public:
         using XBuffer::XBuffer;
+        TypedXBuffer() = default;
 
         static TypedXBuffer create(std::size_t reserve_bytes = 4096) {
             TypedXBuffer xbuf(reserve_bytes);
@@ -1761,14 +1852,16 @@ namespace XOffsetDatastructure {
 
         /// Load from serialized data and return a typed buffer.
         static TypedXBuffer load(XByteView data, std::optional<MaximumCapacity> cap = std::nullopt) {
-            return TypedXBuffer(XBuffer::load_verified<T>(data, cap));
+            TypedXBuffer xbuf;
+            XOFFSET_VREQUIRE(xbuf.load_verified_v<T>(data, cap, default_memory_resource()));
+            return xbuf;
         }
 
         static TypedXBuffer load_unverified(XByteView data, std::optional<MaximumCapacity> cap = std::nullopt) {
             return TypedXBuffer(XBuffer::load_unverified(data, cap));
         }
 
-        std::string save_verified(XSaveOptions options = {}) { return XBuffer::save_verified<T>(options); }
+        XOFFSET_DETAIL_INLINE std::string save_verified(XSaveOptions options = {}) { return XBuffer::save_verified<T>(options); }
         void reload_verified(XByteView data, XMemoryResource* upstream = nullptr) {
             XBuffer::reload_verified<T>(data, upstream);
         }
@@ -1822,16 +1915,18 @@ namespace XOffsetDatastructure {
 
         static TypedXBuffer load_verified(XByteView data, std::optional<MaximumCapacity> cap = std::nullopt,
                                           XMemoryResource* upstream = default_memory_resource()) {
-            return TypedXBuffer(XBuffer::load_verified<T>(data, cap, upstream));
+            TypedXBuffer xbuf;
+            XOFFSET_VREQUIRE(xbuf.load_verified_v<T>(data, cap, upstream));
+            return xbuf;
         }
 
         /// load_verified / reload_verified without exceptions (see XBuffer).
         static XResult<TypedXBuffer> try_load_verified(XByteView data,
                                                        std::optional<MaximumCapacity> cap = std::nullopt,
                                                        XMemoryResource* upstream = default_memory_resource()) {
-            auto loaded = XBuffer::try_load_verified<T>(data, cap, upstream);
-            if (!loaded) return loaded.error();
-            return XResult<TypedXBuffer>(TypedXBuffer(std::move(*loaded)));
+            return detail::try_v_emplace<TypedXBuffer>([&](TypedXBuffer& xbuf) {
+                return xbuf.load_verified_v<T>(data, cap, upstream);
+            });
         }
 
         XStatus try_reload_verified(XByteView data, XMemoryResource* upstream = nullptr) {

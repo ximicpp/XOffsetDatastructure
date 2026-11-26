@@ -220,6 +220,7 @@ private:
 // destructor inlining is restricted to trivially destructible T (e.g. XView).
 namespace detail {
 struct xresult_value_tag {};
+struct xresult_emplace_tag {};
 struct xresult_error_tag {};
 
 template <class T, bool TrivialDtor = std::is_trivially_destructible_v<T>>
@@ -230,6 +231,10 @@ struct XResultStorage {
     };
     bool has_value_;
 
+    XOFFSET_DETAIL_INLINE explicit XResultStorage(xresult_emplace_tag) noexcept(std::is_nothrow_default_constructible_v<T>)
+        : has_value_(true) {
+        ::new (static_cast<void*>(&value_)) T();
+    }
     XResultStorage(xresult_value_tag, T&& value) noexcept(std::is_nothrow_move_constructible_v<T>)
         : has_value_(true) {
         ::new (static_cast<void*>(&value_)) T(std::move(value));
@@ -271,6 +276,11 @@ struct XResultStorage {
     XOFFSET_DETAIL_COLD void construct_error_move(XError&& error) noexcept {
         ::new (static_cast<void*>(&error_)) XError(std::move(error));
     }
+    XOFFSET_DETAIL_COLD void fail_emplace(XError&& error) noexcept {
+        value_.~T();
+        has_value_ = false;
+        ::new (static_cast<void*>(&error_)) XError(std::move(error));
+    }
     XOFFSET_DETAIL_COLD void destroy_error() noexcept { error_.~XError(); }
 
     void destroy() noexcept {
@@ -292,6 +302,10 @@ struct XResultStorage<T, true> {
     };
     bool has_value_;
 
+    XOFFSET_DETAIL_INLINE explicit XResultStorage(xresult_emplace_tag) noexcept(std::is_nothrow_default_constructible_v<T>)
+        : has_value_(true) {
+        ::new (static_cast<void*>(&value_)) T();
+    }
     XOFFSET_DETAIL_INLINE XResultStorage(xresult_value_tag, T&& value) noexcept(std::is_nothrow_move_constructible_v<T>)
         : has_value_(true) {
         ::new (static_cast<void*>(&value_)) T(std::move(value));
@@ -331,6 +345,11 @@ struct XResultStorage<T, true> {
     }
 
     XOFFSET_DETAIL_COLD void construct_error_move(XError&& error) noexcept {
+        ::new (static_cast<void*>(&error_)) XError(std::move(error));
+    }
+    XOFFSET_DETAIL_COLD void fail_emplace(XError&& error) noexcept {
+        value_.~T();
+        has_value_ = false;
         ::new (static_cast<void*>(&error_)) XError(std::move(error));
     }
     XOFFSET_DETAIL_COLD void destroy_error() noexcept { error_.~XError(); }
@@ -377,6 +396,14 @@ XOFFSET_DETAIL_COLD inline const XError& empty_error() noexcept {
 } // namespace detail
 
 template <class T>
+class XResult;
+
+namespace detail {
+template <class T, class Step>
+XOFFSET_DETAIL_INLINE XResult<T> try_v_emplace(Step&& step);
+} // namespace detail
+
+template <class T>
 class XResult : private detail::XResultCopyStorage<T> {
     using Base = detail::XResultCopyStorage<T>;
 public:
@@ -389,6 +416,9 @@ public:
         : Base(detail::xresult_error_tag{}, std::move(error)) {}
     XOFFSET_DETAIL_COLD XResult(const XError& error)
         : Base(detail::xresult_error_tag{}, error) {}
+
+    XOFFSET_DETAIL_INLINE explicit XResult(detail::xresult_emplace_tag tag) noexcept(std::is_nothrow_default_constructible_v<T>)
+        : Base(tag) {}
 
     XOFFSET_DETAIL_INLINE bool has_value() const noexcept { return this->has_value_; }
     XOFFSET_DETAIL_INLINE explicit operator bool() const noexcept { return this->has_value_; }
@@ -409,6 +439,10 @@ public:
     XErrc code() const noexcept { return this->has_value_ ? XErrc::ok : this->error_.code; }
 
 private:
+    template <class U, class Step>
+    friend XResult<U> detail::try_v_emplace(Step&& step);
+    XOFFSET_DETAIL_COLD void fail_emplace(XError&& error) noexcept { Base::fail_emplace(std::move(error)); }
+
     XOFFSET_DETAIL_COLD void fail_require() const {
 #if XOFFSET_NO_EXCEPTIONS
         detail::fatal(this->error_.code, this->error_.message.c_str());
@@ -571,6 +605,23 @@ XOFFSET_DETAIL_INLINE XResult<T> try_v_into(T& out, Step&& step) {
     XStatus status = try_v(step);
     if (!status) XOFFSET_DETAIL_UNLIKELY return std::move(status).error();
     return XResult<T>(std::move(out));
+}
+
+// Constructs T directly inside the returned XResult<T> (NRVO, no move_from)
+// and fills it with `step(value)`. On failure destroys T and stores the error.
+template <class T, class Step>
+XOFFSET_DETAIL_INLINE XResult<T> try_v_emplace(Step&& step) {
+    XResult<T> out(xresult_emplace_tag{});
+#if XOFFSET_NO_EXCEPTIONS
+    if (!step(*out)) XOFFSET_DETAIL_UNLIKELY out.fail_emplace(take_pending_error());
+#else
+    try {
+        step(*out);
+    } catch (...) {
+        out.fail_emplace(current_exception_error());
+    }
+#endif
+    return out;
 }
 
 // Runs f in a fail-soft region (a pin scope): the code of a failed arena

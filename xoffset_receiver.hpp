@@ -280,8 +280,9 @@ public:
         if constexpr (C == XCheck::full || detail::force_full_check) {
             return XBuffer::try_load_verified<T>(wire, cap_);
         } else {
-            XBuffer out;
-            return detail::try_v_into(out, [&] { return detail::ReceiverAccess::load_admit<T>(out, wire, cap_); });
+            return detail::try_v_emplace<XBuffer>([&](XBuffer& out) {
+                return detail::ReceiverAccess::load_admit<T>(out, wire, cap_);
+            });
         }
     }
 
