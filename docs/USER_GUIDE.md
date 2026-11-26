@@ -1,4 +1,4 @@
-# XOffsetDatastructure User Guide (2.0.0-preview.2, wire format 3.0)
+# XOffsetDatastructure User Guide (2.0.0-preview.3, wire format 3.0)
 
 This guide is for users of the library. It explains how to define types, build,
 modify, save and load them, and the constraints you must follow.
@@ -437,7 +437,7 @@ world.edit([&](View& w) {                  // pinned scope: plain references, as
 
 ### 3.6 Threads: one thread per buffer
 
-In 2.0.0-preview.2 a buffer is used by one thread at a time. The library does not lock, and reading is not
+In 2.0.0-preview.3 a buffer is used by one thread at a time. The library does not lock, and reading is not
 free of side effects inside the buffer: a proxy creates the buffer's control block on first use, a
 `read()` or `edit()` scope counts its borrows, and `save_delta_into` with `touched_only` updates the
 touch log.
@@ -459,7 +459,7 @@ touch log.
   free directory only when it ends, and the receiver rejects that wire or delta. Save after the scope
   returns. Default builds are not affected.
 
-Several threads reading one buffer at the same time is not supported in 2.0.0-preview.2.
+Several threads reading one buffer at the same time is not supported in 2.0.0-preview.3.
 
 ## 4. Saving and loading
 

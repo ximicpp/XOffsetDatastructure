@@ -1,4 +1,4 @@
-# Performance numbers (2.0.0-preview.2)
+# Performance numbers (2.0.0-preview.3)
 
 Current published numbers, how they were measured, and their limits. Ratios are XOffset ÷ rival:
 **below 1 means XOffset is faster**. Compression is never timed; sizes are after zstd level 3. Older
@@ -179,7 +179,7 @@ in-place nested gameplay tick (`rw_rich`), and read-only zero-copy views.
 Host: cloud x86-64 Linux (Intel Xeon Skylake @ 2.19 GHz, 32 KiB L1d / 4 MiB L2 per core),
 GCC 16.2 `-std=c++26 -freflection -O3 -DNDEBUG`, pinned to CPU 2, medians over 9
 independent processes with randomized library order, compression not timed; includes the
-post-`2.0.0-preview.2` fast paths for `save_verified`, `XReceiver::load` (`try_v_emplace`
+`2.0.0-preview.3` fast paths for `save_verified`, `XReceiver::load` (`try_v_emplace`
 NRVO + direct `SlotSlab` copy), `load_verified` / `TypedXBuffer::load`, and inline
 single-word granule validation. Full tables:
 [`bench/cppcon2024/results/2026-11-26-realistic/summary.md`](../bench/cppcon2024/results/2026-11-26-realistic/summary.md)
@@ -221,7 +221,7 @@ vs `1,818` ns with `slack_div = 8` and `2,227` ns on an organic unreserved buffe
   (`view_admit`) / **1,591 ns** (`view_bounds`) vs `Cap'n Proto` 10,178 ns, `cista`
   10,017–10,143 ns / 38,280–43,395 ns, and `FlatBuffers` 22,654 ns / 33,640 ns (nested table
   construction dominates the sender).
-- **Post-`2.0.0-preview.2` fast-path A/B** (same Skylake host, 7 interleaved pairs vs `v2.0.0`):
+- **`2.0.0-preview.3` fast-path A/B** (same Skylake host, 7 interleaved pairs vs `v2.0.0`):
   `sr_fresh` improved **1.69x** on `Flat-3KB` (`369 → 218` ns; `rx.load` **2.03x**, `212 → 104`
   ns) and **1.59x** on `Rich-3KB` (`416 → 262` ns); `load_verified` improved **1.42–1.55x** on
   `Flat-3KB` and **1.20–1.39x** on `Rich-3KB/12KB`; `verify_only` improved **1.17–1.26x** across

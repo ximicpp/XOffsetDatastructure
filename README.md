@@ -1,6 +1,6 @@
 # XOffsetDatastructure
 
-**2.0.0-preview.2** · C++20 / C++26 · header-only · 64-bit little-endian
+**2.0.0-preview.3** · C++20 / C++26 · header-only · 64-bit little-endian
 
 This is a preview of 2.0.0: the API and the wire format may still change before the final 2.0.0
 ([RELEASING.md](docs/RELEASING.md) section 1.1).
@@ -96,7 +96,7 @@ Needs CMake 3.20+ and GCC 13+, Clang 18+, Apple clang 21+ or MSVC 19.44+ on a
 64-bit little-endian target:
 
 ```sh
-git clone --depth 1 --branch v2.0.0-preview.2 https://github.com/ximicpp/XOffsetDatastructure.git
+git clone --depth 1 --branch v2.0.0-preview.3 https://github.com/ximicpp/XOffsetDatastructure.git
 cd XOffsetDatastructure
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DXOFFSET_CXX_STANDARD=20
 cmake --build build --config Release --target helloworld
@@ -109,7 +109,7 @@ submodules needed for C++20/C++23):
 ```cmake
 include(FetchContent)
 FetchContent_Declare(xoffsetdatastructure
-    URL https://github.com/ximicpp/XOffsetDatastructure/archive/refs/tags/v2.0.0-preview.2.tar.gz)
+    URL https://github.com/ximicpp/XOffsetDatastructure/archive/refs/tags/v2.0.0-preview.3.tar.gz)
 set(XOFFSET_CXX_STANDARD 20 CACHE STRING "" FORCE)
 FetchContent_MakeAvailable(xoffsetdatastructure)
 target_link_libraries(my_app PRIVATE XOffset::xoffset)

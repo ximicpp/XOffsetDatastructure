@@ -1,5 +1,5 @@
 {
-  "archive_root": "xoffsetdatastructure-2.0.0-preview.2",
+  "archive_root": "xoffsetdatastructure-2.0.0-preview.3",
   "dependency_lock": {
     "include_trees": {
       "external/boost/libs/config/include": "1840c63a8e130b742d6f8148acaf9706a566ccf1791d2afd6eb9462465c2aaf8",
@@ -32,9 +32,9 @@
       "sha256": "f1f7f98c21afb92057a18d0917892d568ff5b4ede2586bbcac0bdfc97d523ba6"
     },
     "CHANGELOG.md": {
-      "bytes": 57372,
+      "bytes": 60595,
       "mode": 420,
-      "sha256": "74fce8cffc1b2d8284ae0747aa7a4e01de8e72beacf4c7bc4a67e3f9097d1943"
+      "sha256": "2ce64d77e8e199ea90cd959937318ef2af77f187eecf61dbafea3171d2ea4216"
     },
     "CMakeLists.txt": {
       "bytes": 8503,
@@ -64,7 +64,7 @@
     "README.md": {
       "bytes": 8361,
       "mode": 420,
-      "sha256": "bbfa1d6ef0862e3e4bba79b7d79d604fb143456c54b868217fd5c2f41d59be2e"
+      "sha256": "a61c7d685cc1c48f0daffb89b6fc77c8c6431367de8e7173b5ac5f40daced8d3"
     },
     "SECURITY.md": {
       "bytes": 3176,
@@ -74,7 +74,7 @@
     "XOFFSET_VERSION": {
       "bytes": 16,
       "mode": 420,
-      "sha256": "93538d1b733a614c7cd232f9940e1f98ae5ca1074977d7defcf772d30d8c0c76"
+      "sha256": "c6e38e424e8576773098da7fb82ae8dc08b2eb072f27417721961e8fda68ad1d"
     },
     "bench/cppcon2024/README.md": {
       "bytes": 15649,
@@ -349,7 +349,7 @@
     "docs/ALPHA_COMPATIBILITY.md": {
       "bytes": 10850,
       "mode": 420,
-      "sha256": "c8659c68f5fced1a4222f5f894fd77cdbec155940f3d390c43c656308650ac59"
+      "sha256": "73da718f995aa2f6dedceca778142f7c5f6436a20e305bada4eb4620aec4178b"
     },
     "docs/ARCHIVED_EVIDENCE.md": {
       "bytes": 2693,
@@ -359,12 +359,12 @@
     "docs/BUFFER_REUSE.md": {
       "bytes": 9214,
       "mode": 420,
-      "sha256": "637083b9e5cc389128fb6ab292f071395b4ecbe3e8a0d5e9a1ab05046366e2f7"
+      "sha256": "abe77ee14bfbc33bee84aa6cd926bcf2962589f0860d48689e7f8774236d96d0"
     },
     "docs/BUILD_AND_PLATFORMS.md": {
       "bytes": 11909,
       "mode": 420,
-      "sha256": "dcc6a6bc273e014479ccee352488fc0f8f026caff855eb7faaf09350462f7d04"
+      "sha256": "19beaf93dde1b2f3bc68df933eb9d830df343189e35011252eeeff9d0ff1c8c0"
     },
     "docs/CLIENT_TARGETS.md": {
       "bytes": 9924,
@@ -379,17 +379,17 @@
     "docs/DEPLOYMENT.md": {
       "bytes": 28285,
       "mode": 420,
-      "sha256": "06b2a75ec2b3b969d851d86d17a6b5f7b21230b603e7a0476fe5ed63ccb86f22"
+      "sha256": "935080244c34b39f0eeb1a08477a9c96695aa5cd19b3762a8bfb527265dfb6da"
     },
     "docs/DEVICE_TESTING.md": {
       "bytes": 12955,
       "mode": 420,
-      "sha256": "c70b8ec7bf7333b381e3d85b0835b8a04b1330e8ccbbc3f86491c487b15cf3c2"
+      "sha256": "acd255ac365c0e3a35f906179c5d06d9c3addaac96e59f4bfd70becca3989799"
     },
     "docs/GETTING_STARTED.md": {
       "bytes": 17256,
       "mode": 420,
-      "sha256": "2b03a7bdaec900f02f2c30e2af65dd408958f8b3bfdf5d79f6b958537ded2c8c"
+      "sha256": "5bbc753903552a27a6ceb0167ea8810e2ff5170129aab53be9ba537d53f8bbc8"
     },
     "docs/HOW_IT_WORKS.md": {
       "bytes": 7092,
@@ -399,12 +399,12 @@
     "docs/PACKAGING.md": {
       "bytes": 22863,
       "mode": 420,
-      "sha256": "db1c84fc2bd427539b5558b0e990b2fc677abba01ebcd8a2cbe2957e74942112"
+      "sha256": "0a826cdbf449ec8c07f2f26e5c842a7cc986dff3d180386c020030835aa0d117"
     },
     "docs/PERFORMANCE.md": {
-      "bytes": 22408,
+      "bytes": 22398,
       "mode": 420,
-      "sha256": "0e030d53002305a0601be40fb963c7e5ce1a7c8e7fc3140f9630a8f04242f9e2"
+      "sha256": "3595b0909f34cd7bd7bf2e5997a0cbfbccdd79c900b7a0f00151a1b760287cc7"
     },
     "docs/PERF_GATE.md": {
       "bytes": 26576,
@@ -444,12 +444,12 @@
     "docs/USER_GUIDE.md": {
       "bytes": 77050,
       "mode": 420,
-      "sha256": "c088d0210e6922ab46780a654d6817fe4a1fa543af3a31c173592ad9723f6ae7"
+      "sha256": "32f3ecdda3a1510d07fa44a9b316c5a8198c0a2babf0998acb7769fe4ee085f9"
     },
     "docs/V2_THREAT_MODEL.md": {
       "bytes": 33705,
       "mode": 420,
-      "sha256": "8f8c63679342fc62a9b3e1cfffd11d73d02795ede4666830c8c9a3f293853ad1"
+      "sha256": "7c0fe70d04638289372573f57d7460d6d7d52eef8d7691cef86dcfff6aef6fb1"
     },
     "docs/VALIDATION_RUNNER.md": {
       "bytes": 10833,
@@ -6049,5 +6049,5 @@
     "offline_build": "full/storage CMake and package validation use bundled dependency bytes; caller provides compatible compiler, SDK, CMake and standard library",
     "validation_limits": "validate_vm.py native full/storage are supported entry points; historical wire bundles and full developer-test discovery are outside this distribution"
   },
-  "version": "2.0.0-preview.2"
+  "version": "2.0.0-preview.3"
 }

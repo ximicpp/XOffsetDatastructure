@@ -5,6 +5,46 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+## 2.0.0-preview.3: fast fresh load/save, faster wire validation, and realistic 8-library benchmark
+
+Third preview of 2.0.0: the API, the wire format and the delta format may still change until the
+final 2.0.0. Wire 3.0 and Delta 2.0 are unchanged from 2.0.0-preview.1 and 2.0.0-preview.2, so all
+three previews interoperate; use the same schemas on both ends. No public API or wire format breaks;
+this preview adds receive/send hot-path optimizations and the expanded realistic 8-library benchmark
+suite.
+
+- Fresh-buffer send and receive (`xoffset_error.hpp`, `xoffset_receiver.hpp`,
+  `xoffset_virtual_memory.hpp`, `xoffset_arena.hpp`, `xoffset_buffer.hpp`):
+  - `detail::try_v_emplace<T>` constructs `XBuffer` / `TypedXBuffer<T>` directly in the returned
+    `XResult` slot (NRVO), removing the out-of-line `XBufferCore::move_from` and second destructor
+    from `XReceiver::load`, `XBuffer::try_load_verified`, and `TypedXBuffer::load` / `load_verified`
+    / `try_load_verified`.
+  - `VirtualMemoryStorage::take_slot_copy` and inline slot release in `~VirtualMemoryStorage` give
+    dense slot-sized images a direct single-step acquire + copy path in `load_admit_v` and
+    `load_verified_v` (preserving capacity limits, failure injection, and rollback).
+  - `XBuffer::save_verified<T>()` adds an inline dense fast path for clean buffers below the
+    automatic compaction threshold, keeping `emit_failed()`, `auto_compact`, `save_self_check`, and
+    `XOFFSET_REJECT_IMPLICIT_PADDING` unchanged.
+  - On Skylake 2.19 GHz (GCC 16.2 `-O3`, 7 interleaved pairs vs `v2.0.0`): `Flat-3KB` `sr_fresh`
+    improves 1.69x (`369 -> 218` ns; `rx.load` 2.03x, `212 -> 104` ns), `Rich-3KB` `sr_fresh` 1.59x,
+    and `load_verified` 1.20–1.55x across flat and nested graphs.
+- Full wire graph validation (`xoffset_wire.hpp`, `xoffset_buffer.hpp`):
+  - `WireGranuleIndex::prepare()` defers zeroing the `free_` bitmap until a free region is touched;
+    `try_mark_live` checks and marks live granules in one pass; `register_owned_granules` inlines
+    single-word bitmap updates after the `begin == ctx.cursor` check.
+  - `checked_block` uses unsigned offset arithmetic, `validate_string_slow` / `validate_vector_slow`
+    move cold error paths out of line so `XString` and `XVectorCore` head validation inline cleanly,
+    and `validate_record` replaces `for_each_reflected_subobject_v` with a direct fold expression.
+  - Improves `verify_only` by 1.17–1.26x and `reload_verified` by 1.13–1.24x with zero semantic
+    changes (verified by 30,000 granule oracle ops, 2,505 differential fuzz cases with
+    `cursor=off` comparison and 0 inconsistencies, C++20 `-fno-exceptions`, and ASan + UBSan).
+- Realistic 8-library benchmark and refreshed docs (`bench/cppcon2024/complexity_bench.cpp`,
+  `README.md`, `docs/PERFORMANCE.md`, `bench/cppcon2024/README.md`):
+  - Adds a depth-4 RPG `RichCharacter` (~12 KB, 373 containers/strings > SSO) and L1d-resident
+    iso-byte control (`Flat-3KB` vs `Rich-3KB`) across all 8 CppCon 2024 libraries covering
+    16-shape `varied_reuse`, `fresh_trusted` / `fresh_checked`, cross-server handoff
+    (`Receive -> Gameplay Mutate -> Send`), in-place `rw_rich`, and read-only zero-copy `view`.
+
 ## 2.0.0-preview.2: configuration check, and misuse that fails loudly
 
 Second preview of 2.0.0: the API, the wire format and the delta format may still change until the

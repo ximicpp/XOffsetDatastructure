@@ -1,4 +1,4 @@
-# 2.0.0-preview.2 compatibility and input boundaries
+# 2.0.0-preview.3 compatibility and input boundaries
 
 (The file name dates from the alpha period and is kept for link stability.) This release is the first
 public preview of XOffset V2: Semantic Versioning starts with the final 2.0.0, and until then the API
@@ -13,7 +13,7 @@ claimed.
 ## Version and toolchain
 
 `XOFFSET_VERSION` at the source root (`share/XOffsetDatastructure/VERSION` after install) is the single
-text source of the full version `2.0.0-preview.2`; the CMake project's numeric version is `2.0.0`.
+text source of the full version `2.0.0-preview.3`; the CMake project's numeric version is `2.0.0`.
 Installed consumers of stable releases (from the final 2.0.0) can request any compatible version of the same major version:
 
 ```cmake
@@ -24,8 +24,8 @@ Or discover unversioned and assert an exact identifier (required for prereleases
 
 ```cmake
 find_package(XOffsetDatastructure CONFIG REQUIRED COMPONENTS full)
-if(NOT XOffsetDatastructure_VERSION STREQUAL "2.0.0-preview.2")
-    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 2.0.0-preview.2")
+if(NOT XOffsetDatastructure_VERSION STREQUAL "2.0.0-preview.3")
+    message(FATAL_ERROR "This consumer requires XOffsetDatastructure 2.0.0-preview.3")
 endif()
 ```
 
