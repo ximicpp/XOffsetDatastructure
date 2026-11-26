@@ -696,3 +696,44 @@ xoffset_check_polymorphic_rejection()
 xoffset_test_host_modules()
 xoffset_write_test_inventory()
 
+
+# Configuration check (xoffset_config.hpp): two translation units that set a
+# hardening switch, the client uplink check or a storage size differently
+# must not link. config_check_same links the same two units configured
+# alike, one of them spelling a size differently (MSVC compares the macro
+# text, so there both spell it the same way).
+function(xoffset_config_check name save_definitions load_definitions)
+    add_library(${name}_save OBJECT EXCLUDE_FROM_ALL config_check/save.cpp)
+    configure_xoffset_target(${name}_save)
+    target_compile_definitions(${name}_save PRIVATE ${save_definitions})
+    add_executable(${name} EXCLUDE_FROM_ALL config_check/load.cpp $<TARGET_OBJECTS:${name}_save>)
+    configure_xoffset_target(${name})
+    target_compile_definitions(${name} PRIVATE ${load_definitions})
+endfunction()
+if(MSVC)
+    xoffset_config_check(config_check_same "XOFFSET_SLOT_MAX_BYTES=262144u" "XOFFSET_SLOT_MAX_BYTES=262144u")
+else()
+    xoffset_config_check(config_check_same "XOFFSET_SLOT_MAX_BYTES=262144u" "XOFFSET_SLOT_MAX_BYTES=(256u*1024u)")
+endif()
+set_target_properties(config_check_same PROPERTIES EXCLUDE_FROM_ALL OFF)
+set_target_properties(config_check_same_save PROPERTIES EXCLUDE_FROM_ALL OFF)
+add_test(NAME config_check_same COMMAND config_check_same)
+set_tests_properties(config_check_same PROPERTIES LABELS "config_check" PASS_REGULAR_EXPRESSION "^OK")
+foreach(variant scrub uplink slot)
+    if(variant STREQUAL "scrub")
+        set(save_definitions XOFFSET_SCRUB_POPPED=1)
+        set(load_definitions XOFFSET_SCRUB_POPPED=0)
+    elseif(variant STREQUAL "uplink")
+        set(save_definitions XOFFSET_CHECK_UPLINK=0)
+        set(load_definitions XOFFSET_CHECK_UPLINK=1)
+    else()
+        set(save_definitions XOFFSET_SLOT_MAX_BYTES=65536u)
+        set(load_definitions XOFFSET_SLOT_MAX_BYTES=262144u)
+    endif()
+    xoffset_config_check(config_check_${variant}_fail "${save_definitions}" "${load_definitions}")
+    add_test(NAME config_check_${variant}_fail
+        COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target config_check_${variant}_fail --config $<CONFIG>)
+    set_tests_properties(config_check_${variant}_fail PROPERTIES
+        LABELS "config_check"
+        PASS_REGULAR_EXPRESSION "XOFFSET_CONFIG_MISMATCH|LNK2038")
+endforeach()

@@ -187,7 +187,8 @@
 // mistake, so each is OFF unless a build asks for it: -DXOFFSET_<NAME>=1 for
 // one, -DXOFFSET_HARDENED=1 for every one the build does not set itself.
 // They change inline functions: define them the same way in every
-// translation unit of a program.
+// translation unit of a program (a program that does not fails to link:
+// see "Configuration check" at the end of this file).
 // save_compact writes no holes and zeroes container slack and string tails,
 // with or without them; it copies the implicit padding of records as it is
 // (docs/V2_THREAT_MODEL.md, T5).
@@ -374,6 +375,44 @@
 #  define XOFFSET_DETAIL_TO_CHARS_FLOAT 1
 #endif
 
+// ---- Storage sizes -----------------------------------------------------------
+// The slot slab, the relocating reservation and the retired-block discard
+// (xoffset_slot_storage.hpp, xoffset_arena.hpp; docs/USER_GUIDE.md 3.4).
+#ifndef XOFFSET_SLOT_MAX_BYTES
+#  define XOFFSET_SLOT_MAX_BYTES (256u * 1024u)
+#endif
+#ifndef XOFFSET_RELOCATING_RESERVE_BYTES
+#  define XOFFSET_RELOCATING_RESERVE_BYTES (1024u * 1024u)
+#endif
+// Where a relocating buffer goes when its first reservation is full: 0 is a
+// reservation of its whole maximum (servers: one move), otherwise that many
+// bytes and then doubling (phones, whose address space is small: iOS
+// without the extended virtual addressing entitlement has about 7 GiB).
+#ifndef XOFFSET_RELOCATE_STEP_BYTES
+#  if defined(__ANDROID__)
+#    define XOFFSET_RELOCATE_STEP_BYTES (64u * 1024u * 1024u)
+#  elif defined(__APPLE__)
+#    include <TargetConditionals.h>
+#    if TARGET_OS_IPHONE
+#      define XOFFSET_RELOCATE_STEP_BYTES (16u * 1024u * 1024u)
+#    else
+#      define XOFFSET_RELOCATE_STEP_BYTES 0u
+#    endif
+#  else
+#    define XOFFSET_RELOCATE_STEP_BYTES 0u
+#  endif
+#endif
+#ifndef XOFFSET_SLOT_RETAIN_BYTES
+#  define XOFFSET_SLOT_RETAIN_BYTES (64u * 1024u * 1024u)
+#endif
+// A retired arena block of at least this many bytes gives its whole pages
+// back to the OS instead of being cleared with memset (Linux; 0 disables).
+// Arena storage is always private anonymous memory (VM owner or slot), so the
+// pages read back as zero, which is what the M3 hole rule needs.
+#ifndef XOFFSET_RETIRE_DISCARD_BYTES
+#  define XOFFSET_RETIRE_DISCARD_BYTES (16u * 1024u)
+#endif
+
 // The switches as constants: code tests them with if constexpr, so each
 // switch has one #if (its definition above).
 namespace XOffsetDatastructure::detail {
@@ -384,3 +423,79 @@ inline constexpr bool pin_quarantine = XOFFSET_PIN_QUARANTINE != 0;
 inline constexpr bool save_self_check = XOFFSET_SAVE_SELF_CHECK != 0;
 inline constexpr bool check_sorted = XOFFSET_CHECK_SORTED != 0;
 } // namespace XOffsetDatastructure::detail
+
+// ---- Configuration check ------------------------------------------------------
+// The switches and sizes above change inline functions and the layout of the
+// storage they share, so every translation unit of a program must see the same
+// values: when two disagree, the linker keeps one copy of each inline function
+// and the other unit silently runs code built for the other configuration (a
+// scrub it asked for skipped, a slot freed to the wrong class). A program whose
+// units disagree on any of these does not link:
+//   ELF (Linux, Android) and Mach-O (Apple): each unit instantiates
+//     config_guard<values...>, which defines the hidden symbol
+//     XOFFSET_CONFIG_MISMATCH__define_XOFFSET_switches_identically_in_every_translation_unit.
+//     Units that agree share one instantiation (one definition, the linker
+//     keeps one); units that disagree bring two, and the linker reports a
+//     duplicate symbol (with LTO: the assembler reports it already defined).
+//     The values are template arguments, so 262144u and (256u * 1024u) agree.
+//   MSVC and clang-cl: #pragma detect_mismatch, linker error LNK2038 naming
+//     the setting. It compares the macro text, so spell a value the same way
+//     in every unit.
+// The check is per linked image (the symbol is hidden): a shared library may
+// use a configuration of its own as long as no XOffset object crosses its
+// boundary. NDEBUG-only checks (XOFFSET_CHECK_SORTED, XOFFSET_SYNC_CHECKS,
+// XOFFSET_MOVE_OWNERSHIP_CHECKS, XOFFSET_FORCE_FULL_CHECK) are not part of it,
+// so a debug unit may link with release units. Nothing here runs: the cost is
+// a one-instruction function and a pointer to it per program.
+// -DXOFFSET_NO_CONFIG_CHECK=1 leaves it out (GCC on MinGW and Cygwin always
+// does).
+#define XOFFSET_DETAIL_STR2(...) #__VA_ARGS__
+#define XOFFSET_DETAIL_STR(x) XOFFSET_DETAIL_STR2(x)
+#if !defined(XOFFSET_NO_CONFIG_CHECK)
+#  if (defined(__MINGW32__) || defined(__CYGWIN__)) && !defined(_MSC_VER)
+#    define XOFFSET_NO_CONFIG_CHECK 1
+#  else
+#    define XOFFSET_NO_CONFIG_CHECK 0
+#  endif
+#endif
+#if !XOFFSET_NO_CONFIG_CHECK
+#  if defined(_MSC_VER)
+#    pragma detect_mismatch("XOFFSET_SCRUB_POPPED", XOFFSET_DETAIL_STR(XOFFSET_SCRUB_POPPED))
+#    pragma detect_mismatch("XOFFSET_SCRUB_ERASED", XOFFSET_DETAIL_STR(XOFFSET_SCRUB_ERASED))
+#    pragma detect_mismatch("XOFFSET_SCRUB_PADDING", XOFFSET_DETAIL_STR(XOFFSET_SCRUB_PADDING))
+#    pragma detect_mismatch("XOFFSET_PIN_QUARANTINE", XOFFSET_DETAIL_STR(XOFFSET_PIN_QUARANTINE))
+#    pragma detect_mismatch("XOFFSET_SAVE_SELF_CHECK", XOFFSET_DETAIL_STR(XOFFSET_SAVE_SELF_CHECK))
+#    pragma detect_mismatch("XOFFSET_SCRUB_RESET", XOFFSET_DETAIL_STR(XOFFSET_SCRUB_RESET))
+#    pragma detect_mismatch("XOFFSET_CHECK_UPLINK", XOFFSET_DETAIL_STR(XOFFSET_CHECK_UPLINK))
+#    pragma detect_mismatch("XOFFSET_USE_PMR", XOFFSET_DETAIL_STR(XOFFSET_USE_PMR))
+#    pragma detect_mismatch("XOFFSET_NO_EXCEPTIONS", XOFFSET_DETAIL_STR(XOFFSET_NO_EXCEPTIONS))
+#    pragma detect_mismatch("XOFFSET_THREAD_CACHES", XOFFSET_DETAIL_STR(XOFFSET_THREAD_CACHES))
+#    pragma detect_mismatch("XOFFSET_SLOT_MAX_BYTES", XOFFSET_DETAIL_STR(XOFFSET_SLOT_MAX_BYTES))
+#    pragma detect_mismatch("XOFFSET_RELOCATING_RESERVE_BYTES", XOFFSET_DETAIL_STR(XOFFSET_RELOCATING_RESERVE_BYTES))
+#    pragma detect_mismatch("XOFFSET_RELOCATE_STEP_BYTES", XOFFSET_DETAIL_STR(XOFFSET_RELOCATE_STEP_BYTES))
+#    pragma detect_mismatch("XOFFSET_SLOT_RETAIN_BYTES", XOFFSET_DETAIL_STR(XOFFSET_SLOT_RETAIN_BYTES))
+#    pragma detect_mismatch("XOFFSET_RETIRE_DISCARD_BYTES", XOFFSET_DETAIL_STR(XOFFSET_RETIRE_DISCARD_BYTES))
+#  elif defined(__GNUC__) || defined(__clang__)
+#    if defined(__APPLE__)
+#      define XOFFSET_DETAIL_CONFIG_SYMBOL_VISIBILITY ".private_extern "
+#    else
+#      define XOFFSET_DETAIL_CONFIG_SYMBOL_VISIBILITY ".hidden "
+#    endif
+namespace XOffsetDatastructure::detail {
+template <unsigned long long... Values>
+[[gnu::used, gnu::noinline]] inline void config_guard() noexcept {
+    __asm__(".globl XOFFSET_CONFIG_MISMATCH__define_XOFFSET_switches_identically_in_every_translation_unit\n\t"
+            XOFFSET_DETAIL_CONFIG_SYMBOL_VISIBILITY
+            "XOFFSET_CONFIG_MISMATCH__define_XOFFSET_switches_identically_in_every_translation_unit\n"
+            "XOFFSET_CONFIG_MISMATCH__define_XOFFSET_switches_identically_in_every_translation_unit:");
+}
+[[gnu::used]] inline void (*const config_guard_instance)() noexcept = &config_guard<
+    XOFFSET_SCRUB_POPPED != 0, XOFFSET_SCRUB_ERASED != 0, XOFFSET_SCRUB_PADDING != 0,
+    XOFFSET_PIN_QUARANTINE != 0, XOFFSET_SAVE_SELF_CHECK != 0, XOFFSET_SCRUB_RESET != 0,
+    XOFFSET_CHECK_UPLINK != 0, XOFFSET_USE_PMR != 0, XOFFSET_NO_EXCEPTIONS != 0,
+    XOFFSET_THREAD_CACHES != 0, XOFFSET_SLOT_MAX_BYTES, XOFFSET_RELOCATING_RESERVE_BYTES,
+    XOFFSET_RELOCATE_STEP_BYTES, XOFFSET_SLOT_RETAIN_BYTES, XOFFSET_RETIRE_DISCARD_BYTES>;
+} // namespace XOffsetDatastructure::detail
+#    undef XOFFSET_DETAIL_CONFIG_SYMBOL_VISIBILITY
+#  endif
+#endif

@@ -5,6 +5,19 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- Configuration check (`xoffset_config.hpp`, "Configuration check"; USER_GUIDE section 5): translation
+  units of one program that set the hardening switches, `XOFFSET_CHECK_UPLINK`, `XOFFSET_USE_PMR`,
+  `XOFFSET_NO_EXCEPTIONS`, `XOFFSET_THREAD_CACHES` or the storage sizes differently used to link and
+  run silently, each inline function taken from whichever unit the linker kept (an ODR violation:
+  a requested scrub skipped, a slot returned to a size class of the other configuration). Such a
+  program now fails to link: GCC and Clang on ELF and Mach-O report a duplicate hidden symbol
+  `XOFFSET_CONFIG_MISMATCH__define_XOFFSET_switches_identically_in_every_translation_unit`, MSVC
+  and clang-cl report `LNK2038` (`#pragma detect_mismatch`). Nothing runs and no symbol of the
+  library changes its name; a program gains one empty function and one pointer. The
+  `NDEBUG`-dependent checks are not compared; `-DXOFFSET_NO_CONFIG_CHECK=1` turns the check off. The
+  storage size defaults moved from `xoffset_slot_storage.hpp` to `xoffset_config.hpp` unchanged.
+  Tests: `config_check_same`, `config_check_{scrub,uplink,slot}_fail`.
+
 ## 2.0.0: first public SemVer release (XOffset V2)
 
 First public stable release of the XOffset V2 architecture and the start of Semantic Versioning
