@@ -741,7 +741,16 @@ foreach(variant IN LISTS xoffset_config_check_variants)
     if(APPLE)
         set_target_properties(config_check_${variant}_fail config_check_${variant}_fail_save
             PROPERTIES EXCLUDE_FROM_ALL OFF)
-        add_test(NAME config_check_${variant}_fail COMMAND config_check_${variant}_fail)
+        # The program aborts, and CTest fails a test killed by a signal whatever
+        # its output; cmake -E env turns the abort into an exit status. Under an
+        # emulator (xcrun simctl spawn) the target name is needed and the
+        # emulator already does that.
+        if(CMAKE_CROSSCOMPILING_EMULATOR)
+            add_test(NAME config_check_${variant}_fail COMMAND config_check_${variant}_fail)
+        else()
+            add_test(NAME config_check_${variant}_fail
+                COMMAND ${CMAKE_COMMAND} -E env $<TARGET_FILE:config_check_${variant}_fail>)
+        endif()
         set(expected "XOffset configuration mismatch")
     else()
         add_test(NAME config_check_${variant}_fail
