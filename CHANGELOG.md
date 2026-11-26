@@ -11,7 +11,8 @@ Fourth preview of 2.0.0: the API, the wire format and the delta format may still
 final 2.0.0. Documentation only: library code, Wire 3.0 and Delta 2.0 are unchanged from
 2.0.0-preview.3, so all four previews interoperate; use the same schemas on both ends.
 
-- README reduced to the core idea, a short example and the classic CppCon 2024 table; the
+- README reduced to about 60 lines: the core idea, a minimal example, the classic CppCon 2024 table
+  and the FetchContent entry point; the
   `RichCharacter` table stays in docs/PERFORMANCE.md (#370).
 
 ## 2.0.0-preview.3: fast fresh load/save, faster wire validation, and realistic 8-library benchmark

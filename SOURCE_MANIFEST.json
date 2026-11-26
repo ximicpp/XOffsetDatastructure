@@ -32,9 +32,9 @@
       "sha256": "f1f7f98c21afb92057a18d0917892d568ff5b4ede2586bbcac0bdfc97d523ba6"
     },
     "CHANGELOG.md": {
-      "bytes": 61058,
+      "bytes": 61108,
       "mode": 420,
-      "sha256": "e6c8764935bfc26978ab8b15b3471d19e1e043f4b122f85b1cf5df9f586b9ea4"
+      "sha256": "8e371ea6713842da076e57c61bc650798199ff0ae56da90c8315cc4e29033f18"
     },
     "CMakeLists.txt": {
       "bytes": 8503,
@@ -62,9 +62,9 @@
       "sha256": "0c16fbcd9aa84484e0767074f9473fdaf3fb90ea89c20d6441f4220c3ed55114"
     },
     "README.md": {
-      "bytes": 5785,
+      "bytes": 2319,
       "mode": 420,
-      "sha256": "a821d171652cd8a8e74f31a7bd5c5a5f0ae081708a0978226d4b2077ac830a96"
+      "sha256": "b8ef8de420bb389825c9af9dde6942206a97256d3501db9739bc734e5baea115"
     },
     "SECURITY.md": {
       "bytes": 3176,
