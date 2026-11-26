@@ -5,6 +5,20 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- Configuration check (`xoffset_config.hpp`, "Configuration check"; USER_GUIDE section 5): translation
+  units of one program that set the hardening switches, `XOFFSET_CHECK_UPLINK`, `XOFFSET_USE_PMR`,
+  `XOFFSET_NO_EXCEPTIONS`, `XOFFSET_THREAD_CACHES` or the storage sizes differently used to link and
+  run silently, each inline function taken from whichever unit the linker kept (an ODR violation:
+  a requested scrub skipped, a slot returned to a size class of the other configuration). Such a
+  program is now refused: GCC and Clang on ELF (Linux, Android) fail to link with a duplicate hidden
+  symbol `XOFFSET_CONFIG_MISMATCH__define_XOFFSET_switches_identically_in_every_translation_unit`;
+  MSVC and clang-cl fail to link with `LNK2038` (lld-link: `/failifmismatch`; `#pragma detect_mismatch`); on Apple (Mach-O has
+  no COMDAT groups) a static initializer per unit aborts the program before `main` with
+  "XOffset configuration mismatch". No data path changes and no library symbol is renamed. Found by the review of 2.0.0-preview.1. The
+  `NDEBUG`-dependent checks are not compared; `-DXOFFSET_NO_CONFIG_CHECK=1` turns the check off. The
+  storage size defaults moved from `xoffset_slot_storage.hpp` to `xoffset_config.hpp` unchanged.
+  Tests: `config_check_same`, `config_check_{scrub,uplink,slot}_fail`.
+
 ## 2.0.0-preview.1: first public preview of XOffset V2
 
 First public preview of the XOffset V2 architecture, published on 2026-11-25 as `2.0.0` and renamed
