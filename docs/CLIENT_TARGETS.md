@@ -41,7 +41,7 @@ for clang-cl.
 | Linux x86-64 | GCC 13 / 16, Clang 18, P2996 Clang | C++20, C++23 | Matrix and ASan columns of `tools/local_validate.sh` |
 
 On every target the full CTest passes (including the no-exception `*_noexc` programs) and the corpus
-is accepted and byte-identical. Real devices (3.2.0-rc.1 and 3.2.x): an Android 11 phone, Windows 11
+is accepted and byte-identical. Real devices (internal-3.2.0-rc.1 and 3.2.x): an Android 11 phone, Windows 11
 and macOS machines, and an iPhone 15 Pro Max passed CTest and the corpus; evidence in
 [validation/2026-10-28-rc1-platform](validation/2026-10-28-rc1-platform/README.md) and
 [DEVICE_TESTING.md](DEVICE_TESTING.md).

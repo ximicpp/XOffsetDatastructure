@@ -194,8 +194,8 @@ compared delta of one changed field, section 1). A
 delta is exactly its header, the optional fields its flags announce and its
 block or run section; nothing may follow.
 
-**Stability.** Format 2.0 goes with wire format 3.0 (format 1.0, from 3.4.0
-to 4.1.0, addressed the 2.x image, whose root was at 48). A sender writes 2.0
+**Stability.** Format 2.0 goes with wire format 3.0 (format 1.0, from internal-3.4.0
+to internal-4.1.0, addressed the 2.x image, whose root was at 48). A sender writes 2.0
 and a receiver reads it, on every 64-bit little-endian target, compiler and
 schema backend. Once released, nothing in this section changes within 2.0:
 not the fields, not their order or meaning, not what a receiver accepts or

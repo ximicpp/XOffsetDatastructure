@@ -709,3 +709,69 @@ xoffset_check_polymorphic_rejection()
 xoffset_test_host_modules()
 xoffset_write_test_inventory()
 
+
+# Configuration check (xoffset_config.hpp): two translation units that set a
+# hardening switch, the client uplink check or a storage size differently
+# are refused, at link time (ELF, MSVC: the build of the program fails;
+# lld-link says /failifmismatch instead of LNK2038) or,
+# on Apple, at startup (the program aborts before main). config_check_same
+# links the same two units configured alike, one of them spelling a size
+# differently (MSVC compares the macro text, so there both spell it the same
+# way).
+function(xoffset_config_check name save_definitions load_definitions)
+    add_library(${name}_save OBJECT EXCLUDE_FROM_ALL config_check/save.cpp)
+    configure_xoffset_target(${name}_save)
+    target_compile_definitions(${name}_save PRIVATE ${save_definitions})
+    add_executable(${name} EXCLUDE_FROM_ALL config_check/load.cpp $<TARGET_OBJECTS:${name}_save>)
+    configure_xoffset_target(${name})
+    target_compile_definitions(${name} PRIVATE ${load_definitions})
+endfunction()
+if(MSVC)
+    xoffset_config_check(config_check_same "XOFFSET_SLOT_MAX_BYTES=262144u" "XOFFSET_SLOT_MAX_BYTES=262144u")
+else()
+    xoffset_config_check(config_check_same "XOFFSET_SLOT_MAX_BYTES=262144u" "XOFFSET_SLOT_MAX_BYTES=(256u*1024u)")
+endif()
+set_target_properties(config_check_same PROPERTIES EXCLUDE_FROM_ALL OFF)
+set_target_properties(config_check_same_save PROPERTIES EXCLUDE_FROM_ALL OFF)
+add_test(NAME config_check_same COMMAND config_check_same)
+set_tests_properties(config_check_same PROPERTIES LABELS "config_check" PASS_REGULAR_EXPRESSION "^OK")
+# MinGW and Cygwin builds have no check (XOFFSET_NO_CONFIG_CHECK).
+set(xoffset_config_check_variants scrub uplink slot)
+if(MINGW OR CYGWIN)
+    set(xoffset_config_check_variants "")
+endif()
+foreach(variant IN LISTS xoffset_config_check_variants)
+    if(variant STREQUAL "scrub")
+        set(save_definitions XOFFSET_SCRUB_POPPED=1)
+        set(load_definitions XOFFSET_SCRUB_POPPED=0)
+    elseif(variant STREQUAL "uplink")
+        set(save_definitions XOFFSET_CHECK_UPLINK=0)
+        set(load_definitions XOFFSET_CHECK_UPLINK=1)
+    else()
+        set(save_definitions XOFFSET_SLOT_MAX_BYTES=65536u)
+        set(load_definitions XOFFSET_SLOT_MAX_BYTES=262144u)
+    endif()
+    xoffset_config_check(config_check_${variant}_fail "${save_definitions}" "${load_definitions}")
+    if(APPLE)
+        set_target_properties(config_check_${variant}_fail config_check_${variant}_fail_save
+            PROPERTIES EXCLUDE_FROM_ALL OFF)
+        # The program aborts, and CTest fails a test killed by a signal whatever
+        # its output; cmake -E env turns the abort into an exit status. Under an
+        # emulator (xcrun simctl spawn) the target name is needed and the
+        # emulator already does that.
+        if(CMAKE_CROSSCOMPILING_EMULATOR)
+            add_test(NAME config_check_${variant}_fail COMMAND config_check_${variant}_fail)
+        else()
+            add_test(NAME config_check_${variant}_fail
+                COMMAND ${CMAKE_COMMAND} -E env $<TARGET_FILE:config_check_${variant}_fail>)
+        endif()
+        set(expected "XOffset configuration mismatch")
+    else()
+        add_test(NAME config_check_${variant}_fail
+            COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR} --target config_check_${variant}_fail --config $<CONFIG>)
+        set(expected "XOFFSET_CONFIG_MISMATCH|LNK2038|failifmismatch")
+    endif()
+    set_tests_properties(config_check_${variant}_fail PROPERTIES
+        LABELS "config_check"
+        PASS_REGULAR_EXPRESSION "${expected}")
+endforeach()

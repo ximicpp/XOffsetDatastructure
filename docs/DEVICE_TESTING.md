@@ -1,6 +1,6 @@
-# Real-device testing (2.0.0)
+# Real-device testing (2.0.0-preview.1)
 
-This page describes real-device testing for 2.0.0: pull this version on a clean computer, connect the
+This page describes real-device testing for 2.0.0-preview.1: pull this version on a clean computer, connect the
 phone over USB, run one command, and send back the result file.
 
 Sections 1–6 cover an **Android phone + Linux server**: functional checks, SLG timing and memory limits;
@@ -47,7 +47,7 @@ colima start --cpu 4 --memory 6 --disk 40    # or use Docker Desktop
 **Linux**: git, python3, unzip, ninja, docker (the current user can run `docker info`), CMake 3.30 or
 newer (when the distribution's is too old: `pip3 install --user cmake`).
 
-**Windows**: the script does not support it directly. The 3.2.0-rc.1 real-device results were obtained by
+**Windows**: the script does not support it directly. The internal-3.2.0-rc.1 real-device results were obtained by
 running the script inside WSL2 (Ubuntu 22.04) and connecting to the phone through Windows' `adb.exe`, with
 a separate adb wrapper: it converts WSL paths to Windows paths with `wslpath -w` and keeps the trailing
 `/.` of directories (without it, `adb push` puts the corpus one directory level deeper and the demo replay
@@ -73,9 +73,9 @@ Requirements: 64-bit (arm64-v8a), Android 9 or newer.
 ## 4. Pulling this version
 
 ```sh
-git clone --branch v2.0.0 --depth 1 https://github.com/ximicpp/XOffsetDatastructure.git xoffset-2.0.0
-cd xoffset-2.0.0
-cat XOFFSET_VERSION          # 2.0.0
+git clone --branch v2.0.0-preview.1 --depth 1 https://github.com/ximicpp/XOffsetDatastructure.git xoffset-2.0.0-preview.1
+cd xoffset-2.0.0-preview.1
+cat XOFFSET_VERSION          # 2.0.0-preview.1
 git rev-parse HEAD           # matches the commit in the release record
 ```
 
@@ -111,7 +111,7 @@ Exit codes: 0 all passed, 3 some step failed (see RESULT.md), 2 missing tools or
 At the end the script prints where the result package is, like:
 
 ```
-result: ~/xo-device/2.0.0-<first 7 of commit>/out-<UTC time>/RESULT.md; send back ~/xo-device/2.0.0-<first 7 of commit>/out-<UTC time>.tar.gz
+result: ~/xo-device/2.0.0-preview.1-<first 7 of commit>/out-<UTC time>/RESULT.md; send back ~/xo-device/2.0.0-preview.1-<first 7 of commit>/out-<UTC time>.tar.gz
 ```
 
 Send **`out-<UTC time>.tar.gz`** back to the project, and say which phone model it is. The package
@@ -157,7 +157,7 @@ bash tools/device/ios_device.sh device out-iphone --steps build,info,ctest,slg,m
 - With several iPhones connected, look up the UDID with `xcrun devicectl list devices` and add
   `--udid <UDID>`.
 - Wire corpus check: add `,corpus` to the steps and `--ref <reference directory>`. The reference
-  directory is the `~/xo-device/2.0.0-<first 7 of commit>/ref-corpus` produced by the Android script in
+  directory is the `~/xo-device/2.0.0-preview.1-<first 7 of commit>/ref-corpus` produced by the Android script in
   section 5 (written by Linux GCC 16 C++26).
 - To compare `slg` with FlatBuffers, add `--fb-include <include directory of flatbuffers 25.12.19>` and
   `--fb-generated <directory containing slg_generated.h>`; without them only XOffset is measured.
@@ -184,7 +184,7 @@ the memory limit being measured.
   free, and so must the same ports on the phone (`adb reverse` listens on the phone). When they are taken,
   switch to another set with `XO_PORT_BASE=<another start>`; the start must be below 32768: Android's
   ephemeral ports (usually 32768–60999, 37000–50000 on some vendors) can be taken by the phone's own
-  connections at any time. The 3.2.0-rc.1 script started at 47800, inside that range, and
+  connections at any time. The internal-3.2.0-rc.1 script started at 47800, inside that range, and
   `adb reverse tcp:48024` failed on a Xiaomi phone; when testing with rc.1, change the 47800 start in
   `PORTS` on line 52 and `MAPDEMO_PORT_BASE` on line 344 of the script to 17800.
 - **Re-running only one step**: `XO_SKIP="ctest corpus slg mem" bash tools/device/android_device.sh run`
@@ -196,7 +196,7 @@ the memory limit being measured.
 
 | Version | Phone | Result |
 | --- | --- | --- |
-| 3.2.0-rc.1 (5d9f63d), 2026-10-28 | Xiaomi M2102K1C, Android 11, arm64-v8a | Compile-fail tests 15/15, CTest 114/114, reference wires byte-identical, both demo clients passed ([record](validation/2026-10-28-rc1-platform/README.md)) |
+| internal-3.2.0-rc.1 (5d9f63d), 2026-10-28 | Xiaomi M2102K1C, Android 11, arm64-v8a | Compile-fail tests 15/15, CTest 114/114, reference wires byte-identical, both demo clients passed ([record](validation/2026-10-28-rc1-platform/README.md)) |
 | 3.2.x (e61ebdc6), 2026-10-29 | iPhone 15 Pro Max, iOS 26.6.2 | Resident test host: CTest 138/138, 24 reference wires byte-identical, slg verify and memory probe passed, both demo clients passed |
 | main (c304e1f7, Wire 3.0), 2026-11-24 | Xiaomi M2102K1C, Android 11, arm64-v8a, 4 KB pages (NDK r27, zero submodules) | Full CTest 206/206 (C++20 `PMR=1`) + 9/9 (C++23 `PMR=0`), 27/27 Wire 3.0 corpus byte-identical across 6 platforms, `xo_slg_bench` verify, `xo_mem_probe` (`--single` 2047 MiB, 16 GiB / 64 GiB VA), `test_v2_fuzz` 11,505 cases 0 inconsistencies |
 | main (c304e1f7, Wire 3.0), 2026-11-24 | iPhone 15 Pro Max, iOS 26.6.2, arm64, 16 KB pages (`minos 14.0`, `XOFFSET_USE_PMR=0`) | Resident test host: CTest 207/207, 0 `std::pmr` imports, 27/27 Wire 3.0 corpus byte-identical across 6 platforms, `xo_slg_bench` verify, `test_v2_fuzz` 11,505 cases 0 inconsistencies, default VA `xo_mem_probe` (`--single` 2047 MiB, `--va 64` 56 buffers / 3.5 GiB VA) |

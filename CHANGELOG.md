@@ -5,6 +5,20 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- Configuration check (`xoffset_config.hpp`, "Configuration check"; USER_GUIDE section 5): translation
+  units of one program that set the hardening switches, `XOFFSET_CHECK_UPLINK`, `XOFFSET_USE_PMR`,
+  `XOFFSET_NO_EXCEPTIONS`, `XOFFSET_THREAD_CACHES` or the storage sizes differently used to link and
+  run silently, each inline function taken from whichever unit the linker kept (an ODR violation:
+  a requested scrub skipped, a slot returned to a size class of the other configuration). Such a
+  program is now refused: GCC and Clang on ELF (Linux, Android) fail to link with a duplicate hidden
+  symbol `XOFFSET_CONFIG_MISMATCH__define_XOFFSET_switches_identically_in_every_translation_unit`;
+  MSVC and clang-cl fail to link with `LNK2038` (lld-link: `/failifmismatch`; `#pragma detect_mismatch`); on Apple (Mach-O has
+  no COMDAT groups) a static initializer per unit aborts the program before `main` with
+  "XOffset configuration mismatch". No data path changes and no library symbol is renamed. Found by the review of 2.0.0-preview.1. The
+  `NDEBUG`-dependent checks are not compared; `-DXOFFSET_NO_CONFIG_CHECK=1` turns the check off. The
+  storage size defaults moved from `xoffset_slot_storage.hpp` to `xoffset_config.hpp` unchanged.
+  Tests: `config_check_same`, `config_check_{scrub,uplink,slot}_fail`.
+
 Misuse fails loudly (new-user API review of 2.0.0):
 
 - No-exception builds: without a fatal handler, `detail::fatal` now writes the code and message to
@@ -28,22 +42,27 @@ Misuse fails loudly (new-user API review of 2.0.0):
 
 ## 2.0.0: first public SemVer release (XOffset V2)
 
-First public stable release of the XOffset V2 architecture and the start of Semantic Versioning
-([RELEASING.md](docs/RELEASING.md) section 1.1). Historical `3.0.0`–`4.3.0` tags below were
-pre-public internal V2 iterations succeeding the legacy `v1.0.0` and `v2.0-*` prototypes; from
-`2.0.0` onward, incompatible wire, delta or public API changes come only in a new major version, and
-every `2.x` release interoperates on Wire 3.0 and Delta 2.0. Stable installs now support CMake
-`SameMajorVersion` `find_package` version matching (prereleases remain `exact-full-version-only`).
-Release evidence on the candidate `75122b23` (the release commit changes only documentation, the
-source-archive tool and `SOURCE_MANIFEST.json`): pre-release K4 fuzz (`--budget hour`) with 0
+## 2.0.0-preview.1: first public preview of XOffset V2
+
+First public preview of the XOffset V2 architecture, published on 2026-11-25 as `2.0.0` and renamed
+`2.0.0-preview.1` on 2026-11-26: the public API, the wire format and the delta format may still change
+until the final 2.0.0, which starts Semantic Versioning ([RELEASING.md](docs/RELEASING.md) section
+1.1). The internal builds below (tags `internal-3.0.0` to `internal-4.3.0`, named `v3.0.0`–`v4.3.0`
+until 2026-11-26) were pre-public V2 iterations after the legacy `v1.0.0` and `v2.0-*` prototypes.
+From the final `2.0.0` onward, incompatible wire, delta or public API changes come only in a new major
+version, and every `2.x` release interoperates on Wire 3.0 and Delta 2.0. Stable installs support
+CMake `SameMajorVersion` `find_package` version matching; prereleases such as this preview remain
+`exact-full-version-only`. Release evidence on the candidate `75122b23` (the release commit changes
+only documentation, the source-archive and version tools, `XOFFSET_VERSION` and
+`SOURCE_MANIFEST.json`): pre-release K4 fuzz (`--budget hour`) with 0
 findings (GCC 16 ASan+UBSan differential, 4 × 550,195 cases + replay; P2996 libFuzzer, 6 reflection and 5 field-list targets
 including `schema_family`; 3-way outcome-diff identical across reflection, field-list and
 no-exceptions builds); `--release` validation 28/28: Linux C++26 `gcc`/`asan`/`tsan`/`p2996` 287/287,
 8-column C++20/23 matrix 252/252, MSVC C++20/C++23, clang-cl and MinGW under Wine and Android NDK
 r29/r30 under QEMU 252/252 each plus 52 no-exceptions tests, wire matrix 8 builds × 64 reads with the
-same bytes, map state demo 202 verdicts. Ir gate against v4.3.0 on GCC 16 and P2996: every total
-0.9990–1.0001 and every stage 0.9954–1.0004; the benchmark programs differ from v4.3.0 only in
-growth paths that can report a capacity error, so the performance numbers measured on 4.3.0 stand.
+same bytes, map state demo 202 verdicts. Ir gate against internal-4.3.0 on GCC 16 and P2996: every total
+0.9990–1.0001 and every stage 0.9954–1.0004; the benchmark programs differ from internal-4.3.0 only in
+growth paths that can report a capacity error, so the performance numbers measured on internal-4.3.0 stand.
 
 - CMake packaging (`cmake/XOffsetVersion.cmake`, `XOffsetDatastructureConfig.cmake.in`,
   `XOffsetDatastructureConfigVersion.cmake.in`, `tools/prepare_release.py`,
@@ -73,21 +92,21 @@ growth paths that can report a capacity error, so the performance numbers measur
   tier): the map state demo built with GCC 16 and `demo/mapstate/tools/run_all_tiers.sh` with the
   schema version-1 client beside the current one (self-test, schema lock check, 1 / 100 / 10000 units
   x 500 steps in both buffer modes, failure inputs). The demo is the only run of the server to client
-  path between processes over TCP; its `writeback` self-test failed from 4.2.0 until the fix below
+  path between processes over TCP; its `writeback` self-test failed from internal-4.2.0 until the fix below
   without any validation step noticing.
-- Performance documentation measured on 4.3.0. PERFORMANCE.md section 2 comes from a new
+- Performance documentation measured on internal-4.3.0. PERFORMANCE.md section 2 comes from a new
   `bench/premises` run (2026-11-25, 31 processes, `results/2026-11-25/`): the churned-buffer losses of
-  the 4.1.0 run are gone under the default `automatic` emission (from 2.9 KB up, trusted 0.32–0.60
+  the internal-4.1.0 run are gone under the default `automatic` emission (from 2.9 KB up, trusted 0.32–0.60
   and full validation 0.51–0.76 of zpp::bits), and full validation loses narrowly only below about
   80 bytes (1.07 at 68 bytes). The SLG demo cases against all five rivals: trusted tier 15 wins, 0
-  ties, 0 losses (4.1.0: 13 wins, 2 ties). Section 3 has the 4.3.0 memory run: RSS 538.3 MiB, 0.92x the
+  ties, 0 losses (internal-4.1.0: 13 wins, 2 ties). Section 3 has the internal-4.3.0 memory run: RSS 538.3 MiB, 0.92x the
   smallest rival, page tables 0.42%. The examples and guides no longer recommend
   `XWireEmission::zero_runs` across machines: it always sends the churned image and took 0.99–9.5
   times zpp::bits's time where the default took 0.32–0.60; `server_to_client` and `server_to_server`
   send with the default. Library unchanged.
 - Map state demo: `mapdemo_selftest` `writeback` passes again. Its client sends the image
   (`XWireEmission::free_runs`), so the bytes it hides in a vector's spare capacity reach A; since
-  4.2.0 the default `save_verified` may send the compact wire, which leaves them behind, and the test
+  internal-4.2.0 the default `save_verified` may send the compact wire, which leaves them behind, and the test
   failed. A's check is unchanged: its `save_compact` rebuild drops those bytes. Library and wire
   unchanged.
 - README trimmed to a short description, the CppCon 2024 `Character` benchmark and a quick start. The
@@ -95,7 +114,7 @@ growth paths that can report a capacity error, so the performance numbers measur
   description of the arena moved to the new `docs/HOW_IT_WORKS.md`, the CppCon 2024 `Character` notes
   to PERFORMANCE.md section 2, and the tested compiler floors and the default language standard to
   BUILD_AND_PLATFORMS.md. Documentation only.
-- Threads: 2.0.0 supports one thread per buffer. The new USER_GUIDE section 3.6 states the rule: a
+- Threads: 2.0.0-preview.1 supports one thread per buffer. The new USER_GUIDE section 3.6 states the rule: a
   buffer, with its proxies, `XHandle`s, delta baselines and `edit()`/`read()` scopes, is used by one
   thread at a time, reads included (a proxy's first use, a `read()` scope and `save_delta_into` with
   touches update the buffer's own bookkeeping); one state goes to many connections as one saved copy;
@@ -138,13 +157,20 @@ growth paths that can report a capacity error, so the performance numbers measur
   local roots could use them), and about 32,700 live VM-backed buffers per process on Linux.
   DEPLOYMENT section 4 states that string contents, enum values and floating-point values are not
   validated.
-- Source archive (`xoffsetdatastructure-2.0.0.tar.gz`): ships every current document (`docs/*.md`,
+- Source archive (`xoffsetdatastructure-2.0.0-preview.1.tar.gz`): ships every current document (`docs/*.md`,
   `SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`) and the benchmark and map state demo reports
   they link to. Before, it shipped four documents, and most links of its README had no target in the
   archive. `tools/prepare_release.py` now refuses to create or audit an archive in which a relative
   Markdown link has no target. Library and wire unchanged.
+- Version: `XOFFSET_VERSION` is `2.0.0-preview.1`; `preview` joins `alpha`, `beta` and `rc` as a
+  prerelease identifier (`cmake/XOffsetVersion.cmake`, `tools/prepare_release.py`,
+  `tools/validate_vm_package.py`). Like every prerelease, the install refuses versioned `find_package`
+  requests: discover it unversioned ([BUILD_AND_PLATFORMS.md](docs/BUILD_AND_PLATFORMS.md)).
+- Internal builds renamed: the tags `v3.0.0` to `v4.3.0` (15 tags, with `v3.2.0-rc.1` and `v3.2.0-rc.2`) are
+  now `internal-3.0.0` to `internal-4.3.0` on the same commits, and the GitHub releases of `internal-4.2.0` and `internal-4.3.0` are
+  marked pre-release, so none of them is taken for a release newer than 2.0.0.
 
-## 4.3.0: add-only schema evolution
+## internal-4.3.0: add-only schema evolution
 
 A type can gain fields without conversion: a field added in reserved `XSpare<N>` bytes keeps the first
 version's fingerprint, so old and new programs exchange whole wires, image deltas and stored images
@@ -159,8 +185,8 @@ ASan+UBSan differential, 4 × 662,370 cases + replay; P2996 libFuzzer, 6 reflect
 targets including `schema_family`; 3-way outcome-diff); `--release` validation 27/27: Linux C++26
 `gcc`/`asan`/`tsan`/`p2996` 282/282, 8-column C++20/23 matrix 247/247, MSVC C++20/C++23, clang-cl and
 MinGW under Wine and Android NDK r29/r30 under QEMU 247/247 each plus 52 no-exceptions tests, wire
-matrix 8 builds × 64 reads with the same bytes. Ir gate against v4.2.0: every total and stage 1.0000
-on GCC 16 and P2996, and the benchmark programs have the same machine code as v4.2.0.
+matrix 8 builds × 64 reads with the same bytes. Ir gate against internal-4.2.0: every total and stage 1.0000
+on GCC 16 and P2996, and the benchmark programs have the same machine code as internal-4.2.0.
 
 - Compatibility policy ([RELEASING.md](docs/RELEASING.md) section 1.1, USER_GUIDE section 8,
   SECURITY.md): 4.x releases keep promising nothing between versions; from 5.0.0, the first release
@@ -226,7 +252,7 @@ on GCC 16 and P2996, and the benchmark programs have the same machine code as v4
   `scene_units` from them, so A sends a version-1 client the same wires as any client, deltas included,
   and forwards write-backs between both versions (it converted every snapshot for it before).
 
-## 4.2.0: one-image Wire 3.0 and in-place relayout
+## internal-4.2.0: one-image Wire 3.0 and in-place relayout
 
 Wire format 3.0 merges the arena image and the wire into one 40-byte-header format with an in-band
 allocator and whole-state delta format 2.0, `XWireEmission::automatic` emits churned buffers
@@ -241,7 +267,7 @@ libFuzzer executions across 9 reflection/fieldlist targets + 3-way outcome-diff)
 `gcc`/`asan`/`tsan`/`p2996` and 6-column C++20/23 matrix, Windows MSVC C++20/23 (214/214 each),
 macOS 12.0 C++20/23 and iOS 14.0 simulator (214/214 each) all pass with 27/27 Wire 3.0 corpus
 identity (plus 2026-11-24 physical Android 11 and iPhone 15 Pro Max verification). Ir gate against
-v4.1.0: 0 failures, every scenario total level or better (`slg.A`–`slg.D` 0.863–0.976,
+internal-4.1.0: 0 failures, every scenario total level or better (`slg.A`–`slg.D` 0.863–0.976,
 `formal.emit_after`/`mutate`/`reload` 0.912–0.959); warnings on `reloc.map/set.erase/find`
 (1.020–1.035) and GCC `slg.A.apply` (1.040), plus ledger exemptions for `slg.B.back_encode` and
 P2996 `slg.A.apply`.
@@ -502,18 +528,18 @@ P2996 `slg.A.apply`.
   and small messages tie only under full validation). Churn matters most: one read/write pass makes
   the trusted tier lose from about 11 KB messages, and `save_compact` brings the lead back. README:
   the tuned read/write layout ties cista. Documentation and benchmark only.
-- Apple clang client columns re-run on the v4.1.0 tag (macOS arm64 C++20 and C++23, iOS 27.0 simulator
+- Apple clang client columns re-run on the internal-4.1.0 tag (macOS arm64 C++20 and C++23, iOS 27.0 simulator
   C++20): full CTest 211/211 each, the 24-file reference corpus accepted and written byte for byte.
-  Documentation only; the last such run was for 3.3.0.
+  Documentation only; the last such run was for internal-3.3.0.
 
-## 4.1.0: speed-first defaults
+## internal-4.1.0: speed-first defaults
 
 Hardening and zeroing become compile-time switches, off by default; the client uplink bounds check stays
 on. Faster first growth of `XVector`, a fairer CppCon 2024 comparison, and an English-only, shorter
 documentation set. Pre-release scorecard: 19 main cells, 16 wins, 3 ties, 0 losses
 ([PERFORMANCE.md](docs/PERFORMANCE.md)); pre-release fuzz with no findings; release validation 27/27.
 Ir gate warnings (no failures, every total level or better): GCC `reloc.str.assign_short.copy` 1.039 and
-P2996 `reloc.vec.push_back` 1.040 against 4.0.0; the same rows on the other compiler are level.
+P2996 `reloc.vec.push_back` 1.040 against internal-4.0.0; the same rows on the other compiler are level.
 
 - `reset()` no longer zeroes the payload it discards (`XOFFSET_SCRUB_RESET`, 0 by default, 1 with
   `XOFFSET_HARDENED=1`). **Behaviour change:** the next content's slack, string tails and padding
@@ -529,7 +555,7 @@ P2996 `reloc.vec.push_back` 1.040 against 4.0.0; the same rows on the other comp
 - **Hardening is opt-in** (speed first). Measures that cost time on mutate and send are compile-time
   switches, 0 by default: `XOFFSET_SCRUB_POPPED`, `XOFFSET_SCRUB_ERASED`, `XOFFSET_SCRUB_PADDING`,
   `XOFFSET_PIN_QUARANTINE`, `XOFFSET_SAVE_SELF_CHECK`. `XOFFSET_HARDENED=1` turns on every one a build
-  does not set itself (the behaviour up to 4.0.0). **Behaviour change:** a default build can carry
+  does not set itself (the behaviour up to internal-4.0.0). **Behaviour change:** a default build can carry
   bytes of removed elements and padding in `save_verified` output and deltas; use `save_compact` or a
   hardened build where a receiver must not see them ([threat model](docs/V2_THREAT_MODEL.md) 4.1).
 - `XVector`: an empty vector's first block holds at least 4 elements and 32 bytes; `push_back` of a
@@ -545,7 +571,7 @@ P2996 `reloc.vec.push_back` 1.040 against 4.0.0; the same rows on the other comp
   removed from the tree (see `docs/ARCHIVED_EVIDENCE.md`). The source package now carries
   `docs/BUILD_AND_PLATFORMS.md`.
 
-## 4.0.0: shared deltas in the library
+## internal-4.0.0: shared deltas in the library
 
 Pre-release scorecard: 19 main cells, 14 wins, 5 ties, 0 losses ([PERFORMANCE.md](docs/PERFORMANCE.md)).
 Release validation 27/27; pre-release fuzz with no findings.
@@ -560,7 +586,7 @@ Release validation 27/27; pre-release fuzz with no findings.
 - `tools/perf_gate/repro_scorecard.sh`: one command from a ref to the SLG scorecard. bench/slg gains a
   zpp_bits shared-encoding rival for the D cells.
 
-## 3.6.0: losing cells and memory
+## internal-3.6.0: losing cells and memory
 
 - Growth policy: `XGrowPolicy::Relocating` buffers move when they outgrow their storage. Proxies
   (`XRef<T>`, `ref<T>()`, named field accessors, batch operations) and pinned `edit()` / `read()`
@@ -572,7 +598,7 @@ Release validation 27/27; pre-release fuzz with no findings.
 - `XReceiver::view` prefetches wires of at most 1 KiB.
 - Cloud x86 scorecard columns gate releases (`tools/perf_gate/x86_columns.sh`).
 
-## 3.5.0: performance on the production platform
+## internal-3.5.0: performance on the production platform
 
 - Shared deltas are a product interface: `XReceiver<L>::apply_sync`, format XS 1.0;
   `fuzz_shared_delta`.
@@ -583,22 +609,22 @@ Release validation 27/27; pre-release fuzz with no findings.
 - Faster small-message server send on x86 (`XBufferCore` 64-byte aligned, hot fields in the first line).
 - `tools/fuzz_prerelease.sh --budget hour`.
 
-## 3.4.0: delta sync on trusted links
+## internal-3.4.0: delta sync on trusted links
 
 - `XReceiver<L>::apply_delta<T>`: deltas checked at the link's tier. Delta format 1.0 frozen.
 - Fuzzing covers the trusted tier.
 - Faster `XMap` / `XSet` random-order inserts and small-message saves.
 - VM storage keeps its host header inside the payload's first 64 bytes.
-- Withdrawn: the `root<T>()` cache refill of 3.3.1 (slower on the Mac).
+- Withdrawn: the `root<T>()` cache refill of internal-3.3.1 (slower on the Mac).
 
-## 3.3.1: trusted receive
+## internal-3.3.1: trusted receive
 
 - `xoffset_receiver.hpp`: `XReceiver<XLink>` picks the receive check by connection type
   (trusted tier for server links).
 - A maximum capacity above the 2 GiB payload limit fails at create with `capacity_exceeded`.
 - Merges and releases are judged in the cloud only.
 
-## 3.3.0: native delta sync
+## internal-3.3.0: native delta sync
 
 - Delta sync (`xoffset_delta.hpp`, [DELTA_SYNC.md](docs/DELTA_SYNC.md)): `XDeltaBaseline`,
   `save_delta_into<T>`, `XBuffer::touch` with `touched_only`, baselines without a copy; deltas are
@@ -609,13 +635,13 @@ Release validation 27/27; pre-release fuzz with no findings.
 - Many hot-path improvements (inline small-block bump, root cache, in-place reloads keep the free
   table, one-pass `save_verified_into`). `bench/hft` added (record only).
 
-## 3.2.1
+## internal-3.2.1
 
 - iOS test host serves by default; `demo/mesh` batch fixes. Library unchanged.
 
-## 3.2.0: clients on native compilers
+## internal-3.2.0: clients on native compilers
 
-Includes 3.2.0-rc.1 and rc.2.
+Includes internal-3.2.0-rc.1 and rc.2.
 
 - **Client build path:** C++20/C++23 with one `XOFFSET_RECORD` field list per record; MSVC, Android
   NDK Clang and Apple clang build clients. Builds without exceptions (`-fno-exceptions`, `/EHs-c-`)
@@ -629,14 +655,14 @@ Includes 3.2.0-rc.1 and rc.2.
 - Demos: `demo/mapstate` (Linux servers to native clients), `demo/mesh` (cross-device). iOS test host,
   `tools/schema_guard`, `contrib/zstd_dict`. Opt-in `XOFFSET_OWNER_MAP_SHARED`.
 
-## 3.1.0: wire format 2.1
+## internal-3.1.0: wire format 2.1
 
 - **Breaking:** wire format 2.1 (40-byte header, 12-byte container heads). A 2.1 reader rejects
   2.0 wires.
 - Faster dense small-message reloads and `XVector` inserts.
 - Nightly libFuzzer without GitHub Actions.
 
-## 3.0.0: first release of the C++26 line
+## internal-3.0.0: first release of the C++26 line
 
 - `save_compact` / `save_compact_into` (compact wire, message composition from parts);
   `XSaveOptions{.emission}`; `XBuffer::clone()` / `clone_into()`;

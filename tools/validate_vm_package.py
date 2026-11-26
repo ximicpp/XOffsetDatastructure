@@ -28,7 +28,7 @@ DEPENDENCY_LICENSES = ["external/boost/LICENSE_1_0.txt", "external/typelayout/LI
 # Source path -> installed name under share/XOffsetDatastructure.
 RELEASE_FILES = {"XOFFSET_VERSION": "VERSION", "CHANGELOG.md": "CHANGELOG.md",
                  "docs/ALPHA_COMPATIBILITY.md": "ALPHA_COMPATIBILITY.md"}
-VERSION_PATTERN = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(alpha|beta|rc)\.(0|[1-9][0-9]*))?")
+VERSION_PATTERN = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(alpha|beta|preview|rc)\.(0|[1-9][0-9]*))?")
 
 
 def read_version(source: Path) -> dict[str, str]:

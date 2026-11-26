@@ -43,40 +43,7 @@
 #endif
 
 
-#ifndef XOFFSET_SLOT_MAX_BYTES
-#  define XOFFSET_SLOT_MAX_BYTES (256u * 1024u)
-#endif
-#ifndef XOFFSET_RELOCATING_RESERVE_BYTES
-#  define XOFFSET_RELOCATING_RESERVE_BYTES (1024u * 1024u)
-#endif
-// Where a relocating buffer goes when its first reservation is full: 0 is a
-// reservation of its whole maximum (servers: one move), otherwise that many
-// bytes and then doubling (phones, whose address space is small: iOS
-// without the extended virtual addressing entitlement has about 7 GiB).
-#ifndef XOFFSET_RELOCATE_STEP_BYTES
-#  if defined(__ANDROID__)
-#    define XOFFSET_RELOCATE_STEP_BYTES (64u * 1024u * 1024u)
-#  elif defined(__APPLE__)
-#    include <TargetConditionals.h>
-#    if TARGET_OS_IPHONE
-#      define XOFFSET_RELOCATE_STEP_BYTES (16u * 1024u * 1024u)
-#    else
-#      define XOFFSET_RELOCATE_STEP_BYTES 0u
-#    endif
-#  else
-#    define XOFFSET_RELOCATE_STEP_BYTES 0u
-#  endif
-#endif
-#ifndef XOFFSET_SLOT_RETAIN_BYTES
-#  define XOFFSET_SLOT_RETAIN_BYTES (64u * 1024u * 1024u)
-#endif
-// A retired arena block of at least this many bytes gives its whole pages
-// back to the OS instead of being cleared with memset (Linux; 0 disables).
-// Arena storage is always private anonymous memory (VM owner or slot), so the
-// pages read back as zero, which is what the M3 hole rule needs.
-#ifndef XOFFSET_RETIRE_DISCARD_BYTES
-#  define XOFFSET_RETIRE_DISCARD_BYTES (16u * 1024u)
-#endif
+// XOFFSET_SLOT_MAX_BYTES and the other storage sizes: xoffset_config.hpp.
 
 namespace XOffsetDatastructure {
 // Owner-table lookups sit on every allocate, grow and retire; GCC stops

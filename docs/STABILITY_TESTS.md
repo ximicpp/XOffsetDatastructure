@@ -46,21 +46,21 @@ Clients (iOS, Android, Windows, 64-bit little-endian) build with the field-list 
 native compiler, using the same library and the same wire as the server. It is not a CTest item; each
 client target runs `tools/native_targets.sh` once:
 
-| Check | What it tests | Status (4.2.0 and 4.3.0) |
+| Check | What it tests | Status (internal-4.2.0 and internal-4.3.0) |
 |---|---|---|
-| Full CTest on the target (Release) | The tests of K0–K7 above that run in both builds pass on the target's compiler and standard library | Windows x64 (native MSVC 19.44 C++20 and C++23, 214/214 each), macOS 12.0 arm64 (Apple clang 21, C++20 and C++23, 214/214 each) and the iOS 14.0 simulator (Apple clang 21, C++20, 214/214) all pass on 4.2.0; physical real devices verified on 2026-11-24 with Wire 3.0: Android 11 arm64-v8a (NDK 27, 206/206) and iPhone 15 Pro Max arm64 (`minos 14.0`, `XOFFSET_USE_PMR=0`, 207/207) ([CLIENT_TARGETS.md](CLIENT_TARGETS.md), [DEVICE_TESTING.md](DEVICE_TESTING.md)). On 4.3.0 the cloud Wine/QEMU columns (MSVC 19.44 C++20 and C++23, clang-cl 19 and MinGW GCC 16 under Wine; Android NDK r29 and r30 under QEMU) pass 247/247 each plus 52 no-exceptions tests |
-| Reading the reference corpus | All 27 corpus files written by the server's C++26 reflection build are accepted by the target's `load_verified` | Accepted by all of the targets above (27/27 Wire 3.0 files across Linux, Windows, macOS, iOS simulator, physical Android 11 and physical iPhone 15 Pro Max; on 4.3.0 also every cloud column, 8 builds, 64 reads) |
+| Full CTest on the target (Release) | The tests of K0–K7 above that run in both builds pass on the target's compiler and standard library | Windows x64 (native MSVC 19.44 C++20 and C++23, 214/214 each), macOS 12.0 arm64 (Apple clang 21, C++20 and C++23, 214/214 each) and the iOS 14.0 simulator (Apple clang 21, C++20, 214/214) all pass on internal-4.2.0; physical real devices verified on 2026-11-24 with Wire 3.0: Android 11 arm64-v8a (NDK 27, 206/206) and iPhone 15 Pro Max arm64 (`minos 14.0`, `XOFFSET_USE_PMR=0`, 207/207) ([CLIENT_TARGETS.md](CLIENT_TARGETS.md), [DEVICE_TESTING.md](DEVICE_TESTING.md)). On internal-4.3.0 the cloud Wine/QEMU columns (MSVC 19.44 C++20 and C++23, clang-cl 19 and MinGW GCC 16 under Wine; Android NDK r29 and r30 under QEMU) pass 247/247 each plus 52 no-exceptions tests |
+| Reading the reference corpus | All 27 corpus files written by the server's C++26 reflection build are accepted by the target's `load_verified` | Accepted by all of the targets above (27/27 Wire 3.0 files across Linux, Windows, macOS, iOS simulator, physical Android 11 and physical iPhone 15 Pro Max; on internal-4.3.0 also every cloud column, 8 builds, 64 reads) |
 | Writing the corpus, `diff -r` | The corpus written by the target is byte-identical to the reference | Byte-identical on all of the targets above |
-| Engine macros (`test_engine_macros`, `test_engine_macros_noexc`, in the full CTest) | The client headers build and run after the function-like macros engines define first (Unreal Engine's `check`, `verify`, `ensure`, `LIKELY`; Apple `AssertMacros.h`'s `check`, `verify`, `require`) | Added in 4.3.0; runs wherever the full CTest runs |
+| Engine macros (`test_engine_macros`, `test_engine_macros_noexc`, in the full CTest) | The client headers build and run after the function-like macros engines define first (Unreal Engine's `check`, `verify`, `ensure`, `LIKELY`; Apple `AssertMacros.h`'s `check`, `verify`, `require`) | Added in internal-4.3.0; runs wherever the full CTest runs |
 
 The scope of the guarantee is in [USER_GUIDE.md](USER_GUIDE.md) section 8, and per-target results in
 [CLIENT_TARGETS.md](CLIENT_TARGETS.md). Every client target is run before each release
 ([RELEASING.md](RELEASING.md)).
 
-## K9 (core promise, since 3.5.0): native delta sync
+## K9 (core promise, since internal-3.5.0): native delta sync
 
 Only the changed bytes are sent; the receiver merges them and checks per the link's tier (API added in
-3.3, promoted to a core promise in 3.5.0). Whole-state deltas (format 2.0): `test_delta_sync` (rejection
+3.3, promoted to a core promise in internal-3.5.0). Whole-state deltas (format 2.0): `test_delta_sync` (rejection
 cases and random streams, including no-exception builds), `test_delta_format` (golden files of the frozen
 delta wire 1.0), `fuzz_delta_sync` (pre-release ASan fuzz, both server and client builds, admit versus full
 differential), `test_receiver` (`apply_delta`'s default tier per link). Full conditions in

@@ -1,4 +1,4 @@
-# XOffsetDatastructure User Guide (2.0.0, wire format 3.0)
+# XOffsetDatastructure User Guide (2.0.0-preview.1, wire format 3.0)
 
 This guide is for users of the library. It explains how to define types, build,
 modify, save and load them, and the constraints you must follow.
@@ -437,7 +437,7 @@ world.edit([&](View& w) {                  // pinned scope: plain references, as
 
 ### 3.6 Threads: one thread per buffer
 
-In 2.0.0 a buffer is used by one thread at a time. The library does not lock, and reading is not
+In 2.0.0-preview.1 a buffer is used by one thread at a time. The library does not lock, and reading is not
 free of side effects inside the buffer: a proxy creates the buffer's control block on first use, a
 `read()` or `edit()` scope counts its borrows, and `save_delta_into` with `touched_only` updates the
 touch log.
@@ -459,7 +459,7 @@ touch log.
   free directory only when it ends, and the receiver rejects that wire or delta. Save after the scope
   returns. Default builds are not affected.
 
-Several threads reading one buffer at the same time is not supported in 2.0.0.
+Several threads reading one buffer at the same time is not supported in 2.0.0-preview.1.
 
 ## 4. Saving and loading
 
@@ -778,6 +778,7 @@ if (world.relayout_advised()) (void)world.relayout();   // TypedXBuffer<World>
 | Never move-assign a container into a container in its own subtree (or the other way round, section 3.3) | Undefined behavior in Release builds |
 | The buffer object outlives its `XHandle`s and borrowed spans | Dangling access |
 | All translation units in one executable use the same header version, compile options and toolchain | Inconsistent layout or schema identity |
+| All translation units of one executable or shared library set the `XOFFSET_` hardening switches, `XOFFSET_CHECK_UPLINK`, `XOFFSET_USE_PMR`, `XOFFSET_NO_EXCEPTIONS`, `XOFFSET_THREAD_CACHES` and the storage sizes (`XOFFSET_SLOT_MAX_BYTES` and the others in `xoffset_config.hpp`) the same way (the CMake option `XOFFSET_HARDENED` does this for every target that links XOffset) | The program does not link: a duplicate symbol `XOFFSET_CONFIG_MISMATCH__...` (GCC, Clang on Linux and Android; with LTO the assembler reports it already defined) or `LNK2038` (MSVC, clang-cl, which compare the macro text). On Apple it aborts before `main` with "XOffset configuration mismatch". The `NDEBUG`-dependent checks are exempt, so debug and release units may link together; `-DXOFFSET_NO_CONFIG_CHECK=1` turns the check off |
 | Before receiving untrusted input, limit the wire length, `maximum_capacity` and the number of concurrent buffers | Even a single valid wire can use a lot of memory |
 | 64-bit little-endian platforms only, with 8-bit bytes and IEEE 754 `float` and `double` (32-bit Android builds are not supported) | `static_assert` at compile time on other platforms (section 2.3) |
 | On Apple deployment targets below macOS 14 / iOS 17 (tvOS 17, watchOS 10), `XOFFSET_USE_PMR` automatically defaults to `0` (header-only `XMemoryResource` without `<memory_resource>`); forcing `-DXOFFSET_USE_PMR=1` on those older targets requires `std::pmr` symbols absent from the older system libc++ | `#error` at compile time if `-DXOFFSET_USE_PMR=1` is forced on older Apple deployment targets |
@@ -904,8 +905,9 @@ fails to compile.
 
 ## 8. Core guarantees and API stability
 
-Pre-public internal iterations (`3.x` and `4.x`) did not promise cross-version source API or wire
-compatibility; from **2.0.0** (the first public stable release of XOffset V2), incompatible wire or
+Pre-public internal iterations (`internal-3.x` and `internal-4.x`) and the 2.0.0 previews do not promise
+cross-version source API or wire compatibility; from the final **2.0.0** (the first public stable
+release of XOffset V2), incompatible wire or
 API changes come only in a new major version, and every release of one major version reads the wires
 of every other release of it
 ([RELEASING.md section 1.1](RELEASING.md#11-compatibility-policy)). ABI stability (mixing versions in
