@@ -5,6 +5,17 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+## 2.0.0-preview.2: configuration check, and misuse that fails loudly
+
+Second preview of 2.0.0: the API, the wire format and the delta format may still change until the
+final 2.0.0. Wire 3.0 and Delta 2.0 are the same as in 2.0.0-preview.1. Behaviour changes: a program
+whose translation units set the `XOFFSET_` switches differently no longer links (on Apple it aborts
+before `main`); in no-exception builds a send from a buffer with a recorded failure calls the fatal
+handler instead of returning an empty wire; a write through a stale proxy records `XErrc::stale`.
+Published without the full release gate and the fuzz run, as decided for previews: each change
+passed the PR-tier checks (`tools/local_validate.sh` pr tier with the Ir gates), and GCC 16 and P2996
+ran again on the release commit.
+
 - Configuration check (`xoffset_config.hpp`, "Configuration check"; USER_GUIDE section 5): translation
   units of one program that set the hardening switches, `XOFFSET_CHECK_UPLINK`, `XOFFSET_USE_PMR`,
   `XOFFSET_NO_EXCEPTIONS`, `XOFFSET_THREAD_CACHES` or the storage sizes differently used to link and
@@ -39,8 +50,6 @@ Misuse fails loudly (new-user API review of 2.0.0):
   member and the type to use; a proxy of a record without a field list asks for
   `XOFFSET_RECORD`; the wire admission asserts and the base-class assert of wire types have readable
   messages; an incomplete field list no longer also reports a misleading natural-layout error.
-
-## 2.0.0: first public SemVer release (XOffset V2)
 
 ## 2.0.0-preview.1: first public preview of XOffset V2
 
