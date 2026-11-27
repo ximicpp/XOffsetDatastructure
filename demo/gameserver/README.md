@@ -149,6 +149,9 @@ What the numbers say:
 - Login, resume and migration need no extra code paths on the client: each ends in key deltas, which the
   same `apply_delta` call takes.
 
+Builds on macOS too (Apple clang 21 in C++20, P2996 Clang in C++26 with reflection), where the loop
+uses poll(); the runs above are Linux only.
+
 Checked with ThreadSanitizer and with AddressSanitizer + UndefinedBehaviorSanitizer builds of all three
 programs (three logic nodes, 200 bots, resumes and migrations): no reports.
 
