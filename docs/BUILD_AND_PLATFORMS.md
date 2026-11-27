@@ -92,7 +92,7 @@ matching C++20/C++23 compiler (or the matching P2996/GCC 16 toolchain for C++26
 installs). For storage, request `COMPONENTS storage`, link `XOffset::storage`,
 and use CMake 3.13+. From the final 2.0.0, stable packages accept any `find_package`
 request for a compatible version of the same major version (`SameMajorVersion`,
-[RELEASING.md](RELEASING.md) section 1.1); prereleases such as 2.0.0-preview.5 reject
+[RELEASING.md](RELEASING.md) section 1.1); prereleases such as 2.0.0-preview.6 reject
 numeric, `EXACT` and range requests (discover unversioned and compare
 `XOffsetDatastructure_VERSION` with `STREQUAL`).
 
@@ -104,7 +104,7 @@ include(FetchContent)
 FetchContent_Declare(
     xoffsetdatastructure
     # The release's source archive (about 3 MB): no Git history, no submodules.
-    URL https://github.com/ximicpp/XOffsetDatastructure/archive/refs/tags/v2.0.0-preview.5.tar.gz
+    URL https://github.com/ximicpp/XOffsetDatastructure/archive/refs/tags/v2.0.0-preview.6.tar.gz
 )
 set(XOFFSET_CXX_STANDARD 20 CACHE STRING "" FORCE)
 FetchContent_MakeAvailable(xoffsetdatastructure)

@@ -5,6 +5,24 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+## 2.0.0-preview.6: README and getting-started updates
+
+Sixth preview of 2.0.0: the API, the wire format and the delta format may still change until the
+final 2.0.0. The library code is the same as in 2.0.0-preview.5 (Wire 3.0 and Delta 2.0 unchanged, so
+all six previews interoperate; use the same schemas on both ends); only documents changed. Published
+without the full release gate and the fuzz run, as for every preview.
+
+- README: the example also shows the receiver (`TypedXBuffer<World>::load`, then changes in place,
+  ready to send again). The Performance section now leads with the realistic `RichCharacter`
+  benchmark across 8 libraries (trusted send + receive, receive-edit-send hop, equal-check, in-place
+  read/write) and summarizes the other workloads: the CppCon 2024 `Character`, read-only views, the
+  SLG scorecard and memory, sizes and churn (full tables in `docs/PERFORMANCE.md`). The FetchContent
+  snippet sets `XOFFSET_CXX_STANDARD` to 20 and says that C++26 reflection builds use the release
+  archive, which bundles the pinned dependencies. More links to the documents.
+- GETTING_STARTED: section 2 configures a C++20 build from a checkout and builds and runs `helloworld`
+  with the three use-case examples; the link to the removed README quick start now points to the
+  README "Use it" section and `BUILD_AND_PLATFORMS.md`.
+
 ## 2.0.0-preview.5: MSVC builds again, record elements checked in the loop without exceptions
 
 Fifth preview of 2.0.0: the API, the wire format and the delta format may still change until the

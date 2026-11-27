@@ -1,6 +1,6 @@
-# Real-device testing (2.0.0-preview.5)
+# Real-device testing (2.0.0-preview.6)
 
-This page describes real-device testing for 2.0.0-preview.5: pull this version on a clean computer, connect the
+This page describes real-device testing for 2.0.0-preview.6: pull this version on a clean computer, connect the
 phone over USB, run one command, and send back the result file.
 
 Sections 1–6 cover an **Android phone + Linux server**: functional checks, SLG timing and memory limits;
@@ -73,9 +73,9 @@ Requirements: 64-bit (arm64-v8a), Android 9 or newer.
 ## 4. Pulling this version
 
 ```sh
-git clone --branch v2.0.0-preview.5 --depth 1 https://github.com/ximicpp/XOffsetDatastructure.git xoffset-2.0.0-preview.5
-cd xoffset-2.0.0-preview.5
-cat XOFFSET_VERSION          # 2.0.0-preview.5
+git clone --branch v2.0.0-preview.6 --depth 1 https://github.com/ximicpp/XOffsetDatastructure.git xoffset-2.0.0-preview.6
+cd xoffset-2.0.0-preview.6
+cat XOFFSET_VERSION          # 2.0.0-preview.6
 git rev-parse HEAD           # matches the commit in the release record
 ```
 
@@ -111,7 +111,7 @@ Exit codes: 0 all passed, 3 some step failed (see RESULT.md), 2 missing tools or
 At the end the script prints where the result package is, like:
 
 ```
-result: ~/xo-device/2.0.0-preview.5-<first 7 of commit>/out-<UTC time>/RESULT.md; send back ~/xo-device/2.0.0-preview.5-<first 7 of commit>/out-<UTC time>.tar.gz
+result: ~/xo-device/2.0.0-preview.6-<first 7 of commit>/out-<UTC time>/RESULT.md; send back ~/xo-device/2.0.0-preview.6-<first 7 of commit>/out-<UTC time>.tar.gz
 ```
 
 Send **`out-<UTC time>.tar.gz`** back to the project, and say which phone model it is. The package
@@ -157,7 +157,7 @@ bash tools/device/ios_device.sh device out-iphone --steps build,info,ctest,slg,m
 - With several iPhones connected, look up the UDID with `xcrun devicectl list devices` and add
   `--udid <UDID>`.
 - Wire corpus check: add `,corpus` to the steps and `--ref <reference directory>`. The reference
-  directory is the `~/xo-device/2.0.0-preview.5-<first 7 of commit>/ref-corpus` produced by the Android script in
+  directory is the `~/xo-device/2.0.0-preview.6-<first 7 of commit>/ref-corpus` produced by the Android script in
   section 5 (written by Linux GCC 16 C++26).
 - To compare `slg` with FlatBuffers, add `--fb-include <include directory of flatbuffers 25.12.19>` and
   `--fb-generated <directory containing slg_generated.h>`; without them only XOffset is measured.

@@ -1,4 +1,4 @@
-# XOffsetDatastructure Deployment Guide (2.0.0-preview.5)
+# XOffsetDatastructure Deployment Guide (2.0.0-preview.6)
 
 This guide is for engineers integrating XOffset into servers and clients. It covers the
 prerequisites for releases, security and networking. API usage is in [USER_GUIDE.md](USER_GUIDE.md),

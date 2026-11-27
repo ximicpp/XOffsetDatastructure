@@ -1,6 +1,6 @@
 # XOffsetDatastructure
 
-**2.0.0-preview.5** · C++20 / C++26 · header-only · 64-bit little-endian
+**2.0.0-preview.6** · C++20 / C++26 · header-only · 64-bit little-endian
 (preview: API and wire format may change before 2.0.0)
 
 C++ structs, strings, vectors and maps live in one buffer that uses relative offsets.
@@ -68,7 +68,7 @@ widens to **12x–39x** and `FlatBuffers` to **46x–57x**.
 ```cmake
 include(FetchContent)
 FetchContent_Declare(xoffsetdatastructure
-    URL https://github.com/ximicpp/XOffsetDatastructure/archive/refs/tags/v2.0.0-preview.5.tar.gz)
+    URL https://github.com/ximicpp/XOffsetDatastructure/archive/refs/tags/v2.0.0-preview.6.tar.gz)
 set(XOFFSET_CXX_STANDARD 20 CACHE STRING "" FORCE) # zero external deps: GCC 13+, Clang 18+, Apple Clang 21+, MSVC 19.44+
 FetchContent_MakeAvailable(xoffsetdatastructure)
 target_link_libraries(my_app PRIVATE XOffset::xoffset)
@@ -76,7 +76,7 @@ target_link_libraries(my_app PRIVATE XOffset::xoffset)
 
 C++20 / C++23 uses only the C++ standard library (`XOFFSET_RECORD` per struct). For C++26
 reflection (GCC 16+ or P2996 Clang, no `XOFFSET_RECORD` required), use the release archive
-([xoffsetdatastructure-2.0.0-preview.5.tar.gz](https://github.com/ximicpp/XOffsetDatastructure/releases/download/v2.0.0-preview.5/xoffsetdatastructure-2.0.0-preview.5.tar.gz),
+([xoffsetdatastructure-2.0.0-preview.6.tar.gz](https://github.com/ximicpp/XOffsetDatastructure/releases/download/v2.0.0-preview.6/xoffsetdatastructure-2.0.0-preview.6.tar.gz),
 which bundles pinned dependencies) with `XOFFSET_CXX_STANDARD=26`.
 
 Next: [GETTING_STARTED.md](docs/GETTING_STARTED.md) ·
