@@ -1,9 +1,9 @@
 # Getting started: core use cases and recommended patterns (2.0.0-preview.5)
 
 This document walks new users through the use cases: server to server, server to client, and client
-uplink. Each use case has a runnable example, and the example is the recommended pattern. First get
-`helloworld` running with the [README's C++20 quick start](../README.md#quick-start-c20); the full API
-description is in the [user guide](USER_GUIDE.md).
+uplink. Each use case has a runnable example, and the example is the recommended pattern. For CMake
+integration see [README](../README.md#use-it) and [BUILD_AND_PLATFORMS.md](BUILD_AND_PLATFORMS.md);
+the full API description is in the [user guide](USER_GUIDE.md).
 
 ## 1. What problem this library solves
 
@@ -21,11 +21,13 @@ same C++ type definitions:
 
 ## 2. Run the examples first
 
-In the build directory of the README quick start (a C++20 configuration is enough; the C++26 reflection
-build works as well):
+Configure a C++20 build from a checkout of this repository (a C++26 reflection build works as well)
+and build the examples:
 
 ```sh
-cmake --build build --config Release --target server_to_client client_uplink server_to_server
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DXOFFSET_CXX_STANDARD=20
+cmake --build build --config Release --target helloworld server_to_client client_uplink server_to_server
+./build/bin/Release/helloworld
 ./build/bin/Release/server_to_client
 ./build/bin/Release/client_uplink
 ./build/bin/Release/server_to_server
