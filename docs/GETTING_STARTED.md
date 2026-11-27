@@ -250,6 +250,9 @@ player.save_verified_into(out);
 
 ## 9. What to read next
 
+- [GAME_SERVER_ARCHITECTURE.md](GAME_SERVER_ARCHITECTURE.md): the use cases put together into an SLG / MMO
+  back end (one buffer per entity, gateway, logic shards, storage, migration, schema evolution), with a
+  runnable example ([`examples/game_server`](../examples/game_server/game_server.cpp)).
 - [User guide](USER_GUIDE.md): all the rules for defining types, modifying, saving and loading, when
   references are invalidated, and error handling.
 - [Deployment guide](DEPLOYMENT.md): same-version releases, untrusted input, capacity limits, networking
