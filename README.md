@@ -15,7 +15,7 @@ struct World { std::uint64_t tick; XVector<Unit> units; XSpare<16> spare{}; };
 XOFFSET_RECORD(World, tick, units, spare)
 XOFFSET_REGISTER_SCHEMA_NAME(World, "game.World")
 
-auto world = TypedXBuffer<World>::create(4096);
+auto world = TypedXBuffer<World>::create(4096); // 4096 B to start, not a limit: grows (default cap 64 MiB)
 auto u = world.root().units().emplace_back();   // change in place
 u.id() = 1; u.hp() = 100; u.name() = "Archer";
 std::string wire;
