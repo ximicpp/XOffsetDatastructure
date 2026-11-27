@@ -298,6 +298,10 @@ namespace detail {
     template<class T>
     XOFFSET_DETAIL_NOINLINE vstatus VerifiedPathsAccess::save_into_general_v(XBufferCore& source, std::string& out,
                                                                              XSaveOptions options) {
+        // An empty buffer (moved from, or never given content) has no image
+        // and no owner to resolve: refused as save_verified refuses it.
+        if (!source.arena()) [[unlikely]]
+            XOFFSET_VFAIL(XException, XErrc::no_root, "save_verified_into<T>(): no root object of requested type");
         // 512 or more free bytes that still go as the image (below the
         // compact share, below one run): the small path's copy.
         if ((options.emission == XWireEmission::automatic || options.emission == XWireEmission::free_runs) &&

@@ -478,6 +478,16 @@ void typed_access_states() {
     auto donor = source.clone();
     auto taker = std::move(donor);
     need(saves_agree(taker), "move target: saves agree");
+    // The moved-from buffer is empty: every save refuses it (no_root)
+    // instead of resolving an owner it no longer has.
+    need(refused(donor), "moved-from buffer: refused");
+    {
+        auto compact = donor.try_save_compact<FpRoot>();
+        need(!compact && compact.code() == XErrc::no_root, "moved-from buffer: compact save refused");
+    }
+    // Given content again, it saves as any buffer.
+    donor = source.clone();
+    need(saves_agree(donor), "moved-from buffer given content again: saves agree");
 
     // A fresh typed buffer and the fast loads (section 1) have access.
     auto fresh = XBuffer::create<FpRoot>(4096, source_cap());
