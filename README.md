@@ -57,20 +57,6 @@ full table in [docs/PERFORMANCE.md](docs/PERFORMANCE.md)):
   `FlatBuffers + Verifier`, and **34x–44x** faster than `Protocol Buffers`. In-place read/write
   remains #1 (**509 ns** vs `606–836 ns`).
 
-## Capabilities & scope
-
-- **Delta & viewport sync**: send only changed bytes once a peer holds a copy
-  ([DELTA_SYNC.md](docs/DELTA_SYNC.md), [SHARED_DELTA.md](docs/SHARED_DELTA.md)).
-- **Tiered validation**: `XReceiver` matches the check level to the link — *trusted* (server peers
-  and server-to-client), *bounds* (read-only client uplink), or *full* (untrusted mutable reload)
-  ([V2_THREAT_MODEL.md](docs/V2_THREAT_MODEL.md)).
-- **Schema evolution & pinning**: add-only fields via `XSpare<N>`, connect-time handshake, and
-  compile-time layout pins across compilers ([SCHEMA_EVOLUTION.md](docs/SCHEMA_EVOLUTION.md),
-  [SCHEMA_PINS.md](docs/SCHEMA_PINS.md)).
-- **Non-goals**: 64-bit little-endian C++ only (not cross-language); no built-in compression
-  (layer zstd/LZ4 outside the wire); validation guarantees structural/memory safety, not
-  authentication or encryption (use TLS/mTLS on untrusted links).
-
 ## Use it
 
 ```cmake
