@@ -28,34 +28,40 @@ recv.root().units()[0].name() = "Elite Archer";
 
 ## Performance
 
-CppCon 2024 benchmark, `Character` (~3 KB, buffer reused), x86-64 Linux, GCC 16.2 `-O3`
-([method](bench/cppcon2024/README.md), [all numbers](docs/PERFORMANCE.md)):
+Realistic RPG character (`RichCharacter`, ~12 KB, depth 4, 373 containers/strings),
+x86-64 Linux, GCC 16.2 `-O3`, 9 processes ([method](bench/cppcon2024/README.md),
+[all numbers](docs/PERFORMANCE.md)):
 
-| Library | Send + receive (ns) | Read/write (ns) | Wire (B) |
-| --- | ---: | ---: | ---: |
-| XOffset | **121** | **310** | 3,160 |
-| zpp::bits | 775 | 675\* | 2,916 |
-| FlatBuffers | 1,311 | 675\* | 3,680 |
-| cista offset | 1,377 | 597 | 3,216 |
-| cista raw | 1,392 | 541 | 3,216 |
-| Cap'n Proto | 5,202 | 675\* | 3,656 |
-| MessagePack | 12,335 | 675\* | 3,542 |
-| Protocol Buffers | 18,840 | 1,100 | 4,095 |
+| Library | Send + recv, trusted (ns) | Hop: recv→edit→send (ns) | Equal-check: varied / fresh (ns) | In-place R/W (ns) |
+| --- | ---: | ---: | ---: | ---: |
+| **XOffset** | **1,027** | **1,818** | **3,201** / **3,418** | **509** |
+| cista offset | 11,250 *(11x)* | 13,451 *(7.4x)* | 46,404 / 44,202 *(14.5x / 13x)* | 836 |
+| cista raw | 12,045 *(12x)* | 13,790 *(7.6x)* | 41,808 / 38,627 *(13x / 11x)* | 721 |
+| zpp::bits | 14,143 *(14x)* | 15,429 *(8.5x)* | 14,143 / 36,971 *(4.4x / 11x)* | 657\* |
+| Cap'n Proto | 33,191 *(32x)* | 35,113 *(19x)* | 33,191 / 62,310 *(10x / 18x)* | 657\* |
+| FlatBuffers | 36,135 *(35x)* | 37,633 *(21x)* | 45,277 / 66,847 *(14x / 20x)* | 657\* |
+| MessagePack | 55,891 *(54x)* | 60,636 *(33x)* | 55,891 / 76,421 *(17x / 22x)* | 657\* |
+| Protocol Buffers | 108,441 *(106x)* | 103,785 *(57x)* | 108,441 / 150,721 *(34x / 44x)* | 606 |
 
-\* Shared `std` container model (`FlatBuffers` and `Cap'n Proto` do not mutate variable-length
-fields in place). `121 ns` uses the trusted server tier (`231 ns` fresh vs `zpp::bits` `2,166 ns`);
-with **full-graph validation** (`reload_verified`), XOffset takes **386 ns** reuse (**2.0x**
-`zpp::bits`) and **508 ns** fresh (**4.3x**). In-place read/write leads on the 2024 model
-(**310 ns** vs `541–1,100 ns`; tuned: XOffset `123 ns`, `cista raw` `122 ns`).
+Single default XOffset layout (`save_compact()` / `slack_div = 8`; exact-reserved buffers reach
+**942 ns** varied / **1,157 ns** fresh, up to **130x**). \* Shared `std` container model
+(`FlatBuffers` and `Cap'n Proto` unpack to mutate variable-length fields).
 
-On a deeper, realistic RPG character (`RichCharacter`, ~12 KB, depth 4, 373 containers/strings;
-full table in [docs/PERFORMANCE.md](docs/PERFORMANCE.md)):
-- **Trusted send + receive**: **942 ns** varied / **1,157 ns** fresh (**9.7x–130x** vs the other
-  7 libraries); multi-hop `recv → edit → send` is **1,818 ns** (**7.4x–57x**).
-- **Equal-check (every receiver validates)**: **3,201 ns** varied / **3,418 ns** fresh — still
-  **4.4x / 10.8x** faster than `zpp::bits`, **11x–20x** faster than `cista DEEP_CHECK` and
-  `FlatBuffers + Verifier`, and **34x–44x** faster than `Protocol Buffers`. In-place read/write
-  remains #1 (**509 ns** vs `606–836 ns`).
+**Why the gap grows (`O(bytes)` vs `O(objects)`):** holding payload size fixed inside L1d
+(`Flat-3KB → Rich-3KB`), XOffset scales only with bytes (`124 → 165 ns`), while `zpp::bits`
+widens to **12x–39x** and `FlatBuffers` to **46x–57x**.
+
+**Across other workloads** ([docs/PERFORMANCE.md](docs/PERFORMANCE.md)):
+- **Classic CppCon 2024 flat `Character` (~3 KB)**: **121 ns** vs `775–18,840 ns` (`6.4x–156x`);
+  full check **386 ns** (`2.0x` `zpp::bits`) / **508 ns** fresh (`4.3x`); read/write **310 ns**
+  (tuned `123 ns`, `cista raw` `122 ns`).
+- **Read-only zero-copy `view` (`Rich-12KB`)**: **249 ns** trusted / **1,591 ns** bounds-checked
+  vs `10,017–43,395 ns` (`Cap'n Proto`, `cista`, `FlatBuffers`).
+- **SLG server scorecard & memory**: **17 wins, 2 ties, 0 losses** across 19 cells (deltas,
+  shared viewports, uplink); lowest single-process RSS (**538 MiB**, `0.92x` Protobuf).
+- **Size, churn & tradeoffs**: trusted wins from **68 B to 729 KB** and after **100k random
+  edits**; only full validation below `78 B` is narrowly slower (`1.07x` at `68 B`), and
+  uncompressed wire is `1.1–1.45x` `zpp::bits` (`1.00–1.12x` after zstd-3).
 
 ## Use it
 
