@@ -5,6 +5,9 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- `try_save_verified` / `try_save_verified_into` / `save_verified_into` on an empty buffer (moved from)
+  crashed while resolving its owner; they now refuse it with `XErrc::no_root`, as `save_verified` does
+  (`xoffset_verified_paths.hpp`).
 - New document `docs/GAME_SERVER_ARCHITECTURE.md` and example `examples/game_server`: an SLG / MMO back
   end in one program (gateway with the schema handshake and frame cap, logic shards on their own threads
   owning one buffer per player, city and alliance, a KV store of raw saves, key delta at login and small
