@@ -230,7 +230,10 @@ else:
 
 ## 8. What the example leaves out
 
-The example keeps the program small and deterministic; a production back end adds:
+The example keeps the program small and deterministic. [`demo/gameserver`](../demo/gameserver/README.md)
+runs the same design as separate processes over TCP, with Redis as the store, session resume, heartbeats,
+rate limits, migration between nodes and a load generator, and reports latency and throughput. A
+production back end adds:
 
 - **Network**: sockets with length-prefixed frames ([`examples/server_to_client.cpp`](../examples/server_to_client.cpp)
   shows framing), TLS on client links, mTLS or a private network on server links.

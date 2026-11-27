@@ -5,6 +5,13 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- New demo `demo/gameserver` (`-DXOFFSET_BUILD_GAMESERVER_DEMO=ON`, Linux and macOS): the game server design
+  of `docs/GAME_SERVER_ARCHITECTURE.md` as separate processes over TCP: a gateway (schema handshake,
+  sessions with resume tokens, heartbeats, rate limits, routing through a directory in Redis), logic
+  nodes (an IO thread, shard threads owning one buffer per entity, write-behind saves of arena images to
+  Redis, migration and alliance requests between nodes), and a load generator with latency percentiles,
+  session resumes, migrations, hostile-client checks and a final check of the saves against the client
+  replicas. CTest `gameserver_demo` when `redis-server` is installed. No library change.
 - New document `docs/GAME_SERVER_ARCHITECTURE.md` and example `examples/game_server`: an SLG / MMO back
   end in one program (gateway with the schema handshake and frame cap, logic shards on their own threads
   owning one buffer per player, city and alliance, a KV store of raw saves, key delta at login and small
