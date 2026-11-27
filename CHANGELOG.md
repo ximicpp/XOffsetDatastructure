@@ -5,6 +5,18 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+## 2.0.0-preview.5: MSVC builds again, record elements checked in the loop without exceptions
+
+Fifth preview of 2.0.0: the API, the wire format and the delta format may still change until the
+final 2.0.0. Wire 3.0 and Delta 2.0 are unchanged from 2.0.0-preview.4, so all five previews
+interoperate; use the same schemas on both ends. Published without the full release gate and the fuzz
+run, as for every preview; GCC 16 and P2996 ran again on the release commit.
+
+- MSVC 19.44 (C++20 and C++23 field-list builds) works again: since 2.0.0-preview.2 it instantiated
+  a discarded branch of the member type check (`explain_member_types`, `xoffset_wire.hpp`), so the
+  configure probe failed. The member type walk now dispatches by partial specialization (#374).
+- README: the example says that `create(4096)` is the initial size, not a limit (the buffer grows up to
+  the default 64 MiB cap) (#375).
 - Without exceptions, a record element of a vector or array is checked in the element loop again
   (`validate_wire_element`, `xoffset_wire.hpp`). 2.0.0-preview.3 left it a call per element with
   P2996 Clang: the full check of the demo's `ViewSnapshot` took 1.2x to 1.45x the instructions of

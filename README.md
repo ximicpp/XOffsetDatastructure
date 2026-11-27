@@ -1,6 +1,6 @@
 # XOffsetDatastructure
 
-**2.0.0-preview.4** · C++20 / C++26 · header-only · 64-bit little-endian
+**2.0.0-preview.5** · C++20 / C++26 · header-only · 64-bit little-endian
 (preview: API and wire format may change before 2.0.0)
 
 C++ structs, strings, vectors and maps live in one buffer that uses relative offsets.
@@ -46,7 +46,7 @@ close to the fastest (tuned code: XOffset 123 ns, cista raw 122 ns).
 ```cmake
 include(FetchContent)
 FetchContent_Declare(xoffsetdatastructure
-    URL https://github.com/ximicpp/XOffsetDatastructure/archive/refs/tags/v2.0.0-preview.4.tar.gz)
+    URL https://github.com/ximicpp/XOffsetDatastructure/archive/refs/tags/v2.0.0-preview.5.tar.gz)
 FetchContent_MakeAvailable(xoffsetdatastructure)
 target_link_libraries(my_app PRIVATE XOffset::xoffset)
 ```
