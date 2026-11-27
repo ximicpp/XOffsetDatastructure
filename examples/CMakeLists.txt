@@ -50,3 +50,12 @@ foreach(use_case server_to_client client_uplink server_to_server)
         set_tests_properties(example_${use_case} example_${use_case}_noexc PROPERTIES LABELS "examples")
     endif()
 endforeach()
+
+# A game server in one process: gateway, logic shards on their own threads,
+# storage and clients (docs/GAME_SERVER_ARCHITECTURE.md).
+add_executable(game_server game_server/game_server.cpp)
+configure_xoffset_target(game_server)
+if(XOFFSET_BUILD_TESTS)
+    add_test(NAME example_game_server COMMAND game_server)
+    set_tests_properties(example_game_server PROPERTIES LABELS "examples")
+endif()

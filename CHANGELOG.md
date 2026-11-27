@@ -5,6 +5,12 @@ of this file and in the pull requests.
 
 ## Unreleased
 
+- New document `docs/GAME_SERVER_ARCHITECTURE.md` and example `examples/game_server`: an SLG / MMO back
+  end in one program (gateway with the schema handshake and frame cap, logic shards on their own threads
+  owning one buffer per player, city and alliance, a KV store of raw saves, key delta at login and small
+  deltas after, a cross-shard request by id, migration, a release-1 client and save against release-2
+  servers). Runs under CTest as `example_game_server`. No library change.
+
 ## 2.0.0-preview.6: README and getting-started updates
 
 Sixth preview of 2.0.0: the API, the wire format and the delta format may still change until the
